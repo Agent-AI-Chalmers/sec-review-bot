@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.local/contracts/schemas/v4/repository-review-input.schema.json",
+  "title": "Contract v4 repository-review input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "input_bundle_uri",
+    "review_intent",
+    "scan_target",
+    "scan_scope"
+  ],
+  "allOf": [
+    {
+      "properties": {
+        "review_intent": {
+          "type": "object",
+          "properties": {
+            "objective": {
+              "const": "audit"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scan_target": {
+            "type": "object",
+            "properties": {
+              "scan_mode": {
+                "const": "full"
+              }
+            },
+            "required": [
+              "scan_mode"
+            ]
+          }
+        },
+        "required": [
+          "scan_target"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scan_target": {
+            "type": "object",
+            "properties": {
+              "base_sha": {
+                "const": null
+              },
+              "commit_shas": {
+                "type": "array",
+                "maxItems": 0
+              }
+            }
+          },
+          "scan_scope": {
+            "type": "object",
+            "properties": {
+              "incremental_changed_files": {
+                "type": "array",
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scan_target": {
+            "type": "object",
+            "properties": {
+              "scan_mode": {
+                "const": "incremental"
+              }
+            },
+            "required": [
+              "scan_mode"
+            ]
+          }
+        },
+        "required": [
+          "scan_target"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scan_target": {
+            "type": "object",
+            "properties": {
+              "base_sha": {
+                "type": "string",
+                "minLength": 1
+              },
+              "commit_shas": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "v4"
+    },
+    "input_bundle_uri": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_intent": {
+      "$ref": "common.schema.json#/$defs/reviewIntent"
+    },
+    "scan_target": {
+      "$ref": "common.schema.json#/$defs/scanTarget"
+    },
+    "scan_scope": {
+      "$ref": "common.schema.json#/$defs/scanScope"
+    }
+  }
+}

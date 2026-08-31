@@ -1,0 +1,1 @@
+MITIGATION_AGENT_MCP_TOOLS = ("codegraph",)

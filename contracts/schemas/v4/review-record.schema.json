@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.local/contracts/schemas/v4/review-record.schema.json",
+  "title": "Contract v4 ReviewRecord",
+  "$ref": "common.schema.json#/$defs/reviewRecord"
+}

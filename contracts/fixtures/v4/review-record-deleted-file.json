@@ -1,0 +1,41 @@
+{
+  "analysis": {
+    "verdict": "confirmed-defect",
+    "overview": "A committed debug endpoint exposes runtime environment details.",
+    "narratives": []
+  },
+  "mitigation": {
+    "overview": "Remove the debug endpoint file.",
+    "changed_files": [
+      "src/debug-endpoint.ts"
+    ],
+    "file_changes": [
+      {
+        "path": "src/debug-endpoint.ts",
+        "status": "deleted"
+      }
+    ],
+    "patch_diff": "diff --git a/src/debug-endpoint.ts b/src/debug-endpoint.ts\ndeleted file mode 100644"
+  },
+  "verification": {
+    "overview": "The route registration no longer imports the deleted debug endpoint.",
+    "review_target_claim": "Debug-only environment disclosure must not be reachable in production.",
+    "validation_level": "static",
+    "patch_coverage": "full",
+    "regression_status": "not-run",
+    "resolution_next_step": "none",
+    "patch_findings": [
+      "The debug endpoint file is deleted."
+    ],
+    "verification_findings": [],
+    "residual_risks": []
+  },
+  "cvss": {
+    "outcome": "not-scored",
+    "base_score": null,
+    "severity": null,
+    "vector": null,
+    "overview": null,
+    "not_scored_reason": "The finding is tracked as a defect rather than a vulnerability."
+  }
+}

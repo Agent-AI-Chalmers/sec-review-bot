@@ -1,0 +1,307 @@
+openapi: 3.0.3
+info:
+  title: Book Shop API scan seed
+  version: "1.0"
+servers:
+  - url: http://localhost:3001
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          example: admin@example.com
+        password:
+          type: string
+          example: password123
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        name:
+          type: string
+          example: ZAP User
+        email:
+          type: string
+          example: zapuser@example.test
+        password:
+          type: string
+          example: zapPassword123!
+    ProfileUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: ZAP Reader
+        email:
+          type: string
+          example: zapreader@example.test
+        isAdmin:
+          type: boolean
+          example: true
+        balance:
+          type: number
+          example: 999.0
+    TopUpRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+          example: 50
+    CheckoutRequest:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+          example: []
+        total:
+          type: number
+          example: 49.99
+    ReviewDeleteRequest:
+      type: object
+      required: [reviewId]
+      properties:
+        reviewId:
+          type: string
+          example: cm123review
+    SearchRequest:
+      type: object
+      properties:
+        q:
+          type: string
+          example: code
+    AvatarUploadRequest:
+      type: object
+      properties:
+        avatar:
+          type: string
+          format: binary
+    AssetRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          example: atomic-habits.png
+    LogRequest:
+      type: object
+      properties:
+        dir:
+          type: string
+          example: logs
+        file:
+          type: string
+          example: app.log
+    ExportRequest:
+      type: object
+      properties:
+        filename:
+          type: string
+          example: orders_report
+        format:
+          type: string
+          example: csv
+paths:
+  /api/auth/register:
+    post:
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created.
+  /api/auth/login:
+    post:
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated session.
+  /api/users/profile:
+    get:
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current profile.
+    patch:
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdateRequest"
+      responses:
+        "200":
+          description: Profile updated.
+  /api/users/topup:
+    post:
+      operationId: topUp
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TopUpRequest"
+      responses:
+        "200":
+          description: Balance updated.
+  /api/users/avatar:
+    post:
+      operationId: uploadAvatar
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AvatarUploadRequest"
+      responses:
+        "200":
+          description: Avatar uploaded.
+  /api/orders/history:
+    get:
+      operationId: orderHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+          example: cluid123
+      responses:
+        "200":
+          description: Order history.
+  /api/orders/checkout:
+    post:
+      operationId: checkout
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutRequest"
+      responses:
+        "200":
+          description: Checkout complete.
+  /api/books/search:
+    get:
+      operationId: searchBooks
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          example: code
+      responses:
+        "200":
+          description: Search results.
+  /api/books/{id}/reviews:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: cm123book
+    get:
+      operationId: listReviews
+      responses:
+        "200":
+          description: Review list.
+    delete:
+      operationId: deleteReview
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewDeleteRequest"
+      responses:
+        "200":
+          description: Review deleted.
+  /api/assets:
+    get:
+      operationId: assetRead
+      parameters:
+        - name: file
+          in: query
+          required: true
+          schema:
+            type: string
+          example: atomic-habits.png
+      responses:
+        "200":
+          description: Asset content.
+  /api/admin/logs:
+    get:
+      operationId: readLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: dir
+          in: query
+          schema:
+            type: string
+          example: logs
+        - name: file
+          in: query
+          schema:
+            type: string
+          example: app.log
+      responses:
+        "200":
+          description: Log listing or content.
+  /api/admin/export:
+    post:
+      operationId: exportReport
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportRequest"
+      responses:
+        "200":
+          description: Export completed.
+  /api/admin/reports:
+    get:
+      operationId: readReports
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Reports list.

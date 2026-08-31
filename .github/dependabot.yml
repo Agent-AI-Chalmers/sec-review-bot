@@ -1,0 +1,58 @@
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/apps/github-integration"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Shanghai"
+    groups:
+      github-integration:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
+
+  - package-ecosystem: "uv"
+    directory: "/agents"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Shanghai"
+    groups:
+      python-tooling:
+        patterns:
+          - "ruff"
+          - "black"
+          - "mypy"
+          - "pyright"
+          - "pytest"
+          - "pytest-asyncio"
+      agents-runtime:
+        patterns:
+          - "deepagents"
+          - "langchain*"
+          - "langgraph"
+          - "langfuse"
+          - "google-genai"
+          - "anthropic"
+          - "openai"
+          - "mcp"
+          - "temporalio"
+          - "opentelemetry-*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Shanghai"

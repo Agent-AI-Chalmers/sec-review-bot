@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.local/contracts/schemas/v4/repository-review-result.schema.json",
+  "title": "Contract v4 repository-review result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "scan_summary",
+    "case_results",
+    "deliveries"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "v4"
+    },
+    "scan_summary": {
+      "$ref": "common.schema.json#/$defs/scanSummary"
+    },
+    "case_results": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/repositoryCaseResult"
+      }
+    },
+    "deliveries": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/repositoryDelivery"
+      }
+    }
+  }
+}

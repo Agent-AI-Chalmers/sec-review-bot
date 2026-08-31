@@ -1,0 +1,110 @@
+name: Sec Review Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: 'Scan mode: full or incremental'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - incremental
+      base_sha:
+        description: 'Required for manual incremental: base commit SHA (7-40 hex chars)'
+        required: false
+        default: ''
+        type: string
+      head_sha:
+        description: 'Optional for manual incremental: head commit SHA (defaults to current branch HEAD)'
+        required: false
+        default: ''
+        type: string
+      repair_mode:
+        description: 'Repair mode for generated fixes'
+        required: false
+        default: 'test-changes-allowed'
+        type: choice
+        options:
+          - test-changes-allowed
+          - no-test-changes
+  # Schedule trigger (optional)
+  # To enable, uncomment the schedule section below (GitHub Actions uses UTC)
+  # schedule:
+  #   - cron: '0 3 * * 1'  # Weekly on Monday at 03:00 UTC
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build dispatch payload
+        env:
+          EVENT_SCHEDULE: ${{ github.event.schedule || '' }}
+          TARGET_BRANCH: ${{ github.ref_name }}
+          INPUT_SCAN_MODE: ${{ github.event.inputs.scan_mode || '' }}
+          INPUT_BASE_SHA: ${{ github.event.inputs.base_sha || '' }}
+          INPUT_HEAD_SHA: ${{ github.event.inputs.head_sha || '' }}
+          INPUT_REPAIR_MODE: ${{ github.event.inputs.repair_mode || '' }}
+        run: |
+          set -euo pipefail
+          event_type="manual"
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            event_type="scheduled"
+          fi
+          jq -nc \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg target_branch "$TARGET_BRANCH" \
+            --arg scan_mode "$INPUT_SCAN_MODE" \
+            --arg base_sha "$INPUT_BASE_SHA" \
+            --arg head_sha "$INPUT_HEAD_SHA" \
+            --arg event_type "$event_type" \
+            --arg schedule "$EVENT_SCHEDULE" \
+            --arg repair_mode "$INPUT_REPAIR_MODE" \
+            --arg correlation_id "$GITHUB_RUN_ID" \
+            '{
+              repo_full_name: $repo,
+              target_branch: $target_branch,
+              scan_mode: $scan_mode,
+              base_sha: $base_sha,
+              head_sha: $head_sha,
+              event_type: $event_type,
+              schedule: $schedule,
+              repair_mode: $repair_mode,
+              correlation_id: $correlation_id
+            }' > payload.json
+
+      - name: Request OIDC token
+        id: oidc
+        run: |
+          set -euo pipefail
+          token="$(
+            curl --fail-with-body \
+              -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sec-review-bot" \
+              | jq -r '.value'
+          )"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "GitHub Actions OIDC token response did not include a token." >&2
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch repository security review
+        env:
+          DISPATCH_URL: ${{ secrets.SEC_BOT_DISPATCH_URL }}
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          # This calls the bot's repository-review dispatch endpoint,
+          # not the GitHub App webhook endpoint.
+          curl --fail-with-body \
+            -X POST \
+            -H "content-type: application/json" \
+            -H "x-sec-review-bot-oidc-token: $OIDC_TOKEN" \
+            --data-binary @payload.json \
+            "$DISPATCH_URL"

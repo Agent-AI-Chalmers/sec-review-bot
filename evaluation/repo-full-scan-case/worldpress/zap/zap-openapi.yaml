@@ -1,0 +1,471 @@
+openapi: 3.0.3
+info:
+  title: WorldPress API scan seed
+  version: "1.0"
+servers:
+  - url: http://localhost:5000
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          example: admin123
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: zapuser
+        password:
+          type: string
+          example: zapPassword123!
+        email:
+          type: string
+          example: zapuser@example.test
+    UpdateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          example: zapeditor
+        email:
+          type: string
+          example: zapeditor@example.test
+        password:
+          type: string
+          example: zapPassword123!
+        role:
+          type: string
+          example: editor
+        bio:
+          type: string
+          example: ZAP seeded bio
+    CreatePostRequest:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+          example: ZAP seed post
+        content:
+          type: string
+          example: ZAP seed content
+        excerpt:
+          type: string
+          example: ZAP seed excerpt
+        status:
+          type: string
+          example: draft
+        category:
+          type: string
+          example: General
+        tags:
+          type: string
+          example: security,zap
+    UpdatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Updated ZAP seed post
+        content:
+          type: string
+          example: Updated ZAP seed content
+        excerpt:
+          type: string
+          example: Updated excerpt
+        status:
+          type: string
+          example: published
+        category:
+          type: string
+          example: General
+        tags:
+          type: string
+          example: security,zap
+    CommentRequest:
+      type: object
+      required: [content]
+      properties:
+        author:
+          type: string
+          example: ZAP User
+        email:
+          type: string
+          example: zapuser@example.test
+        content:
+          type: string
+          example: ZAP seed comment
+    UploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+    ThumbnailRequest:
+      type: object
+      required: [filename]
+      properties:
+        filename:
+          type: string
+          example: sample.png
+        size:
+          type: string
+          example: 150x150
+    SettingsImportRequest:
+      type: object
+      properties:
+        data:
+          type: string
+          example: gASV...
+    FetchUrlRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          example: http://example.com
+paths:
+  /api/health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          description: Health status.
+  /api/auth/login:
+    post:
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated session.
+  /api/auth/logout:
+    post:
+      operationId: logout
+      responses:
+        "200":
+          description: Logged out.
+  /api/auth/me:
+    get:
+      operationId: me
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user.
+  /api/auth/register:
+    post:
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created.
+  /api/users:
+    get:
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User list.
+  /api/users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        example: 1
+    get:
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile.
+    put:
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: User updated.
+    delete:
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User deleted.
+  /api/users/export:
+    get:
+      operationId: exportUsers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: CSV export.
+  /api/posts:
+    get:
+      operationId: listPosts
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          example: security
+        - name: category
+          in: query
+          schema:
+            type: string
+          example: General
+        - name: status
+          in: query
+          schema:
+            type: string
+          example: published
+      responses:
+        "200":
+          description: Post list.
+    post:
+      operationId: createPost
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: Post created.
+  /api/posts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        example: 1
+    get:
+      operationId: getPost
+      responses:
+        "200":
+          description: Post detail.
+    put:
+      operationId: updatePost
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePostRequest"
+      responses:
+        "200":
+          description: Post updated.
+    delete:
+      operationId: deletePost
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Post deleted.
+  /api/posts/{id}/comments:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        example: 1
+    get:
+      operationId: getComments
+      responses:
+        "200":
+          description: Comment list.
+    post:
+      operationId: addComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentRequest"
+      responses:
+        "201":
+          description: Comment created.
+  /api/media:
+    get:
+      operationId: listMedia
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Media list.
+  /api/media/upload:
+    post:
+      operationId: uploadFile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadRequest"
+      responses:
+        "201":
+          description: File uploaded.
+  /api/media/download:
+    get:
+      operationId: downloadFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: file
+          in: query
+          required: true
+          schema:
+            type: string
+          example: sample.png
+      responses:
+        "200":
+          description: File download.
+  /api/media/preview:
+    get:
+      operationId: previewFile
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          example: sample.png
+      responses:
+        "200":
+          description: File preview.
+  /api/media/thumbnail:
+    post:
+      operationId: generateThumbnail
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ThumbnailRequest"
+      responses:
+        "200":
+          description: Thumbnail generated.
+  /api/media/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        example: 1
+    delete:
+      operationId: deleteMedia
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File deleted.
+  /api/settings:
+    get:
+      operationId: getSettings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings document.
+    put:
+      operationId: updateSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        "200":
+          description: Settings updated.
+  /api/settings/fetch-url:
+    post:
+      operationId: fetchRemoteResource
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FetchUrlRequest"
+      responses:
+        "200":
+          description: Remote response fetched.
+  /api/settings/import:
+    post:
+      operationId: importSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsImportRequest"
+      responses:
+        "200":
+          description: Settings imported.
+  /api/settings/import-xml:
+    post:
+      operationId: importXml
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: XML imported.

@@ -1,0 +1,55 @@
+{
+  "contract_version": "v4",
+  "scan_summary": {
+    "scannable_file_count": 8,
+    "scanned_file_count": 8,
+    "skipped_file_count": 0,
+    "candidate_count": 1,
+    "case_count": 1,
+    "suppressed_candidate_count": 0
+  },
+  "case_results": [
+    {
+      "case_id": "case-blocked-1",
+      "disposition": "blocked",
+      "reason": "The fix requires credential rotation outside the repository workspace.",
+      "review_record": {
+        "analysis": {
+          "verdict": "confirmed-vulnerability",
+          "overview": "A production token was committed to repository history.",
+          "narratives": []
+        },
+        "mitigation": {
+          "overview": "No repository patch can rotate the exposed credential.",
+          "changed_files": [],
+          "file_changes": [],
+          "patch_diff": null
+        },
+        "verification": {
+          "overview": "The required remediation is an external secret rotation and history cleanup.",
+          "review_target_claim": "Committed production tokens must be revoked and removed from history.",
+          "validation_level": "static",
+          "patch_coverage": "unresolved",
+          "regression_status": "not-applicable",
+          "resolution_next_step": "manual-review",
+          "patch_findings": [],
+          "verification_findings": [
+            "No workspace-only patch can revoke the credential."
+          ],
+          "residual_risks": [
+            "The token may remain valid until rotated by an administrator."
+          ]
+        },
+        "cvss": {
+          "outcome": "scored",
+          "base_score": 8.1,
+          "severity": "high",
+          "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
+          "overview": "Authenticated repository readers can recover a production token.",
+          "not_scored_reason": null
+        }
+      }
+    }
+  ],
+  "deliveries": []
+}

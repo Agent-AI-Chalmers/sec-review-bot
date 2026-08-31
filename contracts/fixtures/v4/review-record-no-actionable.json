@@ -1,0 +1,27 @@
+{
+  "analysis": {
+    "verdict": "no-actionable-finding",
+    "overview": "The reported redirect path already validates same-origin targets.",
+    "narratives": []
+  },
+  "mitigation": {
+    "overview": null,
+    "changed_files": [],
+    "file_changes": [],
+    "patch_diff": null
+  },
+  "verification": {
+    "overview": "No patch is required because the reviewed path rejects external targets.",
+    "review_target_claim": "Callback redirects must not leave the trusted origin.",
+    "validation_level": "static",
+    "patch_coverage": "not-applicable",
+    "regression_status": "not-applicable",
+    "resolution_next_step": "none",
+    "patch_findings": [],
+    "verification_findings": [
+      "The existing allowlist check runs before redirect response creation."
+    ],
+    "residual_risks": []
+  },
+  "cvss": null
+}

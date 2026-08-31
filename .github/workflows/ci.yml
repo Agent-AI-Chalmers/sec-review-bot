@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "assets/**"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "assets/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      github-integration: ${{ steps.filter.outputs.github-integration }}
+      agents: ${{ steps.filter.outputs.agents }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Detect changed areas
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            github-integration:
+              - 'apps/github-integration/**'
+              - '.github/dependabot.yml'
+              - '.github/workflows/ci.yml'
+            agents:
+              - 'agents/**'
+              - '.github/dependabot.yml'
+              - '.github/workflows/ci.yml'
+
+  github-integration:
+    name: GitHub Integration
+    needs: changes
+    if: needs.changes.outputs.github-integration == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/github-integration
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: apps/github-integration/package.json
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: apps/github-integration/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: apps/github-integration/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm test
+
+  agents:
+    name: Agents
+    needs: changes
+    if: needs.changes.outputs.agents == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agents
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: agents/.python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.10.9"
+          enable-cache: true
+          cache-dependency-glob: agents/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --group dev --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run black --check .
+
+      - name: Typecheck
+        run: uv run mypy .
+
+      - name: Pyright
+        run: uv run pyright .
+
+      - name: Test
+        run: uv run python -m pytest
+
+  ci-status:
+    name: CI Status
+    needs:
+      - changes
+      - github-integration
+      - agents
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # Use this aggregate job as the required branch-protection check.
+      - name: Check CI result
+        env:
+          GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
+          AGENTS_RESULT: ${{ needs.agents.result }}
+        run: |
+          set -euo pipefail
+          for result in "$GITHUB_INTEGRATION_RESULT" "$AGENTS_RESULT"; do
+            case "$result" in
+              success|skipped)
+                ;;
+              *)
+                echo "A required CI job did not pass. Result: $result" >&2
+                exit 1
+                ;;
+            esac
+          done

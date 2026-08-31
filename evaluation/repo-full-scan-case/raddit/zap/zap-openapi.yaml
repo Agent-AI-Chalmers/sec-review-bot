@@ -1,0 +1,449 @@
+openapi: 3.0.3
+info:
+  title: Raddit API scan seed
+  version: "1.0"
+servers:
+  - url: http://localhost:8080
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          example: admin123
+        next:
+          type: string
+          example: /
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: zapuser
+        email:
+          type: string
+          example: zapuser@example.test
+        password:
+          type: string
+          example: zapPassword123!
+    CreatePostRequest:
+      type: object
+      required: [title, content, subreddit]
+      properties:
+        title:
+          type: string
+          example: ZAP seed post
+        content:
+          type: string
+          example: ZAP seed content
+        subreddit:
+          type: string
+          example: security
+    UpdatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Updated ZAP seed post
+        content:
+          type: string
+          example: Updated ZAP seed content
+    CreateCommentRequest:
+      type: object
+      required: [content, post_id]
+      properties:
+        content:
+          type: string
+          example: ZAP seed comment
+        post_id:
+          type: integer
+          example: 1
+        parent_id:
+          type: integer
+          nullable: true
+          example: null
+    UpdateProfileRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          example: zapuser@example.test
+        bio:
+          type: string
+          example: ZAP seeded profile
+        avatar:
+          type: string
+          example: https://example.test/avatar.png
+        password:
+          type: string
+          example: zapPassword123!
+        role:
+          type: string
+          example: user
+    VoteRequest:
+      type: object
+      required: [vote_type]
+      properties:
+        vote_type:
+          type: string
+          enum: [up, down]
+          example: up
+paths:
+  /health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          description: Health status.
+  /api/auth/register:
+    post:
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created.
+  /api/auth/login:
+    post:
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated session.
+  /api/auth/logout:
+    get:
+      operationId: logout
+      parameters:
+        - name: next
+          in: query
+          schema:
+            type: string
+          example: /
+      responses:
+        "200":
+          description: Logged out.
+  /api/auth/me:
+    get:
+      operationId: me
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user.
+  /api/posts:
+    get:
+      operationId: listPosts
+      parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+          example: p.created_at
+        - name: order
+          in: query
+          schema:
+            type: string
+          example: DESC
+      responses:
+        "200":
+          description: Post list.
+    post:
+      operationId: createPost
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: Post created.
+  /api/posts/search:
+    get:
+      operationId: searchPosts
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          example: security
+      responses:
+        "200":
+          description: Search results.
+  /api/posts/preview:
+    get:
+      operationId: previewUrl
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+          example: http://example.com
+      responses:
+        "200":
+          description: URL preview.
+  /api/posts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        example: 1
+    get:
+      operationId: getPost
+      responses:
+        "200":
+          description: Post detail.
+    put:
+      operationId: updatePost
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePostRequest"
+      responses:
+        "200":
+          description: Post updated.
+    delete:
+      operationId: deletePost
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Post deleted.
+  /api/posts/{id}/comments:
+    get:
+      operationId: listComments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Comments.
+  /api/posts/{id}/vote:
+    post:
+      operationId: votePost
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteRequest"
+      responses:
+        "200":
+          description: Vote recorded.
+  /api/comments:
+    post:
+      operationId: createComment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: Comment created.
+  /api/comments/{id}:
+    delete:
+      operationId: deleteComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Comment deleted.
+  /api/users/{id}:
+    get:
+      operationId: getUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: User profile.
+  /api/users/{id}/posts:
+    get:
+      operationId: getUserPosts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: User posts.
+  /api/users/profile:
+    put:
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated.
+  /api/files/upload:
+    post:
+      operationId: uploadFile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: File uploaded.
+  /api/files/download:
+    get:
+      operationId: downloadFile
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+          example: example.txt
+      responses:
+        "200":
+          description: File content.
+  /api/files/list:
+    get:
+      operationId: listFiles
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File list.
+  /api/tools/ping:
+    get:
+      operationId: ping
+      parameters:
+        - name: host
+          in: query
+          required: true
+          schema:
+            type: string
+          example: 127.0.0.1
+      responses:
+        "200":
+          description: Ping output.
+  /api/tools/nslookup:
+    get:
+      operationId: nslookup
+      parameters:
+        - name: host
+          in: query
+          required: true
+          schema:
+            type: string
+          example: localhost
+      responses:
+        "200":
+          description: nslookup output.
+  /api/admin/dashboard:
+    get:
+      operationId: adminDashboard
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin dashboard.
+  /api/admin/debug:
+    get:
+      operationId: adminDebug
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Debug data.
+  /api/admin/users:
+    get:
+      operationId: adminUsers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User list.
+  /api/admin/users/{id}:
+    delete:
+      operationId: adminDeleteUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 2
+      responses:
+        "200":
+          description: User deleted.

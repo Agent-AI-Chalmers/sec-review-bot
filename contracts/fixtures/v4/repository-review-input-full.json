@@ -1,0 +1,23 @@
+{
+  "contract_version": "v4",
+  "input_bundle_uri": "/tmp/sec-review-fixtures/repository-review-full",
+  "review_intent": {
+    "objective": "audit"
+  },
+  "scan_target": {
+    "target_branch": "main",
+    "default_branch": "main",
+    "event_type": "manual",
+    "scan_mode": "full",
+    "base_sha": null,
+    "head_sha": "1111111111111111111111111111111111111111",
+    "commit_shas": []
+  },
+  "scan_scope": {
+    "max_file_bytes": 200000,
+    "paths_ignore": [
+      "dist/**"
+    ],
+    "incremental_changed_files": []
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "contract_version": "v4",
+  "review_record": {
+    "analysis": {
+      "verdict": "confirmed-vulnerability",
+      "overview": "Webhook retry payloads can reuse stale signature metadata.",
+      "narratives": []
+    },
+    "mitigation": {
+      "overview": "Recompute the signature metadata before enqueueing retry payloads.",
+      "changed_files": [
+        "src/webhook.ts"
+      ],
+      "file_changes": [],
+      "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()"
+    },
+    "verification": {
+      "overview": "The patch covers the retry enqueue path.",
+      "review_target_claim": "Retry payloads must be signed with current metadata.",
+      "validation_level": "static",
+      "patch_coverage": "full",
+      "regression_status": "not-run",
+      "resolution_next_step": "none",
+      "patch_findings": [],
+      "verification_findings": [],
+      "residual_risks": []
+    },
+    "cvss": {
+      "outcome": "scored",
+      "base_score": 5.8,
+      "severity": "medium",
+      "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
+      "overview": "Authenticated users can replay stale webhook retry payloads.",
+      "not_scored_reason": null
+    }
+  }
+}

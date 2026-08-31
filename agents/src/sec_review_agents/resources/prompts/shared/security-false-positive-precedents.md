@@ -1,0 +1,6 @@
+# Common False-Positive Precedents
+
+- Treat generic hardening gaps, best-practice omissions, policy preferences, and security-posture improvements as non-actionable unless repository evidence shows a concrete attacker-influenced path to a security-relevant effect.
+- Do not treat missing client-side authentication, authorization, or validation as a vulnerability by itself. Client-side code is not a trusted enforcement boundary; continue only when repository evidence links the client-side behavior to an authoritative server-side trust failure, sensitive state change, dangerous sink, or exposed protected operation.
+- Do not treat ordinary React, Angular, or similar framework text interpolation as XSS by itself. Continue XSS analysis only when repository evidence shows an unsafe HTML/script sink or framework escape hatch, such as `dangerouslySetInnerHTML`, trust-bypass APIs, direct DOM HTML insertion, unsafe template rendering, or an equivalent repository-specific sink.
+- Do not treat logging, documentation, schema-shape, UI visibility, local storage, rate limiting, or resource-use concerns as actionable vulnerabilities unless the checked repository path shows sensitive data exposure, privilege or trust-boundary impact, dangerous operation reachability, or another concrete confidentiality, integrity, or availability effect.

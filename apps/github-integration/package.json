@@ -1,0 +1,44 @@
+{
+  "name": "@sec-review-bot/github-integration",
+  "private": true,
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "bin": {
+    "sec-review-runner-runs": "dist/tools/runner-run-diagnostics.js"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "pnpm run clean && tsc -p tsconfig.json",
+    "server": "pnpm run build && node dist/app.js",
+    "dev": "sh -c 'rm -rf dist; tsc -w -p tsconfig.json & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT INT TERM; nodemon --watch dist --ext js,json --delay 200ms dist/app.js'",
+    "test": "rm -rf dist && node --import tsx --test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@octokit/webhooks": "^14.2.0",
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^17.4.2",
+    "jose": "^6.2.10",
+    "octokit": "^5.0.5",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.13.3",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
+    "@typescript-eslint/parser": "^8.68.0",
+    "ajv": "^8.20.0",
+    "eslint": "^10.9.1",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.23.12",
+    "typescript": "^6.0.3"
+  }
+}

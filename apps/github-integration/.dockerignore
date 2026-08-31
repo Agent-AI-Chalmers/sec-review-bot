@@ -1,0 +1,7 @@
+.git
+node_modules
+dist
+.agent-app-state
+.env
+*.pem
+*.log

@@ -1,0 +1,511 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.local/contracts/schemas/v4/common.schema.json",
+  "title": "Contract v4 common definitions",
+  "$defs": {
+    "repoRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "Repository-relative path only: rejects leading/trailing whitespace, absolute paths, Windows drive paths, backslashes, empty path segments, . or .. segments, and .git segments.",
+      "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)(?:\\.{1,2}|\\.git)(?:/|$))(?!.*\\s$).+$"
+    },
+    "reviewIntent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objective"
+      ],
+      "properties": {
+        "objective": {
+          "enum": [
+            "audit",
+            "repair"
+          ]
+        },
+        "repair_mode": {
+          "enum": [
+            "test-changes-allowed",
+            "no-test-changes"
+          ]
+        }
+      }
+    },
+    "fileChange": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "status",
+            "content",
+            "content_encoding"
+          ],
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/repoRelativePath"
+            },
+            "status": {
+              "const": "upsert"
+            },
+            "content": {
+              "type": "string"
+            },
+            "content_encoding": {
+              "enum": [
+                "utf-8",
+                "base64"
+              ]
+            },
+            "mode": {
+              "enum": [
+                "100644",
+                "100755"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "status"
+          ],
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/repoRelativePath"
+            },
+            "status": {
+              "const": "deleted"
+            }
+          }
+        }
+      ]
+    },
+    "reviewRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis",
+        "mitigation",
+        "verification",
+        "cvss"
+      ],
+      "properties": {
+        "analysis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "verdict",
+            "overview",
+            "narratives"
+          ],
+          "properties": {
+            "verdict": {
+              "enum": [
+                "no-actionable-finding",
+                "inconclusive",
+                "plausible-risk",
+                "confirmed-defect",
+                "confirmed-vulnerability",
+                null
+              ]
+            },
+            "overview": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "narratives": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "mitigation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "overview",
+            "changed_files",
+            "file_changes",
+            "patch_diff"
+          ],
+          "properties": {
+            "overview": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "changed_files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "file_changes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/fileChange"
+              }
+            },
+            "patch_diff": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "overview",
+            "review_target_claim",
+            "validation_level",
+            "patch_coverage",
+            "regression_status",
+            "resolution_next_step",
+            "patch_findings",
+            "verification_findings",
+            "residual_risks"
+          ],
+          "properties": {
+            "overview": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "review_target_claim": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "validation_level": {
+              "enum": [
+                "static",
+                "logic-simulated",
+                "runtime-partial",
+                "runtime-endpoint",
+                null
+              ]
+            },
+            "patch_coverage": {
+              "enum": [
+                "full",
+                "partial",
+                "local-only",
+                "unresolved",
+                "misaligned",
+                "no-patch",
+                "not-applicable",
+                null
+              ]
+            },
+            "regression_status": {
+              "enum": [
+                "passed",
+                "failed",
+                "not-run",
+                "not-applicable",
+                "unresolved",
+                null
+              ]
+            },
+            "resolution_next_step": {
+              "enum": [
+                "none",
+                "retry-ai",
+                "manual-review",
+                null
+              ]
+            },
+            "patch_findings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "verification_findings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "residual_risks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "cvss": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome",
+                "base_score",
+                "severity",
+                "vector",
+                "overview",
+                "not_scored_reason"
+              ],
+              "properties": {
+                "outcome": {
+                  "enum": [
+                    "scored",
+                    "not-scored",
+                    "skipped",
+                    null
+                  ]
+                },
+                "base_score": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 10
+                },
+                "severity": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "vector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "overview": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "not_scored_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "scanTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_branch",
+        "default_branch",
+        "event_type",
+        "scan_mode",
+        "base_sha",
+        "head_sha",
+        "commit_shas"
+      ],
+      "properties": {
+        "target_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "default_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_type": {
+          "enum": [
+            "manual",
+            "scheduled"
+          ]
+        },
+        "scan_mode": {
+          "enum": [
+            "full",
+            "incremental"
+          ]
+        },
+        "base_sha": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "head_sha": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit_shas": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "scanScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_file_bytes",
+        "paths_ignore",
+        "incremental_changed_files"
+      ],
+      "properties": {
+        "max_file_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "paths_ignore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "incremental_changed_files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "status",
+              "previous_path"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "type": "string",
+                "minLength": 1
+              },
+              "previous_path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "scanSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scannable_file_count",
+        "scanned_file_count",
+        "skipped_file_count",
+        "candidate_count",
+        "case_count",
+        "suppressed_candidate_count"
+      ],
+      "properties": {
+        "scannable_file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scanned_file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped_file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "case_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "suppressed_candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "repositoryCaseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "disposition",
+        "reason",
+        "review_record"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "review_record": {
+          "$ref": "#/$defs/reviewRecord"
+        }
+      }
+    },
+    "repositoryDelivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delivery_id",
+        "case_ids",
+        "file_changes"
+      ],
+      "properties": {
+        "delivery_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "file_changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileChange"
+          }
+        }
+      }
+    }
+  }
+}

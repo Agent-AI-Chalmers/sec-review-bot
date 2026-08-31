@@ -1,0 +1,376 @@
+{
+  "reports": {
+    "frontend": "zap-frontend-report.json",
+    "api": "zap-api-report.json"
+  },
+  "summary": {
+    "raw_alert_groups": 33,
+    "raw_alert_instances": 206,
+    "clean_alert_groups": 16,
+    "clean_alert_instances": 49
+  },
+  "alerts": [
+    {
+      "source": "api",
+      "pluginid": "10097",
+      "alert": "Hash Disclosure - BCrypt",
+      "risk": "High",
+      "riskdesc": "High (High)",
+      "risk_rank": 3,
+      "confidence": 3,
+      "instance_count": 1,
+      "urls": [
+        "http://localhost:8080/api/users/1"
+      ],
+      "params": [],
+      "attacks": [],
+      "evidence": [
+        "$2a$10$mqy.EAUx2SwmXWBpzjcCwuqPEreceFzlN4uJJAP/XUYhMglUODTqS"
+      ],
+      "description": "A hash was disclosed by the web server. - BCrypt",
+      "solution": "Ensure that hashes that are used to protect credentials or other resources are not leaked by the web server or database. There is typically no requirement for password hashes to be accessible to the web browser."
+    },
+    {
+      "source": "api",
+      "pluginid": "40018",
+      "alert": "SQL Injection",
+      "risk": "High",
+      "riskdesc": "High (Low)",
+      "risk_rank": 3,
+      "confidence": 1,
+      "instance_count": 1,
+      "urls": [
+        "http://localhost:8080/api/posts/search?q=security%27"
+      ],
+      "params": [
+        "q"
+      ],
+      "attacks": [
+        "security'"
+      ],
+      "evidence": [
+        "HTTP/1.1 500 Internal Server Error"
+      ],
+      "description": "SQL injection may be possible.",
+      "solution": "Do not trust client side input, even if there is client side validation in place. In general, type check all data on the server side. If the application uses JDBC, use PreparedStatement or CallableStatement, with parameters passed by '?' If the application uses ASP, use ADO Command Objects with strong type checking and parameterized queries. If database Stored Procedures can be used, use them. Do *not* concatenate strings into queries in the stored procedure, or use 'exec', 'exec immediate', or equivalent functionality! Do not create dynamic SQL queries using simple string concatenation. Escape all data received from the client. Apply an 'allow list' of allowed characters, or a 'deny list' of disallowed characters in user input. Apply the principle of least privilege by using the least privileged database user possible. In particular, avoid using the 'sa' or 'db-owner' database users. This does not eliminate SQL injection, but minimizes its impact. Grant the minimum database access that is necessary for the application."
+    },
+    {
+      "source": "api",
+      "pluginid": "90020",
+      "alert": "Remote OS Command Injection",
+      "risk": "High",
+      "riskdesc": "High (Medium)",
+      "risk_rank": 3,
+      "confidence": 2,
+      "instance_count": 1,
+      "urls": [
+        "http://localhost:8080/api/tools/ping?host=127.0.0.1%26cat+%2Fetc%2Fpasswd%26"
+      ],
+      "params": [
+        "host"
+      ],
+      "attacks": [
+        "127.0.0.1&cat /etc/passwd&"
+      ],
+      "evidence": [
+        "root:x:0:0"
+      ],
+      "description": "Attack technique used for unauthorized execution of operating system commands. This attack is possible when an application accepts untrusted input to build operating system commands in an insecure manner involving improper data sanitization, and/or improper calling of external programs.",
+      "solution": "If at all possible, use library calls rather than external processes to recreate the desired functionality. Run your code in a \"jail\" or similar sandbox environment that enforces strict boundaries between the process and the operating system. This may effectively restrict which files can be accessed in a particular directory or which commands can be executed by your software. OS-level examples include the Unix chroot jail, AppArmor, and SELinux. In general, managed code may provide some protection. For example, java.io.FilePermission in the Java SecurityManager allows you to specify restrictions on file operations. This may not be a feasible solution, and it only limits the impact to the operating system; the rest of your application may still be subject to compromise. For any data that will be used to generate a command to be executed, keep as much of that data out of external control as possible. For example, in web applications, this may require storing the command locally in the session's state instead of sending it out to the client in a hidden form field. Use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. For example, consider using the ESAPI Encoding control or a similar tool, library, or framework. These will help the programmer encode outputs in a manner less prone to error. If you need to use dynamically-generated query strings or commands in spite of the risk, properly quote arguments and escape any special characters within those arguments. The most conservative approach is to escape or filter all characters that do not pass an extremely strict allow list (such as everything that is not alphanumeric or white space). If some special characters are still needed, such as white space, wrap each argument in quotes after the escaping/filtering step. Be careful of argument injection. If the program to be executed allows arguments to be specified within an input file or from standard input, then consider using that mode to pass arguments instead of the command line. If available, use structured mechanisms that automatically enforce the separation between data and code. These mechanisms may be able to provide the relevant quoting, encoding, and validation automatically, instead of relying on the developer to provide this capability at every point where output is generated. Some languages offer multiple functions that can be used to invoke commands. Where possible, identify any function that invokes a command shell using a single string, and replace it with a function that requires individual arguments. These functions typically perform appropriate quoting and filtering of arguments. For example, in C, the system() function accepts a string that contains the entire command to be executed, whereas execl(), execve(), and others require an array of strings, one for each argument. In Windows, CreateProcess() only accepts one command at a time. In Perl, if system() is provided with an array of arguments, then it will quote each of the arguments. Assume all input is malicious. Use an \"accept known good\" input validation strategy, i.e., use an allow list of acceptable inputs that strictly conform to specifications. Reject any input that does not strictly conform to specifications, or transform it into something that does. Do not rely exclusively on looking for malicious or malformed inputs (i.e., do not rely on a deny list). However, deny lists can be useful for detecting potential attacks or determining which inputs are so malformed that they should be rejected outright. When performing input validation, consider all potentially relevant properties, including length, type of input, the full range of acceptable values, missing or extra inputs, syntax, consistency across related fields, and conformance to business rules. As an example of business rule logic, \"boat\" may be syntactically valid because it only contains alphanumeric characters, but it is not valid if you are expecting colors such as \"red\" or \"blue.\" When constructing OS command strings, use stringent allow lists that limit the character set based on the expected value of the parameter in the request. This will indirectly limit the scope of an attack, but this technique is less important than proper output encoding and escaping. Note that proper output encoding, escaping, and quoting is the most effective solution for preventing OS command injection, although input validation may provide some defense-in-depth. This is because it effectively limits what will appear in output. Input validation will not always prevent OS command injection, especially if you are required to support free-form text fields that could contain arbitrary characters. For example, when invoking a mail program, you might need to allow the subject field to contain otherwise-dangerous inputs like \";\" and \">\" characters, which would need to be escaped or otherwise handled. In this case, stripping the character might reduce the risk of OS command injection, but it would produce incorrect behavior because the subject field would not be recorded as the user intended. This might seem to be a minor inconvenience, but it could be more important when the program relies on well-structured subject lines in order to pass messages to other components. Even if you make a mistake in your validation (such as forgetting one out of 100 input fields), appropriate encoding is still likely to protect you from injection-based attacks. As long as it is not done in isolation, input validation is still a useful technique, since it may significantly reduce your attack surface, allow you to detect some attacks, and provide other security benefits that proper encoding does not address."
+    },
+    {
+      "source": "api",
+      "pluginid": "30002",
+      "alert": "Format String Error",
+      "risk": "Medium",
+      "riskdesc": "Medium (Medium)",
+      "risk_rank": 2,
+      "confidence": 2,
+      "instance_count": 1,
+      "urls": [
+        "http://localhost:8080/api/auth/register"
+      ],
+      "params": [
+        "password"
+      ],
+      "attacks": [
+        "ZAP%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s%n%s"
+      ],
+      "evidence": [],
+      "description": "A Format String error occurs when the submitted data of an input string is evaluated as a command by the application.",
+      "solution": "Rewrite the background program using proper deletion of bad character strings. This will require a recompile of the background executable."
+    },
+    {
+      "source": "frontend",
+      "pluginid": "10020",
+      "alert": "Missing Anti-clickjacking Header",
+      "risk": "Medium",
+      "riskdesc": "Medium (Medium)",
+      "risk_rank": 2,
+      "confidence": 2,
+      "instance_count": 4,
+      "urls": [
+        "http://localhost:5173",
+        "http://localhost:5173/",
+        "http://localhost:5173/robots.txt",
+        "http://localhost:5173/sitemap.xml"
+      ],
+      "params": [
+        "x-frame-options"
+      ],
+      "attacks": [],
+      "evidence": [],
+      "description": "The response does not protect against 'ClickJacking' attacks. It should include either Content-Security-Policy with 'frame-ancestors' directive or X-Frame-Options.",
+      "solution": "Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web pages returned by your site/app. If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security Policy's \"frame-ancestors\" directive."
+    },
+    {
+      "source": "frontend",
+      "pluginid": "10038",
+      "alert": "Content Security Policy (CSP) Header Not Set",
+      "risk": "Medium",
+      "riskdesc": "Medium (High)",
+      "risk_rank": 2,
+      "confidence": 3,
+      "instance_count": 4,
+      "urls": [
+        "http://localhost:5173",
+        "http://localhost:5173/",
+        "http://localhost:5173/robots.txt",
+        "http://localhost:5173/sitemap.xml"
+      ],
+      "params": [],
+      "attacks": [],
+      "evidence": [],
+      "description": "Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks, including Cross Site Scripting (XSS) and data injection attacks. These attacks are used for everything from data theft to site defacement or distribution of malware. CSP provides a set of standard HTTP headers that allow website owners to declare approved sources of content that browsers should be allowed to load on that page — covered types are JavaScript, CSS, HTML frames, fonts, images and embeddable objects such as Java applets, ActiveX, audio and video files.",
+      "solution": "Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header."
+    },
+    {
+      "source": "api",
+      "pluginid": "100000",
+      "alert": "A Server Error response code was returned by the server",
+      "risk": "Low",
+      "riskdesc": "Low (High)",
+      "risk_rank": 1,
+      "confidence": 3,
+      "instance_count": 5,
+      "urls": [
+        "http://localhost:8080/api/auth/register",
+        "http://localhost:8080/api/files/download?name=dasqjXQvbhQHEpXfnOkcPjIwURpHnRYJTdwDHLZtFjXRUkrtrHHOyBDnoTAIiJUcPLIEZLdrpDECGawXbiTdwgoQrSlNSAPcJwGrCxMihaVCLQhhsmGgvcbjeKbiERNdoquaWoPTPQucsNgCiaqIbYCRFHuXwLQTmNeSDqKrdwtWGMOIoLOObiABgaeHgMkITQEIoOOMVvAHBwQLwFaDNoJkIJqILZvEXesKXLbbBywjTefBfvamPVbCydYwcXGpKyGpPiIqtdqnjJoHwhjnmHjuyruYcJoImYbVFApXQVguLWAQTrahuolgVrugkqrYdHsWAeEqlgZNOvRkjMeYPyDaNFWohDiNdCKflakfuCBxacevOOfGpsdABKNhJBPAHdqfsLmVRYSGXTPVlbLWVJxppJYyBykhVIABgISoZCZJfsZRccQXnZrOncEhBlpJFhNVSRxpXXBDLyoaLaGeXsKSWjaaLxpailFRMbDwoMJLRdsKybBljjjuFQjXRHRiwwJFoLBRNoSaoexHsfaHXwhQQnVlOMjBqjiCCumipiPdDEihZBAsRIDDVGmUHFkiaaluoILYNeUWJZorPlITGjknKYvknBGsvkrWhFZcdwuyQxORMOYpNgMkZngiioBiJLukHsZviRsjYQHZaTyHpJMVIueAdEjOmcjKbeNveAYLOyggNyoEUZCqYaNSFmUkmIWkchKiLivuRZRkfuUvaTrZNGdonrTGZKfISsRBDFfJGJWSNvprXkoPIKXVhYtAXGcHUBGsROHIpaFEwtiMXspRQuPGSKdZGZuTjdKUjiqftqDYbyTXsfakRxbyyiJKyswPtYUSSOheNWFBWCWoulQVdFAPfrpVvoBtkPKXPMNTQVUpdIihfgdaqSmpKpslCYScnwOcixwTZyEBQbwwXEcXvhxutBPMgJvYoMiTJhlbHBXQCEJOlTIKmQPWqNhyCgTKCqRXViFoyBtmledPjrTCYiGIaSXPxAMXvjrCRUaJCgniZIGevQZEpxvKIVlSFhvLSIHFjLFMkcCjOGegeWRouxCRbEtIqMUDtlQBlWSWghVQRqGbnmeryAQRNruGKKJfuMXdJYhmVpRPaZnqoKgTDaMdHXGoriXScBvNaSmCptGlxALiitcNlCXHDmsAXBapnOTaeTDvsFbJQsNWUKGvysmmipxKWSWkZXAKhcYDUPJTrfHxUfHuYtfIITBmHmmYTkMQIJLFtJQGGIpPAFVVyXaJQsRkMkeEfGxrLmhpmJDIKRGeIixPwXfvMEALARYDLOgIbqMKjoTwZSFlvhecNmMfYNjgdNXpQreITYKslklsfiTNVvVjJpHqgXndqkeFKpUEVrXmsOHiwnFFkPDaeCfJwGacKQtlflMWTgfkTKFdTOlPgbspfZWibevtjoMpDRuUqZnsUooPytXymkhLRWttrNYhYdXdbmOctxutcdproFYJrvUMpMLHjkxUophKXuryCmHTdAODDMSqHcKleDjnfiridhrqBepZJGOJiNyRoxsyQVHdeGLOfZSjkinfROOhRfqtrlXoPMaHRgjxVRhGmlvuyyXecpBByRPihuTcSqGAeskloLqrVSjywRDiHqdNfrNsjPWRmCLJAbxaPJeMWbpirgrmwRieuBidBhooGVPDLCDBGAXwPFtqpWLauhyossTjYvUpbnSGgMeiWYBhfUYaErQftiHywKlEJrUuLiuaLElbnFcLeqZkkHAxEiZiuWBOXZQDmHiqsHuaOnyVJHHGOahJfJJliSnAykrLhndqPSJtefoayjpZMUSKgmlyQYQBocuntAQVJbNNBgtoiZjGeoYQBbjBoPHblpAbuVELlnOUUPvTIaaAxfsYxhvlILpuPBchgYGkGxguOFFvqwgpvnkFDGHDSMDkVWJMOQyBlEPiwXfHaKuBpdEtNoTGQUQnJxwUgnQGVGmNiBltRtGMepBVCTDXEamTPSkYYmEbjoIlUyDQyiNQdXdgVeCqxiSoagOPCEoUSkTqQXGbTaxGtgtycaAirSsQJuWBLpHfWQheNiHVvWuiOdkwaskXituQygrdnSNAvskEcYlMTNsZjmFnDEvuWADMdoHyNHLe",
+        "http://localhost:8080/api/posts/preview?url=www.google.com%2F",
+        "http://localhost:8080/api/posts/search?q=5%3BURL%3D%27https%3A%2F%2F6824396933261640610.owasp.org%27",
+        "http://localhost:8080/api/posts?sort=http%3A%2F%2Fwww.google.com%2F&order=DESC"
+      ],
+      "params": [],
+      "attacks": [],
+      "evidence": [
+        "500",
+        "502"
+      ],
+      "description": "A response code of 500 was returned by the server. This may indicate that the application is failing to handle unexpected input correctly. Raised by the 'Alert on HTTP Response Code Error' script",
+      "solution": ""
+    },
+    {
+      "source": "api",
+      "pluginid": "10021",
+      "alert": "X-Content-Type-Options Header Missing",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 5,
+      "urls": [
+        "http://localhost:8080/api/auth/logout?next=/",
+        "http://localhost:8080/api/posts/1/comments",
+        "http://localhost:8080/api/posts/preview?url=http://example.com",
+        "http://localhost:8080/api/posts?sort=p.created_at&order=DESC",
+        "http://localhost:8080/health"
+      ],
+      "params": [
+        "x-content-type-options"
+      ],
+      "attacks": [],
+      "evidence": [],
+      "description": "The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'. This allows older versions of Internet Explorer and Chrome to perform MIME-sniffing on the response body, potentially causing the response body to be interpreted and displayed as a content type other than the declared content type. Current (early 2014) and legacy versions of Firefox will use the declared content type (if one is set), rather than performing MIME-sniffing.",
+      "solution": "Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages. If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing."
+    },
+    {
+      "source": "api",
+      "pluginid": "10054",
+      "alert": "Cookie without SameSite Attribute",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 1,
+      "urls": [
+        "http://localhost:8080/api/auth/logout?next=/"
+      ],
+      "params": [
+        "session"
+      ],
+      "attacks": [],
+      "evidence": [
+        "Set-Cookie: session"
+      ],
+      "description": "A cookie has been set without the SameSite attribute, which means that the cookie can be sent as a result of a 'cross-site' request. The SameSite attribute is an effective counter measure to cross-site request forgery, cross-site script inclusion, and timing attacks.",
+      "solution": "Ensure that the SameSite attribute is set to either 'lax' or ideally 'strict' for all cookies."
+    },
+    {
+      "source": "api",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Resource-Policy Header Missing or Invalid",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 5,
+      "urls": [
+        "http://localhost:8080/api/auth/logout?next=/",
+        "http://localhost:8080/api/auth/register",
+        "http://localhost:8080/api/posts/preview?url=http://example.com",
+        "http://localhost:8080/api/posts?sort=p.created_at&order=DESC",
+        "http://localhost:8080/health"
+      ],
+      "params": [
+        "Cross-Origin-Resource-Policy"
+      ],
+      "attacks": [],
+      "evidence": [],
+      "description": "Cross-Origin-Resource-Policy header is an opt-in header designed to counter side-channels attacks like Spectre. Resource should be specifically set as shareable amongst different origins.",
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Resource-Policy header appropriately, and that it sets the Cross-Origin-Resource-Policy header to 'same-origin' for all web pages. 'same-site' is considered as less secured and should be avoided. If resources must be shared, set the header to 'cross-origin'. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Resource-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-resource-policy)."
+    },
+    {
+      "source": "frontend",
+      "pluginid": "10021",
+      "alert": "X-Content-Type-Options Header Missing",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 5,
+      "urls": [
+        "http://localhost:5173",
+        "http://localhost:5173/@vite/client",
+        "http://localhost:5173/robots.txt",
+        "http://localhost:5173/sitemap.xml",
+        "http://localhost:5173/src/main.jsx"
+      ],
+      "params": [
+        "x-content-type-options"
+      ],
+      "attacks": [],
+      "evidence": [],
+      "description": "The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'. This allows older versions of Internet Explorer and Chrome to perform MIME-sniffing on the response body, potentially causing the response body to be interpreted and displayed as a content type other than the declared content type. Current (early 2014) and legacy versions of Firefox will use the declared content type (if one is set), rather than performing MIME-sniffing.",
+      "solution": "Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages. If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing."
+    },
+    {
+      "source": "frontend",
+      "pluginid": "10063",
+      "alert": "Permissions Policy Header Not Set",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 5,
+      "urls": [
+        "http://localhost:5173",
+        "http://localhost:5173/@vite/client",
+        "http://localhost:5173/robots.txt",
+        "http://localhost:5173/sitemap.xml",
+        "http://localhost:5173/src/main.jsx"
+      ],
+      "params": [],
+      "attacks": [],
+      "evidence": [],
+      "description": "Permissions Policy Header is an added layer of security that helps to restrict from unauthorized access or usage of browser/client features by web resources. This policy ensures the user privacy by limiting or specifying the features of the browsers can be used by the web resources. Permissions Policy provides a set of standard HTTP headers that allow website owners to limit which features of browsers can be used by the page such as camera, microphone, location, full screen etc.",
+      "solution": "Ensure that your web server, application server, load balancer, etc. is configured to set the Permissions-Policy header."
+    },
+    {
+      "source": "frontend",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Embedder-Policy Header Missing or Invalid",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 3,
+      "urls": [
+        "http://localhost:5173",
+        "http://localhost:5173/robots.txt",
+        "http://localhost:5173/sitemap.xml"
+      ],
+      "params": [
+        "Cross-Origin-Embedder-Policy"
+      ],
+      "attacks": [],
+      "evidence": [],
+      "description": "Cross-Origin-Embedder-Policy header is a response header that prevents a document from loading any cross-origin resources that don't explicitly grant the document permission (using CORP or CORS).",
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Embedder-Policy header appropriately, and that it sets the Cross-Origin-Embedder-Policy header to 'require-corp' for documents. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Embedder-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-embedder-policy)."
+    },
+    {
+      "source": "frontend",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Opener-Policy Header Missing or Invalid",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 3,
+      "urls": [
+        "http://localhost:5173",
+        "http://localhost:5173/robots.txt",
+        "http://localhost:5173/sitemap.xml"
+      ],
+      "params": [
+        "Cross-Origin-Opener-Policy"
+      ],
+      "attacks": [],
+      "evidence": [],
+      "description": "Cross-Origin-Opener-Policy header is a response header that allows a site to control if others included documents share the same browsing context. Sharing the same browsing context with untrusted documents might lead to data leak.",
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Opener-Policy header appropriately, and that it sets the Cross-Origin-Opener-Policy header to 'same-origin' for documents. 'same-origin-allow-popups' is considered as less secured and should be avoided. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Opener-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-opener-policy)."
+    },
+    {
+      "source": "frontend",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Resource-Policy Header Missing or Invalid",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 4,
+      "urls": [
+        "http://localhost:5173",
+        "http://localhost:5173/robots.txt",
+        "http://localhost:5173/sitemap.xml",
+        "http://localhost:5173/src/main.jsx"
+      ],
+      "params": [
+        "Cross-Origin-Resource-Policy"
+      ],
+      "attacks": [],
+      "evidence": [],
+      "description": "Cross-Origin-Resource-Policy header is an opt-in header designed to counter side-channels attacks like Spectre. Resource should be specifically set as shareable amongst different origins.",
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Resource-Policy header appropriately, and that it sets the Cross-Origin-Resource-Policy header to 'same-origin' for all web pages. 'same-site' is considered as less secured and should be avoided. If resources must be shared, set the header to 'cross-origin'. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Resource-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-resource-policy)."
+    },
+    {
+      "source": "frontend",
+      "pluginid": "90022",
+      "alert": "Application Error Disclosure",
+      "risk": "Low",
+      "riskdesc": "Low (Medium)",
+      "risk_rank": 1,
+      "confidence": 2,
+      "instance_count": 1,
+      "urls": [
+        "http://localhost:5173/api/posts?sort=created_at&order=DESC"
+      ],
+      "params": [],
+      "attacks": [],
+      "evidence": [
+        "HTTP/1.1 500 Internal Server Error"
+      ],
+      "description": "This page contains an error/warning message that may disclose sensitive information like the location of the file that produced the unhandled exception. This information can be used to launch further attacks against the web application. The alert could be a false positive if the error message is found inside a documentation page.",
+      "solution": "Review the source code of this page. Implement custom error pages. Consider implementing a mechanism to provide a unique error reference/identifier to the client (browser) while logging the details on the server side and not exposing them to the user."
+    }
+  ]
+}

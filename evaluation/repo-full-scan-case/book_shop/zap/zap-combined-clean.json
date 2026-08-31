@@ -1,0 +1,1116 @@
+{
+  "target": "http://localhost:3001",
+  "generated": {
+    "frontend": "2026-05-09T00:23:41.576053081Z",
+    "api": "2026-05-09T00:25:28.523114798Z"
+  },
+  "filtering": {
+    "mode": "book-shop-combined-filter",
+    "raw_reports": [
+      "zap-frontend-report.json",
+      "zap-api-report.json"
+    ],
+    "note": "The raw reports are preserved. This clean report removes only known Next.js dev-server noise and scanner-request noise; all other frontend and API alerts are preserved for manual triage.",
+    "ignored_pluginids": [
+      "110005",
+      "10110",
+      "110009",
+      "10096",
+      "10094",
+      "10027",
+      "90005",
+      "10049"
+    ],
+    "ignored_paths": [
+      "/_next/static/",
+      "/_next/webpack-hmr",
+      "/favicon.ico",
+      "/robots.txt",
+      "/sitemap.xml"
+    ]
+  },
+  "alerts": [
+    {
+      "id": "40018:SQL Injection",
+      "pluginid": "40018",
+      "alert": "SQL Injection",
+      "alertRef": "40018",
+      "risk": "High",
+      "risk_rank": 3,
+      "riskcode": 3,
+      "riskdesc": "High (Low)",
+      "confidence": 1,
+      "cweid": "89",
+      "wascid": "19",
+      "urls": [
+        "http://localhost:3001/api/auth/register",
+        "http://localhost:3001/api/books/search?q=%27"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/api/auth/register",
+          "method": "POST",
+          "param": "email",
+          "evidence": "HTTP/1.1 500 Internal Server Error",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/search?q=%27",
+          "method": "GET",
+          "param": "q",
+          "evidence": "HTTP/1.1 500 Internal Server Error",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Do not trust client side input, even if there is client side validation in place. In general, type check all data on the server side. If the application uses JDBC, use PreparedStatement or CallableStatement, with parameters passed by '?' If the application uses ASP, use ADO Command Objects with strong type checking and parameterized queries. If database Stored Procedures can be used, use them. Do *not* concatenate strings into queries in the stored procedure, or use 'exec', 'exec immediate', or equivalent functionality! Do not create dynamic SQL queries using simple string concatenation. Escape all data received from the client. Apply an 'allow list' of allowed characters, or a 'deny list' of disallowed characters in user input. Apply the principle of least privilege by using the least privileged database user possible. In particular, avoid using the 'sa' or 'db-owner' database users. This does not eliminate SQL injection, but minimizes its impact. Grant the minimum database access that is necessary for the application.",
+      "reference": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+      "count": 2
+    },
+    {
+      "id": "10020:Missing Anti-clickjacking Header",
+      "pluginid": "10020",
+      "alert": "Missing Anti-clickjacking Header",
+      "alertRef": "10020-1",
+      "risk": "Medium",
+      "risk_rank": 2,
+      "riskcode": 2,
+      "riskdesc": "Medium (Medium)",
+      "confidence": 2,
+      "cweid": "1021",
+      "wascid": "15",
+      "urls": [
+        "http://localhost:3001",
+        "http://localhost:3001/admin",
+        "http://localhost:3001/cart",
+        "http://localhost:3001/profile"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "x-frame-options",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/admin",
+          "method": "GET",
+          "param": "x-frame-options",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/cart",
+          "method": "GET",
+          "param": "x-frame-options",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/profile",
+          "method": "GET",
+          "param": "x-frame-options",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web pages returned by your site/app. If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security Policy's \"frame-ancestors\" directive.",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Frame-Options",
+      "count": 4
+    },
+    {
+      "id": "10038:Content Security Policy (CSP) Header Not Set",
+      "pluginid": "10038",
+      "alert": "Content Security Policy (CSP) Header Not Set",
+      "alertRef": "10038-1",
+      "risk": "Medium",
+      "risk_rank": 2,
+      "riskcode": 2,
+      "riskdesc": "Medium (High)",
+      "confidence": 3,
+      "cweid": "693",
+      "wascid": "15",
+      "urls": [
+        "http://localhost:3001",
+        "http://localhost:3001/cart",
+        "http://localhost:3001/shop"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/cart",
+          "method": "GET",
+          "param": "",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/shop",
+          "method": "GET",
+          "param": "",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header.",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html https://www.w3.org/TR/CSP/ https://w3c.github.io/webappsec-csp/ https://web.dev/articles/csp https://caniuse.com/#feat=contentsecuritypolicy https://content-security-policy.com/",
+      "count": 3
+    },
+    {
+      "id": "100000:A Server Error response code was returned by the server",
+      "pluginid": "100000",
+      "alert": "A Server Error response code was returned by the server",
+      "alertRef": "100000-2",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (High)",
+      "confidence": 3,
+      "cweid": "388",
+      "wascid": "20",
+      "urls": [
+        "http://localhost:3001/api/auth/register",
+        "http://localhost:3001/api/books/search?q=5%3BURL%3D%27https%3A%2F%2F7814690558211636708.owasp.org%27"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/api/auth/register",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/search?q=5%3BURL%3D%27https%3A%2F%2F7814690558211636708.owasp.org%27",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "",
+      "reference": "",
+      "count": 2
+    },
+    {
+      "id": "100001:Unexpected Content-Type was returned",
+      "pluginid": "100001",
+      "alert": "Unexpected Content-Type was returned",
+      "alertRef": "100001",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (High)",
+      "confidence": 3,
+      "cweid": "-1",
+      "wascid": "-1",
+      "urls": [
+        "http://localhost:3001",
+        "http://localhost:3001/7009819706020411382",
+        "http://localhost:3001/api",
+        "http://localhost:3001/api/4283959495002157155",
+        "http://localhost:3001/api/admin",
+        "http://localhost:3001/api/admin/283000545279937381",
+        "http://localhost:3001/api/admin/actuator/health",
+        "http://localhost:3001/api/assets?file=atomic-habits.png",
+        "http://localhost:3001/api/auth",
+        "http://localhost:3001/api/auth/4021566763681903646",
+        "http://localhost:3001/api/books",
+        "http://localhost:3001/api/books/6584680193435759916",
+        "http://localhost:3001/api/books/cm123book",
+        "http://localhost:3001/api/books/cm123book/8279533905746900903",
+        "http://localhost:3001/api/orders",
+        "http://localhost:3001/api/orders/5287707837460859361",
+        "http://localhost:3001/api/users",
+        "http://localhost:3001/api/users/3721727512899350383",
+        "http://localhost:3001/metadata/instance",
+        "http://localhost:3001/metadata/v1",
+        "http://localhost:3001/openstack/latest/meta_data.json"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/7009819706020411382",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/4283959495002157155",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin/283000545279937381",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin/actuator/health",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/assets?file=atomic-habits.png",
+          "method": "GET",
+          "param": "",
+          "evidence": "image/png",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/4021566763681903646",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/6584680193435759916",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/cm123book",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/cm123book/8279533905746900903",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/orders",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/orders/5287707837460859361",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/users",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/users/3721727512899350383",
+          "method": "GET",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/metadata/instance",
+          "method": "POST",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/metadata/v1",
+          "method": "POST",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/openstack/latest/meta_data.json",
+          "method": "POST",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "",
+      "reference": "",
+      "count": 21
+    },
+    {
+      "id": "10010:Cookie No HttpOnly Flag",
+      "pluginid": "10010",
+      "alert": "Cookie No HttpOnly Flag",
+      "alertRef": "10010",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "1004",
+      "wascid": "13",
+      "urls": [
+        "http://localhost:3001/api/auth/login"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/api/auth/login",
+          "method": "POST",
+          "param": "session",
+          "evidence": "set-cookie: session",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that the HttpOnly flag is set for all cookies.",
+      "reference": "https://owasp.org/www-community/HttpOnly",
+      "count": 1
+    },
+    {
+      "id": "10021:X-Content-Type-Options Header Missing",
+      "pluginid": "10021",
+      "alert": "X-Content-Type-Options Header Missing",
+      "alertRef": "10021",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "15",
+      "urls": [
+        "http://localhost:3001",
+        "http://localhost:3001/api/assets?file=atomic-habits.png",
+        "http://localhost:3001/api/auth/login",
+        "http://localhost:3001/api/auth/register",
+        "http://localhost:3001/api/books/cm123book/reviews",
+        "http://localhost:3001/api/books/search?q=code"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:3001/api/assets?file=atomic-habits.png",
+          "method": "GET",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/login",
+          "method": "POST",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/register",
+          "method": "POST",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:3001/api/books/cm123book/reviews",
+          "method": "GET",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:3001/api/books/search?q=code",
+          "method": "GET",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        }
+      ],
+      "solution": "Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages. If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing.",
+      "reference": "https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/compatibility/gg622941(v=vs.85) https://owasp.org/www-community/Security_Headers",
+      "count": 6
+    },
+    {
+      "id": "10037:Server Leaks Information via \"X-Powered-By\" HTTP Response Header Field(s)",
+      "pluginid": "10037",
+      "alert": "Server Leaks Information via \"X-Powered-By\" HTTP Response Header Field(s)",
+      "alertRef": "10037",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "497",
+      "wascid": "13",
+      "urls": [
+        "http://localhost:3001",
+        "http://localhost:3001/cart",
+        "http://localhost:3001/shop"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "",
+          "evidence": "X-Powered-By: Next.js",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/cart",
+          "method": "GET",
+          "param": "",
+          "evidence": "X-Powered-By: Next.js",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/shop",
+          "method": "GET",
+          "param": "",
+          "evidence": "X-Powered-By: Next.js",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that your web server, application server, load balancer, etc. is configured to suppress \"X-Powered-By\" headers.",
+      "reference": "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/01-Information_Gathering/08-Fingerprint_Web_Application_Framework https://www.troyhunt.com/shhh-dont-let-your-response-headers/",
+      "count": 3
+    },
+    {
+      "id": "10054:Cookie without SameSite Attribute",
+      "pluginid": "10054",
+      "alert": "Cookie without SameSite Attribute",
+      "alertRef": "10054-1",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "1275",
+      "wascid": "13",
+      "urls": [
+        "http://localhost:3001/api/auth/login"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/api/auth/login",
+          "method": "POST",
+          "param": "session",
+          "evidence": "set-cookie: session",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that the SameSite attribute is set to either 'lax' or ideally 'strict' for all cookies.",
+      "reference": "https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-cookie-same-site",
+      "count": 1
+    },
+    {
+      "id": "10063:Permissions Policy Header Not Set",
+      "pluginid": "10063",
+      "alert": "Permissions Policy Header Not Set",
+      "alertRef": "10063-1",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "15",
+      "urls": [
+        "http://localhost:3001"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that your web server, application server, load balancer, etc. is configured to set the Permissions-Policy header.",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Permissions-Policy https://developer.chrome.com/blog/feature-policy/ https://scotthelme.co.uk/a-new-security-header-feature-policy/ https://w3c.github.io/webappsec-feature-policy/ https://www.smashingmagazine.com/2018/12/feature-policy/",
+      "count": 1
+    },
+    {
+      "id": "90004:Cross-Origin-Embedder-Policy Header Missing or Invalid",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Embedder-Policy Header Missing or Invalid",
+      "alertRef": "90004-2",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "14",
+      "urls": [
+        "http://localhost:3001"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "Cross-Origin-Embedder-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Embedder-Policy header appropriately, and that it sets the Cross-Origin-Embedder-Policy header to 'require-corp' for documents. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Embedder-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-embedder-policy).",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy",
+      "count": 1
+    },
+    {
+      "id": "90004:Cross-Origin-Opener-Policy Header Missing or Invalid",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Opener-Policy Header Missing or Invalid",
+      "alertRef": "90004-3",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "14",
+      "urls": [
+        "http://localhost:3001"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "Cross-Origin-Opener-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Opener-Policy header appropriately, and that it sets the Cross-Origin-Opener-Policy header to 'same-origin' for documents. 'same-origin-allow-popups' is considered as less secured and should be avoided. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Opener-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-opener-policy).",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Opener-Policy",
+      "count": 1
+    },
+    {
+      "id": "90004:Cross-Origin-Resource-Policy Header Missing or Invalid",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Resource-Policy Header Missing or Invalid",
+      "alertRef": "90004-1",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "14",
+      "urls": [
+        "http://localhost:3001",
+        "http://localhost:3001/api/assets?file=atomic-habits.png",
+        "http://localhost:3001/api/auth/login",
+        "http://localhost:3001/api/auth/register",
+        "http://localhost:3001/api/books/cm123book/reviews",
+        "http://localhost:3001/api/books/search?q=code"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "Cross-Origin-Resource-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/assets?file=atomic-habits.png",
+          "method": "GET",
+          "param": "Cross-Origin-Resource-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/login",
+          "method": "POST",
+          "param": "Cross-Origin-Resource-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/register",
+          "method": "POST",
+          "param": "Cross-Origin-Resource-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/cm123book/reviews",
+          "method": "GET",
+          "param": "Cross-Origin-Resource-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/search?q=code",
+          "method": "GET",
+          "param": "Cross-Origin-Resource-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Resource-Policy header appropriately, and that it sets the Cross-Origin-Resource-Policy header to 'same-origin' for all web pages. 'same-site' is considered as less secured and should be avoided. If resources must be shared, set the header to 'cross-origin'. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Resource-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-resource-policy).",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy",
+      "count": 6
+    },
+    {
+      "id": "100000:A Client Error response code was returned by the server",
+      "pluginid": "100000",
+      "alert": "A Client Error response code was returned by the server",
+      "alertRef": "100000-1",
+      "risk": "Informational",
+      "risk_rank": 0,
+      "riskcode": 0,
+      "riskdesc": "Informational (High)",
+      "confidence": 3,
+      "cweid": "388",
+      "wascid": "20",
+      "urls": [
+        "http://localhost:3001/7009819706020411382",
+        "http://localhost:3001/api",
+        "http://localhost:3001/api/4283959495002157155",
+        "http://localhost:3001/api/admin",
+        "http://localhost:3001/api/admin/283000545279937381",
+        "http://localhost:3001/api/admin/actuator/health",
+        "http://localhost:3001/api/admin/export",
+        "http://localhost:3001/api/admin/logs",
+        "http://localhost:3001/api/admin/logs?dir=logs&file=app.log",
+        "http://localhost:3001/api/admin/reports",
+        "http://localhost:3001/api/assets",
+        "http://localhost:3001/api/assets?file=",
+        "http://localhost:3001/api/assets?file=http%3A%2F%2Fwww.google.com%2F",
+        "http://localhost:3001/api/auth",
+        "http://localhost:3001/api/auth/4021566763681903646",
+        "http://localhost:3001/api/auth/login",
+        "http://localhost:3001/api/auth/register",
+        "http://localhost:3001/api/books",
+        "http://localhost:3001/api/books/6584680193435759916",
+        "http://localhost:3001/api/books/cm123book",
+        "http://localhost:3001/api/books/cm123book/8279533905746900903",
+        "http://localhost:3001/api/books/cm123book/reviews",
+        "http://localhost:3001/api/orders",
+        "http://localhost:3001/api/orders/5287707837460859361",
+        "http://localhost:3001/api/orders/checkout",
+        "http://localhost:3001/api/orders/history",
+        "http://localhost:3001/api/orders/history?userId=cluid123",
+        "http://localhost:3001/api/users",
+        "http://localhost:3001/api/users/3721727512899350383",
+        "http://localhost:3001/api/users/avatar",
+        "http://localhost:3001/api/users/profile",
+        "http://localhost:3001/api/users/topup",
+        "http://localhost:3001/metadata/instance",
+        "http://localhost:3001/metadata/v1",
+        "http://localhost:3001/openstack/latest/meta_data.json"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/7009819706020411382",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/4283959495002157155",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin/283000545279937381",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin/actuator/health",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin/export",
+          "method": "POST",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin/logs",
+          "method": "GET",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin/logs?dir=logs&file=app.log",
+          "method": "GET",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/admin/reports",
+          "method": "GET",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/assets",
+          "method": "GET",
+          "param": "",
+          "evidence": "400",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/assets?file=",
+          "method": "GET",
+          "param": "",
+          "evidence": "400",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/assets?file=http%3A%2F%2Fwww.google.com%2F",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/4021566763681903646",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/login",
+          "method": "POST",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/login",
+          "method": "POST",
+          "param": "",
+          "evidence": "429",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/auth/register",
+          "method": "POST",
+          "param": "",
+          "evidence": "400",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/6584680193435759916",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/cm123book",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/cm123book/8279533905746900903",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/books/cm123book/reviews",
+          "method": "DELETE",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/orders",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/orders/5287707837460859361",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/orders/checkout",
+          "method": "POST",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/orders/history",
+          "method": "GET",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/orders/history?userId=cluid123",
+          "method": "GET",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/users",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/users/3721727512899350383",
+          "method": "GET",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/users/avatar",
+          "method": "POST",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/users/profile",
+          "method": "GET",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/users/profile",
+          "method": "PATCH",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/api/users/topup",
+          "method": "POST",
+          "param": "",
+          "evidence": "401",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/metadata/instance",
+          "method": "POST",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/metadata/v1",
+          "method": "POST",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/openstack/latest/meta_data.json",
+          "method": "POST",
+          "param": "",
+          "evidence": "404",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "",
+      "reference": "",
+      "count": 35
+    },
+    {
+      "id": "10024:Information Disclosure - Sensitive Information in URL",
+      "pluginid": "10024",
+      "alert": "Information Disclosure - Sensitive Information in URL",
+      "alertRef": "10024",
+      "risk": "Informational",
+      "risk_rank": 0,
+      "riskcode": 0,
+      "riskdesc": "Informational (Medium)",
+      "confidence": 2,
+      "cweid": "598",
+      "wascid": "13",
+      "urls": [
+        "http://localhost:3001/api/orders/history?userId=cluid123"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/api/orders/history?userId=cluid123",
+          "method": "GET",
+          "param": "userId",
+          "evidence": "userId",
+          "otherinfo": "The URL contains potentially sensitive information. The following string was found via the pattern: user userId"
+        }
+      ],
+      "solution": "Do not pass sensitive information in URIs.",
+      "reference": "",
+      "count": 1
+    },
+    {
+      "id": "10111:Authentication Request Identified",
+      "pluginid": "10111",
+      "alert": "Authentication Request Identified",
+      "alertRef": "10111",
+      "risk": "Informational",
+      "risk_rank": 0,
+      "riskcode": 0,
+      "riskdesc": "Informational (High)",
+      "confidence": 3,
+      "cweid": "-1",
+      "wascid": "-1",
+      "urls": [
+        "http://localhost:3001/api/auth/login"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/api/auth/login",
+          "method": "POST",
+          "param": "email",
+          "evidence": "password",
+          "otherinfo": "userParam=email userValue=zaproxy@example.com passwordParam=password"
+        }
+      ],
+      "solution": "This is an informational alert rather than a vulnerability and so there is nothing to fix.",
+      "reference": "https://www.zaproxy.org/docs/desktop/addons/authentication-helper/auth-req-id/",
+      "count": 1
+    },
+    {
+      "id": "10112:Session Management Response Identified",
+      "pluginid": "10112",
+      "alert": "Session Management Response Identified",
+      "alertRef": "10112",
+      "risk": "Informational",
+      "risk_rank": 0,
+      "riskcode": 0,
+      "riskdesc": "Informational (Medium)",
+      "confidence": 2,
+      "cweid": "-1",
+      "wascid": "-1",
+      "urls": [
+        "http://localhost:3001/api/auth/login"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/api/auth/login",
+          "method": "POST",
+          "param": "token",
+          "evidence": "token",
+          "otherinfo": "json:token cookie:session"
+        }
+      ],
+      "solution": "This is an informational alert rather than a vulnerability and so there is nothing to fix.",
+      "reference": "https://www.zaproxy.org/docs/desktop/addons/authentication-helper/session-mgmt-id/",
+      "count": 1
+    }
+  ],
+  "summary": {
+    "total_alerts": 17,
+    "high": 1,
+    "medium": 2,
+    "low": 10,
+    "info": 4,
+    "affected_urls": 44
+  }
+}

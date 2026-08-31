@@ -1,0 +1,12 @@
+{
+  "contract_version": "v4",
+  "input_bundle_uri": "/tmp/sec-review-fixtures/pull-request-review",
+  "review_intent": {
+    "objective": "audit"
+  },
+  "pr": {
+    "number": 42,
+    "title": "Harden webhook signature validation",
+    "repo_full_name": "octo-org/example"
+  }
+}

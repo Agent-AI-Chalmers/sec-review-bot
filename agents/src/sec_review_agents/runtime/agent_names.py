@@ -1,0 +1,22 @@
+RUNNABLE_AGENT_NAMES = frozenset(
+    {
+        "repository-discovery",
+        "repository-triager",
+        "issue-analyzer",
+        "pull-request-analyzer",
+        "repository-analyzer",
+        "issue-mitigator",
+        "issue-mitigator-self-check",
+        "pull-request-mitigator",
+        "repository-mitigator",
+        "issue-verifier",
+        "pull-request-verifier",
+        "repository-verifier",
+        "issue-single-agent",
+        "repository-cvss-v4-scorer",
+        "repository-delivery-planner",
+        "patch-synthesizer",
+        "memory-extractor",
+        "memory-maintainer",
+    }
+)

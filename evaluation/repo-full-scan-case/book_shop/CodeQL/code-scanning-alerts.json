@@ -1,0 +1,224 @@
+[
+    {
+        "number": 4,
+        "created_at": "2026-05-02T18:40:47Z",
+        "updated_at": "2026-05-02T18:40:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/book_shop/code-scanning/alerts/4",
+        "html_url": "https://github.com/Agent-AI-Chalmers/book_shop/security/code-scanning/4",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "js/path-injection",
+            "severity": "error",
+            "description": "Uncontrolled data used in path expression",
+            "name": "js/path-injection",
+            "tags": [
+                "external/cwe/cwe-022",
+                "external/cwe/cwe-023",
+                "external/cwe/cwe-036",
+                "external/cwe/cwe-073",
+                "external/cwe/cwe-099",
+                "security"
+            ],
+            "full_description": "Accessing paths influenced by users can allow an attacker to access unexpected resources.",
+            "help": "# Uncontrolled data used in path expression\nAccessing files using paths constructed from user-controlled data can allow an attacker to access unexpected resources. This can result in sensitive information being revealed or deleted, or an attacker being able to influence behavior by modifying unexpected files.\n\n\n## Recommendation\nValidate user input before using it to construct a file path.\n\nThe validation method you should use depends on whether you want to allow the user to specify complex paths with multiple components that may span multiple folders, or only simple filenames without a path component.\n\nIn the former case, a common strategy is to make sure that the constructed file path is contained within a safe root folder. First, normalize the path using `path.resolve` or `fs.realpathSync` to remove any \"..\" segments. You should always normalize the file path since an unnormalized path that starts with the root folder can still be used to access files outside the root folder. Then, after you have normalized the path, check that the path starts with the root folder.\n\nIn the latter case, you can use a library like the `sanitize-filename` npm package to eliminate any special characters from the file path. Note that it is *not* sufficient to only remove \"../\" sequences: for example, applying this filter to \".../...//\" would still result in the string \"../\".\n\nFinally, the simplest (but most restrictive) option is to use an allow list of safe patterns and make sure that the user input matches one of these patterns.\n\n\n## Example\nIn the first (bad) example, the code reads the file name from an HTTP request, then accesses that file within a root folder. A malicious user could enter a file name containing \"../\" segments to navigate outside the root folder and access sensitive files.\n\n\n```javascript\nconst fs = require('fs'),\n      http = require('http'),\n      url = require('url');\n\nconst ROOT = \"/var/www/\";\n\nvar server = http.createServer(function(req, res) {\n  let filePath = url.parse(req.url, true).query.path;\n\n  // BAD: This function uses unsanitized input that can read any file on the file system.\n  res.write(fs.readFileSync(ROOT + filePath, 'utf8'));\n});\n```\nThe second (good) example shows how to avoid access to sensitive files by sanitizing the file path. First, the code resolves the file name relative to a root folder, normalizing the path and removing any \"../\" segments in the process. Then, the code calls `fs.realpathSync` to resolve any symbolic links in the path. Finally, the code checks that the normalized path starts with the path of the root folder, ensuring the file is contained within the root folder.\n\n\n```javascript\nconst fs = require('fs'),\n      http = require('http'),\n      path = require('path'),\n      url = require('url');\n\nconst ROOT = \"/var/www/\";\n\nvar server = http.createServer(function(req, res) {\n  let filePath = url.parse(req.url, true).query.path;\n\n  // GOOD: Verify that the file path is under the root directory\n  filePath = fs.realpathSync(path.resolve(ROOT, filePath));\n  if (!filePath.startsWith(ROOT)) {\n    res.statusCode = 403;\n    res.end();\n    return;\n  }\n  res.write(fs.readFileSync(filePath, 'utf8'));\n});\n```\n\n## References\n* OWASP: [Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal).\n* npm: [sanitize-filename](https://www.npmjs.com/package/sanitize-filename) package.\n* Common Weakness Enumeration: [CWE-22](https://cwe.mitre.org/data/definitions/22.html).\n* Common Weakness Enumeration: [CWE-23](https://cwe.mitre.org/data/definitions/23.html).\n* Common Weakness Enumeration: [CWE-36](https://cwe.mitre.org/data/definitions/36.html).\n* Common Weakness Enumeration: [CWE-73](https://cwe.mitre.org/data/definitions/73.html).\n* Common Weakness Enumeration: [CWE-99](https://cwe.mitre.org/data/definitions/99.html).\n",
+            "security_severity_level": "high"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"none\",\"language\":\"javascript-typescript\"}",
+            "category": "/language:javascript-typescript",
+            "state": "open",
+            "commit_sha": "4139a35c8d53cfd53817ec71578e2252ffd56f05",
+            "message": {
+                "text": "This path depends on a user-provided value."
+            },
+            "location": {
+                "path": "src/app/api/admin/export/route.ts",
+                "start_line": 35,
+                "end_line": 35,
+                "start_column": 22,
+                "end_column": 32
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/book_shop/code-scanning/alerts/4/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 3,
+        "created_at": "2026-05-02T18:40:47Z",
+        "updated_at": "2026-05-02T18:40:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/book_shop/code-scanning/alerts/3",
+        "html_url": "https://github.com/Agent-AI-Chalmers/book_shop/security/code-scanning/3",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "js/command-line-injection",
+            "severity": "error",
+            "description": "Uncontrolled command line",
+            "name": "js/command-line-injection",
+            "tags": [
+                "correctness",
+                "external/cwe/cwe-078",
+                "external/cwe/cwe-088",
+                "security"
+            ],
+            "full_description": "Using externally controlled strings in a command line may allow a malicious user to change the meaning of the command.",
+            "help": "# Uncontrolled command line\nCode that passes untrusted user input directly to `child_process.exec` or similar APIs that execute shell commands allows the user to execute malicious code.\n\n\n## Recommendation\nIf possible, use APIs that don't run shell commands and that accept command arguments as an array of strings rather than a single concatenated string. This is both safer and more portable.\n\nIf given arguments as a single string, avoid simply splitting the string on whitespace. Arguments may contain quoted whitespace, causing them to split into multiple arguments. Use a library like `shell-quote` to parse the string into an array of arguments instead.\n\nIf this approach is not viable, then add code to verify that the user input string is safe before using it.\n\n\n## Example\nThe following example shows code that extracts a filename from an HTTP query parameter that may contain untrusted data, and then embeds it into a shell command to count its lines without examining it first:\n\n\n```javascript\nvar cp = require(\"child_process\"),\n    http = require('http'),\n    url = require('url');\n\nvar server = http.createServer(function(req, res) {\n    let file = url.parse(req.url, true).query.path;\n\n    cp.execSync(`wc -l ${file}`); // BAD\n});\n\n```\nA malicious user can take advantage of this code by executing arbitrary shell commands. For example, by providing a filename like `foo.txt; rm -rf .`, the user can first count the lines in `foo.txt` and subsequently delete all files in the current directory.\n\nTo avoid this catastrophic behavior, use an API such as `child_process.execFileSync` that does not spawn a shell by default:\n\n\n```javascript\nvar cp = require(\"child_process\"),\n    http = require('http'),\n    url = require('url');\n\nvar server = http.createServer(function(req, res) {\n    let file = url.parse(req.url, true).query.path;\n\n    cp.execFileSync('wc', ['-l', file]); // GOOD\n});\n\n```\nIf you want to allow the user to specify other options to `wc`, you can use a library like `shell-quote` to parse the user input into an array of arguments without risking command injection:\n\n\n```javascript\nvar cp = require(\"child_process\"),\n    http = require('http'),\n    url = require('url'),\n    shellQuote = require('shell-quote');\n\nvar server = http.createServer(function(req, res) {\n    let options = url.parse(req.url, true).query.options;\n\n    cp.execFileSync('wc', shellQuote.parse(options)); // GOOD\n});\n\n```\nAlternatively, the original example can be made safe by checking the filename against an allowlist of safe characters before using it:\n\n\n```javascript\nvar cp = require(\"child_process\"),\n    http = require('http'),\n    url = require('url');\n\nvar server = http.createServer(function(req, res) {\n    let file = url.parse(req.url, true).query.path;\n\n    // only allow safe characters in file name\n    if (file.match(/^[\\w\\.\\-\\/]+$/)) {\n        cp.execSync(`wc -l ${file}`); // GOOD\n    }\n});\n\n```\n\n## References\n* OWASP: [Command Injection](https://www.owasp.org/index.php/Command_Injection).\n* npm: [shell-quote](https://www.npmjs.com/package/shell-quote).\n* Common Weakness Enumeration: [CWE-78](https://cwe.mitre.org/data/definitions/78.html).\n* Common Weakness Enumeration: [CWE-88](https://cwe.mitre.org/data/definitions/88.html).\n",
+            "security_severity_level": "critical"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"none\",\"language\":\"javascript-typescript\"}",
+            "category": "/language:javascript-typescript",
+            "state": "open",
+            "commit_sha": "4139a35c8d53cfd53817ec71578e2252ffd56f05",
+            "message": {
+                "text": "This command line depends on a user-provided value."
+            },
+            "location": {
+                "path": "src/app/api/admin/export/route.ts",
+                "start_line": 38,
+                "end_line": 38,
+                "start_column": 7,
+                "end_column": 63
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/book_shop/code-scanning/alerts/3/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 2,
+        "created_at": "2026-05-02T18:40:47Z",
+        "updated_at": "2026-05-02T18:40:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/book_shop/code-scanning/alerts/2",
+        "html_url": "https://github.com/Agent-AI-Chalmers/book_shop/security/code-scanning/2",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "js/shell-command-injection-from-environment",
+            "severity": "warning",
+            "description": "Shell command built from environment values",
+            "name": "js/shell-command-injection-from-environment",
+            "tags": [
+                "correctness",
+                "external/cwe/cwe-078",
+                "external/cwe/cwe-088",
+                "security"
+            ],
+            "full_description": "Building a shell command string with values from the enclosing environment may cause subtle bugs or vulnerabilities.",
+            "help": "# Shell command built from environment values\nDynamically constructing a shell command with values from the local environment, such as file paths, may inadvertently change the meaning of the shell command. Such changes can occur when an environment value contains characters that the shell interprets in a special way, for instance quotes and spaces. This can result in the shell command misbehaving, or even allowing a malicious user to execute arbitrary commands on the system.\n\n\n## Recommendation\nIf possible, use hard-coded string literals to specify the shell command to run, and provide the dynamic arguments to the shell command separately to avoid interpretation by the shell.\n\nAlternatively, if the shell command must be constructed dynamically, then add code to ensure that special characters in environment values do not alter the shell command unexpectedly.\n\n\n## Example\nThe following example shows a dynamically constructed shell command that recursively removes a temporary directory that is located next to the currently executing JavaScript file. Such utilities are often found in custom build scripts.\n\n\n```javascript\nvar cp = require(\"child_process\"),\n  path = require(\"path\");\nfunction cleanupTemp() {\n  let cmd = \"rm -rf \" + path.join(__dirname, \"temp\");\n  cp.execSync(cmd); // BAD\n}\n\n```\nThe shell command will, however, fail to work as intended if the absolute path of the script's directory contains spaces. In that case, the shell command will interpret the absolute path as multiple paths, instead of a single path.\n\nFor instance, if the absolute path of the temporary directory is `/home/username/important project/temp`, then the shell command will recursively delete `/home/username/important` and `project/temp`, where the latter path gets resolved relative to the working directory of the JavaScript process.\n\nEven worse, although less likely, a malicious user could provide the path `/home/username/; cat /etc/passwd #/important project/temp` in order to execute the command `cat /etc/passwd`.\n\nTo avoid such potentially catastrophic behaviors, provide the directory as an argument that does not get interpreted by a shell:\n\n\n```javascript\nvar cp = require(\"child_process\"),\n  path = require(\"path\");\nfunction cleanupTemp() {\n  let cmd = \"rm\",\n    args = [\"-rf\", path.join(__dirname, \"temp\")];\n  cp.execFileSync(cmd, args); // GOOD\n}\n\n```\n\n## References\n* OWASP: [Command Injection](https://www.owasp.org/index.php/Command_Injection).\n* Common Weakness Enumeration: [CWE-78](https://cwe.mitre.org/data/definitions/78.html).\n* Common Weakness Enumeration: [CWE-88](https://cwe.mitre.org/data/definitions/88.html).\n",
+            "security_severity_level": "medium"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"none\",\"language\":\"javascript-typescript\"}",
+            "category": "/language:javascript-typescript",
+            "state": "open",
+            "commit_sha": "4139a35c8d53cfd53817ec71578e2252ffd56f05",
+            "message": {
+                "text": "This shell command depends on an uncontrolled absolute path."
+            },
+            "location": {
+                "path": "src/app/api/admin/export/route.ts",
+                "start_line": 38,
+                "end_line": 38,
+                "start_column": 7,
+                "end_column": 63
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/book_shop/code-scanning/alerts/2/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 1,
+        "created_at": "2026-05-02T18:40:23Z",
+        "updated_at": "2026-05-02T18:40:23Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/book_shop/code-scanning/alerts/1",
+        "html_url": "https://github.com/Agent-AI-Chalmers/book_shop/security/code-scanning/1",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "actions/missing-workflow-permissions",
+            "severity": "warning",
+            "description": "Workflow does not contain permissions",
+            "name": "actions/missing-workflow-permissions",
+            "tags": [
+                "actions",
+                "external/cwe/cwe-275",
+                "maintainability",
+                "security"
+            ],
+            "full_description": "Workflows should contain explicit permissions to restrict the scope of the default GITHUB_TOKEN.",
+            "help": "## Overview\n\nIf a GitHub Actions job or workflow has no explicit permissions set, then the repository permissions are used. Repositories created under organizations inherit the organization permissions. The organizations or repositories created before February 2023 have the default permissions set to read-write. Often these permissions do not adhere to the principle of least privilege and can be reduced to read-only, leaving the `write` permission only to a specific types as `issues: write` or `pull-requests: write`.\n\nNote that this query cannot check whether the organization or repository token settings are set to read-only. However, even if they are, it is recommended to define explicit permissions (`contents: read` and `packages: read` are equivalent to the read-only default) so that (a) the actual needs of the workflow are documented, and (b) the permissions will remain restricted if the default is subsequently changed, or the workflow is copied to a different repository or organization.\n\n## Recommendation\n\nAdd the `permissions` key to the job or the root of workflow (in this case it is applied to all jobs in the workflow that do not have their own `permissions` key) and assign the least privileges required to complete the task.\n\n## Example\n\n### Incorrect Usage\n\n```yaml\nname: \"My workflow\"\n# No permissions block\n```\n\n### Correct Usage\n\n```yaml\nname: \"My workflow\"\npermissions:\n  contents: read\n  pull-requests: write\n```\n\nor\n\n```yaml\njobs:\n  my-job:\n    permissions:\n      contents: read\n      pull-requests: write\n```\n\n## References\n\n- GitHub Docs: [Assigning permissions to jobs](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/assigning-permissions-to-jobs).\n",
+            "security_severity_level": "medium"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"none\",\"language\":\"actions\"}",
+            "category": "/language:actions",
+            "state": "open",
+            "commit_sha": "4139a35c8d53cfd53817ec71578e2252ffd56f05",
+            "message": {
+                "text": "Actions job or workflow does not limit the permissions of the GITHUB_TOKEN. Consider setting an explicit permissions block, using the following as a minimal starting point: {{contents: read}}"
+            },
+            "location": {
+                "path": ".github/workflows/github-sec-bot.yml",
+                "start_line": 31,
+                "end_line": 173,
+                "start_column": 5,
+                "end_column": 29
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/book_shop/code-scanning/alerts/1/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    }
+]

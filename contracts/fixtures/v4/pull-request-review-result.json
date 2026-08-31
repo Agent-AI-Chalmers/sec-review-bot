@@ -1,0 +1,34 @@
+{
+  "contract_version": "v4",
+  "review_record": {
+    "analysis": {
+      "verdict": "confirmed-defect",
+      "overview": "The pull request fixes direct webhook validation but misses retries.",
+      "narratives": []
+    },
+    "mitigation": {
+      "overview": null,
+      "changed_files": [],
+      "file_changes": [],
+      "patch_diff": null
+    },
+    "verification": {
+      "overview": "Queued retry payloads remain unverified.",
+      "review_target_claim": "The patch should cover every webhook execution path.",
+      "validation_level": "static",
+      "patch_coverage": "partial",
+      "regression_status": "not-run",
+      "resolution_next_step": "manual-review",
+      "patch_findings": [
+        "Direct webhook requests are covered."
+      ],
+      "verification_findings": [
+        "Retry payload validation is still missing."
+      ],
+      "residual_risks": [
+        "Queued retries may reuse stale metadata."
+      ]
+    },
+    "cvss": null
+  }
+}

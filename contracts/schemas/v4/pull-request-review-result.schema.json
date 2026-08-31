@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.local/contracts/schemas/v4/pull-request-review-result.schema.json",
+  "title": "Contract v4 pull-request-review result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "review_record"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "v4"
+    },
+    "review_record": {
+      "$ref": "common.schema.json#/$defs/reviewRecord"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_fixtures": {
+    "issue-review-input.json": "issue-review-input.schema.json",
+    "issue-review-result.json": "issue-review-result.schema.json",
+    "pull-request-review-input.json": "pull-request-review-input.schema.json",
+    "pull-request-review-result.json": "pull-request-review-result.schema.json",
+    "repository-review-input-full.json": "repository-review-input.schema.json",
+    "repository-review-input-incremental.json": "repository-review-input.schema.json",
+    "repository-review-result-blocked.json": "repository-review-result.schema.json",
+    "repository-review-result.json": "repository-review-result.schema.json",
+    "review-record-deleted-file.json": "review-record.schema.json",
+    "review-record-no-actionable.json": "review-record.schema.json",
+    "review-record.json": "review-record.schema.json"
+  }
+}

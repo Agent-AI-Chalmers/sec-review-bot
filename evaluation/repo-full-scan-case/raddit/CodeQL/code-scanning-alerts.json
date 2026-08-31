@@ -1,0 +1,597 @@
+[
+    {
+        "number": 11,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/11",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/11",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/sql-injection",
+            "severity": "error",
+            "description": "Database query built from user-controlled sources",
+            "name": "go/sql-injection",
+            "tags": [
+                "external/cwe/cwe-089",
+                "security"
+            ],
+            "full_description": "Building a database query from user-controlled sources is vulnerable to insertion of malicious code by the user.",
+            "help": "# Database query built from user-controlled sources\nIf a database query (such as an SQL or NoSQL query) is built from user-provided data without sufficient sanitization, a malicious user may be able to run commands that exfiltrate, tamper with, or destroy data stored in the database.\n\n\n## Recommendation\nMost database connector libraries offer a way of safely embedding untrusted data into a query by means of query parameters or prepared statements. Use these features rather than building queries by string concatenation.\n\n\n## Example\nIn the following example, assume the function `handler` is an HTTP request handler in a web application, whose parameter `req` contains the request object:\n\n\n```go\npackage main\n\nimport (\n\t\"database/sql\"\n\t\"fmt\"\n\t\"net/http\"\n)\n\nfunc handler(db *sql.DB, req *http.Request) {\n\tq := fmt.Sprintf(\"SELECT ITEM,PRICE FROM PRODUCT WHERE ITEM_CATEGORY='%s' ORDER BY PRICE\",\n\t\treq.URL.Query()[\"category\"])\n\tdb.Query(q)\n}\n\n```\nThe handler constructs an SQL query involving user input taken from the request object unsafely using `fmt.Sprintf` to embed a request parameter directly into the query string `q`. The parameter may include quote characters, allowing a malicious user to terminate the string literal into which the parameter is embedded and add arbitrary SQL code after it.\n\nInstead, the untrusted query parameter should be safely embedded using placeholder parameters:\n\n\n```go\npackage main\n\nimport (\n\t\"database/sql\"\n\t\"net/http\"\n)\n\nfunc handlerGood(db *sql.DB, req *http.Request) {\n\tq := \"SELECT ITEM,PRICE FROM PRODUCT WHERE ITEM_CATEGORY='?' ORDER BY PRICE\"\n\tdb.Query(q, req.URL.Query()[\"category\"])\n}\n\n```\n\n## References\n* Wikipedia: [SQL injection](https://en.wikipedia.org/wiki/SQL_injection).\n* Common Weakness Enumeration: [CWE-89](https://cwe.mitre.org/data/definitions/89.html).\n",
+            "security_severity_level": "high"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "This query depends on a user-provided value."
+            },
+            "location": {
+                "path": "backend/handlers/posts.go",
+                "start_line": 69,
+                "end_line": 69,
+                "start_column": 33,
+                "end_column": 38
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/11/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 10,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/10",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/10",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/sql-injection",
+            "severity": "error",
+            "description": "Database query built from user-controlled sources",
+            "name": "go/sql-injection",
+            "tags": [
+                "external/cwe/cwe-089",
+                "security"
+            ],
+            "full_description": "Building a database query from user-controlled sources is vulnerable to insertion of malicious code by the user.",
+            "help": "# Database query built from user-controlled sources\nIf a database query (such as an SQL or NoSQL query) is built from user-provided data without sufficient sanitization, a malicious user may be able to run commands that exfiltrate, tamper with, or destroy data stored in the database.\n\n\n## Recommendation\nMost database connector libraries offer a way of safely embedding untrusted data into a query by means of query parameters or prepared statements. Use these features rather than building queries by string concatenation.\n\n\n## Example\nIn the following example, assume the function `handler` is an HTTP request handler in a web application, whose parameter `req` contains the request object:\n\n\n```go\npackage main\n\nimport (\n\t\"database/sql\"\n\t\"fmt\"\n\t\"net/http\"\n)\n\nfunc handler(db *sql.DB, req *http.Request) {\n\tq := fmt.Sprintf(\"SELECT ITEM,PRICE FROM PRODUCT WHERE ITEM_CATEGORY='%s' ORDER BY PRICE\",\n\t\treq.URL.Query()[\"category\"])\n\tdb.Query(q)\n}\n\n```\nThe handler constructs an SQL query involving user input taken from the request object unsafely using `fmt.Sprintf` to embed a request parameter directly into the query string `q`. The parameter may include quote characters, allowing a malicious user to terminate the string literal into which the parameter is embedded and add arbitrary SQL code after it.\n\nInstead, the untrusted query parameter should be safely embedded using placeholder parameters:\n\n\n```go\npackage main\n\nimport (\n\t\"database/sql\"\n\t\"net/http\"\n)\n\nfunc handlerGood(db *sql.DB, req *http.Request) {\n\tq := \"SELECT ITEM,PRICE FROM PRODUCT WHERE ITEM_CATEGORY='?' ORDER BY PRICE\"\n\tdb.Query(q, req.URL.Query()[\"category\"])\n}\n\n```\n\n## References\n* Wikipedia: [SQL injection](https://en.wikipedia.org/wiki/SQL_injection).\n* Common Weakness Enumeration: [CWE-89](https://cwe.mitre.org/data/definitions/89.html).\n",
+            "security_severity_level": "high"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "This query depends on a user-provided value.\nThis query depends on a user-provided value.\nThis query depends on a user-provided value."
+            },
+            "location": {
+                "path": "backend/handlers/posts.go",
+                "start_line": 36,
+                "end_line": 36,
+                "start_column": 33,
+                "end_column": 38
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/10/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 9,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/9",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/9",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/sql-injection",
+            "severity": "error",
+            "description": "Database query built from user-controlled sources",
+            "name": "go/sql-injection",
+            "tags": [
+                "external/cwe/cwe-089",
+                "security"
+            ],
+            "full_description": "Building a database query from user-controlled sources is vulnerable to insertion of malicious code by the user.",
+            "help": "# Database query built from user-controlled sources\nIf a database query (such as an SQL or NoSQL query) is built from user-provided data without sufficient sanitization, a malicious user may be able to run commands that exfiltrate, tamper with, or destroy data stored in the database.\n\n\n## Recommendation\nMost database connector libraries offer a way of safely embedding untrusted data into a query by means of query parameters or prepared statements. Use these features rather than building queries by string concatenation.\n\n\n## Example\nIn the following example, assume the function `handler` is an HTTP request handler in a web application, whose parameter `req` contains the request object:\n\n\n```go\npackage main\n\nimport (\n\t\"database/sql\"\n\t\"fmt\"\n\t\"net/http\"\n)\n\nfunc handler(db *sql.DB, req *http.Request) {\n\tq := fmt.Sprintf(\"SELECT ITEM,PRICE FROM PRODUCT WHERE ITEM_CATEGORY='%s' ORDER BY PRICE\",\n\t\treq.URL.Query()[\"category\"])\n\tdb.Query(q)\n}\n\n```\nThe handler constructs an SQL query involving user input taken from the request object unsafely using `fmt.Sprintf` to embed a request parameter directly into the query string `q`. The parameter may include quote characters, allowing a malicious user to terminate the string literal into which the parameter is embedded and add arbitrary SQL code after it.\n\nInstead, the untrusted query parameter should be safely embedded using placeholder parameters:\n\n\n```go\npackage main\n\nimport (\n\t\"database/sql\"\n\t\"net/http\"\n)\n\nfunc handlerGood(db *sql.DB, req *http.Request) {\n\tq := \"SELECT ITEM,PRICE FROM PRODUCT WHERE ITEM_CATEGORY='?' ORDER BY PRICE\"\n\tdb.Query(q, req.URL.Query()[\"category\"])\n}\n\n```\n\n## References\n* Wikipedia: [SQL injection](https://en.wikipedia.org/wiki/SQL_injection).\n* Common Weakness Enumeration: [CWE-89](https://cwe.mitre.org/data/definitions/89.html).\n",
+            "security_severity_level": "high"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "This query depends on a user-provided value."
+            },
+            "location": {
+                "path": "backend/handlers/auth.go",
+                "start_line": 61,
+                "end_line": 61,
+                "start_column": 30,
+                "end_column": 35
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/9/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 8,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/8",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/8",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/path-injection",
+            "severity": "error",
+            "description": "Uncontrolled data used in path expression",
+            "name": "go/path-injection",
+            "tags": [
+                "external/cwe/cwe-022",
+                "external/cwe/cwe-023",
+                "external/cwe/cwe-036",
+                "external/cwe/cwe-073",
+                "external/cwe/cwe-099",
+                "security"
+            ],
+            "full_description": "Accessing paths influenced by users can allow an attacker to access unexpected resources.",
+            "help": "# Uncontrolled data used in path expression\nAccessing files using paths constructed from user-controlled data can allow an attacker to access unexpected resources. This can result in sensitive information being revealed or deleted, or an attacker being able to influence behavior by modifying unexpected files.\n\nPaths that are naively constructed from data controlled by a user may be absolute paths, or may contain unexpected special characters such as \"..\". Such a path could point anywhere on the file system.\n\n\n## Recommendation\nValidate user input before using it to construct a file path.\n\nCommon validation methods include checking that the normalized path is relative and does not contain any \"..\" components, or checking that the path is contained within a safe folder. The method you should use depends on how the path is used in the application, and whether the path should be a single path component.\n\nIf the path should be a single path component (such as a file name), you can check for the existence of any path separators (\"/\" or \"\\\\\"), or \"..\" sequences in the input, and reject the input if any are found.\n\nNote that removing \"../\" sequences is *not* sufficient, since the input could still contain a path separator followed by \"..\". For example, the input \".../...//\" would still result in the string \"../\" if only \"../\" sequences are removed.\n\nFinally, the simplest (but most restrictive) option is to use an allow list of safe patterns and make sure that the user input matches one of these patterns.\n\n\n## Example\nIn the first example, a file name is read from an HTTP request and then used to access a file. However, a malicious user could enter a file name which is an absolute path, such as \"/etc/passwd\".\n\nIn the second example, it appears that the user is restricted to opening a file within the `\"user\"` home directory. However, a malicious user could enter a file name containing special characters. For example, the string `\"../../etc/passwd\"` will result in the code reading the file located at \"/home/user/../../etc/passwd\", which is the system's password file. This file would then be sent back to the user, giving them access to password information.\n\n\n```go\npackage main\n\nimport (\n\t\"io/ioutil\"\n\t\"net/http\"\n\t\"path/filepath\"\n)\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n\tpath := r.URL.Query()[\"path\"][0]\n\n\t// BAD: This could read any file on the file system\n\tdata, _ := ioutil.ReadFile(path)\n\tw.Write(data)\n\n\t// BAD: This could still read any file on the file system\n\tdata, _ = ioutil.ReadFile(filepath.Join(\"/home/user/\", path))\n\tw.Write(data)\n}\n\n```\nIf the input should only be a file name, you can check that it doesn't contain any path separators or \"..\" sequences.\n\n\n```go\npackage main\n\nimport (\n\t\"io/ioutil\"\n\t\"net/http\"\n\t\"path/filepath\"\n\t\"strings\"\n)\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n\tpath := r.URL.Query()[\"path\"][0]\n\n\t// GOOD: ensure that the filename has no path separators or parent directory references\n\t// (Note that this is only suitable if `path` is expected to have a single component!)\n\tif strings.Contains(path, \"/\") || strings.Contains(path, \"\\\\\") || strings.Contains(path, \"..\") {\n\t\thttp.Error(w, \"Invalid file name\", http.StatusBadRequest)\n\t\treturn\n\t}\n\tdata, _ := ioutil.ReadFile(filepath.Join(\"/home/user/\", path))\n\tw.Write(data)\n}\n\n```\nNote that this approach is only suitable if the input is expected to be a single file name.\n\nIf the input can be a path with multiple components, you can make it safe by verifying that the path is within a specific directory that is considered safe. You can do this by resolving the input with respect to that directory, and then checking that the resulting path is still within it.\n\n\n```go\npackage main\n\nimport (\n\t\"io/ioutil\"\n\t\"net/http\"\n\t\"path/filepath\"\n\t\"strings\"\n)\n\nconst safeDir = \"/home/user/\"\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n\tpath := r.URL.Query()[\"path\"][0]\n\n\t// GOOD: ensure that the resolved path is within the safe directory\n\tabsPath, err := filepath.Abs(filepath.Join(safeDir, path))\n\tif err != nil || !strings.HasPrefix(absPath, safeDir) {\n\t\thttp.Error(w, \"Invalid file name\", http.StatusBadRequest)\n\t\treturn\n\t}\n\tdata, _ := ioutil.ReadFile(absPath)\n\tw.Write(data)\n}\n\n```\nNote that `/home/user` is just an example, you should replace it with the actual safe directory in your application. Also, while in this example the path of the safe directory is absolute, this may not always be the case, and you may need to resolve it first before checking the input.\n\n\n## References\n* OWASP: [Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal).\n* Common Weakness Enumeration: [CWE-22](https://cwe.mitre.org/data/definitions/22.html).\n* Common Weakness Enumeration: [CWE-23](https://cwe.mitre.org/data/definitions/23.html).\n* Common Weakness Enumeration: [CWE-36](https://cwe.mitre.org/data/definitions/36.html).\n* Common Weakness Enumeration: [CWE-73](https://cwe.mitre.org/data/definitions/73.html).\n* Common Weakness Enumeration: [CWE-99](https://cwe.mitre.org/data/definitions/99.html).\n",
+            "security_severity_level": "high"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "This path depends on a user-provided value."
+            },
+            "location": {
+                "path": "backend/handlers/files.go",
+                "start_line": 70,
+                "end_line": 70,
+                "start_column": 9,
+                "end_column": 17
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/8/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 7,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/7",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/7",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/path-injection",
+            "severity": "error",
+            "description": "Uncontrolled data used in path expression",
+            "name": "go/path-injection",
+            "tags": [
+                "external/cwe/cwe-022",
+                "external/cwe/cwe-023",
+                "external/cwe/cwe-036",
+                "external/cwe/cwe-073",
+                "external/cwe/cwe-099",
+                "security"
+            ],
+            "full_description": "Accessing paths influenced by users can allow an attacker to access unexpected resources.",
+            "help": "# Uncontrolled data used in path expression\nAccessing files using paths constructed from user-controlled data can allow an attacker to access unexpected resources. This can result in sensitive information being revealed or deleted, or an attacker being able to influence behavior by modifying unexpected files.\n\nPaths that are naively constructed from data controlled by a user may be absolute paths, or may contain unexpected special characters such as \"..\". Such a path could point anywhere on the file system.\n\n\n## Recommendation\nValidate user input before using it to construct a file path.\n\nCommon validation methods include checking that the normalized path is relative and does not contain any \"..\" components, or checking that the path is contained within a safe folder. The method you should use depends on how the path is used in the application, and whether the path should be a single path component.\n\nIf the path should be a single path component (such as a file name), you can check for the existence of any path separators (\"/\" or \"\\\\\"), or \"..\" sequences in the input, and reject the input if any are found.\n\nNote that removing \"../\" sequences is *not* sufficient, since the input could still contain a path separator followed by \"..\". For example, the input \".../...//\" would still result in the string \"../\" if only \"../\" sequences are removed.\n\nFinally, the simplest (but most restrictive) option is to use an allow list of safe patterns and make sure that the user input matches one of these patterns.\n\n\n## Example\nIn the first example, a file name is read from an HTTP request and then used to access a file. However, a malicious user could enter a file name which is an absolute path, such as \"/etc/passwd\".\n\nIn the second example, it appears that the user is restricted to opening a file within the `\"user\"` home directory. However, a malicious user could enter a file name containing special characters. For example, the string `\"../../etc/passwd\"` will result in the code reading the file located at \"/home/user/../../etc/passwd\", which is the system's password file. This file would then be sent back to the user, giving them access to password information.\n\n\n```go\npackage main\n\nimport (\n\t\"io/ioutil\"\n\t\"net/http\"\n\t\"path/filepath\"\n)\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n\tpath := r.URL.Query()[\"path\"][0]\n\n\t// BAD: This could read any file on the file system\n\tdata, _ := ioutil.ReadFile(path)\n\tw.Write(data)\n\n\t// BAD: This could still read any file on the file system\n\tdata, _ = ioutil.ReadFile(filepath.Join(\"/home/user/\", path))\n\tw.Write(data)\n}\n\n```\nIf the input should only be a file name, you can check that it doesn't contain any path separators or \"..\" sequences.\n\n\n```go\npackage main\n\nimport (\n\t\"io/ioutil\"\n\t\"net/http\"\n\t\"path/filepath\"\n\t\"strings\"\n)\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n\tpath := r.URL.Query()[\"path\"][0]\n\n\t// GOOD: ensure that the filename has no path separators or parent directory references\n\t// (Note that this is only suitable if `path` is expected to have a single component!)\n\tif strings.Contains(path, \"/\") || strings.Contains(path, \"\\\\\") || strings.Contains(path, \"..\") {\n\t\thttp.Error(w, \"Invalid file name\", http.StatusBadRequest)\n\t\treturn\n\t}\n\tdata, _ := ioutil.ReadFile(filepath.Join(\"/home/user/\", path))\n\tw.Write(data)\n}\n\n```\nNote that this approach is only suitable if the input is expected to be a single file name.\n\nIf the input can be a path with multiple components, you can make it safe by verifying that the path is within a specific directory that is considered safe. You can do this by resolving the input with respect to that directory, and then checking that the resulting path is still within it.\n\n\n```go\npackage main\n\nimport (\n\t\"io/ioutil\"\n\t\"net/http\"\n\t\"path/filepath\"\n\t\"strings\"\n)\n\nconst safeDir = \"/home/user/\"\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n\tpath := r.URL.Query()[\"path\"][0]\n\n\t// GOOD: ensure that the resolved path is within the safe directory\n\tabsPath, err := filepath.Abs(filepath.Join(safeDir, path))\n\tif err != nil || !strings.HasPrefix(absPath, safeDir) {\n\t\thttp.Error(w, \"Invalid file name\", http.StatusBadRequest)\n\t\treturn\n\t}\n\tdata, _ := ioutil.ReadFile(absPath)\n\tw.Write(data)\n}\n\n```\nNote that `/home/user` is just an example, you should replace it with the actual safe directory in your application. Also, while in this example the path of the safe directory is absolute, this may not always be the case, and you may need to resolve it first before checking the input.\n\n\n## References\n* OWASP: [Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal).\n* Common Weakness Enumeration: [CWE-22](https://cwe.mitre.org/data/definitions/22.html).\n* Common Weakness Enumeration: [CWE-23](https://cwe.mitre.org/data/definitions/23.html).\n* Common Weakness Enumeration: [CWE-36](https://cwe.mitre.org/data/definitions/36.html).\n* Common Weakness Enumeration: [CWE-73](https://cwe.mitre.org/data/definitions/73.html).\n* Common Weakness Enumeration: [CWE-99](https://cwe.mitre.org/data/definitions/99.html).\n",
+            "security_severity_level": "high"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "This path depends on a user-provided value."
+            },
+            "location": {
+                "path": "backend/handlers/files.go",
+                "start_line": 65,
+                "end_line": 65,
+                "start_column": 23,
+                "end_column": 31
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/7/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 6,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/6",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/6",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/request-forgery",
+            "severity": "error",
+            "description": "Uncontrolled data used in network request",
+            "name": "go/request-forgery",
+            "tags": [
+                "external/cwe/cwe-918",
+                "security"
+            ],
+            "full_description": "Sending network requests with user-controlled data allows for request forgery attacks.",
+            "help": "# Uncontrolled data used in network request\nDirectly incorporating user input into an HTTP request without validating the input can facilitate different kinds of request forgery attacks, where the attacker essentially controls the request. If the vulnerable request is in server-side code, then security mechanisms, such as external firewalls, can be bypassed. If the vulnerable request is in client-side code, then unsuspecting users can send malicious requests to other servers, potentially resulting in a DDOS attack.\n\n\n## Recommendation\nTo guard against request forgery, it is advisable to avoid putting user input directly into a network request. If a flexible network request mechanism is required, it is recommended to maintain a list of authorized request targets and choose from that list based on the user input provided.\n\n\n## Example\nThe following example shows an HTTP request parameter being used directly in a URL request without validating the input, which facilitates an SSRF attack. The request `http.Get(...)` is vulnerable since attackers can choose the value of `target` to be anything they want. For instance, the attacker can choose `\"internal.example.com/#\"` as the target, causing the URL used in the request to be `\"https://internal.example.com/#.example.com/data\"`.\n\nA request to `https://internal.example.com` may be problematic if that server is not meant to be directly accessible from the attacker's machine.\n\n\n```go\npackage main\n\nimport (\n\t\"net/http\"\n)\n\nfunc handler(w http.ResponseWriter, req *http.Request) {\n\ttarget := req.FormValue(\"target\")\n\n\t// BAD: `target` is controlled by the attacker\n\tresp, err := http.Get(\"https://\" + target + \".example.com/data/\")\n\tif err != nil {\n\t\t// error handling\n\t}\n\n\t// process request response\n\tuse(resp)\n}\n\n```\nOne way to remedy the problem is to use the user input to select a known fixed string before performing the request:\n\n\n```go\npackage main\n\nimport (\n\t\"net/http\"\n)\n\nfunc handler1(w http.ResponseWriter, req *http.Request) {\n\ttarget := req.FormValue(\"target\")\n\n\tvar subdomain string\n\tif target == \"EU\" {\n\t\tsubdomain = \"europe\"\n\t} else {\n\t\tsubdomain = \"world\"\n\t}\n\n\t// GOOD: `subdomain` is controlled by the server\n\tresp, err := http.Get(\"https://\" + subdomain + \".example.com/data/\")\n\tif err != nil {\n\t\t// error handling\n\t}\n\n\t// process request response\n\tuse(resp)\n}\n\n```\n\n## References\n* OWASP: [SSRF](https://www.owasp.org/index.php/Server_Side_Request_Forgery)\n* Common Weakness Enumeration: [CWE-918](https://cwe.mitre.org/data/definitions/918.html).\n",
+            "security_severity_level": "critical"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "The URL of this request depends on a user-provided value."
+            },
+            "location": {
+                "path": "backend/handlers/posts.go",
+                "start_line": 238,
+                "end_line": 238,
+                "start_column": 15,
+                "end_column": 36
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/6/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 5,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/5",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/5",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/clear-text-logging",
+            "severity": "error",
+            "description": "Clear-text logging of sensitive information",
+            "name": "go/clear-text-logging",
+            "tags": [
+                "external/cwe/cwe-312",
+                "external/cwe/cwe-315",
+                "external/cwe/cwe-359",
+                "security"
+            ],
+            "full_description": "Logging sensitive information without encryption or hashing can expose it to an attacker.",
+            "help": "# Clear-text logging of sensitive information\nSensitive information that is logged unencrypted is accessible to an attacker who gains access to the logs.\n\n\n## Recommendation\nEnsure that sensitive information is always encrypted or obfuscated before being logged.\n\nIn general, decrypt sensitive information only at the point where it is necessary for it to be used in cleartext.\n\nBe aware that external processes often store the standard out and standard error streams of the application, causing logged sensitive information to be stored.\n\n\n## Example\nThe following example code logs user credentials (in this case, their password) in plain text:\n\n\n```go\npackage main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n)\n\nfunc serve() {\n\thttp.HandleFunc(\"/register\", func(w http.ResponseWriter, r *http.Request) {\n\t\tr.ParseForm()\n\t\tuser := r.Form.Get(\"user\")\n\t\tpw := r.Form.Get(\"password\")\n\n\t\tlog.Printf(\"Registering new user %s with password %s.\\n\", user, pw)\n\t})\n\thttp.ListenAndServe(\":80\", nil)\n}\n\n```\nInstead, the credentials should be encrypted, obfuscated, or omitted entirely:\n\n\n```go\npackage main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n)\n\nfunc serve1() {\n\thttp.HandleFunc(\"/register\", func(w http.ResponseWriter, r *http.Request) {\n\t\tr.ParseForm()\n\t\tuser := r.Form.Get(\"user\")\n\t\tpw := r.Form.Get(\"password\")\n\n\t\tlog.Printf(\"Registering new user %s.\\n\", user)\n\n\t\t// ...\n\t\tuse(pw)\n\t})\n\thttp.ListenAndServe(\":80\", nil)\n}\n\n```\n\n## References\n* M. Dowd, J. McDonald and J. Schuhm, *The Art of Software Security Assessment*, 1st Edition, Chapter 2 - 'Common Vulnerabilities of Encryption', p. 43. Addison Wesley, 2006.\n* M. Howard and D. LeBlanc, *Writing Secure Code*, 2nd Edition, Chapter 9 - 'Protecting Secret Data', p. 299. Microsoft, 2002.\n* OWASP: [Password Plaintext Storage](https://www.owasp.org/index.php/Password_Plaintext_Storage).\n* Common Weakness Enumeration: [CWE-312](https://cwe.mitre.org/data/definitions/312.html).\n* Common Weakness Enumeration: [CWE-315](https://cwe.mitre.org/data/definitions/315.html).\n* Common Weakness Enumeration: [CWE-359](https://cwe.mitre.org/data/definitions/359.html).\n",
+            "security_severity_level": "high"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "Sensitive data returned by an access to Password flows to a logging call."
+            },
+            "location": {
+                "path": "backend/handlers/auth.go",
+                "start_line": 75,
+                "end_line": 75,
+                "start_column": 18,
+                "end_column": 30
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/5/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 4,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/4",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/4",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/clear-text-logging",
+            "severity": "error",
+            "description": "Clear-text logging of sensitive information",
+            "name": "go/clear-text-logging",
+            "tags": [
+                "external/cwe/cwe-312",
+                "external/cwe/cwe-315",
+                "external/cwe/cwe-359",
+                "security"
+            ],
+            "full_description": "Logging sensitive information without encryption or hashing can expose it to an attacker.",
+            "help": "# Clear-text logging of sensitive information\nSensitive information that is logged unencrypted is accessible to an attacker who gains access to the logs.\n\n\n## Recommendation\nEnsure that sensitive information is always encrypted or obfuscated before being logged.\n\nIn general, decrypt sensitive information only at the point where it is necessary for it to be used in cleartext.\n\nBe aware that external processes often store the standard out and standard error streams of the application, causing logged sensitive information to be stored.\n\n\n## Example\nThe following example code logs user credentials (in this case, their password) in plain text:\n\n\n```go\npackage main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n)\n\nfunc serve() {\n\thttp.HandleFunc(\"/register\", func(w http.ResponseWriter, r *http.Request) {\n\t\tr.ParseForm()\n\t\tuser := r.Form.Get(\"user\")\n\t\tpw := r.Form.Get(\"password\")\n\n\t\tlog.Printf(\"Registering new user %s with password %s.\\n\", user, pw)\n\t})\n\thttp.ListenAndServe(\":80\", nil)\n}\n\n```\nInstead, the credentials should be encrypted, obfuscated, or omitted entirely:\n\n\n```go\npackage main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n)\n\nfunc serve1() {\n\thttp.HandleFunc(\"/register\", func(w http.ResponseWriter, r *http.Request) {\n\t\tr.ParseForm()\n\t\tuser := r.Form.Get(\"user\")\n\t\tpw := r.Form.Get(\"password\")\n\n\t\tlog.Printf(\"Registering new user %s.\\n\", user)\n\n\t\t// ...\n\t\tuse(pw)\n\t})\n\thttp.ListenAndServe(\":80\", nil)\n}\n\n```\n\n## References\n* M. Dowd, J. McDonald and J. Schuhm, *The Art of Software Security Assessment*, 1st Edition, Chapter 2 - 'Common Vulnerabilities of Encryption', p. 43. Addison Wesley, 2006.\n* M. Howard and D. LeBlanc, *Writing Secure Code*, 2nd Edition, Chapter 9 - 'Protecting Secret Data', p. 299. Microsoft, 2002.\n* OWASP: [Password Plaintext Storage](https://www.owasp.org/index.php/Password_Plaintext_Storage).\n* Common Weakness Enumeration: [CWE-312](https://cwe.mitre.org/data/definitions/312.html).\n* Common Weakness Enumeration: [CWE-315](https://cwe.mitre.org/data/definitions/315.html).\n* Common Weakness Enumeration: [CWE-359](https://cwe.mitre.org/data/definitions/359.html).\n",
+            "security_severity_level": "high"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "Sensitive data returned by an access to Password flows to a logging call."
+            },
+            "location": {
+                "path": "backend/handlers/auth.go",
+                "start_line": 68,
+                "end_line": 68,
+                "start_column": 18,
+                "end_column": 30
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/4/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 3,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/3",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/3",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/cookie-secure-not-set",
+            "severity": "warning",
+            "description": "Cookie 'Secure' attribute is not set to true",
+            "name": "go/cookie-secure-not-set",
+            "tags": [
+                "external/cwe/cwe-614",
+                "security"
+            ],
+            "full_description": "Cookies without the `Secure` flag may be sent in cleartext. This makes them vulnerable to be intercepted by an attacker.",
+            "help": "# Cookie 'Secure' attribute is not set to true\nCookies without the `Secure` flag set may be transmitted using HTTP instead of HTTPS. This leaves them vulnerable to being read by a third party attacker. If a sensitive cookie such as a session key is intercepted this way, it would allow the attacker to perform actions on a user's behalf.\n\n\n## Recommendation\nSet the `Secure` flag to `true` to ensure cookies are only transmitted over secure HTTPS connections.\n\n\n## Example\nIn the following example, in the case marked BAD, the `Secure` flag is set to `false` by default. In the case marked GOOD, the `Secure` flag is set to `true`.\n\n\n```go\npackage main\n\nimport (\n\t\"net/http\"\n)\n\nfunc handlerBad(w http.ResponseWriter, r *http.Request) {\n\tc := http.Cookie{\n\t\tName:  \"session\",\n\t\tValue: \"secret\",\n\t}\n\thttp.SetCookie(w, &c) // BAD: The Secure flag is set to false by default.\n}\n\nfunc handlerGood(w http.ResponseWriter, r *http.Request) {\n\tc := http.Cookie{\n\t\tName:   \"session\",\n\t\tValue:  \"secret\",\n\t\tSecure: true,\n\t}\n\thttp.SetCookie(w, &c) // GOOD: The Secure flag is set to true.\n}\n\n```\n\n## References\n* MDN: [Set-Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie) Header.\n* Detectify: [Cookie lack Secure flag](https://support.detectify.com/support/solutions/articles/48001048982-cookie-lack-secure-flag).\n* PortSwigger: [TLS cookie without secure flag set](https://portswigger.net/kb/issues/00500200_tls-cookie-without-secure-flag-set).\n* Common Weakness Enumeration: [CWE-614](https://cwe.mitre.org/data/definitions/614.html).\n",
+            "security_severity_level": "medium"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "Cookie does not set Secure attribute to true."
+            },
+            "location": {
+                "path": "backend/handlers/auth.go",
+                "start_line": 112,
+                "end_line": 112,
+                "start_column": 2,
+                "end_column": 54
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/3/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 2,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/2",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/2",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/cookie-secure-not-set",
+            "severity": "warning",
+            "description": "Cookie 'Secure' attribute is not set to true",
+            "name": "go/cookie-secure-not-set",
+            "tags": [
+                "external/cwe/cwe-614",
+                "security"
+            ],
+            "full_description": "Cookies without the `Secure` flag may be sent in cleartext. This makes them vulnerable to be intercepted by an attacker.",
+            "help": "# Cookie 'Secure' attribute is not set to true\nCookies without the `Secure` flag set may be transmitted using HTTP instead of HTTPS. This leaves them vulnerable to being read by a third party attacker. If a sensitive cookie such as a session key is intercepted this way, it would allow the attacker to perform actions on a user's behalf.\n\n\n## Recommendation\nSet the `Secure` flag to `true` to ensure cookies are only transmitted over secure HTTPS connections.\n\n\n## Example\nIn the following example, in the case marked BAD, the `Secure` flag is set to `false` by default. In the case marked GOOD, the `Secure` flag is set to `true`.\n\n\n```go\npackage main\n\nimport (\n\t\"net/http\"\n)\n\nfunc handlerBad(w http.ResponseWriter, r *http.Request) {\n\tc := http.Cookie{\n\t\tName:  \"session\",\n\t\tValue: \"secret\",\n\t}\n\thttp.SetCookie(w, &c) // BAD: The Secure flag is set to false by default.\n}\n\nfunc handlerGood(w http.ResponseWriter, r *http.Request) {\n\tc := http.Cookie{\n\t\tName:   \"session\",\n\t\tValue:  \"secret\",\n\t\tSecure: true,\n\t}\n\thttp.SetCookie(w, &c) // GOOD: The Secure flag is set to true.\n}\n\n```\n\n## References\n* MDN: [Set-Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie) Header.\n* Detectify: [Cookie lack Secure flag](https://support.detectify.com/support/solutions/articles/48001048982-cookie-lack-secure-flag).\n* PortSwigger: [TLS cookie without secure flag set](https://portswigger.net/kb/issues/00500200_tls-cookie-without-secure-flag-set).\n* Common Weakness Enumeration: [CWE-614](https://cwe.mitre.org/data/definitions/614.html).\n",
+            "security_severity_level": "medium"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "Cookie does not set Secure attribute to true."
+            },
+            "location": {
+                "path": "backend/handlers/auth.go",
+                "start_line": 94,
+                "end_line": 94,
+                "start_column": 2,
+                "end_column": 60
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/2/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    },
+    {
+        "number": 1,
+        "created_at": "2026-05-02T15:42:47Z",
+        "updated_at": "2026-05-02T15:42:47Z",
+        "url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/1",
+        "html_url": "https://github.com/Agent-AI-Chalmers/raddit/security/code-scanning/1",
+        "state": "open",
+        "fixed_at": null,
+        "dismissed_by": null,
+        "dismissed_at": null,
+        "dismissed_reason": null,
+        "dismissed_comment": null,
+        "rule": {
+            "id": "go/command-injection",
+            "severity": "error",
+            "description": "Command built from user-controlled sources",
+            "name": "go/command-injection",
+            "tags": [
+                "external/cwe/cwe-078",
+                "security"
+            ],
+            "full_description": "Building a system command from user-controlled sources is vulnerable to insertion of malicious code by the user.",
+            "help": "# Command built from user-controlled sources\nIf a system command invocation is built from user-provided data without sufficient sanitization, a malicious user may be able to run commands to exfiltrate data or compromise the system.\n\n\n## Recommendation\nWhenever possible, use hard-coded string literals for commands and avoid shell string interpreters like `sh -c`.\n\nIf given arguments as a single string, avoid simply splitting the string on whitespace. Arguments may contain quoted whitespace, causing them to split into multiple arguments.\n\nIf this is not possible, sanitize user input to avoid characters like spaces and various kinds of quotes that can alter the meaning of the command.\n\n\n## Example\nIn the following example, assume the function `handler` is an HTTP request handler in a web application, whose parameter `req` contains the request object:\n\n\n```go\npackage main\n\nimport (\n\t\"net/http\"\n\t\"os/exec\"\n)\n\nfunc handler(req *http.Request) {\n\timageName := req.URL.Query()[\"imageName\"][0]\n\toutputPath := \"/tmp/output.svg\"\n\tcmd := exec.Command(\"sh\", \"-c\", fmt.Sprintf(\"imagetool %s > %s\", imageName, outputPath))\n\tcmd.Run()\n\t// ...\n}\n\n```\nThe handler extracts the image file name from the request and uses the image name to construct a shell command that is executed using ``` `sh -c` ```, which can lead to command injection.\n\nIt's better to avoid shell commands by using the `exec.Command` function directly, as shown in the following example:\n\n\n```go\npackage main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n\t\"os\"\n\t\"os/exec\"\n)\n\nfunc handler(req *http.Request) {\n\timageName := req.URL.Query()[\"imageName\"][0]\n\toutputPath := \"/tmp/output.svg\"\n\n\t// Create the output file\n\toutfile, err := os.Create(outputPath)\n\tif err != nil {\n\t\tlog.Fatal(err)\n\t}\n\tdefer outfile.Close()\n\n\t// Prepare the command\n\tcmd := exec.Command(\"imagetool\", imageName)\n\n\t// Set the output to our file\n\tcmd.Stdout = outfile\n\n\tcmd.Run()\n}\n\n```\nAlternatively, a regular expression can be used to ensure that the image name is safe to use in a shell command:\n\n\n```go\npackage main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n\t\"os/exec\"\n\t\"regexp\"\n)\n\nfunc handler(req *http.Request) {\n\timageName := req.URL.Query()[\"imageName\"][0]\n\toutputPath := \"/tmp/output.svg\"\n\n\t// Validate the imageName with a regular expression\n\tvalidImageName := regexp.MustCompile(`^[a-zA-Z0-9_\\-\\.]+$`)\n\tif !validImageName.MatchString(imageName) {\n\t\tlog.Fatal(\"Invalid image name\")\n\t\treturn\n\t}\n\n\tcmd := exec.Command(\"sh\", \"-c\", fmt.Sprintf(\"imagetool %s > %s\", imageName, outputPath))\n\tcmd.Run()\n}\n\n```\nSome commands, like `git`, can indirectly execute commands if an attacker specifies the flags given to the command.\n\nTo mitigate this risk, either add a `--` argument to ensure subsequent arguments are not interpreted as flags, or verify that the argument does not start with `\"--\"`.\n\n\n```go\npackage main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n\t\"os/exec\"\n\t\"strings\"\n)\n\nfunc handler(req *http.Request) {\n\trepoURL := req.URL.Query()[\"repoURL\"][0]\n\toutputPath := \"/tmp/repo\"\n\n\t// Sanitize the repoURL to ensure it does not start with \"--\"\n\tif strings.HasPrefix(repoURL, \"--\") {\n\t\tlog.Fatal(\"Invalid repository URL\")\n\t} else {\n\t\tcmd := exec.Command(\"git\", \"clone\", repoURL, outputPath)\n\t\terr := cmd.Run()\n\t\tif err != nil {\n\t\t\tlog.Fatal(err)\n\t\t}\n\t}\n\n\t// Or: add \"--\" to ensure that the repoURL is not interpreted as a flag\n\tcmd := exec.Command(\"git\", \"clone\", \"--\", repoURL, outputPath)\n\terr := cmd.Run()\n\tif err != nil {\n\t\tlog.Fatal(err)\n\t}\n}\n\n```\n\n## References\n* OWASP: [Command Injection](https://www.owasp.org/index.php/Command_Injection).\n* Common Weakness Enumeration: [CWE-78](https://cwe.mitre.org/data/definitions/78.html).\n",
+            "security_severity_level": "critical"
+        },
+        "tool": {
+            "name": "CodeQL",
+            "guid": null,
+            "version": "2.25.3"
+        },
+        "most_recent_instance": {
+            "ref": "refs/heads/main",
+            "analysis_key": ".github/workflows/codeql.yml:analyze",
+            "environment": "{\"build-mode\":\"autobuild\",\"language\":\"go\"}",
+            "category": "/language:go",
+            "state": "open",
+            "commit_sha": "d88a43e084303c95b69cab0a612bcfb67a1e053b",
+            "message": {
+                "text": "This command depends on a user-provided value."
+            },
+            "location": {
+                "path": "backend/utils/utils.go",
+                "start_line": 22,
+                "end_line": 22,
+                "start_column": 34,
+                "end_column": 51
+            },
+            "classifications": []
+        },
+        "instances_url": "https://api.github.com/repos/Agent-AI-Chalmers/raddit/code-scanning/alerts/1/instances",
+        "dismissal_approved_by": null,
+        "assignees": []
+    }
+]

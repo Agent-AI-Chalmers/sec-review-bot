@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Security agent repository review logo</title>
+  <desc id="desc">A flat two-color shield with a repository branch graph and a small validation checkmark.</desc>
+  <defs>
+    <style>
+      .dark-stroke{stroke:#111827}
+      .teal-stroke{stroke:#14B8A6}
+      .dark-fill{fill:#111827}
+      .teal-fill{fill:#14B8A6}
+      .shield{stroke-width:48;stroke-linecap:round;stroke-linejoin:round;fill:none}
+      .flow{stroke-width:26;stroke-linecap:round;stroke-linejoin:round;fill:none}
+      .check{stroke-width:22;stroke-linecap:round;stroke-linejoin:round;fill:none}
+      .node{fill-rule:evenodd;clip-rule:evenodd;stroke:none}
+    </style>
+  </defs>
+
+  <!-- Shield outline -->
+  <path class="dark-stroke shield" d="M512 112 C398 184 304 228 202 252 L202 414 C202 636 326 802 512 902"/>
+  <path class="teal-stroke shield" d="M512 112 C626 184 720 228 822 252 L822 414 C822 636 698 802 512 902"/>
+
+  <!-- Repository branch graph; endpoints stop at the node outer rims to keep the hollow rings clean. -->
+  <path class="dark-stroke flow" d="M338 359 L338 457"/>
+  <path class="dark-stroke flow" d="M378 497 L507 497"/>
+  <path class="teal-stroke flow" d="M587 497 C660 497 705 452 705 359"/>
+  <path class="teal-stroke flow" d="M547 537 L547 688"/>
+
+  <!-- Small validation checkmark, shifted inward so it does not crowd the shield border. -->
+  <path class="teal-stroke check" d="M628 643 L666 679 L720 613"/>
+
+  <!-- Hollow branch nodes as compound filled rings. -->
+  <path class="dark-fill node" d="M338 279a40 40 0 1 0 0 80a40 40 0 1 0 0-80Zm0 21a19 19 0 1 1 0 38a19 19 0 1 1 0-38Z"/>
+  <path class="dark-fill node" d="M338 457a40 40 0 1 0 0 80a40 40 0 1 0 0-80Zm0 21a19 19 0 1 1 0 38a19 19 0 1 1 0-38Z"/>
+  <path class="teal-fill node" d="M547 457a40 40 0 1 0 0 80a40 40 0 1 0 0-80Zm0 21a19 19 0 1 1 0 38a19 19 0 1 1 0-38Z"/>
+  <path class="teal-fill node" d="M705 279a40 40 0 1 0 0 80a40 40 0 1 0 0-80Zm0 21a19 19 0 1 1 0 38a19 19 0 1 1 0-38Z"/>
+</svg>

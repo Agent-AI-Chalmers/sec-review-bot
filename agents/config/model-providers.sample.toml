@@ -1,0 +1,54 @@
+[[deployments]]
+name = "openai_fast"
+model = "openai/gpt-4.1-mini"
+# Official OpenAI model page lists a 1,047,576-token context window:
+# https://developers.openai.com/api/docs/models/gpt-4.1-mini
+max_input_tokens = 1047576
+api_key = "your_openai_key"
+api_base = "https://your-openai-endpoint/v1"
+# timeout_ms and max_retries are optional per-deployment client settings.
+# timeout_ms = 60000
+# max_retries = 2
+
+[[deployments]]
+name = "anthropic_strong"
+model = "anthropic/claude-3-7-sonnet-20250219"
+# Official Claude API/help guidance lists 200K+ tokens for non-1M Claude API models:
+# https://support.claude.com/en/articles/8606395-how-large-is-the-claude-api-s-context-window
+max_input_tokens = 200000
+api_key = "your_anthropic_key"
+api_base = "https://your-anthropic-endpoint/v1"
+# timeout_ms = 120000
+# max_retries = 2
+
+[[deployments]]
+name = "google_gemini"
+model = "google/gemini-2.5-pro"
+# Official Google model page lists 1,048,576 maximum input tokens:
+# https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-pro
+max_input_tokens = 1048576
+api_key = "your_google_api_key"
+# api_base is optional for Google; omit it for the default Gemini Developer API.
+# api_base = "https://your-google-endpoint"
+
+[agent_deployment_bindings]
+# Every agent that may run must be explicitly bound here. The bindings below are
+# examples; choose openai_fast or a stronger deployment per agent as needed.
+repository-discovery = "anthropic_strong"
+repository-triager = "anthropic_strong"
+issue-analyzer = "anthropic_strong"
+pull-request-analyzer = "anthropic_strong"
+repository-analyzer = "anthropic_strong"
+issue-mitigator = "anthropic_strong"
+issue-mitigator-self-check = "anthropic_strong"
+pull-request-mitigator = "anthropic_strong"
+repository-mitigator = "anthropic_strong"
+issue-verifier = "anthropic_strong"
+pull-request-verifier = "anthropic_strong"
+repository-verifier = "anthropic_strong"
+issue-single-agent = "anthropic_strong"
+repository-cvss-v4-scorer = "anthropic_strong"
+repository-delivery-planner = "anthropic_strong"
+patch-synthesizer = "anthropic_strong"
+memory-extractor = "anthropic_strong"
+memory-maintainer = "anthropic_strong"

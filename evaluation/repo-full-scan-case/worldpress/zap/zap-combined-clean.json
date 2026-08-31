@@ -1,0 +1,879 @@
+{
+  "target": {
+    "frontend": "http://localhost:3001",
+    "api": "http://localhost:5000"
+  },
+  "generated": {
+    "frontend": "2026-05-09T00:02:17.860242737Z",
+    "api": "2026-05-09T00:03:45.086935308Z"
+  },
+  "filtering": {
+    "mode": "worldpress-combined-filter",
+    "raw_reports": [
+      "zap-frontend-report.json",
+      "zap-api-report.json"
+    ],
+    "note": "The raw reports are preserved. This clean report removes only known Vite frontend noise and scanner-request noise; all other frontend and backend alerts are preserved for manual triage.",
+    "ignored_pluginids": [
+      "90005",
+      "10109",
+      "10049"
+    ],
+    "ignored_paths": [
+      "/@vite/client",
+      "/@react-refresh",
+      "/@id/",
+      "/@fs/",
+      "/__vite",
+      "/node_modules/",
+      "/src/",
+      "/favicon.ico",
+      "/vite.svg",
+      "/robots.txt",
+      "/sitemap.xml"
+    ]
+  },
+  "alerts": [
+    {
+      "id": "40018:SQL Injection",
+      "pluginid": "40018",
+      "alert": "SQL Injection",
+      "alertRef": "40018",
+      "risk": "High",
+      "risk_rank": 3,
+      "riskcode": 3,
+      "riskdesc": "High (Low)",
+      "confidence": 1,
+      "cweid": "89",
+      "wascid": "19",
+      "urls": [
+        "http://localhost:5000/api/auth/login",
+        "http://localhost:5000/api/posts?search=security%27&category=General&status=published",
+        "http://localhost:5000/api/posts?search=security&category=%27&status=published",
+        "http://localhost:5000/api/posts?search=security&category=General&status=%27"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:5000/api/auth/login",
+          "method": "POST",
+          "param": "username",
+          "evidence": "HTTP/1.1 500 INTERNAL SERVER ERROR",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts?search=security%27&category=General&status=published",
+          "method": "GET",
+          "param": "search",
+          "evidence": "HTTP/1.1 500 INTERNAL SERVER ERROR",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts?search=security&category=%27&status=published",
+          "method": "GET",
+          "param": "category",
+          "evidence": "HTTP/1.1 500 INTERNAL SERVER ERROR",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts?search=security&category=General&status=%27",
+          "method": "GET",
+          "param": "status",
+          "evidence": "HTTP/1.1 500 INTERNAL SERVER ERROR",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Do not trust client side input, even if there is client side validation in place. In general, type check all data on the server side. If the application uses JDBC, use PreparedStatement or CallableStatement, with parameters passed by '?' If the application uses ASP, use ADO Command Objects with strong type checking and parameterized queries. If database Stored Procedures can be used, use them. Do *not* concatenate strings into queries in the stored procedure, or use 'exec', 'exec immediate', or equivalent functionality! Do not create dynamic SQL queries using simple string concatenation. Escape all data received from the client. Apply an 'allow list' of allowed characters, or a 'deny list' of disallowed characters in user input. Apply the principle of least privilege by using the least privileged database user possible. In particular, avoid using the 'sa' or 'db-owner' database users. This does not eliminate SQL injection, but minimizes its impact. Grant the minimum database access that is necessary for the application.",
+      "reference": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+      "count": 4
+    },
+    {
+      "id": "10020:Missing Anti-clickjacking Header",
+      "pluginid": "10020",
+      "alert": "Missing Anti-clickjacking Header",
+      "alertRef": "10020-1",
+      "risk": "Medium",
+      "risk_rank": 2,
+      "riskcode": 2,
+      "riskdesc": "Medium (Medium)",
+      "confidence": 2,
+      "cweid": "1021",
+      "wascid": "15",
+      "urls": [
+        "http://localhost:3001"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "x-frame-options",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web pages returned by your site/app. If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security Policy's \"frame-ancestors\" directive.",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Frame-Options",
+      "count": 1
+    },
+    {
+      "id": "10038:Content Security Policy (CSP) Header Not Set",
+      "pluginid": "10038",
+      "alert": "Content Security Policy (CSP) Header Not Set",
+      "alertRef": "10038-1",
+      "risk": "Medium",
+      "risk_rank": 2,
+      "riskcode": 2,
+      "riskdesc": "Medium (High)",
+      "confidence": 3,
+      "cweid": "693",
+      "wascid": "15",
+      "urls": [
+        "http://localhost:3001",
+        "http://localhost:3001/login"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "",
+          "evidence": "",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:3001/login",
+          "method": "GET",
+          "param": "",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header.",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html https://www.w3.org/TR/CSP/ https://w3c.github.io/webappsec-csp/ https://web.dev/articles/csp https://caniuse.com/#feat=contentsecuritypolicy https://content-security-policy.com/",
+      "count": 2
+    },
+    {
+      "id": "10098:Cross-Domain Misconfiguration",
+      "pluginid": "10098",
+      "alert": "Cross-Domain Misconfiguration",
+      "alertRef": "10098",
+      "risk": "Medium",
+      "risk_rank": 2,
+      "riskcode": 2,
+      "riskdesc": "Medium (Medium)",
+      "confidence": 2,
+      "cweid": "264",
+      "wascid": "14",
+      "urls": [
+        "http://localhost:5000/api/auth/logout",
+        "http://localhost:5000/api/health",
+        "http://localhost:5000/api/posts",
+        "http://localhost:5000/api/posts/1",
+        "http://localhost:5000/api/users"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:5000/api/auth/logout",
+          "method": "POST",
+          "param": "",
+          "evidence": "Access-Control-Allow-Origin: *",
+          "otherinfo": "The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary third party domains, using unauthenticated APIs on this domain. Web browser implementations do not permit arbitrary third parties to read the response from authenticated APIs, however. This reduces the risk somewhat. This misconfiguration could be used by an attacker to access data that is available in an unauthenticated manner, but which uses some other form of security, such as IP address white-listing."
+        },
+        {
+          "uri": "http://localhost:5000/api/health",
+          "method": "GET",
+          "param": "",
+          "evidence": "Access-Control-Allow-Origin: *",
+          "otherinfo": "The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary third party domains, using unauthenticated APIs on this domain. Web browser implementations do not permit arbitrary third parties to read the response from authenticated APIs, however. This reduces the risk somewhat. This misconfiguration could be used by an attacker to access data that is available in an unauthenticated manner, but which uses some other form of security, such as IP address white-listing."
+        },
+        {
+          "uri": "http://localhost:5000/api/posts",
+          "method": "POST",
+          "param": "",
+          "evidence": "Access-Control-Allow-Origin: *",
+          "otherinfo": "The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary third party domains, using unauthenticated APIs on this domain. Web browser implementations do not permit arbitrary third parties to read the response from authenticated APIs, however. This reduces the risk somewhat. This misconfiguration could be used by an attacker to access data that is available in an unauthenticated manner, but which uses some other form of security, such as IP address white-listing."
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1",
+          "method": "PUT",
+          "param": "",
+          "evidence": "Access-Control-Allow-Origin: *",
+          "otherinfo": "The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary third party domains, using unauthenticated APIs on this domain. Web browser implementations do not permit arbitrary third parties to read the response from authenticated APIs, however. This reduces the risk somewhat. This misconfiguration could be used by an attacker to access data that is available in an unauthenticated manner, but which uses some other form of security, such as IP address white-listing."
+        },
+        {
+          "uri": "http://localhost:5000/api/users",
+          "method": "GET",
+          "param": "",
+          "evidence": "Access-Control-Allow-Origin: *",
+          "otherinfo": "The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary third party domains, using unauthenticated APIs on this domain. Web browser implementations do not permit arbitrary third parties to read the response from authenticated APIs, however. This reduces the risk somewhat. This misconfiguration could be used by an attacker to access data that is available in an unauthenticated manner, but which uses some other form of security, such as IP address white-listing."
+        }
+      ],
+      "solution": "Ensure that sensitive data is not available in an unauthenticated manner (using IP address white-listing, for instance). Configure the \"Access-Control-Allow-Origin\" HTTP header to a more restrictive set of domains, or remove all CORS headers entirely, to allow the web browser to enforce the Same Origin Policy (SOP) in a more restrictive manner.",
+      "reference": "https://vulncat.fortify.com/en/detail?category=HTML5&subcategory=Overly%20Permissive%20CORS%20Policy",
+      "count": 5
+    },
+    {
+      "id": "100000:A Server Error response code was returned by the server",
+      "pluginid": "100000",
+      "alert": "A Server Error response code was returned by the server",
+      "alertRef": "100000-2",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (High)",
+      "confidence": 3,
+      "cweid": "388",
+      "wascid": "20",
+      "urls": [
+        "http://localhost:5000",
+        "http://localhost:5000/8463835962798711061",
+        "http://localhost:5000/api",
+        "http://localhost:5000/api/2741685316168108824",
+        "http://localhost:5000/api/auth",
+        "http://localhost:5000/api/auth/128228849695716888",
+        "http://localhost:5000/api/auth/actuator/health",
+        "http://localhost:5000/api/auth/login",
+        "http://localhost:5000/api/auth/logout",
+        "http://localhost:5000/api/auth/me",
+        "http://localhost:5000/api/auth/register",
+        "http://localhost:5000/api/health",
+        "http://localhost:5000/api/media",
+        "http://localhost:5000/api/media/1",
+        "http://localhost:5000/api/media/1456343021916288968",
+        "http://localhost:5000/api/media/download",
+        "http://localhost:5000/api/media/preview",
+        "http://localhost:5000/api/media/thumbnail",
+        "http://localhost:5000/api/media/upload",
+        "http://localhost:5000/api/posts",
+        "http://localhost:5000/api/posts/1",
+        "http://localhost:5000/api/posts/1/1550392943819843129",
+        "http://localhost:5000/api/posts/1/comments",
+        "http://localhost:5000/api/posts?search=5%3BURL%3D%27https%3A%2F%2F5586280214925755314.owasp.org%27&category=General&status=published",
+        "http://localhost:5000/api/settings",
+        "http://localhost:5000/api/settings/661721412233800799",
+        "http://localhost:5000/api/settings/fetch-url",
+        "http://localhost:5000/api/settings/import",
+        "http://localhost:5000/api/settings/import-xml",
+        "http://localhost:5000/api/users",
+        "http://localhost:5000/api/users/1",
+        "http://localhost:5000/api/users/export",
+        "http://localhost:5000/computeMetadata/v1",
+        "http://localhost:5000/latest/meta-data",
+        "http://localhost:5000/metadata/instance",
+        "http://localhost:5000/metadata/v1",
+        "http://localhost:5000/opc/v1/instance",
+        "http://localhost:5000/opc/v2/instance",
+        "http://localhost:5000/openstack/latest/meta_data.json"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:5000",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/8463835962798711061",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/2741685316168108824",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/auth",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/auth/128228849695716888",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/auth/actuator/health",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/auth/login",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/auth/logout",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/auth/me",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/auth/register",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/health",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/media",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/media/1",
+          "method": "DELETE",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/media/1456343021916288968",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/media/download",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/media/preview",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/media/thumbnail",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/media/upload",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1",
+          "method": "DELETE",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1",
+          "method": "PUT",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1/1550392943819843129",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1/comments",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1/comments",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts?search=5%3BURL%3D%27https%3A%2F%2F5586280214925755314.owasp.org%27&category=General&status=published",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/settings",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/settings",
+          "method": "PUT",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/settings/661721412233800799",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/settings/fetch-url",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/settings/import",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/settings/import-xml",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/users",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/users/1",
+          "method": "DELETE",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/users/1",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/users/1",
+          "method": "PUT",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/users/export",
+          "method": "GET",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/computeMetadata/v1",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/latest/meta-data",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/metadata/instance",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/metadata/v1",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/opc/v1/instance",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/opc/v2/instance",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/openstack/latest/meta_data.json",
+          "method": "POST",
+          "param": "",
+          "evidence": "500",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "",
+      "reference": "",
+      "count": 39
+    },
+    {
+      "id": "100001:Unexpected Content-Type was returned",
+      "pluginid": "100001",
+      "alert": "Unexpected Content-Type was returned",
+      "alertRef": "100001",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (High)",
+      "confidence": 3,
+      "cweid": "-1",
+      "wascid": "-1",
+      "urls": [
+        "http://localhost:5000/api/posts/1/comments"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:5000/api/posts/1/comments",
+          "method": "POST",
+          "param": "",
+          "evidence": "text/html",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "",
+      "reference": "",
+      "count": 1
+    },
+    {
+      "id": "10021:X-Content-Type-Options Header Missing",
+      "pluginid": "10021",
+      "alert": "X-Content-Type-Options Header Missing",
+      "alertRef": "10021",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "15",
+      "urls": [
+        "http://localhost:3001",
+        "http://localhost:5000/api/auth/logout",
+        "http://localhost:5000/api/health",
+        "http://localhost:5000/api/posts/1",
+        "http://localhost:5000/api/posts/1/comments",
+        "http://localhost:5000/api/posts?search=security&category=General&status=published"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:5000/api/auth/logout",
+          "method": "POST",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:5000/api/health",
+          "method": "GET",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1",
+          "method": "GET",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1/comments",
+          "method": "POST",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        },
+        {
+          "uri": "http://localhost:5000/api/posts?search=security&category=General&status=published",
+          "method": "GET",
+          "param": "x-content-type-options",
+          "evidence": "",
+          "otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type. At \"High\" threshold this scan rule will not alert on client or server error responses."
+        }
+      ],
+      "solution": "Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages. If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing.",
+      "reference": "https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/compatibility/gg622941(v=vs.85) https://owasp.org/www-community/Security_Headers",
+      "count": 6
+    },
+    {
+      "id": "10036:Server Leaks Version Information via \"Server\" HTTP Response Header Field",
+      "pluginid": "10036",
+      "alert": "Server Leaks Version Information via \"Server\" HTTP Response Header Field",
+      "alertRef": "10036-2",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (High)",
+      "confidence": 3,
+      "cweid": "497",
+      "wascid": "13",
+      "urls": [
+        "http://localhost:3001/api/auth/login?redirect=/dashboard",
+        "http://localhost:5000/api/auth/me",
+        "http://localhost:5000/api/health",
+        "http://localhost:5000/api/posts/1",
+        "http://localhost:5000/api/posts?search=security&category=General&status=published",
+        "http://localhost:5000/api/users/1"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001/api/auth/login?redirect=/dashboard",
+          "method": "POST",
+          "param": "",
+          "evidence": "Werkzeug/3.0.3 Python/3.13.5",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/auth/me",
+          "method": "GET",
+          "param": "",
+          "evidence": "Werkzeug/3.0.3 Python/3.13.5",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/health",
+          "method": "GET",
+          "param": "",
+          "evidence": "Werkzeug/3.0.3 Python/3.13.5",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts/1",
+          "method": "PUT",
+          "param": "",
+          "evidence": "Werkzeug/3.0.3 Python/3.13.5",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/posts?search=security&category=General&status=published",
+          "method": "GET",
+          "param": "",
+          "evidence": "Werkzeug/3.0.3 Python/3.13.5",
+          "otherinfo": ""
+        },
+        {
+          "uri": "http://localhost:5000/api/users/1",
+          "method": "DELETE",
+          "param": "",
+          "evidence": "Werkzeug/3.0.3 Python/3.13.5",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that your web server, application server, load balancer, etc. is configured to suppress the \"Server\" header or provide generic details.",
+      "reference": "https://httpd.apache.org/docs/current/mod/core.html#servertokens https://learn.microsoft.com/en-us/previous-versions/msp-n-p/ff648552(v=pandp.10) https://www.troyhunt.com/shhh-dont-let-your-response-headers/",
+      "count": 6
+    },
+    {
+      "id": "10063:Permissions Policy Header Not Set",
+      "pluginid": "10063",
+      "alert": "Permissions Policy Header Not Set",
+      "alertRef": "10063-1",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "15",
+      "urls": [
+        "http://localhost:3001"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that your web server, application server, load balancer, etc. is configured to set the Permissions-Policy header.",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Permissions-Policy https://developer.chrome.com/blog/feature-policy/ https://scotthelme.co.uk/a-new-security-header-feature-policy/ https://w3c.github.io/webappsec-feature-policy/ https://www.smashingmagazine.com/2018/12/feature-policy/",
+      "count": 1
+    },
+    {
+      "id": "90004:Cross-Origin-Embedder-Policy Header Missing or Invalid",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Embedder-Policy Header Missing or Invalid",
+      "alertRef": "90004-2",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "14",
+      "urls": [
+        "http://localhost:3001"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "Cross-Origin-Embedder-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Embedder-Policy header appropriately, and that it sets the Cross-Origin-Embedder-Policy header to 'require-corp' for documents. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Embedder-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-embedder-policy).",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy",
+      "count": 1
+    },
+    {
+      "id": "90004:Cross-Origin-Opener-Policy Header Missing or Invalid",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Opener-Policy Header Missing or Invalid",
+      "alertRef": "90004-3",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "14",
+      "urls": [
+        "http://localhost:3001"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "Cross-Origin-Opener-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Opener-Policy header appropriately, and that it sets the Cross-Origin-Opener-Policy header to 'same-origin' for documents. 'same-origin-allow-popups' is considered as less secured and should be avoided. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Opener-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-opener-policy).",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Opener-Policy",
+      "count": 1
+    },
+    {
+      "id": "90004:Cross-Origin-Resource-Policy Header Missing or Invalid",
+      "pluginid": "90004",
+      "alert": "Cross-Origin-Resource-Policy Header Missing or Invalid",
+      "alertRef": "90004-1",
+      "risk": "Low",
+      "risk_rank": 1,
+      "riskcode": 1,
+      "riskdesc": "Low (Medium)",
+      "confidence": 2,
+      "cweid": "693",
+      "wascid": "14",
+      "urls": [
+        "http://localhost:3001"
+      ],
+      "instances": [
+        {
+          "uri": "http://localhost:3001",
+          "method": "GET",
+          "param": "Cross-Origin-Resource-Policy",
+          "evidence": "",
+          "otherinfo": ""
+        }
+      ],
+      "solution": "Ensure that the application/web server sets the Cross-Origin-Resource-Policy header appropriately, and that it sets the Cross-Origin-Resource-Policy header to 'same-origin' for all web pages. 'same-site' is considered as less secured and should be avoided. If resources must be shared, set the header to 'cross-origin'. If possible, ensure that the end user uses a standards-compliant and modern web browser that supports the Cross-Origin-Resource-Policy header (https://caniuse.com/mdn-http_headers_cross-origin-resource-policy).",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy",
+      "count": 1
+    }
+  ],
+  "summary": {
+    "total_alerts": 12,
+    "high": 1,
+    "medium": 3,
+    "low": 8,
+    "info": 0,
+    "affected_urls": 46
+  }
+}
