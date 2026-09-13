@@ -25,20 +25,20 @@
     "@octokit/webhooks": "^14.2.0",
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.4.2",
-    "jose": "^6.2.10",
+    "jose": "^6.2.12",
     "octokit": "^5.0.5",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^24.13.3",
-    "@typescript-eslint/eslint-plugin": "^8.68.0",
-    "@typescript-eslint/parser": "^8.68.0",
+    "@types/node": "^24.13.4",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.0",
     "ajv": "^8.20.0",
-    "eslint": "^10.9.1",
+    "eslint": "^10.10.0",
     "nodemon": "^3.1.14",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3"
   }
 }
