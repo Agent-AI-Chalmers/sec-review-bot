@@ -156,7 +156,9 @@ jobs:
         run: uv run pyright .
 
       - name: Test
-        run: uv run python -m pytest
+        # Report every setup/call/teardown phase taking at least 10 ms. This is
+        # diagnostic only: it does not select, skip, reorder, or relax tests.
+        run: uv run python -m pytest --durations=0 --durations-min=0.01
 
   ci-status:
     name: CI Status

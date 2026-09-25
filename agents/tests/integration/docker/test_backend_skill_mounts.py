@@ -1,4 +1,3 @@
-import subprocess
 import uuid
 from pathlib import Path
 from unittest.mock import patch
@@ -12,45 +11,19 @@ from sec_review_agents.agents.verification.repository import (
     create_repository_verification_backend,
 )
 from sec_review_agents.filesystem.docker_runtime import (
-    DEFAULT_DOCKER_SANDBOX_IMAGE,
     default_docker_bin,
     is_docker_runtime_available,
 )
-from sec_review_agents.utils.env import env_value
 
 
 def _docker_available() -> bool:
     return is_docker_runtime_available(default_docker_bin())
 
 
-def _workspace_image() -> str:
-    return env_value("AGENT_DOCKER_IMAGE") or DEFAULT_DOCKER_SANDBOX_IMAGE
-
-
-def _docker_image_available(image: str) -> bool:
-    try:
-        result = subprocess.run(
-            [default_docker_bin(), "image", "inspect", image],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-    except Exception:
-        return False
-    return result.returncode == 0
-
-
-pytestmark = [
-    pytest.mark.skipif(
-        not _docker_available(),
-        reason="Docker runtime is not available in this environment.",
-    ),
-    pytest.mark.skipif(
-        not _docker_image_available(_workspace_image()),
-        reason=f"Docker workspace image is not available locally: {_workspace_image()}",
-    ),
-]
+pytestmark = pytest.mark.skipif(
+    not _docker_available(),
+    reason="Docker runtime is not available in this environment.",
+)
 
 
 def test_repository_analyzer_docker_tmp_write_and_execute_contract(
