@@ -129,6 +129,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Python
+        id: setup-python
         uses: actions/setup-python@v7
         with:
           python-version-file: agents/.python-version
@@ -143,16 +144,29 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev --frozen
 
-      - name: Lint
+      # mypy's cache is safe to restore across commits: mypy validates cached
+      # metadata against the current source and dependencies before reusing it.
+      # Include the commit in the exact key so successful runs can publish a
+      # fresh cache; the restore prefix finds the newest compatible prior run.
+      - name: Restore mypy cache
+        uses: actions/cache@v4
+        with:
+          path: agents/.mypy_cache
+          key: >-
+            mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('agents/uv.lock', 'agents/pyproject.toml') }}-${{ github.sha }}
+          restore-keys: |
+            mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('agents/uv.lock', 'agents/pyproject.toml') }}-
+
+      - name: Lint with Ruff
         run: uv run ruff check .
 
-      - name: Format
+      - name: Check formatting with Black
         run: uv run black --check .
 
-      - name: Typecheck
+      - name: Type-check with mypy
         run: uv run mypy .
 
-      - name: Pyright
+      - name: Type-check with Pyright
         run: uv run pyright .
 
       - name: Test
