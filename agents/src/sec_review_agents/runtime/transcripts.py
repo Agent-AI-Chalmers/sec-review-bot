@@ -127,8 +127,16 @@ class TranscriptCallbackHandler(BaseCallbackHandler):
         messages: list[list[Any]],
         **kwargs: Any,
     ) -> None:
+        """Record the model turn without duplicating its full context.
+
+        The runtime writes the initial system prompt separately and the agent
+        result writes the incremental message history. LangChain passes the
+        entire accumulated message list here, so persisting ``messages`` would
+        repeat the conversation on every model turn.
+        """
+        _ = messages
         self.writer.write_event(
-            "chat_model_start",
+            "model_start",
             run_id=str(kwargs.get("run_id")),
             parent_run_id=(
                 str(kwargs.get("parent_run_id"))
@@ -136,10 +144,6 @@ class TranscriptCallbackHandler(BaseCallbackHandler):
                 else None
             ),
             model=serialized.get("name") or serialized.get("id"),
-            messages=[
-                serialize_agent_messages(list(message_batch))
-                for message_batch in messages
-            ],
         )
 
     def on_llm_end(self, response: Any, **kwargs: Any) -> None:
