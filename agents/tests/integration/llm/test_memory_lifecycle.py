@@ -22,13 +22,9 @@ LIFECYCLE_PROBE = llm_probe(
 )
 
 
-def _write_jsonl(path: Path, records: list[dict]) -> None:
+def _write_transcript(path: Path, records: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        "\n".join(json.dumps(record, separators=(",", ":")) for record in records)
-        + "\n",
-        encoding="utf-8",
-    )
+    path.write_text(json.dumps(records, separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def _fetch_observation_status(memory_root: Path, observation_id: str) -> str | None:
@@ -51,63 +47,54 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
     transcript_root = artifacts / "transcripts" / "0001-review"
     memory_root = initialize_memory_store(root / "memory")
 
-    _write_jsonl(
+    _write_transcript(
         transcript_root / "0001-analyzer-initial.json",
         [
             {
-                "seq": 1,
-                "event": "prompt_snapshot",
-                "system_prompt": (
+                "index": 0,
+                "type": "system",
+                "content": (
                     "Analyze repository evidence and keep confidence calibrated "
                     "to verified source-to-sink facts."
                 ),
             },
             {
-                "seq": 2,
-                "event": "message",
-                "message": {
-                    "type": "ai",
-                    "content": (
-                        "Analyzer result: high confidence. I believe the uploaded "
-                        "filename reaches the archive extraction sink."
-                    ),
-                },
+                "index": 1,
+                "type": "ai",
+                "content": (
+                    "Analyzer result: high confidence. I believe the uploaded "
+                    "filename reaches the archive extraction sink."
+                ),
             },
         ],
     )
-    _write_jsonl(
+    _write_transcript(
         transcript_root / "0002-mitigator-initial.json",
         [
             {
-                "seq": 1,
-                "event": "message",
-                "message": {
-                    "type": "ai",
-                    "content": (
-                        "Mitigator draft: normalize archive paths before writing "
-                        "files, based on the analyzer's source-to-sink claim."
-                    ),
-                },
+                "index": 0,
+                "type": "ai",
+                "content": (
+                    "Mitigator draft: normalize archive paths before writing "
+                    "files, based on the analyzer's source-to-sink claim."
+                ),
             }
         ],
     )
-    _write_jsonl(
+    _write_transcript(
         transcript_root / "0003-verifier-initial.json",
         [
             {
-                "seq": 1,
-                "event": "message",
-                "message": {
-                    "type": "ai",
-                    "content": (
-                        "Verifier result: the analyzer's key source-to-sink "
-                        "assumption is unsupported. The extracted archive path is "
-                        "already canonicalized before the sink. Reusable lesson: "
-                        "when verifier evidence contradicts analyzer confidence, "
-                        "demote confidence and re-check the chain before using the "
-                        "finding to plan mitigation."
-                    ),
-                },
+                "index": 0,
+                "type": "ai",
+                "content": (
+                    "Verifier result: the analyzer's key source-to-sink "
+                    "assumption is unsupported. The extracted archive path is "
+                    "already canonicalized before the sink. Reusable lesson: "
+                    "when verifier evidence contradicts analyzer confidence, "
+                    "demote confidence and re-check the chain before using the "
+                    "finding to plan mitigation."
+                ),
             }
         ],
     )

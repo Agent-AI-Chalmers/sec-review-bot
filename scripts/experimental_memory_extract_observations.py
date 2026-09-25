@@ -51,7 +51,7 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         help=(
             "Review artifact directories containing transcripts/, or transcript "
-            "JSONL files."
+            "JSON transcript files."
         ),
     )
     parser.add_argument(
@@ -99,7 +99,7 @@ async def main() -> int:
 
     transcript_refs = collect_transcript_refs(args.inputs)
     if not transcript_refs:
-        print("No transcript JSONL files found.")
+        print("No transcript JSON files found.")
         return 1
 
     groups = _group_transcript_refs_by_thread(transcript_refs)
