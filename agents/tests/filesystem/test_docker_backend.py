@@ -623,6 +623,14 @@ def test_edit_uses_newline_tolerant_docker_file_operation() -> None:
     assert payload["path"] == "/mnt/material/workspace/app.py"
 
 
+def test_finalize_normalizes_mount_ownership_once_at_backend_end() -> None:
+    backend = _backend()
+    with patch.object(backend, "_normalize_mount_ownership") as normalize:
+        backend.finalize()
+
+    normalize.assert_called_once_with()
+
+
 def test_tmp_is_available_only_when_path_binding_exposes_it() -> None:
     backend = _backend()
 
@@ -647,7 +655,7 @@ def test_tmp_is_available_only_when_path_binding_exposes_it() -> None:
     assert backend_with_tmp._is_allowed_path("/tmp/app.py", writable=True)
 
 
-def test_execute_normalizes_writable_mount_ownership_after_command() -> None:
+def test_execute_does_not_normalize_mount_ownership_after_command() -> None:
     backend = _backend(
         mounts=[
             DockerMount(
@@ -676,7 +684,7 @@ def test_execute_normalizes_writable_mount_ownership_after_command() -> None:
         result = backend.execute("echo ok")
 
     assert result.exit_code == 0
-    assert len(calls) >= 5
+    assert len(calls) == 4
     assert calls[0][1] == "rm"
     assert calls[1][1] == "run"
     assert calls[2][1] == "exec"
@@ -687,9 +695,7 @@ def test_execute_normalizes_writable_mount_ownership_after_command() -> None:
     assert execute_call[-3] == backend.shell
     assert execute_call[-2] == "-c"
 
-    chown_call = next(args for args in calls if "chown -R" in args[-1])
-    assert chown_call[1] == "exec"
-    assert "/workspace" in chown_call[-1]
+    assert not any("chown -R" in args[-1] for args in calls)
 
 
 def test_execute_does_not_chown_read_only_mounts() -> None:

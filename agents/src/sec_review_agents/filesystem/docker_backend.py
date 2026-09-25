@@ -185,27 +185,16 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             expect_success=False,
         )
 
-    async def _anormalize_mount_ownership(self) -> None:
-        if not self._should_normalize_ownership():
-            return
+    def finalize(self) -> None:
+        """Normalize writable mounts once before the container is stopped.
 
-        writable_mount_paths = [
-            normalize_unix_path(mount.container_path)
-            for mount in self.mounts
-            if mount.writable and is_absolute_unix_path(mount.container_path)
-        ]
-        if not writable_mount_paths:
-            return
-
-        quoted_paths = " ".join(shlex.quote(path) for path in writable_mount_paths)
-        command = f"chown -R {self.ownership_uid}:{self.ownership_gid} {quoted_paths} 2>/dev/null || true"
-        await docker_runtime.aexec_shell(
-            container_name=self.container_name,
-            shell=self.shell,
-            command=command,
-            timeout_ms=self.command_timeout_ms,
-            expect_success=False,
-        )
+        Mount ownership is a host-side cleanup concern. Running a recursive
+        ``chown`` after every file operation makes each read or edit scan the
+        whole workspace and can stall an agent on larger repositories.
+        ``managed_backend`` calls this method at the end of the backend
+        lifetime, so normal tool operations never pay that cost.
+        """
+        self._normalize_mount_ownership()
 
     @property
     def id(self) -> str:
@@ -234,7 +223,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                 else "the configured timeout"
             )
             return self._timeout_response(error, timeout_desc)
-        self._normalize_mount_ownership()
         output, truncated = truncate_output(
             combine_command_output(result.stdout, result.stderr),
             self.max_output_bytes,
@@ -273,7 +261,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                 else "the configured timeout"
             )
             return self._timeout_response(error, timeout_desc)
-        await self._anormalize_mount_ownership()
         output, truncated = truncate_output(
             combine_command_output(result.stdout, result.stderr),
             self.max_output_bytes,
@@ -730,7 +717,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             if response.error
             else WriteResult(path=file_path)
         )
-        self._normalize_mount_ownership()
         return result
 
     async def awrite(self, file_path: str, content: str) -> WriteResult:
@@ -765,7 +751,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             if response.error
             else WriteResult(path=file_path)
         )
-        await self._anormalize_mount_ownership()
         return result
 
     def edit(
@@ -788,7 +773,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                 replace_all,
                 result_path=file_path,
             )
-            self._normalize_mount_ownership()
             return result
 
         if self.edit_temp_root is None:
@@ -803,7 +787,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             replace_all,
             result_path=file_path,
         )
-        self._normalize_mount_ownership()
         return result
 
     async def aedit(
@@ -826,7 +809,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                 replace_all,
                 result_path=file_path,
             )
-            await self._anormalize_mount_ownership()
             return result
 
         if self.edit_temp_root is None:
@@ -841,7 +823,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             replace_all,
             result_path=file_path,
         )
-        await self._anormalize_mount_ownership()
         return result
 
     def _edit_inline_newline_tolerant(
