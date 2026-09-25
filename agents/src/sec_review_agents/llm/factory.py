@@ -64,6 +64,10 @@ def _build_openai_chat_model(
         kwargs["api_version"] = deployment.api_version
     if timeout_seconds is not None and timeout_seconds > 0:
         kwargs["timeout"] = timeout_seconds
+    if deployment.thinking_mode:
+        kwargs["extra_body"] = {
+            "thinking": {"type": deployment.thinking_mode},
+        }
     if deployment.reasoning_effort:
         kwargs["reasoning_effort"] = deployment.reasoning_effort
     return ChatOpenAI(**kwargs)
@@ -89,8 +93,13 @@ def _build_anthropic_chat_model(
         kwargs["anthropic_api_url"] = deployment.api_base
     if timeout_seconds is not None and timeout_seconds > 0:
         kwargs["timeout"] = timeout_seconds
+    if deployment.thinking_mode:
+        thinking: dict[str, Any] = {"type": deployment.thinking_mode}
+        if deployment.thinking_budget_tokens is not None:
+            thinking["budget_tokens"] = deployment.thinking_budget_tokens
+        kwargs["thinking"] = thinking
     if deployment.anthropic_effort:
-        kwargs["effort"] = deployment.anthropic_effort
+        kwargs["output_config"] = {"effort": deployment.anthropic_effort}
     return ChatAnthropic(**kwargs)
 
 

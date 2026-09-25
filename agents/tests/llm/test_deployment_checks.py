@@ -19,6 +19,8 @@ def _deployment() -> ChatDeploymentConfig:
         api_version=None,
         timeout_ms=None,
         max_retries=2,
+        thinking_mode=None,
+        thinking_budget_tokens=None,
         reasoning_effort=None,
         anthropic_effort=None,
     )
