@@ -29,11 +29,7 @@ def _docker_available() -> bool:
 def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    _create_large_init_commit_repository(
-        workspace,
-        file_count=400,
-        bytes_per_file=1024,
-    )
+    _create_large_init_commit_repository(workspace)
     host_result = subprocess.run(
         ["git", "show", "--stat", "--patch", "--root", "HEAD"],
         cwd=workspace,
@@ -71,9 +67,6 @@ def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> 
 
 def _create_large_init_commit_repository(
     workspace: Path,
-    *,
-    file_count: int,
-    bytes_per_file: int,
 ) -> None:
     def run(command: list[str]) -> None:
         subprocess.run(
@@ -87,13 +80,11 @@ def _create_large_init_commit_repository(
     run(["git", "init"])
     run(["git", "config", "user.email", "test@example.com"])
     run(["git", "config", "user.name", "Test User"])
-    payload = "x" * (bytes_per_file - 1) + "\n"
-    for index in range(file_count):
-        directory = workspace / f"dir-{index // 100:03d}"
-        directory.mkdir(exist_ok=True)
-        (directory / f"file-{index:05d}.txt").write_text(
-            payload,
-            encoding="utf-8",
-        )
+    # One 16 KiB text file comfortably crosses the 8 KiB output boundary. Using
+    # hundreds of files would benchmark Git and mount cleanup, not truncation.
+    (workspace / "large.txt").write_text(
+        "x" * (16 * 1024 - 1) + "\n",
+        encoding="utf-8",
+    )
     run(["git", "add", "."])
     run(["git", "commit", "-m", "init"])
