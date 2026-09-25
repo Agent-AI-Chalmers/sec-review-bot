@@ -2,22 +2,19 @@ name: CI
 
 on:
   workflow_dispatch:
+  # Give contributors fast feedback before a change enters the merge queue.
   pull_request:
     paths-ignore:
       - "**/*.md"
       - "docs/**"
       - "assets/**"
   # Merge queue candidates must report the same required CI Status check as PRs.
+  # Re-test the exact candidate GitHub intends to merge against the latest main.
+  # A separate push-to-main run is intentionally omitted because merge_group has
+  # already tested that commit; post-merge deploy/release work belongs elsewhere.
   merge_group:
     types:
       - checks_requested
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - "assets/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -34,6 +31,7 @@ jobs:
     outputs:
       github-integration: ${{ steps.filter.outputs.github-integration }}
       agents: ${{ steps.filter.outputs.agents }}
+      automation-config: ${{ steps.filter.outputs.automation-config }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -45,12 +43,36 @@ jobs:
           filters: |
             github-integration:
               - 'apps/github-integration/**'
-              - '.github/dependabot.yml'
               - '.github/workflows/ci.yml'
             agents:
               - 'agents/**'
-              - '.github/dependabot.yml'
               - '.github/workflows/ci.yml'
+            # Automation configuration has its own lightweight validation. A
+            # Dependabot scheduling change should not run both application suites.
+            automation-config:
+              - '.github/dependabot.yml'
+              - '.github/workflows/**'
+
+  automation-config:
+    name: Automation Config
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.automation-config == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # actionlint catches invalid expressions, job dependencies, event syntax,
+      # and other GitHub Actions mistakes that ordinary project tests cannot see.
+      - name: Lint GitHub Actions workflows
+        uses: raven-actions/actionlint@v2
+
+      # Dependabot has no equivalent local semantic validator, but parsing the
+      # file still prevents malformed YAML from reaching the default branch.
+      - name: Parse Dependabot configuration
+        run: ruby -e 'require "yaml"; YAML.parse_file(".github/dependabot.yml")'
 
   github-integration:
     name: GitHub Integration
@@ -140,6 +162,7 @@ jobs:
     name: CI Status
     needs:
       - changes
+      - automation-config
       - github-integration
       - agents
     if: always()
@@ -148,11 +171,15 @@ jobs:
       # Use this aggregate job as the required branch-protection check.
       - name: Check CI result
         env:
+          AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
           AGENTS_RESULT: ${{ needs.agents.result }}
         run: |
           set -euo pipefail
-          for result in "$GITHUB_INTEGRATION_RESULT" "$AGENTS_RESULT"; do
+          for result in \
+            "$AUTOMATION_CONFIG_RESULT" \
+            "$GITHUB_INTEGRATION_RESULT" \
+            "$AGENTS_RESULT"; do
             case "$result" in
               success|skipped)
                 ;;
