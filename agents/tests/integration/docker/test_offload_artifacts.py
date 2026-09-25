@@ -1,4 +1,3 @@
-import re
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Any
@@ -69,11 +68,11 @@ def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
             ),
         )
 
-        content = captured["messages"][0].content
-        path = _extract_path(
-            content,
-            r"filesystem at: (?P<path>/conversation_history/[^\s]+)",
-        )
+        offloaded = backend.glob("*.md", path="/conversation_history")
+        assert offloaded.error is None
+        assert offloaded.matches is not None
+        assert len(offloaded.matches) == 1
+        path = offloaded.matches[0]["path"]
         read_result = backend.read(path)
 
         assert read_result.error is None
@@ -115,10 +114,11 @@ def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
         )
 
         assert isinstance(message, ToolMessage)
-        path = _extract_path(
-            message.content,
-            r"filesystem at this path: (?P<path>/large_tool_results/[^\s]+)",
-        )
+        offloaded = backend.glob("*", path="/large_tool_results")
+        assert offloaded.error is None
+        assert offloaded.matches is not None
+        assert len(offloaded.matches) == 1
+        path = offloaded.matches[0]["path"]
         read_result = backend.read(path)
 
         assert read_result.error is None
@@ -126,10 +126,3 @@ def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
         assert read_result.file_data["content"] == payload
     finally:
         backend.container.close()
-
-
-def _extract_path(content: object, pattern: str) -> str:
-    match = re.search(pattern, str(content))
-    if match is None:
-        raise AssertionError(f"offload path not found in content: {content!r}")
-    return match.group("path")
