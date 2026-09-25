@@ -149,7 +149,7 @@ jobs:
       # Include the commit in the exact key so successful runs can publish a
       # fresh cache; the restore prefix finds the newest compatible prior run.
       - name: Restore mypy cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: agents/.mypy_cache
           key: >-
