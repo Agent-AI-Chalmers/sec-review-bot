@@ -98,7 +98,20 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
 
     assert result["changed_files"] == ["a.txt"]
     assert message_events[1]["content"] == "I found the answer but forgot the schema."
-    assert "Returning structured response" in message_events[-1]["content"]
+    assert message_events[-2]["tool_calls"] == [
+        {
+            "name": "PatchClaimProbeOutput",
+            "args": {
+                "status": "applied",
+                "changed_files": ["a.txt"],
+                "rationale": "retry used the structured response tool",
+            },
+            "id": "call_1",
+            "type": "tool_call",
+        }
+    ]
+    assert message_events[-1]["type"] == "tool"
+    assert message_events[-1]["name"] == "PatchClaimProbeOutput"
 
 
 def test_missing_structured_response_middleware_keeps_tool_agent_in_one_invoke() -> (
@@ -234,4 +247,6 @@ def test_patch_tool_calls_middleware_repairs_dangling_tool_call_history() -> Non
     ]
     assert len(patched_tool_messages) == 1
     assert patched_tool_messages[0].name == "lookup_evidence"
-    assert "was cancelled" in patched_tool_messages[0].content
+    assert patched_tool_messages[0].tool_call_id == "call_missing"
+    assert patched_tool_messages[0].status == "error"
+    assert patched_tool_messages[0].content
