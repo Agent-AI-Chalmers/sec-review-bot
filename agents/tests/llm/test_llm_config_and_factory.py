@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
@@ -43,6 +44,8 @@ api_key = "primary-key"
 api_base = "https://primary.example/v1"
 timeout_ms = 60000
 max_retries = 3
+thinking_mode = "disabled"
+reasoning_effort = "high"
 
 [[deployments]]
 name = "anthropic_strong"
@@ -50,6 +53,9 @@ model = "anthropic/claude-3-7-sonnet-20250219"
 max_input_tokens = 200000
 api_key = "secondary-key"
 max_retries = 4
+thinking_mode = "enabled"
+thinking_budget_tokens = 12000
+anthropic_effort = "max"
 
 [[deployments]]
 name = "google_gemini"
@@ -79,12 +85,17 @@ def test_multi_deployment_and_agent_selection_config(tmp_path: Path) -> None:
         assert deployments[0].max_input_tokens == 1047576
         assert deployments[0].timeout_ms == 60000
         assert deployments[0].max_retries == 3
+        assert deployments[0].thinking_mode == "disabled"
+        assert deployments[0].reasoning_effort == "high"
         assert isinstance(deployments[0].api_key, SecretStr)
         assert reveal_secret(deployments[0].api_key) == "primary-key"
         assert "primary-key" not in repr(deployments[0])
         assert deployments[1].deployment_name == "anthropic_strong"
         assert deployments[1].timeout_ms is None
         assert deployments[1].max_retries == 4
+        assert deployments[1].thinking_mode == "enabled"
+        assert deployments[1].thinking_budget_tokens == 12000
+        assert deployments[1].anthropic_effort == "max"
         assert deployments[2].deployment_name == "google_gemini"
         assert deployments[2].max_retries == 2
         assert resolve_deployment_for_agent("issue-analyzer") == "anthropic_strong"
@@ -101,6 +112,18 @@ def test_factory_builds_provider_native_models(tmp_path: Path) -> None:
         analysis_model = create_chat_model(agent_name="issue-analyzer")
         assert isinstance(analysis_model, ChatAnthropic)
         assert analysis_model.max_retries == 4
+        assert analysis_model.thinking == {"type": "enabled", "budget_tokens": 12000}
+        assert analysis_model.output_config == {"effort": "max"}
+        assert analysis_model.reasoning_effort is None
+        analysis_payload = analysis_model._get_request_payload(
+            [HumanMessage(content="hello")]
+        )
+        assert analysis_payload["thinking"] == {
+            "type": "enabled",
+            "budget_tokens": 12000,
+        }
+        assert analysis_payload["output_config"] == {"effort": "max"}
+        assert "effort" not in analysis_payload
 
         discovery_deployment = resolve_chat_deployment(
             agent_name="repository-discovery"
@@ -111,6 +134,8 @@ def test_factory_builds_provider_native_models(tmp_path: Path) -> None:
         assert discovery_model.max_retries == 3
         assert discovery_model.openai_api_base == "https://primary.example/v1"
         assert discovery_model.request_timeout == 60.0
+        assert discovery_model.extra_body == {"thinking": {"type": "disabled"}}
+        assert discovery_model.reasoning_effort == "high"
 
         verifier_deployment = resolve_chat_deployment(agent_name="issue-verifier")
         assert verifier_deployment.deployment_name == "google_gemini"
@@ -178,6 +203,88 @@ issue-analyzer = "anthropic_zero_retry"
         assert analysis_model.max_retries == 0
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    [
+        ("thinking_mode", "sometimes", "thinking_mode must be one of"),
+        ("reasoning_effort", "extreme", "reasoning_effort must be one of"),
+        ("anthropic_effort", "ultra", "anthropic_effort must be one of"),
+    ],
+)
+def test_deployment_config_rejects_unknown_reasoning_options(
+    tmp_path: Path,
+    field: str,
+    value: str,
+    expected: str,
+) -> None:
+    config_path = _write_toml(
+        tmp_path,
+        f"""
+[[deployments]]
+name = "invalid_options"
+model = "openai/example"
+max_input_tokens = 1000
+api_key = "key"
+{field} = "{value}"
+""",
+    )
+
+    with (
+        patch.dict(
+            os.environ, {"MODEL_PROVIDERS_CONFIG_TOML": config_path}, clear=True
+        ),
+        pytest.raises(ValueError, match=expected),
+    ):
+        build_chat_deployments()
+
+
+def test_anthropic_enabled_thinking_requires_budget(tmp_path: Path) -> None:
+    config_path = _write_toml(
+        tmp_path,
+        """
+[[deployments]]
+name = "anthropic_thinking"
+model = "anthropic/claude-example"
+max_input_tokens = 1000
+api_key = "key"
+thinking_mode = "enabled"
+""",
+    )
+
+    with (
+        patch.dict(
+            os.environ, {"MODEL_PROVIDERS_CONFIG_TOML": config_path}, clear=True
+        ),
+        pytest.raises(ValueError, match="thinking_budget_tokens is required"),
+    ):
+        build_chat_deployments()
+
+
+def test_thinking_budget_is_rejected_for_non_anthropic_provider(
+    tmp_path: Path,
+) -> None:
+    config_path = _write_toml(
+        tmp_path,
+        """
+[[deployments]]
+name = "openai_thinking"
+model = "openai/example"
+max_input_tokens = 1000
+api_key = "key"
+thinking_mode = "enabled"
+thinking_budget_tokens = 12000
+""",
+    )
+
+    with (
+        patch.dict(
+            os.environ, {"MODEL_PROVIDERS_CONFIG_TOML": config_path}, clear=True
+        ),
+        pytest.raises(ValueError, match="only supported for Anthropic"),
+    ):
+        build_chat_deployments()
+
+
 def test_factory_rejects_blank_provider_model_parts() -> None:
     deployment = ChatDeploymentConfig(
         deployment_name="bad_model",
@@ -188,6 +295,8 @@ def test_factory_rejects_blank_provider_model_parts() -> None:
         api_version=None,
         timeout_ms=None,
         max_retries=2,
+        thinking_mode=None,
+        thinking_budget_tokens=None,
         reasoning_effort=None,
         anthropic_effort=None,
     )
@@ -206,6 +315,8 @@ def test_factory_rejects_negative_runtime_options() -> None:
         api_version=None,
         timeout_ms=None,
         max_retries=2,
+        thinking_mode=None,
+        thinking_budget_tokens=None,
         reasoning_effort=None,
         anthropic_effort=None,
     )

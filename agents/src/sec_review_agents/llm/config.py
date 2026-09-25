@@ -10,6 +10,11 @@ from sec_review_agents.utils.package_paths import default_model_providers_config
 
 DEFAULT_CHAT_DEPLOYMENT_MAX_RETRIES = 2
 SUPPORTED_CHAT_DEPLOYMENT_PROVIDERS = frozenset({"openai", "anthropic", "google"})
+SUPPORTED_THINKING_MODES = frozenset({"enabled", "disabled"})
+SUPPORTED_REASONING_EFFORTS = frozenset(
+    {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+)
+SUPPORTED_ANTHROPIC_EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
 
 
 @dataclass(frozen=True)
@@ -22,8 +27,10 @@ class ChatDeploymentConfig:
     api_version: str | None
     timeout_ms: int | None
     max_retries: int
-    reasoning_effort: str | None  # none minimal low medium high xhigh
-    anthropic_effort: str | None  # low medium high max
+    thinking_mode: str | None  # enabled disabled
+    thinking_budget_tokens: int | None
+    reasoning_effort: str | None  # none minimal low medium high xhigh max ultra
+    anthropic_effort: str | None  # low medium high xhigh max
 
 
 @dataclass(frozen=True)
@@ -131,6 +138,22 @@ def _require_positive_int(mapping: dict[str, Any], key: str, *, ctx: str) -> int
     return parsed
 
 
+def _optional_choice(
+    mapping: dict[str, Any],
+    key: str,
+    *,
+    ctx: str,
+    allowed: frozenset[str],
+) -> str | None:
+    value = str(mapping.get(key) or "").strip().lower()
+    if not value:
+        return None
+    if value not in allowed:
+        choices = ", ".join(sorted(allowed))
+        raise ValueError(f"{ctx}.{key} must be one of: {choices}")
+    return value
+
+
 def reveal_secret(secret: SecretStr) -> str:
     return secret.get_secret_value()
 
@@ -170,8 +193,48 @@ def _build_chat_deployments_from_payload(
             raise ValueError(
                 f"deployments[{index}].max_retries must be an integer >= 0"
             )
-        reasoning_effort = str(item.get("reasoning_effort") or "").strip() or None
-        anthropic_effort = str(item.get("anthropic_effort") or "").strip() or None
+        thinking_mode = _optional_choice(
+            item,
+            "thinking_mode",
+            ctx=f"deployments[{index}]",
+            allowed=SUPPORTED_THINKING_MODES,
+        )
+        thinking_budget_tokens = (
+            _require_positive_int(
+                item,
+                "thinking_budget_tokens",
+                ctx=f"deployments[{index}]",
+            )
+            if "thinking_budget_tokens" in item
+            else None
+        )
+        provider, _provider_model = split_provider_model(model_id)
+        if provider != "anthropic" and thinking_budget_tokens is not None:
+            raise ValueError(
+                f"deployments[{index}].thinking_budget_tokens is only supported "
+                "for Anthropic deployments"
+            )
+        if (
+            provider == "anthropic"
+            and thinking_mode == "enabled"
+            and (thinking_budget_tokens is None)
+        ):
+            raise ValueError(
+                f"deployments[{index}].thinking_budget_tokens is required when "
+                "thinking_mode is enabled for Anthropic deployments"
+            )
+        reasoning_effort = _optional_choice(
+            item,
+            "reasoning_effort",
+            ctx=f"deployments[{index}]",
+            allowed=SUPPORTED_REASONING_EFFORTS,
+        )
+        anthropic_effort = _optional_choice(
+            item,
+            "anthropic_effort",
+            ctx=f"deployments[{index}]",
+            allowed=SUPPORTED_ANTHROPIC_EFFORTS,
+        )
 
         if deployment_name in seen_names:
             raise ValueError(
@@ -189,6 +252,8 @@ def _build_chat_deployments_from_payload(
                 api_version=api_version,
                 timeout_ms=timeout_ms,
                 max_retries=max_retries,
+                thinking_mode=thinking_mode,
+                thinking_budget_tokens=thinking_budget_tokens,
                 reasoning_effort=reasoning_effort,
                 anthropic_effort=anthropic_effort,
             )
