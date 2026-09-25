@@ -135,9 +135,10 @@ jobs:
           python-version-file: agents/.python-version
 
       - name: Set up uv
+        # setup-uv intentionally uses immutable releases and does not publish
+        # floating major/minor tags; pin the action while the uv CLI tracks latest.
         uses: astral-sh/setup-uv@v10.2.0
         with:
-          version: "0.10.9"
           enable-cache: true
           cache-dependency-glob: agents/uv.lock
 
@@ -149,7 +150,7 @@ jobs:
       # Include the commit in the exact key so successful runs can publish a
       # fresh cache; the restore prefix finds the newest compatible prior run.
       - name: Restore mypy cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: agents/.mypy_cache
           key: >-
