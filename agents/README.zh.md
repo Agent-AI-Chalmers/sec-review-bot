@@ -124,6 +124,10 @@ local run 一概不参与 memory extraction 或 maintenance。
 
 这些命令默认使用 direct local execution。
 
+---
+
+本地运行默认使用临时目录保存 workflow result、workspace snapshot、history 和其他 artifacts。命令结束时会打印 `WORKFLOW_RESULT=...`，可根据该路径查看结果；也可以通过 `--output-dir` 指定固定的输出目录。
+
 示例：
 
 ```bash
@@ -135,7 +139,8 @@ cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
-  --target-branch main
+  --target-branch main \
+  --output-dir /abs/path/to/local-run
 
 # 1b) issue two-stage ablation
 sec-review-agents-run-local-issue \
@@ -204,35 +209,6 @@ TEMPORAL_ADDRESS=127.0.0.1:7233 \
 TEMPORAL_NAMESPACE=default \
 TEMPORAL_TASK_QUEUE=sec-review-agents \
 sec-review-agents-worker
-```
-
-Artifacts 放在 local run root 里面：
-
-```text
-<local-run-root>/
-  manifest.json
-  workspace.snapshot.tar
-  history/
-  incremental-window/
-  artifacts/
-```
-
-只有想把 local run 目录固定到一个好找的位置时，才需要传 `--output-dir`；不传时 CLI 会使用 temp directory。
-
-使用这种模式时，在上面任意命令中加 `--temporal`。例如：
-
-```bash
-sec-review-agents-run-local-repository \
-  --temporal \
-  --output-dir "$PWD/.local-temporal-runs" \
-  --repo /path/to/repo
-```
-
-Issue ablation 路径也可以显式使用 local Temporal：
-
-```bash
-sec-review-agents-run-local-issue --temporal --strategy two-stage --repo /path/to/repo ...
-sec-review-agents-run-local-issue --temporal --strategy single-agent --repo /path/to/repo ...
 ```
 
 ## Agent 运行时配置

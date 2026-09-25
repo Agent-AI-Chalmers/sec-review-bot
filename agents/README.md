@@ -122,6 +122,10 @@ After installing dependencies, local runs use these `run-local-*` CLIs:
 
 By default these commands use direct local execution.
 
+---
+
+Local runs use a temporary directory by default for the workflow result, workspace snapshot, history, and other artifacts. At the end of the command, the CLI prints `WORKFLOW_RESULT=...`, which you can use to locate the result; you can also use `--output-dir` to override the output directory.
+
 Examples:
 
 ```bash
@@ -133,7 +137,8 @@ cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
-  --target-branch main
+  --target-branch main \
+  --output-dir /abs/path/to/local-run
 
 # 1b) issue two-stage ablation
 sec-review-agents-run-local-issue \
@@ -202,35 +207,6 @@ TEMPORAL_ADDRESS=127.0.0.1:7233 \
 TEMPORAL_NAMESPACE=default \
 TEMPORAL_TASK_QUEUE=sec-review-agents \
 sec-review-agents-worker
-```
-
-Artifacts live inside the local run root:
-
-```text
-<local-run-root>/
-  manifest.json
-  workspace.snapshot.tar
-  history/
-  incremental-window/
-  artifacts/
-```
-
-Use `--output-dir` when you want local run directories in a predictable place. If `--output-dir` is not set, the CLI uses a temp directory.
-
-To use this mode, add `--temporal` to any command above. Example:
-
-```bash
-sec-review-agents-run-local-repository \
-  --temporal \
-  --output-dir "$PWD/.local-temporal-runs" \
-  --repo /path/to/repo
-```
-
-Issue ablation paths can also use local Temporal explicitly:
-
-```bash
-sec-review-agents-run-local-issue --temporal --strategy two-stage --repo /path/to/repo ...
-sec-review-agents-run-local-issue --temporal --strategy single-agent --repo /path/to/repo ...
 ```
 
 ## Agent Runtime Configuration
