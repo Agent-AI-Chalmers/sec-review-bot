@@ -135,8 +135,8 @@ jobs:
           python-version-file: agents/.python-version
 
       - name: Set up uv
-        # setup-uv does not publish a floating v10 tag; use its concrete action
-        # release while allowing the installed uv CLI to track latest stable.
+        # setup-uv intentionally uses immutable releases and does not publish
+        # floating major/minor tags; pin the action while the uv CLI tracks latest.
         uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
