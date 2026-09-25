@@ -180,6 +180,7 @@ def build_local_repository_security_bundle(
     baseline_ref: str | None = None,
     event_type: str = "manual",
     default_branch: str | None = None,
+    repair_mode: str = "test-changes-allowed",
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     resolved_ref = resolve_git_ref(repo_path, ref)
@@ -280,7 +281,10 @@ def build_local_repository_security_bundle(
     input_data = {
         "contract_version": "v4",
         "input_bundle_uri": str(paths.local_root_path),
-        "review_intent": {"objective": "audit"},
+        "review_intent": {
+            "objective": "audit",
+            "repair_mode": repair_mode,
+        },
         "scan_target": {
             "target_branch": (target_branch or ref),
             "default_branch": resolved_default_branch,

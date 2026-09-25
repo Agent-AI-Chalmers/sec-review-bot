@@ -134,37 +134,48 @@ cp agents/.env.sample agents/.env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 
 # 1) issue
+# Explicitly choose both the review objective and repair mode.
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
-  --output-dir /abs/path/to/local-run
+  --output-dir /abs/path/to/local-run \
+  --review-objective repair \
+  --repair-mode test-changes-allowed
 
 # 1b) issue two-stage ablation
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
-  --strategy two-stage
+  --strategy two-stage \
+  --review-objective audit \
+  --repair-mode no-test-changes
 
 # 1c) issue single-agent baseline
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
-  --strategy single-agent
+  --strategy single-agent \
+  --review-objective repair \
+  --repair-mode test-changes-allowed
 
 # 2) pr
+# Pull-request objective is fixed to audit, but repair mode is still required.
 sec-review-agents-run-local-pr \
   --repo /abs/path/to/repo \
   --pr-md /abs/path/to/pr.md \
   --base-sha <base-commit-sha> \
-  --head-sha <head-commit-sha>
+  --head-sha <head-commit-sha> \
+  --repair-mode no-test-changes
 
 # 3) full repo scan
+# Repository objective is fixed to audit, but repair mode is still required.
 sec-review-agents-run-local-repository \
   --repo /abs/path/to/repo \
-  --target-branch main
+  --target-branch main \
+  --repair-mode test-changes-allowed
 
 # 4) incremental repo scan
 sec-review-agents-run-local-repository \
@@ -172,7 +183,8 @@ sec-review-agents-run-local-repository \
   --target-branch main \
   --scan-mode incremental \
   --base-sha <base-commit-sha> \
-  --head-sha <head-commit-sha> # optional; defaults to current target-branch head
+  --head-sha <head-commit-sha> \
+  --repair-mode test-changes-allowed # optional head; repair-mode is required
 ```
 
 ### Direct Local Run

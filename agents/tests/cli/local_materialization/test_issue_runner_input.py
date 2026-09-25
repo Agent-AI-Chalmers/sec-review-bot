@@ -54,6 +54,31 @@ def test_build_local_issue_bundle_omits_runner_artifacts_path(tmp_path: Path) ->
     assert (bundle.local_root_path / "workspace.snapshot.tar").is_file()
 
 
+def test_build_local_issue_bundle_preserves_review_intent_selection(
+    tmp_path: Path,
+) -> None:
+    repo_path = tmp_path / "repo"
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    _create_repo(repo_path)
+
+    bundle = build_local_issue_bundle(
+        repo_path=repo_path,
+        title="Local issue",
+        body="Body",
+        issue_number=1,
+        repo_full_name_value=None,
+        output_dir=output_dir,
+        review_objective="audit",
+        repair_mode="no-test-changes",
+    )
+
+    assert bundle.input["review_intent"] == {
+        "objective": "audit",
+        "repair_mode": "no-test-changes",
+    }
+
+
 def test_build_local_issue_bundle_creates_limited_history_workspace(
     tmp_path: Path,
 ) -> None:

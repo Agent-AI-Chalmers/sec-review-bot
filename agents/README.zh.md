@@ -136,37 +136,48 @@ cp agents/.env.sample agents/.env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 
 # 1) issue
+# 必须显式选择 review objective 和 repair mode。
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
-  --output-dir /abs/path/to/local-run
+  --output-dir /abs/path/to/local-run \
+  --review-objective repair \
+  --repair-mode test-changes-allowed
 
 # 1b) issue two-stage ablation
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
-  --strategy two-stage
+  --strategy two-stage \
+  --review-objective audit \
+  --repair-mode no-test-changes
 
 # 1c) issue single-agent baseline
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
-  --strategy single-agent
+  --strategy single-agent \
+  --review-objective repair \
+  --repair-mode test-changes-allowed
 
 # 2) pr
+# PR 的 objective 固定为 audit，但仍必须显式选择 repair mode。
 sec-review-agents-run-local-pr \
   --repo /abs/path/to/repo \
   --pr-md /abs/path/to/pr.md \
   --base-sha <base-commit-sha> \
-  --head-sha <head-commit-sha>
+  --head-sha <head-commit-sha> \
+  --repair-mode no-test-changes
 
 # 3) repo 全量扫描
+# Repository 的 objective 固定为 audit，但仍必须显式选择 repair mode。
 sec-review-agents-run-local-repository \
   --repo /abs/path/to/repo \
-  --target-branch main
+  --target-branch main \
+  --repair-mode test-changes-allowed
 
 # 4) repo 增量扫描
 sec-review-agents-run-local-repository \
@@ -174,7 +185,8 @@ sec-review-agents-run-local-repository \
   --target-branch main \
   --scan-mode incremental \
   --base-sha <base-commit-sha> \
-  --head-sha <head-commit-sha> # 可选，不填则自动取 target-branch 当前 head
+  --head-sha <head-commit-sha> \
+  --repair-mode test-changes-allowed # 可选 head；repair-mode 必填
 ```
 
 ### Direct local run

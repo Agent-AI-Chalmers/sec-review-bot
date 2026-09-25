@@ -53,6 +53,8 @@ def build_local_issue_bundle(
     repo_full_name_value: str | None,
     output_dir: Path,
     target_branch: str | None = None,
+    review_objective: str = "repair",
+    repair_mode: str = "test-changes-allowed",
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     issue_number_value = str(issue_number)
@@ -118,8 +120,8 @@ def build_local_issue_bundle(
     input_data = {
         "contract_version": "v4",
         "review_intent": {
-            "objective": "repair",
-            "repair_mode": "test-changes-allowed",
+            "objective": review_objective,
+            "repair_mode": repair_mode,
         },
         "issue": issue_metadata,
         "input_bundle_uri": str(paths.local_root_path),

@@ -47,6 +47,12 @@ def parse_args() -> argparse.Namespace:
         "--repo", required=True, help="Path to the local repository to analyze."
     )
     parser.add_argument(
+        "--repair-mode",
+        choices=("test-changes-allowed", "no-test-changes"),
+        required=True,
+        help="Repair-stage patch constraint.",
+    )
+    parser.add_argument(
         "--pr-md",
         help="Markdown file describing the pull request. First heading or line becomes the title.",
     )
@@ -152,6 +158,7 @@ def main() -> None:
         head_ref=head_sha,
         event_type=args.event_type,
         is_draft=args.draft,
+        repair_mode=args.repair_mode,
     )
 
     print(f"LOCAL_ROOT={bundle.input['input_bundle_uri']}")
