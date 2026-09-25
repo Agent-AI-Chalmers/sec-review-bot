@@ -6,7 +6,10 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.transcripts import TranscriptWriter
+from sec_review_agents.runtime.transcripts import (
+    TranscriptCallbackHandler,
+    TranscriptWriter,
+)
 
 
 class _FakeMessage:
@@ -55,6 +58,25 @@ def test_transcript_writer_fans_out_to_multiple_paths(tmp_path: Path) -> None:
         json.loads(line) for line in consumer.read_text(encoding="utf-8").splitlines()
     ]
     assert [item["seq"] for item in events] == [1, 2]
+
+
+def test_transcript_model_start_does_not_repeat_full_message_history(
+    tmp_path: Path,
+) -> None:
+    transcript_path = tmp_path / "transcript.jsonl"
+    writer = TranscriptWriter((transcript_path,), agent_name="test-agent")
+    callback = TranscriptCallbackHandler(writer)
+
+    callback.on_chat_model_start(
+        {"name": "test-model"},
+        [[_FakeMessage("the accumulated history")]],
+        run_id="model-run",
+    )
+
+    event = json.loads(transcript_path.read_text(encoding="utf-8"))
+    assert event["event"] == "model_start"
+    assert event["model"] == "test-model"
+    assert "messages" not in event
 
 
 @pytest.mark.asyncio
