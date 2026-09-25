@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
@@ -196,7 +197,13 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
     def fake_analyzer(prepared_case: dict, _runtime_context: dict) -> dict:
         case_id = prepared_case["case_execution_input"]["case_id"]
         if case_id == "case-2":
-            raise RuntimeError("case-2 analyzer failed")
+            # This test targets failure isolation and immediate window refill,
+            # not Temporal's production retry delays. Retry policy is covered
+            # independently so a real backoff does not become wall-clock sleep.
+            raise ApplicationError(
+                "case-2 analyzer failed",
+                non_retryable=True,
+            )
         if case_id == "case-3":
             case_3_started.set()
         return {
