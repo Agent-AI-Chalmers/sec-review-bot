@@ -4,8 +4,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/apps/github-integration"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "06:00"
       timezone: "Asia/Shanghai"
     groups:
@@ -23,8 +22,7 @@ updates:
   - package-ecosystem: "uv"
     directory: "/agents"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "06:00"
       timezone: "Asia/Shanghai"
     groups:
@@ -52,7 +50,6 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "06:00"
       timezone: "Asia/Shanghai"
