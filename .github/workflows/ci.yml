@@ -7,6 +7,7 @@ on:
       - "**/*.md"
       - "docs/**"
       - "assets/**"
+  # Merge queue candidates must report the same required CI Status check as PRs.
   merge_group:
     types:
       - checks_requested
