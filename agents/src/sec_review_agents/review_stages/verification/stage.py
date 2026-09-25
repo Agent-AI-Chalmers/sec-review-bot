@@ -77,13 +77,13 @@ def reset_verification_attempt_artifacts(
         filenames=filenames,
     )
     if attempt_label == "initial":
-        transcript_files = ["transcripts/initial.jsonl"]
+        transcript_files = ["transcripts/initial.json"]
         transcript_files.extend(
-            f"transcripts/retry-{retry_index}.jsonl"
+            f"transcripts/retry-{retry_index}.json"
             for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
         )
     else:
-        transcript_files = [f"transcripts/{attempt_label}.jsonl"]
+        transcript_files = [f"transcripts/{attempt_label}.json"]
     reset_stage_attempt_artifacts(
         verifier_artifacts_path,
         filenames=transcript_files,
@@ -177,7 +177,7 @@ async def run_verification_stage(
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir:
         local_transcript_path = (
-            verifier_artifacts_path / "transcripts" / f"{attempt_label}.jsonl"
+            verifier_artifacts_path / "transcripts" / f"{attempt_label}.json"
         )
         transcript_paths: tuple[Path, ...] = (local_transcript_path,)
         if published_transcript_path is not None:

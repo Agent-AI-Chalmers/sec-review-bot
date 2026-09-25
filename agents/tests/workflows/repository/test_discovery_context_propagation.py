@@ -197,12 +197,9 @@ async def test_execute_discovery_persists_chunk_message_history(
             discovery_artifacts_path=artifact_root,
         )
 
-    transcript_file = artifact_root / "transcripts" / "discovery-chunk-0001.jsonl"
-    events = [
-        json.loads(line)
-        for line in transcript_file.read_text(encoding="utf-8").splitlines()
-    ]
-    assert events[0]["message"]["content"] == "chunk scan response"
+    transcript_file = artifact_root / "transcripts" / "discovery-chunk-0001.json"
+    messages = json.loads(transcript_file.read_text(encoding="utf-8"))
+    assert messages[0]["content"] == "chunk scan response"
 
 
 @pytest.mark.asyncio

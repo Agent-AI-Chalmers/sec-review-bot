@@ -25,7 +25,7 @@ async def run_repository_discovery_agent(
 ) -> dict:
     chunk_id = str((chunk or {}).get("chunk_id") or "").strip()
     transcript_paths = (
-        (discovery_artifacts_path / "transcripts" / f"{chunk_id}.jsonl",)
+        (discovery_artifacts_path / "transcripts" / f"{chunk_id}.json",)
         if discovery_artifacts_path
         else ()
     )

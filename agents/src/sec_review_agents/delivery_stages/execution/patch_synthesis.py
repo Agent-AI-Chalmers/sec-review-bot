@@ -198,7 +198,7 @@ async def synthesize_combined_delivery_patch(
     ) as tempdir:
         reset_stage_attempt_artifacts(
             delivery_artifacts_root,
-            filenames=("transcript.jsonl", "workspace.patch"),
+            filenames=("transcript.json", "workspace.patch"),
         )
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
@@ -221,7 +221,7 @@ async def synthesize_combined_delivery_patch(
                 agent_name=PATCH_SYNTHESIS_AGENT_NAME,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                transcript_paths=(delivery_artifacts_root / "transcript.jsonl",),
+                transcript_paths=(delivery_artifacts_root / "transcript.json",),
             )
 
         raw_declared_changed_files = structured_payload.get("declared_changed_files")

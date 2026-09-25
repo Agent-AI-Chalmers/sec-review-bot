@@ -33,7 +33,7 @@ async def test_invoke_returns_structured_response_after_success(
             "sec_review_agents.runtime.agent_runtime_graph.log_agent_invocation_failed"
         ),
     ):
-        transcript_path = tmp_path / "transcript.jsonl"
+        transcript_path = tmp_path / "transcript.json"
         result = await invoke_agent_runtime_graph(
             agent=agent,
             agent_name="test-agent",
@@ -42,10 +42,7 @@ async def test_invoke_returns_structured_response_after_success(
             config={"metadata": {"scope": "unit"}},
             transcript_paths=(transcript_path,),
         )
-        transcript_events = [
-            json.loads(line)
-            for line in transcript_path.read_text(encoding="utf-8").splitlines()
-        ]
+        transcript_events = json.loads(transcript_path.read_text(encoding="utf-8"))
 
     assert result == {"status": "ok"}
     invoke_config = agent.ainvoke.call_args.kwargs["config"]
@@ -54,8 +51,8 @@ async def test_invoke_returns_structured_response_after_success(
         "sec_review_agent": "test-agent",
     }
     assert invoke_config["recursion_limit"] == 3
-    assert transcript_events[0]["event"] == "agent_start"
-    assert any(item["event"] == "structured_response" for item in transcript_events)
+    assert [item["type"] for item in transcript_events] == ["system"]
+    assert transcript_events[0]["type"] == "system"
 
 
 @pytest.mark.asyncio
@@ -78,7 +75,7 @@ async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
         flush=flush,
     )
 
-    transcript_path = tmp_path / "transcript.jsonl"
+    transcript_path = tmp_path / "transcript.json"
     with (
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.build_tracing_config",
@@ -106,23 +103,17 @@ async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
             user_prompt="prompt",
             transcript_paths=(transcript_path,),
         )
-    transcript_events = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+        transcript_events = json.loads(transcript_path.read_text(encoding="utf-8"))
 
     started_mock.assert_called_once()
     assert not started_mock.call_args.kwargs["tracing_enabled"]
-    invoke_callbacks = agent.ainvoke.call_args.kwargs["config"]["callbacks"]
-    assert [type(callback).__name__ for callback in invoke_callbacks] == [
-        "TranscriptCallbackHandler"
-    ]
-    assert not transcript_events[0]["tracing_enabled"]
+    assert "callbacks" not in agent.ainvoke.call_args.kwargs["config"]
+    assert transcript_events[0]["type"] == "system"
     flush.assert_called_once_with()
 
 
 @pytest.mark.asyncio
-async def test_transcript_callback_preserves_callback_manager(
+async def test_transcript_export_preserves_callback_manager(
     tmp_path: Path,
 ) -> None:
     agent = Mock()
@@ -157,15 +148,13 @@ async def test_transcript_callback_preserves_callback_manager(
             system_prompt="",
             user_prompt="prompt",
             config={"callbacks": callback_manager},
-            transcript_paths=(tmp_path / "transcript.jsonl",),
+            transcript_paths=(tmp_path / "transcript.json",),
         )
 
     invoke_callbacks = agent.ainvoke.call_args.kwargs["config"]["callbacks"]
     assert isinstance(invoke_callbacks, CallbackManager)
     assert caller_handler in invoke_callbacks.handlers
-    assert "TranscriptCallbackHandler" in [
-        type(callback).__name__ for callback in invoke_callbacks.handlers
-    ]
+    assert invoke_callbacks.handlers == [caller_handler]
 
 
 @pytest.mark.asyncio
@@ -350,7 +339,7 @@ async def test_transcript_message_events_cover_legacy_message_dump_fields(
         }
     )
 
-    transcript_path = tmp_path / "transcript.jsonl"
+    transcript_path = tmp_path / "transcript.json"
     with (
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.compute_graph_recursion_limit",
@@ -374,14 +363,11 @@ async def test_transcript_message_events_cover_legacy_message_dump_fields(
             user_prompt="prompt",
             transcript_paths=(transcript_path,),
         )
-    events = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+        events = json.loads(transcript_path.read_text(encoding="utf-8"))
 
-    message_events = [item for item in events if item["event"] == "message"]
+    message_events = [item for item in events if item["type"] == "ai"]
     assert len(message_events) == 1
-    message = message_events[0]["message"]
+    message = message_events[0]
     assert set(message) == {
         "index",
         "type",

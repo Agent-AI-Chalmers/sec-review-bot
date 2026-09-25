@@ -89,13 +89,13 @@ def reset_mitigation_attempt_artifacts(
         filenames=filenames,
     )
     if attempt_label == "initial":
-        transcript_files = ["transcripts/initial.jsonl"]
+        transcript_files = ["transcripts/initial.json"]
         transcript_files.extend(
-            f"transcripts/retry-{retry_index}.jsonl"
+            f"transcripts/retry-{retry_index}.json"
             for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
         )
     else:
-        transcript_files = [f"transcripts/{attempt_label}.jsonl"]
+        transcript_files = [f"transcripts/{attempt_label}.json"]
     reset_stage_attempt_artifacts(
         mitigator_artifacts_path,
         filenames=transcript_files,
@@ -216,7 +216,7 @@ def prepare_mitigation_transcript(
     attempt_label: str,
 ) -> tuple[Path, ...]:
     local_transcript_path = (
-        mitigator_artifacts_path / "transcripts" / f"{attempt_label}.jsonl"
+        mitigator_artifacts_path / "transcripts" / f"{attempt_label}.json"
     )
     if published_transcript_path is None:
         return (local_transcript_path,)

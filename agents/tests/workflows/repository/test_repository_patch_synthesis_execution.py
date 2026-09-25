@@ -911,7 +911,7 @@ class TestRepositoryDeliveryExecution:
         patch_synthesis_artifacts = (
             self.run_artifacts / "patch-synthesis" / "combined-edb095e4e7"
         )
-        assert (patch_synthesis_artifacts / "transcript.jsonl").exists()
+        assert (patch_synthesis_artifacts / "transcript.json").exists()
         assert (patch_synthesis_artifacts / "workspace.patch").exists()
 
     @pytest.mark.asyncio

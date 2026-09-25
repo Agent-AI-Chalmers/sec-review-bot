@@ -247,7 +247,7 @@ async def _run_delivery_planning_agent_pass(
     )
     reset_stage_attempt_artifacts(
         pass_artifacts_path,
-        filenames=("transcript.jsonl",),
+        filenames=("transcript.json",),
     )
     backend = create_repository_delivery_planning_backend(
         patch_root=delivery_planning_root / "patches",
@@ -273,7 +273,7 @@ async def _run_delivery_planning_agent_pass(
                 pass_kind=pass_kind,
                 draft_origins=draft_origins,
             ),
-            transcript_paths=(pass_artifacts_path / "transcript.jsonl",),
+            transcript_paths=(pass_artifacts_path / "transcript.json",),
         )
 
 

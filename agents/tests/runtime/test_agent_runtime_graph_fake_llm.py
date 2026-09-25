@@ -82,7 +82,7 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
         system_prompt="Return the configured structured response.",
     )
     with tempfile.TemporaryDirectory() as tempdir:
-        transcript_path = Path(tempdir) / "transcript.jsonl"
+        transcript_path = Path(tempdir) / "transcript.json"
         result = await invoke_agent_runtime_graph(
             agent=agent,
             agent_name="fake-missing-structured-response",
@@ -90,14 +90,11 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
             user_prompt="Return a patch claim.",
             transcript_paths=(transcript_path,),
         )
-        message_events = [
-            json.loads(line)["message"]
-            for line in transcript_path.read_text(encoding="utf-8").splitlines()
-            if json.loads(line)["event"] == "message"
-        ]
+        message_events = json.loads(transcript_path.read_text(encoding="utf-8"))
 
     assert result["changed_files"] == ["a.txt"]
-    assert message_events[1]["content"] == "I found the answer but forgot the schema."
+    assert message_events[0]["type"] == "system"
+    assert message_events[2]["content"] == "I found the answer but forgot the schema."
     assert message_events[-2]["tool_calls"] == [
         {
             "name": "PatchClaimProbeOutput",

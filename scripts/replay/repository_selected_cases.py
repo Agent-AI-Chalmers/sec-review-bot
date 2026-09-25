@@ -80,8 +80,7 @@ def _max_tokens_failure(run_artifacts: Path, case_id: str) -> bool:
         / "cases"
         / case_id
         / "analyzer"
-        / "messages"
-        / "messages-0001.json"
+        / "transcript.json"
     )
     if not messages_path.is_file():
         return False

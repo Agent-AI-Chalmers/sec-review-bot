@@ -243,7 +243,7 @@ async def _run_repository_triage_agent_pass(
     pass_kind: TriagePassKind = "draft" if pass_index <= 0 else "refinement"
     reset_stage_attempt_artifacts(
         _triage_pass_artifacts_path(triage_root, pass_meta),
-        filenames=("transcript.jsonl",),
+        filenames=("transcript.json",),
     )
     backend = create_repository_triage_backend()
     pass_artifacts_path = _triage_pass_artifacts_path(triage_root, pass_meta)
@@ -262,7 +262,7 @@ async def _run_repository_triage_agent_pass(
                 pass_kind=pass_kind,
                 draft_origins=draft_origins,
             ),
-            transcript_paths=(pass_artifacts_path / "transcript.jsonl",),
+            transcript_paths=(pass_artifacts_path / "transcript.json",),
         )
 
 

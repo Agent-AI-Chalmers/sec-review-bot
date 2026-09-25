@@ -59,14 +59,14 @@ async def run_single_agent_stage(
     with tempfile.TemporaryDirectory(prefix="sec-review-single-agent-") as tempdir:
         reset_stage_attempt_artifacts(
             single_agent_artifacts_path,
-            filenames=("workspace.patch", "transcript.jsonl"),
+            filenames=("workspace.patch", "transcript.json"),
         )
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
             tar_path=baseline_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        transcript_path = single_agent_artifacts_path / "transcript.jsonl"
+        transcript_path = single_agent_artifacts_path / "transcript.json"
         backend = build_backend(workspace_path)
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.

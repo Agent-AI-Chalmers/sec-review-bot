@@ -67,20 +67,20 @@ def _retry_count(run_dir: Path) -> int | None:
     # view is not a general token/cost or delivery contract.
     artifacts = run_dir / "artifacts" / run_dir.name
     retry_indexes: list[int] = []
-    for transcript_path in artifacts.glob("**/transcripts/retry-*.jsonl"):
+    for transcript_path in artifacts.glob("**/transcripts/retry-*.json"):
         label = transcript_path.stem
         try:
             retry_indexes.append(int(label.split("-", 1)[1]))
         except (IndexError, ValueError):
             continue
-    for transcript_path in artifacts.glob("transcripts/*/*-retry-*.jsonl"):
+    for transcript_path in artifacts.glob("transcripts/*/*-retry-*.json"):
         match = re.search(r"-retry-(\d+)$", transcript_path.stem)
         if match:
             retry_indexes.append(int(match.group(1)))
     if retry_indexes:
         return max(retry_indexes)
-    if any(artifacts.glob("**/transcripts/initial.jsonl")) or any(
-        artifacts.glob("transcripts/*/*-initial.jsonl")
+    if any(artifacts.glob("**/transcripts/initial.json")) or any(
+        artifacts.glob("transcripts/*/*-initial.json")
     ):
         return 0
     return None

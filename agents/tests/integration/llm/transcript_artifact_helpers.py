@@ -21,17 +21,12 @@ def transcript_messages(transcript_path: Path) -> list[dict[str, Any]]:
     transcript_files = (
         [transcript_path]
         if transcript_path.is_file()
-        else sorted(transcript_path.glob("*.jsonl"))
+        else sorted(transcript_path.glob("*.json"))
     )
     for transcript_file in transcript_files:
-        for line in transcript_file.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            event = json.loads(line)
-            if event.get("event") == "message" and isinstance(
-                event.get("message"), dict
-            ):
-                messages.append(event["message"])
+        value = json.loads(transcript_file.read_text(encoding="utf-8"))
+        if isinstance(value, list):
+            messages.extend(item for item in value if isinstance(item, dict))
     return messages
 
 
