@@ -51,7 +51,7 @@ Batch helpers:
 - `python -m scripts.patcheval.collect_patcheval_patches`
 - `python -m scripts.patcheval.summarize_patcheval_evaluation`
 
-Token usage for current runs is derived from transcript JSON files:
+Token usage for current runs is derived from transcript files:
 
 ```bash
 python -m scripts.token_usage.summarize \

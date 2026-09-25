@@ -420,7 +420,7 @@ async def extract_memory_observations_from_paths(
     if not transcript_refs:
         return MemoryObservationResult(
             skipped=True,
-            summary="No transcript JSON files found.",
+            summary="No transcript files found.",
         )
 
     memory_store_dir = resolve_memory_store_dir(memory_store_dir, required=True)

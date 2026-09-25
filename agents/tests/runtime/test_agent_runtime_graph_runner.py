@@ -42,7 +42,7 @@ async def test_invoke_returns_structured_response_after_success(
             config={"metadata": {"scope": "unit"}},
             transcript_paths=(transcript_path,),
         )
-        transcript_events = json.loads(transcript_path.read_text(encoding="utf-8"))
+        transcript_messages = json.loads(transcript_path.read_text(encoding="utf-8"))
 
     assert result == {"status": "ok"}
     invoke_config = agent.ainvoke.call_args.kwargs["config"]
@@ -51,8 +51,8 @@ async def test_invoke_returns_structured_response_after_success(
         "sec_review_agent": "test-agent",
     }
     assert invoke_config["recursion_limit"] == 3
-    assert [item["type"] for item in transcript_events] == ["system"]
-    assert transcript_events[0]["type"] == "system"
+    assert [item["type"] for item in transcript_messages] == ["system"]
+    assert transcript_messages[0]["type"] == "system"
 
 
 @pytest.mark.asyncio
@@ -103,12 +103,12 @@ async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
             user_prompt="prompt",
             transcript_paths=(transcript_path,),
         )
-        transcript_events = json.loads(transcript_path.read_text(encoding="utf-8"))
+        transcript_messages = json.loads(transcript_path.read_text(encoding="utf-8"))
 
     started_mock.assert_called_once()
     assert not started_mock.call_args.kwargs["tracing_enabled"]
     assert "callbacks" not in agent.ainvoke.call_args.kwargs["config"]
-    assert transcript_events[0]["type"] == "system"
+    assert transcript_messages[0]["type"] == "system"
     flush.assert_called_once_with()
 
 
@@ -314,7 +314,7 @@ async def test_missing_structured_response_raises() -> None:
 
 
 @pytest.mark.asyncio
-async def test_transcript_message_events_cover_legacy_message_dump_fields(
+async def test_transcript_messages_cover_message_dump_fields(
     tmp_path: Path,
 ) -> None:
     class FakeMessage:
@@ -363,11 +363,11 @@ async def test_transcript_message_events_cover_legacy_message_dump_fields(
             user_prompt="prompt",
             transcript_paths=(transcript_path,),
         )
-        events = json.loads(transcript_path.read_text(encoding="utf-8"))
+        messages = json.loads(transcript_path.read_text(encoding="utf-8"))
 
-    message_events = [item for item in events if item["type"] == "ai"]
-    assert len(message_events) == 1
-    message = message_events[0]
+    ai_messages = [item for item in messages if item["type"] == "ai"]
+    assert len(ai_messages) == 1
+    message = ai_messages[0]
     assert set(message) == {
         "index",
         "type",

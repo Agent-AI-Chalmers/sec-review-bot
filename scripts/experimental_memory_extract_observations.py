@@ -99,7 +99,7 @@ async def main() -> int:
 
     transcript_refs = collect_transcript_refs(args.inputs)
     if not transcript_refs:
-        print("No transcript JSON files found.")
+        print("No transcript files found.")
         return 1
 
     groups = _group_transcript_refs_by_thread(transcript_refs)

@@ -98,7 +98,9 @@ def _memory_observations_dir(memory_store_dir: Path) -> Path:
 def test_stage_transcripts_copies_json_under_thread_dir(tmp_path: Path) -> None:
     source = tmp_path / "run" / "transcript.json"
     source.parent.mkdir()
-    source.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+    source.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
     destination = tmp_path / "staged"
 
     staged = memory_extraction.stage_transcripts(
@@ -121,7 +123,7 @@ def test_stage_transcripts_copies_json_under_thread_dir(tmp_path: Path) -> None:
     ]
     assert (destination / "0001-review" / "0001-transcript.json").read_text(
         encoding="utf-8"
-    ) == ('{"seq":1,"event":"message"}\n')
+    ) == ('[{"index":0,"type":"ai","content":"message"}]\n')
     assert not (destination / "MANIFEST.md").exists()
 
 
@@ -135,8 +137,12 @@ def test_collect_review_memory_transcripts_uses_published_threads(
     unrelated = review_root / "notes" / "scratch.json"
     published.parent.mkdir(parents=True)
     unrelated.parent.mkdir(parents=True)
-    published.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
-    unrelated.write_text('{"seq":1,"event":"scratch"}\n', encoding="utf-8")
+    published.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
+    unrelated.write_text(
+        '[{"index":0,"type":"note","content":"scratch"}]\n', encoding="utf-8"
+    )
 
     refs = memory_extraction.collect_review_memory_transcripts(review_root)
 
@@ -156,7 +162,9 @@ def test_collect_review_memory_transcripts_rejects_invalid_published_name(
     review_root = tmp_path / "review"
     transcript = review_root / "transcripts" / "0001-review" / "analyzer.json"
     transcript.parent.mkdir(parents=True)
-    transcript.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+    transcript.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
 
     with pytest.raises(ValueError, match="<order>-<stage>-<attempt>"):
         memory_extraction.collect_review_memory_transcripts(review_root)
@@ -166,7 +174,9 @@ def test_stage_review_transcripts_writes_ordered_thread_prompt(tmp_path: Path) -
     sources = []
     for label in ("analyzer", "mitigator", "verifier"):
         path = tmp_path / f"{label}.json"
-        path.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+        path.write_text(
+            '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+        )
         sources.append(path)
 
     staged = memory_extraction.stage_transcripts(
@@ -701,7 +711,9 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
         / "0001-analyzer-initial.json"
     )
     transcript.parent.mkdir(parents=True)
-    transcript.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+    transcript.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
 
     with (
         patch("sec_review_agents.memory.extractor.create_memory_extractor_agent_graph"),
@@ -765,7 +777,9 @@ async def test_extract_memory_observations_repeated_id_updates_pending_row(
         / "0001-analyzer-initial.json"
     )
     transcript.parent.mkdir(parents=True)
-    transcript.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+    transcript.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
     bodies = iter(["First durable lesson.", "Second durable lesson."])
 
     with (
@@ -817,7 +831,9 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
         / "0001-analyzer-initial.json"
     )
     transcript.parent.mkdir(parents=True)
-    transcript.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+    transcript.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
 
     with (
         patch("sec_review_agents.memory.extractor.create_memory_extractor_agent_graph"),
@@ -862,8 +878,12 @@ async def test_extract_memory_observations_runs_once_per_published_thread(
     second = artifacts / "transcripts" / "0002-case-beta" / "0001-analyzer-initial.json"
     first.parent.mkdir(parents=True)
     second.parent.mkdir(parents=True)
-    first.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
-    second.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+    first.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
+    second.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
     prompts: list[str] = []
     bodies = iter(["Alpha lesson.", "Beta lesson."])
 
@@ -928,7 +948,9 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
         / "0001-analyzer-initial.json"
     )
     transcript.parent.mkdir(parents=True)
-    transcript.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+    transcript.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
     observation = _memory_observations_dir(memory_root) / "same-run.md"
     observation.parent.mkdir(parents=True, exist_ok=True)
     observation.write_text("Original durable lesson.\n", encoding="utf-8")
@@ -981,7 +1003,9 @@ async def test_extract_memory_observations_skips_publish_when_observation_proces
         / "0001-analyzer-initial.json"
     )
     transcript.parent.mkdir(parents=True)
-    transcript.write_text('{"seq":1,"event":"message"}\n', encoding="utf-8")
+    transcript.write_text(
+        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+    )
     observation = _memory_observations_dir(memory_root) / "same-run.md"
     observation.parent.mkdir(parents=True, exist_ok=True)
     observation.write_text("Maintained lesson.\n", encoding="utf-8")

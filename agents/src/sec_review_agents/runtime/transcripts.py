@@ -1,4 +1,4 @@
-"""Persist the readable conversation produced by an agent as a JSON array."""
+"""Persist the readable conversation produced by an agent."""
 
 import json
 from pathlib import Path

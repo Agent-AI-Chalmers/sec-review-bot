@@ -2,7 +2,7 @@
 
 This directory contains the offline helper for summarizing token usage and effective patch cost from local run transcripts.
 
-It is a repository-level reporting script. It reads stage-local transcript JSON files directly.
+It is a repository-level reporting script. It reads stage-local transcript files directly.
 
 Install the agents package before running this repository-level script:
 
