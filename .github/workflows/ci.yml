@@ -7,6 +7,9 @@ on:
       - "**/*.md"
       - "docs/**"
       - "assets/**"
+  merge_group:
+    types:
+      - checks_requested
   push:
     branches:
       - main
@@ -51,7 +54,9 @@ jobs:
   github-integration:
     name: GitHub Integration
     needs: changes
-    if: needs.changes.outputs.github-integration == 'true'
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.github-integration == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -89,7 +94,9 @@ jobs:
   agents:
     name: Agents
     needs: changes
-    if: needs.changes.outputs.agents == 'true'
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.agents == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
