@@ -31,6 +31,7 @@ jobs:
     outputs:
       github-integration: ${{ steps.filter.outputs.github-integration }}
       agents: ${{ steps.filter.outputs.agents }}
+      scripts: ${{ steps.filter.outputs.scripts }}
       automation-config: ${{ steps.filter.outputs.automation-config }}
     steps:
       - name: Check out repository
@@ -46,6 +47,9 @@ jobs:
               - '.github/workflows/ci.yml'
             agents:
               - 'agents/**'
+              - '.github/workflows/ci.yml'
+            scripts:
+              - 'scripts/**'
               - '.github/workflows/ci.yml'
             # Automation configuration has its own lightweight validation. A
             # Dependabot scheduling change should not run both application suites.
@@ -175,6 +179,50 @@ jobs:
         # diagnostic only: it does not select, skip, reorder, or relax tests.
         run: uv run python -m pytest --durations=0 --durations-min=0.01
 
+  scripts:
+    name: Repository Scripts
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.scripts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: agents/.python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: agents/uv.lock
+
+      - name: Install dependencies
+        working-directory: agents
+        run: uv sync --group dev --frozen
+
+      # Scripts are repository tools rather than part of the typed agents
+      # package, but they still depend on the agents runtime and its deps.
+      - name: Lint repository scripts with Ruff
+        working-directory: scripts
+        run: uv --project ../agents run ruff check .
+
+      - name: Compile repository scripts
+        working-directory: scripts
+        run: python -m compileall -q .
+
+      - name: Smoke-test repository script entrypoints
+        working-directory: scripts
+        env:
+          PYTHONPATH: ../agents/src
+        run: |
+          uv --project ../agents run python experimental_memory_extract_observations.py --help
+          uv --project ../agents run python experimental_memory_maintain_from_observations.py --help
+
   ci-status:
     name: CI Status
     needs:
@@ -182,6 +230,7 @@ jobs:
       - automation-config
       - github-integration
       - agents
+      - scripts
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -191,12 +240,14 @@ jobs:
           AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
           AGENTS_RESULT: ${{ needs.agents.result }}
+          SCRIPTS_RESULT: ${{ needs.scripts.result }}
         run: |
           set -euo pipefail
           for result in \
             "$AUTOMATION_CONFIG_RESULT" \
             "$GITHUB_INTEGRATION_RESULT" \
-            "$AGENTS_RESULT"; do
+            "$AGENTS_RESULT" \
+            "$SCRIPTS_RESULT"; do
             case "$result" in
               success|skipped)
                 ;;
