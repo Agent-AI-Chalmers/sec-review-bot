@@ -141,13 +141,12 @@ def _usage_records_from_value(
     return records
 
 
-def _fallback_model_id(events: list[dict[str, Any]]) -> str | None:
-    for event in events:
-        if event.get("event") != "chat_model_start":
-            continue
-        model = event.get("model")
-        if isinstance(model, str) and model.strip():
-            return model.strip()
+def _fallback_model_id(messages: list[dict[str, Any]]) -> str | None:
+    """Recover a model id from transcript metadata when usage lacks one."""
+    for message in messages:
+        model_id = _model_id_from_value(message)
+        if model_id is not None:
+            return model_id
     return None
 
 
@@ -172,7 +171,7 @@ def _read_transcript_usage(path: Path) -> StageUsage:
     elif len(model_ids) > 1:
         model_id = "mixed"
     else:
-            model_id = "unknown"
+        model_id = _fallback_model_id(messages) or "unknown"
 
     stage, _attempt = _transcript_stage_attempt(path)
     return StageUsage(
