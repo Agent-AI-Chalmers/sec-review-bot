@@ -57,12 +57,6 @@ def log_stage_failed(
     )
 
 
-def log_case_processing(
-    *, case_id: str | None, ordinal: int | None, total: int | None
-) -> None:
-    logger.debug("case_processing", case_id=case_id, ordinal=ordinal, total=total)
-
-
 def log_agent_configuration(
     *,
     agent_name: str,
