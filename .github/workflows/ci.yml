@@ -211,6 +211,10 @@ jobs:
         working-directory: scripts
         run: uv --project ../agents run ruff check .
 
+      - name: Check repository script formatting with Black
+        working-directory: scripts
+        run: uv --project ../agents run black --check .
+
       - name: Compile repository scripts
         working-directory: scripts
         run: python -m compileall -q .
