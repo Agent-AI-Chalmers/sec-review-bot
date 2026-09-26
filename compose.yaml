@@ -3,14 +3,13 @@ services:
     image: temporalio/temporal:latest
     command: ["server", "start-dev", "--ip", "0.0.0.0"]
     ports:
+      - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
       - "${TEMPORAL_UI_PORT:-8233}:8233"
 
   runner-service:
     build:
       context: agents
       dockerfile: Dockerfile
-    env_file:
-      - agents/.env
     environment:
       RUNNER_SERVICE_HOST: "0.0.0.0"
       RUNNER_SERVICE_PORT: "8000"
@@ -20,51 +19,13 @@ services:
       # No default token: the runner can spend LLM quota and execute workflows.
       RUNNER_SERVICE_TOKEN: "${RUNNER_SERVICE_TOKEN:?RUNNER_SERVICE_TOKEN is required}"
       TEMPORAL_WORKFLOW_TIMEOUT_SECONDS: "${TEMPORAL_WORKFLOW_TIMEOUT_SECONDS:-10800}"
-      MODEL_PROVIDERS_CONFIG_TOML: "/run/secrets/model-providers.toml"
       SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT: "${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}"
-      SEC_REVIEW_AGENT_ARTIFACT_ROOT: "${SEC_REVIEW_AGENT_ARTIFACT_ROOT:-${PWD}/.agent-artifacts}"
-      LANGFUSE_BASE_URL: "${LANGFUSE_BASE_URL:-http://host.docker.internal:3000}"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${RUNNER_SERVICE_PORT:-8000}:8000"
-    secrets:
-      - source: model-providers
-        target: model-providers.toml
     depends_on:
       temporal:
         condition: service_started
 
-  runner-worker:
-    build:
-      context: agents
-      dockerfile: Dockerfile
-    command: ["sec-review-agents-worker"]
-    env_file:
-      - agents/.env
-    environment:
-      TEMPORAL_ADDRESS: "temporal:7233"
-      TEMPORAL_NAMESPACE: "${TEMPORAL_NAMESPACE:-default}"
-      TEMPORAL_TASK_QUEUE: "${TEMPORAL_TASK_QUEUE:-sec-review-agents}"
-      TEMPORAL_ACTIVITY_WORKERS: "${TEMPORAL_ACTIVITY_WORKERS:-8}"
-      MODEL_PROVIDERS_CONFIG_TOML: "/run/secrets/model-providers.toml"
-      SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT: "${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}"
-      SEC_REVIEW_AGENT_ARTIFACT_ROOT: "${SEC_REVIEW_AGENT_ARTIFACT_ROOT:-${PWD}/.agent-artifacts}"
-      AGENT_SANDBOX_BACKEND: "${AGENT_SANDBOX_BACKEND:-auto}"
-      AGENT_DOCKER_BIN: "${AGENT_DOCKER_BIN:-docker}"
-      LANGFUSE_BASE_URL: "${LANGFUSE_BASE_URL:-http://host.docker.internal:3000}"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - "${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}:${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}"
-      - "${SEC_REVIEW_AGENT_ARTIFACT_ROOT:-${PWD}/.agent-artifacts}:${SEC_REVIEW_AGENT_ARTIFACT_ROOT:-${PWD}/.agent-artifacts}"
-      - /var/run/docker.sock:/var/run/docker.sock
-    secrets:
-      - source: model-providers
-        target: model-providers.toml
-    depends_on:
-      temporal:
-        condition: service_started
   github-integration:
     profiles: ["app"]
     build:
@@ -94,11 +55,7 @@ services:
     depends_on:
       runner-service:
         condition: service_started
-      runner-worker:
-        condition: service_started
 
 secrets:
-  model-providers:
-    file: ${MODEL_PROVIDERS_CONFIG_TOML_FILE:-./agents/config/model-providers.toml}
   github-app-private-key:
     file: ${GITHUB_APP_PRIVATE_KEY_FILE:-./apps/github-integration/private-key.pem}

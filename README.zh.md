@@ -10,7 +10,7 @@
 
 [English](README.md) · 中文
 
-[文档](docs/README.zh.md) · [部署](docs/operations/DOCKER_COMPOSE_DEPLOYMENT.zh.md)
+[文档](docs/README.zh.md) · [部署](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
 </div>
 
@@ -54,7 +54,8 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 - LangChain / LangGraph：agent 运行时，负责模型适配、结构化输出、工具调用和 workflow 内部的 agent loop。
 - Langfuse：可选 tracing backend，用于 LLM 调用和 agent run 诊断。
 - Temporal：长时间 agent run 的可靠执行层和任务队列（承担类似 RQ 的 job queue 角色），负责 workflow / activity 的调度、worker 分发、重试、超时和失败状态。
-- Docker Compose：App、runner service、worker 和 Temporal 的本地联调环境。
+- Docker Compose：App、runner service 和 Temporal 的本地控制平面环境。
+- 执行 worker：轮询 Temporal 并负责 Docker sandbox 执行的宿主机进程。
 - Docker sandbox：agent 文件和命令工具的默认执行后端。
 
 ## 项目状态
@@ -85,7 +86,7 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 
 ### 本地启动完整链路
 
-同时启动 GitHub integration service、运行服务、runner worker 和 Temporal：
+启动 GitHub integration、Runner Service 和 Temporal 控制平面：
 
 ```bash
 cp compose.env.sample .env
@@ -97,9 +98,11 @@ cp apps/github-integration/.env.sample apps/github-integration/.env
 docker compose --profile app up --build --force-recreate
 ```
 
-这套 Compose 是基于镜像的本地集成环境。修改 GitHub integration 或 agents 代码后，需要重新运行这条命令来重建容器；它不是热更新开发循环。
+然后在宿主机启动 `sec-review-agents-worker`。它轮询 Temporal，并使用宿主机 Docker daemon 可见的路径创建 Docker sandbox。前台运行和 systemd 常驻方式见[本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
-如果只调试运行后端，可不启用 `app` profile，只启动 `temporal`、`runner-service`、`runner-worker` 三个 Compose service。
+这套 Compose 是基于镜像的本地集成环境。修改 GitHub integration 或 Runner Service 代码后，需要重新运行这条命令来重建容器；它不是热更新开发循环。
+
+如果不需要 GitHub integration，可不启用 `app` profile，只启动 `temporal` 和 `runner-service`；提交的 run 仍然需要宿主机 worker 才能执行。
 
 验证运行服务：
 
@@ -117,7 +120,7 @@ Compose 里的 Temporal Web UI 默认暴露在 `127.0.0.1:8233`；运行服务�
 
 | 目标 | 入口 |
 | --- | --- |
-| 本地启动完整链路 | [Docker Compose 部署说明](docs/operations/DOCKER_COMPOSE_DEPLOYMENT.zh.md) |
+| 本地启动完整链路和执行 worker | [本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) |
 | 开发 GitHub integration | [GitHub integration 说明](apps/github-integration/README.zh.md) |
 | 开发 agent 运行后端或做本地运行 | [Agents 本地运行说明](agents/README.zh.md) |
 | 把 webhook 转发到本地 | [本地 webhook 设置](docs/operations/LOCAL_WEBHOOK_SETUP.zh.md) |

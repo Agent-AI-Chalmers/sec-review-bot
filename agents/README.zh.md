@@ -52,7 +52,7 @@ LLM 配置按 deployment 选择 provider。
 
 本地 `run-local-*` CLI 和 `sec-review-agents-check-llm-deployments` 会加载 `agents/.env`，但不会覆盖进程里已有的环境变量。
 
-`sec-review-agents-service` 和 `sec-review-agents-worker` 不会自己加载 `.env`。Compose 通过 `env_file` 注入 `agents/.env`；安装后运行、生产部署或手动启动时，应由 shell、supervisor 或 CI 先注入进程环境变量。
+`sec-review-agents-service` 和 `sec-review-agents-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。集成 Compose 部署直接配置 Runner Service，不读取 `agents/.env`。
 
 没有 `.env` 文件路径 override。`MODEL_PROVIDERS_CONFIG_TOML` 是模型配置路径的最高优先级入口；只有想把 TOML 放到其他位置，或运行方式不保留当前项目相对目录结构时，才需要显式设置它。
 
@@ -283,6 +283,6 @@ TEMPORAL_TASK_QUEUE=sec-review-agents \
 sec-review-agents-worker
 ```
 
-Service 负责 HTTP、鉴权、run request 校验和启动 Temporal workflow；worker 负责从 Temporal task queue 取 workflow / activity task 并调用 runner core。模型、sandbox、skills 和并发相关环境变量属于 service / worker 运行环境。
+Service 负责 HTTP、鉴权、run request 校验和启动 Temporal workflow；worker 负责从 Temporal task queue 取 workflow / activity task 并调用 runner core。模型、sandbox、skills 和 activity 并发相关环境变量属于 worker 运行环境。
 
-Docker Compose 启动 Temporal、service 和 worker 的说明见 [Docker Compose 部署](../docs/operations/DOCKER_COMPOSE_DEPLOYMENT.zh.md)；本文件只覆盖 runner 入口、本地 `run-local-*` CLI 和 agents 运行边界。
+Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)；本文件只覆盖 runner 入口、本地 `run-local-*` CLI 和 agents 运行边界。

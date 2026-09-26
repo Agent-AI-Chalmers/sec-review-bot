@@ -10,7 +10,7 @@ An experimental security review bot for GitHub issues, pull requests, and reposi
 
 English · [中文](README.zh.md)
 
-[Documentation](docs/README.md) · [Deployment](docs/operations/DOCKER_COMPOSE_DEPLOYMENT.md)
+[Documentation](docs/README.md) · [Deployment](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md)
 
 </div>
 
@@ -54,7 +54,8 @@ This repository is a monorepo with two main subsystems:
 - LangChain / LangGraph: agent runtime for chat model adapters, structured output, tools, and workflow-local agent loops.
 - Langfuse: optional tracing backend for LLM calls and agent run diagnostics.
 - Temporal: durable execution layer and task queue for long-running agent runs (the RQ-style job queue role); owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
-- Docker Compose: local integration environment for the App, runner service, worker, and Temporal.
+- Docker Compose: local control-plane environment for the App, runner service, and Temporal.
+- Execution worker: host process that polls Temporal and owns Docker sandbox execution.
 - Docker sandbox: default execution backend for agent file and command tools.
 
 ## Project Status
@@ -85,7 +86,7 @@ Full trigger behavior is documented in the [GitHub integration triggers guide](a
 
 ### Run The Stack Locally
 
-Start the GitHub integration service, runner service, runner worker, and Temporal together:
+Start the GitHub integration, Runner Service, and Temporal control plane:
 
 ```bash
 cp compose.env.sample .env
@@ -97,9 +98,11 @@ cp apps/github-integration/.env.sample apps/github-integration/.env
 docker compose --profile app up --build --force-recreate
 ```
 
-This Compose setup is image-based. After changing GitHub integration or agents code, rerun the command to rebuild the containers; it is not a hot-reload development loop.
+Then start `sec-review-agents-worker` on the host. It polls Temporal and creates Docker sandboxes using paths visible to the host Docker daemon. See the [local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) for foreground and systemd startup.
 
-If you only need to debug the execution backend, omit the `app` profile and start only `temporal`, `runner-service`, and `runner-worker`.
+This Compose setup is image-based. After changing GitHub integration or Runner Service code, rerun the command to rebuild the containers; it is not a hot-reload development loop.
+
+If you do not need GitHub integration, omit the `app` profile and start only `temporal` and `runner-service`; the host worker is still required to execute submitted runs.
 
 Check the runner service:
 
@@ -117,7 +120,7 @@ Package-specific setup and commands live in the package READMEs.
 
 | Goal | Start here |
 | --- | --- |
-| Run the full local stack | [Docker Compose deployment guide](docs/operations/DOCKER_COMPOSE_DEPLOYMENT.md) |
+| Run the full local stack and execution workers | [Local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) |
 | GitHub integration development | [GitHub integration guide](apps/github-integration/README.md) |
 | Agent backend development and local runs | [Agents local run guide](agents/README.md) |
 | Webhook routing to local | [Local webhook setup](docs/operations/LOCAL_WEBHOOK_SETUP.md) |
