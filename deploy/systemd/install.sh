@@ -45,12 +45,20 @@ if ! /usr/sbin/runuser -u "$service_user" -- \
 fi
 
 install -d -m 0755 "$config_dir"
+if [ -L "$deployment_env" ]; then
+    echo "Refusing to use a symbolic link as deployment config: $deployment_env" >&2
+    exit 1
+fi
 if [ ! -e "$deployment_env" ]; then
     escaped_repository_root=$(printf '%s' "$repository_root" | sed 's/[&|]/\\&/g')
     sed "s|/absolute/path/to/sec-review-bot|$escaped_repository_root|g" \
         "$script_dir/deployment.env.sample" >"$deployment_env"
-    chmod 0600 "$deployment_env"
+elif [ ! -f "$deployment_env" ]; then
+    echo "Deployment config is not a regular file: $deployment_env" >&2
+    exit 1
 fi
+chown root:root "$deployment_env"
+chmod 0600 "$deployment_env"
 
 render_unit() {
     source_path=$1
