@@ -21,10 +21,7 @@ from sec_review_agents.observability.tracing import (
     build_tracing_config,
     tracing_configured,
 )
-from sec_review_agents.runtime.transcripts import (
-    TranscriptCallbackHandler,
-    TranscriptWriter,
-)
+from sec_review_agents.runtime.transcripts import TranscriptWriter
 from sec_review_agents.utils.limit import compute_graph_recursion_limit
 
 
@@ -92,11 +89,6 @@ async def invoke_agent_runtime_graph(
         config,
         tracing_config.to_langchain_config(),
     )
-    if transcript_writer is not None:
-        invoke_config = merge_configs(
-            invoke_config,
-            {"callbacks": [TranscriptCallbackHandler(transcript_writer)]},
-        )
     if recursion_limit is not None:
         invoke_config["recursion_limit"] = recursion_limit
 
@@ -106,15 +98,7 @@ async def invoke_agent_runtime_graph(
         tracing_enabled=tracing_config.enabled,
     )
     if transcript_writer is not None:
-        transcript_writer.write_event(
-            "agent_start",
-            recursion_limit=recursion_limit,
-            tracing_enabled=tracing_config.enabled,
-        )
-        transcript_writer.write_event(
-            "prompt_snapshot",
-            system_prompt=system_prompt,
-        )
+        transcript_writer.write_system_prompt(system_prompt)
 
     messages: list[Any] = [
         {
@@ -154,21 +138,8 @@ async def invoke_agent_runtime_graph(
             structured_payload = dict(structured_result)
         else:
             structured_payload = dict(structured_result)
-        if transcript_writer is not None:
-            transcript_writer.write_event(
-                "structured_response",
-                payload=structured_payload,
-            )
-            transcript_writer.write_event("agent_end", status="ok")
         return structured_payload
     except Exception as error:
-        if transcript_writer is not None:
-            transcript_writer.write_event(
-                "agent_error",
-                error_type=error.__class__.__name__,
-                error=str(error),
-            )
-            transcript_writer.write_event("agent_end", status="error")
         log_agent_invocation_failed(
             agent_name=agent_name,
             started_at=started_at,

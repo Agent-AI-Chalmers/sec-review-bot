@@ -34,7 +34,7 @@ from sec_review_agents.memory.store import (
     resolve_memory_store_dir,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 PUBLISHED_TRANSCRIPT_STAGES = {"analyzer", "mitigator", "verifier"}
 
@@ -138,7 +138,7 @@ def _published_transcript_stage_attempt(transcript: Path) -> tuple[str, str]:
     if not order.isdecimal() or stage not in PUBLISHED_TRANSCRIPT_STAGES or not attempt:
         raise ValueError(
             "Published transcript files must be named "
-            "<order>-<stage>-<attempt>.jsonl with stage analyzer, mitigator, or verifier: "
+            "<order>-<stage>-<attempt>.json with stage analyzer, mitigator, or verifier: "
             f"{transcript}"
         )
     return stage, attempt
@@ -152,7 +152,7 @@ def collect_published_transcripts(review_artifact_root: Path) -> list[Transcript
     for thread_dir in sorted(
         path for path in transcripts_root.iterdir() if path.is_dir()
     ):
-        for transcript in sorted(thread_dir.glob("*.jsonl")):
+        for transcript in sorted(thread_dir.glob("*.json")):
             stage, attempt = _published_transcript_stage_attempt(transcript)
             refs.append(
                 TranscriptRef(
@@ -212,7 +212,7 @@ def stage_transcripts(
         target = (
             destination
             / transcript.thread
-            / f"{thread_counts[transcript.thread]:04d}-{transcript.label}.jsonl"
+            / f"{thread_counts[transcript.thread]:04d}-{transcript.label}.json"
         )
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
@@ -321,7 +321,7 @@ async def _extract_memory_observation_for_refs(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
             deployment_override=deployment,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_memory_extractor_agent_graph(
                 model=model,
                 backend=backend,
@@ -420,7 +420,7 @@ async def extract_memory_observations_from_paths(
     if not transcript_refs:
         return MemoryObservationResult(
             skipped=True,
-            summary="No transcript JSONL files found.",
+            summary="No transcript files found.",
         )
 
     memory_store_dir = resolve_memory_store_dir(memory_store_dir, required=True)

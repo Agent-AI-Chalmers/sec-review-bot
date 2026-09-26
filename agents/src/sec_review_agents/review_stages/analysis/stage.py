@@ -11,7 +11,7 @@ from sec_review_agents.agents.analysis.agent import (
 from sec_review_agents.review_stages.analysis.result import build_analysis_stage_result
 from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.files import persist_json
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -44,7 +44,7 @@ async def run_analysis_stage(
             published_transcript_path=published_transcript_path,
         )
         backend = build_backend(workspace_path)
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent_graph = await create_analysis_agent_graph(
                 agent_name=agent_name,
                 backend=backend,
@@ -67,7 +67,7 @@ async def run_analysis_stage(
 def reset_analysis_artifacts(*, analyzer_artifacts_path: Path) -> None:
     reset_stage_attempt_artifacts(
         analyzer_artifacts_path,
-        filenames=("analysis-result.json", "transcript.jsonl"),
+        filenames=("analysis-result.json", "transcript.json"),
     )
 
 
@@ -76,7 +76,7 @@ def prepare_analysis_transcript(
     analyzer_artifacts_path: Path,
     published_transcript_path: Path | None,
 ) -> tuple[Path, ...]:
-    local_transcript_path = analyzer_artifacts_path / "transcript.jsonl"
+    local_transcript_path = analyzer_artifacts_path / "transcript.json"
     if published_transcript_path is None:
         return (local_transcript_path,)
 

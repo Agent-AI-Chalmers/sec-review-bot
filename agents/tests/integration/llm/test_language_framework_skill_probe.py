@@ -18,7 +18,7 @@ from langchain.agents.middleware import AgentMiddleware
 from pydantic import BaseModel, Field
 
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
@@ -150,7 +150,7 @@ async def test_django_reference_distinguishes_orm_values_from_dynamic_sql(
     backend, agent = await _create_language_framework_skill_probe_agent(
         workspace=workspace,
     )
-    with managed_backend(backend):
+    async with amanaged_backend(backend):
         result = await agent.ainvoke(
             {
                 "messages": [

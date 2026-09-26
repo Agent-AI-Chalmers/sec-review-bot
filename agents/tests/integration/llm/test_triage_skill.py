@@ -47,7 +47,7 @@ async def test_triage_reads_scanner_finding_skill_for_reachability_noise() -> No
             triage_mode="single",
         )
 
-    read_paths = read_file_paths_from_transcript(triage_root / "transcript.jsonl")
+    read_paths = read_file_paths_from_transcript(triage_root / "transcript.json")
 
     print(
         json.dumps(

@@ -19,7 +19,7 @@ from sec_review_agents.review_stages.cvss.result import (
 )
 from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.files import persist_json
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -125,9 +125,9 @@ async def run_cvss_v4_scoring_stage(
             tar_path=baseline_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        transcript_path = cvss_artifacts_path / "transcript.jsonl"
+        transcript_path = cvss_artifacts_path / "transcript.json"
         backend = build_backend(workspace_path)
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_cvss_agent_graph(
                 agent_name=agent_name,
                 backend=backend,
@@ -151,7 +151,7 @@ async def run_cvss_v4_scoring_stage(
 def reset_cvss_artifacts(*, cvss_artifacts_path: Path) -> None:
     reset_stage_attempt_artifacts(
         cvss_artifacts_path,
-        filenames=("cvss-v4-result.json", "transcript.jsonl"),
+        filenames=("cvss-v4-result.json", "transcript.json"),
     )
 
 

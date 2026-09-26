@@ -27,7 +27,7 @@ from sec_review_agents.memory.extractor import (
     stage_transcripts,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 WARNING = (
@@ -51,7 +51,7 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         help=(
             "Review artifact directories containing transcripts/, or transcript "
-            "JSONL files."
+            "JSON transcript files."
         ),
     )
     parser.add_argument(
@@ -99,7 +99,7 @@ async def main() -> int:
 
     transcript_refs = collect_transcript_refs(args.inputs)
     if not transcript_refs:
-        print("No transcript JSONL files found.")
+        print("No transcript files found.")
         return 1
 
     groups = _group_transcript_refs_by_thread(transcript_refs)
@@ -134,7 +134,7 @@ async def main() -> int:
                 agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
                 deployment_override=args.deployment,
             )
-            with managed_backend(backend):
+            async with amanaged_backend(backend):
                 agent = await create_memory_extractor_agent_graph(
                     model=model,
                     backend=backend,

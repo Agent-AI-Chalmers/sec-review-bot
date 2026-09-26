@@ -1,5 +1,5 @@
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -589,7 +589,7 @@ def oldest_observation_created_at_by_status(
 
 
 @contextmanager
-def open_memory_state(memory_store_dir: Path) -> Iterator[sqlite3.Connection]:
+def open_memory_state(memory_store_dir: Path) -> Generator[sqlite3.Connection]:
     state_path = memory_store_dir / MEMORY_STATE_FILENAME
     connection = sqlite3.connect(state_path)
     try:

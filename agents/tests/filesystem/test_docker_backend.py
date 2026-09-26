@@ -7,7 +7,8 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from deepagents.backends.protocol import (
@@ -35,6 +36,7 @@ from sec_review_agents.filesystem.sandbox_file_ops import (
     limits_payload,
     sandbox_file_script_source,
 )
+from sec_review_agents.runtime.backend_cleanup import aclose_backend_container
 
 
 def _run_file_script(payload: dict[str, object]) -> dict[str, object]:
@@ -138,6 +140,48 @@ async def test_async_docker_command_uses_async_subprocess() -> None:
     )
     assert result.stdout == "ok"
     assert result.returncode == 0
+
+
+@pytest.mark.asyncio
+async def test_afinalize_uses_async_docker_shell() -> None:
+    """Use the non-blocking Docker API when normalizing mount ownership."""
+    mount = DockerMount(
+        host_path="/tmp/workspace",
+        container_path="/workspace",
+        writable=True,
+    )
+    backend = _backend(mounts=[mount])
+
+    with (
+        patch(
+            "sec_review_agents.filesystem.docker_backend.docker_runtime.aexec_shell",
+            new_callable=AsyncMock,
+        ) as async_shell,
+        patch(
+            "sec_review_agents.filesystem.docker_backend.docker_runtime.exec_shell",
+        ) as sync_shell,
+    ):
+        await backend.afinalize()
+
+    async_shell.assert_awaited_once()
+    sync_shell.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_aclose_backend_container_prefers_async_finalizer() -> None:
+    """Prefer an async backend finalizer so teardown does not block the loop."""
+    afinalize = AsyncMock()
+    finalize = Mock()
+    backend = SimpleNamespace(
+        afinalize=afinalize,
+        finalize=finalize,
+        container=None,
+    )
+
+    await aclose_backend_container(backend)
+
+    afinalize.assert_awaited_once_with()
+    finalize.assert_not_called()
 
 
 def test_sandbox_backend_defaults_to_docker_when_available() -> None:
@@ -623,6 +667,14 @@ def test_edit_uses_newline_tolerant_docker_file_operation() -> None:
     assert payload["path"] == "/mnt/material/workspace/app.py"
 
 
+def test_finalize_normalizes_mount_ownership_once_at_backend_end() -> None:
+    backend = _backend()
+    with patch.object(backend, "_normalize_mount_ownership") as normalize:
+        backend.finalize()
+
+    normalize.assert_called_once_with()
+
+
 def test_tmp_is_available_only_when_path_binding_exposes_it() -> None:
     backend = _backend()
 
@@ -647,7 +699,7 @@ def test_tmp_is_available_only_when_path_binding_exposes_it() -> None:
     assert backend_with_tmp._is_allowed_path("/tmp/app.py", writable=True)
 
 
-def test_execute_normalizes_writable_mount_ownership_after_command() -> None:
+def test_execute_does_not_normalize_mount_ownership_after_command() -> None:
     backend = _backend(
         mounts=[
             DockerMount(
@@ -676,7 +728,7 @@ def test_execute_normalizes_writable_mount_ownership_after_command() -> None:
         result = backend.execute("echo ok")
 
     assert result.exit_code == 0
-    assert len(calls) >= 5
+    assert len(calls) == 4
     assert calls[0][1] == "rm"
     assert calls[1][1] == "run"
     assert calls[2][1] == "exec"
@@ -687,9 +739,7 @@ def test_execute_normalizes_writable_mount_ownership_after_command() -> None:
     assert execute_call[-3] == backend.shell
     assert execute_call[-2] == "-c"
 
-    chown_call = next(args for args in calls if "chown -R" in args[-1])
-    assert chown_call[1] == "exec"
-    assert "/workspace" in chown_call[-1]
+    assert not any("chown -R" in args[-1] for args in calls)
 
 
 def test_execute_does_not_chown_read_only_mounts() -> None:

@@ -78,7 +78,7 @@ async def test_llm_can_correct_candidate_structured_response_in_same_thread(
             'declared_changed_files exactly ["b.txt"], and a short rationale. '
             "Do not mention a.txt yet."
         ),
-        transcript_paths=(tmp_path / "transcript.jsonl",),
+        transcript_paths=(tmp_path / "transcript.json",),
     )
 
     assert result["declared_changed_files"] == ["a.txt"]

@@ -16,7 +16,7 @@ from langchain.agents.middleware import AgentMiddleware
 from pydantic import BaseModel, Field
 
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
@@ -177,7 +177,7 @@ async def test_command_argument_injection_with_and_without_skills(
         workspace=workspace,
         skills_enabled=False,
     )
-    with managed_backend(without_skills_backend):
+    async with amanaged_backend(without_skills_backend):
         without_skills_result = await without_skills_agent.ainvoke(
             {"messages": [{"role": "user", "content": prompt}]},
             config={"recursion_limit": _CONTRAST_RECURSION_LIMIT},
@@ -187,7 +187,7 @@ async def test_command_argument_injection_with_and_without_skills(
         workspace=workspace,
         skills_enabled=True,
     )
-    with managed_backend(with_skills_backend):
+    async with amanaged_backend(with_skills_backend):
         with_skills_result = await with_skills_agent.ainvoke(
             {"messages": [{"role": "user", "content": prompt}]},
             config={"recursion_limit": _CONTRAST_RECURSION_LIMIT},

@@ -39,6 +39,12 @@ def parse_args() -> argparse.Namespace:
         "--repo", required=True, help="Path to the local repository to analyze."
     )
     parser.add_argument(
+        "--repair-mode",
+        choices=("test-changes-allowed", "no-test-changes"),
+        required=True,
+        help="Repair-stage patch constraint.",
+    )
+    parser.add_argument(
         "--scan-mode",
         choices=("full", "incremental"),
         default="full",
@@ -174,6 +180,7 @@ def main() -> None:
         scan_mode=scan_mode,
         baseline_ref=base_sha,
         event_type=args.event_type,
+        repair_mode=args.repair_mode,
     )
 
     print(f"LOCAL_ROOT={bundle.input['input_bundle_uri']}")

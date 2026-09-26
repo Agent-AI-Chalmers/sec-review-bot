@@ -359,7 +359,7 @@ async def _run_issue_analyzer_probe(
             for expected_term in case.expected_terms
         },
         "toolUsage": _language_framework_tool_usage(
-            artifacts / "analyzer" / "transcript.jsonl"
+            artifacts / "analyzer" / "transcript.json"
         ),
         "result": result,
     }

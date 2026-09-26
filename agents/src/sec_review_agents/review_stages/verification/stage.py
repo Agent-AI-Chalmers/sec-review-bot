@@ -15,7 +15,7 @@ from sec_review_agents.review_stages.verification.result import (
 )
 from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.files import persist_json
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -77,13 +77,13 @@ def reset_verification_attempt_artifacts(
         filenames=filenames,
     )
     if attempt_label == "initial":
-        transcript_files = ["transcripts/initial.jsonl"]
+        transcript_files = ["transcripts/initial.json"]
         transcript_files.extend(
-            f"transcripts/retry-{retry_index}.jsonl"
+            f"transcripts/retry-{retry_index}.json"
             for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
         )
     else:
-        transcript_files = [f"transcripts/{attempt_label}.jsonl"]
+        transcript_files = [f"transcripts/{attempt_label}.json"]
     reset_stage_attempt_artifacts(
         verifier_artifacts_path,
         filenames=transcript_files,
@@ -177,7 +177,7 @@ async def run_verification_stage(
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir:
         local_transcript_path = (
-            verifier_artifacts_path / "transcripts" / f"{attempt_label}.jsonl"
+            verifier_artifacts_path / "transcripts" / f"{attempt_label}.json"
         )
         transcript_paths: tuple[Path, ...] = (local_transcript_path,)
         if published_transcript_path is not None:
@@ -196,7 +196,7 @@ async def run_verification_stage(
         backend = build_backend(workspace_path)
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_verification_agent_graph(
                 agent_name=agent_name,
                 backend=backend,

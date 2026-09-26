@@ -2,7 +2,7 @@ import asyncio
 import fcntl
 import shutil
 import tempfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +44,7 @@ from sec_review_agents.memory.store import (
     resolve_memory_store_dir,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 MEMORY_MAINTENANCE_LOCK_FILENAME = ".maintenance.lock"
 MEMORY_MAINTENANCE_LOCK_POLL_SECONDS = 0.1
@@ -167,7 +167,7 @@ def _publish_maintained_memory(*, source: Path, memory_store_dir: Path) -> None:
 
 
 @asynccontextmanager
-async def _maintenance_singleton_lock(memory_store_dir: Path) -> AsyncIterator[None]:
+async def _maintenance_singleton_lock(memory_store_dir: Path) -> AsyncGenerator[None]:
     """Serialize direct maintenance calls for one memory store."""
     lock_path = memory_store_dir / MEMORY_MAINTENANCE_LOCK_FILENAME
     with lock_path.open("a+", encoding="utf-8") as lock_file:
@@ -255,7 +255,7 @@ async def _maintain_memory_with_result_locked(
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
             deployment_override=deployment,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_memory_maintainer_agent_graph(
                 model=model,
                 backend=backend,

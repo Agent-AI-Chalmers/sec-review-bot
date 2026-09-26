@@ -520,7 +520,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     delivery_planning_root
                     / "batches"
                     / "batch-0001"
-                    / "transcript.jsonl",
+                    / "transcript.json",
                 )
                 return {}
 

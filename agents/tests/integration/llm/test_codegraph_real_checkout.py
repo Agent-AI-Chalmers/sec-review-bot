@@ -248,7 +248,7 @@ async def _run_analyzer_probe(
             result_text,
         ),
         "toolUsage": tool_usage_from_transcript(
-            artifacts / "analyzer" / "transcript.jsonl",
+            artifacts / "analyzer" / "transcript.json",
             observations=(_codegraph_tool_observation,),
         ),
         "result": result,

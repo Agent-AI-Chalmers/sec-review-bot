@@ -15,7 +15,7 @@ from sec_review_agents.review_stages.mitigation.result import (
 )
 from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.files import persist_json, persist_text_artifact
 from sec_review_agents.workspace.patches import (
     normalize_declared_changed_files,
@@ -89,13 +89,13 @@ def reset_mitigation_attempt_artifacts(
         filenames=filenames,
     )
     if attempt_label == "initial":
-        transcript_files = ["transcripts/initial.jsonl"]
+        transcript_files = ["transcripts/initial.json"]
         transcript_files.extend(
-            f"transcripts/retry-{retry_index}.jsonl"
+            f"transcripts/retry-{retry_index}.json"
             for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
         )
     else:
-        transcript_files = [f"transcripts/{attempt_label}.jsonl"]
+        transcript_files = [f"transcripts/{attempt_label}.json"]
     reset_stage_attempt_artifacts(
         mitigator_artifacts_path,
         filenames=transcript_files,
@@ -166,7 +166,7 @@ async def run_mitigation_stage(
         backend = build_backend(workspace_path)
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_mitigation_agent_graph(
                 agent_name=agent_name,
                 backend=backend,
@@ -216,7 +216,7 @@ def prepare_mitigation_transcript(
     attempt_label: str,
 ) -> tuple[Path, ...]:
     local_transcript_path = (
-        mitigator_artifacts_path / "transcripts" / f"{attempt_label}.jsonl"
+        mitigator_artifacts_path / "transcripts" / f"{attempt_label}.json"
     )
     if published_transcript_path is None:
         return (local_transcript_path,)

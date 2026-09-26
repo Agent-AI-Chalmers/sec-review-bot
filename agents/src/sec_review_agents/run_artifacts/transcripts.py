@@ -43,7 +43,7 @@ def transcript_thread_file(
     if order < 1:
         raise ValueError("Transcript order must be >= 1.")
     suffix = f"{_slug_component(stage)}-{_slug_component(attempt)}"
-    return thread_dir / f"{order:04d}-{suffix}.jsonl"
+    return thread_dir / f"{order:04d}-{suffix}.json"
 
 
 def review_stage_transcript_path(

@@ -52,6 +52,18 @@ def parse_args() -> argparse.Namespace:
         help="Local issue strategy to run.",
     )
     parser.add_argument(
+        "--review-objective",
+        choices=("audit", "repair"),
+        required=True,
+        help="Review intent: audit the claim or proceed with repair-oriented review.",
+    )
+    parser.add_argument(
+        "--repair-mode",
+        choices=("test-changes-allowed", "no-test-changes"),
+        required=True,
+        help="Repair-stage patch constraint.",
+    )
+    parser.add_argument(
         "--repo", required=True, help="Path to the local repository to analyze."
     )
     parser.add_argument(
@@ -137,6 +149,8 @@ def main() -> None:
         repo_full_name_value=args.repo_full_name,
         output_dir=output_dir,
         target_branch=target_branch,
+        review_objective=args.review_objective,
+        repair_mode=args.repair_mode,
     )
     bundle = ReviewBundle(
         workflow="issue-review",

@@ -18,7 +18,7 @@ def test_review_stage_transcript_path_uses_default_thread(tmp_path: Path) -> Non
             order=1,
             stage="analyzer",
         )
-        == tmp_path / "transcripts" / "0001-review" / "0001-analyzer-initial.jsonl"
+        == tmp_path / "transcripts" / "0001-review" / "0001-analyzer-initial.json"
     )
 
 
@@ -36,7 +36,7 @@ def test_transcript_thread_file_numbers_stage_attempt(tmp_path: Path) -> None:
             stage="mitigator",
             attempt="retry-1",
         )
-        == tmp_path / "transcripts" / "0001-review" / "0004-mitigator-retry-1.jsonl"
+        == tmp_path / "transcripts" / "0001-review" / "0004-mitigator-retry-1.json"
     )
 
 

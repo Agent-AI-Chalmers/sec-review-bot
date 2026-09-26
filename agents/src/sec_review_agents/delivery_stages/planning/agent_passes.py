@@ -20,7 +20,7 @@ from sec_review_agents.agents.delivery_planning.workbench_state import (
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
 from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.files import persist_json
 
 DEFAULT_DELIVERY_PLANNING_PASSES = 2
@@ -247,12 +247,12 @@ async def _run_delivery_planning_agent_pass(
     )
     reset_stage_attempt_artifacts(
         pass_artifacts_path,
-        filenames=("transcript.jsonl",),
+        filenames=("transcript.json",),
     )
     backend = create_repository_delivery_planning_backend(
         patch_root=delivery_planning_root / "patches",
     )
-    with managed_backend(backend):
+    async with amanaged_backend(backend):
         pass_kind: DeliveryPlanningPassKind = (
             "draft" if pass_index <= 0 else "refinement"
         )
@@ -273,7 +273,7 @@ async def _run_delivery_planning_agent_pass(
                 pass_kind=pass_kind,
                 draft_origins=draft_origins,
             ),
-            transcript_paths=(pass_artifacts_path / "transcript.jsonl",),
+            transcript_paths=(pass_artifacts_path / "transcript.json",),
         )
 
 

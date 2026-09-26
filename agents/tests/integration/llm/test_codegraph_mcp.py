@@ -17,7 +17,7 @@ from sec_review_agents.agents.analysis.repository import (
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.mcp.codegraph import codegraph_mcp_connections_for_backend
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from tests.integration.llm.deployment_helpers import llm_test_deployment
 from tests.integration.llm.probe_helpers import ProbeRequirement, llm_probe
 
@@ -102,7 +102,7 @@ async def test_llm_uses_codegraph_mcp_to_find_symbol_and_caller(
             ),
         )
 
-    with managed_backend(backend):
+    async with amanaged_backend(backend):
         result = await agent.ainvoke(
             {
                 "messages": [

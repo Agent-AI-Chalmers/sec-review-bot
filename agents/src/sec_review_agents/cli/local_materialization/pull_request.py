@@ -228,6 +228,7 @@ def build_local_pull_request_bundle(
     head_ref: str = "HEAD",
     event_type: str = "local_review",
     is_draft: bool = False,
+    repair_mode: str = "test-changes-allowed",
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     pr_number_value = int(pr_number)
@@ -318,7 +319,10 @@ def build_local_pull_request_bundle(
 
     input_data = {
         "contract_version": "v4",
-        "review_intent": {"objective": "audit"},
+        "review_intent": {
+            "objective": "audit",
+            "repair_mode": repair_mode,
+        },
         "pr": pr_metadata,
         "input_bundle_uri": str(manifest_paths.local_root_path),
     }

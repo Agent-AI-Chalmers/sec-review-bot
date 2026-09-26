@@ -32,7 +32,7 @@ from sec_review_agents.memory.store import (
     memory_content_dir,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.env import bootstrap_agents_env
 from sec_review_agents.utils.time import utc_now_iso
 
@@ -187,7 +187,7 @@ async def main() -> int:
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
             deployment_override=args.deployment,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_memory_maintainer_agent_graph(
                 model=model,
                 backend=backend,

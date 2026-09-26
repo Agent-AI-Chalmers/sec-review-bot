@@ -82,7 +82,7 @@ async def test_discovery_reads_language_framework_skill_for_express_ordering(
             discovery_artifacts_path=artifacts,
         )
 
-    transcript_path = artifacts / "transcripts" / f"{chunk['chunk_id']}.jsonl"
+    transcript_path = artifacts / "transcripts" / f"{chunk['chunk_id']}.json"
     read_paths = read_file_paths_from_transcript(transcript_path)
     result_text = json.dumps(result, ensure_ascii=False).lower()
 

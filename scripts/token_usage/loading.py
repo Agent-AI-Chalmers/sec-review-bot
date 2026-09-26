@@ -141,34 +141,19 @@ def _usage_records_from_value(
     return records
 
 
-def _fallback_model_id(events: list[dict[str, Any]]) -> str | None:
-    for event in events:
-        if event.get("event") != "chat_model_start":
-            continue
-        model = event.get("model")
-        if isinstance(model, str) and model.strip():
-            return model.strip()
+def _fallback_model_id(messages: list[dict[str, Any]]) -> str | None:
+    """Recover a model id from transcript metadata when usage lacks one."""
+    for message in messages:
+        model_id = _model_id_from_value(message)
+        if model_id is not None:
+            return model_id
     return None
 
 
 def _read_transcript_usage(path: Path) -> StageUsage:
-    events: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        event = json.loads(line)
-        if isinstance(event, dict):
-            events.append(event)
-
-    llm_records: list[tuple[dict[str, int], str | None]] = []
-    message_records: list[tuple[dict[str, int], str | None]] = []
-    for event in events:
-        if event.get("event") == "llm_end":
-            llm_records.extend(_usage_records_from_value(event.get("response")))
-        elif event.get("event") == "message":
-            message_records.extend(_usage_records_from_value(event.get("message")))
-
-    records = llm_records or message_records
+    value = json.loads(path.read_text(encoding="utf-8"))
+    messages = value if isinstance(value, list) else []
+    records = _usage_records_from_value(messages)
     totals = {field: 0 for field in NUMERIC_FIELDS}
     for record, _model_id in records:
         for field in NUMERIC_FIELDS:
@@ -186,7 +171,7 @@ def _read_transcript_usage(path: Path) -> StageUsage:
     elif len(model_ids) > 1:
         model_id = "mixed"
     else:
-        model_id = _fallback_model_id(events) or "unknown"
+        model_id = _fallback_model_id(messages) or "unknown"
 
     stage, _attempt = _transcript_stage_attempt(path)
     return StageUsage(
@@ -216,7 +201,7 @@ def _attempt_sort_key(label: str) -> tuple[int, int]:
 def _transcript_stage_attempt(path: Path) -> tuple[str, str]:
     if path.parent.name == "transcripts":
         return path.parent.parent.name, path.stem
-    if path.name == "transcript.jsonl":
+    if path.name == "transcript.json":
         if (
             path.parent.parent.name == "batches"
             and path.parent.parent.parent.name in PASS_STAGE_DIRS
@@ -232,11 +217,11 @@ def _discover_transcripts(artifact_root: Path) -> list[Path]:
     transcripts: set[Path] = set()
     published_root = artifact_root / "transcripts"
 
-    for candidate in artifact_root.rglob("*.jsonl"):
+    for candidate in artifact_root.rglob("*.json"):
         if published_root in candidate.parents:
             continue
         if (
-            candidate.name == "transcript.jsonl"
+            candidate.name == "transcript.json"
             or candidate.parent.name == "transcripts"
         ):
             transcripts.add(candidate)
