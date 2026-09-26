@@ -1,0 +1,17 @@
+[Unit]
+Description=Sec Review Bot local control plane
+Wants=network-online.target
+After=network-online.target
+PartOf=sec-review-bot.target
+
+[Service]
+Type=simple
+User=@SEC_REVIEW_BOT_USER@
+EnvironmentFile=/etc/sec-review-bot/deployment.env
+ExecStartPre=/usr/bin/env docker info
+ExecStartPre=/usr/bin/env docker compose version
+ExecStart=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && exec docker compose --profile app up --no-build --abort-on-container-exit --remove-orphans --no-color'
+ExecStop=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && exec docker compose --profile app stop'
+Restart=always
+RestartSec=5s
+TimeoutStopSec=120s

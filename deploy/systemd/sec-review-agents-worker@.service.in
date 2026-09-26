@@ -1,17 +1,19 @@
 [Unit]
 Description=Sec Review Agents execution worker %i
-After=network-online.target
-Wants=network-online.target
+Requires=sec-review-bot-control-plane.service
+After=sec-review-bot-control-plane.service
+PartOf=sec-review-bot.target sec-review-bot-control-plane.service
 
 [Service]
 Type=simple
+User=@SEC_REVIEW_BOT_USER@
 Environment=TEMPORAL_ADDRESS=127.0.0.1:7233
 Environment=TEMPORAL_NAMESPACE=default
 Environment=TEMPORAL_TASK_QUEUE=sec-review-agents
 Environment=TEMPORAL_ACTIVITY_WORKERS=2
 Environment=AGENT_SANDBOX_BACKEND=docker
 Environment=AGENT_DOCKER_BIN=docker
-EnvironmentFile=%h/.config/sec-review-bot/worker.env
+EnvironmentFile=/etc/sec-review-bot/deployment.env
 ExecStartPre=/usr/bin/env docker info
 ExecStart=/bin/sh -c 'cd "$SEC_REVIEW_AGENTS_DIR" && exec .venv/bin/sec-review-agents-worker'
 Restart=on-failure
@@ -19,4 +21,4 @@ RestartSec=5s
 TimeoutStopSec=90s
 
 [Install]
-WantedBy=default.target
+WantedBy=sec-review-bot.target
