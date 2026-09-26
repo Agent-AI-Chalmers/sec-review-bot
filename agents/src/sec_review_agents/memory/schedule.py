@@ -219,33 +219,6 @@ async def ensure_default_memory_maintenance_schedule(
     )
 
 
-async def ensure_configured_memory_maintenance_schedule(
-    client: Client,
-    *,
-    task_queue: str,
-) -> None:
-    memory_store_dir = initialize_configured_memory_store()
-    if memory_store_dir is None:
-        return
-    try:
-        result = await ensure_default_memory_maintenance_schedule(
-            client,
-            task_queue=task_queue,
-        )
-    except Exception as error:
-        logger.warning(
-            "memory_maintenance_schedule_ensure_failed",
-            error=str(error),
-        )
-        return
-    logger.info(
-        "memory_maintenance_schedule_ensured",
-        action=result.get("action"),
-        schedule_id=result.get("schedule_id"),
-        interval_seconds=result.get("interval_seconds"),
-    )
-
-
 async def ensure_configured_memory_schedules(
     client: Client,
     *,
@@ -290,7 +263,6 @@ __all__ = [
     "MemoryMaintenanceScheduleRequest",
     "build_memory_extraction_schedule",
     "build_memory_maintenance_schedule",
-    "ensure_configured_memory_maintenance_schedule",
     "ensure_configured_memory_schedules",
     "ensure_default_memory_extraction_schedule",
     "ensure_default_memory_maintenance_schedule",
