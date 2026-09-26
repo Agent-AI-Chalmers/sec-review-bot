@@ -94,7 +94,7 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 - 根目录 `.env`：Compose 控制平面；
 - `apps/github-integration/.env`：GitHub integration；
 - `agents/config/model-providers.toml`：模型 deployment；
-- `~/.config/sec-review-bot/worker.env`：systemd worker。
+- `/etc/sec-review-bot/deployment.env`：systemd 集成服务。
 
 先在仓库根目录创建前三份配置：
 
@@ -104,7 +104,7 @@ cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
 ```
 
-Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据和模型 deployment 凭据。Systemd worker 配置在启动 worker 时创建。
+Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据和模型 deployment 凭据。第四份配置由 systemd 安装脚本创建，见下文。
 
 `agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd worker 自动读取。本地 CLI 的配置方式见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -158,6 +158,75 @@ uv run sec-review-agents-check-llm-deployments
 uv run sec-review-agents-check-llm-deployments --fail-fast
 ```
 
+### 4. systemd 集成服务配置
+
+[`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) 是控制平面 systemd service 和宿主机 worker 共用的配置样例。不要手动把它复制到 `/etc`；“运行部署”中的安装步骤会在文件不存在时生成 `/etc/sec-review-bot/deployment.env`，并把当前 checkout 的绝对路径写入其中。首次启动 `sec-review-bot.target` 前需要检查生成的配置。
+
+核心字段：
+
+| Field | 如何配置 |
+| --- | --- |
+| `SEC_REVIEW_BOT_DIR` | 当前仓库的绝对路径，由安装脚本生成。 |
+| `SEC_REVIEW_AGENTS_DIR` | `agents/` 的绝对路径，由安装脚本生成。 |
+| `MODEL_PROVIDERS_CONFIG_TOML` | 模型配置文件的绝对路径，由安装脚本生成。 |
+| `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` | 必须与根目录 `.env` 的 `SEC_REVIEW_INPUT_BUNDLE_ROOT` 指向同一目录。 |
+| `SEC_REVIEW_AGENT_ARTIFACT_ROOT` | Worker 写入运行产物的绝对路径。 |
+| `TEMPORAL_ADDRESS` | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。 |
+| `TEMPORAL_NAMESPACE`、`TEMPORAL_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
+| `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
+
+路径默认指向当前 checkout 下的目录，Temporal 和 task queue 默认值也与 Compose sample 一致，因此未修改相关 Compose 值时通常无需调整。再次运行安装脚本不会覆盖已有的 `deployment.env`。
+
+以下变量按需添加或修改。
+
+#### Langfuse tracing
+
+```bash
+LANGFUSE_PUBLIC_KEY=your_public_key
+LANGFUSE_SECRET_KEY=your_secret_key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+```
+
+#### Runtime diagnostics
+
+```bash
+AGENT_LOG_LEVEL=INFO
+AGENT_MODEL_TURN_DIAGNOSTICS=1
+AGENT_GRAPH_MAX_STEPS=24
+AGENT_GRAPH_RECURSION_BUFFER=8
+```
+
+#### Repository workflow 并发
+
+```bash
+AGENT_DISCOVERY_MAX_CONCURRENCY=1
+AGENT_CASE_PROCESSING_MAX_CONCURRENCY=1
+```
+
+并发值只限制同时在飞请求数，不等价于 TPM/RPM 限流控制；是否触发配额更取决于 token 体积、请求速率和重试行为。
+
+#### Docker sandbox
+
+```bash
+AGENT_SANDBOX_BACKEND=docker
+AGENT_DOCKER_IMAGE=mcr.microsoft.com/devcontainers/universal:6-noble
+AGENT_DOCKER_NETWORK_MODE=none
+```
+
+执行节点使用 `AGENT_SANDBOX_BACKEND=docker` 后，Docker 不可用时 worker 会在启动阶段失败。
+
+#### Docker sandbox 下的可选 CodeGraph MCP
+
+```bash
+docker build -f agents/docker/workspace-codegraph.Dockerfile -t sec-review-bot-workspace:codegraph agents
+AGENT_DOCKER_IMAGE=sec-review-bot-workspace:codegraph
+AGENT_MCP_ENABLED=true
+```
+
+`deployment.env.sample` 默认使用通用 sandbox 镜像并关闭 MCP。需要 CodeGraph 时，再构建专用镜像并启用 MCP。
+
+本地 fallback 下，需要在 host `PATH` 上安装 `codegraph`，并设置 `AGENT_MCP_ENABLED=true`。CodeGraph tools 只会挂到显式 opt in、并且暴露可写 `/workspace` 的阶段。
+
 ### 集成部署路径
 
 集成部署使用以下三个仓库级目录：
@@ -170,21 +239,72 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ## 运行部署
 
-### 控制平面
+### 集成服务
 
-启动控制平面：
-
-```bash
-docker compose --profile app up --build
-```
-
-这会启动 GitHub integration、Runner Service 和 Temporal，不会启动执行 worker。
-
-修改 GitHub integration 或 Runner Service 代码后，重建相关容器：
+先安装 agents 项目，构建控制平面镜像，并确认当前用户可以访问 Docker：
 
 ```bash
-docker compose --profile app up --build --force-recreate
+cd agents
+uv sync --frozen --no-dev
+cd ..
+docker info
+docker compose --profile app build
 ```
+
+安装 systemd units。参数指定实际运行 Compose 和 worker 的普通宿主机用户：
+
+```bash
+sudo deploy/systemd/install.sh "$USER"
+```
+
+按 [systemd 集成服务配置](#4-systemd-集成服务配置)检查生成的配置：
+
+```bash
+sudoedit /etc/sec-review-bot/deployment.env
+```
+
+启动完整集成服务，并配置为随系统启动：
+
+```bash
+sudo systemctl enable --now sec-review-bot.target
+```
+
+`sec-review-bot.target` 同时管理 Compose 控制平面和 `sec-review-agents-worker@1.service`。控制平面包括 GitHub integration、Runner Service 和 Temporal；worker 在宿主机执行 review activity 并创建 Docker sandbox。Compose 以前台进程受 systemd 监督；任一控制平面容器意外退出时，systemd 会重新启动控制平面。
+
+日常启停和重启只操作 target：
+
+```bash
+sudo systemctl start sec-review-bot.target
+sudo systemctl stop sec-review-bot.target
+sudo systemctl restart sec-review-bot.target
+```
+
+查看整体状态和日志：
+
+```bash
+sudo systemctl status sec-review-bot.target
+sudo systemctl status sec-review-bot-control-plane.service
+sudo systemctl status sec-review-agents-worker@1.service
+sudo journalctl \
+  -u sec-review-bot-control-plane.service \
+  -u sec-review-agents-worker@1.service \
+  -f
+```
+
+取消随系统启动并立即停止完整服务：
+
+```bash
+sudo systemctl disable --now sec-review-bot.target
+```
+
+修改 GitHub integration 或 Runner Service 代码后，重新构建镜像，再重启 target：
+
+```bash
+docker compose --profile app build
+sudo systemctl restart sec-review-bot.target
+```
+
+如果更新包含 `deploy/systemd` 下的 unit，再运行一次安装脚本后重启 target。
 
 验证 Runner Service：
 
@@ -194,53 +314,22 @@ curl -sS http://127.0.0.1:8000/healthz \
   -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
 ```
 
-### systemd 执行 Worker
+### 组件级操作
 
-先安装 agents 项目，并确认当前用户可以访问 Docker：
-
-```bash
-cd agents
-uv sync --frozen --no-dev
-cd ..
-docker info
-```
-
-安装 user service 模板及其环境变量样例：
+正常运行只需要操作 `sec-review-bot.target`。排障或只更新一个组件时，可以单独重启控制平面或 worker：
 
 ```bash
-mkdir -p ~/.config/systemd/user ~/.config/sec-review-bot
-cp deploy/systemd/sec-review-agents-worker@.service \
-  ~/.config/systemd/user/
-cp deploy/systemd/worker.env.sample \
-  ~/.config/sec-review-bot/worker.env
+sudo systemctl restart sec-review-bot-control-plane.service
+sudo systemctl restart sec-review-agents-worker@1.service
 ```
 
-编辑 `~/.config/sec-review-bot/worker.env`，替换其中的所有 `/absolute/path/to/...`。这些路径必须是绝对路径，因为 systemd environment file 不会展开 `${PWD}` 或 shell substitution。然后启动一个 worker：
+也可以绕过 systemd，在前台启动 Compose 控制平面进行开发调试：
 
 ```bash
-systemctl --user daemon-reload
-systemctl --user enable --now sec-review-agents-worker@1.service
-systemctl --user status sec-review-agents-worker@1.service
-journalctl --user -u sec-review-agents-worker@1.service -f
+docker compose --profile app up --build
 ```
 
-停止这个 worker，但保留自动启动配置：
-
-```bash
-systemctl --user stop sec-review-agents-worker@1.service
-```
-
-停止这个 worker，并取消自动启动：
-
-```bash
-systemctl --user disable --now sec-review-agents-worker@1.service
-```
-
-如需在退出登录后继续运行并随系统启动，执行一次：
-
-```bash
-sudo loginctl enable-linger "$USER"
-```
+这个命令不会启动宿主机 worker。
 
 ### Worker 并发
 
@@ -249,63 +338,11 @@ sudo loginctl enable-linger "$USER"
 systemd template 可以在同一执行节点运行多个 worker 进程：
 
 ```bash
-systemctl --user enable --now sec-review-agents-worker@2.service
-systemctl --user enable --now sec-review-agents-worker@3.service
+sudo systemctl enable --now sec-review-agents-worker@2.service
+sudo systemctl enable --now sec-review-agents-worker@3.service
 ```
 
 Temporal 会在共用 task queue 的实例之间分配任务。应先调整单进程配置；只有测量表明单进程成为瓶颈，或需要进程级故障隔离时，再增加进程或执行节点。
-
-## 可选运行控制
-
-以下变量属于宿主机 worker。使用 systemd 时，把需要的值写入 `~/.config/sec-review-bot/worker.env`，修改后重启 worker。
-
-### Langfuse tracing
-
-```bash
-LANGFUSE_PUBLIC_KEY=your_public_key
-LANGFUSE_SECRET_KEY=your_secret_key
-LANGFUSE_BASE_URL=https://cloud.langfuse.com
-```
-
-### Runtime diagnostics
-
-```bash
-AGENT_LOG_LEVEL=INFO
-AGENT_MODEL_TURN_DIAGNOSTICS=1
-AGENT_GRAPH_MAX_STEPS=24
-AGENT_GRAPH_RECURSION_BUFFER=8
-```
-
-### Repository workflow 并发
-
-```bash
-AGENT_DISCOVERY_MAX_CONCURRENCY=1
-AGENT_CASE_PROCESSING_MAX_CONCURRENCY=1
-```
-
-并发值只限制同时在飞请求数，不等价于 TPM/RPM 限流控制；是否触发配额更取决于 token 体积、请求速率和重试行为。
-
-### Docker sandbox
-
-```bash
-AGENT_SANDBOX_BACKEND=docker
-AGENT_DOCKER_IMAGE=mcr.microsoft.com/devcontainers/universal:6-noble
-AGENT_DOCKER_NETWORK_MODE=none
-```
-
-这些值应配置在宿主机 worker 环境中。执行节点使用 `AGENT_SANDBOX_BACKEND=docker` 后，Docker 不可用时 worker 会在启动阶段失败。
-
-### Docker sandbox 下的可选 CodeGraph MCP
-
-```bash
-docker build -f agents/docker/workspace-codegraph.Dockerfile -t sec-review-bot-workspace:codegraph agents
-AGENT_DOCKER_IMAGE=sec-review-bot-workspace:codegraph
-AGENT_MCP_ENABLED=true
-```
-
-`worker.env.sample` 默认使用通用 sandbox 镜像并关闭 MCP。需要 CodeGraph 时，再构建专用镜像并启用 MCP。
-
-本地 fallback 下，需要在 host `PATH` 上安装 `codegraph`，并设置 `AGENT_MCP_ENABLED=true`。CodeGraph tools 只会挂到显式 opt in、并且暴露可写 `/workspace` 的阶段。
 
 ## 清理
 

@@ -86,23 +86,28 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 
 ### 本地启动完整链路
 
-启动 GitHub integration、Runner Service 和 Temporal 控制平面：
+创建集成部署配置：
 
 ```bash
 cp compose.env.sample .env
-cp agents/.env.sample agents/.env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
-# 填好 .env、agents/.env、agents/config/model-providers.toml、apps/github-integration/.env，
+# 填好 .env、agents/config/model-providers.toml、apps/github-integration/.env，
 # 并把私钥放到 apps/github-integration/private-key.pem
-docker compose --profile app up --build --force-recreate
 ```
 
-然后在宿主机启动 `sec-review-agents-worker`。它轮询 Temporal，并使用宿主机 Docker daemon 可见的路径创建 Docker sandbox。前台运行和 systemd 常驻方式见[本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
+构建控制平面镜像并安装集成服务：
 
-这套 Compose 是基于镜像的本地集成环境。修改 GitHub integration 或 Runner Service 代码后，需要重新运行这条命令来重建容器；它不是热更新开发循环。
+```bash
+cd agents
+uv sync --frozen --no-dev
+cd ..
+docker compose --profile app build
+sudo deploy/systemd/install.sh "$USER"
+sudo systemctl enable --now sec-review-bot.target
+```
 
-如果不需要 GitHub integration，可不启用 `app` profile，只启动 `temporal` 和 `runner-service`；提交的 run 仍然需要宿主机 worker 才能执行。
+`sec-review-bot.target` 统一管理 GitHub integration、Runner Service、Temporal 和宿主机执行 worker。配置、状态查看、更新和组件级调试见[本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
 验证运行服务：
 

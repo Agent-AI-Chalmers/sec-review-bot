@@ -1,0 +1,7 @@
+[Unit]
+Description=Sec Review Bot local integrated deployment
+Requires=sec-review-bot-control-plane.service sec-review-agents-worker@1.service
+After=sec-review-bot-control-plane.service sec-review-agents-worker@1.service
+
+[Install]
+WantedBy=multi-user.target

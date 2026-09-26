@@ -86,23 +86,28 @@ Full trigger behavior is documented in the [GitHub integration triggers guide](a
 
 ### Run The Stack Locally
 
-Start the GitHub integration, Runner Service, and Temporal control plane:
+Create the integrated deployment configuration:
 
 ```bash
 cp compose.env.sample .env
-cp agents/.env.sample agents/.env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
-# Fill .env, agents/.env, agents/config/model-providers.toml, apps/github-integration/.env,
+# Fill .env, agents/config/model-providers.toml, apps/github-integration/.env,
 # and place the private key at apps/github-integration/private-key.pem.
-docker compose --profile app up --build --force-recreate
 ```
 
-Then start `sec-review-agents-worker` on the host. It polls Temporal and creates Docker sandboxes using paths visible to the host Docker daemon. See the [local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) for foreground and systemd startup.
+Build the control-plane images and install the integrated service:
 
-This Compose setup is image-based. After changing GitHub integration or Runner Service code, rerun the command to rebuild the containers; it is not a hot-reload development loop.
+```bash
+cd agents
+uv sync --frozen --no-dev
+cd ..
+docker compose --profile app build
+sudo deploy/systemd/install.sh "$USER"
+sudo systemctl enable --now sec-review-bot.target
+```
 
-If you do not need GitHub integration, omit the `app` profile and start only `temporal` and `runner-service`; the host worker is still required to execute submitted runs.
+`sec-review-bot.target` manages GitHub integration, Runner Service, Temporal, and the host execution worker as one service. See the [local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) for configuration, status inspection, updates, and component-level development.
 
 Check the runner service:
 
