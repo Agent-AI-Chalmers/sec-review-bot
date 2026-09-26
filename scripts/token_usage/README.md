@@ -35,6 +35,8 @@ python -m scripts.token_usage.summarize --csv /abs/path/to/local-run-xxx
 python -m scripts.token_usage.summarize --json /abs/path/to/local-run-xxx
 ```
 
+The input may be a run wrapper containing `artifacts/`, or an artifact root written directly by the integrated deployment, such as `.agent-artifacts/run-20260926T144116Z-348e955e`.
+
 ## Pricing
 
 - By default, the script infers the price profile from each transcript's model
