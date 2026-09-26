@@ -497,19 +497,6 @@ def fetch_all_extraction_jobs(connection: sqlite3.Connection) -> list[Extraction
     return [ExtractionJobRow(*row) for row in rows]
 
 
-def mark_observations_processed(
-    connection: sqlite3.Connection,
-    *,
-    observation_ids: list[str],
-) -> None:
-    for observation_id in observation_ids:
-        set_observation_status(
-            connection,
-            observation_id=observation_id,
-            status=OBSERVATION_STATUS_PROCESSED,
-        )
-
-
 def mark_observations_processed_if_unchanged(
     connection: sqlite3.Connection,
     *,
