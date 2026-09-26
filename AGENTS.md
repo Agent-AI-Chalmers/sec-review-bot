@@ -84,6 +84,20 @@ pnpm test
 
 `pnpm run lint:fix` is appropriate for local mechanical cleanup. Use the non-mutating `lint`, `typecheck`, and `test` commands when reporting verification.
 
+### Repository Scripts
+
+Treat `scripts/` as maintained repository consumers even though they are not part of the installed agents package or a stable public interface. When changing agents APIs, workflow contracts, artifact paths or formats, CLI arguments, transcript persistence, or runtime lifecycle helpers, search `scripts/` for affected imports, paths, filenames, and calling conventions and update them when needed. Do not assume that an experimental or repository-level script may retain an obsolete internal API.
+
+Run the repository script checks from `scripts/`, using the agents project explicitly for Python dependencies:
+
+```bash
+uv --project ../agents run ruff check .
+uv --project ../agents run black --check .
+python -m compileall -q .
+```
+
+Run targeted `--help` or fixture-based smoke checks for scripts affected by a change. Keep these probes focused on the relevant entrypoints and contracts rather than treating scripts as another fully typed application package.
+
 ### Documentation Checks
 
 After documentation moves or local Markdown link edits, run:
