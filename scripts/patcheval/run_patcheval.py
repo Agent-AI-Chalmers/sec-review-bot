@@ -4,7 +4,6 @@ import json
 import os
 from pathlib import Path
 
-from scripts.patcheval.issue_bundle import build_patcheval_issue_bundle
 from sec_review_agents.cli.local_execution import (
     build_local_workflow_request,
     direct_run_for_bundle,
@@ -19,6 +18,8 @@ from sec_review_agents.runtime.runtime_config import (
     ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV,
 )
 from sec_review_agents.utils.env import bootstrap_agents_env
+
+from scripts.patcheval.issue_bundle import build_patcheval_issue_bundle
 
 
 def parse_args() -> argparse.Namespace:

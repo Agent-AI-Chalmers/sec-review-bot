@@ -1,7 +1,7 @@
 import csv
 import io
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import (
@@ -28,7 +28,7 @@ from .price_profiles import (
 
 @dataclass(frozen=True)
 class RenderConfig:
-    pricing: PricingConfig = PricingConfig()
+    pricing: PricingConfig = field(default_factory=PricingConfig)
 
 
 def should_render_attempt_rows(run: RunUsage) -> bool:

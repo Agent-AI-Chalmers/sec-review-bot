@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 
+from sec_review_agents.utils.env import bootstrap_agents_env
+
 from scripts.token_usage import PricingConfig, load_run_usage
 from scripts.token_usage.output import (
     RenderConfig,
@@ -10,7 +12,6 @@ from scripts.token_usage.output import (
     render_raw_text,
     render_table,
 )
-from sec_review_agents.utils.env import bootstrap_agents_env
 
 
 def parse_args() -> argparse.Namespace:

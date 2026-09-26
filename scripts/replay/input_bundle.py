@@ -33,11 +33,11 @@ def _manifest_path(input_bundle_root: Path, key: str) -> Path:
     manifest_path = input_bundle_root / INPUT_BUNDLE_MANIFEST_NAME
     manifest = read_json(manifest_path)
     if not isinstance(manifest, dict):
-        raise ValueError(f"Input bundle manifest must be an object: {manifest_path}")
+        raise TypeError(f"Input bundle manifest must be an object: {manifest_path}")
 
     section = manifest.get(key)
     if not isinstance(section, dict):
-        raise ValueError(f"Input bundle manifest missing section: {key}")
+        raise TypeError(f"Input bundle manifest missing section: {key}")
     value = section.get("snapshot" if key == "workspace" else "path")
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Input bundle manifest missing path: {key}")
@@ -51,13 +51,13 @@ def _optional_manifest_path(input_bundle_root: Path, key: str) -> Path | None:
     manifest_path = input_bundle_root / INPUT_BUNDLE_MANIFEST_NAME
     manifest = read_json(manifest_path)
     if not isinstance(manifest, dict):
-        raise ValueError(f"Input bundle manifest must be an object: {manifest_path}")
+        raise TypeError(f"Input bundle manifest must be an object: {manifest_path}")
 
     section = manifest.get(key)
     if section is None:
         return None
     if not isinstance(section, dict):
-        raise ValueError(f"Input bundle manifest section must be an object: {key}")
+        raise TypeError(f"Input bundle manifest section must be an object: {key}")
     value = section.get("snapshot" if key == "workspace" else "path")
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Input bundle manifest missing path: {key}")

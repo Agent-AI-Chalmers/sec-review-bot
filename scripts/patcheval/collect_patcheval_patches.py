@@ -103,7 +103,7 @@ def _read_dataset_cves(dataset_path: Path) -> list[str]:
     except (OSError, json.JSONDecodeError):
         data = None
     if not isinstance(data, list):
-        raise ValueError(f"PatchEval dataset must be a JSON list: {dataset_path}")
+        raise TypeError(f"PatchEval dataset must be a JSON list: {dataset_path}")
 
     cves: list[str] = []
     for item in data:

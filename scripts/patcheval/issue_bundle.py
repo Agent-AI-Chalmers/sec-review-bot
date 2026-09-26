@@ -1,12 +1,6 @@
 import shutil
 from pathlib import Path
 
-from scripts.patcheval.dataset import (
-    PatchevalCase,
-    PatchevalIssueMode,
-    load_patcheval_case,
-)
-from scripts.patcheval.workspace_seed import materialize_patcheval_workspace
 from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
     build_run_paths,
@@ -23,6 +17,13 @@ from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
 )
+
+from scripts.patcheval.dataset import (
+    PatchevalCase,
+    PatchevalIssueMode,
+    load_patcheval_case,
+)
+from scripts.patcheval.workspace_seed import materialize_patcheval_workspace
 
 
 def build_patcheval_issue_bundle(

@@ -7,10 +7,11 @@ import asyncio
 import json
 from pathlib import Path
 
-from scripts.replay.input_bundle import default_replay_artifact_root, read_json
 from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
 from sec_review_agents.utils.env import bootstrap_agents_env
 from sec_review_agents.utils.paths import artifact_path, required_path
+
+from scripts.replay.input_bundle import default_replay_artifact_root, read_json
 
 
 def _default_input_path_from_run_artifacts(run_artifacts_path: Path) -> Path:

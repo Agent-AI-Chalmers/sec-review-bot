@@ -26,7 +26,7 @@ def local_target(link: str) -> str | None:
     parsed = urlparse(link)
     if parsed.scheme or parsed.netloc:
         return None
-    if link.startswith("#") or link.startswith("mailto:"):
+    if link.startswith(("#", "mailto:")):
         return None
     return unquote(parsed.path)
 

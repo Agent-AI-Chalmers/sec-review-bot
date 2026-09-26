@@ -107,7 +107,7 @@ def extract_dir_from_image(
         return destination
     except PatchevalWorkspaceSeedError:
         raise
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         raise PatchevalWorkspaceSeedError(
             f"Unexpected error while extracting '{container_path}' from '{image_name}': {error}"
         ) from error

@@ -11,10 +11,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from scripts.replay.input_bundle import (
-    read_json,
-    read_replay_bundle_paths,
-)
 from sec_review_agents.run_artifacts.transcripts import (
     repository_case_thread_name,
     review_thread_dir,
@@ -32,6 +28,11 @@ from sec_review_agents.workflows.repository_case.direct import (
     run_repository_case_review_direct,
 )
 from sec_review_agents.workflows.review_intent import require_review_intent
+
+from scripts.replay.input_bundle import (
+    read_json,
+    read_replay_bundle_paths,
+)
 
 
 def _resolve_run_artifacts(run_root: Path, run_artifacts_path: str | None) -> Path:
@@ -75,13 +76,7 @@ def _case_index(case_results: list[dict[str, Any]], case_id: str) -> int:
 
 
 def _max_tokens_failure(run_artifacts: Path, case_id: str) -> bool:
-    messages_path = (
-        run_artifacts
-        / "cases"
-        / case_id
-        / "analyzer"
-        / "transcript.json"
-    )
+    messages_path = run_artifacts / "cases" / case_id / "analyzer" / "transcript.json"
     if not messages_path.is_file():
         return False
     try:
@@ -246,7 +241,8 @@ async def _replay_case_outcome(
             case=case,
             repair_mode=repair_mode,
         )
-    except Exception as exc:
+    # One failed replay must not cancel the other selected cases.
+    except Exception as exc:  # noqa: BLE001
         return case_id, None, f"{type(exc).__name__}: {exc}"
     return case_id, result, None
 

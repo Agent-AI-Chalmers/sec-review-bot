@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from scripts.replay.input_bundle import read_json
 from sec_review_agents.delivery_stages.execution import (
     build_delivery_execution_input,
     execute_delivery_entry,
@@ -27,6 +26,8 @@ from sec_review_agents.workflows.repository.result import (
 from sec_review_agents.workflows.repository.workflow import (
     project_repository_case_result_for_delivery,
 )
+
+from scripts.replay.input_bundle import read_json
 
 ENV_RUN_ARTIFACTS_PATH = "REPOSITORY_DELIVERY_EXECUTION_RUN_ARTIFACTS_PATH"
 ENV_INPUT_PATH = "REPOSITORY_DELIVERY_EXECUTION_INPUT_PATH"

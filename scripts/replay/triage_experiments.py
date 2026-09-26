@@ -9,9 +9,10 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from scripts.replay.input_bundle import read_json
 from sec_review_agents.llm.config import resolve_config_toml_path
 from sec_review_agents.utils.env import bootstrap_agents_env
+
+from scripts.replay.input_bundle import read_json
 
 DEFAULT_EXPERIMENTS = (
     "batch-pro:batched:deepseek_v4_pro",
