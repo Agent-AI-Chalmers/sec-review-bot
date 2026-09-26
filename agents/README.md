@@ -50,7 +50,7 @@ When running from this repository, local commands read `agents/.env` and `agents
 
 The local `run-local-*` CLIs and `sec-review-agents-check-llm-deployments` load `agents/.env`, but never overwrite environment variables already set in the process.
 
-`sec-review-agents-service` and `sec-review-agents-worker` do not load `.env` by themselves. Compose passes `agents/.env` through `env_file`; installed, production, or manually started processes should receive environment variables from the shell, supervisor, or CI.
+`sec-review-agents-service` and `sec-review-agents-worker` do not load `.env` by themselves. Pass their environment through the shell, process supervisor, or CI. The integrated Compose deployment configures Runner Service directly and does not read `agents/.env`.
 
 There is no `.env` path override. `MODEL_PROVIDERS_CONFIG_TOML` has the highest priority for model config; set it only when using another TOML location or when the run layout does not preserve the project-relative path.
 
@@ -278,6 +278,6 @@ TEMPORAL_TASK_QUEUE=sec-review-agents \
 sec-review-agents-worker
 ```
 
-The service owns HTTP, authentication, run request validation, and starting Temporal workflows. The worker takes workflow / activity tasks from the Temporal task queue and calls runner core. Model, sandbox, skills, and concurrency environment variables belong to the service / worker runtime.
+The service owns HTTP, authentication, run request validation, and starting Temporal workflows. The worker takes workflow / activity tasks from the Temporal task queue and calls runner core. Model, sandbox, skills, and activity concurrency environment variables belong to the worker runtime.
 
-Docker Compose startup for Temporal, service, and worker is documented in the [Docker Compose deployment guide](../docs/operations/DOCKER_COMPOSE_DEPLOYMENT.md). This file covers runner entrypoints, local `run-local-*` CLIs, and agents runtime boundaries.
+Docker Compose control-plane startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md). This file covers runner entrypoints, local `run-local-*` CLIs, and agents runtime boundaries.

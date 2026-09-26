@@ -78,7 +78,7 @@ App 侧和 agent 侧之间的契约，看这里：
 本地运行系统或配置 GitHub webhook 时，看这里：
 
 - [DEPENDENCY_MAINTENANCE.md](operations/DEPENDENCY_MAINTENANCE.md) / [中文](operations/DEPENDENCY_MAINTENANCE.zh.md)：依赖更新策略、本地检查命令和验证方式。
-- [DOCKER_COMPOSE_DEPLOYMENT.md](operations/DOCKER_COMPOSE_DEPLOYMENT.md) / [中文](operations/DOCKER_COMPOSE_DEPLOYMENT.zh.md)：完整本地 Docker Compose 部署。
+- [LOCAL_INTEGRATED_DEPLOYMENT.md](operations/LOCAL_INTEGRATED_DEPLOYMENT.md) / [中文](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)：本地控制平面、宿主机执行 worker、systemd 运维和扩展方式。
 - [LOCAL_WEBHOOK_SETUP.md](operations/LOCAL_WEBHOOK_SETUP.md) / [中文](operations/LOCAL_WEBHOOK_SETUP.zh.md)：GitHub App 本地 webhook 设置。
 
 ### roadmap/

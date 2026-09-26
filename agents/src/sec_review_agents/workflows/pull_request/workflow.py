@@ -98,9 +98,13 @@ async def mitigate_pull_request_activity(
         prepared_input["artifact_paths"],
         "mitigator",
     )
+    run_artifacts_root = required_path(
+        prepared_input["artifact_root_path"],
+        label="artifact_root_path",
+    )
     if not _should_run_pr_mitigation(analysis_result):
         review_stage_transcript_path(
-            prepared_input["artifact_root_path"],
+            run_artifacts_root,
             order=retry_stage_order(stage="mitigator", retry_context=retry_context),
             stage="mitigator",
             attempt=mitigation_attempt_label(retry_context),
@@ -127,7 +131,7 @@ async def mitigate_pull_request_activity(
         ),
         mitigator_artifacts_path=mitigator_artifacts_path,
         published_transcript_path=review_stage_transcript_path(
-            prepared_input["artifact_root_path"],
+            run_artifacts_root,
             order=retry_stage_order(stage="mitigator", retry_context=retry_context),
             stage="mitigator",
             attempt=mitigation_attempt_label(retry_context),
