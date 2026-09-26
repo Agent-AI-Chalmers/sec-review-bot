@@ -8,10 +8,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from scripts.replay.input_bundle import (
-    read_json,
-    read_replay_bundle_paths,
-)
 from sec_review_agents.run_artifacts.transcripts import (
     repository_case_thread_name,
     review_thread_dir,
@@ -38,6 +34,11 @@ from sec_review_agents.workflows.repository_case.direct import (
     run_repository_case_review_direct,
 )
 from sec_review_agents.workflows.review_intent import require_review_intent
+
+from scripts.replay.input_bundle import (
+    read_json,
+    read_replay_bundle_paths,
+)
 
 ENV_RUN_ARTIFACTS_PATH = "REPOSITORY_CASE_PROCESSING_RUN_ARTIFACTS_PATH"
 ENV_INPUT_PATH = "REPOSITORY_CASE_PROCESSING_INPUT_PATH"

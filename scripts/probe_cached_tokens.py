@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-
-from scripts.token_usage import usage_from_ai_message
 from sec_review_agents.llm.config import (
     build_chat_deployments,
     resolve_deployment_for_agent,
@@ -15,6 +13,8 @@ from sec_review_agents.llm.factory import (
     create_chat_model,
     create_chat_model_from_deployment,
 )
+
+from scripts.token_usage import usage_from_ai_message
 
 
 @dataclass(frozen=True)
@@ -236,7 +236,7 @@ def _print_summary(results: list[RoundStats]) -> None:
         if cached > 0:
             rounds_with_cache += 1
 
-    print("")
+    print()
     print("Summary")
     print(f"  rounds: {len(results)}")
     print(f"  rounds_with_cache_read_tokens: {rounds_with_cache}")
@@ -274,7 +274,7 @@ def main() -> None:
     print(f"  rounds: {args.rounds}")
     print(f"  prefix_repetitions: {args.prefix_repetitions}")
     print(f"  stable_prefix_chars: {len(stable_prefix)}")
-    print("")
+    print()
 
     transcript: list[BaseMessage] = []
     results: list[RoundStats] = []

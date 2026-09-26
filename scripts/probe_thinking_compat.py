@@ -6,7 +6,6 @@ import time
 from dataclasses import dataclass
 
 from langchain_core.messages import AIMessage, HumanMessage
-
 from sec_review_agents.llm.config import get_llm_config, resolve_deployment_for_agent
 from sec_review_agents.llm.factory import (
     create_chat_model_from_deployment,
@@ -163,7 +162,7 @@ def main() -> None:
 
     print("Thinking compatibility probe")
     print(f"Agents under test: {', '.join(agents)}")
-    print("")
+    print()
 
     results: list[ProbeResult] = []
     for agent in agents:
@@ -190,7 +189,7 @@ def main() -> None:
         )
         results.append(result)
         _print_result(result)
-        print("")
+        print()
 
     failures = [
         item
