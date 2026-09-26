@@ -1,5 +1,9 @@
 FROM node:24-bookworm-slim AS builder
 
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
+ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
+    npm_config_registry=${NPM_CONFIG_REGISTRY}
+
 # better-sqlite3 may compile native bindings when a prebuild is unavailable.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -12,10 +16,14 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable pnpm \
+    && pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
     && pnpm install --frozen-lockfile
 
 COPY . ./
 RUN pnpm run build
+# This package is the workspace root; legacy deploy keeps pnpm's production
+# deployment command usable without injected workspace packages.
+RUN pnpm deploy --filter . --prod --legacy /prod
 
 FROM node:24-bookworm-slim
 
@@ -30,11 +38,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack enable pnpm \
-    && pnpm install --prod --frozen-lockfile
-
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /prod ./
 RUN rm -rf dist/test
 
 CMD ["node", "dist/app.js"]

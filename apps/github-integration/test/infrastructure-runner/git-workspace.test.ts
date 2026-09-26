@@ -8,7 +8,8 @@ import { promisify } from 'node:util'
 
 import {
   createWorkspaceSnapshotTar,
-  materializeWorkspaceWithCommitHistory
+  materializeWorkspaceWithCommitHistory,
+  retryGitFetch
 } from '../../infrastructure/runner/git-workspace.js'
 
 const execFileAsync = promisify(execFile)
@@ -17,6 +18,44 @@ async function git (cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('git', args, { cwd })
   return stdout.trim()
 }
+
+test('retryGitFetch retries with exponential delays and then succeeds', async () => {
+  let attempts = 0
+  const delays: number[] = []
+
+  await retryGitFetch(
+    async () => {
+      attempts += 1
+      if (attempts < 3) {
+        throw new Error('temporary fetch failure')
+      }
+    },
+    async delay_ms => {
+      delays.push(delay_ms)
+    }
+  )
+
+  assert.equal(attempts, 3)
+  assert.deepEqual(delays, [1000, 2000])
+})
+
+test('retryGitFetch preserves the final fetch error', async () => {
+  const failure = new Error('permanent fetch failure')
+  let attempts = 0
+
+  await assert.rejects(
+    retryGitFetch(
+      async () => {
+        attempts += 1
+        throw failure
+      },
+      async () => {}
+    ),
+    error => error === failure
+  )
+
+  assert.equal(attempts, 3)
+})
 
 test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch metadata', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-git-workspace-test-'))

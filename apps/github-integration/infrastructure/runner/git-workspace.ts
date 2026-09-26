@@ -4,8 +4,14 @@ import os from 'os'
 import path from 'path'
 import { promisify } from 'util'
 
+import { logWarn } from '../../utils/logger.js'
+
 const execFileAsync = promisify(execFile)
 export const WORKSPACE_SNAPSHOT_TAR_NAME = 'workspace.snapshot.tar'
+
+const GIT_FETCH_MAX_ATTEMPTS = 3
+const GIT_FETCH_INITIAL_RETRY_DELAY_MS = 1_000
+type Sleep = (delay_ms: number) => Promise<void>
 
 // Materialization flow for real-history workspaces:
 // 1. fetch only the requested refs in a temporary git repository;
@@ -86,6 +92,42 @@ async function runGitCommand (
       ...(options.env ?? {})
     }
   })
+}
+
+export async function retryGitFetch (
+  operation: () => Promise<void>,
+  sleep: Sleep = delay
+): Promise<void> {
+  for (let attempt = 1; attempt <= GIT_FETCH_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await operation()
+      return
+    } catch (error) {
+      if (attempt === GIT_FETCH_MAX_ATTEMPTS) {
+        throw error
+      }
+
+      const delay_ms = GIT_FETCH_INITIAL_RETRY_DELAY_MS * (2 ** (attempt - 1))
+      logWarn('git_fetch_retry_scheduled', {
+        attempt,
+        next_attempt: attempt + 1,
+        delay_ms
+      })
+      await sleep(delay_ms)
+    }
+  }
+}
+
+async function delay (delay_ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, delay_ms))
+}
+
+async function runGitFetchWithRetry (
+  workspace_path: string,
+  args: string[],
+  options: GitCommandOptions
+): Promise<void> {
+  await retryGitFetch(() => runGitCommand(workspace_path, args, options))
 }
 
 async function requireWorkspaceCommand (command: string, args: string[]): Promise<void> {
@@ -207,7 +249,7 @@ async function materializeWorkspaceFromRealGitHistory ({
         '--',
         ...refs
       ]
-      await runGitCommand(
+      await runGitFetchWithRetry(
         materialized_path,
         fetchArgs,
         auth

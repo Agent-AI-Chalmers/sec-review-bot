@@ -70,6 +70,10 @@ services:
     build:
       context: apps/github-integration
       dockerfile: Dockerfile
+      args:
+        # Override for networks where the public npm registry is unreliable.
+        # The default preserves the normal npm registry behavior.
+        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     env_file:
       - apps/github-integration/.env
     environment:
