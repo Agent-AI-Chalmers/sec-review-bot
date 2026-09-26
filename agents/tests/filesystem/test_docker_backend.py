@@ -7,7 +7,8 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from deepagents.backends.protocol import (
@@ -35,6 +36,7 @@ from sec_review_agents.filesystem.sandbox_file_ops import (
     limits_payload,
     sandbox_file_script_source,
 )
+from sec_review_agents.runtime.backend_cleanup import aclose_backend_container
 
 
 def _run_file_script(payload: dict[str, object]) -> dict[str, object]:
@@ -138,6 +140,48 @@ async def test_async_docker_command_uses_async_subprocess() -> None:
     )
     assert result.stdout == "ok"
     assert result.returncode == 0
+
+
+@pytest.mark.asyncio
+async def test_afinalize_uses_async_docker_shell() -> None:
+    """Use the non-blocking Docker API when normalizing mount ownership."""
+    mount = DockerMount(
+        host_path="/tmp/workspace",
+        container_path="/workspace",
+        writable=True,
+    )
+    backend = _backend(mounts=[mount])
+
+    with (
+        patch(
+            "sec_review_agents.filesystem.docker_backend.docker_runtime.aexec_shell",
+            new_callable=AsyncMock,
+        ) as async_shell,
+        patch(
+            "sec_review_agents.filesystem.docker_backend.docker_runtime.exec_shell",
+        ) as sync_shell,
+    ):
+        await backend.afinalize()
+
+    async_shell.assert_awaited_once()
+    sync_shell.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_aclose_backend_container_prefers_async_finalizer() -> None:
+    """Prefer an async backend finalizer so teardown does not block the loop."""
+    afinalize = AsyncMock()
+    finalize = Mock()
+    backend = SimpleNamespace(
+        afinalize=afinalize,
+        finalize=finalize,
+        container=None,
+    )
+
+    await aclose_backend_container(backend)
+
+    afinalize.assert_awaited_once_with()
+    finalize.assert_not_called()
 
 
 def test_sandbox_backend_defaults_to_docker_when_available() -> None:

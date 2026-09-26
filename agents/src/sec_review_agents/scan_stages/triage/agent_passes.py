@@ -17,7 +17,7 @@ from sec_review_agents.agents.triage.prompts import (
 from sec_review_agents.agents.triage.workbench_state import TriageWorkbenchState
 from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.scan_stages.triage.batching import triage_candidate_batches
 from sec_review_agents.utils.files import persist_json
 
@@ -247,7 +247,7 @@ async def _run_repository_triage_agent_pass(
     )
     backend = create_repository_triage_backend()
     pass_artifacts_path = _triage_pass_artifacts_path(triage_root, pass_meta)
-    with managed_backend(backend):
+    async with amanaged_backend(backend):
         agent = await create_repository_triage_agent_graph(
             backend=backend,
             workbench_state=workbench_state,

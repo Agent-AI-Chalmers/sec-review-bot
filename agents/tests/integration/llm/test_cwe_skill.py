@@ -21,7 +21,7 @@ from sec_review_agents.agents.analysis.repository import (
 )
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
@@ -112,7 +112,7 @@ async def test_llm_uses_cwe_skill_navigation_to_classify_execution_after_redirec
         middleware=middleware,
     )
 
-    with managed_backend(backend):
+    async with amanaged_backend(backend):
         result = await agent.ainvoke(
             {
                 "messages": [

@@ -21,7 +21,7 @@ from sec_review_agents.delivery_stages.model import (
 )
 from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.markdown import inline_code, md
 from sec_review_agents.workspace.file_changes import FileChange
 from sec_review_agents.workspace.patches import (
@@ -209,7 +209,7 @@ async def synthesize_combined_delivery_patch(
             workspace_root_path=workspace_path,
             workspace_writable=True,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_patch_synthesis_agent_graph(
                 backend=backend,
                 workspace_root_path=workspace_path,

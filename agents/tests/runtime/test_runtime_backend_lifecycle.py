@@ -20,8 +20,8 @@ from sec_review_agents.filesystem.docker_runtime import DockerContainerResource
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import (
-    close_backend_container,
-    managed_backend,
+    aclose_backend_container,
+    amanaged_backend,
 )
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
@@ -53,37 +53,38 @@ def _docker_container() -> DockerContainerResource:
     )
 
 
-def test_managed_backend_closes_docker_container() -> None:
+@pytest.mark.asyncio
+async def test_amanaged_backend_closes_docker_container() -> None:
     docker_container = _docker_container()
     backend = _BackendStub(container=docker_container)
 
-    with (
-        patch.object(docker_container, "close") as close,
-        managed_backend(backend) as managed,
-    ):
-        assert managed is backend
+    with patch.object(docker_container, "close") as close:
+        async with amanaged_backend(backend) as managed:
+            assert managed is backend
 
     close.assert_called_once_with()
 
 
-def test_managed_backend_closes_docker_container_after_error() -> None:
+@pytest.mark.asyncio
+async def test_amanaged_backend_closes_docker_container_after_error() -> None:
     docker_container = _docker_container()
     backend = _BackendStub(container=docker_container)
 
     with (
         patch.object(docker_container, "close") as close,
         pytest.raises(RuntimeError, match="boom"),
-        managed_backend(backend),
     ):
-        raise RuntimeError("boom")
+        async with amanaged_backend(backend):
+            raise RuntimeError("boom")
 
     close.assert_called_once_with()
 
 
-def test_close_backend_container_ignores_non_docker_backends() -> None:
+@pytest.mark.asyncio
+async def test_aclose_backend_container_ignores_non_docker_backends() -> None:
     backend = SimpleNamespace(close=Mock())
 
-    close_backend_container(backend)
+    await aclose_backend_container(backend)
 
     backend.close.assert_not_called()
 
@@ -294,14 +295,14 @@ async def test_managed_backend_closes_docker_container_when_create_agent_fails()
             side_effect=RuntimeError("create failed"),
         ),
         pytest.raises(RuntimeError, match="create failed"),
-        managed_backend(backend),
     ):
-        await build_agent_runtime_graph(
-            agent_name="test-agent",
-            model=model,
-            backend=backend,
-            system_prompt="system",
-        )
+        async with amanaged_backend(backend):
+            await build_agent_runtime_graph(
+                agent_name="test-agent",
+                model=model,
+                backend=backend,
+                system_prompt="system",
+            )
 
     close.assert_called_once_with()
 

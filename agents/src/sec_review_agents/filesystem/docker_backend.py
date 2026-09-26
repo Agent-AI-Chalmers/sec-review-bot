@@ -191,10 +191,33 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         Mount ownership is a host-side cleanup concern. Running a recursive
         ``chown`` after every file operation makes each read or edit scan the
         whole workspace and can stall an agent on larger repositories.
-        ``managed_backend`` calls this method at the end of the backend
+        ``amanaged_backend`` calls this method at the end of the backend
         lifetime, so normal tool operations never pay that cost.
         """
         self._normalize_mount_ownership()
+
+    async def afinalize(self) -> None:
+        """Normalize writable mounts without blocking an async caller."""
+        if not self._should_normalize_ownership():
+            return
+
+        writable_mount_paths = [
+            normalize_unix_path(mount.container_path)
+            for mount in self.mounts
+            if mount.writable and is_absolute_unix_path(mount.container_path)
+        ]
+        if not writable_mount_paths:
+            return
+
+        quoted_paths = " ".join(shlex.quote(path) for path in writable_mount_paths)
+        command = f"chown -R {self.ownership_uid}:{self.ownership_gid} {quoted_paths} 2>/dev/null || true"
+        await docker_runtime.aexec_shell(
+            container_name=self.container_name,
+            shell=self.shell,
+            command=command,
+            timeout_ms=self.command_timeout_ms,
+            expect_success=False,
+        )
 
     @property
     def id(self) -> str:

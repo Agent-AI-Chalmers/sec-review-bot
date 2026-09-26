@@ -14,7 +14,7 @@ from sec_review_agents.agents.discovery.prompts import (
     build_repository_discovery_user_prompt,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 
 async def run_repository_discovery_agent(
@@ -31,7 +31,7 @@ async def run_repository_discovery_agent(
     )
 
     backend = create_repository_discovery_backend()
-    with managed_backend(backend):
+    async with amanaged_backend(backend):
         agent = await create_repository_discovery_agent_graph(
             backend=backend,
             chunk=chunk,

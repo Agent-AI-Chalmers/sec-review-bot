@@ -34,7 +34,7 @@ from sec_review_agents.memory.store import (
     resolve_memory_store_dir,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 PUBLISHED_TRANSCRIPT_STAGES = {"analyzer", "mitigator", "verifier"}
 
@@ -321,7 +321,7 @@ async def _extract_memory_observation_for_refs(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
             deployment_override=deployment,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_memory_extractor_agent_graph(
                 model=model,
                 backend=backend,

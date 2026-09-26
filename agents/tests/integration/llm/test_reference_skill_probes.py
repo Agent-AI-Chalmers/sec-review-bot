@@ -19,7 +19,7 @@ from langchain.agents.middleware import AgentMiddleware
 from pydantic import BaseModel, Field
 
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
@@ -152,7 +152,7 @@ async def test_web_xss_reference_rejects_plain_react_interpolation() -> None:
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/web-security/SKILL.md, route to the "
@@ -214,7 +214,7 @@ async def test_web_access_control_reference_rejects_client_boundary_only_claim()
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/web-security/SKILL.md, route to the "
@@ -263,7 +263,7 @@ async def test_web_xss_reference_confirms_dangerous_react_html_sink() -> None:
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/web-security/SKILL.md, route to the "
@@ -313,7 +313,7 @@ async def test_web_path_traversal_reference_confirms_uncontained_file_read() -> 
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/web-security/SKILL.md, route to the "
@@ -362,7 +362,7 @@ async def test_web_command_injection_reference_confirms_argument_injection() -> 
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/web-security/SKILL.md, route to the "
@@ -416,7 +416,7 @@ async def test_web_sql_injection_reference_confirms_untrusted_raw_order_clause()
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/web-security/SKILL.md, route to the "
@@ -464,7 +464,7 @@ async def test_web_ssrf_reference_confirms_unvalidated_server_side_fetch() -> No
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/web-security/SKILL.md, route to the "
@@ -526,7 +526,7 @@ async def test_ci_github_actions_reference_rejects_pull_request_target_keyword_o
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/ci-security/SKILL.md, route to the "
@@ -585,7 +585,7 @@ async def test_ci_github_actions_reference_confirms_privileged_fork_code_executi
         backend, agent = await _create_skill_probe_agent(
             workspace=workspace,
         )
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
                 "Read /skills/ci-security/SKILL.md, route to the "

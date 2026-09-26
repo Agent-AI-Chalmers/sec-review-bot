@@ -15,7 +15,7 @@ from sec_review_agents.review_stages.mitigation.result import (
 )
 from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import managed_backend
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.files import persist_json, persist_text_artifact
 from sec_review_agents.workspace.patches import (
     normalize_declared_changed_files,
@@ -166,7 +166,7 @@ async def run_mitigation_stage(
         backend = build_backend(workspace_path)
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
-        with managed_backend(backend):
+        async with amanaged_backend(backend):
             agent = await create_mitigation_agent_graph(
                 agent_name=agent_name,
                 backend=backend,
