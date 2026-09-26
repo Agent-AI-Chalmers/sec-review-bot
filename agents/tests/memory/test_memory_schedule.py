@@ -24,7 +24,6 @@ from sec_review_agents.memory.schedule import (
     MemoryMaintenanceScheduleRequest,
     build_memory_extraction_schedule,
     build_memory_maintenance_schedule,
-    ensure_configured_memory_maintenance_schedule,
     ensure_configured_memory_schedules,
     ensure_default_memory_extraction_schedule,
     ensure_default_memory_maintenance_schedule,
@@ -280,7 +279,7 @@ async def test_ensure_default_memory_extraction_schedule_uses_task_queue(
 
 
 @pytest.mark.asyncio
-async def test_ensure_configured_memory_maintenance_schedule_skips_without_memory_dir(
+async def test_ensure_configured_memory_schedules_skips_without_memory_dir(
     monkeypatch,
 ) -> None:
     calls = []
@@ -291,11 +290,15 @@ async def test_ensure_configured_memory_maintenance_schedule_skips_without_memor
 
     monkeypatch.delenv("AGENT_MEMORY_DIR", raising=False)
     monkeypatch.setattr(
+        "sec_review_agents.memory.schedule.ensure_default_memory_extraction_schedule",
+        fake_ensure_default_schedule,
+    )
+    monkeypatch.setattr(
         "sec_review_agents.memory.schedule.ensure_default_memory_maintenance_schedule",
         fake_ensure_default_schedule,
     )
 
-    await ensure_configured_memory_maintenance_schedule(
+    await ensure_configured_memory_schedules(
         _temporal_client(_FakeScheduleClient()),
         task_queue="memory-test",
     )
@@ -304,7 +307,7 @@ async def test_ensure_configured_memory_maintenance_schedule_skips_without_memor
 
 
 @pytest.mark.asyncio
-async def test_ensure_configured_memory_maintenance_schedule_skips_when_memory_globally_disabled(
+async def test_ensure_configured_memory_schedules_skips_when_memory_globally_disabled(
     monkeypatch,
 ) -> None:
     calls = []
@@ -316,50 +319,20 @@ async def test_ensure_configured_memory_maintenance_schedule_skips_when_memory_g
     monkeypatch.setenv("AGENT_MEMORY_ENABLED", "false")
     monkeypatch.setenv("AGENT_MEMORY_DIR", "/tmp/ignored-memory")
     monkeypatch.setattr(
+        "sec_review_agents.memory.schedule.ensure_default_memory_extraction_schedule",
+        fake_ensure_default_schedule,
+    )
+    monkeypatch.setattr(
         "sec_review_agents.memory.schedule.ensure_default_memory_maintenance_schedule",
         fake_ensure_default_schedule,
     )
 
-    await ensure_configured_memory_maintenance_schedule(
+    await ensure_configured_memory_schedules(
         _temporal_client(_FakeScheduleClient()),
         task_queue="memory-test",
     )
 
     assert calls == []
-
-
-@pytest.mark.asyncio
-async def test_ensure_configured_memory_maintenance_schedule_uses_memory_config(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    calls = []
-
-    async def fake_ensure_default_schedule(client, *, task_queue):
-        calls.append((client, task_queue))
-        return {
-            "action": "created",
-            "schedule_id": "memory-maintenance-pending-trigger",
-            "interval_seconds": 3600,
-        }
-
-    monkeypatch.setenv("AGENT_MEMORY_DIR", str(tmp_path / "memory"))
-    monkeypatch.setattr(
-        "sec_review_agents.memory.schedule.ensure_default_memory_maintenance_schedule",
-        fake_ensure_default_schedule,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.schedule.logger",
-        type("Logger", (), {"info": lambda *_args, **_kwargs: None})(),
-    )
-    client = _FakeScheduleClient()
-
-    await ensure_configured_memory_maintenance_schedule(
-        _temporal_client(client),
-        task_queue="memory-test",
-    )
-
-    assert calls == [(client, "memory-test")]
 
 
 @pytest.mark.asyncio
@@ -412,19 +385,33 @@ async def test_ensure_configured_memory_schedules_ensures_extraction_and_mainten
 
 
 @pytest.mark.asyncio
-async def test_ensure_configured_memory_maintenance_schedule_logs_failure(
+async def test_ensure_configured_memory_schedules_logs_failure_and_continues(
     tmp_path,
     monkeypatch,
 ) -> None:
+    calls = []
     warnings = []
 
-    async def fake_ensure_default_schedule(_client, *, task_queue):
+    async def fake_extraction_schedule(_client, *, task_queue):
+        calls.append(("extraction", task_queue))
         raise RuntimeError("temporal unavailable")
+
+    async def fake_maintenance_schedule(_client, *, task_queue):
+        calls.append(("maintenance", task_queue))
+        return {
+            "action": "created",
+            "schedule_id": "memory-maintenance-pending-trigger",
+            "interval_seconds": 3600,
+        }
 
     monkeypatch.setenv("AGENT_MEMORY_DIR", str(tmp_path / "memory"))
     monkeypatch.setattr(
+        "sec_review_agents.memory.schedule.ensure_default_memory_extraction_schedule",
+        fake_extraction_schedule,
+    )
+    monkeypatch.setattr(
         "sec_review_agents.memory.schedule.ensure_default_memory_maintenance_schedule",
-        fake_ensure_default_schedule,
+        fake_maintenance_schedule,
     )
     monkeypatch.setattr(
         "sec_review_agents.memory.schedule.logger",
@@ -432,21 +419,26 @@ async def test_ensure_configured_memory_maintenance_schedule_logs_failure(
             "Logger",
             (),
             {
+                "info": lambda *_args, **_kwargs: None,
                 "warning": lambda _self, event, **fields: warnings.append(
                     (event, fields)
-                )
+                ),
             },
         )(),
     )
 
-    await ensure_configured_memory_maintenance_schedule(
+    await ensure_configured_memory_schedules(
         _temporal_client(_FakeScheduleClient()),
         task_queue="memory-test",
     )
 
+    assert calls == [
+        ("extraction", "memory-test"),
+        ("maintenance", "memory-test"),
+    ]
     assert warnings == [
         (
-            "memory_maintenance_schedule_ensure_failed",
-            {"error": "temporal unavailable"},
+            "memory_schedule_ensure_failed",
+            {"schedule": "extraction", "error": "temporal unavailable"},
         )
     ]

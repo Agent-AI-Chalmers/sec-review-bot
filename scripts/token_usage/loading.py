@@ -19,12 +19,21 @@ PASS_STAGE_DIRS = {"triage", "delivery-planning"}
 
 
 def _artifact_root(run_dir: Path) -> Path:
+    """Resolve both run wrappers and directories that are already artifact roots.
+
+    Local runners may expose ``<run>/artifacts/<run-id>`` while the integrated
+    deployment writes ``.agent-artifacts/<run-id>`` directly.  Keep accepting
+    the wrapper form, but do not append a second ``artifacts`` component when
+    the caller already passed the materialized artifact root.
+    """
     if run_dir.name == "artifacts":
         return run_dir
     candidate = run_dir / "artifacts" / run_dir.name
     if candidate.exists():
         return candidate
-    return run_dir / "artifacts"
+    if (run_dir / "artifacts").is_dir():
+        return run_dir / "artifacts"
+    return run_dir
 
 
 def _detect_workflow_metadata(run_dir: Path) -> tuple[str | None, int | None]:
