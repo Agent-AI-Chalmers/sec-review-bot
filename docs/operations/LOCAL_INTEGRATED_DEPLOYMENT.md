@@ -321,6 +321,40 @@ After confirming that no tasks need to be retained, you can remove the directori
 sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
 ```
 
+## Proxies
+
+The GitHub integration image build and Git workspace fetches use separate network settings. For Compose, set these variables in the repository `.env`; for non-Compose startup, set runtime variables in the GitHub integration `.env`.
+
+### pnpm Registry
+
+Corepack and pnpm use `https://registry.npmjs.org` by default while building the GitHub integration image. If that endpoint is unavailable or unreliable, select a reachable registry:
+
+```bash
+NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+```
+
+This variable is passed only to Corepack and pnpm during the image build. Rebuild the GitHub integration image after changing it:
+
+```bash
+docker compose --profile app build github-integration
+```
+
+### Git Fetch
+
+GitHub integration uses `git fetch` to retrieve the target commit while preparing a review input bundle. If the container cannot connect directly to GitHub, configure the host HTTP proxy only for these fetches:
+
+```bash
+GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://host.docker.internal:7897
+```
+
+Compose maps `host.docker.internal` to the host. The proxy must listen on an address reachable from Docker containers instead of loopback only. This variable does not change the network path used by the GitHub API, Runner Service, worker, or sandboxes.
+
+When running GitHub integration without Compose, use an address reachable by the host process instead, for example:
+
+```bash
+GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
+```
+
 ## Troubleshooting
 
 - `403 Resource not accessible by integration`: check GitHub App permissions and whether the installation approved changed permissions.

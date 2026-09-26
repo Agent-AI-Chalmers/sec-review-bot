@@ -42,8 +42,11 @@ services:
       AGENT_RUNNER_SERVICE_URL: "http://runner-service:8000"
       AGENT_RUNNER_SERVICE_TOKEN: "${RUNNER_SERVICE_TOKEN:?RUNNER_SERVICE_TOKEN is required}"
       AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS:-15000}"
+      GITHUB_INTEGRATION_GIT_HTTP_PROXY: "${GITHUB_INTEGRATION_GIT_HTTP_PROXY:-}"
       SEC_REVIEW_INPUT_BUNDLE_ROOT: "${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}"
       SEC_REVIEW_APP_STATE_ROOT: "${SEC_REVIEW_APP_STATE_ROOT:-${PWD}/.agent-app-state}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - "${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}:${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}"
       - "${SEC_REVIEW_APP_STATE_ROOT:-${PWD}/.agent-app-state}:${SEC_REVIEW_APP_STATE_ROOT:-${PWD}/.agent-app-state}"

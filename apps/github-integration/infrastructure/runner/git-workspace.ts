@@ -127,7 +127,32 @@ async function runGitFetchWithRetry (
   args: string[],
   options: GitCommandOptions
 ): Promise<void> {
-  await retryGitFetch(() => runGitCommand(workspace_path, args, options))
+  await retryGitFetch(() => runGitCommand(
+    workspace_path,
+    args,
+    withConfiguredGitFetchProxy(options)
+  ))
+}
+
+export function withConfiguredGitFetchProxy (
+  options: GitCommandOptions,
+  configured_proxy = process.env.GITHUB_INTEGRATION_GIT_HTTP_PROXY
+): GitCommandOptions {
+  const proxy = configured_proxy?.trim()
+  if (!proxy) {
+    return options
+  }
+
+  // Scope the proxy to repository materialization. GitHub API calls and
+  // communication with other Compose services keep their existing routes.
+  return {
+    ...options,
+    env: {
+      ...(options.env ?? {}),
+      http_proxy: proxy,
+      https_proxy: proxy
+    }
+  }
 }
 
 async function requireWorkspaceCommand (command: string, args: string[]): Promise<void> {

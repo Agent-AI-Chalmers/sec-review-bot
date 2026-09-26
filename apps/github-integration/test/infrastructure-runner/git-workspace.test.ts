@@ -9,7 +9,8 @@ import { promisify } from 'node:util'
 import {
   createWorkspaceSnapshotTar,
   materializeWorkspaceWithCommitHistory,
-  retryGitFetch
+  retryGitFetch,
+  withConfiguredGitFetchProxy
 } from '../../infrastructure/runner/git-workspace.js'
 
 const execFileAsync = promisify(execFile)
@@ -55,6 +56,35 @@ test('retryGitFetch preserves the final fetch error', async () => {
   )
 
   assert.equal(attempts, 3)
+})
+
+test('withConfiguredGitFetchProxy leaves fetch options unchanged without a proxy', () => {
+  const options = {
+    config: ['credential.helper='],
+    env: { GIT_TERMINAL_PROMPT: '0' }
+  }
+
+  assert.equal(withConfiguredGitFetchProxy(options, undefined), options)
+  assert.equal(withConfiguredGitFetchProxy(options, '  '), options)
+})
+
+test('withConfiguredGitFetchProxy adds a fetch-only Git proxy', () => {
+  const options = {
+    config: ['credential.helper='],
+    env: { GIT_TERMINAL_PROMPT: '0' }
+  }
+
+  assert.deepEqual(
+    withConfiguredGitFetchProxy(options, ' http://host.docker.internal:7897 '),
+    {
+      config: ['credential.helper='],
+      env: {
+        GIT_TERMINAL_PROMPT: '0',
+        http_proxy: 'http://host.docker.internal:7897',
+        https_proxy: 'http://host.docker.internal:7897'
+      }
+    }
+  )
 })
 
 test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch metadata', async () => {

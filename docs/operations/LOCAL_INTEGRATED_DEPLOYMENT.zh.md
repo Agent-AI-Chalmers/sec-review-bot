@@ -323,6 +323,40 @@ sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-sta
 sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
 ```
 
+## 代理
+
+GitHub integration 的镜像构建和 Git workspace 拉取使用不同的网络配置。Compose 部署在根目录 `.env` 中设置这些变量；非 Compose 启动时，在 GitHub integration 的 `.env` 中设置运行时变量。
+
+### pnpm registry
+
+构建 GitHub integration 镜像时，Corepack 和 pnpm 默认访问 `https://registry.npmjs.org`。该地址不可用或速度不稳定时，可以改用可达的 registry：
+
+```bash
+NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+```
+
+这个变量只在镜像构建阶段传给 Corepack 和 pnpm。修改后需要重新构建 GitHub integration 镜像：
+
+```bash
+docker compose --profile app build github-integration
+```
+
+### Git fetch
+
+GitHub integration 在准备 review input bundle 时通过 `git fetch` 拉取目标 commit。如果容器无法直接连接 GitHub，可以只为这些 fetch 配置宿主机 HTTP 代理：
+
+```bash
+GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://host.docker.internal:7897
+```
+
+Compose 会把 `host.docker.internal` 映射到宿主机。代理必须监听 Docker 容器可访问的地址，而不是只监听 `127.0.0.1`。这个变量不会改变 GitHub API、Runner Service、worker 或 sandbox 的网络路径。
+
+非 Compose 启动 GitHub integration 时，可以改用宿主机进程能够访问的地址，例如：
+
+```bash
+GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
+```
+
 ## 排障
 
 - `403 Resource not accessible by integration`：检查 GitHub App 权限，以及 installation 是否重新批准过新权限。
