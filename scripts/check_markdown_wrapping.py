@@ -34,7 +34,9 @@ def is_structural_line(line: str) -> bool:
     if not stripped:
         return True
     return (
-        stripped.startswith(("#", "- ", "* ", "+ ", "> ", "|", "```", "---", "<!--", "["))
+        stripped.startswith(
+            ("#", "- ", "* ", "+ ", "> ", "|", "```", "---", "<!--", "[")
+        )
         or ORDERED_LIST_RE.match(stripped) is not None
         or HTML_BLOCK_RE.match(stripped) is not None
     )
