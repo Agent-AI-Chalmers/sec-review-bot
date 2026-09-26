@@ -224,6 +224,18 @@ systemctl --user status sec-review-agents-worker@1.service
 journalctl --user -u sec-review-agents-worker@1.service -f
 ```
 
+停止这个 worker，但保留自动启动配置：
+
+```bash
+systemctl --user stop sec-review-agents-worker@1.service
+```
+
+停止这个 worker，并取消自动启动：
+
+```bash
+systemctl --user disable --now sec-review-agents-worker@1.service
+```
+
 如需在退出登录后继续运行并随系统启动，执行一次：
 
 ```bash

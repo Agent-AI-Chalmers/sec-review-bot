@@ -222,6 +222,18 @@ systemctl --user status sec-review-agents-worker@1.service
 journalctl --user -u sec-review-agents-worker@1.service -f
 ```
 
+To stop this worker while keeping it enabled for automatic startup:
+
+```bash
+systemctl --user stop sec-review-agents-worker@1.service
+```
+
+To stop this worker and disable automatic startup:
+
+```bash
+systemctl --user disable --now sec-review-agents-worker@1.service
+```
+
 To keep the worker running after logout and start it during boot, enable lingering once:
 
 ```bash
