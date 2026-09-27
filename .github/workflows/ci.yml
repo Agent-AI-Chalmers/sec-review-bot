@@ -5,7 +5,8 @@ on:
   # Give contributors fast feedback before a change enters the merge queue.
   pull_request:
     paths-ignore:
-      - "**/*.md"
+      # Markdown under agents/ can be runtime prompt or skill content.
+      - "*.md"
       - "docs/**"
       - "assets/**"
   # Merge queue candidates must report the same required CI Status check as PRs.
