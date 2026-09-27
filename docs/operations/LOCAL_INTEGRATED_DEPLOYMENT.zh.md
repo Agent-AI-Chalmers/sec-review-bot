@@ -104,9 +104,13 @@ cp compose.env.sample .env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
 cp deploy/systemd/deployment.env.sample deploy/systemd/deployment.env
+chmod 600 .env \
+  agents/config/model-providers.toml \
+  apps/github-integration/.env \
+  deploy/systemd/deployment.env
 ```
 
-Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据、模型 deployment 凭据，以及 `deploy/systemd/deployment.env` 中的绝对路径。systemd 安装脚本会把第四份配置复制到 `/etc`，见下文。
+这些文件含有本地凭据，因此上述命令将它们限制为仅当前用户可读写。Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据、模型 deployment 凭据，以及 `deploy/systemd/deployment.env` 中的绝对路径。systemd 安装脚本会把第四份配置复制到 `/etc`，见下文。
 
 `agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd worker 自动读取。本地 CLI 的配置方式见 [agents 本地运行说明](../../agents/README.zh.md)。
 
