@@ -91,7 +91,7 @@ GitHub 参考：
 
 如果你已经有域名，也可以用 Cloudflare Tunnel 把公网地址转到本地服务。
 
-更多 webhook / GitHub App 本地开发说明见 [本地 webhook 设置](../../docs/operations/LOCAL_WEBHOOK_SETUP.zh.md)。
+GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 入站设置](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 ## 职责
 

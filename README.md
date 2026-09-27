@@ -128,7 +128,7 @@ Package-specific setup and commands live in the package READMEs.
 | Run the full local stack and execution workers | [Local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) |
 | GitHub integration development | [GitHub integration guide](apps/github-integration/README.md) |
 | Agent backend development and local runs | [Agents local run guide](agents/README.md) |
-| Webhook routing to local | [Local webhook setup](docs/operations/LOCAL_WEBHOOK_SETUP.md) |
+| GitHub inbound routing to local | [Local GitHub inbound setup](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md) |
 
 ## Publication
 

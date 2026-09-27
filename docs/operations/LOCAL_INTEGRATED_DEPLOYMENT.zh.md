@@ -28,7 +28,7 @@ flowchart LR
     temporal --> worker
 ```
 
-Cloudflare Tunnel 将两个公网 endpoint 转发到本地 `github-integration`。具体配置见[本地 webhook 设置](LOCAL_WEBHOOK_SETUP.zh.md)。
+Cloudflare Tunnel 将两个公网 endpoint 转发到本地 `github-integration`。具体配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 Runner Service 是 GitHub integration 与 Temporal 之间的 HTTP API。它负责鉴权、校验任务请求、启动 Temporal workflow 和查询任务状态；agent 由 `sec-review-agents-worker` 执行。
 
@@ -73,7 +73,7 @@ Runner Service 是 GitHub integration 与 Temporal 之间的 HTTP API。它负�
 
 ### GitHub App webhook 配置
 
-如果要把公网 URL 转发到本地 GitHub integration service，见 [本地 webhook 设置](LOCAL_WEBHOOK_SETUP.zh.md)。
+如果要把公网 URL 转发到本地 GitHub integration service，见 [本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 ### Actions secrets 配置
 
