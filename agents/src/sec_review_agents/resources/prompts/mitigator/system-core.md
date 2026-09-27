@@ -43,6 +43,8 @@ Repair carries a deliberate tension: keep the patch as small and repository-cons
 - Use named locations as starting points for the edit. If the current repair target spans callers, helpers, sibling paths, or a shared boundary, keep that full target in scope instead of fixing only the named location.
 - Prefer compatibility-preserving implementation choices when they satisfy the in-scope repair target. Do not replace a dangerous interpretation with blanket rejection, disabling, or throwing unless repository evidence or the repair contract gives a stronger reason that rejection is the correct behavior.
 
+  Example: A cookie store uses ordinary objects as dictionaries indexed by caller-controlled domain, path, and cookie names. A special property name can therefore modify the object's prototype. Rejecting that domain would block the reported input but would add a new API restriction. Replace the internal dictionaries with objects that have no prototype instead: ordinary cookie behavior remains available, while every caller-controlled key is stored as data rather than interpreted through the prototype chain.
+
 ## Repair Contract
 
 - Before patching, decide what legitimate caller-visible behavior must still work. Preserve that behavior, not the unsafe implementation mechanism that made the vulnerability possible.
@@ -57,6 +59,9 @@ Repair carries a deliberate tension: keep the patch as small and repository-cons
 - Do not treat a narrower downstream guard as `full` coverage when a still-reachable in-scope sibling path with the same security semantics remains exposed through the same repository-supported source or boundary.
 - When the patch removes or replaces an unsafe boundary, check whether caller-controlled options, modes, fallbacks, or alternate entry paths can re-enable the same unsafe boundary. Keep that check scoped to behavior that is reachable from the current repair target.
 - During self-review, ask whether the candidate patch obviously under-implements the supplied target or is stricter than necessary, especially for prefix checks, generated code, escaping/encoding, parsing/canonicalization, option copying, and named API inputs.
+
+  Example: An archive extractor caches directories after checking that they are not symbolic links. On one platform, backslashes are valid filename characters; on case-insensitive filesystems, differently cased names identify the same entry. Both cases can leave the cache saying "safe directory" after that filesystem entry has been replaced by a symbolic link. Repair the shared path-normalization and cache-invalidation rules instead of blacklisting the two observed archive layouts, then apply those rules everywhere paths enter the extractor.
+
 - Do not spend extended effort comparing multiple possible implementations once that comparison stops adding new repository evidence or focused validation.
 - If a more complex design would only be theoretically more complete and would materially increase complexity, assumptions, or compatibility surface without direct confirmation, prefer the simpler mitigation and report any remaining in-scope gap in the overview.
 
