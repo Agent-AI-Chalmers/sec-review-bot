@@ -89,7 +89,7 @@ GitHub references:
 
 If you already have a domain, you can also use Cloudflare Tunnel to route a public address to the local service.
 
-For more local webhook / GitHub App setup details, see the [local webhook setup guide](../../docs/operations/LOCAL_WEBHOOK_SETUP.md).
+For local GitHub App webhook and Actions dispatch routing, see the [local GitHub inbound setup guide](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
 
 ## Role
 

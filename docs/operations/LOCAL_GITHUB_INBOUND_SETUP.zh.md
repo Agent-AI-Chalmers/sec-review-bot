@@ -1,8 +1,8 @@
-# 本地 Webhook 设置
+# 本地 GitHub 入站设置
 
-语言：[English](LOCAL_WEBHOOK_SETUP.md) | 中文
+语言：[English](LOCAL_GITHUB_INBOUND_SETUP.md) | 中文
 
-本文是 [LOCAL_WEBHOOK_SETUP.md](LOCAL_WEBHOOK_SETUP.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文是 [LOCAL_GITHUB_INBOUND_SETUP.md](LOCAL_GITHUB_INBOUND_SETUP.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
 ## 什么是 webhook
 
@@ -47,18 +47,21 @@ GitHub -> 公网 HTTPS URL -> 本地 http://localhost:30000/api/webhook
 - Cloudflare Tunnel
   - 更正式，适合你已经有域名或希望固定一个稳定 webhook 地址
 
-## 本地 webhook 地址
+## 本地服务地址
 
-App receiver 默认监听：
+GitHub integration 默认提供两个入站 endpoint：
 
 ```text
 http://localhost:30000/api/webhook
+http://localhost:30000/api/repository-review/dispatch
 ```
 
-其中：
+用途分别是：
 
-- 端口来自 `PORT`
-- 路径是 `/api/webhook`
+- `/api/webhook` 接收 GitHub App 的 issue 和 PR 事件。
+- `/api/repository-review/dispatch` 接收 GitHub Actions 发起的仓库级 review 请求。
+
+端口来自 `PORT`。只调试 GitHub App webhook 时配置第一个地址即可；使用仓库级 review workflow 时，第二个地址也必须能从公网访问。
 
 ## 方案一：使用 `smee`
 
@@ -99,20 +102,26 @@ npx smee -u https://smee.io/xxxxxxxxxxxx -t http://localhost:30000/api/webhook
 ### 怎么工作
 
 1. 在一台可运行 `cloudflared` 的机器上创建 tunnel
-2. 把某个域名或子域名路由到本地 webhook 服务
-3. GitHub 直接把 webhook 发到这个稳定的 HTTPS 地址
+2. 把某个域名或子域名路由到本地 GitHub integration 服务
+3. GitHub App 和 GitHub Actions 通过这个稳定的 HTTPS 地址访问各自的 endpoint
 
-例如把：
-
-```text
-https://your-subdomain.example.com
-```
-
-路由到：
+在 Cloudflare Tunnel 中添加两条 Published application route。两条 route 使用相同的 Hostname 和 Service，只填写不同的 Path：
 
 ```text
-http://localhost:30000/api/webhook
+Hostname: your-subdomain.example.com
+Service: http://localhost:30000
+Path 1: /api/webhook
+Path 2: /api/repository-review/dispatch
 ```
+
+Service 中不要附加 endpoint 路径。配置完成后，两个公网地址分别是：
+
+```text
+https://your-subdomain.example.com/api/webhook
+https://your-subdomain.example.com/api/repository-review/dispatch
+```
+
+第一个 URL 填入 GitHub App 的 Webhook URL。第二个 URL 写入目标仓库的 Actions secret `SEC_BOT_DISPATCH_URL`。
 
 ### 图示
 
@@ -120,9 +129,13 @@ http://localhost:30000/api/webhook
 
 ![Cloudflare create tunnel install and run example](../../assets/screenshots/cloudflare-create-tunnel-install-run.png)
 
-![Cloudflare published application webhook route example](../../assets/screenshots/cloudflare-published-application-webhook-route.png)
+先添加一条 route，然后用相同方式添加另一条 route：
 
-![Cloudflare tunnel webhook route overview](../../assets/screenshots/cloudflare-tunnel-webhook-route-overview.png)
+![Cloudflare 添加 GitHub 入站 route](../../assets/screenshots/cloudflare-add-github-inbound-route.png)
+
+完成后，同一个 tunnel 下应当有两条 route：
+
+![Cloudflare GitHub 入站 routes](../../assets/screenshots/cloudflare-github-inbound-routes.png)
 
 卸载的时候可以看：<https://developers.cloudflare.com/tunnel/troubleshooting/>，命令是：
 
@@ -141,6 +154,7 @@ sudo cloudflared service uninstall
 - 你改了 App 权限，但 installation 还没重新批准
 - webhook secret 和本地配置不一致
 - webhook URL 填对了，但本地转发工具没在跑
+- Cloudflare Tunnel 只配置了 `/api/webhook`，导致 repository review dispatch 返回 `404`
 - 你以为自己在监听公网地址，其实本地服务没有监听对应端口
 - App 没有 `Pull requests`、`Issues` 或 `Contents` 的足够权限，导致后续回写失败
 

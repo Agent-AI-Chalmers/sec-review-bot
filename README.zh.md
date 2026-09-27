@@ -128,7 +128,7 @@ Compose 里的 Temporal Web UI 默认暴露在 `127.0.0.1:8233`；运行服务�
 | 本地启动完整链路和执行 worker | [本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) |
 | 开发 GitHub integration | [GitHub integration 说明](apps/github-integration/README.zh.md) |
 | 开发 agent 运行后端或做本地运行 | [Agents 本地运行说明](agents/README.zh.md) |
-| 把 webhook 转发到本地 | [本地 webhook 设置](docs/operations/LOCAL_WEBHOOK_SETUP.zh.md) |
+| 把 GitHub 入站请求转发到本地 | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
 
 ## 论文
 

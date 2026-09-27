@@ -26,7 +26,7 @@ flowchart LR
     temporal --> worker
 ```
 
-Cloudflare Tunnel forwards both public endpoints to the local `github-integration` service. See [Local Webhook Setup](LOCAL_WEBHOOK_SETUP.md) for configuration.
+Cloudflare Tunnel forwards both public endpoints to the local `github-integration` service. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for configuration.
 
 Runner Service is the HTTP API between GitHub integration and Temporal. It authenticates and validates task requests, starts Temporal workflows, and queries task status; `sec-review-agents-worker` executes the agents.
 
@@ -71,7 +71,7 @@ Generate a secret in the GitHub App webhook settings and set `WEBHOOK_SECRET` in
 
 ### GitHub App Webhook Configuration
 
-To forward a public URL to the local GitHub integration service, see [Local Webhook Setup](LOCAL_WEBHOOK_SETUP.md).
+To forward a public URL to the local GitHub integration service, see [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md).
 
 ### Actions Secrets Configuration
 

@@ -1,8 +1,8 @@
-# Local Webhook Setup
+# Local GitHub Inbound Setup
 
-Language: English | [中文](LOCAL_WEBHOOK_SETUP.zh.md)
+Language: English | [中文](LOCAL_GITHUB_INBOUND_SETUP.zh.md)
 
-This page explains how to route GitHub webhooks to a local GitHub App receiver.
+This page explains how to route GitHub App webhooks and GitHub Actions repository review requests to the local GitHub integration service.
 
 ## What a Webhook Is
 
@@ -47,18 +47,21 @@ Common choices:
 - Cloudflare Tunnel
   - more formal; useful if you already have a domain or want a stable webhook URL
 
-## Local Webhook Address
+## Local Service Addresses
 
-The App receiver listens here by default:
+The GitHub integration service provides two inbound endpoints by default:
 
 ```text
 http://localhost:30000/api/webhook
+http://localhost:30000/api/repository-review/dispatch
 ```
 
-Where:
+They serve different purposes:
 
-- the port comes from `PORT`
-- the path is `/api/webhook`
+- `/api/webhook` receives issue and pull request events from the GitHub App.
+- `/api/repository-review/dispatch` receives repository review requests from GitHub Actions.
+
+The port comes from `PORT`. Only the first endpoint is needed when debugging GitHub App webhooks. The second endpoint must also be publicly reachable when using the repository review workflow.
 
 ## Option 1: Use `smee`
 
@@ -99,20 +102,26 @@ If you already have a domain but no public inbound service, or if you do not wan
 ### How It Works
 
 1. Create a tunnel on a machine that can run `cloudflared`.
-2. Route a domain or subdomain to the local webhook service.
-3. GitHub sends webhooks directly to that stable HTTPS address.
+2. Route a domain or subdomain to the local GitHub integration service.
+3. The GitHub App and GitHub Actions use that stable HTTPS address for their respective endpoints.
 
-For example, route:
-
-```text
-https://your-subdomain.example.com
-```
-
-to:
+Add two Published application routes to the Cloudflare Tunnel. Both routes use the same Hostname and Service but have different Paths:
 
 ```text
-http://localhost:30000/api/webhook
+Hostname: your-subdomain.example.com
+Service: http://localhost:30000
+Path 1: /api/webhook
+Path 2: /api/repository-review/dispatch
 ```
+
+Do not append an endpoint path to Service. After configuration, the two public URLs are:
+
+```text
+https://your-subdomain.example.com/api/webhook
+https://your-subdomain.example.com/api/repository-review/dispatch
+```
+
+Use the first URL as the GitHub App Webhook URL. Store the second URL in the target repository's `SEC_BOT_DISPATCH_URL` Actions secret.
 
 ### Diagrams
 
@@ -120,9 +129,13 @@ When creating the tunnel, follow the Cloudflare instructions:
 
 ![Cloudflare create tunnel install and run example](../../assets/screenshots/cloudflare-create-tunnel-install-run.png)
 
-![Cloudflare published application webhook route example](../../assets/screenshots/cloudflare-published-application-webhook-route.png)
+Add one route, then repeat the process for the other route:
 
-![Cloudflare tunnel webhook route overview](../../assets/screenshots/cloudflare-tunnel-webhook-route-overview.png)
+![Cloudflare add GitHub inbound route](../../assets/screenshots/cloudflare-add-github-inbound-route.png)
+
+When finished, the same tunnel should have two routes:
+
+![Cloudflare GitHub inbound routes](../../assets/screenshots/cloudflare-github-inbound-routes.png)
 
 For uninstalling, see <https://developers.cloudflare.com/tunnel/troubleshooting/>.
 The command is:
@@ -142,6 +155,7 @@ sudo cloudflared service uninstall
 - You changed App permissions, but the installation has not been re-approved.
 - The webhook secret does not match local configuration.
 - The webhook URL is correct, but the local forwarding tool is not running.
+- Cloudflare Tunnel only routes `/api/webhook`, so repository review dispatch requests return `404`.
 - You think you are listening on a public address, but the local service is not listening on the expected port.
 - The App lacks enough `Pull requests`, `Issues`, or `Contents` permissions, so later write-back fails.
 
