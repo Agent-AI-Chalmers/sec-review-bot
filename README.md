@@ -52,7 +52,7 @@ This repository is a monorepo with two main subsystems:
 - GitHub integration: TypeScript / Node.js service for GitHub App webhooks, GitHub Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing.
 - Agent execution backend: Python / FastAPI service plus Temporal worker.
 - LangChain / LangGraph: agent runtime for chat model adapters, structured output, tools, and workflow-local agent loops.
-- Langfuse: optional tracing backend for LLM calls and agent run diagnostics.
+- [Langfuse](https://langfuse.com/docs): optional tracing backend for LLM calls and agent run diagnostics. It is configured as an external service; this repository's Compose stack does not start Langfuse.
 - Temporal: durable execution layer and task queue for long-running agent runs (the RQ-style job queue role); owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
 - Docker Compose: local control-plane environment for the App, runner service, and Temporal.
 - Execution worker: host process that polls Temporal and owns Docker sandbox execution.

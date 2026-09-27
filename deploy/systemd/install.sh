@@ -27,6 +27,7 @@ repository_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 unit_dir=/etc/systemd/system
 config_dir=/etc/sec-review-bot
 deployment_env=$config_dir/deployment.env
+deployment_env_source=$script_dir/deployment.env
 
 if [ ! -x "$repository_root/agents/.venv/bin/sec-review-agents-worker" ]; then
     echo "Missing agents worker executable." >&2
@@ -45,20 +46,12 @@ if ! /usr/sbin/runuser -u "$service_user" -- \
 fi
 
 install -d -m 0755 "$config_dir"
-if [ -L "$deployment_env" ]; then
-    echo "Refusing to use a symbolic link as deployment config: $deployment_env" >&2
+if [ ! -f "$deployment_env_source" ]; then
+    echo "Missing deployment config: $deployment_env_source" >&2
+    echo "Copy deployment.env.sample to deployment.env and fill in its values first." >&2
     exit 1
 fi
-if [ ! -e "$deployment_env" ]; then
-    escaped_repository_root=$(printf '%s' "$repository_root" | sed 's/[&|]/\\&/g')
-    sed "s|/absolute/path/to/sec-review-bot|$escaped_repository_root|g" \
-        "$script_dir/deployment.env.sample" >"$deployment_env"
-elif [ ! -f "$deployment_env" ]; then
-    echo "Deployment config is not a regular file: $deployment_env" >&2
-    exit 1
-fi
-chown root:root "$deployment_env"
-chmod 0600 "$deployment_env"
+install -m 0600 "$deployment_env_source" "$deployment_env"
 
 render_unit() {
     source_path=$1
@@ -82,5 +75,5 @@ render_unit \
 systemctl daemon-reload
 
 echo "Installed Sec Review Bot systemd units for user '$service_user'."
-echo "Review $deployment_env, then run:"
+echo "Copied $deployment_env_source to $deployment_env. Review it, then run:"
 echo "  systemctl enable --now sec-review-bot.target"

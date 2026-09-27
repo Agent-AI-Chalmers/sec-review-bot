@@ -94,17 +94,19 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 - 根目录 `.env`：Compose 控制平面；
 - `apps/github-integration/.env`：GitHub integration；
 - `agents/config/model-providers.toml`：模型 deployment；
-- `/etc/sec-review-bot/deployment.env`：systemd 集成服务。
+- `deploy/systemd/deployment.env`：安装前的 systemd 部署配置；
+- `/etc/sec-review-bot/deployment.env`：systemd service 实际读取的已安装副本。
 
-先在仓库根目录创建前三份配置：
+先在仓库根目录创建这四份配置：
 
 ```bash
 cp compose.env.sample .env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
+cp deploy/systemd/deployment.env.sample deploy/systemd/deployment.env
 ```
 
-Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据和模型 deployment 凭据。第四份配置由 systemd 安装脚本创建，见下文。
+Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据、模型 deployment 凭据，以及 `deploy/systemd/deployment.env` 中的绝对路径。systemd 安装脚本会把第四份配置复制到 `/etc`，见下文。
 
 `agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd worker 自动读取。本地 CLI 的配置方式见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -160,26 +162,30 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd 集成服务配置
 
-[`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) 是控制平面 systemd service 和宿主机 worker 共用的配置样例。不要手动把它复制到 `/etc`；“运行部署”中的安装步骤会在文件不存在时生成 `/etc/sec-review-bot/deployment.env`，并把当前 checkout 的绝对路径写入其中。首次启动 `sec-review-bot.target` 前需要检查生成的配置。
+`deploy/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会用 `deploy/systemd/deployment.env` 替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取 `/etc/sec-review-bot/deployment.env`。
+
+如果 [`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) 新增了选项，需要手动把相关选项加入 `deploy/systemd/deployment.env`。
 
 核心字段：
 
 | Field | 如何配置 |
 | --- | --- |
-| `SEC_REVIEW_BOT_DIR` | 当前仓库的绝对路径，由安装脚本生成。 |
-| `SEC_REVIEW_AGENTS_DIR` | `agents/` 的绝对路径，由安装脚本生成。 |
-| `MODEL_PROVIDERS_CONFIG_TOML` | 模型配置文件的绝对路径，由安装脚本生成。 |
+| `SEC_REVIEW_BOT_DIR` | 当前仓库的绝对路径，安装前填写。 |
+| `SEC_REVIEW_AGENTS_DIR` | `agents/` 的绝对路径，安装前填写。 |
+| `MODEL_PROVIDERS_CONFIG_TOML` | 模型配置文件的绝对路径，安装前填写。 |
 | `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` | 必须与根目录 `.env` 的 `SEC_REVIEW_INPUT_BUNDLE_ROOT` 指向同一目录。 |
 | `SEC_REVIEW_AGENT_ARTIFACT_ROOT` | Worker 写入运行产物的绝对路径。 |
 | `TEMPORAL_ADDRESS` | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。 |
 | `TEMPORAL_NAMESPACE`、`TEMPORAL_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
 | `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
 
-路径默认指向当前 checkout 下的目录，Temporal 和 task queue 默认值也与 Compose sample 一致，因此未修改相关 Compose 值时通常无需调整。再次运行安装脚本不会覆盖已有的 `deployment.env`。
+除非 checkout 位置或对应的 Compose 配置发生变化，否则生成的路径和默认值通常不需要调整。
 
 以下变量按需添加或修改。
 
 #### Langfuse tracing
+
+[Langfuse](https://langfuse.com/docs) 是可选的外部可观测性服务，不属于本仓库的 Compose 控制平面。可以使用 [Langfuse Cloud](https://cloud.langfuse.com)，也可以单独运行[自托管 Langfuse](https://langfuse.com/self-hosting)。在 Langfuse 中创建 project 和 API keys 后，把下面三项一起写入 `/etc/sec-review-bot/deployment.env`：
 
 ```bash
 LANGFUSE_PUBLIC_KEY=your_public_key
@@ -207,6 +213,8 @@ AGENT_CASE_PROCESSING_MAX_CONCURRENCY=1
 
 #### Docker sandbox
 
+`deployment.env.sample` 默认使用通用 sandbox 镜像并关闭 MCP：
+
 ```bash
 AGENT_SANDBOX_BACKEND=docker
 AGENT_DOCKER_IMAGE=mcr.microsoft.com/devcontainers/universal:6-noble
@@ -215,15 +223,13 @@ AGENT_DOCKER_NETWORK_MODE=none
 
 执行节点使用 `AGENT_SANDBOX_BACKEND=docker` 后，Docker 不可用时 worker 会在启动阶段失败。
 
-#### Docker sandbox 下的可选 CodeGraph MCP
+要在 sandbox 中启用 CodeGraph MCP，先构建专用镜像，再修改镜像和 MCP 配置：
 
 ```bash
 docker build -f agents/docker/workspace-codegraph.Dockerfile -t sec-review-bot-workspace:codegraph agents
 AGENT_DOCKER_IMAGE=sec-review-bot-workspace:codegraph
 AGENT_MCP_ENABLED=true
 ```
-
-`deployment.env.sample` 默认使用通用 sandbox 镜像并关闭 MCP。需要 CodeGraph 时，再构建专用镜像并启用 MCP。
 
 本地 fallback 下，需要在 host `PATH` 上安装 `codegraph`，并设置 `AGENT_MCP_ENABLED=true`。CodeGraph tools 只会挂到显式 opt in、并且暴露可写 `/workspace` 的阶段。
 
@@ -251,16 +257,10 @@ docker info
 docker compose --profile app build
 ```
 
-安装 systemd units。参数指定实际运行 Compose 和 worker 的普通宿主机用户：
+检查 `deploy/systemd/deployment.env` 后，安装 systemd units。参数指定实际运行 Compose 和 worker 的普通宿主机用户：
 
 ```bash
 sudo deploy/systemd/install.sh "$USER"
-```
-
-按 [systemd 集成服务配置](#4-systemd-集成服务配置)检查生成的配置：
-
-```bash
-sudoedit /etc/sec-review-bot/deployment.env
 ```
 
 启动完整集成服务，并配置为随系统启动：
