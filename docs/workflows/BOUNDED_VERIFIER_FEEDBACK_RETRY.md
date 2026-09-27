@@ -69,26 +69,33 @@ The important property is the budget, not the exact number. The design leaves ro
 Verifier output separates patch coverage from the next workflow action:
 
 - `patch_coverage`: how well the patch covers the reviewed target claim
+- `regression_status`: whether regression, build, test, or behavior-preservation evidence clears the patched workspace
 - `resolution_next_step`: what should happen after the verification judgment
 
 `resolution_next_step` has three values:
 
-- `none`: no further action is needed for this verifier outcome. This is the normal value for `patch_coverage=full`.
-- `retry-ai`: the remaining gap is concrete, in scope, and likely fixable by one bounded AI mitigation retry pass.
-- `manual-review`: the remaining work needs human judgment, repository administrator action, credential rotation, deployment/configuration changes, history cleanup, cache/fork cleanup, or some other action outside a normal workspace patch.
+- `none`: no further action is needed for this verifier outcome. With `patch_coverage=full`, this requires `regression_status` to be `passed`, `not-run`, or `not-applicable`.
+- `retry-ai`: a concrete, in-scope security gap or confirmed regression is likely fixable by one bounded AI mitigation retry pass.
+- `manual-review`: unresolved regression evidence is the remaining factor that determines the next action, or the remaining work needs human judgment, repository administrator action, credential rotation, deployment/configuration changes, history cleanup, cache/fork cleanup, or some other action outside a normal workspace patch.
+
+Patch coverage and regression status are independent judgments. A patch may fully cover the security target while failing a supported behavior contract. That outcome is `patch_coverage=full` with `regression_status=failed`, but it is not delivery-ready and must use `retry-ai` or `manual-review` rather than `none`.
+
+When a separate, concrete security gap is still suitable for bounded repair, `retry-ai` may be used even if `regression_status=unresolved`. The unresolved regression must remain in `patch_findings` and be reassessed after the retry. If the unresolved regression itself determines the next action, including when security coverage is already `full`, use `manual-review`.
 
 `partial` does not automatically mean retry. A partial patch can either expose an actionable code gap that should be retried, or it can represent useful current-snapshot hardening with residual work that only a human or repository administrator can complete.
 
 Examples:
 
 - SSRF bypass remains in the patched URL/IP validation logic -> `patch_coverage=partial`, `resolution_next_step=retry-ai`
+- a bounded security gap remains and regression evidence is also unresolved -> `patch_coverage=partial`, `regression_status=unresolved`, `resolution_next_step=retry-ai`, with both concerns retained in `patch_findings`
+- security coverage is full but the patch breaks a supported API contract -> `patch_coverage=full`, `regression_status=failed`, `resolution_next_step=retry-ai` or `manual-review`
 - committed secret removed from the current tree but still present in git history -> `patch_coverage=partial`, `resolution_next_step=manual-review`
 
 ## Retry Trigger Policy
 
 Retry is driven by `resolution_next_step=retry-ai`, not by `patch_coverage` alone.
 
-Retry-eligible patch judgments are usually `partial` / `local-only` / `unresolved` / `misaligned`, but they must also carry `resolution_next_step=retry-ai`.
+Retry-eligible patch judgments are usually `partial` / `local-only` / `unresolved` / `misaligned`. Full security coverage can also be retry-eligible when `regression_status=failed`. Every retry-eligible outcome must carry `resolution_next_step=retry-ai`.
 
 The more common retry pattern is:
 

@@ -741,6 +741,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             assert not (patch_root / "case-2.patch").exists()
 
     def test_case_disposition_reason_is_deterministic(self) -> None:
+        """Keep a fully cleared verifier result eligible for delivery."""
         analyzer_result = {
             "verdict": "confirmed-vulnerability",
         }
@@ -751,6 +752,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
             "overview": "Patch fully covers the target claim.",
             "review_target_claim": "target claim",
             "patch_coverage": "full",
+            "regression_status": "not-run",
+            "resolution_next_step": "none",
         }
         case_disposition = derive_case_disposition(
             analyzer_result,
@@ -760,6 +763,39 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert case_disposition["disposition"] == "keep"
         assert "passed analyzer" in case_disposition["reason"]
         assert set(case_disposition) == {"disposition", "reason"}
+
+    @pytest.mark.parametrize("regression_status", ["failed", "unresolved", None])
+    def test_case_disposition_blocks_uncleared_regression(
+        self, regression_status: str | None
+    ) -> None:
+        """Fail closed when regression evidence is failed, unresolved, or absent."""
+        case_disposition = derive_case_disposition(
+            {"verdict": "confirmed-vulnerability"},
+            mitigator_result={"changed_files": ["src/server.js"]},
+            verifier_result={
+                "patch_coverage": "full",
+                "regression_status": regression_status,
+                "resolution_next_step": "manual-review",
+            },
+        )
+
+        assert case_disposition["disposition"] == "blocked"
+        assert "regression risk" in case_disposition["reason"]
+
+    def test_case_disposition_blocks_pending_follow_up(self) -> None:
+        """Block delivery whenever the verifier still requests follow-up."""
+        case_disposition = derive_case_disposition(
+            {"verdict": "confirmed-vulnerability"},
+            mitigator_result={"changed_files": ["src/server.js"]},
+            verifier_result={
+                "patch_coverage": "full",
+                "regression_status": "passed",
+                "resolution_next_step": "manual-review",
+            },
+        )
+
+        assert case_disposition["disposition"] == "blocked"
+        assert "requires follow-up" in case_disposition["reason"]
 
     def test_partial_verifier_coverage_is_confirmed_unresolved(self) -> None:
         analyzer_result = {

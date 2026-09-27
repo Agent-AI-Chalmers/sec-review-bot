@@ -116,6 +116,7 @@ async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
 async def test_transcript_export_preserves_callback_manager(
     tmp_path: Path,
 ) -> None:
+    """Preserve caller callbacks independently of ambient tracing configuration."""
     agent = Mock()
     agent.ainvoke = AsyncMock(
         return_value={
@@ -125,8 +126,19 @@ async def test_transcript_export_preserves_callback_manager(
     )
     caller_handler = BaseCallbackHandler()
     callback_manager = CallbackManager([caller_handler])
+    tracing_config = TracingConfig(
+        enabled=False,
+        callback=None,
+        metadata={"sec_review_agent": "test-agent"},
+        run_name="test-agent",
+        flush=lambda: None,
+    )
 
     with (
+        patch(
+            "sec_review_agents.runtime.agent_runtime_graph.build_tracing_config",
+            return_value=tracing_config,
+        ),
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.compute_graph_recursion_limit",
             return_value=None,

@@ -150,6 +150,8 @@ class SupportReview(BaseModel):
     }
 
 
+# ScopeReview asks whether the issue is a local defect or lies in a shared
+# control point used by multiple execution paths.
 class ScopeReview(BaseModel):
     """
     Capture repair-relevant scope and the checked nearby paths that informed it.
@@ -165,8 +167,9 @@ class ScopeReview(BaseModel):
     shared_boundary: str | None = Field(
         default=None,
         description=(
-            "Short description of the common control point, trust boundary, or shared enforcement surface when "
-            "repository evidence directly supports one and `scope_shape` is `shared-enforcement-point`."
+            "Name the single common control point, trust boundary, or shared enforcement surface when repository "
+            "evidence directly supports one and `scope_shape` is `shared-enforcement-point`. Do not combine "
+            "separate defense-in-depth controls into one shared boundary."
         ),
     )
     reviewed_nearby_paths: list[ReviewedNearbyPath] = Field(

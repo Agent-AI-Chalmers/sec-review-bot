@@ -68,6 +68,22 @@ def derive_case_disposition(
             "The verifier did not fully approve the patch for delivery execution."
         )
 
+    # Full coverage answers only the security-target question. Known or unresolved
+    # regressions still make the overall patch unsafe to send to delivery.
+    if verifier_result.get("regression_status") not in {
+        "passed",
+        "not-run",
+        "not-applicable",
+    }:
+        return _blocked_case_disposition(
+            "The verifier did not clear regression risk for delivery execution."
+        )
+
+    if verifier_result.get("resolution_next_step") != "none":
+        return _blocked_case_disposition(
+            "The verifier requires follow-up before delivery execution."
+        )
+
     if verdict not in {"confirmed-defect", "confirmed-vulnerability", "plausible-risk"}:
         return _blocked_case_disposition(
             "The analyzer did not confirm the case strongly enough for delivery execution."

@@ -19,6 +19,7 @@ def test_retry_decision_requires_changed_files_and_retry_ai_verifier_next_step()
 
 
 def test_feedback_retry_context_projects_previous_verifier_feedback() -> None:
+    """Carry actionable verifier fields into retry context without raw artifacts."""
     retry_context = feedback_loop.feedback_retry_context(
         retry_index=1,
         mitigation_result={
@@ -31,6 +32,7 @@ def test_feedback_retry_context_projects_previous_verifier_feedback() -> None:
             "overview": "needs revision",
             "patch_coverage": "partial",
             "resolution_next_step": "retry-ai",
+            "regression_status": "failed",
             "patch_findings": ["missing guard"],
             "raw_trace": "large verifier detail must not enter retry context",
         },
@@ -48,6 +50,7 @@ def test_feedback_retry_context_projects_previous_verifier_feedback() -> None:
         "resolution_next_step": "retry-ai",
         "patch_findings": ["missing guard"],
         "validation_level": None,
+        "regression_status": "failed",
         "verification_findings": [],
         "residual_risks": [],
     }
@@ -63,6 +66,7 @@ def test_feedback_retry_context_projects_previous_verifier_feedback() -> None:
             "resolution_next_step": "retry-ai",
             "patch_findings": ["missing guard"],
             "validation_level": None,
+            "regression_status": "failed",
             "verification_findings": [],
             "residual_risks": [],
         }
@@ -70,6 +74,7 @@ def test_feedback_retry_context_projects_previous_verifier_feedback() -> None:
 
 
 def test_feedback_retry_context_accumulates_previous_verifier_history() -> None:
+    """Retain regression state across bounded verifier retry history."""
     first_retry_context = feedback_loop.feedback_retry_context(
         retry_index=1,
         mitigation_result={"overview": "first patch", "changed_files": ["app.py"]},
@@ -77,6 +82,7 @@ def test_feedback_retry_context_accumulates_previous_verifier_history() -> None:
             "overview": "first verifier",
             "patch_coverage": "partial",
             "resolution_next_step": "retry-ai",
+            "regression_status": "not-run",
             "patch_findings": ["first gap"],
         },
     )
@@ -88,6 +94,7 @@ def test_feedback_retry_context_accumulates_previous_verifier_history() -> None:
             "overview": "second verifier",
             "patch_coverage": "partial",
             "resolution_next_step": "retry-ai",
+            "regression_status": "passed",
             "patch_findings": ["second gap"],
         },
         history=first_retry_context["history"],
@@ -102,6 +109,7 @@ def test_feedback_retry_context_accumulates_previous_verifier_history() -> None:
             "resolution_next_step": "retry-ai",
             "patch_findings": ["first gap"],
             "validation_level": None,
+            "regression_status": "not-run",
             "verification_findings": [],
             "residual_risks": [],
         },
@@ -113,6 +121,7 @@ def test_feedback_retry_context_accumulates_previous_verifier_history() -> None:
             "resolution_next_step": "retry-ai",
             "patch_findings": ["second gap"],
             "validation_level": None,
+            "regression_status": "passed",
             "verification_findings": [],
             "residual_risks": [],
         },
