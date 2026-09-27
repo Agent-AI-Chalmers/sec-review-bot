@@ -103,7 +103,7 @@ The second common knob is `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`. It only 
 
 Discovery tuning depends on chunk count and per-chunk cost. If a repository produces only one chunk, raising `AGENT_DISCOVERY_MAX_CONCURRENCY` does nothing. If there are many chunks, raising discovery concurrency can reduce discovery wall time.
 
-Temporal deployments also have a worker-side activity executor pool: `TEMPORAL_ACTIVITY_WORKERS`. The workflow concurrency settings above control how many tasks the workflow is allowed to keep in flight. `TEMPORAL_ACTIVITY_WORKERS` controls how many activities a worker can execute at once. If this pool is too small, activities that the workflow has already scheduled still queue on the worker side.
+Temporal deployments also use `TEMPORAL_MAX_CONCURRENT_ACTIVITIES` to limit how many activities one worker process can execute at once. The workflow concurrency settings above control how many tasks the workflow is allowed to keep in flight. If worker capacity is too small, activities that the workflow has already scheduled still wait on the Temporal side.
 
 ## Resource Limits
 

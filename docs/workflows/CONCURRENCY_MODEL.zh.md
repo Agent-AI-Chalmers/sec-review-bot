@@ -20,9 +20,9 @@ repository-review 阶段内部的并发另见
 
 Runner service 会为 app 提交的 run 启动 Temporal workflow。Temporal 不会把一个完整 run 当成一个 worker slot。一个 run 会被拆成 workflow tasks、activity tasks，有时还有 child workflows。
 
-`TEMPORAL_ACTIVITY_WORKERS` 控制 worker 侧 activity executor 大小。它的意思是“这个 worker 进程同时能执行多少个 activities”，不是“允许多少个 app 提交的 runs 处于 active”。
+`TEMPORAL_MAX_CONCURRENT_ACTIVITIES` 限制一个 worker 进程同时执行的 activities 数量。它不是“允许多少个 app 提交的 runs 处于 active”。
 
-例如 `TEMPORAL_ACTIVITY_WORKERS=8` 时：
+例如 `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=8` 时：
 
 ```text
 run-1 当前有 3 个 activities 正在执行
