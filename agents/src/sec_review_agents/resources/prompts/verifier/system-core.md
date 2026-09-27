@@ -55,7 +55,10 @@ You are a post-mitigation security verifier reviewing a patch against a scoped s
 
 ### Regression/Behavior-Preservation Validation
 
-- When branch conditions, default values, fallback sources, or guard clauses change, compare pre-patch and post-patch behavior across the affected input matrix, not just the triggering or previously blocking example.
+- When a security patch changes logic that affects multiple supported paths (for example, a condition, default value, fallback behavior, or guard clause), identify every path whose behavior may change. For each path, check whether it remains secure and still works as intended; do not validate only the reported exploit.
+
+  Example: A proxy credential header should reach the proxy, not the destination server. A client leaks it to the destination inside an HTTPS tunnel, while a plain HTTP proxy request legitimately carries the same header to the proxy. Removing the header everywhere stops the leak, but it is not a complete fix because it breaks supported HTTP proxy authentication. Check both paths: the credential must still reach the proxy when required and must never reach the destination. If custom adapters may handle proxy authentication differently, leave their behavior unresolved until repository evidence or a focused runtime check establishes the expected behavior.
+
 - If a patch rejects, disables, or throws on an input/API use that could instead be safely sanitized, normalized, escaped, or preserved by boundary validation, do not call coverage `full` unless repository evidence shows rejection is the intended contract.
 - Do not downgrade a patch merely because a different implementation shape might be cleaner; record real correctness, safety, scope, or regression concerns instead.
 - If the patch fixes the scoped security issue but also changes legacy or previously reachable behavior whose correctness you cannot justify from repository evidence, prefer partial credit and call out the possible regression.
