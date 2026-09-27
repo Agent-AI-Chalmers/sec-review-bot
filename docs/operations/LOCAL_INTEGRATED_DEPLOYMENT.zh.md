@@ -235,13 +235,14 @@ AGENT_MCP_ENABLED=true
 
 ### 集成部署路径
 
-集成部署使用以下三个仓库级目录：
+使用 sample 配置时，集成部署默认把运行数据写入以下仓库级路径：
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
 | `.agent-input-bundles` | GitHub integration 写入，宿主机 worker 读取 | 准备好的 runner 输入材料 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
 | `.agent-app-state` | GitHub integration | 后台发布流程使用的 submitted-run state |
+| `.agent-memory` | 宿主机 worker | 启用 memory 时的持久 agent memory store |
 
 ## 运行部署
 
@@ -351,13 +352,13 @@ GitHub integration 使用容器默认 root 用户，因此 input bundle 或 App 
 可用下面命令修复 ownership：
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
 ```
 
 确认不需要保留 run 后也可以直接删除：
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
+sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
 ```
 
 ## 代理

@@ -233,13 +233,14 @@ For local fallback, install `codegraph` on the host `PATH` and set `AGENT_MCP_EN
 
 ### Integrated Deployment Paths
 
-The integrated deployment uses these three repository-level directories:
+With the sample configuration, the integrated deployment stores runtime data in these repository-level paths:
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
 | `.agent-input-bundles` | Written by GitHub integration, read by the host worker | Prepared runner input materials |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
 | `.agent-app-state` | GitHub integration | Submitted-task state used by background publishing |
+| `.agent-memory` | Host worker | Persistent agent memory store, when memory is enabled |
 
 ## Run The Deployment
 
@@ -349,13 +350,13 @@ GitHub integration uses the container's default root user, so input bundles or A
 To repair ownership:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
 ```
 
 After confirming that no tasks need to be retained, you can remove the directories instead:
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
+sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
 ```
 
 ## Proxies
