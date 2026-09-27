@@ -74,6 +74,7 @@ def verifier_result_summary(
         "resolution_next_step": verifier_result.get("resolution_next_step"),
         "patch_findings": verifier_result.get("patch_findings") or [],
         "validation_level": verifier_result.get("validation_level"),
+        "regression_status": verifier_result.get("regression_status"),
         "verification_findings": verifier_result.get("verification_findings") or [],
         "residual_risks": verifier_result.get("residual_risks") or [],
     }
@@ -197,6 +198,8 @@ def _history_projection(
             "title": f"Retry {retry_index}",
             "retry_index": retry_index,
             "patch_coverage": item.get("patch_coverage"),
+            "regression_status": item.get("regression_status"),
+            "resolution_next_step": item.get("resolution_next_step"),
             "patch_findings": item.get("patch_findings") or [],
         }
         projection.append(entry)
