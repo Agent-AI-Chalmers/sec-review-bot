@@ -102,9 +102,13 @@ cp compose.env.sample .env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
 cp deploy/systemd/deployment.env.sample deploy/systemd/deployment.env
+chmod 600 .env \
+  agents/config/model-providers.toml \
+  apps/github-integration/.env \
+  deploy/systemd/deployment.env
 ```
 
-The samples contain both usable defaults and empty or placeholder values that must be replaced. At minimum, configure the Runner Service token, GitHub App credentials, model deployment credentials, and the absolute paths in `deploy/systemd/deployment.env`. The systemd installer copies this fourth configuration file into `/etc` as described below.
+These files contain local credentials, so the commands above restrict them to the current user. The samples contain both usable defaults and empty or placeholder values that must be replaced. At minimum, configure the Runner Service token, GitHub App credentials, model deployment credentials, and the absolute paths in `deploy/systemd/deployment.env`. The systemd installer copies this fourth configuration file into `/etc` as described below.
 
 `agents/.env` is used by `run-local-*` and other local CLIs. Compose and the systemd worker do not load it automatically. See the [agents local running guide](../../agents/README.md) for local CLI configuration.
 
@@ -350,13 +354,19 @@ GitHub integration uses the container's default root user, so input bundles or A
 To repair ownership:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state
 ```
 
 After confirming that no tasks need to be retained, you can remove the directories instead:
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
+sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
+```
+
+The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.
+
+```bash
+sudo rm -rf .agent-memory
 ```
 
 ## Proxies

@@ -4,7 +4,7 @@ services:
     command: ["server", "start-dev", "--ip", "0.0.0.0"]
     ports:
       - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
-      - "${TEMPORAL_UI_PORT:-8233}:8233"
+      - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"
 
   runner-service:
     build:
@@ -51,7 +51,7 @@ services:
       - "${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}:${SEC_REVIEW_INPUT_BUNDLE_ROOT:-${PWD}/.agent-input-bundles}"
       - "${SEC_REVIEW_APP_STATE_ROOT:-${PWD}/.agent-app-state}:${SEC_REVIEW_APP_STATE_ROOT:-${PWD}/.agent-app-state}"
     ports:
-      - "${GITHUB_INTEGRATION_HOST_PORT:-30000}:30000"
+      - "127.0.0.1:${GITHUB_INTEGRATION_HOST_PORT:-30000}:30000"
     secrets:
       - source: github-app-private-key
         target: github-app-private-key.pem
