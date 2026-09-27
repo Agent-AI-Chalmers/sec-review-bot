@@ -32,18 +32,12 @@ deploy/systemd/deployment.env
 
 # workdir
 .agent-workspace
-.agent-workspace-local
 .agent-workspace-patcheval
 .agent-workspace-patcheval-*
 .agent-input-bundles/
 .agent-artifacts/
 .agent-app-state/
-agents/.local-transcript-smoke/
-agents/.sec-review-agent-artifacts/
-agents/.sec-review-agent-memory/
-
-.memory
-.memories
+.agent-memory/
 
 evaluation_input
 
