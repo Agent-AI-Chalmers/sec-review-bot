@@ -18,9 +18,9 @@ These layers are related, but they are not the same knob.
 
 The runner service starts Temporal workflows for app-submitted runs. Temporal does not treat one whole run as one worker slot. A run is decomposed into workflow tasks, activity tasks, and sometimes child workflows.
 
-`TEMPORAL_ACTIVITY_WORKERS` controls the worker-side activity executor size. It means "how many activities this worker process can execute at once", not "how many app-submitted runs may be active."
+`TEMPORAL_MAX_CONCURRENT_ACTIVITIES` limits how many activities one worker process can execute at once. It does not mean "how many app-submitted runs may be active."
 
-For example, with `TEMPORAL_ACTIVITY_WORKERS=8`:
+For example, with `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=8`:
 
 ```text
 run-1 currently has 3 activities executing

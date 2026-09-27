@@ -88,7 +88,7 @@ from sec_review_agents.workflows.repository.workflow import (
     verify_repository_case_activity,
 )
 
-DEFAULT_ACTIVITY_WORKERS = 8
+DEFAULT_MAX_CONCURRENT_ACTIVITIES = 2
 
 
 async def run_worker() -> None:
@@ -101,16 +101,15 @@ async def run_worker() -> None:
         client,
         task_queue=task_queue,
     )
-    with ThreadPoolExecutor(
-        max_workers=max(
-            1,
-            parse_int_env(
-                env_value("TEMPORAL_ACTIVITY_WORKERS"),
-                DEFAULT_ACTIVITY_WORKERS,
-            )
-            or DEFAULT_ACTIVITY_WORKERS,
+    max_concurrent_activities = max(
+        1,
+        parse_int_env(
+            env_value("TEMPORAL_MAX_CONCURRENT_ACTIVITIES"),
+            DEFAULT_MAX_CONCURRENT_ACTIVITIES,
         )
-    ) as executor:
+        or DEFAULT_MAX_CONCURRENT_ACTIVITIES,
+    )
+    with ThreadPoolExecutor(max_workers=max_concurrent_activities) as executor:
         worker = Worker(
             client,
             task_queue=task_queue,
@@ -175,6 +174,7 @@ async def run_worker() -> None:
                 build_repository_review_result_activity,
             ],
             activity_executor=executor,
+            max_concurrent_activities=max_concurrent_activities,
         )
         await worker.run()
 

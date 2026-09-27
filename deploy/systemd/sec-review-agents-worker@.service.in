@@ -10,7 +10,7 @@ User=@SEC_REVIEW_BOT_USER@
 Environment=TEMPORAL_ADDRESS=127.0.0.1:7233
 Environment=TEMPORAL_NAMESPACE=default
 Environment=TEMPORAL_TASK_QUEUE=sec-review-agents
-Environment=TEMPORAL_ACTIVITY_WORKERS=2
+Environment=TEMPORAL_MAX_CONCURRENT_ACTIVITIES=2
 Environment=AGENT_SANDBOX_BACKEND=docker
 Environment=AGENT_DOCKER_BIN=docker
 EnvironmentFile=/etc/sec-review-bot/deployment.env

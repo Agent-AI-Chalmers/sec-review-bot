@@ -331,7 +331,7 @@ This command does not start the host worker.
 
 ### Worker Concurrency
 
-`TEMPORAL_ACTIVITY_WORKERS` controls the activity executor size in one worker process. Start with a conservative value such as `2`, because each activity may create a sandbox and make multiple model calls.
+`TEMPORAL_MAX_CONCURRENT_ACTIVITIES` limits how many activities one worker process can execute at once. It defaults to `2`; each activity may create a sandbox and make multiple model calls, so a single-node deployment should start with this conservative value.
 
 The systemd template can run multiple worker processes on one execution node:
 

@@ -333,7 +333,7 @@ docker compose --profile app up --build
 
 ### Worker 并发
 
-`TEMPORAL_ACTIVITY_WORKERS` 控制单个 worker 进程的 activity executor 大小。建议从 `2` 这样的保守值开始，因为每个 activity 都可能创建 sandbox 并发出多次模型请求。
+`TEMPORAL_MAX_CONCURRENT_ACTIVITIES` 限制单个 worker 进程同时执行的 activities 数量。默认值为 `2`；每个 activity 都可能创建 sandbox 并发出多次模型请求，因此单机部署应从这个保守值开始。
 
 systemd template 可以在同一执行节点运行多个 worker 进程：
 
