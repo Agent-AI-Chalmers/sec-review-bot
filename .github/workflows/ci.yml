@@ -4,11 +4,6 @@ on:
   workflow_dispatch:
   # Give contributors fast feedback before a change enters the merge queue.
   pull_request:
-    paths-ignore:
-      # Markdown under agents/ can be runtime prompt or skill content.
-      - "*.md"
-      - "docs/**"
-      - "assets/**"
   # Merge queue candidates must report the same required CI Status check as PRs.
   # Re-test the exact candidate GitHub intends to merge against the latest main.
   # A separate push-to-main run is intentionally omitted because merge_group has
@@ -33,6 +28,7 @@ jobs:
       github-integration: ${{ steps.filter.outputs.github-integration }}
       agents: ${{ steps.filter.outputs.agents }}
       scripts: ${{ steps.filter.outputs.scripts }}
+      documentation: ${{ steps.filter.outputs.documentation }}
       automation-config: ${{ steps.filter.outputs.automation-config }}
     steps:
       - name: Check out repository
@@ -51,6 +47,13 @@ jobs:
               - '.github/workflows/ci.yml'
             scripts:
               - 'scripts/**'
+              - '.github/workflows/ci.yml'
+            documentation:
+              - '**/*.md'
+              - 'scripts/check_markdown_links.py'
+              - 'scripts/check_markdown_wrapping.py'
+              - 'scripts/check_translated_doc_headings.py'
+              - 'scripts/markdown_check_utils.py'
               - '.github/workflows/ci.yml'
             # Automation configuration has its own lightweight validation. A
             # Dependabot scheduling change should not run both application suites.
@@ -228,6 +231,31 @@ jobs:
           uv --project ../agents run python experimental_memory_extract_observations.py --help
           uv --project ../agents run python experimental_memory_maintain_from_observations.py --help
 
+  documentation:
+    name: Documentation
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.documentation == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: agents/.python-version
+
+      - name: Check Markdown links
+        run: python scripts/check_markdown_links.py
+
+      - name: Check Markdown wrapping
+        run: python scripts/check_markdown_wrapping.py
+
+      - name: Check translated document headings
+        run: python scripts/check_translated_doc_headings.py
+
   ci-status:
     name: CI Status
     needs:
@@ -236,6 +264,7 @@ jobs:
       - github-integration
       - agents
       - scripts
+      - documentation
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -246,13 +275,15 @@ jobs:
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
           AGENTS_RESULT: ${{ needs.agents.result }}
           SCRIPTS_RESULT: ${{ needs.scripts.result }}
+          DOCUMENTATION_RESULT: ${{ needs.documentation.result }}
         run: |
           set -euo pipefail
           for result in \
             "$AUTOMATION_CONFIG_RESULT" \
             "$GITHUB_INTEGRATION_RESULT" \
             "$AGENTS_RESULT" \
-            "$SCRIPTS_RESULT"; do
+            "$SCRIPTS_RESULT" \
+            "$DOCUMENTATION_RESULT"; do
             case "$result" in
               success|skipped)
                 ;;
