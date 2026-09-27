@@ -52,7 +52,7 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 - GitHub integration：TypeScript / Node.js service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布。
 - Agent 运行后端：Python / FastAPI 服务加 Temporal worker。
 - LangChain / LangGraph：agent 运行时，负责模型适配、结构化输出、工具调用和 workflow 内部的 agent loop。
-- Langfuse：可选 tracing backend，用于 LLM 调用和 agent run 诊断。
+- [Langfuse](https://langfuse.com/docs)：可选 tracing backend，用于 LLM 调用和 agent run 诊断。它按外部服务配置；本仓库的 Compose stack 不负责启动 Langfuse。
 - Temporal：长时间 agent run 的可靠执行层和任务队列（承担类似 RQ 的 job queue 角色），负责 workflow / activity 的调度、worker 分发、重试、超时和失败状态。
 - Docker Compose：App、runner service 和 Temporal 的本地控制平面环境。
 - 执行 worker：轮询 Temporal 并负责 Docker sandbox 执行的宿主机进程。
