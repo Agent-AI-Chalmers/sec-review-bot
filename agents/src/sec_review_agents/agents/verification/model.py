@@ -96,6 +96,9 @@ class VerificationOutput(BaseModel):
         if not self.overview.strip():
             raise ValueError("overview is required.")
         strong_patch = self.patch_coverage == "full"
+        has_concrete_patch_finding = any(
+            finding.strip() for finding in self.patch_findings
+        )
         if self.patch_coverage == "not-applicable" and not self.verification_findings:
             raise ValueError(
                 "at least one verification note is required when patch assessment is not-applicable."
@@ -112,7 +115,7 @@ class VerificationOutput(BaseModel):
                 "patch_coverage=full with failed or unresolved regression evidence "
                 "requires retry-ai or manual-review."
             )
-        if strong_patch and blocking_regression and not self.patch_findings:
+        if strong_patch and blocking_regression and not has_concrete_patch_finding:
             raise ValueError(
                 "patch_coverage=full with failed or unresolved regression evidence "
                 "requires a concrete patch finding."
@@ -143,7 +146,7 @@ class VerificationOutput(BaseModel):
             raise ValueError(
                 "resolution_next_step=none is only valid for full, no-patch, or not-applicable patch judgments."
             )
-        if self.resolution_next_step == "retry-ai" and not self.patch_findings:
+        if self.resolution_next_step == "retry-ai" and not has_concrete_patch_finding:
             raise ValueError(
                 "resolution_next_step=retry-ai requires at least one patch finding."
             )

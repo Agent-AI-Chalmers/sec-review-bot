@@ -119,7 +119,10 @@ def test_partial_patch_can_retry_with_unresolved_regression() -> None:
     assert result.resolution_next_step == "retry-ai"
 
 
-def test_patch_full_with_blocking_regression_requires_patch_finding() -> None:
+@pytest.mark.parametrize("patch_findings", [[], [""], ["   "]])
+def test_patch_full_with_blocking_regression_requires_patch_finding(
+    patch_findings: list[str],
+) -> None:
     """Require actionable context whenever regression evidence blocks delivery."""
     with pytest.raises(ValueError, match="requires a concrete patch finding"):
         VerificationOutput.model_validate(
@@ -128,7 +131,7 @@ def test_patch_full_with_blocking_regression_requires_patch_finding() -> None:
                 "review_target_claim": "reviewed claim",
                 "patch_coverage": "full",
                 "resolution_next_step": "manual-review",
-                "patch_findings": [],
+                "patch_findings": patch_findings,
                 "validation_level": "static",
                 "regression_status": "failed",
                 "verification_findings": ["security target is covered"],
@@ -168,6 +171,26 @@ def test_retry_ai_requires_patch_findings() -> None:
     )
 
     assert result.resolution_next_step == "retry-ai"
+
+
+@pytest.mark.parametrize("patch_findings", [[], [""], ["   "]])
+def test_retry_ai_rejects_blank_patch_findings(
+    patch_findings: list[str],
+) -> None:
+    """Reject retry feedback that contains no actionable finding text."""
+    with pytest.raises(ValueError, match="requires at least one patch finding"):
+        VerificationOutput.model_validate(
+            {
+                "overview": "Patch partially covers the reviewed claim.",
+                "review_target_claim": "reviewed claim",
+                "patch_coverage": "partial",
+                "resolution_next_step": "retry-ai",
+                "patch_findings": patch_findings,
+                "validation_level": "static",
+                "regression_status": "not-run",
+                "verification_findings": ["note"],
+            }
+        )
 
 
 def test_no_patch_can_have_no_next_step() -> None:
