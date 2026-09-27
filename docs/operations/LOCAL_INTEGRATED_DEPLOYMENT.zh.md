@@ -356,13 +356,19 @@ GitHub integration 使用容器默认 root 用户，因此 input bundle 或 App 
 可用下面命令修复 ownership：
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state
 ```
 
 确认不需要保留 run 后也可以直接删除：
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
+sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
+```
+
+`.agent-memory` 会跨多次运行持续保存，不属于常规清理范围。只有在确实需要重置 agent memory 时，才应先停止 worker，再单独删除 `.agent-memory`。该操作会永久删除已提取的 observations 和维护后的 memory。
+
+```bash
+sudo rm -rf .agent-memory
 ```
 
 ## 代理

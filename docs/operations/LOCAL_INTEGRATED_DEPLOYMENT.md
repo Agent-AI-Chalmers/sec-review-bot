@@ -354,13 +354,19 @@ GitHub integration uses the container's default root user, so input bundles or A
 To repair ownership:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state
 ```
 
 After confirming that no tasks need to be retained, you can remove the directories instead:
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state .agent-memory
+sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
+```
+
+The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.
+
+```bash
+sudo rm -rf .agent-memory
 ```
 
 ## Proxies
