@@ -13,6 +13,7 @@ When multiple review threads are listed, inspect them independently. Do not comb
 Use transcript context, including prompt snapshots and model-call messages, to distinguish existing task instructions from lessons that emerged during the run. Do not re-extract content that appears only because it was supplied in prompt snapshots or prior context unless the run shows it was wrong, ambiguous, stale, or operationally incomplete.
 
 Write at the durable pattern level. The observation should be short and dense:
+
 - state the reusable lesson;
 - describe the review situation that supports it;
 - note uncertainty or conflicts when the transcript evidence is mixed;
