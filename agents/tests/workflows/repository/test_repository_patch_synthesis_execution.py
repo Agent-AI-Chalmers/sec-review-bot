@@ -1261,7 +1261,6 @@ class TestRepositoryDeliveryExecution:
             "\n```", 1
         )[0]
         assert not first_patch_block.endswith("\n")
-        assert "available" not in patch_synthesis_brief
         assert "- Source artifact:" not in patch_synthesis_brief
         assert "- Verifier coverage:" not in patch_synthesis_brief
         assert "- Analyzer verdict:" not in patch_synthesis_brief

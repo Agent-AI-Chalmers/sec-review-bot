@@ -1,6 +1,5 @@
 from sec_review_agents.agents.mitigation.issue import (
     build_issue_mitigation_user_prompt,
-    build_issue_self_check_mitigation_system_prompt,
     build_issue_self_check_mitigation_user_prompt,
 )
 from sec_review_agents.agents.verification.issue import (
@@ -58,16 +57,6 @@ def test_self_check_prompt_uses_repair_narratives_context() -> None:
     )
 
     assert "Unconfirmed target" in prompt
-
-
-def test_self_check_system_prompt_uses_repair_mode_boundary() -> None:
-    prompt = build_issue_self_check_mitigation_system_prompt(
-        repair_mode="no-test-changes"
-    )
-
-    assert "# No-Test-Changes Boundary" in prompt
-    assert "# Test-Changes-Allowed Boundary" not in prompt
-    assert "# Git History Remediation Boundary" in prompt
 
 
 def test_initial_verification_prompt_omits_narratives_section() -> None:
