@@ -1555,6 +1555,7 @@ class TestRepositoryDeliveryExecution:
     async def test_combined_delivery_patch_failure_does_not_block_other_deliveries(
         self,
     ) -> None:
+        """Keep independent planned deliveries publishable after a sibling fails."""
         self._write_workspace(
             {
                 "src/a.txt": "alpha\n",
@@ -1642,6 +1643,7 @@ class TestRepositoryDeliveryExecution:
     async def test_direct_combined_deliveries_use_baseline_snapshot(
         self,
     ) -> None:
+        """Prevent one combined delivery from becoming the next delivery's baseline."""
         self._write_workspace(
             {
                 "src/a.txt": "alpha\n",

@@ -352,6 +352,7 @@ def test_claim_pending_extraction_jobs_marks_rows_running(tmp_path: Path) -> Non
 def test_claim_pending_memory_extraction_jobs_fails_stale_running_jobs(
     tmp_path: Path,
 ) -> None:
+    """Recover jobs abandoned in running state instead of leaving them invisible."""
     memory_store_dir = tmp_path / "memory"
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
@@ -397,6 +398,7 @@ def test_claim_pending_memory_extraction_jobs_fails_stale_running_jobs(
 async def test_run_memory_extraction_job_leaves_running_job_for_workflow_finalizer(
     tmp_path: Path,
 ) -> None:
+    """Let the workflow own terminal failure after Temporal exhausts activity retries."""
     from sec_review_agents.memory.extraction_workflow import run_memory_extraction_job
 
     memory_store_dir = tmp_path / "memory"
@@ -593,6 +595,7 @@ async def test_memory_extraction_workflow_fans_out_claimed_jobs(monkeypatch) -> 
 async def test_memory_extraction_workflow_keeps_original_failure_when_finalizer_fails(
     monkeypatch,
 ) -> None:
+    """Report the extraction failure rather than masking it with cleanup failure."""
     request = MemoryExtractionRunRequest(timeout_seconds=30, batch_size=1)
 
     async def fake_execute_activity(activity_fn, activity_request, **kwargs):
@@ -863,6 +866,7 @@ def test_oldest_observation_created_at_by_status_uses_oldest_pending(
 async def test_threshold_maintenance_workflow_continues_when_pending_remains(
     monkeypatch,
 ) -> None:
+    """Drain large backlogs through bounded workflow histories."""
     activity_results = [
         {"ok": True, "skipped": False, "processed_count": 10},
         {"ok": True, "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD},
@@ -1020,6 +1024,7 @@ async def test_pending_observations_trigger_starts_at_threshold(monkeypatch) -> 
 async def test_pending_observations_trigger_starts_when_oldest_pending_is_stale(
     monkeypatch,
 ) -> None:
+    """Process a small old backlog even when it never reaches the size threshold."""
     calls = []
     stale_created_at = (
         datetime.now(UTC) - MEMORY_MAINTENANCE_PENDING_MAX_AGE - timedelta(hours=1)
@@ -1069,6 +1074,8 @@ async def test_pending_observations_trigger_starts_when_oldest_pending_is_stale(
 async def test_pending_observations_trigger_handles_duplicate_start(
     monkeypatch,
 ) -> None:
+    """Treat an already-running singleton maintainer as successful coalescing."""
+
     async def fake_execute_activity(*_args, **_kwargs):
         return {"ok": True, "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD}
 

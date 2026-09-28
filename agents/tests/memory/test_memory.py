@@ -533,6 +533,7 @@ def test_materialize_configured_memory_view_locks_source_during_snapshot(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    """Prevent maintenance writes from producing a torn runtime snapshot."""
     memory_root = tmp_path / "source-memory"
     (_memory_content_dir(memory_root) / "topics").mkdir(parents=True)
     (_memory_content_dir(memory_root) / "MEMORY.md").write_text(
@@ -947,6 +948,7 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
 async def test_extract_memory_observations_skips_publish_when_observation_processed_during_run(
     tmp_path: Path,
 ) -> None:
+    """Do not republish work that another maintainer consumed during extraction."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
     transcript = (
@@ -1063,6 +1065,7 @@ async def test_maintain_memory_marks_observations_processed(tmp_path: Path) -> N
 async def test_maintain_memory_does_not_process_rewritten_observation(
     tmp_path: Path,
 ) -> None:
+    """Leave a concurrently rewritten observation pending for a later maintenance run."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
     observation = _memory_observations_dir(memory_root) / "same-run.md"
@@ -1255,6 +1258,7 @@ async def test_maintain_memory_no_pending_summary_warns_when_index_exceeds_start
 async def test_maintain_memory_releases_source_lock_while_agent_runs(
     tmp_path: Path,
 ) -> None:
+    """Avoid blocking memory readers and writers during the slow model call."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
     observation = _memory_observations_dir(memory_root) / "issue-review-run-1.md"
@@ -1303,6 +1307,7 @@ async def test_maintain_memory_releases_source_lock_while_agent_runs(
 async def test_maintenance_singleton_lock_waits_without_blocking_event_loop(
     tmp_path: Path,
 ) -> None:
+    """Serialize maintainers without stalling unrelated asynchronous work."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
     lock_path = memory_root / memory_maintenance.MEMORY_MAINTENANCE_LOCK_FILENAME
