@@ -39,36 +39,40 @@ from sec_review_agents.resources.loader import load_prompt_resource
 from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
 
 
-def _prompt_resource(path: str) -> str:
-    return load_prompt_resource(path).strip()
-
-
 def _joined_prompt_resources(*paths: str) -> str:
     return "\n\n".join(load_prompt_resource(path) for path in paths)
+
+
+def test_prompt_resource_loader_normalizes_only_trailing_newlines() -> None:
+    """Keep prompt boundaries stable without stripping Markdown indentation."""
+    resource = load_prompt_resource("memory/maintain-system.md")
+
+    assert not resource.endswith("\n")
+    assert resource.startswith("You maintain")
 
 
 def test_initial_verifier_prompt_uses_initial_delta_only() -> None:
     """Do not expose retry instructions before a verifier retry exists."""
     prompt = build_issue_verification_system_prompt()
 
-    assert _prompt_resource("verifier/system-initial-delta.md") in prompt
-    assert _prompt_resource("verifier/system-retry-delta.md") not in prompt
+    assert load_prompt_resource("verifier/system-initial-delta.md") in prompt
+    assert load_prompt_resource("verifier/system-retry-delta.md") not in prompt
 
 
 def test_retry_verifier_prompt_uses_retry_delta_only() -> None:
     """A retry must replace, rather than accumulate, initial-only instructions."""
     prompt = build_issue_verification_system_prompt(is_retry=True)
 
-    assert _prompt_resource("verifier/system-retry-delta.md") in prompt
-    assert _prompt_resource("verifier/system-initial-delta.md") not in prompt
+    assert load_prompt_resource("verifier/system-retry-delta.md") in prompt
+    assert load_prompt_resource("verifier/system-initial-delta.md") not in prompt
 
 
 def test_non_verifier_retry_delta_prompt_still_loads_role_retry_delta() -> None:
     """Keep the retry delta ahead of scope-specific mitigation instructions."""
     prompt = build_issue_mitigation_system_prompt(is_retry=True)
 
-    retry_delta = _prompt_resource("mitigator/system-retry-delta.md")
-    scope_delta = _prompt_resource("scopes/issue/mitigator/system-delta.md")
+    retry_delta = load_prompt_resource("mitigator/system-retry-delta.md")
+    scope_delta = load_prompt_resource("scopes/issue/mitigator/system-delta.md")
     assert prompt.index(retry_delta) < prompt.index(scope_delta)
 
 
@@ -81,7 +85,7 @@ def test_mitigation_retry_profiles_include_retry_delta() -> None:
     ]
 
     for prompt in prompts:
-        assert _prompt_resource("mitigator/system-retry-delta.md") in prompt
+        assert load_prompt_resource("mitigator/system-retry-delta.md") in prompt
 
 
 def test_initial_mitigation_profiles_do_not_include_retry_delta() -> None:
@@ -93,7 +97,7 @@ def test_initial_mitigation_profiles_do_not_include_retry_delta() -> None:
     ]
 
     for prompt in prompts:
-        assert _prompt_resource("mitigator/system-retry-delta.md") not in prompt
+        assert load_prompt_resource("mitigator/system-retry-delta.md") not in prompt
 
 
 def test_mitigation_profiles_include_test_change_boundary() -> None:
@@ -106,9 +110,11 @@ def test_mitigation_profiles_include_test_change_boundary() -> None:
     ]
 
     for prompt in prompts:
-        assert _prompt_resource("repair-modes/no-test-changes-boundary.md") in prompt
         assert (
-            _prompt_resource("repair-modes/test-changes-allowed-boundary.md")
+            load_prompt_resource("repair-modes/no-test-changes-boundary.md") in prompt
+        )
+        assert (
+            load_prompt_resource("repair-modes/test-changes-allowed-boundary.md")
             not in prompt
         )
 
@@ -131,7 +137,8 @@ def test_repair_capable_prompts_include_git_history_boundary() -> None:
 
     for prompt in prompts:
         assert (
-            _prompt_resource("shared/no-git-history-remediation-boundary.md") in prompt
+            load_prompt_resource("shared/no-git-history-remediation-boundary.md")
+            in prompt
         )
 
 
@@ -150,7 +157,7 @@ def test_analyzer_and_verifier_prompts_include_advisory_evidence_rule() -> None:
     ]
 
     for prompt in prompts:
-        assert _prompt_resource("shared/advisory-evidence-rule.md") in prompt
+        assert load_prompt_resource("shared/advisory-evidence-rule.md") in prompt
 
 
 def test_review_agent_prompts_end_with_output_formatting() -> None:
@@ -173,8 +180,8 @@ def test_review_agent_prompts_end_with_output_formatting() -> None:
     ]
 
     for prompt in prompts:
-        formatting = _prompt_resource("shared/output-formatting.md")
-        assert prompt.rstrip().endswith(formatting)
+        formatting = load_prompt_resource("shared/output-formatting.md")
+        assert prompt.endswith(formatting)
         assert prompt.count(formatting) == 1
 
 

@@ -1,9 +1,7 @@
 from sec_review_agents.agents.memory_extractor.model import StagedTranscripts
 from sec_review_agents.resources.loader import load_prompt_resource
 
-MEMORY_EXTRACTOR_SYSTEM_PROMPT = load_prompt_resource(
-    "memory/extract-system.md"
-).strip()
+MEMORY_EXTRACTOR_SYSTEM_PROMPT = load_prompt_resource("memory/extract-system.md")
 
 
 def build_extractor_prompt(staged_transcripts: StagedTranscripts) -> str:
