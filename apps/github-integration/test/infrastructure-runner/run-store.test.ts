@@ -7,6 +7,13 @@ function createStore (): RunnerRunStore {
   return new RunnerRunStore(':memory:')
 }
 
+test('RunnerRunStore can be closed more than once during shutdown', () => {
+  const store = createStore()
+
+  store.close()
+  assert.doesNotThrow(() => store.close())
+})
+
 test('RunnerRunStore persists and restores queued runner runs', () => {
   const store = createStore()
 

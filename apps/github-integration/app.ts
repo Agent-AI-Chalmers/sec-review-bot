@@ -13,6 +13,7 @@ import { handlePullRequestReadyForReview } from './interfaces/github/webhooks/pu
 import { handlePullRequestSynchronize } from './interfaces/github/webhooks/pull-request-synchronize.js'
 import { verifyGitWorkspaceRuntime } from './infrastructure/runner/git-workspace.js'
 import { startRunnerRunPublisher } from './infrastructure/runner/run-publisher.js'
+import { runnerRunStore } from './infrastructure/runner/run-store.js'
 import { logError, logInfo } from './utils/logger.js'
 
 await verifyGitWorkspaceRuntime()
@@ -32,7 +33,7 @@ app.webhooks.on('issues.opened', handleIssueOpened)
 app.webhooks.on('pull_request.opened', handlePullRequestOpened)
 app.webhooks.on('pull_request.ready_for_review', handlePullRequestReadyForReview)
 app.webhooks.on('pull_request.synchronize', handlePullRequestSynchronize)
-startRunnerRunPublisher({ app })
+const publisher = startRunnerRunPublisher({ app })
 
 app.webhooks.onError((error) => {
   if (error.name === 'AggregateError') {
@@ -64,3 +65,50 @@ server.listen(port, () => {
     webhook_url: localWebhookUrl
   })
 })
+
+let shutdownStarted = false
+const shutdownSignals = ['SIGINT', 'SIGTERM'] as const
+type ShutdownSignal = typeof shutdownSignals[number]
+
+function closeServer (): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error)
+        return
+      }
+      resolve()
+    })
+  })
+}
+
+async function shutdown (signal: ShutdownSignal): Promise<void> {
+  if (shutdownStarted) {
+    return
+  }
+  shutdownStarted = true
+  logInfo('server_shutdown_started', { signal })
+
+  const serverClosed = closeServer()
+  const results = await Promise.allSettled([serverClosed, publisher.stop()])
+  let shutdownError = results.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected'
+  )?.reason
+  try {
+    runnerRunStore.close()
+  } catch (error) {
+    shutdownError ??= error
+  }
+  if (shutdownError !== undefined) {
+    process.exitCode = 1
+    logError('server_shutdown_failed', { error: shutdownError, signal })
+    return
+  }
+  logInfo('server_shutdown_completed', { signal })
+}
+
+for (const signal of shutdownSignals) {
+  process.once(signal, () => {
+    void shutdown(signal)
+  })
+}

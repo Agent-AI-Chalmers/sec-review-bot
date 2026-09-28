@@ -9,6 +9,7 @@ import { DeterministicRunnerPublishError } from '../../infrastructure/runner/pub
 import {
   classifyRunnerPublishFailure,
   publishRunnerRunsOnce,
+  startRunnerRunPublisher,
   shouldRetryRunnerPublishFailure
 } from '../../infrastructure/runner/run-publisher.js'
 import { RunnerRunStore } from '../../infrastructure/runner/run-store.js'
@@ -19,6 +20,50 @@ type PublishContext = Record<string, unknown>
 function createStore (): RunnerRunStore {
   return new RunnerRunStore(':memory:')
 }
+
+test('stopping the runner publisher waits for its active publish pass', async () => {
+  const store = createStore()
+  store.save_queued_run({
+    workflow: 'issue-review',
+    run_id: 'run-shutdown',
+    publish_context: publishContextForWorkflow('issue-review')
+  })
+  let releaseStatus: (() => void) | undefined
+  const statusBlocked = new Promise<void>((resolve) => {
+    releaseStatus = resolve
+  })
+  let statusRequested: (() => void) | undefined
+  const statusRequestStarted = new Promise<void>((resolve) => {
+    statusRequested = resolve
+  })
+  const publisher = startRunnerRunPublisher({
+    app: appStub(),
+    store,
+    intervalMs: 60_000,
+    get_runner_run_status: async () => {
+      statusRequested?.()
+      await statusBlocked
+      return {
+        run_id: 'run-shutdown',
+        workflow: 'issue-review',
+        status: 'running'
+      }
+    }
+  })
+  await statusRequestStarted
+
+  let stopped = false
+  const stopping = publisher.stop().then(() => {
+    stopped = true
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(stopped, false)
+
+  releaseStatus?.()
+  await stopping
+  assert.equal(stopped, true)
+  store.close()
+})
 
 function appStub (): App {
   return {} as unknown as App
