@@ -9,13 +9,11 @@ from temporalio.exceptions import WorkflowAlreadyStartedError
 from sec_review_agents.memory import store as memory_store
 from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionJobRequest,
-    MemoryExtractionRequest,
+    MemoryExtractionRegistrationRequest,
     MemoryExtractionRunRequest,
     MemoryExtractionWorkflow,
     claim_pending_memory_extraction_jobs_activity,
     mark_memory_extraction_job_failed_activity,
-    memory_extraction_job_id,
-    memory_extraction_request_for_review,
     register_memory_extraction_job_activity,
     run_memory_extraction_job_activity,
 )
@@ -84,22 +82,12 @@ def test_worker_imports_memory_maintenance_workflow_and_activity() -> None:
     )
 
 
-def test_memory_extraction_job_id_is_per_review() -> None:
-    request = MemoryExtractionRequest(
-        source_workflow="issue-review",
-        run_id="run-1",
-        artifact_root_path="/tmp/run/artifacts",
-        timeout_seconds=30,
-    )
-
-    assert memory_extraction_job_id(request) == "issue-review-run-1"
-
-
 def test_register_memory_extraction_job_activity_writes_pending_job(
     tmp_path: Path,
 ) -> None:
     memory_store_dir = tmp_path / "memory"
-    request = MemoryExtractionRequest(
+    request = MemoryExtractionRegistrationRequest(
+        job_id="issue-review-run-1",
         source_workflow="issue-review",
         run_id="run-1",
         artifact_root_path="/tmp/run/artifacts",
@@ -141,7 +129,8 @@ def test_register_memory_extraction_job_activity_skips_processed_job(
             artifact_root_path="/tmp/run/artifacts",
             status=EXTRACTION_JOB_STATUS_PROCESSED,
         )
-    request = MemoryExtractionRequest(
+    request = MemoryExtractionRegistrationRequest(
+        job_id="issue-review-run-1",
         source_workflow="issue-review",
         run_id="run-1",
         artifact_root_path="/tmp/run/artifacts",
@@ -179,7 +168,8 @@ def test_register_memory_extraction_job_activity_does_not_demote_running_job(
             artifact_root_path="/tmp/run/artifacts",
             status=EXTRACTION_JOB_STATUS_RUNNING,
         )
-    request = MemoryExtractionRequest(
+    request = MemoryExtractionRegistrationRequest(
+        job_id="issue-review-run-1",
         source_workflow="issue-review",
         run_id="run-1",
         artifact_root_path="/tmp/run/artifacts",
@@ -202,35 +192,6 @@ def test_register_memory_extraction_job_activity_does_not_demote_running_job(
     with open_memory_state(memory_store_dir) as connection:
         jobs = fetch_all_extraction_jobs(connection)
     assert jobs[0].status == EXTRACTION_JOB_STATUS_RUNNING
-
-
-def test_memory_extraction_request_for_review_uses_artifact_root() -> None:
-    request = SimpleNamespace(
-        workflow="issue-review",
-        run_id="run-1",
-        timeout_seconds=30,
-        prepared_input={"artifact_root_path": "/tmp/run/artifacts"},
-    )
-
-    extraction_request = memory_extraction_request_for_review(request)
-
-    assert extraction_request == MemoryExtractionRequest(
-        source_workflow="issue-review",
-        run_id="run-1",
-        artifact_root_path="/tmp/run/artifacts",
-        timeout_seconds=30,
-    )
-
-
-def test_memory_extraction_request_for_review_requires_artifact_root() -> None:
-    request = SimpleNamespace(
-        workflow="issue-review",
-        run_id="run-1",
-        timeout_seconds=30,
-        prepared_input={},
-    )
-
-    assert memory_extraction_request_for_review(request) is None
 
 
 @pytest.mark.asyncio
@@ -294,7 +255,8 @@ def test_register_memory_extraction_job_activity_skips_failed_job(
             status=EXTRACTION_JOB_STATUS_FAILED,
         )
 
-    request = MemoryExtractionRequest(
+    request = MemoryExtractionRegistrationRequest(
+        job_id="issue-review-run-1",
         source_workflow="issue-review",
         run_id="run-1",
         artifact_root_path="/tmp/run/artifacts-new",
@@ -674,7 +636,8 @@ async def test_run_memory_maintenance_activity_skips_when_memory_globally_disabl
 def test_register_memory_extraction_job_activity_skips_when_memory_globally_disabled(
     tmp_path: Path,
 ) -> None:
-    request = MemoryExtractionRequest(
+    request = MemoryExtractionRegistrationRequest(
+        job_id="issue-review-run-1",
         source_workflow="issue-review",
         run_id="run-1",
         artifact_root_path=str(tmp_path / "artifacts"),

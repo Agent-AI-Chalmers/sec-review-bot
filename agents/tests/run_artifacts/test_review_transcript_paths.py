@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 
 from sec_review_agents.run_artifacts.transcripts import (
-    repository_case_thread_name,
     retry_stage_order,
     review_stage_transcript_path,
     review_thread_dir,
@@ -19,12 +18,6 @@ def test_review_stage_transcript_path_uses_default_thread(tmp_path: Path) -> Non
             stage="analyzer",
         )
         == tmp_path / "transcripts" / "0001-review" / "0001-analyzer-initial.json"
-    )
-
-
-def test_repository_case_thread_name_is_mechanical_and_slugged() -> None:
-    assert repository_case_thread_name(case_id="Case 12:/A", index=2) == (
-        "0002-case-case-12-a"
     )
 
 

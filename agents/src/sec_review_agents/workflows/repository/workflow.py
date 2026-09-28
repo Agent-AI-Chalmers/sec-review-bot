@@ -3,13 +3,14 @@ import os
 from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from temporalio import activity, workflow
 
 from sec_review_agents.delivery_stages.model import DeliveryCaseInput
 from sec_review_agents.memory.extraction_workflow import (
-    register_memory_extraction_for_review,
+    MemoryExtractionRegistrationRequest,
+    register_memory_extraction,
 )
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
@@ -44,6 +45,7 @@ class RepositoryCaseReviewRequest(TypedDict):
     transcript_thread_path: str
     timeout_seconds: int
     runtime_context: RunnerRuntimeContext
+    memory_extraction_registration_enabled: NotRequired[bool]
 
 
 class RepositoryCaseRequestBatch(TypedDict):
@@ -239,20 +241,13 @@ def prepare_repository_case_review_inputs_activity(
     request: InternalWorkflowRequest,
     cases: Sequence[Mapping[str, Any]],
 ) -> RepositoryCaseRequestBatch:
-    from sec_review_agents.run_artifacts.transcripts import (
-        repository_case_thread_name,
-        review_thread_dir,
-    )
+    from sec_review_agents.run_artifacts.transcripts import review_thread_dir
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.repository.case_execution_input import (
         prepare_case_execution_input,
     )
 
     prepared_input = request.prepared_input
-    run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
-        label="artifact_root_path",
-    )
     bundle_paths = prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
         bundle_paths["workspace_snapshot_tar_path"],
@@ -292,15 +287,14 @@ def prepare_repository_case_review_inputs_activity(
                 "cases_artifacts_path": str(cases_artifacts_path),
                 "transcript_thread_path": str(
                     review_thread_dir(
-                        run_artifacts_root,
-                        thread_name=repository_case_thread_name(
-                            case_id=str(case.get("case_id") or index),
-                            index=index,
-                        ),
+                        cases_artifacts_path / str(case.get("case_id") or index),
                     )
                 ),
                 "timeout_seconds": timeout_seconds,
                 "runtime_context": request.runtime_context,
+                "memory_extraction_registration_enabled": (
+                    request.memory_extraction_registration_enabled
+                ),
             }
             for index, case in enumerate(cases, start=1)
         ],
@@ -964,7 +958,7 @@ class RepositoryCaseReviewWorkflow:
             except Exception:
                 pass
             raise
-        return await workflow.execute_activity(
+        result = await workflow.execute_activity(
             build_repository_case_result_activity,
             args=[
                 prepared_case,
@@ -976,6 +970,18 @@ class RepositoryCaseReviewWorkflow:
             schedule_to_close_timeout=activity_timeout,
             retry_policy=retry_policy,
         )
+        case_id = _repository_case_id_from_request(request)
+        await register_memory_extraction(
+            MemoryExtractionRegistrationRequest(
+                job_id=f"repository-review-{request['run_id']}-{case_id}",
+                source_workflow="repository-review",
+                run_id=request["run_id"],
+                artifact_root_path=str(Path(request["cases_artifacts_path"]) / case_id),
+                timeout_seconds=request["timeout_seconds"],
+            ),
+            enabled=request.get("memory_extraction_registration_enabled", True),
+        )
+        return result
 
 
 @workflow.defn
@@ -1159,7 +1165,6 @@ class RepositoryReviewWorkflow:
             delivery_result,
             timeout_seconds=request.timeout_seconds,
         )
-        await register_memory_extraction_for_review(request)
         return {"ok": True, "result": result}
 
 

@@ -25,7 +25,7 @@ def repository_case_execution_input(case_id: str) -> RepositoryCaseExecutionInpu
 @pytest.mark.asyncio
 async def test_repository_case_activity_binds_trace_context() -> None:
     analyzer_result = {"verdict": "confirmed-vulnerability"}
-    transcript_thread_path = "/tmp/transcripts/0001-case-case-1"
+    transcript_thread_path = "/tmp/cases/case-1/transcripts/0001-review"
 
     with (
         patch(

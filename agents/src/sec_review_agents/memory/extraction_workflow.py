@@ -13,7 +13,14 @@ MEMORY_EXTRACTION_RUNNING_STALE_AFTER_SECONDS = 60 * 60
 
 
 @dataclass(frozen=True)
-class MemoryExtractionRequest:
+class MemoryExtractionRegistrationRequest:
+    """Ask the memory system to process one completed review later.
+
+    The artifact root contains the transcripts to read. ``timeout_seconds`` only
+    limits the short database registration step; it does not limit extraction.
+    """
+
+    job_id: str
     source_workflow: str
     run_id: str
     artifact_root_path: str
@@ -22,52 +29,39 @@ class MemoryExtractionRequest:
 
 @dataclass(frozen=True)
 class MemoryExtractionRunRequest:
+    """Set how many waiting jobs one scheduled run may process and for how long."""
+
     timeout_seconds: int
     batch_size: int = MEMORY_EXTRACTION_DEFAULT_BATCH_SIZE
 
 
 @dataclass(frozen=True)
 class MemoryExtractionJobRequest:
+    """Describe one database job already claimed by the scheduled run.
+
+    The scheduled run passes this data to extraction and uses the same job ID if
+    it must record a failure.
+    """
+
     job_id: str
     source_workflow: str
     run_id: str
     artifact_root_path: str
 
 
-def memory_extraction_request_for_review(
-    request: Any,
-) -> MemoryExtractionRequest | None:
-    prepared_input = getattr(request, "prepared_input", None)
-    if not isinstance(prepared_input, dict):
-        return None
-    artifact_root_path = prepared_input.get("artifact_root_path")
-    if not isinstance(artifact_root_path, str) or not artifact_root_path.strip():
-        return None
-    return MemoryExtractionRequest(
-        source_workflow=str(request.workflow),
-        run_id=str(request.run_id),
-        artifact_root_path=artifact_root_path.strip(),
-        timeout_seconds=int(request.timeout_seconds),
-    )
-
-
-def memory_extraction_job_id(request: MemoryExtractionRequest) -> str:
-    return f"{request.source_workflow}-{request.run_id}"
-
-
-async def register_memory_extraction_for_review(request: Any) -> None:
-    if getattr(request, "memory_extraction_registration_enabled", True) is False:
-        return
-    extraction_request = memory_extraction_request_for_review(request)
-    if extraction_request is None:
+async def register_memory_extraction(
+    request: MemoryExtractionRegistrationRequest,
+    *,
+    enabled: bool,
+) -> None:
+    """Add a completed review to the pending queue without blocking the review."""
+    if not enabled:
         return
     try:
         await workflow.execute_activity(
             register_memory_extraction_job_activity,
-            extraction_request,
-            schedule_to_close_timeout=timedelta(
-                seconds=extraction_request.timeout_seconds
-            ),
+            request,
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
     except Exception as error:
@@ -80,7 +74,7 @@ async def register_memory_extraction_for_review(request: Any) -> None:
 
 @activity.defn
 def register_memory_extraction_job_activity(
-    request: MemoryExtractionRequest,
+    request: MemoryExtractionRegistrationRequest,
 ) -> dict[str, Any]:
     from sec_review_agents.features import agent_memory_enabled
     from sec_review_agents.memory.store import resolve_memory_store_dir
@@ -109,7 +103,7 @@ def register_memory_extraction_job_activity(
     from sec_review_agents.memory.store import initialize_memory_store
 
     initialize_memory_store(memory_store_dir)
-    job_id = memory_extraction_job_id(request)
+    job_id = request.job_id
     with open_memory_state(memory_store_dir) as connection:
         existing = fetch_extraction_job_by_id(connection, job_id)
         if existing is not None and existing.status == EXTRACTION_JOB_STATUS_PROCESSED:
@@ -427,14 +421,12 @@ __all__ = [
     "MEMORY_EXTRACTION_DEFAULT_BATCH_SIZE",
     "MEMORY_EXTRACTION_RUNNING_STALE_AFTER_SECONDS",
     "MemoryExtractionJobRequest",
-    "MemoryExtractionRequest",
+    "MemoryExtractionRegistrationRequest",
     "MemoryExtractionRunRequest",
     "MemoryExtractionWorkflow",
     "claim_pending_memory_extraction_jobs_activity",
     "mark_memory_extraction_job_failed_activity",
-    "memory_extraction_job_id",
-    "memory_extraction_request_for_review",
-    "register_memory_extraction_for_review",
+    "register_memory_extraction",
     "register_memory_extraction_job_activity",
     "run_memory_extraction_job",
     "run_memory_extraction_job_activity",

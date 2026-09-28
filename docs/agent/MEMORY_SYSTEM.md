@@ -71,7 +71,7 @@ Experience production runs through an asynchronous path and does not affect the 
 
 Roughly, the flow is a set of periodic checks:
 
-- Source: after a review workflow publishes transcripts, it registers a pending extraction job.
+- Source: after an issue or pull-request review publishes transcripts, it registers a pending extraction job. Repository review registers one job per successfully completed case, using that case's artifact root; a case that fails before completion never registers extraction.
 - Extraction checks periodically and processes available work: the extraction schedule runs every 10 minutes by default, processes registered extraction jobs, and produces pending observations.
   - Multiple jobs can be processed concurrently.
 - Maintenance checks periodically and runs when the threshold or age condition is met: the maintenance trigger schedule runs every hour by default. It starts maintenance only when at least 10 observations are pending, or when the oldest pending observation has waited at least one day.

@@ -27,12 +27,6 @@ def review_thread_dir(
     return review_transcripts_root(artifact_root_path) / thread_name
 
 
-def repository_case_thread_name(*, case_id: str, index: int) -> str:
-    if index < 1:
-        raise ValueError("Repository case transcript thread index must be >= 1.")
-    return f"{index:04d}-case-{_slug_component(case_id)}"
-
-
 def transcript_thread_file(
     thread_dir: Path,
     *,
@@ -79,7 +73,6 @@ def retry_stage_order(*, stage: str, retry_context: Mapping[str, Any] | None) ->
 __all__ = [
     "DEFAULT_REVIEW_THREAD",
     "TRANSCRIPTS_DIRNAME",
-    "repository_case_thread_name",
     "retry_stage_order",
     "review_stage_transcript_path",
     "review_thread_dir",
