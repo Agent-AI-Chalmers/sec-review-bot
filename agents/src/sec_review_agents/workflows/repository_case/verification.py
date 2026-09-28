@@ -32,8 +32,9 @@ async def verify_repository_case(
         verifier_artifacts_path,
         attempt_label=attempt_label,
     )
+    patch_diff = (mitigation_result or {}).get("patch_diff")
     workspace_patch = (
-        str((mitigation_result or {}).get("patch_diff") or "").strip() or None
+        patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
     )
     user_prompt = (
         repository_verification_agent.build_repository_verification_user_prompt(

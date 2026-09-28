@@ -108,3 +108,41 @@ async def test_repository_verification_does_not_prepare_workspace_when_prompt_bu
         )
 
     run_verification_stage_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_repository_verification_preserves_patch_terminal_newline(
+    tmp_path: Path,
+) -> None:
+    """Keep an exported unified diff byte-for-byte valid on its way to verification."""
+    patch_diff = "diff --git a/a.txt b/a.txt\n"
+
+    with (
+        patch(
+            "sec_review_agents.workflows.repository_case.verification.reset_verification_attempt_artifacts"
+        ),
+        patch(
+            "sec_review_agents.agents.verification.repository.build_repository_verification_user_prompt",
+            return_value="user prompt",
+        ) as build_prompt,
+        patch(
+            "sec_review_agents.workflows.repository_case.verification.run_verification_stage",
+            return_value={"patch_coverage": "full"},
+        ) as run_verification_stage_mock,
+    ):
+        await verify_repository_case(
+            workspace_snapshot_tar_path=tmp_path / "workspace.snapshot.tar",
+            history_path=None,
+            incremental_window_path=None,
+            verifier_artifacts_path=tmp_path / "verifier",
+            scan_mode="full",
+            review_input="review input",
+            analysis_result={"overview": "analysis"},
+            mitigation_result={
+                "changed_files": ["a.txt"],
+                "patch_diff": patch_diff,
+            },
+        )
+
+    assert build_prompt.call_args.kwargs["workspace_patch"] == patch_diff
+    assert run_verification_stage_mock.call_args.kwargs["workspace_patch"] == patch_diff
