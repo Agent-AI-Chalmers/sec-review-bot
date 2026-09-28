@@ -4,7 +4,8 @@ from typing import Any
 from temporalio import activity, workflow
 
 from sec_review_agents.memory.extraction_workflow import (
-    register_memory_extraction_for_review,
+    MemoryExtractionRegistrationRequest,
+    register_memory_extraction,
 )
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
@@ -16,6 +17,7 @@ from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
 )
+from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_REPAIR,
@@ -300,7 +302,21 @@ class IssueReviewWorkflow:
             verifier_result,
             timeout_seconds=request.timeout_seconds,
         )
-        await register_memory_extraction_for_review(request)
+        if request.memory_extraction_registration_enabled:
+            await register_memory_extraction(
+                MemoryExtractionRegistrationRequest(
+                    job_id=f"{request.workflow}-{request.run_id}",
+                    source_workflow=request.workflow,
+                    run_id=request.run_id,
+                    artifact_root_path=str(
+                        required_path(
+                            request.prepared_input.get("artifact_root_path"),
+                            label="artifact_root_path",
+                        )
+                    ),
+                    timeout_seconds=request.timeout_seconds,
+                )
+            )
         return {"ok": True, "result": result}
 
 

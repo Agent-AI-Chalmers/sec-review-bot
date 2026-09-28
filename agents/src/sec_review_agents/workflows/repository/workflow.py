@@ -3,13 +3,14 @@ import os
 from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from temporalio import activity, workflow
 
 from sec_review_agents.delivery_stages.model import DeliveryCaseInput
 from sec_review_agents.memory.extraction_workflow import (
-    register_memory_extraction_for_review,
+    MemoryExtractionRegistrationRequest,
+    register_memory_extraction,
 )
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
@@ -41,9 +42,10 @@ class RepositoryCaseReviewRequest(TypedDict):
     run_id: str
     case_execution_input: RepositoryCaseExecutionInput
     cases_artifacts_path: str
-    transcript_thread_path: str
+    published_transcripts_path: str
     timeout_seconds: int
     runtime_context: RunnerRuntimeContext
+    memory_extraction_registration_enabled: NotRequired[bool]
 
 
 class RepositoryCaseRequestBatch(TypedDict):
@@ -104,8 +106,6 @@ def _repository_case_review_timeout_seconds(
     return timeout_seconds
 
 
-# Repository cases publish transcripts into case-specific threads, not the
-# default review thread used by issue and PR workflows.
 def _repository_case_published_transcript_path(
     prepared_case: dict[str, Any],
     *,
@@ -113,13 +113,13 @@ def _repository_case_published_transcript_path(
     stage: str,
     attempt: str = "initial",
 ) -> Path:
-    from sec_review_agents.run_artifacts.transcripts import transcript_thread_file
+    from sec_review_agents.run_artifacts.transcripts import transcript_file
     from sec_review_agents.utils.paths import required_path
 
-    return transcript_thread_file(
+    return transcript_file(
         required_path(
-            prepared_case.get("transcript_thread_path"),
-            label="transcript_thread_path",
+            prepared_case.get("published_transcripts_path"),
+            label="published_transcripts_path",
         ),
         order=order,
         stage=stage,
@@ -239,20 +239,13 @@ def prepare_repository_case_review_inputs_activity(
     request: InternalWorkflowRequest,
     cases: Sequence[Mapping[str, Any]],
 ) -> RepositoryCaseRequestBatch:
-    from sec_review_agents.run_artifacts.transcripts import (
-        repository_case_thread_name,
-        review_thread_dir,
-    )
+    from sec_review_agents.run_artifacts.transcripts import review_transcripts_root
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.repository.case_execution_input import (
         prepare_case_execution_input,
     )
 
     prepared_input = request.prepared_input
-    run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
-        label="artifact_root_path",
-    )
     bundle_paths = prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
         bundle_paths["workspace_snapshot_tar_path"],
@@ -290,17 +283,16 @@ def prepare_repository_case_review_inputs_activity(
                     repair_mode=review_intent.repair_mode,
                 ),
                 "cases_artifacts_path": str(cases_artifacts_path),
-                "transcript_thread_path": str(
-                    review_thread_dir(
-                        run_artifacts_root,
-                        thread_name=repository_case_thread_name(
-                            case_id=str(case.get("case_id") or index),
-                            index=index,
-                        ),
+                "published_transcripts_path": str(
+                    review_transcripts_root(
+                        cases_artifacts_path / str(case.get("case_id") or index),
                     )
                 ),
                 "timeout_seconds": timeout_seconds,
                 "runtime_context": request.runtime_context,
+                "memory_extraction_registration_enabled": (
+                    request.memory_extraction_registration_enabled
+                ),
             }
             for index, case in enumerate(cases, start=1)
         ],
@@ -330,7 +322,7 @@ def prepare_repository_case_activity(
             cases_artifacts_path=Path(request["cases_artifacts_path"]),
             case_id=case_id.strip(),
         ),
-        "transcript_thread_path": request["transcript_thread_path"],
+        "published_transcripts_path": request["published_transcripts_path"],
     }
 
 
@@ -964,7 +956,7 @@ class RepositoryCaseReviewWorkflow:
             except Exception:
                 pass
             raise
-        return await workflow.execute_activity(
+        result = await workflow.execute_activity(
             build_repository_case_result_activity,
             args=[
                 prepared_case,
@@ -976,6 +968,20 @@ class RepositoryCaseReviewWorkflow:
             schedule_to_close_timeout=activity_timeout,
             retry_policy=retry_policy,
         )
+        case_id = _repository_case_id_from_request(request)
+        if request.get("memory_extraction_registration_enabled", True):
+            await register_memory_extraction(
+                MemoryExtractionRegistrationRequest(
+                    job_id=f"repository-review-{request['run_id']}-{case_id}",
+                    source_workflow="repository-review",
+                    run_id=request["run_id"],
+                    artifact_root_path=str(
+                        Path(request["cases_artifacts_path"]) / case_id
+                    ),
+                    timeout_seconds=request["timeout_seconds"],
+                )
+            )
+        return result
 
 
 @workflow.defn
@@ -1159,7 +1165,6 @@ class RepositoryReviewWorkflow:
             delivery_result,
             timeout_seconds=request.timeout_seconds,
         )
-        await register_memory_extraction_for_review(request)
         return {"ok": True, "result": result}
 
 

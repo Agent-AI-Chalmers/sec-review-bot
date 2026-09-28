@@ -61,7 +61,7 @@ def repository_case_review_request(case_id: str) -> RepositoryCaseReviewRequest:
         "run_id": "run-test",
         "case_execution_input": repository_case_execution_input(case_id),
         "cases_artifacts_path": "/tmp/cases",
-        "transcript_thread_path": f"/tmp/transcripts/{case_id}",
+        "published_transcripts_path": f"/tmp/cases/{case_id}/transcripts",
         "timeout_seconds": 30,
         "runtime_context": {},
     }
@@ -882,7 +882,7 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
                 "run_id": "run-test",
                 "case_execution_input": prepared_case["case_execution_input"],
                 "cases_artifacts_path": "/tmp/local/artifacts/run-test/cases",
-                "transcript_thread_path": "/tmp/local/artifacts/run-test/transcripts/case-1",
+                "published_transcripts_path": "/tmp/local/artifacts/run-test/cases/case-1/transcripts",
                 "timeout_seconds": 30,
                 "runtime_context": {},
             }
@@ -994,7 +994,7 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
                 "run_id": "run-test",
                 "case_execution_input": prepared_case["case_execution_input"],
                 "cases_artifacts_path": "/tmp/local/artifacts/run-test/cases",
-                "transcript_thread_path": "/tmp/local/artifacts/run-test/transcripts/case-1",
+                "published_transcripts_path": "/tmp/local/artifacts/run-test/cases/case-1/transcripts",
                 "timeout_seconds": 30,
                 "runtime_context": {},
             }

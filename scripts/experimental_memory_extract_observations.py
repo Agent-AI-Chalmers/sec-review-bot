@@ -20,7 +20,6 @@ from sec_review_agents.filesystem.backend_factory import create_backend_with_mat
 from sec_review_agents.filesystem.material_views import read_only_material_view
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.extractor import (
-    _group_transcript_refs_by_thread,
     _observation_header,
     _observation_id_for_transcripts,
     collect_transcript_refs,
@@ -68,10 +67,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--observation-id",
         default=None,
-        help=(
-            "Optional base observation id. Multi-thread inputs append the thread "
-            "slug."
-        ),
+        help="Optional observation id for the collected transcript sequence.",
     )
     parser.add_argument(
         "--source-workflow",
@@ -102,82 +98,67 @@ async def main() -> int:
         print("No transcript files found.")
         return 1
 
-    groups = _group_transcript_refs_by_thread(transcript_refs)
-    written: list[Path] = []
-    skipped = 0
+    observation_id_value = _observation_id_for_transcripts(
+        transcript_refs,
+        explicit_observation_id=args.observation_id,
+        source_workflow=args.source_workflow,
+        run_id=args.run_id,
+    )
+    with tempfile.TemporaryDirectory(
+        prefix="sec-review-memory-observation-preview-"
+    ) as tempdir:
+        temp_root = Path(tempdir)
+        transcript_root = temp_root / "transcripts"
+        staged = stage_transcripts(transcript_refs, transcript_root)
+        backend = create_backend_with_materials(
+            container_name_prefix="memory-observation-preview",
+            material_views=[
+                read_only_material_view(
+                    agent_path="/transcripts",
+                    host_path=transcript_root,
+                )
+            ],
+            use_docker_sandbox=False,
+        )
+        model = create_chat_model(
+            agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
+            deployment_override=args.deployment,
+        )
+        async with amanaged_backend(backend):
+            agent = await create_memory_extractor_agent_graph(
+                model=model,
+                backend=backend,
+            )
+            structured_result = await invoke_agent_runtime_graph(
+                agent=agent,
+                agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
+                system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
+                user_prompt=build_extractor_prompt(staged),
+            )
 
-    for group in groups:
-        observation_id_value = _observation_id_for_transcripts(
-            group,
-            all_thread_count=len(groups),
-            explicit_observation_id=args.observation_id,
+    observation_body = str(structured_result.get("observation_markdown") or "").strip()
+    if not structured_result.get("has_observation") or not observation_body:
+        print("No observation written: no durable observation.")
+        return 1
+
+    artifact_root = None
+    input_dirs = [path for path in args.inputs if path.expanduser().is_dir()]
+    if len(input_dirs) == 1:
+        artifact_root = input_dirs[0]
+    content = (
+        _observation_header(
+            observation_id_value=observation_id_value,
             source_workflow=args.source_workflow,
             run_id=args.run_id,
+            artifact_root_path=artifact_root,
+            staged_transcripts=staged,
         )
-        with tempfile.TemporaryDirectory(
-            prefix="sec-review-memory-observation-preview-"
-        ) as tempdir:
-            temp_root = Path(tempdir)
-            transcript_root = temp_root / "transcripts"
-            staged = stage_transcripts(group, transcript_root)
-            backend = create_backend_with_materials(
-                container_name_prefix="memory-observation-preview",
-                material_views=[
-                    read_only_material_view(
-                        agent_path="/transcripts",
-                        host_path=transcript_root,
-                    )
-                ],
-                use_docker_sandbox=False,
-            )
-            model = create_chat_model(
-                agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-                deployment_override=args.deployment,
-            )
-            async with amanaged_backend(backend):
-                agent = await create_memory_extractor_agent_graph(
-                    model=model,
-                    backend=backend,
-                )
-                structured_result = await invoke_agent_runtime_graph(
-                    agent=agent,
-                    agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-                    system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
-                    user_prompt=build_extractor_prompt(staged),
-                )
-
-        observation_body = str(
-            structured_result.get("observation_markdown") or ""
-        ).strip()
-        if not structured_result.get("has_observation") or not observation_body:
-            skipped += 1
-            print(f"Skipped {group[0].thread}: no durable observation.")
-            continue
-
-        artifact_root = None
-        input_dirs = [path for path in args.inputs if path.expanduser().is_dir()]
-        if len(input_dirs) == 1:
-            artifact_root = input_dirs[0]
-        content = (
-            _observation_header(
-                observation_id_value=observation_id_value,
-                source_workflow=args.source_workflow,
-                run_id=args.run_id,
-                artifact_root_path=artifact_root,
-                staged_transcripts=staged,
-            )
-            + observation_body.rstrip()
-            + "\n"
-        )
-        target = output_dir / f"{observation_id_value}.md"
-        _write_observation(target, content)
-        written.append(target)
-        print(f"Wrote {target}")
-
-    if not written:
-        print(f"No observations written. Threads skipped: {skipped}.")
-        return 1
-    print(f"Observations written: {len(written)}; threads skipped: {skipped}.")
+        + observation_body.rstrip()
+        + "\n"
+    )
+    target = output_dir / f"{observation_id_value}.md"
+    _write_observation(target, content)
+    print(f"Wrote {target}")
     print(WARNING)
     return 0
 

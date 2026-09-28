@@ -37,7 +37,7 @@ def test_transcript_writes_flat_message_array(tmp_path: Path) -> None:
 
 def test_transcript_writer_fans_out_to_multiple_paths(tmp_path: Path) -> None:
     primary = tmp_path / "stage" / "transcript.json"
-    consumer = tmp_path / "transcripts" / "0001-review" / "0001-analyzer-initial.json"
+    consumer = tmp_path / "transcripts" / "0001-analyzer-initial.json"
     writer = TranscriptWriter((primary, consumer), agent_name="test-agent")
 
     writer.write_messages([_FakeMessage("shared")])

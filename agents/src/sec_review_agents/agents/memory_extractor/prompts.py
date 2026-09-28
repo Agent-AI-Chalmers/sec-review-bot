@@ -5,13 +5,9 @@ MEMORY_EXTRACTOR_SYSTEM_PROMPT = load_prompt_resource("memory/extract-system.md"
 
 
 def build_extractor_prompt(staged_transcripts: StagedTranscripts) -> str:
-    transcript_lines: list[str] = []
-    current_thread: str | None = None
-    for thread, label, mounted in staged_transcripts.entries:
-        if thread != current_thread:
-            current_thread = thread
-            transcript_lines.append(f"- Thread `{thread}`")
-        transcript_lines.append(f"  - {label}: `{mounted}`")
+    transcript_lines = [
+        f"- {label}: `{mounted}`" for label, mounted in staged_transcripts.entries
+    ]
     return "\n".join(
         [
             "### Transcript Inputs",

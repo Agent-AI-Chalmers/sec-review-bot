@@ -9,8 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.run_artifacts.transcripts import (
-    repository_case_thread_name,
-    review_thread_dir,
+    review_transcripts_root,
 )
 from sec_review_agents.runner.temporal_config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 from sec_review_agents.utils.env import (
@@ -152,17 +151,14 @@ def _case_review_request(
         "run_id": run_id,
         "case_execution_input": case_execution_input,
         "cases_artifacts_path": cases_artifacts_path,
-        "transcript_thread_path": str(
-            review_thread_dir(
-                Path(cases_artifacts_path).parent,
-                thread_name=repository_case_thread_name(
-                    case_id=case_execution_input["case_id"],
-                    index=case_index,
-                ),
+        "published_transcripts_path": str(
+            review_transcripts_root(
+                Path(cases_artifacts_path) / case_execution_input["case_id"],
             )
         ),
         "timeout_seconds": DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
         "runtime_context": {},
+        "memory_extraction_registration_enabled": False,
     }
 
 

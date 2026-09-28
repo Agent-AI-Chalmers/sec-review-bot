@@ -73,7 +73,7 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 
 大致流程就是定时检查：
 
-- 来源：review workflow 发布 transcripts 后，会登记一个待处理的 extraction job。
+- 来源：issue 或 pull-request review 发布 transcripts 后，会登记一个待处理的 extraction job。repository review 则会为每个成功完成的 case 单独登记 job，并以该 case 的 artifact root 作为输入；未完整执行的 case 不会登记 extraction。
 - extraction 定时检查，有就处理：extraction schedule 默认每 10 分钟运行一次，处理已登记的 extraction jobs 并产出 pending observations。
   - 可以并发处理多个 job。
 - maintenance 定时检查，达到阈值或者时间过长就处理：maintenance trigger schedule 默认每小时运行一次。只有 pending observations 至少有 10 条，或者最老的 pending observation 已经等待至少 1 天时，才启动 maintenance。

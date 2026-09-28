@@ -62,9 +62,8 @@ def _first_workspace_patch(experiment_dir: Path) -> Path | None:
 
 
 def _retry_count(run_dir: Path) -> int | None:
-    # Retry inference is only a PatchEval issue-CVE reporting hint. Repository
-    # review publishes a run-level transcript view for memory extraction; that
-    # view is not a general token/cost or delivery contract.
+    # Retry inference is only a PatchEval issue-CVE reporting hint. Read both
+    # the canonical stage transcripts and the current flat published view.
     artifacts = run_dir / "artifacts" / run_dir.name
     retry_indexes: list[int] = []
     for transcript_path in artifacts.glob("**/transcripts/retry-*.json"):
@@ -73,14 +72,14 @@ def _retry_count(run_dir: Path) -> int | None:
             retry_indexes.append(int(label.split("-", 1)[1]))
         except (IndexError, ValueError):
             continue
-    for transcript_path in artifacts.glob("transcripts/*/*-retry-*.json"):
+    for transcript_path in artifacts.glob("transcripts/*-retry-*.json"):
         match = re.search(r"-retry-(\d+)$", transcript_path.stem)
         if match:
             retry_indexes.append(int(match.group(1)))
     if retry_indexes:
         return max(retry_indexes)
     if any(artifacts.glob("**/transcripts/initial.json")) or any(
-        artifacts.glob("transcripts/*/*-initial.json")
+        artifacts.glob("transcripts/*-initial.json")
     ):
         return 0
     return None

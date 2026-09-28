@@ -44,7 +44,7 @@ def _fetch_observation_status(memory_root: Path, observation_id: str) -> str | N
 async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> None:
     root = Path(".agent-artifacts") / "memory-probes" / f"lifecycle-{uuid4().hex[:8]}"
     artifacts = root / "artifacts"
-    transcript_root = artifacts / "transcripts" / "0001-review"
+    transcript_root = artifacts / "transcripts"
     memory_root = initialize_memory_store(root / "memory")
 
     _write_transcript(
