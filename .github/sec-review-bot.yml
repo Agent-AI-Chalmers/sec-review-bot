@@ -21,5 +21,7 @@ sec_review_bot:
     - '**/*.zh.md'
     - '**/README.md'
     - '**/README.zh.md'
-    - 'contracts/*.md'
+    - 'contracts'
+    - 'agents/src/sec_review_agents/resources/prompts'
+    - 'agents/src/sec_review_agents/resources/skill_source_notes'
     - 'AGENTS.md'
