@@ -12,6 +12,15 @@ from sec_review_agents.utils.structured_renderer import (
 )
 
 PREVIEW_STAGE_SUMMARY_SCHEMA = StructuredRenderSchema(
+    prose_keys=frozenset(
+        {
+            "overview",
+            "description",
+            "reason",
+            "note",
+            "review_target_claim",
+        }
+    ),
     key_labels={
         "changed_files": "Changed files",
         "patch_coverage": "Patch coverage",
@@ -102,7 +111,7 @@ def _string_list_section(title: str, values: Any) -> list[str]:
         "",
         f"{title}:",
         "",
-        *[md(t"- {item}") for item in items],
+        *[f"- {item}" for item in items],
     ]
 
 
@@ -120,8 +129,7 @@ def _location_section(locations: Any) -> list[str]:
             "unknown",
         )
         if label:
-            rendered_label = md(t"{label}")
-            lines.append(f"- {anchor}: {rendered_label}")
+            lines.append(f"- {anchor}: {label}")
         else:
             lines.append(f"- {anchor}")
     return lines
@@ -137,8 +145,7 @@ def _nearby_paths_section(paths: Any) -> list[str]:
         relationship = inline_code(item.get("relationship"), "unknown")
         note = compact_plain_text(item.get("note"))
         if note:
-            rendered_note = md(t"{note}")
-            lines.append(f"- {label}: {relationship} - {rendered_note}")
+            lines.append(f"- {label}: {relationship} - {note}")
         else:
             lines.append(f"- {label}: {relationship}")
     return lines

@@ -141,6 +141,38 @@ def test_analyzer_and_verifier_prompts_include_advisory_evidence_rule() -> None:
         assert "not automatically local workspace evidence" in prompt
 
 
+def test_review_agent_prompts_define_inline_code_for_prose_fields() -> None:
+    """Public review prose should use the Markdown contract preserved by renderers."""
+    prompts = [
+        build_issue_analyzer_system_prompt("audit"),
+        build_pr_analyzer_system_prompt(),
+        build_repository_analyzer_system_prompt(),
+        build_issue_mitigation_system_prompt(),
+        build_issue_self_check_mitigation_system_prompt(),
+        build_pr_mitigation_system_prompt(),
+        build_repository_mitigation_system_prompt(),
+        build_issue_verification_system_prompt(),
+        build_pr_verification_system_prompt(),
+        build_repository_verification_system_prompt(),
+        build_issue_single_agent_system_prompt(
+            review_objective="audit",
+            repair_mode=REPAIR_MODE_TEST_CHANGES_ALLOWED,
+        ),
+    ]
+
+    for prompt in prompts:
+        assert "## Output Formatting" in prompt
+        assert "Prose fields support Markdown inline code" in prompt
+        assert "Wrap repository paths, symbols, commands" in prompt
+        assert "do not emit raw HTML" in prompt
+        assert "scan every prose field once" in prompt
+        assert "Before returning structured output" in prompt
+        assert prompt.rstrip().endswith(
+            "each repository path, symbol, command, field name, and literal enum "
+            "value is wrapped in inline code."
+        )
+
+
 def test_analyzer_prompts_treat_existing_mitigation_as_coverage_not_verdict() -> None:
     prompts = [
         build_issue_analyzer_system_prompt("audit"),

@@ -104,6 +104,7 @@ def build_issue_verification_system_prompt(is_retry: bool = False) -> str:
                 "scopes/issue/verifier/system-delta.md",
                 "shared/workspace-evidence-rule.md",
                 "shared/advisory-evidence-rule.md",
+                "shared/output-formatting.md",
             ]
         )
     return join_prompt_sections(
@@ -117,6 +118,7 @@ def build_issue_verification_system_prompt(is_retry: bool = False) -> str:
             "scopes/issue/verifier/system-delta.md",
             "shared/workspace-evidence-rule.md",
             "shared/advisory-evidence-rule.md",
+            "shared/output-formatting.md",
         ]
     )
 

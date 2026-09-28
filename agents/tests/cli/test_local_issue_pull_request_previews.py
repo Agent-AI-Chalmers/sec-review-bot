@@ -19,7 +19,9 @@ def _workflow_result() -> dict:
         "review_record": {
             "analysis": {
                 "verdict": "confirmed-vulnerability",
-                "overview": "The endpoint exposed sensitive files.",
+                "overview": (
+                    "The endpoint in `agents/src/example.py` exposed sensitive files."
+                ),
                 "narratives": [
                     {
                         "priority": 2,
@@ -27,7 +29,7 @@ def _workflow_result() -> dict:
                         "verdict": "confirmed-vulnerability",
                         "vulnerability_type": "Path traversal",
                         "validation_level": "static",
-                        "description": "User input reaches file reads.",
+                        "description": "User input reaches `open_file()`.",
                         "locations": [
                             {
                                 "file": "src/server.js",
@@ -58,6 +60,7 @@ def _workflow_result() -> dict:
                 "residual_risks": [],
             },
             "verification": {
+                "review_target_claim": ("`MemoryObservationOutput` remains unchanged."),
                 "patch_coverage": "full",
                 "resolution_next_step": "none",
                 "patch_findings": [],
@@ -119,6 +122,9 @@ def test_writes_pull_request_review_body_preview(tmp_path: Path) -> None:
     assert "<summary>Analysis</summary>" in review_content
     assert "<summary>Analysis narratives</summary>" not in review_content
     assert "**Unsafe preview endpoint**" in review_content
+    assert "`agents/src/example.py`" in review_content
+    assert "`open_file()`" in review_content
+    assert "`MemoryObservationOutput` remains unchanged." in review_content
     assert "Control review:" in review_content
     assert "- Files below the preview root." in review_content
     assert "- Priority:" not in review_content

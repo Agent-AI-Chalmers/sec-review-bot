@@ -106,6 +106,7 @@ def build_issue_mitigation_system_prompt(
         [
             "scopes/issue/mitigator/system-delta.md",
             "shared/workspace-evidence-rule.md",
+            "shared/output-formatting.md",
         ]
     )
     return join_prompt_sections(paths)
@@ -183,6 +184,7 @@ def build_issue_self_check_mitigation_system_prompt(
             "shared/input-location-hints-rule.md",
             "scopes/issue/mitigator/system-delta.md",
             "shared/workspace-evidence-rule.md",
+            "shared/output-formatting.md",
         ]
     )
 

@@ -80,6 +80,7 @@ def build_pr_analyzer_system_prompt() -> str:
             "scopes/pr/analyzer/system-delta.md",
             "shared/workspace-evidence-rule.md",
             "shared/advisory-evidence-rule.md",
+            "shared/output-formatting.md",
         ]
     )
 

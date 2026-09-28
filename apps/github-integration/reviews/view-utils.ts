@@ -51,7 +51,11 @@ export function displayText (value: unknown, fallback = ''): string {
 }
 
 export function inlineCode (value: unknown, fallback = 'unknown'): string {
-  return `\`${displayText(value, fallback).replace(/`/g, '\\`')}\``
+  const text = displayText(value, fallback)
+  const longestRun = Math.max(0, ...Array.from(text.matchAll(/`+/g), (match) => match[0].length))
+  const fence = '`'.repeat(longestRun + 1)
+  const padding = text.startsWith('`') || text.endsWith('`') ? ' ' : ''
+  return `${fence}${padding}${text}${padding}${fence}`
 }
 
 export function formatFindingSummary (item: unknown): string {

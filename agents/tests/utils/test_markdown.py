@@ -65,7 +65,10 @@ def test_inline_code_formats_short_values() -> None:
 
 
 def test_inline_code_escapes_backticks() -> None:
-    assert inline_code("user`name") == "`user\\`name`"
+    """Code spans use a longer fence when their content contains backticks."""
+    assert inline_code("user`name") == "``user`name``"
+    assert inline_code("user``name") == "```user``name```"
+    assert inline_code("`quoted`") == "`` `quoted` ``"
 
 
 def test_inline_code_compacts_whitespace() -> None:

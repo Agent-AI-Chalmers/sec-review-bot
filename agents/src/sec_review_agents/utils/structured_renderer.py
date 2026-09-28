@@ -4,9 +4,9 @@ from typing import Any, Literal
 
 from sec_review_agents.utils.markdown import (
     compact_plain_text,
+    escape_backticks,
     format_scalar,
     inline_code,
-    markdown_text,
     md,
 )
 
@@ -27,6 +27,14 @@ class StructuredRenderSchema:
     )
     anchor_keys: tuple[str, ...] = ("path", "file")
     title_keys: tuple[str, ...] = ("title", "summary", "label", "name", "id")
+    prose_keys: frozenset[str] = frozenset(
+        {
+            "overview",
+            "description",
+            "reason",
+            "note",
+        }
+    )
     key_labels: Mapping[str, str] = field(default_factory=dict)
     field_order: Mapping[str, int] = field(default_factory=dict)
 
@@ -38,6 +46,15 @@ DEFAULT_STRUCTURED_RENDER_SCHEMA = StructuredRenderSchema()
 # Prompt rendering may preserve transcript-shaped context that previews/reports hide.
 PROMPT_STRUCTURED_RENDER_SCHEMA = StructuredRenderSchema(
     hidden_keys=frozenset({"raw", "debug", "diagnostics"}),
+    prose_keys=frozenset(
+        {
+            "overview",
+            "description",
+            "reason",
+            "note",
+            "review_target_claim",
+        }
+    ),
     key_labels={
         "changed_files": "Changed files",
         "patch_coverage": "Patch coverage",
@@ -139,7 +156,7 @@ def _dict_anchor(value: Mapping[str, Any], schema: StructuredRenderSchema) -> st
     for key in schema.title_keys:
         text = compact_plain_text(value.get(key))
         if text:
-            return md(t"{text}")
+            return text
     return ""
 
 
@@ -147,18 +164,24 @@ def _dict_summary(value: Mapping[str, Any], schema: StructuredRenderSchema) -> s
     for key in schema.summary_keys:
         text = compact_plain_text(value.get(key))
         if text:
-            return md(t"{text}")
+            return text
     return ""
 
 
-def _render_scalar_line(label: str, value: Any, *, indent: int) -> str:
+def _render_scalar_line(
+    label: str,
+    value: Any,
+    *,
+    indent: int,
+    prose: bool = False,
+) -> str:
     prefix = "  " * indent
-    rendered_label = markdown_text(label)
-    if _looks_like_short_scalar(value):
+    rendered_label = escape_backticks(label)
+    if not prose and _looks_like_short_scalar(value):
         return f"{prefix}- {rendered_label}: {format_scalar(value)}"
     text = compact_plain_text(value)
     if text:
-        return f"{prefix}- {rendered_label}: {md(t'{text}')}"
+        return f"{prefix}- {rendered_label}: {text}"
     return f"{prefix}- {rendered_label}: {format_scalar(value)}"
 
 
@@ -209,7 +232,7 @@ def _render_list_item(
         return []
     if isinstance(item, str) and _looks_like_path(item):
         return [f"{prefix}- {inline_code(text)}"]
-    return [f"{prefix}- {md(t'{text}')}"]
+    return [f"{prefix}- {text}"]
 
 
 def render_structured_markdown(
@@ -235,7 +258,7 @@ def render_structured_markdown(
 
     overview = compact_plain_text(mapping.get("overview"))
     if overview and indent == 0:
-        lines.extend([md(t"{overview}"), ""])
+        lines.extend([overview, ""])
 
     for key, item in _ordered_items(mapping, schema):
         if key in schema.hidden_keys or (indent == 0 and key == "overview"):
@@ -257,14 +280,14 @@ def render_structured_markdown(
                 continue
             if lines and lines[-1] != "":
                 lines.append("")
-            lines.extend([f"{prefix}{markdown_text(label)}:", "", *nested])
+            lines.extend([f"{prefix}{escape_backticks(label)}:", "", *nested])
             continue
         if _is_ordered_sequence(item):
             items = _renderable_items(item)
             if not items:
                 continue
             if indent > 0:
-                lines.append(f"{prefix}- {markdown_text(label)}:")
+                lines.append(f"{prefix}- {escape_backticks(label)}:")
                 for child in items:
                     lines.extend(
                         _render_list_item(
@@ -277,7 +300,7 @@ def render_structured_markdown(
                 continue
             if lines and lines[-1] != "":
                 lines.append("")
-            lines.extend([f"{prefix}{markdown_text(label)}:", ""])
+            lines.extend([f"{prefix}{escape_backticks(label)}:", ""])
             for child in items:
                 lines.extend(
                     _render_list_item(
@@ -285,7 +308,14 @@ def render_structured_markdown(
                     )
                 )
             continue
-        lines.append(_render_scalar_line(label, item, indent=indent))
+        lines.append(
+            _render_scalar_line(
+                label,
+                item,
+                indent=indent,
+                prose=key in schema.prose_keys,
+            )
+        )
 
     while lines and lines[-1] == "":
         lines.pop()
