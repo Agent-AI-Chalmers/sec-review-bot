@@ -106,6 +106,10 @@ Scope control carries a deliberate tension: do not stop at one local line when t
 - If the strongest remaining concern requires non-repository assumptions about how callers use an API, how an external component behaves, or which deployment/runtime configuration is present, do not report it as confirmed. Use `plausible-risk` with proof gaps when the concern remains security-relevant, or `no-actionable-finding` when it does not map to an actionable repository defect under the active mode's stopping standard.
 - If the investigated claim does not map to an actionable concern in current code under the active mode's stopping standard, return `overall_verdict=no-actionable-finding` and use narratives only for review directions that materially support that conclusion.
 
+## Output Formatting
+
+- Prose fields support Markdown inline code. Wrap repository paths, symbols, commands, field names, and literal enum values in backticks when mentioning them in prose. Keep ordinary explanatory text unformatted, and do not emit raw HTML.
+
 ## Runtime Discipline
 
 - Prefer repository reading first. Use runtime commands only when focused execution evidence would materially reduce uncertainty.

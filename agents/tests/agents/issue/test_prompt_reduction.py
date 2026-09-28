@@ -180,7 +180,7 @@ def test_retry_issue_verification_prompt_inlines_original_issue_text() -> None:
     assert "Previous Verifier Result" in prompt
     previous_verifier_section = prompt.split("# Previous Verifier Result", 1)[1]
     assert "```json" not in previous_verifier_section
-    assert previous_verifier_section.index("- Review target claim: `claim`") < (
+    assert previous_verifier_section.index("- Review target claim: claim") < (
         previous_verifier_section.index("- Patch coverage: `partial`")
     )
     assert previous_verifier_section.index("- Patch coverage: `partial`") < (
@@ -335,7 +335,7 @@ def test_retry_mitigation_prompt_keeps_verifier_as_primary_corrective_signal() -
     )[0]
     assert "```json" not in retry_section
     assert "Latest verifier:" in retry_section
-    assert retry_section.index("- Review target claim: `claim`") < (
+    assert retry_section.index("- Review target claim: claim") < (
         retry_section.index("- Patch coverage: `partial`")
     )
     assert retry_section.index("- Patch coverage: `partial`") < (

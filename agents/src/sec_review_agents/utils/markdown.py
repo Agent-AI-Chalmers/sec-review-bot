@@ -1,5 +1,6 @@
 import difflib
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from string.templatelib import Template, convert
@@ -9,7 +10,7 @@ from typing import Any
 def heading(title: str, *, level: int = 1) -> str:
     marker = "#" * max(1, min(level, 6))
     resolved_title = str(title).strip() or "Untitled"
-    return f"{marker} {markdown_text(resolved_title)}"
+    return f"{marker} {escape_backticks(resolved_title)}"
 
 
 def code_block(language: str, content: str) -> str:
@@ -49,10 +50,16 @@ def compact_plain_text(value: Any, fallback: str = "") -> str:
 def inline_code(value: Any, fallback: str = "") -> str:
     """Format a short token/path/status as markdown inline code."""
     normalized = compact_plain_text(value, fallback)
-    return md(t"`{normalized}`") if normalized else ""
+    if not normalized:
+        return ""
+    longest_run = max((len(run) for run in re.findall(r"`+", normalized)), default=0)
+    fence = "`" * (longest_run + 1)
+    padding = " " if normalized.startswith("`") or normalized.endswith("`") else ""
+    return f"{fence}{padding}{normalized}{padding}{fence}"
 
 
-def markdown_text(value: Any) -> str:
+def escape_backticks(value: Any) -> str:
+    """Escape backticks in text interpolated into program-owned Markdown."""
     return str(value).replace("`", "\\`")
 
 
@@ -75,8 +82,8 @@ def render_template(
 
 
 def md(template: Template) -> str:
-    """Render a t-string with markdown escaping for interpolated values."""
-    return render_template(template, formatter=markdown_text)
+    """Render a Markdown template with interpolated backticks escaped."""
+    return render_template(template, formatter=escape_backticks)
 
 
 def dedupe_text_items(items: list[Any], limit: int | None = None) -> list[str]:

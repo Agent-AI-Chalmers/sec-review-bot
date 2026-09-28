@@ -127,6 +127,40 @@ def test_render_structured_markdown_accepts_lightweight_display_schema() -> None
     ]
 
 
+def test_render_structured_markdown_preserves_inline_code_in_review_prose() -> None:
+    """Review prose keeps model-supplied inline code in local previews."""
+    payload = {
+        "overview": "The patch updates `agents/src/example.py`.",
+        "verification_findings": [
+            "`MemoryObservationOutput` remains unchanged.",
+        ],
+    }
+
+    assert render_structured_markdown(payload) == [
+        "The patch updates `agents/src/example.py`.",
+        "",
+        "Verification findings:",
+        "",
+        "- `MemoryObservationOutput` remains unchanged.",
+    ]
+
+
+def test_prompt_profile_preserves_inline_code_in_review_target_claim() -> None:
+    """Prompt rendering treats review claims as prose regardless of their length."""
+    short_claim = "`MemoryObservationOutput` remains unchanged."
+    long_claim = (
+        "`MemoryObservationOutput` remains unchanged while the verifier checks "
+        "the longer repository-grounded claim without changing its Markdown handling."
+    )
+
+    assert render_structured_markdown(
+        {"review_target_claim": short_claim}, profile="prompt"
+    ) == [f"- Review target claim: {short_claim}"]
+    assert render_structured_markdown(
+        {"review_target_claim": long_claim}, profile="prompt"
+    ) == [f"- Review target claim: {long_claim}"]
+
+
 def test_render_structured_markdown_profiles_keep_prompt_transcripts_visible() -> None:
     payload = {
         "overview": "Context for retry.",
