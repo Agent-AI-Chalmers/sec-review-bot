@@ -64,6 +64,10 @@ Combine cases when direct evidence supports one of these relationships:
 - Execution coupling: one mitigation produces, validates, recalculates, authorizes, or normalizes a value or state that another mitigation directly consumes in the same request path or operation boundary. A broad product flow, endpoint family, or later independent request is not enough.
 - Review coupling: splitting would make review materially misleading because reviewers would see duplicate, competing, or partial fixes to the same code boundary.
 
+Example (shared helper): Two retained cases cover stored script execution through different file-serving endpoints. Both mitigations introduce the same content-type classifier and use it to decide which user-controlled files must never render inline. Put them in one delivery because splitting would create competing versions of the shared classifier and leave each endpoint's fix dependent on which PR lands first.
+
+Example (shared dependency state): Several retained cases describe different vulnerabilities in the same dependency. A single upgrade to the fixed dependency version, followed by the repository's lockfile and bundle regeneration, resolves all of them. Treat the dependency version, lockfile, and generated bundle as one patch surface: separate PRs would repeat or conflict over the same repository state.
+
 Keep cases separate when the evidence does not reach one of those relationships:
 
 - Same CWE is not a grouping reason.
