@@ -76,6 +76,7 @@ def build_issue_analyzer_system_prompt(review_objective: ReviewObjective) -> str
             "scopes/issue/analyzer/system-delta.md",
             "shared/workspace-evidence-rule.md",
             "shared/advisory-evidence-rule.md",
+            "shared/output-formatting.md",
         ]
     )
 

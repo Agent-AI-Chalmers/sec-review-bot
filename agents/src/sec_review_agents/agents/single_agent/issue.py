@@ -91,6 +91,7 @@ def build_issue_single_agent_system_prompt(
             "shared/input-location-hints-rule.md",
             "shared/security-false-positive-precedents.md",
             "shared/workspace-evidence-rule.md",
+            "shared/output-formatting.md",
         ]
     )
     return join_prompt_sections(paths)

@@ -148,6 +148,7 @@ def test_review_agent_prompts_define_inline_code_for_prose_fields() -> None:
         build_pr_analyzer_system_prompt(),
         build_repository_analyzer_system_prompt(),
         build_issue_mitigation_system_prompt(),
+        build_issue_self_check_mitigation_system_prompt(),
         build_pr_mitigation_system_prompt(),
         build_repository_mitigation_system_prompt(),
         build_issue_verification_system_prompt(),
@@ -160,9 +161,16 @@ def test_review_agent_prompts_define_inline_code_for_prose_fields() -> None:
     ]
 
     for prompt in prompts:
+        assert "## Output Formatting" in prompt
         assert "Prose fields support Markdown inline code" in prompt
         assert "Wrap repository paths, symbols, commands" in prompt
         assert "do not emit raw HTML" in prompt
+        assert "scan every prose field once" in prompt
+        assert "Before returning structured output" in prompt
+        assert prompt.rstrip().endswith(
+            "each repository path, symbol, command, field name, and literal enum "
+            "value is wrapped in inline code."
+        )
 
 
 def test_analyzer_prompts_treat_existing_mitigation_as_coverage_not_verdict() -> None:

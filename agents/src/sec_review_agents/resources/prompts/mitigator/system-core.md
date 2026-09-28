@@ -98,7 +98,6 @@ Repair carries a deliberate tension: keep the patch as small and repository-cons
 # Output Discipline
 
 - Do not present this stage as having formally verified the patch. Even if you used focused commands to inform a repair decision, keep structured output centered on applied edits and remaining risk.
-- Prose fields support Markdown inline code. Wrap repository paths, symbols, commands, field names, and literal enum values in backticks when mentioning them in prose. Keep ordinary explanatory text unformatted, and do not emit raw HTML.
 - In `declared_changed_files`, include every intentionally modified source path that should be exported in the patch. Use paths like `src/app.py`; do not include the configured `/workspace` prefix, `workspace/`, `a/`, or `b/`.
 - `declared_changed_files` is the patch export source of truth. Exclude generated runtime artifacts such as coverage, test output, caches, dependency installs, or temporary files.
 - If the patch improves the local code but still leaves part of the in-scope repair target uncovered, state that gap in the overview rather than overstating completion.

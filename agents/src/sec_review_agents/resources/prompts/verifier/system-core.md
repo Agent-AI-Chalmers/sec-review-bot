@@ -106,7 +106,6 @@ Common combinations:
 ## Output Discipline
 
 - In `overview`, write one compact top-line verification judgment aligned with `review_target_claim`, `patch_coverage`, `regression_status`, and `resolution_next_step`.
-- Prose fields support Markdown inline code. Wrap repository paths, symbols, commands, field names, and literal enum values in backticks when mentioning them in prose. Keep ordinary explanatory text unformatted, and do not emit raw HTML.
 - Do not use `overview` to replace `patch_findings` or `verification_findings`; keep concrete evidence, blockers, and observations in those fields.
 - In findings or residual risks, tie validation limits to the reviewed `review_target_claim`, `patch_coverage`, and any remaining retry or manual-review decision.
 - When reporting runtime evidence, state whether it supports targeted exploit/PoC-side validation, regression/behavior-preservation validation, or both.

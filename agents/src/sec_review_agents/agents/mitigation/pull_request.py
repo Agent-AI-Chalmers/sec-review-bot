@@ -102,6 +102,7 @@ def build_pr_mitigation_system_prompt(
         [
             "scopes/pr/mitigator/system-delta.md",
             "shared/workspace-evidence-rule.md",
+            "shared/output-formatting.md",
         ]
     )
     return join_prompt_sections(paths)
