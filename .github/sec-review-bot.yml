@@ -13,4 +13,7 @@ sec_review_bot:
   # - '**/*.min.js'
   # - 'node_modules'
   paths_ignore:
-    - '.github'
+    - '.github/sec-review-bot.yml'
+    - '.github/dependabot.yml'
+    - 'evaluation'
+    - 'scripts/patcheval'
