@@ -285,6 +285,12 @@ export class RunnerRunStore {
     this.markFailure(run_id, 'publish_failed', error)
   }
 
+  close (): void {
+    if (this.db.open) {
+      this.db.close()
+    }
+  }
+
   private markStatus (run_id: string, status: RunnerRunStatus): void {
     this.db.prepare(`
       UPDATE runner_runs

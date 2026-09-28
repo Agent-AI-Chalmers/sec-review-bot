@@ -1,4 +1,5 @@
 import type { App } from 'octokit'
+import { clearImmediate, clearInterval } from 'node:timers'
 
 import {
   getRunnerRunStatus,
@@ -24,9 +25,14 @@ interface RunnerRunPublisherOptions {
   app: App
   store?: RunnerRunStore
   intervalMs?: number
+  get_runner_run_status?: GetRunnerRunStatus
 }
 
 type GetRunnerRunStatus = typeof getRunnerRunStatus
+
+export interface RunnerRunPublisher {
+  stop: () => Promise<void>
+}
 
 type InstallationOctokitForRepo = (repo_full_name: string) => Promise<unknown>
 
@@ -283,14 +289,19 @@ export async function publishRunnerRunsOnce ({
   }
 }
 
-export function startRunnerRunPublisher ({ app, store = runnerRunStore, intervalMs = pollIntervalMs() }: RunnerRunPublisherOptions): ReturnType<typeof setInterval> {
-  let active = false
+export function startRunnerRunPublisher ({
+  app,
+  store = runnerRunStore,
+  intervalMs = pollIntervalMs(),
+  get_runner_run_status = getRunnerRunStatus
+}: RunnerRunPublisherOptions): RunnerRunPublisher {
+  let stopped = false
+  let active: Promise<void> | null = null
   const tick = (): void => {
-    if (active) {
+    if (stopped || active !== null) {
       return
     }
-    active = true
-    void publishRunnerRunsOnce({ app, store })
+    active = publishRunnerRunsOnce({ app, store, get_runner_run_status })
       .catch((error: unknown) => {
         logError('runner_run_publisher_failed', {
           error,
@@ -298,15 +309,22 @@ export function startRunnerRunPublisher ({ app, store = runnerRunStore, interval
         })
       })
       .finally(() => {
-        active = false
+        active = null
       })
   }
 
   const timer = setInterval(tick, intervalMs)
   timer.unref?.()
-  setImmediate(tick)
+  const initialTick = setImmediate(tick)
   logInfo('runner_run_publisher_started', {
     interval_ms: intervalMs
   })
-  return timer
+  return {
+    stop: async () => {
+      stopped = true
+      clearImmediate(initialTick)
+      clearInterval(timer)
+      await active
+    }
+  }
 }
