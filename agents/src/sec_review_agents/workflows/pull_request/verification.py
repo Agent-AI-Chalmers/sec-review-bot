@@ -33,8 +33,9 @@ async def verify_pull_request(
         attempt_label=attempt_label,
     )
     diff_metadata = load_pr_diff_metadata(incremental_window_path)
+    patch_diff = (mitigation_result or {}).get("patch_diff")
     workspace_patch = (
-        str((mitigation_result or {}).get("patch_diff") or "").strip() or None
+        patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
     )
     user_prompt = pr_verification_agent.build_pr_verification_user_prompt(
         pr=pr,

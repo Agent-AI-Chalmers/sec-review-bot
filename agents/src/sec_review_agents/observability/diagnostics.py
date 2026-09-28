@@ -51,7 +51,6 @@ def log_stage_failed(
         duration_ms=duration_ms,
         error_type=error.__class__.__name__,
         error_message=str(error),
-        retryable=False,
         exc_info=error,
         **fields,
     )
@@ -124,6 +123,5 @@ def log_agent_invocation_failed(
         duration_ms=duration_ms,
         error_type=error.__class__.__name__,
         error_message=str(error),
-        retryable=False,
         exc_info=error,
     )

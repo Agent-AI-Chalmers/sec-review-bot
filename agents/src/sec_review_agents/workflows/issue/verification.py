@@ -28,8 +28,10 @@ async def verify_issue(
         verifier_artifacts_path,
         attempt_label=attempt_label,
     )
+    patch_diff = (mitigation_result or {}).get("patch_diff")
+    # you have to pass it originally without stripping, because the patch diff may have leading/trailing whitespace that is significant
     workspace_patch = (
-        str((mitigation_result or {}).get("patch_diff") or "").strip() or None
+        patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
     )
     user_prompt = issue_verification_agent.build_issue_verification_user_prompt(
         issue=issue,
