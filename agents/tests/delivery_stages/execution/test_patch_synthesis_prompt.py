@@ -4,6 +4,7 @@ from sec_review_agents.delivery_stages.execution.patch_synthesis import (
 
 
 def test_reference_patch_is_inlined_without_per_patch_truncation() -> None:
+    """Preserve a full large patch because synthesis has no per-case recovery path."""
     case_id = "case-large"
     patch_text = (
         "diff --git a/large.txt b/large.txt\n"
@@ -30,9 +31,6 @@ def test_reference_patch_is_inlined_without_per_patch_truncation() -> None:
         ],
     )
 
-    assert patch_text.rstrip("\n") in brief
-    assert "available" not in brief
-    assert "path" not in brief
-    assert "truncated" not in brief
-    assert "original_char_count" not in brief
-    assert "reference patch truncated" not in brief
+    reference_patch = brief.split("#### Reference Patch\n\n", 1)[1]
+    expected_patch = patch_text.rstrip("\n")
+    assert reference_patch == f"```diff\n{expected_patch}\n```\n"

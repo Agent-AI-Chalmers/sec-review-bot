@@ -35,39 +35,49 @@ from sec_review_agents.agents.verification.repository import (
     build_repository_verification_filesystem_system_prompt,
     build_repository_verification_system_prompt,
 )
+from sec_review_agents.resources.loader import load_prompt_resource
 from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
 
 
+def _joined_prompt_resources(*paths: str) -> str:
+    return "\n\n".join(load_prompt_resource(path) for path in paths)
+
+
+def test_prompt_resource_loader_normalizes_only_trailing_newlines() -> None:
+    """Keep prompt boundaries stable without stripping Markdown indentation."""
+    resource = load_prompt_resource("memory/maintain-system.md")
+
+    assert not resource.endswith("\n")
+    assert resource.startswith("You maintain")
+
+
 def test_initial_verifier_prompt_uses_initial_delta_only() -> None:
+    """Do not expose retry instructions before a verifier retry exists."""
     prompt = build_issue_verification_system_prompt()
 
-    assert "# Initial Verification Delta" in prompt
-    assert "the strongest repository-grounded claim you can currently support" in prompt
-    assert "`defendedClaim`" not in prompt
-    assert "# Retry Verification Delta" not in prompt
-    assert "`carriedForwardClaim`" not in prompt
+    assert load_prompt_resource("verifier/system-initial-delta.md") in prompt
+    assert load_prompt_resource("verifier/system-retry-delta.md") not in prompt
 
 
 def test_retry_verifier_prompt_uses_retry_delta_only() -> None:
+    """A retry must replace, rather than accumulate, initial-only instructions."""
     prompt = build_issue_verification_system_prompt(is_retry=True)
 
-    assert "# Retry Verification Delta" in prompt
-    assert "the previous verifier's reviewed claim" in prompt
-    assert "the previous blocking concern" in prompt
-    assert "`carriedForwardClaim`" not in prompt
-    assert "`blockingConcern`" not in prompt
-    assert "# Initial Verification Delta" not in prompt
-    assert "`defendedClaim`" not in prompt
+    assert load_prompt_resource("verifier/system-retry-delta.md") in prompt
+    assert load_prompt_resource("verifier/system-initial-delta.md") not in prompt
 
 
 def test_non_verifier_retry_delta_prompt_still_loads_role_retry_delta() -> None:
+    """Keep the retry delta ahead of scope-specific mitigation instructions."""
     prompt = build_issue_mitigation_system_prompt(is_retry=True)
 
-    assert "# Retry Delta" in prompt
-    assert prompt.index("# Retry Delta") < prompt.index("# Issue Scope")
+    retry_delta = load_prompt_resource("mitigator/system-retry-delta.md")
+    scope_delta = load_prompt_resource("scopes/issue/mitigator/system-delta.md")
+    assert prompt.index(retry_delta) < prompt.index(scope_delta)
 
 
 def test_mitigation_retry_profiles_include_retry_delta() -> None:
+    """All mitigation scopes must receive the same retry-only contract."""
     prompts = [
         build_issue_mitigation_system_prompt(is_retry=True),
         build_pr_mitigation_system_prompt(is_retry=True),
@@ -75,10 +85,11 @@ def test_mitigation_retry_profiles_include_retry_delta() -> None:
     ]
 
     for prompt in prompts:
-        assert "# Retry Delta" in prompt
+        assert load_prompt_resource("mitigator/system-retry-delta.md") in prompt
 
 
 def test_initial_mitigation_profiles_do_not_include_retry_delta() -> None:
+    """Initial mitigation runs must not inherit retry-only context."""
     prompts = [
         build_issue_mitigation_system_prompt(),
         build_pr_mitigation_system_prompt(),
@@ -86,10 +97,11 @@ def test_initial_mitigation_profiles_do_not_include_retry_delta() -> None:
     ]
 
     for prompt in prompts:
-        assert "# Retry Delta" not in prompt
+        assert load_prompt_resource("mitigator/system-retry-delta.md") not in prompt
 
 
 def test_mitigation_profiles_include_test_change_boundary() -> None:
+    """Propagate the caller's no-test-changes policy to every mitigation path."""
     prompts = [
         build_issue_mitigation_system_prompt(repair_mode="no-test-changes"),
         build_issue_self_check_mitigation_system_prompt(repair_mode="no-test-changes"),
@@ -98,11 +110,17 @@ def test_mitigation_profiles_include_test_change_boundary() -> None:
     ]
 
     for prompt in prompts:
-        assert "# No-Test-Changes Boundary" in prompt
-        assert "# Test-Changes-Allowed Boundary" not in prompt
+        assert (
+            load_prompt_resource("repair-modes/no-test-changes-boundary.md") in prompt
+        )
+        assert (
+            load_prompt_resource("repair-modes/test-changes-allowed-boundary.md")
+            not in prompt
+        )
 
 
 def test_repair_capable_prompts_include_git_history_boundary() -> None:
+    """Every patch-producing role must receive the shared history boundary."""
     prompts = [
         build_issue_mitigation_system_prompt(),
         build_issue_self_check_mitigation_system_prompt(),
@@ -118,11 +136,14 @@ def test_repair_capable_prompts_include_git_history_boundary() -> None:
     ]
 
     for prompt in prompts:
-        assert "# Git History Remediation Boundary" in prompt
-        assert "do not claim full automatic remediation" in prompt
+        assert (
+            load_prompt_resource("shared/no-git-history-remediation-boundary.md")
+            in prompt
+        )
 
 
 def test_analyzer_and_verifier_prompts_include_advisory_evidence_rule() -> None:
+    """Roles that judge evidence must share the advisory provenance rule."""
     prompts = [
         build_issue_analyzer_system_prompt("audit"),
         build_pr_analyzer_system_prompt(),
@@ -136,13 +157,11 @@ def test_analyzer_and_verifier_prompts_include_advisory_evidence_rule() -> None:
     ]
 
     for prompt in prompts:
-        assert "# Advisory Evidence Rule" in prompt
-        assert "external advisories as external facts" in prompt
-        assert "not automatically local workspace evidence" in prompt
+        assert load_prompt_resource("shared/advisory-evidence-rule.md") in prompt
 
 
-def test_review_agent_prompts_define_inline_code_for_prose_fields() -> None:
-    """Public review prose should use the Markdown contract preserved by renderers."""
+def test_review_agent_prompts_end_with_output_formatting() -> None:
+    """Keep formatting last so later role or scope deltas cannot supersede it."""
     prompts = [
         build_issue_analyzer_system_prompt("audit"),
         build_pr_analyzer_system_prompt(),
@@ -161,54 +180,33 @@ def test_review_agent_prompts_define_inline_code_for_prose_fields() -> None:
     ]
 
     for prompt in prompts:
-        assert "## Output Formatting" in prompt
-        assert "Prose fields support Markdown inline code" in prompt
-        assert "Wrap repository paths, symbols, commands" in prompt
-        assert "do not emit raw HTML" in prompt
-        assert "scan every prose field once" in prompt
-        assert "Before returning structured output" in prompt
-        assert prompt.rstrip().endswith(
-            "each repository path, symbol, command, field name, and literal enum "
-            "value is wrapped in inline code."
-        )
-
-
-def test_analyzer_prompts_treat_existing_mitigation_as_coverage_not_verdict() -> None:
-    prompts = [
-        build_issue_analyzer_system_prompt("audit"),
-        build_pr_analyzer_system_prompt(),
-        build_repository_analyzer_system_prompt(),
-    ]
-
-    for prompt in prompts:
-        assert "investigated signal as a serious current-code hypothesis" in prompt
-        assert "narrow or reject it only when checked repository evidence" in prompt
-        assert (
-            "Do not reject an investigated signal only because current code" in prompt
-        )
-        assert "When you find such an existing mitigation" in prompt
-        assert "the mitigation may be partial" in prompt
-        assert "may make the older mitigation insufficient" in prompt
-        assert "what reachable asset or operation it controls" in prompt
-        assert "what it does not prove" in prompt
+        formatting = load_prompt_resource("shared/output-formatting.md")
+        assert prompt.endswith(formatting)
+        assert prompt.count(formatting) == 1
 
 
 def test_filesystem_prompts_bound_git_exploration() -> None:
-    prompts = [
-        build_issue_analyzer_filesystem_system_prompt(),
-        build_issue_single_agent_filesystem_system_prompt(),
-        build_issue_verification_filesystem_system_prompt(),
+    """Compose each filesystem prompt from its role core and issue delta."""
+    prompt_resources = [
+        (
+            build_issue_analyzer_filesystem_system_prompt(),
+            "analyzer/filesystem-system-core.md",
+            "scopes/issue/analyzer/filesystem-system-delta.md",
+        ),
+        (
+            build_issue_single_agent_filesystem_system_prompt(),
+            "single-agent/filesystem-system-core.md",
+            "scopes/issue/single-agent/filesystem-system-delta.md",
+        ),
+        (
+            build_issue_verification_filesystem_system_prompt(),
+            "verifier/filesystem-system-core.md",
+            "scopes/issue/verifier/filesystem-system-delta.md",
+        ),
     ]
 
-    for prompt in prompts:
-        assert "## Git Metadata" in prompt
-        assert "use at most 5 git commands" not in prompt
-        assert "Treat git usage as scarce" not in prompt
-        assert "Do not spend git commands just because `.git` is present" in prompt
-        assert "A git history command is exceptional" in prompt
-        assert "Do not use broad history exploration commands" in prompt
-        assert "Do not mutate the source working tree" in prompt
-        assert "A CVE, advisory, or fixed commit ref alone is not enough" in prompt
+    for prompt, core_path, delta_path in prompt_resources:
+        assert prompt == _joined_prompt_resources(core_path, delta_path)
 
 
 def test_repository_incremental_evidence_prompt_is_incremental_only() -> None:

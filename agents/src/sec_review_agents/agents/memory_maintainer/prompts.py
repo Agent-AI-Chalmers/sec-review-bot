@@ -3,9 +3,7 @@ from sec_review_agents.agents.memory_maintainer.model import (
 )
 from sec_review_agents.resources.loader import load_prompt_resource
 
-MEMORY_MAINTAINER_SYSTEM_PROMPT = load_prompt_resource(
-    "memory/maintain-system.md"
-).strip()
+MEMORY_MAINTAINER_SYSTEM_PROMPT = load_prompt_resource("memory/maintain-system.md")
 
 
 def build_maintenance_prompt(

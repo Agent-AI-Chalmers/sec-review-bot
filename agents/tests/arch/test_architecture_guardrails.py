@@ -78,19 +78,8 @@ def test_review_record_does_not_own_domain_specific_builders() -> None:
     assert [token for token in forbidden_tokens if token in record_source] == []
 
 
-def test_review_stages_package_declares_components_loop_and_single_agent_core() -> None:
-    init_source = (PACKAGE_ROOT / "review_stages" / "__init__.py").read_text(
-        encoding="utf-8"
-    )
-
-    assert "stage components" in init_source
-    assert "feedback loop" in init_source
-    assert "single-agent fix strategies" in init_source
-    assert "default staged wrapper" not in init_source
-    assert "review_stages.workflow" not in init_source
-
-
 def test_issue_and_pull_request_workflows_are_temporal_entrypoints() -> None:
+    """Keep orchestration in domain workflows without reviving the old wrapper."""
     assert not (PACKAGE_ROOT / "review_stages" / "workflow.py").exists()
     workflow_paths = [
         PACKAGE_ROOT / "workflows" / "issue" / "workflow.py",
@@ -175,6 +164,7 @@ def test_local_cli_entrypoints_do_not_patch_import_paths() -> None:
 
 
 def test_run_local_issue_owns_local_issue_cli_flow() -> None:
+    """Keep the executable CLI flow visible in its entrypoint, not a hidden shim."""
     violations: list[str] = []
     path = PACKAGE_ROOT / "cli" / "run_local_issue.py"
     source = path.read_text(encoding="utf-8")
@@ -198,6 +188,7 @@ def test_run_local_issue_owns_local_issue_cli_flow() -> None:
 
 
 def test_delivery_planning_agent_does_not_build_stage_result_contracts() -> None:
+    """Keep model invocation separate from delivery-stage result projection."""
     agent_path = PACKAGE_ROOT / "agents" / "delivery_planning" / "agent.py"
     source = agent_path.read_text(encoding="utf-8")
     violations = import_violations(
@@ -211,6 +202,7 @@ def test_delivery_planning_agent_does_not_build_stage_result_contracts() -> None
 
 
 def test_delivery_result_builder_accepts_keep_case_ids() -> None:
+    """Keep the result builder independent of workflow artifacts and agent models."""
     from sec_review_agents.delivery_stages.result import (
         build_delivery_result_from_outcomes,
     )

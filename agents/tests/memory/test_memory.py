@@ -11,14 +11,8 @@ from langchain.agents.middleware.types import ModelRequest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 
 from sec_review_agents.agents.memory_extractor.model import StagedTranscripts
-from sec_review_agents.agents.memory_extractor.prompts import (
-    MEMORY_EXTRACTOR_SYSTEM_PROMPT,
-    build_extractor_prompt,
-)
-from sec_review_agents.agents.memory_maintainer.prompts import (
-    MEMORY_MAINTAINER_SYSTEM_PROMPT,
-    build_maintenance_prompt,
-)
+from sec_review_agents.agents.memory_extractor.prompts import build_extractor_prompt
+from sec_review_agents.agents.memory_maintainer.prompts import build_maintenance_prompt
 from sec_review_agents.agents.memory_maintainer.tools import (
     build_memory_delete_file_tool,
 )
@@ -224,45 +218,8 @@ def test_stage_review_transcripts_writes_ordered_thread_prompt(tmp_path: Path) -
     assert "/transcripts/MANIFEST.md" not in prompt
 
 
-def test_extractor_prompt_rejects_one_off_provenance_details() -> None:
-    """The extractor should publish standalone lessons rather than run summaries."""
-    system_prompt = MEMORY_EXTRACTOR_SYSTEM_PROMPT
-
-    assert "durable pattern level" in system_prompt
-    assert "one-run identifiers" in system_prompt
-    assert "copied source code" in system_prompt
-    assert "sensitive values" in system_prompt
-    assert "contamination check" in system_prompt
-    assert "one reusable decision per observation" in system_prompt
-    assert "does not know the source repository" in system_prompt
-    assert "internal class or function names" in system_prompt
-    assert "worked as intended, return no observation" in system_prompt
-    assert "general limitations of language models" in system_prompt
-    assert "agent's existing review guidance" in system_prompt
-    assert "adds to or materially refines that guidance" in system_prompt
-    assert "merely because it is absent from the system prompt" in system_prompt
-    assert "most likely to improve a future reviewer's decision" in system_prompt
-    assert "corrects an assumption" in system_prompt
-    assert "do not propose where the observation should be stored" in system_prompt
-    assert "one short paragraph" in system_prompt
-    assert "Omit incidental invocation details" in system_prompt
-    assert "boundary on the claim, not as run provenance" in system_prompt
-    assert "Example - produce an observation" in system_prompt
-    assert "This qualifies because" in system_prompt
-    assert "Counterexample - return no observation" in system_prompt
-    assert "GNU coreutils 9.4" in system_prompt
-
-
-def test_maintenance_prompt_keeps_index_short_and_topics_substantive() -> None:
-    system_prompt = MEMORY_MAINTAINER_SYSTEM_PROMPT
-
-    assert "startup-injected memory index" in system_prompt
-    assert "Keep it short, dense, and route-oriented" in system_prompt
-    assert "substantive rules, patterns, cautions, and examples" in system_prompt
-    assert "/memory/topics/*.md" in system_prompt
-
-
 def test_transcript_extraction_prompt_extracts_observation_only() -> None:
+    """Keep output-schema internals out of the extractor's task message."""
     staged = StagedTranscripts(entries=[])
     user_prompt = build_extractor_prompt(staged)
 
@@ -275,34 +232,12 @@ def test_transcript_extraction_prompt_extracts_observation_only() -> None:
     assert "prompt snapshots" not in user_prompt
 
 
-def test_extractor_prompt_reads_middleware_injected_context() -> None:
-    """The extractor should separate supplied prompts from lessons learned in-run."""
-    system_prompt = MEMORY_EXTRACTOR_SYSTEM_PROMPT
-
-    assert "Each transcript starts with the system prompt" in system_prompt
-    assert "treat that prompt as the agent's existing review guidance" in system_prompt
-    assert "beyond the supplied guidance" in system_prompt
-    assert "prompt, memory, or skill" not in system_prompt
-
-
-def test_memory_maintenance_prompt_does_not_learn_new_facts() -> None:
-    maintenance_system_prompt = MEMORY_MAINTAINER_SYSTEM_PROMPT
+def test_memory_maintenance_prompt_handles_an_empty_selection() -> None:
+    """Tell maintenance not to invent work when no observations were selected."""
     maintenance_user_prompt = build_maintenance_prompt([])
 
-    assert "No raw transcripts" in maintenance_system_prompt
-    assert "Do not create new security-review lessons" in maintenance_system_prompt
-    assert (
-        "Only reorganize, compress, merge, split, rename, or clarify"
-        in maintenance_system_prompt
-    )
-    assert "selected observation files" in maintenance_system_prompt
-    assert (
-        "incorporate durable lessons from selected observation files"
-        in maintenance_system_prompt
-    )
-    assert "Be more willing to compress than to preserve" in maintenance_system_prompt
-    assert "delete_file" not in maintenance_system_prompt
     assert "Selected Observations" in maintenance_user_prompt
+    assert "No pending observations were selected" in maintenance_user_prompt
     assert "leave memory unchanged" in maintenance_user_prompt
 
 
@@ -598,6 +533,7 @@ def test_materialize_configured_memory_view_locks_source_during_snapshot(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    """Prevent maintenance writes from producing a torn runtime snapshot."""
     memory_root = tmp_path / "source-memory"
     (_memory_content_dir(memory_root) / "topics").mkdir(parents=True)
     (_memory_content_dir(memory_root) / "MEMORY.md").write_text(
@@ -1012,6 +948,7 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
 async def test_extract_memory_observations_skips_publish_when_observation_processed_during_run(
     tmp_path: Path,
 ) -> None:
+    """Do not republish work that another maintainer consumed during extraction."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
     transcript = (
@@ -1128,6 +1065,7 @@ async def test_maintain_memory_marks_observations_processed(tmp_path: Path) -> N
 async def test_maintain_memory_does_not_process_rewritten_observation(
     tmp_path: Path,
 ) -> None:
+    """Leave a concurrently rewritten observation pending for a later maintenance run."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
     observation = _memory_observations_dir(memory_root) / "same-run.md"
@@ -1320,6 +1258,7 @@ async def test_maintain_memory_no_pending_summary_warns_when_index_exceeds_start
 async def test_maintain_memory_releases_source_lock_while_agent_runs(
     tmp_path: Path,
 ) -> None:
+    """Avoid blocking memory readers and writers during the slow model call."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
     observation = _memory_observations_dir(memory_root) / "issue-review-run-1.md"
@@ -1368,6 +1307,7 @@ async def test_maintain_memory_releases_source_lock_while_agent_runs(
 async def test_maintenance_singleton_lock_waits_without_blocking_event_loop(
     tmp_path: Path,
 ) -> None:
+    """Serialize maintainers without stalling unrelated asynchronous work."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
     lock_path = memory_root / memory_maintenance.MEMORY_MAINTENANCE_LOCK_FILENAME

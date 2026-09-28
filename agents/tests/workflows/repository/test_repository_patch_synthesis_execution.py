@@ -1261,7 +1261,6 @@ class TestRepositoryDeliveryExecution:
             "\n```", 1
         )[0]
         assert not first_patch_block.endswith("\n")
-        assert "available" not in patch_synthesis_brief
         assert "- Source artifact:" not in patch_synthesis_brief
         assert "- Verifier coverage:" not in patch_synthesis_brief
         assert "- Analyzer verdict:" not in patch_synthesis_brief
@@ -1556,6 +1555,7 @@ class TestRepositoryDeliveryExecution:
     async def test_combined_delivery_patch_failure_does_not_block_other_deliveries(
         self,
     ) -> None:
+        """Keep independent planned deliveries publishable after a sibling fails."""
         self._write_workspace(
             {
                 "src/a.txt": "alpha\n",
@@ -1643,6 +1643,7 @@ class TestRepositoryDeliveryExecution:
     async def test_direct_combined_deliveries_use_baseline_snapshot(
         self,
     ) -> None:
+        """Prevent one combined delivery from becoming the next delivery's baseline."""
         self._write_workspace(
             {
                 "src/a.txt": "alpha\n",

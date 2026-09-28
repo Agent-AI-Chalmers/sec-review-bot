@@ -52,6 +52,10 @@ Keep patches small and close to the existing ownership boundary. Do not generate
 
 Tests use pytest style: prefer function tests, fixtures, plain `assert`, and `pytest.raises`; `unittest.mock` helpers such as `Mock`, `AsyncMock`, and `patch` are fine when they keep the test direct.
 
+Test behavior and ownership boundaries rather than implementation wording. For composed prompts, prefer asserting that the intended complete resource is selected, omitted, or ordered correctly; do not pin individual sentences merely to prove that guidance exists. Exact text assertions are appropriate only when the text is itself a stable external contract.
+
+Add a test docstring when the protected policy, regression risk, or reason for an otherwise surprising case is not clear from the test name and assertions. Explain why the behavior matters or what regression the test prevents. Do not add docstrings mechanically to obvious tests, and do not use a docstring that only restates the test name.
+
 Python targets 3.14. Do not add `from __future__ import annotations`; PEP 649 gives 3.14 lazy annotations, and postponed annotations can still confuse runtime metadata such as `TypedDict.__required_keys__`. See [PEP 649](https://peps.python.org/pep-0649/).
 
 Follow [PEP 585](https://peps.python.org/pep-0585/) type style: prefer built-in generics such as `list[str]`/`dict[str, int]`, and import ABC generics such as `Callable`, `Iterable`, `Mapping`, and `Sequence` from `collections.abc`; keep typing-only constructs in `typing`.
