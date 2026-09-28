@@ -619,10 +619,26 @@ def _normalize_candidate(
 # ====================== Chunked LLM Scan Execution ======================
 #########################################################################
 def discovery_chunk_target_tokens() -> int:
-    return max(
-        1,
-        resolve_bound_deployment_max_input_tokens("repository-discovery") // 2,
+    # Limit the initial repository payload to 20% of the model input window.
+    # The remaining context absorbs tokenizer error, runtime-added schemas and
+    # skill guidance, tool turns, and the attention loss seen in very long inputs.
+    target_tokens = (
+        resolve_bound_deployment_max_input_tokens("repository-discovery") // 5
     )
+    system_prompt_tokens = count_tokens_approximately(
+        [
+            {
+                "role": "system",
+                "content": build_repository_discovery_system_prompt(),
+            }
+        ]
+    )
+    if target_tokens <= system_prompt_tokens:
+        raise ValueError(
+            "Repository discovery requires 20% of the selected deployment input "
+            "limit to exceed the discovery system prompt size."
+        )
+    return target_tokens
 
 
 def _estimate_discovery_prompt_tokens(

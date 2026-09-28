@@ -232,15 +232,27 @@ async def test_scan_chunk_uses_current_trace_context(tmp_path: Path) -> None:
     assert result["file_results"][0]["candidate_count"] == 0
 
 
-def test_discovery_chunk_token_budget_uses_half_deployment_context() -> None:
+def test_discovery_chunk_token_budget_uses_one_fifth_deployment_context() -> None:
     with patch(
         "sec_review_agents.scan_stages.discovery.stage.resolve_bound_deployment_max_input_tokens",
         return_value=200_001,
     ) as resolve_limit:
         target_tokens = discovery_stage.discovery_chunk_target_tokens()
 
-    assert target_tokens == 100_000
+    assert target_tokens == 40_000
     resolve_limit.assert_called_once_with("repository-discovery")
+
+
+def test_discovery_chunk_token_budget_rejects_limit_below_system_prompt() -> None:
+    """Reject a deployment limit that would silently skip every source file."""
+    with (
+        patch(
+            "sec_review_agents.scan_stages.discovery.stage.resolve_bound_deployment_max_input_tokens",
+            return_value=10,
+        ),
+        pytest.raises(ValueError, match="exceed the discovery system prompt size"),
+    ):
+        discovery_stage.discovery_chunk_target_tokens()
 
 
 def test_discovery_chunk_packing_stops_before_target_overflow(tmp_path: Path) -> None:
