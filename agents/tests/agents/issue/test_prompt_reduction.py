@@ -16,6 +16,7 @@ WORKSPACE_PATCH = "diff --git a/a.py b/a.py"
 
 
 def test_repair_prompt_uses_all_analysis_narratives_as_context() -> None:
+    """Keep mitigation context complete, including entries with unexpected shapes."""
     prompt = build_issue_mitigation_user_prompt(
         issue={"title": "Issue title", "body": "Issue body"},
         retry_context=None,
@@ -38,6 +39,7 @@ def test_repair_prompt_uses_all_analysis_narratives_as_context() -> None:
 
 
 def test_self_check_prompt_uses_repair_narratives_context() -> None:
+    """Give the self-check pass the same candidate narrative it must reassess."""
     prompt = build_issue_self_check_mitigation_user_prompt(
         issue={
             "title": "Issue title",
@@ -60,6 +62,7 @@ def test_self_check_prompt_uses_repair_narratives_context() -> None:
 
 
 def test_initial_verification_prompt_omits_narratives_section() -> None:
+    """Keep verification focused on rendered analysis and mitigation evidence."""
     input_data = {
         "issue": {
             "title": "SSRF issue",
@@ -104,6 +107,7 @@ def test_initial_verification_prompt_omits_narratives_section() -> None:
 
 
 def test_retry_verifier_feedback_keeps_only_lightweight_fields() -> None:
+    """Pass corrective verifier fields forward without replaying the full result."""
     input_data = {
         "retry_context": {
             "retry_index": 1,
@@ -139,6 +143,7 @@ def test_retry_verifier_feedback_keeps_only_lightweight_fields() -> None:
 
 
 def test_retry_issue_verification_prompt_inlines_original_issue_text() -> None:
+    """Keep retry verification anchored to the original issue and ordered fields."""
     prompt = build_issue_verification_user_prompt(
         issue={
             "title": "Original issue title",
@@ -181,6 +186,7 @@ def test_retry_issue_verification_prompt_inlines_original_issue_text() -> None:
 
 
 def test_retry_issue_verification_prompt_renders_history_without_json_block() -> None:
+    """Render retry history as readable evidence rather than opaque JSON."""
     prompt = build_issue_verification_user_prompt(
         issue={
             "title": "Original issue title",
@@ -210,6 +216,7 @@ def test_retry_issue_verification_prompt_renders_history_without_json_block() ->
 
 
 def test_retry_pr_verification_prompt_inlines_original_pr_text() -> None:
+    """Keep pull-request retries grounded in the original proposal text."""
     prompt = build_pr_verification_user_prompt(
         pr={
             "title": "Original PR title",
@@ -242,6 +249,7 @@ def test_retry_pr_verification_prompt_inlines_original_pr_text() -> None:
 
 
 def test_initial_pr_verification_prompt_omits_narratives_section() -> None:
+    """Avoid duplicating analyzer narratives when verifier summaries are sufficient."""
     prompt = build_pr_verification_user_prompt(
         pr={
             "title": "Original PR title",
@@ -276,6 +284,7 @@ def test_initial_pr_verification_prompt_omits_narratives_section() -> None:
 
 
 def test_retry_mitigation_prompt_keeps_verifier_as_primary_corrective_signal() -> None:
+    """Make verifier findings the actionable retry signal while retaining context."""
     input_data = {
         "issue": {
             "title": "Issue title",
