@@ -6,17 +6,32 @@ Useful observations include security-review process lessons, evidence requiremen
 
 Transcripts are source material, not memory. New transcripts may produce observations for later memory maintenance, not instructions to append.
 
-Treat extraction as observation extraction, not append-only logging. Return an observation only when transcripts expose durable experience likely to improve future security reviews.
+Treat extraction as observation extraction, not append-only logging. Each transcript starts with the system prompt shown to the agent; treat that prompt as the agent's existing review guidance. Extract only durable, reusable experience that adds to or materially refines that guidance. A detail is not worth extracting merely because it is absent from the system prompt: repository-local facts, one-run results, unsupported speculation, and details that would not improve a future reviewer's judgment are not memory.
 
-When multiple review threads are listed, inspect them independently. Do not combine evidence from different threads as if it proved one finding.
+A successful run is not automatically a learning event. If the transcripts only confirm that the supplied instructions, checks, or control boundaries worked as intended, return no observation. An observation is warranted when the run corrects an assumption, narrows an overbroad rule, establishes behavior that was previously uncertain, or otherwise changes how a future reviewer should apply the existing guidance.
 
-Use transcript context, including prompt snapshots and model-call messages, to distinguish existing task instructions from lessons that emerged during the run. Do not re-extract content that appears only because it was supplied in prompt snapshots or prior context unless the run shows it was wrong, ambiguous, stale, or operationally incomplete.
+Write at the durable pattern level: one reusable decision per observation, not a summary of the run. If a thread exposes several unrelated lessons, keep the one most likely to improve a future reviewer's decision beyond the supplied guidance. The observation must make sense to a reviewer who does not know the source repository:
 
-Write at the durable pattern level. The observation should be short and dense:
+- describe the situation in which the lesson applies;
+- state the check or decision a future reviewer should make;
+- explain the consequence that makes the decision matter;
+- note uncertainty or conflicting evidence when it changes that decision;
+- do not propose where the observation should be stored.
 
-- state the reusable lesson;
-- describe the review situation that supports it;
-- note uncertainty or conflicts when the transcript evidence is mixed;
-- avoid proposing exact topic placement unless it is obvious.
+Keep the observation to one short paragraph. Include only the situation, decision, and consequence needed to apply the lesson. Add concrete behavior or a version boundary only when it changes that decision.
+
+Write the lesson so that it can be understood without knowing the source repository. Describe components by what they do, such as "the validator that checks the model response" or "the gate that decides whether the patch can be delivered," instead of using internal class or function names. Keep an exact name only when that name is necessary to apply the lesson, such as a public API, protocol field, or schema value. Keep the observation focused on one lesson. Omit unrelated policy choices, general limitations of language models, and separate risks. Record one of them separately only if it independently provides durable, reusable review experience.
+
+Keep exact commands, flags, versions, and API names only when the transcript supports them and they are needed to state the reusable behavior precisely. Omit incidental invocation details. When behavior may vary by version, state the version for which the transcript establishes it; treat that version as a boundary on the claim, not as run provenance.
+
+Use these examples to calibrate the decision and level of detail.
+
+Example - produce an observation: the review begins with a general warning not to assume filesystem-command behavior. During the run, a focused check with GNU coreutils 9.4 establishes that `install -m 0600 source destination` replaces a destination symlink with a regular file, while `cp source destination` follows the symlink and writes to its target. This qualifies because the run establishes behavior that was previously uncertain and changes how a future reviewer should apply the existing warning.
+
+Observation:
+
+> When a patch replaces an explicit symlink guard with a filesystem command, verify that command's destination-symlink behavior instead of generalizing from similar commands. In a focused check with GNU coreutils 9.4, `install -m 0600 source destination` replaced a destination symlink with a regular file, while `cp source destination` followed the symlink and wrote to its target. Treating those commands as interchangeable would reverse the security conclusion.
+
+Counterexample - return no observation: the run traces a response validator and the later delivery gate and confirms that both already reject the unsafe state exactly as the supplied instructions require. The transcript also mentions a project policy choice and the general possibility that a model could report incorrect facts, but neither point was newly established or made more precise by the run. Return no observation rather than restating the supplied rule or combining the incidental points.
 
 Before finishing, review your observation once as a contamination check. Avoid preserving one-run identifiers, artifact paths, stage-local provenance, repository-specific names, private information, credentials, copied source code, or sensitive values unless the exact spelling is itself the reusable API, framework behavior, or vulnerability pattern. Keep exact names for real APIs, libraries, protocol fields, schema values, and security concepts where generic wording would make the lesson less precise.
