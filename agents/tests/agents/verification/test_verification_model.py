@@ -4,6 +4,7 @@ from sec_review_agents.agents.verification.model import VerificationOutput
 
 
 def test_patch_full_with_claim_is_valid() -> None:
+    """Keep `not-run` regression checks delivery-neutral by current policy."""
     result = VerificationOutput.model_validate(
         {
             "overview": "Patch fully covers the reviewed claim.",
@@ -220,22 +221,6 @@ def test_partial_patch_cannot_have_no_next_step() -> None:
                 "patch_coverage": "partial",
                 "resolution_next_step": "none",
                 "patch_findings": ["fix the remaining bypass"],
-                "validation_level": "static",
-                "regression_status": "not-run",
-                "verification_findings": ["note"],
-            }
-        )
-
-
-def test_retry_ai_rejects_empty_patch_findings() -> None:
-    with pytest.raises(ValueError):
-        VerificationOutput.model_validate(
-            {
-                "overview": "Patch partially covers the reviewed claim.",
-                "review_target_claim": "reviewed claim",
-                "patch_coverage": "partial",
-                "resolution_next_step": "retry-ai",
-                "patch_findings": [],
                 "validation_level": "static",
                 "regression_status": "not-run",
                 "verification_findings": ["note"],

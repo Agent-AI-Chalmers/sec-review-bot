@@ -740,8 +740,10 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ) == "diff --git a/src/a.ts b/src/a.ts\n"
             assert not (patch_root / "case-2.patch").exists()
 
-    def test_case_disposition_reason_is_deterministic(self) -> None:
-        """Keep a fully cleared verifier result eligible for delivery."""
+    def test_case_disposition_allows_full_coverage_without_regression_run(
+        self,
+    ) -> None:
+        """Keep `not-run` delivery-neutral unless project policy changes."""
         analyzer_result = {
             "verdict": "confirmed-vulnerability",
         }
