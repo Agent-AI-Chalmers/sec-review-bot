@@ -320,21 +320,21 @@ class PullRequestReviewWorkflow:
             verifier_result,
             timeout_seconds=request.timeout_seconds,
         )
-        await register_memory_extraction(
-            MemoryExtractionRegistrationRequest(
-                job_id=f"{request.workflow}-{request.run_id}",
-                source_workflow=request.workflow,
-                run_id=request.run_id,
-                artifact_root_path=str(
-                    required_path(
-                        request.prepared_input.get("artifact_root_path"),
-                        label="artifact_root_path",
-                    )
-                ),
-                timeout_seconds=request.timeout_seconds,
-            ),
-            enabled=request.memory_extraction_registration_enabled,
-        )
+        if request.memory_extraction_registration_enabled:
+            await register_memory_extraction(
+                MemoryExtractionRegistrationRequest(
+                    job_id=f"{request.workflow}-{request.run_id}",
+                    source_workflow=request.workflow,
+                    run_id=request.run_id,
+                    artifact_root_path=str(
+                        required_path(
+                            request.prepared_input.get("artifact_root_path"),
+                            label="artifact_root_path",
+                        )
+                    ),
+                    timeout_seconds=request.timeout_seconds,
+                )
+            )
         return {"ok": True, "result": result}
 
 

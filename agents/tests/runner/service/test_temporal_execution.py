@@ -7,6 +7,9 @@ from temporalio.client import WorkflowExecutionStatus
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
+from sec_review_agents.memory.extraction_workflow import (
+    MemoryExtractionRegistrationRequest,
+)
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.runner.service.temporal_execution import (
     TemporalRunnerExecutionBackend,
@@ -105,6 +108,7 @@ def fake_prepare_runner_run(request: RunnerExecutionRequest) -> dict:
         "run_id": request.run_id,
         "prepared_input": {
             "workflow": request.workflow,
+            "artifact_root_path": "/tmp/runner-service-test-artifacts",
         },
         "runtime_context": {},
         "timeout_seconds": request.timeout_seconds,
@@ -185,6 +189,13 @@ def fake_build_pull_request_review_result(
 @activity.defn(name="prepare_internal_workflow_activity")
 def fake_prepare_internal_workflow(_workflow_name: str, _run_id: str) -> None:
     return None
+
+
+@activity.defn(name="register_memory_extraction_job_activity")
+def fake_register_memory_extraction_job(
+    _request: MemoryExtractionRegistrationRequest,
+) -> dict:
+    return {"ok": True}
 
 
 @activity.defn(name="build_issue_two_stage_result_activity")
@@ -824,6 +835,7 @@ async def _run_temporal_backend_test(
                 activities=[
                     fake_prepare_runner_run,
                     fake_prepare_internal_workflow,
+                    fake_register_memory_extraction_job,
                     fake_analyze_issue,
                     fake_mitigate_issue,
                     fake_verify_issue,

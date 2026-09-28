@@ -89,7 +89,7 @@ def _memory_observations_dir(memory_store_dir: Path) -> Path:
     return memory_store.memory_observations_dir(memory_store_dir)
 
 
-def test_stage_transcripts_copies_json_under_thread_dir(tmp_path: Path) -> None:
+def test_stage_transcripts_copies_ordered_json_files(tmp_path: Path) -> None:
     source = tmp_path / "run" / "transcript.json"
     source.parent.mkdir()
     source.write_text(
@@ -110,24 +110,21 @@ def test_stage_transcripts_copies_json_under_thread_dir(tmp_path: Path) -> None:
 
     assert staged.entries == [
         (
-            "0001-review",
             "transcript",
-            Path("/transcripts/0001-review/0001-transcript.json"),
+            Path("/transcripts/0001-transcript.json"),
         )
     ]
-    assert (destination / "0001-review" / "0001-transcript.json").read_text(
-        encoding="utf-8"
-    ) == ('[{"index":0,"type":"ai","content":"message"}]\n')
+    assert (destination / "0001-transcript.json").read_text(encoding="utf-8") == (
+        '[{"index":0,"type":"ai","content":"message"}]\n'
+    )
     assert not (destination / "MANIFEST.md").exists()
 
 
-def test_collect_review_memory_transcripts_uses_published_threads(
+def test_collect_review_memory_transcripts_uses_flat_published_files(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    published = (
-        review_root / "transcripts" / "0001-review" / "0001-analyzer-initial.json"
-    )
+    published = review_root / "transcripts" / "0001-analyzer-initial.json"
     unrelated = review_root / "notes" / "scratch.json"
     published.parent.mkdir(parents=True)
     unrelated.parent.mkdir(parents=True)
@@ -140,9 +137,8 @@ def test_collect_review_memory_transcripts_uses_published_threads(
 
     refs = memory_extraction.collect_review_memory_transcripts(review_root)
 
-    assert [(ref.thread, ref.stage, ref.attempt, ref.path) for ref in refs] == [
+    assert [(ref.stage, ref.attempt, ref.path) for ref in refs] == [
         (
-            "0001-review",
             "analyzer",
             "initial",
             published.resolve(),
@@ -154,7 +150,7 @@ def test_collect_review_memory_transcripts_rejects_invalid_published_name(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    transcript = review_root / "transcripts" / "0001-review" / "analyzer.json"
+    transcript = review_root / "transcripts" / "analyzer.json"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -164,7 +160,7 @@ def test_collect_review_memory_transcripts_rejects_invalid_published_name(
         memory_extraction.collect_review_memory_transcripts(review_root)
 
 
-def test_stage_review_transcripts_writes_ordered_thread_prompt(tmp_path: Path) -> None:
+def test_stage_review_transcripts_writes_ordered_prompt(tmp_path: Path) -> None:
     sources = []
     for label in ("analyzer", "mitigator", "verifier"):
         path = tmp_path / f"{label}.json"
@@ -184,35 +180,22 @@ def test_stage_review_transcripts_writes_ordered_thread_prompt(tmp_path: Path) -
 
     assert staged.entries == [
         (
-            "0001-review",
             "analyzer initial",
-            Path("/transcripts/0001-review/0001-analyzer-initial.json"),
+            Path("/transcripts/0001-analyzer-initial.json"),
         ),
         (
-            "0001-review",
             "mitigator initial",
-            Path("/transcripts/0001-review/0002-mitigator-initial.json"),
+            Path("/transcripts/0002-mitigator-initial.json"),
         ),
         (
-            "0001-review",
             "verifier initial",
-            Path("/transcripts/0001-review/0003-verifier-initial.json"),
+            Path("/transcripts/0003-verifier-initial.json"),
         ),
     ]
     prompt = build_extractor_prompt(staged)
-    assert "- Thread `0001-review`" in prompt
-    assert (
-        "analyzer initial: `/transcripts/0001-review/0001-analyzer-initial.json`"
-        in prompt
-    )
-    assert (
-        "mitigator initial: `/transcripts/0001-review/0002-mitigator-initial.json`"
-        in prompt
-    )
-    assert (
-        "verifier initial: `/transcripts/0001-review/0003-verifier-initial.json`"
-        in prompt
-    )
+    assert "analyzer initial: `/transcripts/0001-analyzer-initial.json`" in prompt
+    assert "mitigator initial: `/transcripts/0002-mitigator-initial.json`" in prompt
+    assert "verifier initial: `/transcripts/0003-verifier-initial.json`" in prompt
     assert str(tmp_path) not in prompt
     assert "source:" not in prompt
     assert "/transcripts/MANIFEST.md" not in prompt
@@ -658,13 +641,7 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = (
-        tmp_path
-        / "review"
-        / "transcripts"
-        / "0001-review"
-        / "0001-analyzer-initial.json"
-    )
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -683,12 +660,12 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
         ) as run_agent,
     ):
         result = await memory_extraction.extract_memory_observations_from_paths(
-            [transcript.parent.parent.parent],
+            [transcript.parent.parent],
             memory_store_dir=memory_root,
             deployment="test-deployment",
             source_workflow="issue-review",
             run_id="run-1",
-            artifact_root_path=transcript.parent.parent.parent,
+            artifact_root_path=transcript.parent.parent,
         )
 
     run_agent.assert_called_once()
@@ -704,7 +681,6 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
     assert "- Source workflow: `issue-review`" in observation_text
     assert "- Run id: `run-1`" in observation_text
     assert "- Artifact root name: `review`" in observation_text
-    assert "- Thread: `0001-review`" in observation_text
     assert "- Stages: analyzer initial" in observation_text
     assert str(transcript.resolve()) not in observation_text
     assert "## Source" not in observation_text
@@ -724,13 +700,7 @@ async def test_extract_memory_observations_repeated_id_updates_pending_row(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = (
-        tmp_path
-        / "review"
-        / "transcripts"
-        / "0001-review"
-        / "0001-analyzer-initial.json"
-    )
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -748,12 +718,12 @@ async def test_extract_memory_observations_repeated_id_updates_pending_row(
         ),
     ):
         first = await memory_extraction.extract_memory_observations_from_paths(
-            [transcript.parent.parent.parent],
+            [transcript.parent.parent],
             memory_store_dir=memory_root,
             observation_id_value="same-run",
         )
         second = await memory_extraction.extract_memory_observations_from_paths(
-            [transcript.parent.parent.parent],
+            [transcript.parent.parent],
             memory_store_dir=memory_root,
             observation_id_value="same-run",
         )
@@ -778,13 +748,7 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = (
-        tmp_path
-        / "review"
-        / "transcripts"
-        / "0001-review"
-        / "0001-analyzer-initial.json"
-    )
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -801,7 +765,7 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
         ),
     ):
         result = await memory_extraction.extract_memory_observations_from_paths(
-            [transcript.parent.parent.parent],
+            [transcript.parent.parent],
             memory_store_dir=memory_root,
             observation_id_value="../Unsafe/Observation ID",
         )
@@ -823,85 +787,12 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
 
 
 @pytest.mark.asyncio
-async def test_extract_memory_observations_runs_once_per_published_thread(
-    tmp_path: Path,
-) -> None:
-    memory_root = tmp_path / "memory"
-    memory_store.initialize_memory_store(memory_root)
-    artifacts = tmp_path / "review"
-    first = artifacts / "transcripts" / "0001-case-alpha" / "0001-analyzer-initial.json"
-    second = artifacts / "transcripts" / "0002-case-beta" / "0001-analyzer-initial.json"
-    first.parent.mkdir(parents=True)
-    second.parent.mkdir(parents=True)
-    first.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
-    second.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
-    prompts: list[str] = []
-    bodies = iter(["Alpha lesson.", "Beta lesson."])
-
-    def _run_agent(*, user_prompt, **_kwargs):
-        prompts.append(user_prompt)
-        return {
-            "has_observation": True,
-            "observation_markdown": next(bodies),
-        }
-
-    with (
-        patch(
-            "sec_review_agents.memory.extractor.create_memory_extractor_agent_graph"
-        ) as create_agent,
-        patch(
-            "sec_review_agents.memory.extractor.invoke_agent_runtime_graph",
-            side_effect=_run_agent,
-        ),
-    ):
-        result = await memory_extraction.extract_memory_observations_from_paths(
-            [artifacts],
-            memory_store_dir=memory_root,
-            observation_id_value="repo-run",
-        )
-
-    assert create_agent.call_count == 2
-    assert len(prompts) == 2
-    assert "0001-case-alpha" in prompts[0]
-    assert "0002-case-beta" not in prompts[0]
-    assert "0002-case-beta" in prompts[1]
-    assert "0001-case-alpha" not in prompts[1]
-    assert result.skipped is False
-    assert result.summary == "Memory observations written: 2; threads skipped: 0."
-    assert result.observation_paths == (
-        _memory_observations_dir(memory_root) / "repo-run-0001-case-alpha.md",
-        _memory_observations_dir(memory_root) / "repo-run-0002-case-beta.md",
-    )
-    assert "Alpha lesson." in result.observation_paths[0].read_text(encoding="utf-8")
-    assert "Beta lesson." in result.observation_paths[1].read_text(encoding="utf-8")
-
-    from sec_review_agents.memory.state import open_memory_state
-
-    with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(
-            connection,
-            ["repo-run-0001-case-alpha", "repo-run-0002-case-beta"],
-        )
-    assert [row.status for row in rows] == ["pending", "pending"]
-
-
-@pytest.mark.asyncio
 async def test_extract_memory_observations_skips_processed_observation_by_default(
     tmp_path: Path,
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = (
-        tmp_path
-        / "review"
-        / "transcripts"
-        / "0001-review"
-        / "0001-analyzer-initial.json"
-    )
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -929,7 +820,7 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
         ) as run_agent,
     ):
         result = await memory_extraction.extract_memory_observations_from_paths(
-            [transcript.parent.parent.parent],
+            [transcript.parent.parent],
             memory_store_dir=memory_root,
             observation_id_value="same-run",
         )
@@ -937,7 +828,7 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
     create_agent.assert_not_called()
     run_agent.assert_not_called()
     assert result.skipped is True
-    assert result.observation_paths == ()
+    assert result.observation_paths == (observation,)
     assert observation.read_text(encoding="utf-8") == "Original durable lesson.\n"
     with open_memory_state(memory_root) as connection:
         rows = _fetch_observations_by_ids(connection, ["same-run"])
@@ -951,13 +842,7 @@ async def test_extract_memory_observations_skips_publish_when_observation_proces
     """Do not republish work that another maintainer consumed during extraction."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = (
-        tmp_path
-        / "review"
-        / "transcripts"
-        / "0001-review"
-        / "0001-analyzer-initial.json"
-    )
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -999,14 +884,14 @@ async def test_extract_memory_observations_skips_publish_when_observation_proces
         ),
     ):
         result = await memory_extraction.extract_memory_observations_from_paths(
-            [transcript.parent.parent.parent],
+            [transcript.parent.parent],
             memory_store_dir=memory_root,
             observation_id_value="same-run",
         )
 
     run_agent.assert_called_once()
     assert result.skipped is True
-    assert result.observation_paths == ()
+    assert result.observation_paths == (observation,)
     assert observation.read_text(encoding="utf-8") == "Maintained lesson.\n"
     with memory_extraction.open_memory_state(memory_root) as connection:
         rows = _fetch_observations_by_ids(connection, ["same-run"])

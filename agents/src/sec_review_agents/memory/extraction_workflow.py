@@ -51,12 +51,8 @@ class MemoryExtractionJobRequest:
 
 async def register_memory_extraction(
     request: MemoryExtractionRegistrationRequest,
-    *,
-    enabled: bool,
 ) -> None:
     """Add a completed review to the pending queue without blocking the review."""
-    if not enabled:
-        return
     try:
         await workflow.execute_activity(
             register_memory_extraction_job_activity,

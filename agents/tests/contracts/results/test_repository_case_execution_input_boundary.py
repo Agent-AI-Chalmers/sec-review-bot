@@ -110,7 +110,7 @@ def test_repository_case_execution_rejects_invalid_case_identity(
                 "run_id": "run-repo-case",
                 "case_execution_input": case_execution_input,  # type: ignore[typeddict-item]  # intentionally invalid case payload
                 "cases_artifacts_path": str(tmp_path / "cases"),
-                "transcript_thread_path": str(tmp_path / "transcripts" / "case-1"),
+                "published_transcripts_path": str(tmp_path / "transcripts"),
                 "timeout_seconds": 30,
                 "runtime_context": {},
             }
@@ -140,10 +140,10 @@ def test_repository_case_execution_input_does_not_carry_stage_artifact_paths(
     assert "artifact_paths" not in case_execution_input
 
 
-def test_repository_case_activity_preserves_transcript_thread_path(tmp_path) -> None:
-    transcript_thread_path = str(
-        tmp_path / "cases" / "case-1" / "transcripts" / "0001-review"
-    )
+def test_repository_case_activity_preserves_published_transcripts_path(
+    tmp_path,
+) -> None:
+    published_transcripts_path = str(tmp_path / "cases" / "case-1" / "transcripts")
 
     prepared_case = prepare_repository_case_activity(
         {
@@ -158,13 +158,13 @@ def test_repository_case_activity_preserves_transcript_thread_path(tmp_path) -> 
             },
             "cases_artifacts_path": str(tmp_path / "cases"),
             "run_id": "run-repo-case",
-            "transcript_thread_path": transcript_thread_path,
+            "published_transcripts_path": published_transcripts_path,
             "timeout_seconds": 30,
             "runtime_context": {},
         }
     )
 
-    assert prepared_case["transcript_thread_path"] == transcript_thread_path
+    assert prepared_case["published_transcripts_path"] == published_transcripts_path
 
 
 def test_repository_case_transcripts_are_published_under_the_case_root(
@@ -201,8 +201,8 @@ def test_repository_case_transcripts_are_published_under_the_case_root(
 
     batch = prepare_repository_case_review_inputs_activity(request, [case])
 
-    assert batch["case_requests"][0]["transcript_thread_path"] == str(
-        cases_root / "case-1" / "transcripts" / "0001-review"
+    assert batch["case_requests"][0]["published_transcripts_path"] == str(
+        cases_root / "case-1" / "transcripts"
     )
 
 

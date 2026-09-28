@@ -42,7 +42,7 @@ class RepositoryCaseReviewRequest(TypedDict):
     run_id: str
     case_execution_input: RepositoryCaseExecutionInput
     cases_artifacts_path: str
-    transcript_thread_path: str
+    published_transcripts_path: str
     timeout_seconds: int
     runtime_context: RunnerRuntimeContext
     memory_extraction_registration_enabled: NotRequired[bool]
@@ -106,8 +106,6 @@ def _repository_case_review_timeout_seconds(
     return timeout_seconds
 
 
-# Repository cases publish transcripts into case-specific threads, not the
-# default review thread used by issue and PR workflows.
 def _repository_case_published_transcript_path(
     prepared_case: dict[str, Any],
     *,
@@ -115,13 +113,13 @@ def _repository_case_published_transcript_path(
     stage: str,
     attempt: str = "initial",
 ) -> Path:
-    from sec_review_agents.run_artifacts.transcripts import transcript_thread_file
+    from sec_review_agents.run_artifacts.transcripts import transcript_file
     from sec_review_agents.utils.paths import required_path
 
-    return transcript_thread_file(
+    return transcript_file(
         required_path(
-            prepared_case.get("transcript_thread_path"),
-            label="transcript_thread_path",
+            prepared_case.get("published_transcripts_path"),
+            label="published_transcripts_path",
         ),
         order=order,
         stage=stage,
@@ -241,7 +239,7 @@ def prepare_repository_case_review_inputs_activity(
     request: InternalWorkflowRequest,
     cases: Sequence[Mapping[str, Any]],
 ) -> RepositoryCaseRequestBatch:
-    from sec_review_agents.run_artifacts.transcripts import review_thread_dir
+    from sec_review_agents.run_artifacts.transcripts import review_transcripts_root
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.repository.case_execution_input import (
         prepare_case_execution_input,
@@ -285,8 +283,8 @@ def prepare_repository_case_review_inputs_activity(
                     repair_mode=review_intent.repair_mode,
                 ),
                 "cases_artifacts_path": str(cases_artifacts_path),
-                "transcript_thread_path": str(
-                    review_thread_dir(
+                "published_transcripts_path": str(
+                    review_transcripts_root(
                         cases_artifacts_path / str(case.get("case_id") or index),
                     )
                 ),
@@ -324,7 +322,7 @@ def prepare_repository_case_activity(
             cases_artifacts_path=Path(request["cases_artifacts_path"]),
             case_id=case_id.strip(),
         ),
-        "transcript_thread_path": request["transcript_thread_path"],
+        "published_transcripts_path": request["published_transcripts_path"],
     }
 
 
@@ -971,16 +969,18 @@ class RepositoryCaseReviewWorkflow:
             retry_policy=retry_policy,
         )
         case_id = _repository_case_id_from_request(request)
-        await register_memory_extraction(
-            MemoryExtractionRegistrationRequest(
-                job_id=f"repository-review-{request['run_id']}-{case_id}",
-                source_workflow="repository-review",
-                run_id=request["run_id"],
-                artifact_root_path=str(Path(request["cases_artifacts_path"]) / case_id),
-                timeout_seconds=request["timeout_seconds"],
-            ),
-            enabled=request.get("memory_extraction_registration_enabled", True),
-        )
+        if request.get("memory_extraction_registration_enabled", True):
+            await register_memory_extraction(
+                MemoryExtractionRegistrationRequest(
+                    job_id=f"repository-review-{request['run_id']}-{case_id}",
+                    source_workflow="repository-review",
+                    run_id=request["run_id"],
+                    artifact_root_path=str(
+                        Path(request["cases_artifacts_path"]) / case_id
+                    ),
+                    timeout_seconds=request["timeout_seconds"],
+                )
+            )
         return result
 
 

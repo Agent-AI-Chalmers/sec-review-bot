@@ -28,12 +28,8 @@ EXTRACTION_PROBE = llm_probe(
 async def test_llm_extractor_writes_observation_without_updating_memory() -> None:
     root = Path(".agent-artifacts") / "memory-probes" / f"extraction-{uuid4().hex[:8]}"
     artifacts = root / "artifacts"
-    analyzer_transcript = (
-        artifacts / "transcripts" / "0001-review" / "0001-analyzer-initial.json"
-    )
-    verifier_transcript = (
-        artifacts / "transcripts" / "0001-review" / "0002-verifier-initial.json"
-    )
+    analyzer_transcript = artifacts / "transcripts" / "0001-analyzer-initial.json"
+    verifier_transcript = artifacts / "transcripts" / "0002-verifier-initial.json"
     analyzer_transcript.parent.mkdir(parents=True)
     analyzer_transcript.write_text(
         "\n".join(

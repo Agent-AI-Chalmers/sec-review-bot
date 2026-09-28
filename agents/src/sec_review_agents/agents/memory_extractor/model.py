@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 @dataclass(frozen=True)
 class StagedTranscripts:
-    entries: list[tuple[str, str, Path]]
+    entries: list[tuple[str, Path]]
 
 
 class MemoryObservationOutput(BaseModel):

@@ -25,7 +25,7 @@ def repository_case_execution_input(case_id: str) -> RepositoryCaseExecutionInpu
 @pytest.mark.asyncio
 async def test_repository_case_activity_binds_trace_context() -> None:
     analyzer_result = {"verdict": "confirmed-vulnerability"}
-    transcript_thread_path = "/tmp/cases/case-1/transcripts/0001-review"
+    published_transcripts_path = "/tmp/cases/case-1/transcripts"
 
     with (
         patch(
@@ -42,13 +42,13 @@ async def test_repository_case_activity_binds_trace_context() -> None:
                 "artifact_paths": {
                     "analyzer": "/tmp/cases/case-1/analyzer",
                 },
-                "transcript_thread_path": transcript_thread_path,
+                "published_transcripts_path": published_transcripts_path,
             },
             {},
         )
 
     bind_mock.assert_called_once_with(workflow="repository-review")
     assert analyzer_stage_mock.call_args.kwargs["published_transcript_path"] == (
-        Path(transcript_thread_path) / "0001-analyzer-initial.json"
+        Path(published_transcripts_path) / "0001-analyzer-initial.json"
     )
     assert result == analyzer_result

@@ -30,8 +30,7 @@ async def test_issue_review_registers_memory_extraction_via_activity(
 ) -> None:
     calls: list[MemoryExtractionRegistrationRequest] = []
 
-    async def fake_register(registration, *, enabled):
-        assert enabled is True
+    async def fake_register(registration):
         calls.append(registration)
 
     async def fake_execute_activity(activity_fn, *args, timeout_seconds):
@@ -66,8 +65,7 @@ async def test_pull_request_review_registers_memory_extraction_via_activity(
 ) -> None:
     calls: list[MemoryExtractionRegistrationRequest] = []
 
-    async def fake_register(registration, *, enabled):
-        assert enabled is True
+    async def fake_register(registration):
         calls.append(registration)
 
     async def fake_execute_activity(activity_fn, *args, timeout_seconds):
@@ -132,29 +130,6 @@ async def test_repository_review_does_not_register_run_level_memory_extraction(
 
 
 @pytest.mark.asyncio
-async def test_register_memory_extraction_skips_disabled_request(
-    monkeypatch,
-) -> None:
-    registration = MemoryExtractionRegistrationRequest(
-        job_id="repository-review-run-1-case-7",
-        source_workflow="repository-review",
-        run_id="run-1",
-        artifact_root_path="/tmp/run-1/artifacts/cases/case-7",
-        timeout_seconds=30,
-    )
-
-    async def fake_execute_activity(*_args, **_kwargs):
-        raise AssertionError("disabled case should not register memory extraction")
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.extraction_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-
-    await register_memory_extraction(registration, enabled=False)
-
-
-@pytest.mark.asyncio
 async def test_repository_case_registers_memory_only_after_result_is_built(
     monkeypatch,
 ) -> None:
@@ -163,7 +138,7 @@ async def test_repository_case_registers_memory_only_after_result_is_built(
     prepared_case = {
         "case_execution_input": {"case_id": "case-7"},
         "artifact_paths": {},
-        "transcript_thread_path": "unused",
+        "published_transcripts_path": "unused",
     }
 
     async def fake_execute_activity(activity_fn, *args, **_kwargs):
@@ -184,8 +159,7 @@ async def test_repository_case_registers_memory_only_after_result_is_built(
 
     registrations: list[MemoryExtractionRegistrationRequest] = []
 
-    async def fake_register(registration, *, enabled):
-        assert enabled is True
+    async def fake_register(registration):
         registrations.append(registration)
         events.append("register")
 
@@ -216,7 +190,7 @@ async def test_repository_case_registers_memory_only_after_result_is_built(
             "repair_mode": "test-changes-allowed",
         },
         "cases_artifacts_path": "/tmp/run-1/artifacts/cases",
-        "transcript_thread_path": "unused",
+        "published_transcripts_path": "unused",
         "timeout_seconds": 30,
         "runtime_context": {},
         "memory_extraction_registration_enabled": True,
@@ -266,7 +240,7 @@ async def test_register_memory_extraction_swallows_activity_failure(
         FakeLogger(),
     )
 
-    await register_memory_extraction(registration, enabled=True)
+    await register_memory_extraction(registration)
 
     assert warnings == [
         (
@@ -277,7 +251,7 @@ async def test_register_memory_extraction_swallows_activity_failure(
 
 
 @pytest.mark.asyncio
-async def test_issue_review_passes_disabled_registration_setting(
+async def test_issue_review_does_not_register_memory_when_disabled(
     monkeypatch,
 ) -> None:
     request = InternalWorkflowRequest(
@@ -289,10 +263,10 @@ async def test_issue_review_passes_disabled_registration_setting(
         memory_extraction_registration_enabled=False,
     )
 
-    calls: list[bool] = []
+    calls: list[MemoryExtractionRegistrationRequest] = []
 
-    async def fake_register(_registration, *, enabled):
-        calls.append(enabled)
+    async def fake_register(registration):
+        calls.append(registration)
 
     monkeypatch.setattr(
         issue_workflow,
@@ -309,4 +283,4 @@ async def test_issue_review_passes_disabled_registration_setting(
 
     await issue_workflow.IssueReviewWorkflow().run(request)
 
-    assert calls == [False]
+    assert calls == []

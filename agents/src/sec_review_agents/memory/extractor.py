@@ -44,7 +44,6 @@ class TranscriptRef:
     stage: str
     attempt: str
     path: Path
-    thread: str = "0001-review"
 
     @property
     def label(self) -> str:
@@ -103,26 +102,18 @@ def observation_id(
 def _observation_id_for_transcripts(
     transcript_refs: list[TranscriptRef],
     *,
-    all_thread_count: int,
     explicit_observation_id: str | None,
     source_workflow: str | None,
     run_id: str | None,
 ) -> str:
     if explicit_observation_id:
-        safe_observation_id = _slug_component(explicit_observation_id)
-        if all_thread_count == 1:
-            return safe_observation_id
-        thread = _slug_component(transcript_refs[0].thread)
-        return f"{safe_observation_id}-{thread}"
+        return _slug_component(explicit_observation_id)
     if source_workflow and run_id:
-        base = observation_id(
+        return observation_id(
             [ref.path for ref in transcript_refs],
             source_workflow=source_workflow,
             run_id=run_id,
         )
-        if all_thread_count == 1:
-            return base
-        return f"{base}-{_slug_component(transcript_refs[0].thread)}"
     return observation_id([ref.path for ref in transcript_refs])
 
 
@@ -149,19 +140,15 @@ def collect_published_transcripts(review_artifact_root: Path) -> list[Transcript
     if not transcripts_root.is_dir():
         return []
     refs: list[TranscriptRef] = []
-    for thread_dir in sorted(
-        path for path in transcripts_root.iterdir() if path.is_dir()
-    ):
-        for transcript in sorted(thread_dir.glob("*.json")):
-            stage, attempt = _published_transcript_stage_attempt(transcript)
-            refs.append(
-                TranscriptRef(
-                    stage=stage,
-                    attempt=attempt,
-                    path=transcript,
-                    thread=thread_dir.name,
-                )
+    for transcript in sorted(transcripts_root.glob("*.json")):
+        stage, attempt = _published_transcript_stage_attempt(transcript)
+        refs.append(
+            TranscriptRef(
+                stage=stage,
+                attempt=attempt,
+                path=transcript,
             )
+        )
     return refs
 
 
@@ -193,7 +180,6 @@ def collect_transcript_refs(paths: list[Path]) -> list[TranscriptRef]:
                     stage=ref.stage,
                     attempt=ref.attempt,
                     path=resolved,
-                    thread=ref.thread,
                 )
             )
 
@@ -204,20 +190,13 @@ def stage_transcripts(
     transcripts: list[TranscriptRef], destination: Path
 ) -> StagedTranscripts:
     destination.mkdir(parents=True, exist_ok=True)
-    entries: list[tuple[str, str, Path]] = []
-    thread_counts: dict[str, int] = {}
-    for transcript in transcripts:
+    entries: list[tuple[str, Path]] = []
+    for index, transcript in enumerate(transcripts, start=1):
         source = transcript.path
-        thread_counts[transcript.thread] = thread_counts.get(transcript.thread, 0) + 1
-        target = (
-            destination
-            / transcript.thread
-            / f"{thread_counts[transcript.thread]:04d}-{transcript.label}.json"
-        )
-        target.parent.mkdir(parents=True, exist_ok=True)
+        target = destination / f"{index:04d}-{transcript.label}.json"
         shutil.copy2(source, target)
-        mounted = Path("/transcripts") / transcript.thread / target.name
-        entries.append((transcript.thread, transcript.display, mounted))
+        mounted = Path("/transcripts") / target.name
+        entries.append((transcript.display, mounted))
 
     return StagedTranscripts(entries=entries)
 
@@ -230,11 +209,7 @@ def _observation_header(
     artifact_root_path: Path | None,
     staged_transcripts: StagedTranscripts,
 ) -> str:
-    stage_labels = [label for _thread, label, _mounted in staged_transcripts.entries]
-    threads = []
-    for thread, _label, _mounted in staged_transcripts.entries:
-        if thread not in threads:
-            threads.append(thread)
+    stage_labels = [label for label, _mounted in staged_transcripts.entries]
     lines = [
         f"# Memory Observation: {observation_id_value}",
         "",
@@ -249,7 +224,6 @@ def _observation_header(
         lines.append(
             f"- Artifact root name: `{artifact_root_path.expanduser().resolve().name}`"
         )
-    lines.append(f"- Thread: `{', '.join(threads)}`")
     lines.append(f"- Stages: {', '.join(stage_labels)}")
     lines.extend(
         [
@@ -341,7 +315,7 @@ async def _extract_memory_observation_for_refs(
         if not has_observation:
             return MemoryObservationResult(
                 skipped=True,
-                summary=f"No durable memory observation produced for {transcript_refs[0].thread}.",
+                summary="No durable memory observation produced.",
             )
 
         observation_content = (
@@ -388,24 +362,6 @@ async def _extract_memory_observation_for_refs(
     )
 
 
-def _group_transcript_refs_by_thread(
-    transcript_refs: list[TranscriptRef],
-) -> list[list[TranscriptRef]]:
-    groups: list[list[TranscriptRef]] = []
-    current_thread: str | None = None
-    current_group: list[TranscriptRef] = []
-    for ref in transcript_refs:
-        if ref.thread != current_thread:
-            if current_group:
-                groups.append(current_group)
-            current_thread = ref.thread
-            current_group = []
-        current_group.append(ref)
-    if current_group:
-        groups.append(current_group)
-    return groups
-
-
 async def extract_memory_observations_from_paths(
     transcript_paths: list[Path],
     *,
@@ -425,49 +381,17 @@ async def extract_memory_observations_from_paths(
 
     memory_store_dir = resolve_memory_store_dir(memory_store_dir, required=True)
     initialize_memory_store(memory_store_dir)
-    groups = _group_transcript_refs_by_thread(transcript_refs)
-
-    results: list[MemoryObservationResult] = []
-    for group in groups:
-        results.append(
-            await _extract_memory_observation_for_refs(
-                group,
-                memory_root=memory_store_dir,
-                deployment=deployment,
-                resolved_observation_id=_observation_id_for_transcripts(
-                    group,
-                    all_thread_count=len(groups),
-                    explicit_observation_id=observation_id_value,
-                    source_workflow=source_workflow,
-                    run_id=run_id,
-                ),
-                source_workflow=source_workflow,
-                run_id=run_id,
-                artifact_root_path=artifact_root_path,
-            )
-        )
-
-    observation_paths = tuple(
-        path
-        for result in results
-        for path in result.observation_paths
-        if not result.skipped
-    )
-    written_count = len(observation_paths)
-    skipped_count = len(results) - written_count
-    if written_count == 0:
-        return MemoryObservationResult(
-            skipped=True,
-            summary="No durable memory observations produced.",
-            observation_paths=(),
-        )
-    if len(results) == 1:
-        return results[0]
-    return MemoryObservationResult(
-        skipped=False,
-        summary=(
-            f"Memory observations written: {written_count}; "
-            f"threads skipped: {skipped_count}."
+    return await _extract_memory_observation_for_refs(
+        transcript_refs,
+        memory_root=memory_store_dir,
+        deployment=deployment,
+        resolved_observation_id=_observation_id_for_transcripts(
+            transcript_refs,
+            explicit_observation_id=observation_id_value,
+            source_workflow=source_workflow,
+            run_id=run_id,
         ),
-        observation_paths=observation_paths,
+        source_workflow=source_workflow,
+        run_id=run_id,
+        artifact_root_path=artifact_root_path,
     )

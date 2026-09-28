@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any
 
 TRANSCRIPTS_DIRNAME = "transcripts"
-DEFAULT_REVIEW_THREAD = "0001-review"
 
 
 def _slug_component(value: str) -> str:
@@ -19,16 +18,8 @@ def review_transcripts_root(artifact_root_path: Path) -> Path:
     return artifact_root_path / TRANSCRIPTS_DIRNAME
 
 
-def review_thread_dir(
-    artifact_root_path: Path,
-    *,
-    thread_name: str = DEFAULT_REVIEW_THREAD,
-) -> Path:
-    return review_transcripts_root(artifact_root_path) / thread_name
-
-
-def transcript_thread_file(
-    thread_dir: Path,
+def transcript_file(
+    transcripts_dir: Path,
     *,
     order: int,
     stage: str,
@@ -37,7 +28,7 @@ def transcript_thread_file(
     if order < 1:
         raise ValueError("Transcript order must be >= 1.")
     suffix = f"{_slug_component(stage)}-{_slug_component(attempt)}"
-    return thread_dir / f"{order:04d}-{suffix}.json"
+    return transcripts_dir / f"{order:04d}-{suffix}.json"
 
 
 def review_stage_transcript_path(
@@ -46,10 +37,9 @@ def review_stage_transcript_path(
     order: int,
     stage: str,
     attempt: str = "initial",
-    thread_name: str = DEFAULT_REVIEW_THREAD,
 ) -> Path:
-    return transcript_thread_file(
-        review_thread_dir(artifact_root_path, thread_name=thread_name),
+    return transcript_file(
+        review_transcripts_root(artifact_root_path),
         order=order,
         stage=stage,
         attempt=attempt,
@@ -71,11 +61,9 @@ def retry_stage_order(*, stage: str, retry_context: Mapping[str, Any] | None) ->
 
 
 __all__ = [
-    "DEFAULT_REVIEW_THREAD",
     "TRANSCRIPTS_DIRNAME",
     "retry_stage_order",
     "review_stage_transcript_path",
-    "review_thread_dir",
     "review_transcripts_root",
-    "transcript_thread_file",
+    "transcript_file",
 ]
