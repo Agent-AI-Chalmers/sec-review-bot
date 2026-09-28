@@ -225,6 +225,7 @@ def test_stage_review_transcripts_writes_ordered_thread_prompt(tmp_path: Path) -
 
 
 def test_extractor_prompt_rejects_one_off_provenance_details() -> None:
+    """The extractor should publish standalone lessons rather than run summaries."""
     system_prompt = MEMORY_EXTRACTOR_SYSTEM_PROMPT
 
     assert "durable pattern level" in system_prompt
@@ -232,7 +233,24 @@ def test_extractor_prompt_rejects_one_off_provenance_details() -> None:
     assert "copied source code" in system_prompt
     assert "sensitive values" in system_prompt
     assert "contamination check" in system_prompt
-    assert "prompt snapshots or prior context" in system_prompt
+    assert "one reusable decision per observation" in system_prompt
+    assert "does not know the source repository" in system_prompt
+    assert "internal class or function names" in system_prompt
+    assert "worked as intended, return no observation" in system_prompt
+    assert "general limitations of language models" in system_prompt
+    assert "agent's existing review guidance" in system_prompt
+    assert "adds to or materially refines that guidance" in system_prompt
+    assert "merely because it is absent from the system prompt" in system_prompt
+    assert "most likely to improve a future reviewer's decision" in system_prompt
+    assert "corrects an assumption" in system_prompt
+    assert "do not propose where the observation should be stored" in system_prompt
+    assert "one short paragraph" in system_prompt
+    assert "Omit incidental invocation details" in system_prompt
+    assert "boundary on the claim, not as run provenance" in system_prompt
+    assert "Example - produce an observation" in system_prompt
+    assert "This qualifies because" in system_prompt
+    assert "Counterexample - return no observation" in system_prompt
+    assert "GNU coreutils 9.4" in system_prompt
 
 
 def test_maintenance_prompt_keeps_index_short_and_topics_substantive() -> None:
@@ -258,11 +276,12 @@ def test_transcript_extraction_prompt_extracts_observation_only() -> None:
 
 
 def test_extractor_prompt_reads_middleware_injected_context() -> None:
+    """The extractor should separate supplied prompts from lessons learned in-run."""
     system_prompt = MEMORY_EXTRACTOR_SYSTEM_PROMPT
 
-    assert "transcript context" in system_prompt
-    assert "prompt snapshots and model-call messages" in system_prompt
-    assert "prompt snapshots or prior context" in system_prompt
+    assert "Each transcript starts with the system prompt" in system_prompt
+    assert "treat that prompt as the agent's existing review guidance" in system_prompt
+    assert "beyond the supplied guidance" in system_prompt
     assert "prompt, memory, or skill" not in system_prompt
 
 
