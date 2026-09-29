@@ -33,6 +33,45 @@ function joinParagraphBlocks (blocks: Array<string | null>): string {
   return blocks.filter((item): item is string => Boolean(item)).join('\n\n')
 }
 
+function analysisHeadline (verdict: unknown): string {
+  switch (verdict) {
+    case 'no-actionable-finding': return 'no actionable security finding'
+    case 'confirmed-vulnerability': return 'confirmed security vulnerability'
+    case 'confirmed-defect': return 'confirmed security defect'
+    case 'plausible-risk': return 'plausible security risk'
+    case 'inconclusive': return 'inconclusive'
+    default: return 'unknown'
+  }
+}
+
+function mitigationHeadline (verdict: unknown, changedFiles: unknown[]): string {
+  if (changedFiles.length > 0) {
+    return `patch proposed, ${changedFiles.length} ${changedFiles.length === 1 ? 'file' : 'files'} changed`
+  }
+  return verdict === 'no-actionable-finding' ? 'not needed' : 'no patch proposed'
+}
+
+function verificationHeadline (validationLevel: unknown): string {
+  switch (validationLevel) {
+    case 'static': return 'static review completed'
+    case 'logic-simulated': return 'logic simulation completed'
+    case 'runtime-partial': return 'partial runtime validation completed'
+    case 'runtime-endpoint': return 'runtime endpoint validation completed'
+    default: return 'not recorded'
+  }
+}
+
+function testsHeadline (regressionStatus: unknown): string {
+  switch (regressionStatus) {
+    case 'passed': return 'passed'
+    case 'failed': return 'failed'
+    case 'not-run': return 'not run'
+    case 'not-applicable': return 'not applicable'
+    case 'unresolved': return 'unresolved'
+    default: return 'not recorded'
+  }
+}
+
 function renderMitigationSection (mitigation: ReviewRecord['mitigation']): string | null {
   const overview = asNonEmptyString(mitigation.overview)
   const changed_files = mitigation.changed_files
@@ -73,10 +112,15 @@ function renderVerificationSection (verification: ReviewRecord['verification']):
     return null
   }
 
-  return renderVerificationSummaryLines(verification, {
+  return renderVerificationSummaryLines({
+    ...verification,
+    resolution_next_step: verification.resolution_next_step === 'none'
+      ? null
+      : verification.resolution_next_step
+  }, {
     includeOverview: false,
     reviewTargetClaimFallback: '(none)',
-    includeUnknownResolutionNextStep: true
+    includeUnknownResolutionNextStep: false
   }).join('\n')
 }
 
@@ -105,19 +149,20 @@ export function renderAnalysisSummaryCommentFromReviewRecord (
     verification_findings: [],
     residual_risks: []
   }
-  const verdict = displayText(analysis.verdict, 'unknown')
   const overview = displayText(analysis.overview, 'No overview provided.')
   const changed_files = asList(mitigation.changed_files)
-  const verificationAssessment = displayText(verification.patch_coverage, 'unknown')
   const resolution_next_step = displayText(verification.resolution_next_step, 'unknown')
 
   const lines = [
     '## PR Security Review',
     '',
-    `- Verdict: ${inlineCode(verdict)}`,
-    `- Changed files: ${inlineCode(String(changed_files.length))}`,
-    `- Verification: ${inlineCode(verificationAssessment)}`,
-    `- Resolution next step: ${inlineCode(resolution_next_step)}`,
+    `- Analysis: ${inlineCode(analysisHeadline(analysis.verdict))}`,
+    `- Mitigation: ${inlineCode(mitigationHeadline(analysis.verdict, changed_files))}`,
+    `- Verification: ${inlineCode(verificationHeadline(verification.validation_level))}`,
+    `- Tests: ${inlineCode(testsHeadline(verification.regression_status))}`,
+    ...(resolution_next_step !== 'none'
+      ? [`- Resolution next step: ${inlineCode(resolution_next_step)}`]
+      : []),
     '',
     overview
   ]
