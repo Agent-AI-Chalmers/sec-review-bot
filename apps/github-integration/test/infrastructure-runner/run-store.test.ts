@@ -155,6 +155,31 @@ test('ReviewRunStore atomically reuses the run admitted for the same ingress req
   assert.equal(store.getRun('run-second'), null)
 })
 
+test('ReviewRunStore does not treat a run id constraint as an ingress replay', () => {
+  const store = createStore()
+  store.admit_review_run({
+    workflow: 'repository-review',
+    run_id: 'run-shared',
+    publish_context: {},
+    ingress_kind: 'github_actions_dispatch',
+    ingress_key: 'octo/example:first'
+  })
+
+  assert.throws(
+    () => store.admit_review_run({
+      workflow: 'repository-review',
+      run_id: 'run-shared',
+      publish_context: {},
+      ingress_kind: 'github_actions_dispatch',
+      ingress_key: 'octo/example:second'
+    }),
+    (error: unknown) => {
+      assert.equal((error as { code?: string }).code, 'SQLITE_CONSTRAINT_PRIMARYKEY')
+      return true
+    }
+  )
+})
+
 test('ReviewRunStore removes published runs from active list', () => {
   const store = createStore()
   createQueuedRun(store, {
