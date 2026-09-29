@@ -60,21 +60,21 @@ def _mitigation_headline(verdict: Any, changed_files: list[Any]) -> str:
 
 def _verification_headline(validation_level: Any) -> str:
     return {
-        "static": "static review completed",
-        "logic-simulated": "logic simulation completed",
-        "runtime-partial": "partial runtime validation completed",
-        "runtime-endpoint": "runtime endpoint validation completed",
+        "static": "static review",
+        "logic-simulated": "logic simulation",
+        "runtime-partial": "partial runtime validation",
+        "runtime-endpoint": "runtime endpoint validation",
     }.get(validation_level, "not recorded")
 
 
-def _tests_headline(regression_status: Any) -> str:
+def _checks_headline(regression_status: Any) -> str:
     return {
-        "passed": "passed",
-        "failed": "failed",
-        "not-run": "not run",
-        "not-applicable": "not applicable",
-        "unresolved": "unresolved",
-    }.get(regression_status, "not recorded")
+        "passed": "checks passed",
+        "failed": "checks failed",
+        "not-run": "checks not run",
+        "not-applicable": "checks not applicable",
+        "unresolved": "checks unresolved",
+    }.get(regression_status, "checks not recorded")
 
 
 def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
@@ -85,8 +85,11 @@ def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
         "",
         f"- Analysis: {inline_code(_analysis_headline(analysis.get('verdict')))}",
         f"- Mitigation: {inline_code(_mitigation_headline(analysis.get('verdict'), changed_files))}",
-        f"- Verification: {inline_code(_verification_headline(verification.get('validation_level')))}",
-        f"- Tests: {inline_code(_tests_headline(verification.get('regression_status')))}",
+        "- Verification: "
+        + inline_code(
+            f"{_verification_headline(verification.get('validation_level'))}; "
+            f"{_checks_headline(verification.get('regression_status'))}"
+        ),
         *(
             [
                 f"- Resolution next step: {inline_code(verification.get('resolution_next_step'), 'unknown')}"

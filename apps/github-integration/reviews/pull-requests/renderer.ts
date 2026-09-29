@@ -53,22 +53,22 @@ function mitigationHeadline (verdict: unknown, changedFiles: unknown[]): string 
 
 function verificationHeadline (validationLevel: unknown): string {
   switch (validationLevel) {
-    case 'static': return 'static review completed'
-    case 'logic-simulated': return 'logic simulation completed'
-    case 'runtime-partial': return 'partial runtime validation completed'
-    case 'runtime-endpoint': return 'runtime endpoint validation completed'
+    case 'static': return 'static review'
+    case 'logic-simulated': return 'logic simulation'
+    case 'runtime-partial': return 'partial runtime validation'
+    case 'runtime-endpoint': return 'runtime endpoint validation'
     default: return 'not recorded'
   }
 }
 
-function testsHeadline (regressionStatus: unknown): string {
+function checksHeadline (regressionStatus: unknown): string {
   switch (regressionStatus) {
-    case 'passed': return 'passed'
-    case 'failed': return 'failed'
-    case 'not-run': return 'not run'
-    case 'not-applicable': return 'not applicable'
-    case 'unresolved': return 'unresolved'
-    default: return 'not recorded'
+    case 'passed': return 'checks passed'
+    case 'failed': return 'checks failed'
+    case 'not-run': return 'checks not run'
+    case 'not-applicable': return 'checks not applicable'
+    case 'unresolved': return 'checks unresolved'
+    default: return 'checks not recorded'
   }
 }
 
@@ -158,8 +158,7 @@ export function renderAnalysisSummaryCommentFromReviewRecord (
     '',
     `- Analysis: ${inlineCode(analysisHeadline(analysis.verdict))}`,
     `- Mitigation: ${inlineCode(mitigationHeadline(analysis.verdict, changed_files))}`,
-    `- Verification: ${inlineCode(verificationHeadline(verification.validation_level))}`,
-    `- Tests: ${inlineCode(testsHeadline(verification.regression_status))}`,
+    `- Verification: ${inlineCode(`${verificationHeadline(verification.validation_level)}; ${checksHeadline(verification.regression_status)}`)}`,
     ...(resolution_next_step !== 'none'
       ? [`- Resolution next step: ${inlineCode(resolution_next_step)}`]
       : []),

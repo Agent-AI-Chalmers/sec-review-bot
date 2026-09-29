@@ -164,8 +164,8 @@ def test_pull_request_preview_summarizes_review_stages(tmp_path: Path) -> None:
     )
     assert "- Analysis: `no actionable security finding`" in content
     assert "- Mitigation: `not needed`" in content
-    assert "- Verification: `static review completed`" in content
-    assert "- Tests: `not run`" in content
+    assert "- Verification: `static review; checks not run`" in content
+    assert "- Tests:" not in content
     assert "Changed files: `0`" not in content
     assert "Resolution next step: `none`" not in content
 
@@ -194,6 +194,6 @@ def test_pull_request_preview_reports_patch_and_manual_review(tmp_path: Path) ->
     )
     assert "- Analysis: `confirmed security vulnerability`" in content
     assert "- Mitigation: `patch proposed, 2 files changed`" in content
-    assert "- Verification: `partial runtime validation completed`" in content
-    assert "- Tests: `failed`" in content
+    assert "- Verification: `partial runtime validation; checks failed`" in content
+    assert "- Tests:" not in content
     assert "- Resolution next step: `manual-review`" in content
