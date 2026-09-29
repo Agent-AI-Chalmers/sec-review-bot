@@ -60,6 +60,7 @@ test('issue-opened skips automatic workflow when trigger mode is manual_only', a
 
   await handleIssueOpenedWithDeps(
     {
+      id: 'delivery-test',
       octokit: {},
       payload: createIssueOpenedPayload()
     },
@@ -81,7 +82,8 @@ test('issue-opened skips self-originated payload before issue extraction', async
     let configFetched = false
 
     await handleIssueOpenedWithDeps(
-      {
+    {
+      id: 'delivery-test',
         octokit: {},
         payload: {
           sender: {
@@ -109,6 +111,7 @@ test('issue-opened runs automatic workflow when trigger mode is automatic', asyn
 
   await handleIssueOpenedWithDeps(
     {
+      id: 'delivery-test',
       octokit: {},
       payload: createIssueOpenedPayload()
     },
@@ -136,6 +139,7 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
   await assert.rejects(
     handleIssueOpenedWithDeps(
       {
+        id: 'delivery-test',
         octokit: {},
         payload: createIssueOpenedPayload()
       },

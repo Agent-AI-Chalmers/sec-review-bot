@@ -1,23 +1,36 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
-import { RunnerRunStore } from '../../infrastructure/runner/run-store.js'
+import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 
-function createStore (): RunnerRunStore {
-  return new RunnerRunStore(':memory:')
+function createStore (): ReviewRunStore {
+  return new ReviewRunStore(':memory:')
 }
 
-test('RunnerRunStore can be closed more than once during shutdown', () => {
+function createQueuedRun (store: ReviewRunStore, run: Parameters<ReviewRunStore['create_preparing_review_run']>[0]) {
+  store.create_preparing_review_run(run)
+  store.mark_queued(run.run_id, run.publish_context)
+  return store.getRun(run.run_id)!
+}
+
+function temporaryDatabasePath (): string {
+  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'review-run-store-')), 'review-runs.sqlite')
+}
+
+test('ReviewRunStore can be closed more than once during shutdown', () => {
   const store = createStore()
 
   store.close()
   assert.doesNotThrow(() => store.close())
 })
 
-test('RunnerRunStore persists and restores queued runner runs', () => {
+test('ReviewRunStore persists and restores queued runner runs', () => {
   const store = createStore()
 
-  const record = store.save_queued_run({
+  const record = createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-1',
     publish_context: {
@@ -44,9 +57,107 @@ test('RunnerRunStore persists and restores queued runner runs', () => {
   assert.equal(store.listActiveRuns().length, 1)
 })
 
-test('RunnerRunStore removes published runs from active list', () => {
+test('ReviewRunStore keeps preparing runs out of the Runner poller', () => {
   const store = createStore()
-  store.save_queued_run({
+  const record = store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-preparing',
+    publish_context: {}
+  })
+
+  assert.equal(record.status, 'preparing')
+  assert.deepEqual(store.listActiveRuns(), [])
+  assert.throws(
+    () => store.create_preparing_review_run({
+      workflow: 'issue-review',
+      run_id: 'run-preparing',
+      publish_context: {}
+    }),
+    /UNIQUE constraint failed/
+  )
+})
+
+test('ReviewRunStore marks preparations interrupted by a previous process', () => {
+  const dbPath = temporaryDatabasePath()
+  const first = new ReviewRunStore(dbPath)
+  first.create_preparing_review_run({ workflow: 'issue-review', run_id: 'run-interrupted', publish_context: {} })
+  first.close()
+
+  const restarted = new ReviewRunStore(dbPath)
+  const record = restarted.getRun('run-interrupted')
+  assert.equal(record?.status, 'failed')
+  assert.equal(record?.failure_code, 'PREPARATION_INTERRUPTED')
+  restarted.close()
+})
+
+test('ReviewRunStore reclaims an interrupted ingress with the original run id', () => {
+  const store = new ReviewRunStore(temporaryDatabasePath())
+  store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-reclaim',
+    publish_context: {},
+    ingress_kind: 'github_webhook',
+    ingress_key: 'delivery-reclaim'
+  })
+
+  // Simulate a restart without reopening the database in this focused test.
+  store.markFailed('run-reclaim', { code: 'PREPARATION_INTERRUPTED', message: 'interrupted' })
+  const admission = store.admit_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-new',
+    publish_context: {},
+    ingress_kind: 'github_webhook',
+    ingress_key: 'delivery-reclaim'
+  })
+
+  assert.equal(admission.created, true)
+  assert.equal(admission.record.run_id, 'run-reclaim')
+  assert.equal(admission.record.status, 'preparing')
+  store.close()
+})
+
+test('ReviewRunStore only queues a run from preparing', () => {
+  const store = createStore()
+  store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-transition',
+    publish_context: {}
+  })
+
+  store.mark_queued('run-transition', { issue: { issue_number: 7 } })
+  assert.equal(store.getRun('run-transition')?.status, 'queued')
+  assert.throws(
+    () => store.mark_queued('run-transition', {}),
+    /cannot transition from preparing to queued/
+  )
+})
+
+test('ReviewRunStore atomically reuses the run admitted for the same ingress request', () => {
+  const store = createStore()
+  const first = store.admit_review_run({
+    workflow: 'repository-review',
+    run_id: 'run-first',
+    publish_context: {},
+    ingress_kind: 'github_actions_dispatch',
+    ingress_key: 'octo/example:12345'
+  })
+  const replay = store.admit_review_run({
+    workflow: 'repository-review',
+    run_id: 'run-second',
+    publish_context: {},
+    ingress_kind: 'github_actions_dispatch',
+    ingress_key: 'octo/example:12345'
+  })
+
+  assert.equal(first.created, true)
+  assert.equal(replay.created, false)
+  assert.equal(replay.record.run_id, 'run-first')
+  assert.equal(store.getRun('run-second'), null)
+})
+
+test('ReviewRunStore removes published runs from active list', () => {
+  const store = createStore()
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-2',
     publish_context: {}
@@ -60,9 +171,9 @@ test('RunnerRunStore removes published runs from active list', () => {
   assert.equal(store.getRun('run-2')?.status, 'published')
 })
 
-test('RunnerRunStore keeps publish failures active for retry', () => {
+test('ReviewRunStore keeps publish failures active for retry', () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-3',
     publish_context: {}
@@ -88,9 +199,9 @@ test('RunnerRunStore keeps publish failures active for retry', () => {
   assert.equal(retryingRecord?.failure_message, null)
 })
 
-test('RunnerRunStore only claims publishable runs for publishing once', () => {
+test('ReviewRunStore only claims publishable runs for publishing once', () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-claim',
     publish_context: {}
@@ -101,11 +212,11 @@ test('RunnerRunStore only claims publishable runs for publishing once', () => {
   assert.equal(store.getRun('run-claim')?.publish_attempts, 0)
 })
 
-test('RunnerRunStore reclaims stale publishing runs', async () => {
-  const store = new RunnerRunStore(':memory:', {
+test('ReviewRunStore reclaims stale publishing runs', async () => {
+  const store = new ReviewRunStore(':memory:', {
     publishingClaimTimeoutMs: 0
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-stale-publishing',
     publish_context: {}
@@ -117,11 +228,11 @@ test('RunnerRunStore reclaims stale publishing runs', async () => {
   assert.equal(store.getRun('run-stale-publishing')?.publish_attempts, 0)
 })
 
-test('RunnerRunStore reclaims stale final publish attempt without exhausting retries', async () => {
-  const store = new RunnerRunStore(':memory:', {
+test('ReviewRunStore reclaims stale final publish attempt without exhausting retries', async () => {
+  const store = new ReviewRunStore(':memory:', {
     publishingClaimTimeoutMs: 0
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-final-attempt',
     publish_context: {}
@@ -147,9 +258,9 @@ test('RunnerRunStore reclaims stale final publish attempt without exhausting ret
   assert.equal(reclaimedRecord?.failure_message, null)
 })
 
-test('RunnerRunStore stops listing publish failures after max publish attempts', () => {
+test('ReviewRunStore stops listing publish failures after max publish attempts', () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-4',
     publish_context: {}
@@ -169,31 +280,31 @@ test('RunnerRunStore stops listing publish failures after max publish attempts',
   assert.equal(store.listActiveRuns().length, 0)
 })
 
-test('RunnerRunStore exposes publish lifecycle diagnostics', () => {
+test('ReviewRunStore exposes publish lifecycle diagnostics', () => {
   const store = createStore()
   const publish_context = {}
 
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-queued',
     publish_context
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-published',
     publish_context
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-failed',
     publish_context
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-publish-failed',
     publish_context
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-retry-exhausted',
     publish_context
@@ -243,31 +354,31 @@ test('RunnerRunStore exposes publish lifecycle diagnostics', () => {
   assert.equal(diagnostics.get('run-retry-exhausted')?.publish_attempts_remaining, 0)
 })
 
-test('RunnerRunStore filters diagnostics by status and lifecycle state', () => {
+test('ReviewRunStore filters diagnostics by status and lifecycle state', () => {
   const store = createStore()
   const publish_context = {}
 
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-queued',
     publish_context
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-published',
     publish_context
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-failed',
     publish_context
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-publish-failed',
     publish_context
   })
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-retry-exhausted',
     publish_context

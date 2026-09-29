@@ -41,12 +41,19 @@ function reviewRecordWithMitigation (mitigation: TestMitigation): ReviewRecord {
   } as ReviewRecord
 }
 
-function createOctokitMock () {
+function createOctokitMock ({
+  existingPullRequests = [],
+  createRefError
+}: {
+  existingPullRequests?: Array<{ title: string, body: string | null, html_url: string, number: number }>
+  createRefError?: Error & { status?: number }
+} = {}) {
   const calls = {
     blobs: [] as Array<{ content: string, encoding: 'utf-8' | 'base64' }>,
     trees: [] as Array<Array<{ path: string, mode: FileMode, type: 'blob', sha: string | null }>>,
     commits: [] as Array<{ message: string, tree: string, parents: string[] }>,
     refs: [] as Array<{ ref: string, sha: string }>,
+    updatedRefs: [] as Array<{ ref: string, sha: string, force: boolean }>,
     pulls: [] as Array<{ title: string, head: string, base: string, body: string, draft: boolean }>
   }
 
@@ -69,10 +76,18 @@ function createOctokitMock () {
         },
         createRef: async ({ ref, sha }: { ref: string, sha: string }) => {
           calls.refs.push({ ref, sha })
+          if (createRefError) {
+            throw createRefError
+          }
+          return { data: {} }
+        },
+        updateRef: async ({ ref, sha, force }: { ref: string, sha: string, force: boolean }) => {
+          calls.updatedRefs.push({ ref, sha, force })
           return { data: {} }
         }
       },
       pulls: {
+        list: async () => ({ data: existingPullRequests }),
         create: async ({ title, head, base, body, draft }: { title: string, head: string, base: string, body: string, draft: boolean }) => {
           calls.pulls.push({ title, head, base, body, draft })
           return {
@@ -86,6 +101,74 @@ function createOctokitMock () {
     }
   }
 }
+
+test('issue draft PR reuses an existing run branch PR without creating git objects', async () => {
+  const octokit = createOctokitMock({
+    existingPullRequests: [{
+      title: 'Existing fix',
+      body: 'Existing body',
+      html_url: 'https://example.test/pull/9',
+      number: 9
+    }]
+  })
+  const result = await createDraftPullRequestFromIssueReviewRecord({
+    octokit: octokit as unknown as CreateDraftPrOctokit,
+    issue: {
+      issue_number: 42,
+      owner_login: 'octo-org',
+      repo_name: 'example-repo',
+      default_branch: 'main'
+    },
+    run_id: 'run-12345678',
+    workspace_ref: 'base-sha',
+    review_record: reviewRecordWithMitigation({
+      file_changes: [{
+        path: 'src/app.txt',
+        status: 'upsert',
+        content: 'fixed\n',
+        content_encoding: 'utf-8'
+      }]
+    })
+  })
+
+  assert.equal(result?.number, 9)
+  assert.equal(octokit.calls.blobs.length, 0)
+  assert.equal(octokit.calls.commits.length, 0)
+})
+
+test('issue draft PR retry updates a branch left by a partial prior attempt', async () => {
+  const createRefError = Object.assign(new Error('Reference already exists'), { status: 422 })
+  const octokit = createOctokitMock({ createRefError })
+  const review_record = reviewRecordWithMitigation({
+    file_changes: [{
+      path: 'src/app.txt',
+      status: 'upsert',
+      content: 'fixed\n',
+      content_encoding: 'utf-8'
+    }]
+  })
+  review_record.verification.patch_coverage = 'full'
+
+  const result = await createDraftPullRequestFromIssueReviewRecord({
+    octokit: octokit as unknown as CreateDraftPrOctokit,
+    issue: {
+      issue_number: 42,
+      owner_login: 'octo-org',
+      repo_name: 'example-repo',
+      default_branch: 'main'
+    },
+    run_id: 'run-12345678',
+    workspace_ref: 'base-sha',
+    review_record
+  })
+
+  assert.equal(result?.number, 1)
+  assert.deepEqual(octokit.calls.updatedRefs, [{
+    ref: 'heads/sec-review-bot/issue-42-12345678',
+    sha: 'commit-sha',
+    force: true
+  }])
+})
 
 test('issue draft PR publishes from review_record file_changes without workspace reads', async () => {
   const octokit = createOctokitMock()

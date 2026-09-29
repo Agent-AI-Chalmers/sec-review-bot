@@ -45,7 +45,7 @@ const app_state_root = nodePath.resolve(
   process.cwd(),
   process.env['SEC_REVIEW_APP_STATE_ROOT'] || '.agent-app-state'
 )
-const runner_run_state_db_path = nodePath.join(app_state_root, 'runner-runs.sqlite')
+const review_run_state_db_path = nodePath.join(app_state_root, 'review-runs.sqlite')
 
 export {
   app_id,
@@ -60,5 +60,5 @@ export {
   repository_review_dispatch_read_timeout_ms,
   input_bundle_staging_root,
   app_state_root,
-  runner_run_state_db_path
+  review_run_state_db_path
 }

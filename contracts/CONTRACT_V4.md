@@ -329,6 +329,12 @@ interface RepositoryDelivery {
 
 `RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry final `file_changes`; display file paths are derived from `file_changes[].path`. `case_ids` links back to case-level review details in top-level `case_results[]`.
 
+### Validation Ownership
+
+JSON Schema owns the transport shape: required fields, JSON types, enums, tagged variants, and additional-field policy. Consumers must validate a complete v4 result before interpreting it; they must not coerce an invalid value into a valid one.
+
+Schema does not replace domain code. Cross-field workflow rules remain with the workflow that makes the decision, while consumers remain responsible for side-effect policy such as safe repository paths, GitHub permissions, publication eligibility, and retry behavior.
+
 ## 3. Compatibility
 
 The following changes are breaking changes:

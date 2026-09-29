@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import type {
-  RunnerRunDiagnosticRecord,
-  RunnerRunDiagnosticsOptions,
-  RunnerRunStatus
-} from '../infrastructure/runner/run-store.js'
+  ReviewRunDiagnosticRecord,
+  ReviewRunDiagnosticsOptions,
+  ReviewRunStatus
+} from '../infrastructure/runner/review-store.js'
 
 interface DiagnosticsOptions {
   active_only: boolean
@@ -11,11 +11,11 @@ interface DiagnosticsOptions {
   help: boolean
   json: boolean
   limit: number
-  status: RunnerRunStatus | null
+  status: ReviewRunStatus | null
 }
 
 const DEFAULT_LIMIT = 25
-const RUN_STATUSES: RunnerRunStatus[] = [
+const RUN_STATUSES: ReviewRunStatus[] = [
   'queued',
   'running',
   'publishing',
@@ -41,7 +41,7 @@ export function parseDiagnosticsArgs (args: string[]): DiagnosticsOptions {
   let help = false
   let json = false
   let limit = DEFAULT_LIMIT
-  let status: RunnerRunStatus | null = null
+  let status: ReviewRunStatus | null = null
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
@@ -89,14 +89,14 @@ export function parseDiagnosticsArgs (args: string[]): DiagnosticsOptions {
   return { active_only, failed_only, help, json, limit, status }
 }
 
-function parseStatusOption (value: string | undefined): RunnerRunStatus {
+function parseStatusOption (value: string | undefined): ReviewRunStatus {
   if (value === undefined || value.trim() === '' || value.startsWith('--')) {
     throw new Error('--status requires a runner run status value.')
   }
-  if (!RUN_STATUSES.includes(value as RunnerRunStatus)) {
+  if (!RUN_STATUSES.includes(value as ReviewRunStatus)) {
     throw new Error(`--status must be one of: ${RUN_STATUSES.join(', ')}.`)
   }
-  return value as RunnerRunStatus
+  return value as ReviewRunStatus
 }
 
 function boolText (value: boolean): string {
@@ -110,7 +110,7 @@ function truncate (value: string, maxLength: number): string {
   return `${value.slice(0, Math.max(0, maxLength - 3))}...`
 }
 
-function cellValue (run: RunnerRunDiagnosticRecord, column: string): string {
+function cellValue (run: ReviewRunDiagnosticRecord, column: string): string {
   if (column === 'run_id') return run.run_id
   if (column === 'workflow') return run.workflow
   if (column === 'status') return run.status
@@ -124,7 +124,7 @@ function cellValue (run: RunnerRunDiagnosticRecord, column: string): string {
   throw new Error(`Unknown diagnostics column: ${column}`)
 }
 
-export function formatRunnerRunDiagnostics (runs: RunnerRunDiagnosticRecord[]): string {
+export function formatReviewRunDiagnostics (runs: ReviewRunDiagnosticRecord[]): string {
   const columns = [
     'run_id',
     'workflow',
@@ -156,9 +156,9 @@ export function formatRunnerRunDiagnostics (runs: RunnerRunDiagnosticRecord[]): 
 
 export function diagnosticsHelp (): string {
   return [
-    'Usage: sec-review-runner-runs [options]',
+    'Usage: sec-review-review-runs [options]',
     '',
-    'Print recent GitHub integration runner run publication state.',
+    'Print recent GitHub integration review run publication state.',
     '',
     'Options:',
     '  --limit <n>        Maximum number of rows to print. Defaults to 25.',
@@ -170,7 +170,7 @@ export function diagnosticsHelp (): string {
   ].join('\n')
 }
 
-function diagnosticsStoreOptions (options: DiagnosticsOptions): RunnerRunDiagnosticsOptions {
+function diagnosticsStoreOptions (options: DiagnosticsOptions): ReviewRunDiagnosticsOptions {
   return {
     limit: options.limit,
     ...(options.status ? { status: options.status } : {}),
@@ -187,13 +187,13 @@ async function main (): Promise<void> {
   }
 
   process.env.DOTENV_CONFIG_QUIET = process.env.DOTENV_CONFIG_QUIET ?? 'true'
-  const { runnerRunStore } = await import('../infrastructure/runner/run-store.js')
-  const runs = runnerRunStore.listRunsForDiagnostics(diagnosticsStoreOptions(options))
+  const { reviewRunStore } = await import('../infrastructure/runner/review-store.js')
+  const runs = reviewRunStore.listRunsForDiagnostics(diagnosticsStoreOptions(options))
   if (options.json) {
     console.log(JSON.stringify(runs, null, 2))
     return
   }
-  console.log(formatRunnerRunDiagnostics(runs))
+  console.log(formatReviewRunDiagnostics(runs))
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

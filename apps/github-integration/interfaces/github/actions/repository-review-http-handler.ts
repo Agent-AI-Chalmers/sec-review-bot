@@ -20,6 +20,7 @@ import {
 } from '../../../triggers/repository-review.js'
 import { logError } from '../../../utils/logger.js'
 import type { App } from 'octokit'
+import { reviewExecutionTracker } from '../../../infrastructure/review-execution-tracker.js'
 
 interface DispatchContext {
   app: App
@@ -27,6 +28,12 @@ interface DispatchContext {
   response: ServerResponse
   dispatchReview?: typeof dispatchRepositoryReview
   oidcVerifier?: GitHubActionsOidcVerifier
+}
+
+interface DispatchAdmission {
+  run_id: string
+  status: string
+  replayed: boolean
 }
 
 function writeJson (response: ServerResponse, status_code: number, value: Record<string, unknown>): void {
@@ -152,6 +159,7 @@ export async function handleRepositoryReviewDispatch ({ app, request, response, 
 
   const repo_full_name = String(payload.repo_full_name ?? '').trim()
   const target_branch = String(payload.target_branch ?? '').trim()
+  const correlation_id = String(payload.correlation_id ?? '').trim()
 
   if (!repo_full_name) {
     writeJson(response, 400, {
@@ -165,6 +173,14 @@ export async function handleRepositoryReviewDispatch ({ app, request, response, 
     writeJson(response, 400, {
       ok: false,
       error: 'target_branch is required.'
+    })
+    return
+  }
+
+  if (!correlation_id || correlation_id.length > 128) {
+    writeJson(response, 400, {
+      ok: false,
+      error: 'correlation_id is required and must not exceed 128 characters.'
     })
     return
   }
@@ -185,8 +201,9 @@ export async function handleRepositoryReviewDispatch ({ app, request, response, 
     return
   }
 
+  let oidcClaims
   try {
-    await authorizeRepositoryReviewDispatchOidc({
+    oidcClaims = await authorizeRepositoryReviewDispatchOidc({
       headers: request.headers,
       payload_repo_full_name: repo_full_name,
       payload_target_branch: target_branch,
@@ -203,17 +220,30 @@ export async function handleRepositoryReviewDispatch ({ app, request, response, 
     throw error
   }
 
-  try {
-    const submitted = await dispatchReview({
-      app,
-      payload
-    })
+  let resolveAdmission: (admission: DispatchAdmission) => void
+  const admissionPromise = new Promise<DispatchAdmission>((resolve) => { resolveAdmission = resolve })
+  const execution = dispatchReview({
+    app,
+    payload,
+    verified_repository: oidcClaims.repository,
+    on_admitted: resolveAdmission!
+  })
+  reviewExecutionTracker.start(execution, {
+    ingress: 'repository-review-dispatch',
+    repo: repo_full_name
+  })
 
+  try {
+    const admission = await Promise.race([
+      admissionPromise,
+      execution.then((submitted) => ({ run_id: submitted.run_id, status: 'queued', replayed: false }))
+    ])
     writeJson(response, 202, {
       ok: true,
       accepted: true,
-      status: 'queued',
-      run_id: submitted.run_id,
+      status: admission.status,
+      replayed: admission.replayed,
+      run_id: admission.run_id,
       repo_full_name,
       summary_issue_url: null
     })

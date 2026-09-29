@@ -113,7 +113,7 @@ test('parseReviewRecord rejects deleted file changes with content', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /mitigation\.file_changes\[0].*unsupported field "content"/
+    /review_record does not match contract v4/
   )
 })
 
@@ -129,7 +129,7 @@ test('parseReviewRecord rejects upsert file changes without content encoding', (
 
   assert.throws(
     () => parseReviewRecord(record),
-    /mitigation\.file_changes\[0]\.content_encoding is required/
+    /review_record does not match contract v4/
   )
 })
 
@@ -147,7 +147,7 @@ test('parseReviewRecord rejects file changes with unsupported fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /mitigation\.file_changes\[0].*unsupported field "sha"/
+    /review_record does not match contract v4/
   )
 })
 
@@ -162,7 +162,7 @@ test('parseReviewRecord rejects unsafe file change paths', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /Unsafe repository file path/
+    /review_record does not match contract v4/
   )
 })
 
@@ -177,7 +177,7 @@ test('parseReviewRecord rejects file change paths with surrounding whitespace', 
 
   assert.throws(
     () => parseReviewRecord(record),
-    /mitigation\.file_changes\[0]\.path must not include leading or trailing whitespace/
+    /review_record does not match contract v4/
   )
 })
 
@@ -187,7 +187,7 @@ test('parseReviewRecord rejects unsupported public fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /analysis has unsupported field "status"/
+    /review_record does not match contract v4/
   )
 })
 
@@ -204,7 +204,7 @@ test('parseReviewRecord rejects invalid cvss field types', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /cvss\.base_score must be a number from 0 to 10 or null/
+    /review_record does not match contract v4/
   )
 })
 
@@ -217,7 +217,7 @@ test('parseReviewRecord rejects malformed v4 review_record', () => {
         narratives: []
       }
     }),
-    /mitigation is required/
+    /review_record does not match contract v4/
   )
 })
 
@@ -227,7 +227,7 @@ test('parseReviewRecord rejects unknown public enum values', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /verification\.patch_coverage has unknown value/
+    /review_record does not match contract v4/
   )
 })
 
@@ -237,6 +237,16 @@ test('parseReviewRecord rejects removed public status fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /mitigation has unsupported field "status"/
+    /review_record does not match contract v4/
+  )
+})
+
+test('parseReviewRecord rejects numeric changed_files instead of coercing them', () => {
+  const record = validReviewRecord()
+  record.mitigation.changed_files = [123] as unknown as string[]
+
+  assert.throws(
+    () => parseReviewRecord(record),
+    /review_record does not match contract v4/
   )
 })

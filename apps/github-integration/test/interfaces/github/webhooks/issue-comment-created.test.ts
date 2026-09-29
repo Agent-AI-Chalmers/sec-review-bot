@@ -127,6 +127,7 @@ test('issue-comment-created skips manual command when commenter lacks write perm
 
   await handleIssueCommentCreatedWithDeps(
     {
+      id: 'delivery-test',
       octokit: {},
       payload: createIssueCommentPayload()
     },
@@ -156,6 +157,7 @@ test('issue-comment-created starts issue manual review for write commenter', asy
 
   await handleIssueCommentCreatedWithDeps(
     {
+      id: 'delivery-test',
       octokit: {},
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review repair'
@@ -178,6 +180,7 @@ test('issue-comment-created starts pull request manual review for write commente
 
   await handleIssueCommentCreatedWithDeps(
     {
+      id: 'delivery-test',
       octokit: {},
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review',
@@ -187,8 +190,10 @@ test('issue-comment-created starts pull request manual review for write commente
     {
       authorizeManualCommentCommandFn: async () => authorizationDecision(),
       getPullRequestContextFn: async () => pullRequestContext(),
-      startPullRequestReviewCommandFn: async ({ pr }) => {
+      startPullRequestReviewCommandFn: async ({ resolve_pr }) => {
         pullRequestReviewCalled = true
+        const pr = await resolve_pr?.()
+        assert.ok(pr)
         return submittedPullRequestRun(pr)
       }
     }
@@ -197,3 +202,34 @@ test('issue-comment-created starts pull request manual review for write commente
   assert.equal(pullRequestReviewCalled, true)
 }
 )
+
+test('issue-comment-created delegates PR context loading until after command admission', async () => {
+  let contextLoaded = false
+  let commandStarted = false
+
+  await handleIssueCommentCreatedWithDeps(
+    {
+      id: 'delivery-pr-context',
+      octokit: {},
+      payload: createIssueCommentPayload({ body: '@sec-review-bot review', is_pull_request: true })
+    },
+    {
+      authorizeManualCommentCommandFn: async () => authorizationDecision(),
+      getPullRequestContextFn: async () => {
+        contextLoaded = true
+        throw new Error('GitHub PR lookup failed')
+      },
+      startPullRequestReviewCommandFn: async ({ resolve_pr, on_admitted }) => {
+        commandStarted = true
+        assert.equal(contextLoaded, false)
+        assert.ok(resolve_pr)
+        on_admitted?.({ run_id: 'run-pr-context', status: 'preparing', replayed: false })
+        await assert.rejects(resolve_pr(), /GitHub PR lookup failed/)
+        return { run_id: 'run-pr-context' }
+      }
+    }
+  )
+
+  assert.equal(commandStarted, true)
+  assert.equal(contextLoaded, true)
+})

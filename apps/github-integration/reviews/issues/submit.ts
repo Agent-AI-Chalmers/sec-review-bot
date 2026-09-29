@@ -4,8 +4,10 @@ import { prepareIssueReviewInput } from './prepare-input.js'
 import { submitRunnerRun } from '../../infrastructure/runner/client.js'
 import { logInfo } from '../../utils/logger.js'
 import type { IssueReviewInput } from '../../infrastructure/runner/input.js'
+import { createRunId } from '../shared/input-bundle.js'
 
 interface RunIssueReviewArgs {
+  run_id?: string
   octokit: unknown
   issue: IssueContext
   event_type?: 'opened' | 'manual_review' | null
@@ -28,6 +30,7 @@ function assertIssueReviewInput (input: IssueReviewInput): asserts input is Issu
 }
 
 async function materializeIssueReviewInput ({
+  run_id,
   octokit,
   issue,
   event_type = 'manual_review',
@@ -53,6 +56,7 @@ async function materializeIssueReviewInput ({
   })
 
   const prepared = await prepareIssueReviewInput({
+    ...(run_id ? { run_id } : {}),
     octokit: octokit as GitHubAppOctokit,
     issue,
     review_objective: resolvedReviewObjective,
@@ -80,15 +84,12 @@ async function materializeIssueReviewInput ({
 }
 
 export async function startIssueReviewRun (args: RunIssueReviewArgs): Promise<SubmittedIssueReviewRun> {
-  const prepared = await materializeIssueReviewInput(args)
+  const run_id = args.run_id ?? createRunId()
+  const prepared = await materializeIssueReviewInput({ ...args, run_id })
   const input = prepared.input
   const event_type = args.event_type ?? 'manual_review'
   assertIssueReviewInput(input)
-  const submitted = await submitRunnerRun({
-    workflow: 'issue-review',
-    run_id: prepared.run_id,
-    input
-  })
+  const submitted = await submitRunnerRun({ workflow: 'issue-review', run_id: prepared.run_id, input })
   logInfo('issue_review_runner_run_submitted', {
     event_type,
     issue: args.issue.issue_number,

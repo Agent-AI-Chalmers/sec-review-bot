@@ -5,6 +5,7 @@ import { startIssueReviewCommand } from '../../triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../triggers/pull-request-review.js'
 import type { IssueContext } from '../../infrastructure/github/issue-service.js'
 import type { PullRequestContext } from '../../infrastructure/github/pull-request-service.js'
+import { RunnerSubmissionUncertainError } from '../../infrastructure/runner/client.js'
 
 function issueContext (): IssueContext {
   return {
@@ -62,14 +63,17 @@ function pullRequestContext (): PullRequestContext {
 
 test('startIssueReviewCommand starts and persists a queued issue review run', async () => {
   const issue = issueContext()
-  const saved_runs: unknown[] = []
+  const transitions: unknown[] = []
 
   const submitted = await startIssueReviewCommand({
     octokit: {},
     issue,
     event_type: 'opened',
+    delivery_id: 'delivery-issue-1',
     deps: {
-      start_review: async ({ issue: submittedIssue, event_type, review_objective, repair_mode }) => {
+      create_run_id: () => 'run-issue-1',
+      start_review: async ({ issue: submittedIssue, run_id, event_type, review_objective, repair_mode }) => {
+        assert.equal(run_id, 'run-issue-1')
         assert.equal(event_type, 'opened')
         assert.equal(review_objective, 'audit')
         assert.equal(repair_mode, null)
@@ -82,37 +86,47 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         }
       },
       store: {
-        save_queued_run: (run) => {
-          saved_runs.push(run)
-          return run as never
-        }
+        admit_review_run: (run) => {
+          transitions.push(['preparing', run])
+          return { record: run, created: true } as never
+        },
+        mark_queued: (run_id, publish_context) => transitions.push(['queued', run_id, publish_context]),
+        markFailed: () => assert.fail('successful review must not be marked failed')
       }
     }
   })
 
   assert.equal(submitted.run_id, 'run-issue-1')
-  assert.deepEqual(saved_runs, [{
-    workflow: 'issue-review',
-    run_id: 'run-issue-1',
-    publish_context: {
+  assert.deepEqual(transitions, [
+    ['preparing', {
+      workflow: 'issue-review',
+      run_id: 'run-issue-1',
+      publish_context: {},
+      ingress_kind: 'github_webhook',
+      ingress_key: 'delivery-issue-1'
+    }],
+    ['queued', 'run-issue-1', {
       issue,
       workspace_ref: 'workspace-ref',
       event_type: 'opened'
-    }
-  }])
+    }]
+  ])
 })
 
 test('startPullRequestReviewCommand starts and persists a queued PR review run', async () => {
   const pr = pullRequestContext()
-  const saved_runs: unknown[] = []
+  const transitions: unknown[] = []
 
   const submitted = await startPullRequestReviewCommand({
     octokit: {},
     pr,
     event_type: 'manual_review',
+    delivery_id: 'delivery-pr-1',
     repair_mode: 'no-test-changes',
     deps: {
-      start_review: async ({ pr: submittedPr, event_type, repair_mode }) => {
+      create_run_id: () => 'run-pr-1',
+      start_review: async ({ pr: submittedPr, run_id, event_type, repair_mode }) => {
+        assert.equal(run_id, 'run-pr-1')
         assert.equal(event_type, 'manual_review')
         assert.equal(repair_mode, 'no-test-changes')
         return {
@@ -124,22 +138,218 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         }
       },
       store: {
-        save_queued_run: (run) => {
-          saved_runs.push(run)
-          return run as never
-        }
+        admit_review_run: (run) => {
+          transitions.push(['preparing', run])
+          return { record: run, created: true } as never
+        },
+        mark_queued: (run_id, publish_context) => transitions.push(['queued', run_id, publish_context]),
+        markFailed: () => assert.fail('successful review must not be marked failed')
       }
     }
   })
 
   assert.equal(submitted.run_id, 'run-pr-1')
-  assert.deepEqual(saved_runs, [{
-    workflow: 'pull-request-review',
-    run_id: 'run-pr-1',
-    publish_context: {
+  assert.deepEqual(transitions, [
+    ['preparing', {
+      workflow: 'pull-request-review',
+      run_id: 'run-pr-1',
+      publish_context: {},
+      ingress_kind: 'github_webhook',
+      ingress_key: 'delivery-pr-1'
+    }],
+    ['queued', 'run-pr-1', {
       files: [{ filename: 'src/app.ts' }],
       pr,
       event_type: 'manual_review'
+    }]
+  ])
+})
+
+test('startPullRequestReviewCommand records a failed run when preparation or submission fails', async () => {
+  const transitions: unknown[] = []
+
+  await assert.rejects(
+    startPullRequestReviewCommand({
+      octokit: {},
+      pr: pullRequestContext(),
+      event_type: 'opened',
+      delivery_id: 'delivery-pr-failed',
+      deps: {
+        create_run_id: () => 'run-pr-failed',
+        start_review: async ({ run_id }) => {
+          assert.equal(run_id, 'run-pr-failed')
+          throw new Error('workspace clone failed')
+        },
+        store: {
+          admit_review_run: (run) => {
+            transitions.push(['preparing', run])
+            return { record: run, created: true } as never
+          },
+          mark_queued: () => assert.fail('failed review must not be queued'),
+          markFailed: (run_id, error) => transitions.push(['failed', run_id, error])
+        }
+      }
+    }),
+    /workspace clone failed/
+  )
+
+  assert.deepEqual(transitions, [
+    ['preparing', {
+      workflow: 'pull-request-review',
+      run_id: 'run-pr-failed',
+      publish_context: {},
+      ingress_kind: 'github_webhook',
+      ingress_key: 'delivery-pr-failed'
+    }],
+    ['failed', 'run-pr-failed', { code: 'REVIEW_START_FAILED', message: 'workspace clone failed' }]
+  ])
+})
+
+test('startIssueReviewCommand preserves an uncertain Runner submission for replay', async () => {
+  const transitions: unknown[] = []
+  const error = new RunnerSubmissionUncertainError('Runner response was lost.')
+
+  await assert.rejects(
+    startIssueReviewCommand({
+      octokit: {},
+      issue: issueContext(),
+      event_type: 'opened',
+      delivery_id: 'delivery-uncertain',
+      deps: {
+        create_run_id: () => 'run-uncertain',
+        start_review: async () => { throw error },
+        store: {
+          admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true }) as never,
+          mark_queued: () => assert.fail('uncertain submission must not queue yet'),
+          markFailed: (run_id, failure) => transitions.push([run_id, failure])
+        }
+      }
+    }),
+    error
+  )
+
+  assert.deepEqual(transitions, [[
+    'run-uncertain',
+    { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
+  ]])
+})
+
+test('startPullRequestReviewCommand preserves an uncertain Runner submission for replay', async () => {
+  const transitions: unknown[] = []
+  const error = new RunnerSubmissionUncertainError('Runner response was lost.')
+
+  await assert.rejects(
+    startPullRequestReviewCommand({
+      octokit: {},
+      pr: pullRequestContext(),
+      event_type: 'opened',
+      delivery_id: 'delivery-pr-uncertain',
+      deps: {
+        create_run_id: () => 'run-pr-uncertain',
+        start_review: async () => { throw error },
+        store: {
+          admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true }) as never,
+          mark_queued: () => assert.fail('uncertain submission must not queue yet'),
+          markFailed: (run_id, failure) => transitions.push([run_id, failure])
+        }
+      }
+    }),
+    error
+  )
+
+  assert.deepEqual(transitions, [[
+    'run-pr-uncertain',
+    { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
+  ]])
+})
+
+test('startPullRequestReviewCommand admits a comment delivery before loading PR context', async () => {
+  const transitions: unknown[] = []
+
+  await assert.rejects(
+    startPullRequestReviewCommand({
+      octokit: {},
+      event_type: 'manual_review',
+      delivery_id: 'delivery-context-failure',
+      resolve_pr: async () => {
+        transitions.push(['context'])
+        throw new Error('GitHub PR lookup failed')
+      },
+      deps: {
+        create_run_id: () => 'run-context-failure',
+        start_review: async () => assert.fail('review must not start without PR context'),
+        store: {
+          admit_review_run: (run) => {
+            transitions.push(['preparing', run.run_id])
+            return { record: { ...run, status: 'preparing' }, created: true } as never
+          },
+          mark_queued: () => assert.fail('failed context lookup must not queue'),
+          markFailed: (run_id, error) => transitions.push(['failed', run_id, error])
+        }
+      }
+    }),
+    /GitHub PR lookup failed/
+  )
+
+  assert.deepEqual(transitions, [
+    ['preparing', 'run-context-failure'],
+    ['context'],
+    ['failed', 'run-context-failure', { code: 'REVIEW_START_FAILED', message: 'GitHub PR lookup failed' }]
+  ])
+})
+
+test('startPullRequestReviewCommand reuses a webhook delivery without starting another review', async () => {
+  let starts = 0
+  const submitted = await startPullRequestReviewCommand({
+    octokit: {},
+    pr: pullRequestContext(),
+    event_type: 'opened',
+    delivery_id: 'delivery-1',
+    deps: {
+      create_run_id: () => 'run-new',
+      start_review: async () => {
+        starts += 1
+        throw new Error('replayed delivery must not start')
+      },
+      store: {
+        admit_review_run: () => ({
+          created: false,
+          record: { run_id: 'run-original', status: 'queued' } as never
+        }),
+        mark_queued: () => assert.fail('replayed delivery must not queue again'),
+        markFailed: () => assert.fail('replayed delivery must not change the original run')
+      }
     }
-  }])
+  })
+
+  assert.equal(submitted.run_id, 'run-original')
+  assert.equal(starts, 0)
+})
+
+test('startIssueReviewCommand reuses a webhook delivery without starting another review', async () => {
+  let starts = 0
+  const submitted = await startIssueReviewCommand({
+    octokit: {},
+    issue: issueContext(),
+    event_type: 'opened',
+    delivery_id: 'delivery-issue-1',
+    deps: {
+      create_run_id: () => 'run-unused',
+      start_review: async () => {
+        starts += 1
+        throw new Error('replayed delivery must not start')
+      },
+      store: {
+        admit_review_run: () => ({
+          created: false,
+          record: { run_id: 'run-original', status: 'queued' } as never
+        }),
+        mark_queued: () => assert.fail('replayed delivery must not queue again'),
+        markFailed: () => assert.fail('replayed delivery must not change the original run')
+      }
+    }
+  })
+
+  assert.equal(submitted.run_id, 'run-original')
+  assert.equal(starts, 0)
 })

@@ -3,12 +3,12 @@ import test from 'node:test'
 
 import {
   diagnosticsHelp,
-  formatRunnerRunDiagnostics,
+  formatReviewRunDiagnostics,
   parseDiagnosticsArgs
 } from '../../tools/runner-run-diagnostics.js'
-import type { RunnerRunDiagnosticRecord } from '../../infrastructure/runner/run-store.js'
+import type { ReviewRunDiagnosticRecord } from '../../infrastructure/runner/review-store.js'
 
-function diagnosticRun (overrides: Partial<RunnerRunDiagnosticRecord> = {}): RunnerRunDiagnosticRecord {
+function diagnosticRun (overrides: Partial<ReviewRunDiagnosticRecord> = {}): ReviewRunDiagnosticRecord {
   return {
     run_id: 'run-1',
     workflow: 'issue-review',
@@ -101,14 +101,14 @@ test('runner run diagnostics rejects invalid limit options', () => {
 test('runner run diagnostics help documents filters', () => {
   const help = diagnosticsHelp()
 
-  assert.match(help, /Usage: sec-review-runner-runs/)
+  assert.match(help, /Usage: sec-review-review-runs/)
   assert.match(help, /--status <status>/)
   assert.match(help, /--active-only/)
   assert.match(help, /--failed-only/)
 })
 
 test('runner run diagnostics formats run state table', () => {
-  const table = formatRunnerRunDiagnostics([
+  const table = formatReviewRunDiagnostics([
     diagnosticRun(),
     diagnosticRun({
       run_id: 'run-2',

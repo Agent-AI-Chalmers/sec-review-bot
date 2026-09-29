@@ -10,6 +10,7 @@ export interface GitHubErrorResponse {
 export interface ErrorWithResponse {
   message: string | undefined
   name: string | undefined
+  status: number | undefined
   response: GitHubErrorResponse | undefined
 }
 
@@ -38,25 +39,32 @@ function toGitHubErrorResponse (value: unknown): GitHubErrorResponse | undefined
 
 export function asErrorWithResponse (error: unknown): ErrorWithResponse {
   if (error instanceof Error) {
-    const withMaybeResponse = error as Error & { response?: unknown }
+    const withMaybeGitHubFields = error as Error & { response?: unknown, status?: unknown }
+    const response = toGitHubErrorResponse(withMaybeGitHubFields.response)
     return {
       message: error.message,
       name: error.name,
-      response: toGitHubErrorResponse(withMaybeResponse.response)
+      status: typeof withMaybeGitHubFields.status === 'number'
+        ? withMaybeGitHubFields.status
+        : response?.status,
+      response
     }
   }
 
   if (isRecord(error)) {
+    const response = toGitHubErrorResponse(error.response)
     return {
       message: typeof error.message === 'string' ? error.message : undefined,
       name: typeof error.name === 'string' ? error.name : undefined,
-      response: toGitHubErrorResponse(error.response)
+      status: typeof error.status === 'number' ? error.status : response?.status,
+      response
     }
   }
 
   return {
     message: String(error),
     name: undefined,
+    status: undefined,
     response: undefined
   }
 }

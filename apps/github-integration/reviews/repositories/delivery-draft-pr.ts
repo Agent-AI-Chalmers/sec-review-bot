@@ -4,6 +4,7 @@ import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import type { FileChange, FileMode, TextEncoding } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import type { RepositoryCaseResult, RepositoryDelivery } from './result.js'
+import { asErrorWithResponse } from '../../utils/error-utils.js'
 
 interface RepositoryContext {
   owner_login: string
@@ -32,10 +33,6 @@ interface DraftPullRequestSummary {
   html_url: string
   number: number
   reused: boolean
-}
-
-interface GitHubLikeError {
-  status?: number
 }
 
 function sanitizeBranchSegment (value: unknown): string {
@@ -223,7 +220,7 @@ export async function createRepositoryDeliveryDraftPr ({
       sha: newCommitResponse.data.sha
     })
   } catch (error) {
-    const status = (error as GitHubLikeError | null)?.status
+    const status = asErrorWithResponse(error).status
     if (status !== 422) {
       throw error
     }

@@ -67,7 +67,7 @@ test('app input preparers isolate input bundle root by run id', async () => {
     const source = await readPackageSource(relativePath)
     assert.match(
       source,
-      /const run_id = createRunId\(\)[\s\S]*const input_bundle_root = createInputBundleRoot\([\s\S]*run_id[\s\S]*\)/,
+      /const run_id = (?:provided_run_id \?\? )?createRunId\(\)[\s\S]*const input_bundle_root = createInputBundleRoot\([\s\S]*run_id[\s\S]*\)/,
       `${relativePath} must include run_id when constructing the input bundle root`
     )
   }
