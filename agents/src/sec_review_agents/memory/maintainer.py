@@ -282,15 +282,6 @@ async def _maintain_memory_with_result_locked(
                     observations=selected_rows,
                 )
 
-        if not selected_rows:
-            return MemoryMaintenanceResult(
-                summary=_summary_with_memory_hygiene(
-                    memory_store_dir,
-                    "No pending memory observations selected.",
-                ),
-                processed_count=0,
-            )
-
     return MemoryMaintenanceResult(
         summary=_summary_with_memory_hygiene(
             memory_store_dir,

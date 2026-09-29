@@ -215,13 +215,9 @@ def test_transcript_extraction_prompt_extracts_observation_only() -> None:
     assert "prompt snapshots" not in user_prompt
 
 
-def test_memory_maintenance_prompt_handles_an_empty_selection() -> None:
-    """Tell maintenance not to invent work when no observations were selected."""
-    maintenance_user_prompt = build_maintenance_prompt([])
-
-    assert "Selected Observations" in maintenance_user_prompt
-    assert "No pending observations were selected" in maintenance_user_prompt
-    assert "leave memory unchanged" in maintenance_user_prompt
+def test_memory_maintenance_prompt_requires_an_observation() -> None:
+    with pytest.raises(ValueError, match="requires at least one observation"):
+        build_maintenance_prompt([])
 
 
 def test_initialize_memory_store_seeds_external_memory(tmp_path: Path) -> None:
