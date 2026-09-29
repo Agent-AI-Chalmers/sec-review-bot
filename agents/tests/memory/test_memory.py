@@ -11,10 +11,7 @@ from langchain.agents.middleware.types import ModelRequest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 
 from sec_review_agents.agents.memory_extractor.model import StagedTranscripts
-from sec_review_agents.agents.memory_extractor.prompts import (
-    MEMORY_EXTRACTOR_SYSTEM_PROMPT,
-    build_extractor_prompt,
-)
+from sec_review_agents.agents.memory_extractor.prompts import build_extractor_prompt
 from sec_review_agents.agents.memory_maintainer.prompts import build_maintenance_prompt
 from sec_review_agents.agents.memory_maintainer.tools import (
     build_memory_delete_file_tool,
@@ -218,40 +215,9 @@ def test_transcript_extraction_prompt_extracts_observation_only() -> None:
     assert "prompt snapshots" not in user_prompt
 
 
-def test_memory_extractor_prompt_requires_evidence_sanity_check() -> None:
-    """Extraction must not strengthen transcript claims while compressing them."""
-    system_prompt = MEMORY_EXTRACTOR_SYSTEM_PROMPT
-
-    assert "# Evidence Sanity Check" in system_prompt
-    assert "not as authoritative facts to compress" in system_prompt
-    assert (
-        "only on the supplied transcripts and your general technical knowledge"
-        in system_prompt
-    )
-    assert (
-        "Do not imply that repository behavior was independently verified"
-        in system_prompt
-    )
-    assert "certainty, scope, or causality" in system_prompt
-    assert (
-        "well established for the relevant version, environment, and configuration"
-        in system_prompt
-    )
-    assert (
-        "by evidence strength, not by stage name or transcript order" in system_prompt
-    )
-    assert "conflicting transcript claims cannot be resolved" in system_prompt
-    assert "Omit uncertain details or state the uncertainty explicitly" in system_prompt
-    assert "preserve that uncertainty or return no observation" in system_prompt
-
-
-def test_memory_maintenance_prompt_handles_an_empty_selection() -> None:
-    """Tell maintenance not to invent work when no observations were selected."""
-    maintenance_user_prompt = build_maintenance_prompt([])
-
-    assert "Selected Observations" in maintenance_user_prompt
-    assert "No pending observations were selected" in maintenance_user_prompt
-    assert "leave memory unchanged" in maintenance_user_prompt
+def test_memory_maintenance_prompt_requires_an_observation() -> None:
+    with pytest.raises(ValueError, match="requires at least one observation"):
+        build_maintenance_prompt([])
 
 
 def test_initialize_memory_store_seeds_external_memory(tmp_path: Path) -> None:

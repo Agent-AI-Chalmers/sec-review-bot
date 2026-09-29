@@ -10,12 +10,11 @@ def build_maintenance_prompt(
     observations: list[MemoryMaintenanceObservation],
 ) -> str:
     if not observations:
-        selected = "- No pending observations were selected."
-    else:
-        selected = "\n".join(
-            f"- `{observation.observation_id}`: `{observation.mounted_path}`"
-            for observation in observations
-        )
+        raise ValueError("Memory maintenance requires at least one observation.")
+    selected = "\n".join(
+        f"- `{observation.observation_id}`: `{observation.mounted_path}`"
+        for observation in observations
+    )
     return "\n".join(
         [
             "### Selected Observations",
