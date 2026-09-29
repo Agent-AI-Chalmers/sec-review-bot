@@ -15,12 +15,14 @@ import {
 } from '../../../infrastructure/github/webhook-origin-guard.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
+import { reviewExecutionTracker } from '../../../infrastructure/review-execution-tracker.js'
 
-type IssueCommentCreatedWebhookEvent = Pick<EmitterWebhookEvent<'issue_comment.created'>, 'payload'> & {
+type IssueCommentCreatedWebhookEvent = Pick<EmitterWebhookEvent<'issue_comment.created'>, 'id' | 'payload'> & {
   octokit: unknown
 }
 
 interface WebhookHandlerArgs {
+  id: string
   octokit: unknown
   payload: unknown
 }
@@ -32,12 +34,12 @@ interface HandlerDeps {
   startPullRequestReviewCommandFn?: typeof startPullRequestReviewCommand
 }
 
-export async function handleIssueCommentCreated ({ octokit, payload }: IssueCommentCreatedWebhookEvent): Promise<void> {
-  await handleIssueCommentCreatedWithDeps({ octokit, payload })
+export async function handleIssueCommentCreated ({ id, octokit, payload }: IssueCommentCreatedWebhookEvent): Promise<void> {
+  await handleIssueCommentCreatedWithDeps({ id, octokit, payload })
 }
 
 export async function handleIssueCommentCreatedWithDeps (
-  { octokit, payload }: WebhookHandlerArgs,
+  { id, octokit, payload }: WebhookHandlerArgs,
   {
     authorizeManualCommentCommandFn = authorizeManualCommentCommand,
     getPullRequestContextFn = getPullRequestContext,
@@ -93,22 +95,29 @@ export async function handleIssueCommentCreatedWithDeps (
         return
       }
 
-      // The issue_comment payload only tells us that the comment belongs to a PR.
-      // It does not include the full PR context carried by pull_request webhooks.
-      // The PR workflow needs refs, SHAs, draft state, and related metadata, so
-      // fetch the complete PR context before starting the manual review.
-      const pr = await getPullRequestContextFn(octokit as GitHubAppOctokit, {
-        owner_login: issue.owner_login,
-        repo_name: issue.repo_name,
-        pr_number: issue.issue_number
-      })
-
-      await startPullRequestReviewCommandFn({
+      let resolveAdmission: (() => void) | undefined
+      const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+      const execution = startPullRequestReviewCommandFn({
         octokit,
-        pr,
         event_type: 'manual_review',
-        repair_mode: command.repair_mode
+        delivery_id: id,
+        repair_mode: command.repair_mode,
+        // issue_comment only has issue-shaped PR identity. Resolve full refs and
+        // SHAs after the delivery has a durable run record.
+        resolve_pr: async () => await getPullRequestContextFn(octokit as GitHubAppOctokit, {
+          owner_login: issue.owner_login,
+          repo_name: issue.repo_name,
+          pr_number: issue.issue_number
+        }),
+        on_admitted: () => { resolveAdmission?.() }
       })
+      reviewExecutionTracker.start(execution, {
+        ingress: 'issue_comment.created',
+        issue: issue.issue_number,
+        repo: issue.repo_full_name,
+        review_target: 'pull-request'
+      })
+      await Promise.race([admitted, execution])
 
       return
     }
@@ -117,13 +126,24 @@ export async function handleIssueCommentCreatedWithDeps (
       return
     }
 
-    await startIssueReviewCommandFn({
+    let resolveAdmission: (() => void) | undefined
+    const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+    const execution = startIssueReviewCommandFn({
       octokit,
       issue,
       event_type: 'manual_review',
+      delivery_id: id,
       review_objective: command.issue_review_objective,
-      repair_mode: command.repair_mode
+      repair_mode: command.repair_mode,
+      on_admitted: () => { resolveAdmission?.() }
     })
+    reviewExecutionTracker.start(execution, {
+      ingress: 'issue_comment.created',
+      issue: issue.issue_number,
+      repo: issue.repo_full_name,
+      review_target: 'issue'
+    })
+    await Promise.race([admitted, execution])
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

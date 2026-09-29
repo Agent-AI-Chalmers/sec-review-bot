@@ -28,29 +28,6 @@ pnpm run lint
 pnpm run build
 ```
 
-## Runner Run Diagnostics
-
-After `pnpm install` and `pnpm run build`, run:
-
-```bash
-sec-review-runner-runs --limit 20
-sec-review-runner-runs --active-only
-sec-review-runner-runs --failed-only --json
-sec-review-runner-runs --status publish_failed
-```
-
-The command reads the local SQLite runner run store and prints background publisher state. Important columns:
-
-| Column | Meaning |
-| --- | --- |
-| `active` | The background publisher will still consider the run. |
-| `terminal` | The run no longer needs publisher work. |
-| `retry_exhausted` | The run is `publish_failed` and has no remaining publish retries. |
-| `attempts` | Recorded GitHub publication failures; claiming a run does not increment this. |
-| `failure_code` | Structured failure code stored with the run. |
-
-Runs become terminal when the runner output does not match the expected contract, GitHub permissions are missing, the target repository/issue/PR no longer exists, or GitHub rejects the publication request as invalid. Temporary GitHub publication failures remain `publish_failed` and are retried until publication has failed three times. Use `failure_code` to distinguish the exact cause while troubleshooting.
-
 ## Local Receiver
 
 A complete review also needs the runner service and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub integration service.
@@ -217,12 +194,50 @@ Additional notes:
 - Manual comment commands currently support normal issue comments and comments on the Pull Request page's Conversation tab.
 - Not supported yet: comments on the Files changed page and review comments submitted through Submit review.
 
-## Background Publisher Lifecycle
+## Review Lifecycle
 
-Background publishing keeps runner polling and GitHub publication outside the webhook request path.
+A webhook or Actions dispatch only waits until the integration has validated and durably admitted the request. Workspace preparation, agent execution, and GitHub publication continue outside the inbound request path.
+
+```mermaid
+flowchart LR
+  ingress[GitHub webhook event or Actions HTTP request]
+  subgraph integration[GitHub integration]
+    admission[Validate and durably admit]
+    preparation[Prepare workspace and runner input]
+    publication[Poll, validate, and publish result]
+    admission --> preparation
+  end
+  ingress --> admission
+  admission -.-> acknowledgement[Webhook success response<br/>or Actions 202 Accepted]
+  preparation --> runner[Python Runner and Temporal<br/>execute agent workflow]
+  runner --> publication
+  publication --> output[GitHub issue, comment, review, or pull request]
+```
+
+The integration owns the complete `review_runs` lifecycle. Python and Temporal own agent workflow execution; they do not own GitHub publication state.
+
+### Admission And Replay Identity
+
+A webhook uses its GitHub Delivery ID to recognize a repeated delivery. An Actions dispatch uses the OIDC-verified repository together with the required `correlation_id`, currently `GITHUB_RUN_ID`. These ingress identities prevent transport retries from starting another review; after admission, each maps to the single `run_id` used through preparation, agent execution, polling, and publication.
+
+For an Actions dispatch, HTTP `202 Accepted` means the integration validated and durably recorded the request. It does not mean the agent workflow or GitHub publication has finished. A webhook success response has the same limited meaning when that event starts a review.
+
+```mermaid
+flowchart LR
+  preparing --> queued --> running --> publishing --> published
+  preparing --> failed
+  queued --> failed
+  running --> failed
+  publishing -->|deterministic failure| failed
+  publishing -->|retryable GitHub failure| publish_failed
+  publish_failed -->|retries remain| publishing
+```
+
+`preparing` begins at durable admission, before workspace or input preparation. A `publish_failed` run becomes terminal when its retry budget is exhausted, but retains that stored status so diagnostics preserve the publication failure.
 
 | Stored run state | Meaning | Publisher behavior |
 | --- | --- | --- |
+| `preparing` | The request was admitted, but its workspace and runner input are still being prepared. | Not visible to the runner poller. |
 | `queued` | Runner run was submitted and has not been observed as running. | Poll the runner service. |
 | `running` | Runner service reports the run is still in progress. | Keep polling. |
 | `publishing` | A publisher claimed the completed run for GitHub side effects. | Do not let another publisher claim it unless the claim becomes stale. |
@@ -233,6 +248,29 @@ Background publishing keeps runner polling and GitHub publication outside the we
 The publisher retries `publish_failed` runs until GitHub publication has failed three times. Claiming a completed run for publication does not count as an attempt.
 
 > Current retry behavior is simple: the background publisher polls immediately on startup, then every `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` milliseconds, defaulting to 15 seconds. There is no exponential backoff scheduler yet.
+
+## Review Run Diagnostics
+
+After `pnpm install` and `pnpm run build`, run:
+
+```bash
+sec-review-review-runs --limit 20
+sec-review-review-runs --active-only
+sec-review-review-runs --failed-only --json
+sec-review-review-runs --status publish_failed
+```
+
+The command reads the local SQLite `review_runs` store. Important columns:
+
+| Column | Meaning |
+| --- | --- |
+| `active` | The integration will still process the run. |
+| `terminal` | The run needs no further integration work. |
+| `retry_exhausted` | The run is `publish_failed` and has no publication retries left. |
+| `attempts` | Recorded GitHub publication failures; claiming a run does not increment this. |
+| `failure_code` | Structured failure code stored with the run. |
+
+`PREPARATION_INTERRUPTED` means the process stopped while preparing an admitted run. `SUBMISSION_STATE_UNCERTAIN` means Runner submission may have succeeded, but the transition to `queued` was not stored. Replaying the same ingress request reuses the original `run_id` for either recovery case.
 
 ## GitHub REST API Version
 

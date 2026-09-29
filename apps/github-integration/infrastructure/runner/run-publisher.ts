@@ -6,10 +6,10 @@ import {
   type RunnerRunStatus
 } from './client.js'
 import {
-  runnerRunStore,
-  type RunnerRunRecord,
-  type RunnerRunStore
-} from './run-store.js'
+  reviewRunStore,
+  type ReviewRunRecord,
+  type ReviewRunStore
+} from './review-store.js'
 import { splitRepoFullName } from '../github/repository-service.js'
 import { handleIssueReviewRun } from '../../reviews/issues/publish.js'
 import { handlePullRequestReviewRun } from '../../reviews/pull-requests/publish.js'
@@ -21,23 +21,23 @@ import { isDeterministicRunnerPublishError } from './publish-error.js'
 
 type JsonObject = Record<string, unknown>
 
-interface RunnerRunPublisherOptions {
+interface ReviewRunPublisherOptions {
   app: App
-  store?: RunnerRunStore
+  store?: ReviewRunStore
   intervalMs?: number
   get_runner_run_status?: GetRunnerRunStatus
 }
 
 type GetRunnerRunStatus = typeof getRunnerRunStatus
 
-export interface RunnerRunPublisher {
+export interface ReviewRunPublisher {
   stop: () => Promise<void>
 }
 
 type InstallationOctokitForRepo = (repo_full_name: string) => Promise<unknown>
 
 type RunPublishHandler = (args: {
-  run: RunnerRunRecord
+  run: ReviewRunRecord
   status: RunnerRunStatus
   installation_octokit_for_repo: InstallationOctokitForRepo
 }) => Promise<void>
@@ -194,7 +194,7 @@ async function handleWorkflowRun ({
   status
 }: {
   app: App
-  run: RunnerRunRecord
+  run: ReviewRunRecord
   status: RunnerRunStatus
 }): Promise<void> {
   const handlers: Record<string, RunPublishHandler> = {
@@ -224,8 +224,8 @@ async function publishCompletedRun ({
   get_runner_run_status = getRunnerRunStatus
 }: {
   app: App
-  store: RunnerRunStore
-  run: RunnerRunRecord
+  store: ReviewRunStore
+  run: ReviewRunRecord
   get_runner_run_status?: GetRunnerRunStatus
 }): Promise<void> {
   const status = await get_runner_run_status({ run_id: run.run_id })
@@ -251,13 +251,13 @@ async function publishCompletedRun ({
   })
 }
 
-export async function publishRunnerRunsOnce ({
+export async function publishReviewRunsOnce ({
   app,
-  store = runnerRunStore,
+  store = reviewRunStore,
   get_runner_run_status = getRunnerRunStatus
 }: {
   app: App
-  store?: RunnerRunStore
+  store?: ReviewRunStore
   get_runner_run_status?: GetRunnerRunStatus
 }): Promise<void> {
   for (const run of store.listActiveRuns()) {
@@ -291,17 +291,17 @@ export async function publishRunnerRunsOnce ({
 
 export function startRunnerRunPublisher ({
   app,
-  store = runnerRunStore,
+  store = reviewRunStore,
   intervalMs = pollIntervalMs(),
   get_runner_run_status = getRunnerRunStatus
-}: RunnerRunPublisherOptions): RunnerRunPublisher {
+}: ReviewRunPublisherOptions): ReviewRunPublisher {
   let stopped = false
   let active: Promise<void> | null = null
   const tick = (): void => {
     if (stopped || active !== null) {
       return
     }
-    active = publishRunnerRunsOnce({ app, store, get_runner_run_status })
+    active = publishReviewRunsOnce({ app, store, get_runner_run_status })
       .catch((error: unknown) => {
         logError('runner_run_publisher_failed', {
           error,

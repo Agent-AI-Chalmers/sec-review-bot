@@ -15,12 +15,14 @@ import {
 import { logIssuePayload } from '../../../utils/log-issue.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
+import { reviewExecutionTracker } from '../../../infrastructure/review-execution-tracker.js'
 
-type IssueOpenedWebhookEvent = Pick<EmitterWebhookEvent<'issues.opened'>, 'payload'> & {
+type IssueOpenedWebhookEvent = Pick<EmitterWebhookEvent<'issues.opened'>, 'id' | 'payload'> & {
   octokit: unknown
 }
 
 interface WebhookHandlerArgs {
+  id: string
   octokit: unknown
   payload: unknown
 }
@@ -33,15 +35,17 @@ interface HandlerDeps {
     octokit: WebhookHandlerArgs['octokit']
     issue: IssueContext
     event_type: 'opened'
+    delivery_id: string
+    on_admitted?: (admission: { run_id: string, status: string, replayed: boolean }) => void
   }) => Promise<unknown>
 }
 
-export async function handleIssueOpened ({ octokit, payload }: IssueOpenedWebhookEvent): Promise<void> {
-  await handleIssueOpenedWithDeps({ octokit, payload })
+export async function handleIssueOpened ({ id, octokit, payload }: IssueOpenedWebhookEvent): Promise<void> {
+  await handleIssueOpenedWithDeps({ id, octokit, payload })
 }
 
 export async function handleIssueOpenedWithDeps (
-  { octokit, payload }: WebhookHandlerArgs,
+  { id, octokit, payload }: WebhookHandlerArgs,
   {
     fetchRepositoryTriggerConfigFn = fetchRepositoryTriggerConfig,
     isAutomaticTriggerModeEnabledFn = isAutomaticTriggerModeEnabled,
@@ -100,7 +104,21 @@ export async function handleIssueOpenedWithDeps (
   }
 
   try {
-    await startIssueReviewCommandFn({ octokit, issue, event_type: 'opened' })
+    let resolveAdmission: (() => void) | undefined
+    const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+    const execution = startIssueReviewCommandFn({
+      octokit,
+      issue,
+      event_type: 'opened',
+      delivery_id: id,
+      on_admitted: () => { resolveAdmission?.() }
+    })
+    reviewExecutionTracker.start(execution, {
+      ingress: 'issues.opened',
+      issue: issue.issue_number,
+      repo: issue.repo_full_name
+    })
+    await Promise.race([admitted, execution])
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

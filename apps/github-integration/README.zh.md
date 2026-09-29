@@ -30,29 +30,6 @@ pnpm run lint
 pnpm run build
 ```
 
-## Runner Run 诊断
-
-执行过 `pnpm install` 和 `pnpm run build` 后，可以运行：
-
-```bash
-sec-review-runner-runs --limit 20
-sec-review-runner-runs --active-only
-sec-review-runner-runs --failed-only --json
-sec-review-runner-runs --status publish_failed
-```
-
-该命令读取本地 SQLite runner run store，并输出后台 publisher 状态。重要列：
-
-| 列 | 含义 |
-| --- | --- |
-| `active` | 后台 publisher 仍会处理该 run。 |
-| `terminal` | 该 run 不再需要 publisher 工作。 |
-| `retry_exhausted` | run 处于 `publish_failed`，并且没有剩余发布重试次数。 |
-| `attempts` | 已记录的 GitHub 发布失败次数；领取 run 准备发布不计数。 |
-| `failure_code` | run 中持久化的结构化失败码。 |
-
-如果 runner 输出不符合契约、GitHub 权限不足、目标仓库/Issue/PR 已不存在，或发布请求本身不符合 GitHub 校验，当前 run 会直接进入终态。临时 GitHub 发布失败会保留为 `publish_failed` 并重试，直到 GitHub 发布累计失败三次。排障时再通过 `failure_code` 区分具体原因。
-
 ## 本地接收端
 
 完整 review 还需要 runner service 和 worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub integration service。
@@ -219,12 +196,50 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 - comment 手动命令目前只支持普通 issue comment 和 pull request 页面 Conversation 标签下的 comment
 - 暂不支持：Files changed 页面里的评论和 Submit review 时提交的 review 评论。
 
-## 后台 Publisher 生命周期
+## Review 生命周期
 
-后台 publisher 把 runner 轮询和 GitHub 发布放在 webhook 请求路径之外执行。
+Webhook 或 Actions dispatch 只等待 integration 完成校验并持久化接纳请求。Workspace 准备、agent 执行和 GitHub 发布都在入口请求路径之外继续进行。
+
+```mermaid
+flowchart LR
+  ingress[GitHub webhook 事件或 Actions HTTP 请求]
+  subgraph integration[GitHub integration]
+    admission[校验并持久化接纳]
+    preparation[准备 workspace 和 runner input]
+    publication[轮询、校验并发布结果]
+    admission --> preparation
+  end
+  ingress --> admission
+  admission -.-> acknowledgement[Webhook 成功响应<br/>或 Actions 202 Accepted]
+  preparation --> runner[Python Runner 和 Temporal<br/>执行 agent workflow]
+  runner --> publication
+  publication --> output[GitHub issue、comment、review 或 pull request]
+```
+
+GitHub integration 负责完整的 `review_runs` 生命周期。Python 和 Temporal 负责执行 agent workflow，但不负责 GitHub 发布状态。
+
+### 接纳与重放身份
+
+Webhook 使用 GitHub Delivery ID 识别重复投递。Actions dispatch 使用经过 OIDC 验证的 repository 与必填 `correlation_id`，目前后者取 `GITHUB_RUN_ID`。这些入口身份用于阻止 transport 重试重复启动 review；请求接纳后，每个入口身份都会映射到唯一 `run_id`，供后续准备、agent 执行、轮询和发布使用。
+
+对于 Actions dispatch，HTTP `202 Accepted` 表示 integration 已经校验并持久化记录请求，不表示 agent workflow 或 GitHub 发布已经完成。当 webhook 事件会启动 review 时，其成功响应也只表达同一层含义。
+
+```mermaid
+flowchart LR
+  preparing --> queued --> running --> publishing --> published
+  preparing --> failed
+  queued --> failed
+  running --> failed
+  publishing -->|确定性失败| failed
+  publishing -->|可重试的 GitHub 失败| publish_failed
+  publish_failed -->|仍有重试次数| publishing
+```
+
+`preparing` 从请求被持久化接纳时开始，早于 workspace 或 input 准备。`publish_failed` 的重试次数耗尽后会成为终态，但仍保留该持久化状态，方便诊断发布失败。
 
 | 持久化 run 状态 | 含义 | Publisher 行为 |
 | --- | --- | --- |
+| `preparing` | 请求已经接纳，但 workspace 和 runner input 仍在准备。 | 不会进入 runner 轮询。 |
 | `queued` | Runner run 已提交，但尚未观察到运行中状态。 | 继续轮询 runner service。 |
 | `running` | Runner service 报告 run 仍在执行。 | 继续轮询。 |
 | `publishing` | 某个 publisher 已领取完成的 run，准备执行 GitHub side effects。 | 除非领取已过期，否则其他 publisher 不应再次领取。 |
@@ -235,6 +250,29 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 Publisher 会重试 `publish_failed` run，直到调用 GitHub 发布结果累计失败三次。领取一个完成的 run 准备发布不算一次尝试；只有真正发布失败才计数。
 
 > 当前重试策略很简单：后台 publisher 启动时会立刻轮询一次，之后按 `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` 间隔轮询，默认 15 秒。这里还没有指数退避调度。
+
+## Review run 诊断
+
+执行过 `pnpm install` 和 `pnpm run build` 后，可以运行：
+
+```bash
+sec-review-review-runs --limit 20
+sec-review-review-runs --active-only
+sec-review-review-runs --failed-only --json
+sec-review-review-runs --status publish_failed
+```
+
+该命令读取本地 SQLite `review_runs` store。重要列：
+
+| 列 | 含义 |
+| --- | --- |
+| `active` | integration 仍会处理该 run。 |
+| `terminal` | 该 run 不再需要 integration 处理。 |
+| `retry_exhausted` | run 处于 `publish_failed`，并且没有剩余发布重试次数。 |
+| `attempts` | 已记录的 GitHub 发布失败次数；领取 run 准备发布不计数。 |
+| `failure_code` | run 中持久化的结构化失败码。 |
+
+`PREPARATION_INTERRUPTED` 表示进程在准备已接纳的 run 时停止。`SUBMISSION_STATE_UNCERTAIN` 表示 Runner submission 可能已经成功，但 `queued` 转换没有写入 store。两种恢复场景都会在同一入口请求重放时复用原 `run_id`。
 
 ## GitHub REST API 版本
 

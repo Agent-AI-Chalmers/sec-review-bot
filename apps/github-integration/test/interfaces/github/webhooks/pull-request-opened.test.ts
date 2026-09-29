@@ -80,6 +80,7 @@ test('pull-request-opened skips automatic workflow when trigger mode is manual_o
 
   await handlePullRequestOpenedWithDeps(
     {
+      id: 'delivery-test',
       octokit: {},
       payload: createPullRequestOpenedPayload()
     },
@@ -101,7 +102,8 @@ test('pull-request-opened skips self-originated payload before pull request extr
     let configFetched = false
 
     await handlePullRequestOpenedWithDeps(
-      {
+    {
+      id: 'delivery-test',
         octokit: {},
         payload: {
           sender: {
@@ -129,6 +131,7 @@ test('pull-request-opened runs automatic workflow when trigger mode is automatic
 
   await handlePullRequestOpenedWithDeps(
     {
+      id: 'delivery-test',
       octokit: {},
       payload: createPullRequestOpenedPayload()
     },
@@ -156,6 +159,7 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
   await assert.rejects(
     handlePullRequestOpenedWithDeps(
       {
+        id: 'delivery-test',
         octokit: {},
         payload: createPullRequestOpenedPayload()
       },

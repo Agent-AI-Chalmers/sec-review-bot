@@ -35,18 +35,33 @@ export interface AgentRunnerServiceError extends Error {
   workflow: WorkflowName | null
 }
 
+/** The create request may have reached Runner, so recovery must reuse the same run_id. */
+export class RunnerSubmissionUncertainError extends Error {
+  constructor (message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'RunnerSubmissionUncertainError'
+  }
+}
+
 export interface RunnerWorkflowResponse {
   run_id: string
   workflow: WorkflowName
   result: unknown
 }
 
+/**
+ * Response returned when the Python Runner Service accepts a workflow submission.
+ */
 export interface SubmittedRunnerRun {
   run_id: string
   workflow: WorkflowName
   status: string
 }
 
+/**
+ * Current Temporal workflow state reported by the Python Runner Service.
+ * GitHub admission and publication state are tracked separately in ReviewRunRecord.
+ */
 export interface RunnerRunStatus {
   run_id: string | null
   workflow: WorkflowName | null
@@ -319,14 +334,44 @@ async function createRunnerRun ({
   request: RunnerRequestBody
   service_url: string
 }): Promise<RunnerServiceQueuedResponse> {
-  const createResponse = await fetchRunnerService(`${service_url}/v1/workflows/${encodeURIComponent(workflow)}/runs`, {
-    method: 'POST',
-    headers: serviceHeaders(service_url),
-    body: JSON.stringify(request)
-  })
-  const createBody = await readJsonResponse(createResponse)
+  // Resolve local configuration before the uncertainty boundary. Once fetch
+  // starts, a missing response cannot prove that Runner rejected the run.
+  const headers = serviceHeaders(service_url)
+  let createResponse: Response
+  try {
+    createResponse = await fetchRunnerService(`${service_url}/v1/workflows/${encodeURIComponent(workflow)}/runs`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(request)
+    })
+  } catch (error) {
+    throw new RunnerSubmissionUncertainError(
+      `Runner submission state is uncertain for run ${request.run_id}: ${runnerRequestFailureMessage(error)}`,
+      { cause: error }
+    )
+  }
+
+  let createBody: unknown
+  try {
+    createBody = await readJsonResponse(createResponse)
+  } catch (error) {
+    if (createResponse.ok || isRetryableStatus(createResponse.status)) {
+      throw new RunnerSubmissionUncertainError(
+        `Runner submission response could not be read for run ${request.run_id}.`,
+        { cause: error }
+      )
+    }
+    throw error
+  }
 
   if (!createResponse.ok) {
+    // A final transient response may follow an earlier accepted retry. Reusing
+    // this run_id is safe because Temporal workflow creation is idempotent.
+    if (isRetryableStatus(createResponse.status)) {
+      throw new RunnerSubmissionUncertainError(
+        `Runner submission returned HTTP ${createResponse.status} for run ${request.run_id}.`
+      )
+    }
     if (isRecord(createBody) && isRecord(createBody.error)) {
       throw buildServiceError({
         run_id: typeof createBody.run_id === 'string' ? createBody.run_id : request.run_id,
@@ -338,7 +383,9 @@ async function createRunnerRun ({
   }
 
   if (!isRunnerServiceRunResponse(createBody)) {
-    throw new Error('Agent runner service returned an invalid run creation response.')
+    throw new RunnerSubmissionUncertainError(
+      `Runner accepted run ${request.run_id}, but returned an invalid creation response.`
+    )
   }
 
   return createBody
@@ -375,6 +422,7 @@ async function fetchRunnerRunStatus ({
   return statusBody
 }
 
+/** Submit a prepared review input to the Python Runner Service under the supplied run ID. */
 export async function submitRunnerRun ({
   workflow,
   run_id,
@@ -407,6 +455,7 @@ export async function submitRunnerRun ({
   }
 }
 
+/** Fetch the current Temporal workflow state exposed by the Python Runner Service. */
 export async function getRunnerRunStatus ({ run_id }: { run_id: string }): Promise<RunnerRunStatus> {
   const service_url = runnerServiceUrl()
   const statusBody = await fetchRunnerRunStatus({

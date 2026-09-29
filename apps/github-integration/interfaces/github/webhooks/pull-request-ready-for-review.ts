@@ -15,12 +15,13 @@ import {
 } from '../../../infrastructure/github/webhook-origin-guard.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
+import { reviewExecutionTracker } from '../../../infrastructure/review-execution-tracker.js'
 
-type PullRequestReadyForReviewWebhookEvent = Pick<EmitterWebhookEvent<'pull_request.ready_for_review'>, 'payload'> & {
+type PullRequestReadyForReviewWebhookEvent = Pick<EmitterWebhookEvent<'pull_request.ready_for_review'>, 'id' | 'payload'> & {
   octokit: unknown
 }
 
-export async function handlePullRequestReadyForReview ({ octokit, payload }: PullRequestReadyForReviewWebhookEvent): Promise<void> {
+export async function handlePullRequestReadyForReview ({ id, octokit, payload }: PullRequestReadyForReviewWebhookEvent): Promise<void> {
   const pr = extractPullRequestContext(payload)
 
   logPullRequestPayload(payload)
@@ -61,7 +62,21 @@ export async function handlePullRequestReadyForReview ({ octokit, payload }: Pul
   }
 
   try {
-    await startPullRequestReviewCommand({ octokit, pr, event_type: 'ready_for_review' })
+    let resolveAdmission: (() => void) | undefined
+    const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+    const execution = startPullRequestReviewCommand({
+      octokit,
+      pr,
+      event_type: 'ready_for_review',
+      delivery_id: id,
+      on_admitted: () => { resolveAdmission?.() }
+    })
+    reviewExecutionTracker.start(execution, {
+      ingress: 'pull_request.ready_for_review',
+      pr: pr.pr_number,
+      repo: pr.repo_full_name
+    })
+    await Promise.race([admitted, execution])
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

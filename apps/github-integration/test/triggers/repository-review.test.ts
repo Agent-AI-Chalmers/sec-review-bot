@@ -9,6 +9,7 @@ import {
   RepositoryReviewDispatchValidationError
 } from '../../triggers/repository-review.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+import { RunnerSubmissionUncertainError } from '../../infrastructure/runner/client.js'
 
 function fakeApp (): App {
   return appWithInstallationOctokit({
@@ -66,7 +67,8 @@ test('repository dispatch request resolves scheduled incremental window in the a
       repo_full_name: 'octo/example',
       target_branch: 'main',
       event_type: 'scheduled',
-      schedule: '0 3 * * 1'
+      schedule: '0 3 * * 1',
+      correlation_id: 'scheduled-run-1'
     }
   })
 
@@ -87,7 +89,8 @@ test('repository dispatch request resolves manual incremental refs from raw payl
       base_sha: 'aaaaaaaa',
       head_sha: 'cccccccc',
       event_type: 'manual',
-      repair_mode: 'no-test-changes'
+      repair_mode: 'no-test-changes',
+      correlation_id: 'manual-run-1'
     }
   })
 
@@ -109,11 +112,13 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
     base_sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     event_type: 'manual' as const,
-    repair_mode: 'no-test-changes' as const
+    repair_mode: 'no-test-changes' as const,
+    correlation_id: 'actions-run-1'
   }
 
   const submitted = await dispatchRepositoryReview({
     app: fakeApp(),
+    verified_repository: 'octo/example',
     payload: {
       repo_full_name: 'octo/example',
       target_branch: 'main',
@@ -121,7 +126,8 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       base_sha: 'aaaaaaaa',
       head_sha: 'bbbbbbbb',
       event_type: 'manual',
-      repair_mode: 'no-test-changes'
+      repair_mode: 'no-test-changes',
+      correlation_id: 'actions-run-1'
     },
     deps: {
       getInstallationOctokit: async (repo_full_name) => {
@@ -157,11 +163,14 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           event_type: 'manual'
         }
       },
+      create_run_id: () => 'run-1',
       store: {
-        save_queued_run: (run) => {
+        admit_review_run: (run) => {
           saved_runs.push(run)
-          return run as never
-        }
+          return { record: { ...run, status: 'preparing' }, created: true } as never
+        },
+        mark_queued: () => {},
+        markFailed: () => assert.fail('successful review must not be marked failed')
       }
     }
   })
@@ -169,42 +178,78 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
   assert.equal(submitted.run_id, 'run-1')
   assert.deepEqual(submit_calls, [{
     octokit,
+    run_id: 'run-1',
     ...resolved
   }])
   assert.deepEqual(saved_runs, [{
     workflow: 'repository-review',
     run_id: 'run-1',
-    publish_context: {
-      repo: {
-        owner_login: 'octo',
-        repo_name: 'example',
-        repo_full_name: 'octo/example',
-        default_branch: 'main'
-      },
-      workspace_ref: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      scan_target: {
-        target_branch: 'main',
-        default_branch: 'main',
-        event_type: 'manual',
-        scan_mode: 'incremental',
-        base_sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        commit_shas: []
-      },
-      event_type: 'manual'
-    }
+    publish_context: {},
+    ingress_kind: 'github_actions_dispatch',
+    ingress_key: 'octo/example:actions-run-1'
   }])
 })
 
+test('dispatchRepositoryReview reuses the run admitted for the same repository dispatch', async () => {
+  let submissions = 0
+  const admissions: unknown[] = []
+
+  const submitted = await dispatchRepositoryReview({
+    app: fakeApp(),
+    verified_repository: 'octo/example',
+    payload: {
+      repo_full_name: 'octo/example',
+      target_branch: 'main',
+      correlation_id: 'actions-run-replayed'
+    },
+    on_admitted: (admission) => admissions.push(admission),
+    deps: {
+      getInstallationOctokit: async () => octokitWithRefs(),
+      resolve_dispatch: async () => ({
+        repo_full_name: 'octo/example',
+        target_branch: 'main',
+        scan_mode: 'full',
+        base_sha: null,
+        head_sha: null,
+        event_type: 'manual',
+        repair_mode: null,
+        correlation_id: 'actions-run-replayed'
+      }),
+      create_run_id: () => 'run-unused',
+      submit_run: async () => {
+        submissions += 1
+        throw new Error('replayed dispatch must not submit another run')
+      },
+      store: {
+        admit_review_run: () => ({
+          created: false,
+          record: { run_id: 'run-original', status: 'running' } as never
+        }),
+        mark_queued: () => assert.fail('replayed dispatch must not queue again'),
+        markFailed: () => assert.fail('replayed dispatch must not change the original run')
+      }
+    }
+  })
+
+  assert.equal(submitted.run_id, 'run-original')
+  assert.equal(submitted.replayed, true)
+  assert.equal(submissions, 0)
+  assert.deepEqual(admissions, [{ run_id: 'run-original', status: 'running', replayed: true }])
+})
+
 test('dispatchRepositoryReview maps resolver errors to validation errors', async () => {
+  const transitions: unknown[] = []
   await assert.rejects(
     dispatchRepositoryReview({
       app: fakeApp(),
+    verified_repository: 'octo/example',
       payload: {
         repo_full_name: 'octo/example',
-        target_branch: 'main'
+        target_branch: 'main',
+        correlation_id: 'actions-invalid-window'
       },
       deps: {
+        create_run_id: () => 'run-invalid-window',
         getInstallationOctokit: async () => ({}) as GitHubAppOctokit,
         resolve_dispatch: async () => {
           throw new Error('manual incremental scan requires base_sha.')
@@ -213,13 +258,141 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
           throw new Error('submit_run should not be called')
         },
         store: {
-          save_queued_run: () => {
-            throw new Error('save_queued_run should not be called')
-          }
+          admit_review_run: (run) => {
+            transitions.push(['preparing', run])
+            return { record: { ...run, status: 'preparing' }, created: true } as never
+          },
+          mark_queued: () => assert.fail('invalid dispatch must not queue a run'),
+          markFailed: (run_id, error) => transitions.push(['failed', run_id, error])
         }
       }
     }),
     (error: unknown) => error instanceof RepositoryReviewDispatchValidationError &&
       error.message === 'manual incremental scan requires base_sha.'
   )
+  assert.deepEqual(transitions.at(-1), [
+    'failed',
+    'run-invalid-window',
+    { code: 'REVIEW_PREPARATION_FAILED', message: 'manual incremental scan requires base_sha.' }
+  ])
+})
+
+test('dispatchRepositoryReview rejects invalid pure contract fields before admission', async () => {
+  await assert.rejects(
+    dispatchRepositoryReview({
+      app: fakeApp(),
+    verified_repository: 'octo/example',
+      payload: {
+        repo_full_name: 'octo/example',
+        target_branch: 'main',
+        correlation_id: 'actions-invalid-contract',
+        scan_mode: 'sometimes'
+      },
+      deps: {
+        getInstallationOctokit: async () => assert.fail('invalid contract must not call GitHub'),
+        resolve_dispatch: async () => assert.fail('invalid contract must not resolve refs'),
+        submit_run: async () => assert.fail('invalid contract must not submit'),
+        store: {
+          admit_review_run: () => assert.fail('invalid contract must not create a run'),
+          mark_queued: () => assert.fail('invalid contract must not queue'),
+          markFailed: () => assert.fail('invalid contract has no run to fail')
+        }
+      }
+    }),
+    (error: unknown) => error instanceof RepositoryReviewDispatchValidationError &&
+      /Unsupported repository scan_mode/.test(error.message)
+  )
+})
+
+test('dispatchRepositoryReview records an accepted run when preparation or submission fails', async () => {
+  const transitions: unknown[] = []
+
+  await assert.rejects(
+    dispatchRepositoryReview({
+      app: fakeApp(),
+    verified_repository: 'octo/example',
+      payload: { repo_full_name: 'octo/example', target_branch: 'main', correlation_id: 'actions-run-failed' },
+      deps: {
+        getInstallationOctokit: async () => ({}) as GitHubAppOctokit,
+        resolve_dispatch: async () => ({
+          repo_full_name: 'octo/example',
+          target_branch: 'main',
+          scan_mode: 'full',
+          base_sha: null,
+          head_sha: null,
+          event_type: 'manual',
+          repair_mode: 'test-changes-allowed',
+          correlation_id: 'actions-run-failed'
+        }),
+        create_run_id: () => 'run-repo-failed',
+        submit_run: async ({ run_id }) => {
+          assert.equal(run_id, 'run-repo-failed')
+          throw new Error('bundle preparation failed')
+        },
+        store: {
+          admit_review_run: (run) => {
+            transitions.push(['preparing', run])
+            return { record: { ...run, status: 'preparing' }, created: true } as never
+          },
+          mark_queued: () => assert.fail('failed review must not be queued'),
+          markFailed: (run_id, error) => transitions.push(['failed', run_id, error])
+        }
+      }
+    }),
+    /bundle preparation failed/
+  )
+
+  assert.deepEqual(transitions, [
+    ['preparing', {
+      workflow: 'repository-review',
+      run_id: 'run-repo-failed',
+      publish_context: {},
+      ingress_kind: 'github_actions_dispatch',
+      ingress_key: 'octo/example:actions-run-failed'
+    }],
+    ['failed', 'run-repo-failed', { code: 'REVIEW_START_FAILED', message: 'bundle preparation failed' }]
+  ])
+})
+
+test('dispatchRepositoryReview preserves an uncertain Runner submission for replay', async () => {
+  const transitions: unknown[] = []
+  const error = new RunnerSubmissionUncertainError('Runner response was lost.')
+
+  await assert.rejects(
+    dispatchRepositoryReview({
+      app: fakeApp(),
+      verified_repository: 'octo/example',
+      payload: {
+        repo_full_name: 'octo/example',
+        target_branch: 'main',
+        correlation_id: 'actions-run-uncertain'
+      },
+      deps: {
+        getInstallationOctokit: async () => ({}) as GitHubAppOctokit,
+        resolve_dispatch: async () => ({
+          repo_full_name: 'octo/example',
+          target_branch: 'main',
+          scan_mode: 'full',
+          base_sha: null,
+          head_sha: null,
+          event_type: 'manual',
+          repair_mode: null,
+          correlation_id: 'actions-run-uncertain'
+        }),
+        create_run_id: () => 'run-repo-uncertain',
+        submit_run: async () => { throw error },
+        store: {
+          admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true }) as never,
+          mark_queued: () => assert.fail('uncertain submission must not queue yet'),
+          markFailed: (run_id, failure) => transitions.push([run_id, failure])
+        }
+      }
+    }),
+    error
+  )
+
+  assert.deepEqual(transitions, [[
+    'run-repo-uncertain',
+    { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
+  ]])
 })

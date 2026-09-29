@@ -8,22 +8,27 @@ import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-
 import { DeterministicRunnerPublishError } from '../../infrastructure/runner/publish-error.js'
 import {
   classifyRunnerPublishFailure,
-  publishRunnerRunsOnce,
+  publishReviewRunsOnce,
   startRunnerRunPublisher,
   shouldRetryRunnerPublishFailure
 } from '../../infrastructure/runner/run-publisher.js'
-import { RunnerRunStore } from '../../infrastructure/runner/run-store.js'
+import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import type { RunnerRunStatus, WorkflowName } from '../../infrastructure/runner/client.js'
 
 type PublishContext = Record<string, unknown>
 
-function createStore (): RunnerRunStore {
-  return new RunnerRunStore(':memory:')
+function createStore (): ReviewRunStore {
+  return new ReviewRunStore(':memory:')
+}
+
+function createQueuedRun (store: ReviewRunStore, run: Parameters<ReviewRunStore['create_preparing_review_run']>[0]): void {
+  store.create_preparing_review_run(run)
+  store.mark_queued(run.run_id, run.publish_context)
 }
 
 test('stopping the runner publisher waits for its active publish pass', async () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'issue-review',
     run_id: 'run-shutdown',
     publish_context: publishContextForWorkflow('issue-review')
@@ -264,13 +269,13 @@ test('runner publisher classifies GitHub publish failures by retryability', () =
 
 test('runner publisher marks malformed issue results failed without retry', async () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'issue-review',
     run_id: 'run-1',
     publish_context: publishContextForWorkflow('issue-review')
   })
 
-  await publishRunnerRunsOnce({
+  await publishReviewRunsOnce({
     app: appStub(),
     store,
     get_runner_run_status: async () => succeededStatus('issue-review', {
@@ -288,13 +293,13 @@ test('runner publisher marks malformed issue results failed without retry', asyn
 
 test('runner publisher marks malformed pull request results failed without retry', async () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'pull-request-review',
     run_id: 'run-1',
     publish_context: publishContextForWorkflow('pull-request-review')
   })
 
-  await publishRunnerRunsOnce({
+  await publishReviewRunsOnce({
     app: appStub(),
     store,
     get_runner_run_status: async () => succeededStatus('pull-request-review', {
@@ -312,13 +317,13 @@ test('runner publisher marks malformed pull request results failed without retry
 
 test('runner publisher marks malformed repository results failed without retry', async () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-1',
     publish_context: publishContextForWorkflow('repository-review')
   })
 
-  await publishRunnerRunsOnce({
+  await publishReviewRunsOnce({
     app: appStub(),
     store,
     get_runner_run_status: async () => succeededStatus('repository-review', {
@@ -338,13 +343,13 @@ test('runner publisher marks malformed repository results failed without retry',
 
 test('runner publisher keeps transient publish failures retryable in the store', async () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'issue-review',
     run_id: 'run-1',
     publish_context: publishContextForWorkflow('issue-review')
   })
 
-  await publishRunnerRunsOnce({
+  await publishReviewRunsOnce({
     app: appWithInstallationOctokit({
       installation_octokit: transientIssueCommentFailureOctokit(),
       expected_owner: 'octo',
@@ -365,13 +370,13 @@ test('runner publisher keeps transient publish failures retryable in the store',
 
 test('runner publisher marks deterministic GitHub publish rejections failed without retry', async () => {
   const store = createStore()
-  store.save_queued_run({
+  createQueuedRun(store, {
     workflow: 'issue-review',
     run_id: 'run-1',
     publish_context: publishContextForWorkflow('issue-review')
   })
 
-  await publishRunnerRunsOnce({
+  await publishReviewRunsOnce({
     app: appWithInstallationOctokit({
       installation_octokit: issueCommentFailureOctokit(githubResponseError(422, 'Validation Failed')),
       expected_owner: 'octo',

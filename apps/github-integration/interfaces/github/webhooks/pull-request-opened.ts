@@ -15,12 +15,14 @@ import {
 } from '../../../infrastructure/github/webhook-origin-guard.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
+import { reviewExecutionTracker } from '../../../infrastructure/review-execution-tracker.js'
 
-type PullRequestOpenedWebhookEvent = Pick<EmitterWebhookEvent<'pull_request.opened'>, 'payload'> & {
+type PullRequestOpenedWebhookEvent = Pick<EmitterWebhookEvent<'pull_request.opened'>, 'id' | 'payload'> & {
   octokit: unknown
 }
 
 interface WebhookHandlerArgs {
+  id: string
   octokit: unknown
   payload: unknown
 }
@@ -33,15 +35,17 @@ interface HandlerDeps {
     octokit: WebhookHandlerArgs['octokit']
     pr: PullRequestContext
     event_type: 'opened'
+    delivery_id: string
+    on_admitted?: (admission: { run_id: string, status: string, replayed: boolean }) => void
   }) => Promise<unknown>
 }
 
-export async function handlePullRequestOpened ({ octokit, payload }: PullRequestOpenedWebhookEvent): Promise<void> {
-  await handlePullRequestOpenedWithDeps({ octokit, payload })
+export async function handlePullRequestOpened ({ id, octokit, payload }: PullRequestOpenedWebhookEvent): Promise<void> {
+  await handlePullRequestOpenedWithDeps({ id, octokit, payload })
 }
 
 export async function handlePullRequestOpenedWithDeps (
-  { octokit, payload }: WebhookHandlerArgs,
+  { id, octokit, payload }: WebhookHandlerArgs,
   {
     fetchRepositoryTriggerConfigFn = fetchRepositoryTriggerConfig,
     isAutomaticTriggerModeEnabledFn = isAutomaticTriggerModeEnabled,
@@ -102,7 +106,21 @@ export async function handlePullRequestOpenedWithDeps (
   }
 
   try {
-    await startPullRequestReviewCommandFn({ octokit, pr, event_type: 'opened' })
+    let resolveAdmission: (() => void) | undefined
+    const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+    const execution = startPullRequestReviewCommandFn({
+      octokit,
+      pr,
+      event_type: 'opened',
+      delivery_id: id,
+      on_admitted: () => { resolveAdmission?.() }
+    })
+    reviewExecutionTracker.start(execution, {
+      ingress: 'pull_request.opened',
+      pr: pr.pr_number,
+      repo: pr.repo_full_name
+    })
+    await Promise.race([admitted, execution])
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

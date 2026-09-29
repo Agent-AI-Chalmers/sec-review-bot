@@ -18,6 +18,7 @@ export interface RepositoryContext {
 }
 
 interface RunRepositoryReviewArgs {
+  run_id?: string
   octokit: unknown
   repo_full_name: string
   target_branch?: string | null
@@ -44,6 +45,7 @@ function assertRepositoryReviewInput (input: RepositoryReviewInput): asserts inp
 }
 
 async function materializeRepositoryReviewInput ({
+  run_id,
   octokit,
   repo_full_name,
   target_branch = null,
@@ -74,6 +76,7 @@ async function materializeRepositoryReviewInput ({
   })
 
   const prepared = await prepareRepositoryReviewInput({
+    ...(run_id ? { run_id } : {}),
     octokit: github,
     repo_full_name,
     target_branch,
@@ -96,6 +99,7 @@ async function materializeRepositoryReviewInput ({
 }
 
 export async function startRepositoryReviewRun ({
+  run_id: provided_run_id,
   octokit,
   repo_full_name,
   target_branch = null,
@@ -106,6 +110,7 @@ export async function startRepositoryReviewRun ({
   repair_mode = null
 }: RunRepositoryReviewArgs): Promise<SubmittedRepositoryReviewRun> {
   const { run_id, input, repo, workspace_ref } = await materializeRepositoryReviewInput({
+    ...(provided_run_id ? { run_id: provided_run_id } : {}),
     octokit,
     repo_full_name,
     target_branch,

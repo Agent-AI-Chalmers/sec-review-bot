@@ -276,18 +276,20 @@ async function materializeHistoryArtifacts ({
 }
 
 export async function preparePullRequestReviewInput ({
+  run_id: provided_run_id,
   octokit,
   pr,
   files,
   repair_mode = null
 }: {
+  run_id?: string
   octokit: GitHubAppOctokit
   pr: PullRequestContext
   files: PullRequestFile[]
   repair_mode?: RepairMode | null
 }): Promise<PreparedPullRequestReview> {
   const normalizedFiles = normalizeFiles(files)
-  const run_id = createRunId()
+  const run_id = provided_run_id ?? createRunId()
   const input_bundle_root = createInputBundleRoot(
     pr.repo_full_name,
     `pr-${pr.pr_number}`,

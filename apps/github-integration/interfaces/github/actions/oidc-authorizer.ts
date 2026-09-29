@@ -16,6 +16,10 @@ export interface GitHubActionsOidcClaims {
   [key: string]: unknown
 }
 
+export interface AuthorizedRepositoryReviewOidcClaims extends GitHubActionsOidcClaims {
+  repository: string
+}
+
 export type GitHubActionsOidcVerifier = (token: string) => Promise<GitHubActionsOidcClaims>
 
 export class RepositoryReviewOidcError extends Error {
@@ -55,7 +59,12 @@ function branchNameFromRef (ref: unknown): string | null {
 
 function workflowRefMatchesRepositoryReviewWorkflow (value: unknown, repo_full_name: string, target_branch: string): boolean {
   const text = typeof value === 'string' ? value.trim() : ''
-  return text === `${repo_full_name}/${REPOSITORY_REVIEW_WORKFLOW_PATH}@refs/heads/${target_branch}`
+  const suffix = `/${REPOSITORY_REVIEW_WORKFLOW_PATH}@refs/heads/${target_branch}`
+  return text.endsWith(suffix) && text.slice(0, -suffix.length).toLowerCase() === repo_full_name.toLowerCase()
+}
+
+function canonicalRepository (value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : ''
 }
 
 export async function authorizeRepositoryReviewDispatchOidc ({
@@ -68,7 +77,7 @@ export async function authorizeRepositoryReviewDispatchOidc ({
   payload_repo_full_name: string
   payload_target_branch: string
   verifier?: GitHubActionsOidcVerifier
-}): Promise<GitHubActionsOidcClaims> {
+}): Promise<AuthorizedRepositoryReviewOidcClaims> {
   const token = normalizeHeaderValue(headers['x-sec-review-bot-oidc-token'])
   if (token === null) {
     throw new RepositoryReviewOidcError('Missing GitHub Actions OIDC token.', 401)
@@ -84,7 +93,9 @@ export async function authorizeRepositoryReviewDispatchOidc ({
     )
   }
 
-  if (claims.repository !== payload_repo_full_name) {
+  const verified_repository = canonicalRepository(claims.repository)
+  const requested_repository = canonicalRepository(payload_repo_full_name)
+  if (!verified_repository || verified_repository !== requested_repository) {
     throw new RepositoryReviewOidcError('OIDC repository does not match repo_full_name.')
   }
 
@@ -97,9 +108,9 @@ export async function authorizeRepositoryReviewDispatchOidc ({
     throw new RepositoryReviewOidcError('OIDC ref does not match target_branch.')
   }
 
-  if (!workflowRefMatchesRepositoryReviewWorkflow(claims.workflow_ref, payload_repo_full_name, payload_target_branch)) {
+  if (!workflowRefMatchesRepositoryReviewWorkflow(claims.workflow_ref, verified_repository, payload_target_branch)) {
     throw new RepositoryReviewOidcError('OIDC workflow is not allowed for repository review dispatch.')
   }
 
-  return claims
+  return { ...claims, repository: verified_repository }
 }

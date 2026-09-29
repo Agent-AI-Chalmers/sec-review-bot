@@ -13,7 +13,8 @@ import { handlePullRequestReadyForReview } from './interfaces/github/webhooks/pu
 import { handlePullRequestSynchronize } from './interfaces/github/webhooks/pull-request-synchronize.js'
 import { verifyGitWorkspaceRuntime } from './infrastructure/runner/git-workspace.js'
 import { startRunnerRunPublisher } from './infrastructure/runner/run-publisher.js'
-import { runnerRunStore } from './infrastructure/runner/run-store.js'
+import { reviewRunStore } from './infrastructure/runner/review-store.js'
+import { reviewExecutionTracker } from './infrastructure/review-execution-tracker.js'
 import { logError, logInfo } from './utils/logger.js'
 
 await verifyGitWorkspaceRuntime()
@@ -89,13 +90,18 @@ async function shutdown (signal: ShutdownSignal): Promise<void> {
   shutdownStarted = true
   logInfo('server_shutdown_started', { signal })
 
-  const serverClosed = closeServer()
-  const results = await Promise.allSettled([serverClosed, publisher.stop()])
+  // Finish in-flight HTTP handlers first so every admitted execution has been
+  // registered before the tracker takes its shutdown snapshot.
+  const serverResult = await Promise.allSettled([closeServer()])
+  const results = [
+    ...serverResult,
+    ...await Promise.allSettled([publisher.stop(), reviewExecutionTracker.stop()])
+  ]
   let shutdownError = results.find(
     (result): result is PromiseRejectedResult => result.status === 'rejected'
   )?.reason
   try {
-    runnerRunStore.close()
+    reviewRunStore.close()
   } catch (error) {
     shutdownError ??= error
   }

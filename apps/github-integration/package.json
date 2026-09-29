@@ -6,7 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@11.9.0",
   "bin": {
-    "sec-review-runner-runs": "dist/tools/runner-run-diagnostics.js"
+    "sec-review-review-runs": "dist/tools/runner-run-diagnostics.js"
   },
   "engines": {
     "node": ">=24 <25"

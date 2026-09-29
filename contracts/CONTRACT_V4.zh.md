@@ -331,6 +331,12 @@ interface RepositoryDelivery {
 
 调用方发布 repository delivery draft PR 时应使用 `RepositoryDelivery`。每个 delivery 必须携带最终 `file_changes`；展示文件路径从 `file_changes[].path` 派生。`case_ids` 用于关联顶层 `case_results[]` 中的 case-level review 详情。
 
+### 校验责任
+
+JSON Schema 负责传输结构，包括必填字段、JSON type、enum、tagged variant 和额外字段策略。消费方必须先校验完整的 v4 result，再解释其内容；不能通过宽松类型转换（coercion）把非法值变成合法值。
+
+Schema 不代替领域代码。跨字段 workflow 规则仍由作出决策的 workflow 负责；消费方继续负责副作用策略，例如安全的 repository path、GitHub 权限、发布条件和重试行为。
+
 ## 3. 兼容性
 
 以下变化属于破坏性变更：

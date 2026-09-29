@@ -5,7 +5,8 @@ import {
   completedRunnerRunResult,
   submitRunnerRun,
   type AgentRunnerServiceError,
-  getRunnerRunStatus
+  getRunnerRunStatus,
+  RunnerSubmissionUncertainError
 } from '../../infrastructure/runner/client.js'
 
 const ORIGINAL_ENV = { ...process.env }
@@ -15,6 +16,8 @@ function resetEnv (): void {
   process.env = { ...ORIGINAL_ENV }
   delete process.env.AGENT_RUNNER_SERVICE_URL
   delete process.env.AGENT_RUNNER_SERVICE_TOKEN
+  delete process.env.AGENT_RUNNER_SERVICE_REQUEST_RETRIES
+  delete process.env.AGENT_RUNNER_SERVICE_RETRY_BASE_DELAY_MS
 }
 
 function jsonResponse (body: unknown, init?: ResponseInit): Response {
@@ -80,6 +83,58 @@ test('submitRunnerRun posts an HTTP runner run', async () => {
   assert.equal(submitted.workflow, 'issue-review')
   assert.equal(submitted.status, 'running')
   assert.equal(calls.length, 1)
+})
+
+test('submitRunnerRun marks a lost create response as submission uncertainty', async () => {
+  resetEnv()
+  process.env.AGENT_RUNNER_SERVICE_URL = 'http://runner.test'
+  process.env.AGENT_RUNNER_SERVICE_TOKEN = 'dev-token'
+  process.env.AGENT_RUNNER_SERVICE_REQUEST_RETRIES = '1'
+  process.env.AGENT_RUNNER_SERVICE_RETRY_BASE_DELAY_MS = '1'
+  globalThis.fetch = async () => { throw new TypeError('connection closed') }
+
+  await assert.rejects(
+    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-uncertain', input: {} }),
+    (error: unknown) => error instanceof RunnerSubmissionUncertainError &&
+      /run-uncertain/.test(error.message)
+  )
+})
+
+test('submitRunnerRun marks an invalid successful create response as submission uncertainty', async () => {
+  resetEnv()
+  process.env.AGENT_RUNNER_SERVICE_URL = 'http://runner.test'
+  process.env.AGENT_RUNNER_SERVICE_TOKEN = 'dev-token'
+  globalThis.fetch = async () => jsonResponse({ run_id: 'run-uncertain' }, { status: 202 })
+
+  await assert.rejects(
+    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-uncertain', input: {} }),
+    RunnerSubmissionUncertainError
+  )
+})
+
+test('submitRunnerRun keeps an explicit client rejection deterministic', async () => {
+  resetEnv()
+  process.env.AGENT_RUNNER_SERVICE_URL = 'http://runner.test'
+  process.env.AGENT_RUNNER_SERVICE_TOKEN = 'dev-token'
+  globalThis.fetch = async () => jsonResponse({
+    run_id: 'run-rejected',
+    error: {
+      code: 'INPUT_INVALID',
+      category: 'validation',
+      message: 'Input is invalid.',
+      retryable: false,
+      details: {}
+    }
+  }, { status: 400 })
+
+  await assert.rejects(
+    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-rejected', input: {} }),
+    (error: unknown) => {
+      assert.equal(error instanceof RunnerSubmissionUncertainError, false)
+      assert.equal((error as AgentRunnerServiceError).code, 'INPUT_INVALID')
+      return true
+    }
+  )
 })
 
 test('submitRunnerRun rejects invalid run ids before dispatch', async () => {
