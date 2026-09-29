@@ -36,6 +36,7 @@ from sec_review_agents.agents.verification.repository import (
     build_repository_verification_system_prompt,
 )
 from sec_review_agents.resources.loader import load_prompt_resource
+from sec_review_agents.resources.paths import AGENT_PROMPTS
 from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
 
 
@@ -45,10 +46,10 @@ def _joined_prompt_resources(*paths: str) -> str:
 
 def test_prompt_resource_loader_normalizes_only_trailing_newlines() -> None:
     """Keep prompt boundaries stable without stripping Markdown indentation."""
-    resource = load_prompt_resource("memory/maintain-system.md")
+    relative_path = "memory/maintain-system.md"
+    raw_resource = (AGENT_PROMPTS / relative_path).read_text(encoding="utf-8")
 
-    assert not resource.endswith("\n")
-    assert resource.startswith("You maintain")
+    assert load_prompt_resource(relative_path) == raw_resource.rstrip("\n")
 
 
 def test_initial_verifier_prompt_uses_initial_delta_only() -> None:
