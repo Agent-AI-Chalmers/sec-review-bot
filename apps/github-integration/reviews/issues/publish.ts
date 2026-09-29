@@ -12,7 +12,7 @@ import {
 } from './renderer.js'
 import { logInfo } from '../../utils/logger.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { isRecord } from '../view-utils.js'
+import { assertV4WorkflowResult } from '../../infrastructure/runner/result-schema.js'
 
 interface IssueDraftPullRequest {
   number: number
@@ -56,15 +56,9 @@ function issueReviewResultFromRunStatus (status: RunnerRunStatus): IssueReviewWo
     return null
   }
   try {
-    if (!isRecord(completed.result)) {
-      throw new Error('result must be an object.')
-    }
-    const rawResult = completed.result
-    if (rawResult.contract_version !== 'v4') {
-      throw new Error('contract_version must be v4.')
-    }
+    assertV4WorkflowResult('issue-review', completed.result)
+    const rawResult = completed.result as { contract_version: 'v4', review_record: unknown }
     return {
-      ...rawResult,
       contract_version: 'v4',
       review_record: parseReviewRecord(rawResult.review_record)
     }

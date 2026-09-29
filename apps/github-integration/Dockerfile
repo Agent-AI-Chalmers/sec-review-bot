@@ -14,12 +14,12 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/github-integration/package.json apps/github-integration/pnpm-lock.yaml apps/github-integration/pnpm-workspace.yaml ./
 RUN corepack enable pnpm \
     && pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
     && pnpm install --frozen-lockfile
 
-COPY . ./
+COPY apps/github-integration/ ./
 RUN pnpm run build
 # This package is the workspace root; legacy deploy keeps pnpm's production
 # deployment command usable without injected workspace packages.
@@ -40,6 +40,7 @@ WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /prod ./
+COPY contracts ./contracts
 RUN rm -rf dist/test
 
 CMD ["node", "dist/app.js"]

@@ -29,8 +29,8 @@ services:
   github-integration:
     profiles: ["app"]
     build:
-      context: apps/github-integration
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/github-integration/Dockerfile
       args:
         # Override for networks where the public npm registry is unreliable.
         # The default preserves the normal npm registry behavior.
