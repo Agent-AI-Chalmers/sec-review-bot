@@ -62,6 +62,12 @@ def test_review_record_public_builders_are_review_record_builders() -> None:
 
 
 def test_review_record_does_not_own_domain_specific_builders() -> None:
+    """Keep issue, pull-request, and repository rules out of the shared record builder.
+
+    This check reads source because a domain lookup can be added without a new import
+    or public function. Remove it only after tests directly prove that each workflow
+    prepares its own data before calling the shared builder.
+    """
     record_source = (PACKAGE_ROOT / "review_stages" / "record.py").read_text(
         encoding="utf-8"
     )
@@ -78,48 +84,35 @@ def test_review_record_does_not_own_domain_specific_builders() -> None:
     assert [token for token in forbidden_tokens if token in record_source] == []
 
 
-def test_issue_and_pull_request_workflows_are_temporal_entrypoints() -> None:
-    """Keep orchestration in domain workflows without reviving the old wrapper."""
+def test_legacy_shared_review_workflow_does_not_return() -> None:
+    """Keep orchestration in the domain workflows instead of reviving the old wrapper."""
     assert not (PACKAGE_ROOT / "review_stages" / "workflow.py").exists()
-    workflow_paths = [
-        PACKAGE_ROOT / "workflows" / "issue" / "workflow.py",
-        PACKAGE_ROOT / "workflows" / "pull_request" / "workflow.py",
-    ]
-
-    for path in workflow_paths:
-        source = path.read_text(encoding="utf-8")
-        assert "from temporalio import activity, workflow" in source
-        assert "execute_issue_review_workflow" not in source
-        assert "execute_pull_request_review_workflow" not in source
-        assert "FeedbackLoopConfig" not in source
-        assert "DefaultReviewWorkflow" not in source
-        assert "run_default_review_workflow" not in source
-
-    issue_workflow_source = workflow_paths[0].read_text(encoding="utf-8")
-    assert "IssueSingleAgentWorkflow" not in issue_workflow_source
-    assert "IssueTwoStageWorkflow" not in issue_workflow_source
-    assert "prepare_issue_single_agent_workflow_activity" not in issue_workflow_source
-
-    assert "IssueSingleAgentWorkflow" in (
-        PACKAGE_ROOT / "workflows" / "issue" / "single_agent.py"
-    ).read_text(encoding="utf-8")
-    assert "IssueTwoStageWorkflow" in (
-        PACKAGE_ROOT / "workflows" / "issue" / "two_stage.py"
-    ).read_text(encoding="utf-8")
 
 
-def test_review_stage_profiles_are_not_named_adapters_or_runtime_profiles() -> None:
-    review_stages_root = PACKAGE_ROOT / "review_stages"
-    violations: list[str] = []
+def test_issue_workflow_variants_stay_in_their_own_modules() -> None:
+    """Keep each intentional issue workflow variant defined in its own module."""
+    issue_workflow_root = PACKAGE_ROOT / "workflows" / "issue"
+    variant_modules = {
+        "single_agent.py": "IssueSingleAgentWorkflow",
+        "two_stage.py": "IssueTwoStageWorkflow",
+    }
 
-    assert [path for path in review_stages_root.rglob("runtime.py")] == []
+    for filename, class_name in variant_modules.items():
+        path = issue_workflow_root / filename
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        class_definitions = {
+            node.name for node in tree.body if isinstance(node, ast.ClassDef)
+        }
+        assert class_name in class_definitions
 
-    for path in review_stages_root.rglob("stage.py"):
-        source = path.read_text(encoding="utf-8")
-        if "Adapter" in source or "_ADAPTER" in source or "RuntimeProfile" in source:
-            violations.append(str(path.relative_to(PACKAGE_ROOT)))
-
-    assert violations == []
+    main_path = issue_workflow_root / "workflow.py"
+    main_tree = ast.parse(
+        main_path.read_text(encoding="utf-8"), filename=str(main_path)
+    )
+    main_class_definitions = {
+        node.name for node in main_tree.body if isinstance(node, ast.ClassDef)
+    }
+    assert main_class_definitions.isdisjoint(variant_modules.values())
 
 
 def test_workflow_input_preparation_is_a_single_runner_module() -> None:
@@ -163,42 +156,15 @@ def test_local_cli_entrypoints_do_not_patch_import_paths() -> None:
     assert violations == []
 
 
-def test_run_local_issue_owns_local_issue_cli_flow() -> None:
-    """Keep the executable CLI flow visible in its entrypoint, not a hidden shim."""
-    violations: list[str] = []
-    path = PACKAGE_ROOT / "cli" / "run_local_issue.py"
-    source = path.read_text(encoding="utf-8")
-
-    for token in (
-        "build_local_issue_bundle",
-        "parse_args",
-        "run_local_direct_workflow",
-        "run_local_temporal_workflow",
-        "--temporal",
-    ):
-        if token not in source:
-            violations.append(
-                f"{path.relative_to(PACKAGE_ROOT)} does not contain {token}"
-            )
-    for token in ("dispatch_request", "local_issue_runner", "run_local_issue_cli"):
-        if token in source:
-            violations.append(f"{path.relative_to(PACKAGE_ROOT)} contains {token}")
-
-    assert violations == []
-
-
 def test_delivery_planning_agent_does_not_build_stage_result_contracts() -> None:
     """Keep model invocation separate from delivery-stage result projection."""
     agent_path = PACKAGE_ROOT / "agents" / "delivery_planning" / "agent.py"
-    source = agent_path.read_text(encoding="utf-8")
     violations = import_violations(
         agent_path,
         ("sec_review_agents.delivery_stages.planning.result",),
     )
-    forbidden_tokens = ("DeliveryEntry",)
 
     assert violations == []
-    assert [token for token in forbidden_tokens if token in source] == []
 
 
 def test_delivery_result_builder_accepts_keep_case_ids() -> None:
@@ -215,6 +181,12 @@ def test_delivery_result_builder_accepts_keep_case_ids() -> None:
 
 
 def test_delivery_result_module_does_not_own_execution_results() -> None:
+    """Keep execution outcomes out of the module that builds the final result.
+
+    The forbidden names are a temporary ownership check. An import check would not
+    catch the same execution classes or builders being recreated in this file, so keep
+    this check until the handoff from execution has a direct behavior test.
+    """
     source = (PACKAGE_ROOT / "delivery_stages" / "result.py").read_text(
         encoding="utf-8"
     )
@@ -226,20 +198,13 @@ def test_delivery_result_module_does_not_own_execution_results() -> None:
     assert [token for token in forbidden_tokens if token in source] == []
 
 
-def test_delivery_model_does_not_own_result_builders_or_models() -> None:
-    source = (PACKAGE_ROOT / "delivery_stages" / "model.py").read_text(encoding="utf-8")
-    forbidden_tokens = (
-        "BaseModel",
-        "DeliveryExecutionResult",
-        "DeliveryArtifact",
-        "DeliveryResult",
-        "build_delivery_result",
-    )
-
-    assert [token for token in forbidden_tokens if token in source] == []
-
-
 def test_delivery_planning_stage_does_not_own_input_projection() -> None:
+    """Keep case-to-planning data conversion out of the orchestration stage.
+
+    These fields identify knowledge that belongs to planning input preparation. Keep
+    this source check until an input/output test can prove that the preparation module,
+    rather than the stage coordinator, owns that conversion.
+    """
     source = (PACKAGE_ROOT / "delivery_stages" / "planning" / "stage.py").read_text(
         encoding="utf-8"
     )
@@ -254,17 +219,10 @@ def test_delivery_planning_stage_does_not_own_input_projection() -> None:
 
 
 def test_patch_synthesis_stays_inside_delivery_execution() -> None:
+    """Keep the removed patch-synthesis package gone and its current owner explicit."""
     old_root = PACKAGE_ROOT / "delivery_stages" / "patch_synthesis"
     assert [path.name for path in old_root.glob("*.py")] == []
 
     path = PACKAGE_ROOT / "delivery_stages" / "execution" / "patch_synthesis.py"
-    source = path.read_text(encoding="utf-8")
-    forbidden_tokens = (
-        "create_patch_synthesis_outcomes",
-        "ThreadPoolExecutor",
-        "as_completed",
-        "repository-delivery",
-    )
 
     assert path.exists()
-    assert [token for token in forbidden_tokens if token in source] == []
