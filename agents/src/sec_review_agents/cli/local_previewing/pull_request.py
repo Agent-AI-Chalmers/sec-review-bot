@@ -41,17 +41,62 @@ def _analysis_lines(analysis: dict[str, Any]) -> list[str]:
     ]
 
 
+def _analysis_headline(verdict: Any) -> str:
+    return {
+        "no-actionable-finding": "no actionable security finding",
+        "confirmed-vulnerability": "confirmed security vulnerability",
+        "confirmed-defect": "confirmed security defect",
+        "plausible-risk": "plausible security risk",
+        "inconclusive": "inconclusive",
+    }.get(verdict, "unknown")
+
+
+def _mitigation_headline(verdict: Any, changed_files: list[Any]) -> str:
+    if changed_files:
+        noun = "file" if len(changed_files) == 1 else "files"
+        return f"patch proposed, {len(changed_files)} {noun} changed"
+    return "not needed" if verdict == "no-actionable-finding" else "no patch proposed"
+
+
+def _verification_headline(validation_level: Any) -> str:
+    return {
+        "static": "static review",
+        "logic-simulated": "logic simulation",
+        "runtime-partial": "partial runtime validation",
+        "runtime-endpoint": "runtime endpoint validation",
+    }.get(validation_level, "not recorded")
+
+
+def _checks_headline(regression_status: Any) -> str:
+    return {
+        "passed": "checks passed",
+        "failed": "checks failed",
+        "not-run": "checks not run",
+        "not-applicable": "checks not applicable",
+        "unresolved": "checks unresolved",
+    }.get(regression_status, "checks not recorded")
+
+
 def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
     analysis, mitigation, verification = _fix_sections(review_record)
     changed_files = as_list(mitigation.get("changed_files"))
     lines = [
         "## PR Security Review",
         "",
-        f"- Verdict: {inline_code(analysis.get('verdict'), 'unknown')}",
-        f"- Changed files: {inline_code(len(changed_files))}",
-        f"- Verification: {inline_code(verification.get('patch_coverage'), 'unknown')}",
-        f"- Regression: {inline_code(verification.get('regression_status'), 'unknown')}",
-        f"- Resolution next step: {inline_code(verification.get('resolution_next_step'), 'unknown')}",
+        f"- Analysis: {inline_code(_analysis_headline(analysis.get('verdict')))}",
+        f"- Mitigation: {inline_code(_mitigation_headline(analysis.get('verdict'), changed_files))}",
+        "- Verification: "
+        + inline_code(
+            f"{_verification_headline(verification.get('validation_level'))}; "
+            f"{_checks_headline(verification.get('regression_status'))}"
+        ),
+        *(
+            [
+                f"- Resolution next step: {inline_code(verification.get('resolution_next_step'), 'unknown')}"
+            ]
+            if verification.get("resolution_next_step") != "none"
+            else []
+        ),
         "",
         plain_text(analysis.get("overview"), "No overview provided."),
         "",
@@ -70,10 +115,18 @@ def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
         )
         lines.append("")
     if verification.get("patch_coverage"):
+        verification_details = {
+            **verification,
+            "resolution_next_step": (
+                None
+                if verification.get("resolution_next_step") == "none"
+                else verification.get("resolution_next_step")
+            ),
+        }
         lines.extend(
             folded_block(
                 "Verification",
-                render_verification_preview_lines(verification),
+                render_verification_preview_lines(verification_details),
             )
         )
         lines.append("")

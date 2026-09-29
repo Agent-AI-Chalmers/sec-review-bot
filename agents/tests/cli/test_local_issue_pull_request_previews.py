@@ -136,3 +136,64 @@ def test_writes_pull_request_review_body_preview(tmp_path: Path) -> None:
     content = review_body.read_text(encoding="utf-8")
     assert "## PR Security Review" in content
     assert "## Final Patch Preview" in content
+
+
+def test_pull_request_preview_summarizes_review_stages(tmp_path: Path) -> None:
+    local_root = tmp_path / "run-1"
+    workflow_result = _workflow_result()
+    review_record = workflow_result["review_record"]
+    review_record["analysis"]["verdict"] = "no-actionable-finding"
+    review_record["mitigation"]["changed_files"] = []
+    review_record["mitigation"]["patch_diff"] = None
+    review_record["verification"].update(
+        {
+            "validation_level": "static",
+            "patch_coverage": "not-applicable",
+            "regression_status": "not-run",
+            "resolution_next_step": "none",
+        }
+    )
+
+    write_pull_request_previews(
+        materialized_input=_materialized_input(local_root),
+        workflow_result=workflow_result,
+    )
+
+    content = (local_root / "artifacts" / "previews" / "review-body.md").read_text(
+        encoding="utf-8"
+    )
+    assert "- Analysis: `no actionable security finding`" in content
+    assert "- Mitigation: `not needed`" in content
+    assert "- Verification: `static review; checks not run`" in content
+    assert "- Tests:" not in content
+    assert "Changed files: `0`" not in content
+    assert "Resolution next step: `none`" not in content
+
+
+def test_pull_request_preview_reports_patch_and_manual_review(tmp_path: Path) -> None:
+    local_root = tmp_path / "run-1"
+    workflow_result = _workflow_result()
+    review_record = workflow_result["review_record"]
+    review_record["analysis"]["verdict"] = "confirmed-vulnerability"
+    review_record["mitigation"]["changed_files"] = ["src/a.py", "src/b.py"]
+    review_record["verification"].update(
+        {
+            "validation_level": "runtime-partial",
+            "regression_status": "failed",
+            "resolution_next_step": "manual-review",
+        }
+    )
+
+    write_pull_request_previews(
+        materialized_input=_materialized_input(local_root),
+        workflow_result=workflow_result,
+    )
+
+    content = (local_root / "artifacts" / "previews" / "review-body.md").read_text(
+        encoding="utf-8"
+    )
+    assert "- Analysis: `confirmed security vulnerability`" in content
+    assert "- Mitigation: `patch proposed, 2 files changed`" in content
+    assert "- Verification: `partial runtime validation; checks failed`" in content
+    assert "- Tests:" not in content
+    assert "- Resolution next step: `manual-review`" in content

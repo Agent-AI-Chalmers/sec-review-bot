@@ -112,6 +112,11 @@ function nowIso (): string {
   return new Date().toISOString()
 }
 
+function isIngressUniqueConstraintError (error: unknown): boolean {
+  return typeof error === 'object' && error !== null &&
+    'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE'
+}
+
 function positiveIntegerOrDefault (value: number | undefined, default_value: number): number {
   return Number.isFinite(value) && typeof value === 'number' && value >= 0
     ? Math.floor(value)
@@ -212,8 +217,11 @@ export class ReviewRunStore {
         return { record, created: true }
       })()
     } catch (error) {
+      if (!isIngressUniqueConstraintError(error)) {
+        throw error
+      }
       // The transaction prevents a check-then-insert race. If another SQLite
-      // connection committed the same ingress first, read its durable winner.
+      // connection won the ingress unique constraint, read its durable record.
       const concurrent = this.db.prepare(`
         SELECT * FROM review_runs WHERE ingress_kind = ? AND ingress_key = ?
       `).get(run.ingress_kind, run.ingress_key) as ReviewRunRow | undefined
