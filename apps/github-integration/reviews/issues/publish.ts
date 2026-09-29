@@ -1,4 +1,4 @@
-import { createIssueComment } from '../../infrastructure/github/comment-service.js'
+import { createIssueCommentUnlessMarkerExists } from '../../infrastructure/github/comment-service.js'
 import type { IssueContext } from '../../infrastructure/github/issue-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import { createDraftPullRequestFromIssueReviewRecord } from './draft-pr.js'
@@ -10,7 +10,7 @@ import {
   buildSuggestedDraftPrPlanFromReviewRecord,
   renderIssueReviewCommentFromReviewRecord
 } from './renderer.js'
-import { logError, logInfo } from '../../utils/logger.js'
+import { logInfo } from '../../utils/logger.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { isRecord } from '../view-utils.js'
 
@@ -22,6 +22,13 @@ interface IssueDraftPullRequest {
 interface IssueReviewComment {
   id: number
   html_url: string
+  reused: boolean
+}
+
+function issueReviewRunMarker (run_id: string): string {
+  // The publisher may retry after GitHub accepted a comment but its response was lost.
+  // A stable run marker makes that retry observable and idempotent.
+  return `<!-- sec-review-bot:issue-review-run:${run_id} -->`
 }
 
 export interface IssueReviewWorkflowResult {
@@ -125,44 +132,38 @@ async function publishIssueReviewResult ({
     : null
 
   if (draftPrPlan?.patch_ready) {
-    try {
-      logInfo('draft_pr_creation_started', {
+    logInfo('draft_pr_creation_started', {
+      event_type,
+      issue: issue.issue_number,
+      repo: issue.repo_full_name
+    })
+    draftPullRequest = await createDraftPullRequestFromIssueReviewRecord({
+      octokit: github,
+      issue,
+      run_id,
+      workspace_ref,
+      review_record
+    }) as IssueDraftPullRequest | null
+    if (draftPullRequest) {
+      logInfo('draft_pr_creation_completed', {
+        draft_pr_number: draftPullRequest.number,
+        draft_pr_url: draftPullRequest.html_url,
         event_type,
-        issue: issue.issue_number,
-        repo: issue.repo_full_name
-      })
-      draftPullRequest = await createDraftPullRequestFromIssueReviewRecord({
-        octokit: github,
-        issue,
-        run_id,
-        workspace_ref,
-        review_record
-      }) as IssueDraftPullRequest | null
-      if (draftPullRequest) {
-        logInfo('draft_pr_creation_completed', {
-          draft_pr_number: draftPullRequest.number,
-          draft_pr_url: draftPullRequest.html_url,
-          event_type,
-          issue: issue.issue_number
-        })
-      }
-    } catch (error) {
-      logError('draft_pr_creation_failed', {
-        error,
-        error_message: asErrorMessage(error),
-        event_type,
-        issue: issue.issue_number,
-        repo: issue.repo_full_name
+        issue: issue.issue_number
       })
     }
   }
 
-  const commentBody = renderIssueReviewCommentFromReviewRecord({
-    issue,
-    review_record,
-    draftPrPlan,
-    draftPullRequest
-  })
+  const marker = issueReviewRunMarker(run_id)
+  const commentBody = [
+    marker,
+    renderIssueReviewCommentFromReviewRecord({
+      issue,
+      review_record,
+      draftPrPlan,
+      draftPullRequest
+    })
+  ].join('\n\n')
 
   logInfo('issue_comment_publish_started', {
     event_type,
@@ -170,18 +171,20 @@ async function publishIssueReviewResult ({
     repo: issue.repo_full_name
   })
 
-  const comment = await createIssueComment(github, {
+  const comment = await createIssueCommentUnlessMarkerExists(github, {
     owner_login: issue.owner_login,
     repo_name: issue.repo_name,
     issue_number: issue.issue_number,
-    body: commentBody
+    body: commentBody,
+    marker
   }) as IssueReviewComment
 
   logInfo('issue_comment_publish_completed', {
     comment_id: comment.id,
     comment_url: comment.html_url,
     event_type,
-    issue: issue.issue_number
+    issue: issue.issue_number,
+    reused: comment.reused
   })
 
 }

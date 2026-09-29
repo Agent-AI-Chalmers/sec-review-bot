@@ -7,6 +7,7 @@ import {
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import type { ReviewRecord } from '../review-record.js'
 import type { FileChange, FileMode } from '../file-change.js'
+import { asErrorWithResponse } from '../../utils/error-utils.js'
 
 interface IssueContext {
   issue_number: number
@@ -171,6 +172,25 @@ export async function createDraftPullRequestFromIssueReviewRecord ({
   const title = buildDraftPullRequestTitleFromReviewRecord(issue)
   const body = buildDraftPullRequestBodyFromReviewRecord({ issue, review_record })
 
+  // The run-specific branch is the publish idempotency key. Reuse its open PR
+  // before creating git objects so a retried publish cannot create another PR.
+  const existingPullRequests = await octokit.rest.pulls.list({
+    owner,
+    repo,
+    state: 'open',
+    head: `${owner}:${branch_name}`
+  })
+  const existingPullRequest = existingPullRequests.data[0]
+  if (existingPullRequest) {
+    return {
+      branch_name,
+      title: existingPullRequest.title,
+      body: existingPullRequest.body ?? body,
+      html_url: existingPullRequest.html_url,
+      number: existingPullRequest.number
+    }
+  }
+
   const commitResponse = await octokit.rest.git.getCommit({
     owner,
     repo,
@@ -199,12 +219,27 @@ export async function createDraftPullRequestFromIssueReviewRecord ({
     parents: [head_sha]
   })
 
-  await octokit.rest.git.createRef({
-    owner,
-    repo,
-    ref: `refs/heads/${branch_name}`,
-    sha: newCommitResponse.data.sha
-  })
+  try {
+    await octokit.rest.git.createRef({
+      owner,
+      repo,
+      ref: `refs/heads/${branch_name}`,
+      sha: newCommitResponse.data.sha
+    })
+  } catch (error) {
+    if (asErrorWithResponse(error).status !== 422) {
+      throw error
+    }
+    // A previous attempt may have created the run-specific branch but failed
+    // before opening the PR. Reuse that branch as the retry checkpoint.
+    await octokit.rest.git.updateRef({
+      owner,
+      repo,
+      ref: `heads/${branch_name}`,
+      sha: newCommitResponse.data.sha,
+      force: true
+    })
+  }
 
   const pullRequestResponse = await octokit.rest.pulls.create({
     owner,

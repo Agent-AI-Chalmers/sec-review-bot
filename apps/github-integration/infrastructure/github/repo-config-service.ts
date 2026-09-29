@@ -1,5 +1,6 @@
 import { parse as parseYaml } from 'yaml'
 import type { GitHubAppOctokit } from './octokit.js'
+import { asErrorWithResponse } from '../../utils/error-utils.js'
 
 const CONFIG_PATH = '.github/sec-review-bot.yml'
 
@@ -35,11 +36,6 @@ interface RepoGetContentResponse {
   data: {
     content?: string
   } | Array<unknown>
-}
-
-interface GitHubLikeError {
-  status?: number
-  name?: string
 }
 
 function isRecord (value: unknown): value is Record<string, unknown> {
@@ -168,7 +164,7 @@ export function isAutomaticTriggerModeEnabled (config: Partial<RepositoryTrigger
 }
 
 function isNotFoundError (error: unknown): boolean {
-  return isRecord(error) && (error as GitHubLikeError).status === 404
+  return asErrorWithResponse(error).status === 404
 }
 
 interface FetchRepositoryTriggerConfigArgs {

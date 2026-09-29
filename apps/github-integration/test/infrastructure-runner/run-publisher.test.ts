@@ -73,6 +73,7 @@ function transientIssueCommentFailureOctokit (): unknown {
   return {
     rest: {
       issues: {
+        listComments: async () => ({ data: [] }),
         createComment: async () => {
           throw new Error('GitHub API unavailable.')
         }
@@ -100,6 +101,7 @@ function issueCommentFailureOctokit (error: Error): unknown {
   return {
     rest: {
       issues: {
+        listComments: async () => ({ data: [] }),
         createComment: async () => {
           throw error
         }
