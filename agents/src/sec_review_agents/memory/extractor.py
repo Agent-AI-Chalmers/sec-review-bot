@@ -232,7 +232,7 @@ def _observation_header(
             "",
         ]
     )
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 def _publish_observation(
