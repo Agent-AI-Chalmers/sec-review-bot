@@ -18,6 +18,7 @@ from sec_review_agents.runner.core import (
     validate_run_request_body,
 )
 from sec_review_agents.runner.input_preparation import INPUT_BUNDLE_ROOT_ENV
+from sec_review_agents.runner.input_schema import validate_v4_workflow_input
 from sec_review_agents.runner.service.gateway import (
     RunnerRunConflictError,
     RunnerWorkflowGateway,
@@ -142,6 +143,22 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
                         code=RUNNER_WORKFLOW_UNSUPPORTED,
                         category="workflow",
                         message=f"Unsupported workflow: {workflow}",
+                    ),
+                },
+            )
+
+        try:
+            validate_v4_workflow_input(request["input"], workflow)
+        except ValueError as error:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "run_id": run_id,
+                    "workflow": workflow,
+                    "error": build_runner_error(
+                        code=RUNNER_REQUEST_INVALID,
+                        category="input",
+                        message=str(error),
                     ),
                 },
             )

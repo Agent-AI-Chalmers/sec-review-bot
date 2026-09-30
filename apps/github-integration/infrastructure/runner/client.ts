@@ -1,6 +1,7 @@
 import { isIP } from 'node:net'
 
 import { logInfo } from '../../utils/logger.js'
+import { assertV4WorkflowInput } from './contract-schema.js'
 
 export type WorkflowName = 'issue-review' | 'pull-request-review' | 'repository-review'
 
@@ -191,6 +192,7 @@ function validateRunnerInput ({ workflow, input }: { workflow: WorkflowName, inp
   if (!isRecord(input)) {
     throw new Error(`Runner input is missing before ${workflow} dispatch.`)
   }
+  assertV4WorkflowInput(workflow, input)
 }
 
 function logRunnerRequestDiagnostics ({

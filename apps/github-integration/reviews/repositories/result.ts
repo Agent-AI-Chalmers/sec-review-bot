@@ -1,7 +1,7 @@
 import type { FileChange } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import type { ReviewRecord } from '../review-record.js'
-import { assertV4WorkflowResult } from '../../infrastructure/runner/result-schema.js'
+import { assertV4WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
 
 export interface RepositoryDelivery {
   delivery_id: string

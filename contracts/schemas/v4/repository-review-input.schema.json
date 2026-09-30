@@ -94,8 +94,7 @@
             "type": "object",
             "properties": {
               "base_sha": {
-                "type": "string",
-                "minLength": 1
+                "$ref": "common.schema.json#/$defs/nonBlankString"
               },
               "commit_shas": {
                 "type": "array",

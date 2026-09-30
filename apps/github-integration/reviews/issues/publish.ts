@@ -12,7 +12,7 @@ import {
 } from './renderer.js'
 import { logInfo } from '../../utils/logger.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { assertV4WorkflowResult } from '../../infrastructure/runner/result-schema.js'
+import { assertV4WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
 
 interface IssueDraftPullRequest {
   number: number

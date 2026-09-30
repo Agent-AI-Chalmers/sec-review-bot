@@ -20,6 +20,9 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY . ./
+# Compose supplies the workspace contracts as a separate build context so the
+# Runner image gets canonical schemas without sending the whole repository.
+COPY --from=contracts . /contracts
 RUN uv sync --frozen --no-dev
 
 CMD ["sec-review-agents-service"]

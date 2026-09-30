@@ -3,6 +3,10 @@
   "$id": "https://sec-review-bot.local/contracts/schemas/v4/common.schema.json",
   "title": "Contract v4 common definitions",
   "$defs": {
+    "nonBlankString": {
+      "type": "string",
+      "pattern": ".*\\S.*"
+    },
     "repoRelativePath": {
       "type": "string",
       "minLength": 1,
@@ -325,12 +329,10 @@
       ],
       "properties": {
         "target_branch": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/nonBlankString"
         },
         "default_branch": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/nonBlankString"
         },
         "event_type": {
           "enum": [
@@ -345,20 +347,22 @@
           ]
         },
         "base_sha": {
-          "type": [
-            "string",
-            "null"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonBlankString"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "head_sha": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/nonBlankString"
         },
         "commit_shas": {
           "type": "array",
           "items": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/$defs/nonBlankString"
           }
         }
       }
@@ -379,7 +383,7 @@
         "paths_ignore": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/nonBlankString"
           }
         },
         "incremental_changed_files": {
@@ -394,12 +398,10 @@
             ],
             "properties": {
               "path": {
-                "type": "string",
-                "minLength": 1
+                "$ref": "#/$defs/nonBlankString"
               },
               "status": {
-                "type": "string",
-                "minLength": 1
+                "$ref": "#/$defs/nonBlankString"
               },
               "previous_path": {
                 "type": [

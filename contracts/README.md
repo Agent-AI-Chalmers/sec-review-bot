@@ -63,7 +63,9 @@ This split is also a security boundary. GitHub identity, permissions, API calls,
 
 The Markdown specifications define field semantics, compatibility rules, and integration guidance.
 
-The schema files are the executable structural form of that specification. Contract v4 schemas use [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12). Python tests validate them with [jsonschema](https://python-jsonschema.readthedocs.io/), and TypeScript tests validate them with [Ajv](https://ajv.js.org/).
+The schema files are the executable structural form of that specification. Contract v4 schemas use [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12). The Python Runner enforces input schemas with [jsonschema](https://python-jsonschema.readthedocs.io/), and the TypeScript integration enforces input and result schemas with [Ajv](https://ajv.js.org/). Both packages also execute the shared fixtures in tests.
+
+The agents wheel includes a build-time copy of these canonical schemas as package data. Installed Python tools therefore do not depend on the repository-level `contracts/` path at runtime.
 
 Schemas are structural contract checks, not the complete authority for every runtime or publishing rule.
 
@@ -73,7 +75,7 @@ Runtime parsers may also enforce canonical forms that schemas intentionally leav
 
 The fixture files provide concrete JSON examples that tests can execute against, so they are part of contract validation.
 
-[`fixtures/v4/manifest.json`](fixtures/v4/manifest.json) records which fixture is validated by which schema, so Python and TypeScript tests share one fixture-to-schema mapping.
+[`fixtures/v4/manifest.json`](fixtures/v4/manifest.json) records which valid fixtures must match and which invalid fixtures must be rejected by each schema, so Python and TypeScript exercise the same structural boundary.
 
 When contract fields change, update the relevant written specification, [schema](schemas/v4), [fixture](fixtures/v4), and [manifest](fixtures/v4/manifest.json) entries in this directory together.
 

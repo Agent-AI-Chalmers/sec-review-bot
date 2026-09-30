@@ -16,7 +16,7 @@ import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { getGitHubAppMetadata } from '../../infrastructure/github/github-app-metadata-service.js'
-import { assertV4WorkflowResult } from '../../infrastructure/runner/result-schema.js'
+import { assertV4WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
 
 interface SuggestionReviewResult {
   review_id: number
