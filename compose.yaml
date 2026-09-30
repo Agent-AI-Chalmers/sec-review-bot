@@ -1,7 +1,16 @@
 services:
   temporal:
     image: temporalio/temporal:latest
-    command: ["server", "start-dev", "--ip", "0.0.0.0"]
+    command:
+      - server
+      - start-dev
+      - --ip
+      - 0.0.0.0
+      - --db-filename
+      - /var/lib/temporal/temporal.db
+    volumes:
+      # Keep workflow state across the process restarts performed by systemd.
+      - "${TEMPORAL_STATE_ROOT:-${PWD}/.agent-temporal-state}:/var/lib/temporal"
     ports:
       - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
       - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"

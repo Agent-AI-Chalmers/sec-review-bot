@@ -6,6 +6,7 @@ import {
   submitRunnerRun,
   type AgentRunnerServiceError,
   getRunnerRunStatus,
+  RUNNER_RUN_NOT_FOUND,
   RunnerSubmissionUncertainError
 } from '../../infrastructure/runner/client.js'
 
@@ -132,6 +133,7 @@ test('submitRunnerRun keeps an explicit client rejection deterministic', async (
     (error: unknown) => {
       assert.equal(error instanceof RunnerSubmissionUncertainError, false)
       assert.equal((error as AgentRunnerServiceError).code, 'INPUT_INVALID')
+      assert.equal((error as AgentRunnerServiceError).http_status, 400)
       return true
     }
   )
@@ -395,10 +397,63 @@ test('getRunnerRunStatus maps structured HTTP errors to AgentRunnerServiceError'
       assert.equal(serviceError.name, 'AgentRunnerServiceError')
       assert.equal(serviceError.code, 'RUNNER_REQUEST_INVALID')
       assert.equal(serviceError.category, 'input')
+      assert.equal(serviceError.http_status, 400)
       assert.equal(serviceError.run_id, 'bad run')
       assert.equal(serviceError.workflow, null)
       assert.deepEqual(serviceError.details, { field: 'run_id' })
       assert.match(serviceError.message, /run_id must match/)
+      return true
+    }
+  )
+})
+
+test('getRunnerRunStatus identifies a missing runner execution as non-retryable', async () => {
+  resetEnv()
+  process.env.AGENT_RUNNER_SERVICE_URL = 'http://runner.test'
+  process.env.AGENT_RUNNER_SERVICE_TOKEN = 'dev-token'
+
+  globalThis.fetch = async (input: string | URL | Request) => {
+    assert.equal(input.toString(), 'http://runner.test/v1/runs/run-missing')
+    return jsonResponse({
+      run_id: 'run-missing',
+      error: {
+        category: 'runtime',
+        code: RUNNER_RUN_NOT_FOUND,
+        message: 'Runner run not found.',
+        retryable: false,
+        details: {}
+      }
+    }, { status: 404 })
+  }
+
+  await assert.rejects(
+    getRunnerRunStatus({ run_id: 'run-missing' }),
+    (error: unknown) => {
+      const serviceError = error as AgentRunnerServiceError
+      assert.equal(serviceError.name, 'AgentRunnerServiceError')
+      assert.equal(serviceError.code, RUNNER_RUN_NOT_FOUND)
+      assert.equal(serviceError.category, 'runtime')
+      assert.equal(serviceError.retryable, false)
+      assert.equal(serviceError.http_status, 404)
+      assert.equal(serviceError.run_id, 'run-missing')
+      assert.equal(serviceError.workflow, null)
+      return true
+    }
+  )
+})
+
+test('getRunnerRunStatus does not treat a generic route 404 as a missing run', async () => {
+  resetEnv()
+  process.env.AGENT_RUNNER_SERVICE_URL = 'http://runner.test'
+  process.env.AGENT_RUNNER_SERVICE_TOKEN = 'dev-token'
+
+  globalThis.fetch = async () => jsonResponse({ detail: 'Not Found' }, { status: 404 })
+
+  await assert.rejects(
+    getRunnerRunStatus({ run_id: 'run-route-mismatch' }),
+    (error: unknown) => {
+      assert.notEqual((error as Error).name, 'AgentRunnerServiceError')
+      assert.match((error as Error).message, /HTTP 404/)
       return true
     }
   )

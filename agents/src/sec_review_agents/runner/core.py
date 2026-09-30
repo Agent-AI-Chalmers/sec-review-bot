@@ -19,6 +19,8 @@ RUNNER_REQUEST_INVALID = "RUNNER_REQUEST_INVALID"
 RUNNER_WORKFLOW_UNSUPPORTED = "RUNNER_WORKFLOW_UNSUPPORTED"
 # The run ID already belongs to a different workflow request.
 RUNNER_RUN_CONFLICT = "RUNNER_RUN_CONFLICT"
+# The Runner has no stored execution record for the requested run ID.
+RUNNER_RUN_NOT_FOUND = "RUNNER_RUN_NOT_FOUND"
 # A completed workflow returned data that is not a valid Runner response.
 RUNNER_RESPONSE_INVALID = "RUNNER_RESPONSE_INVALID"
 # The workflow execution failed before it could return a valid result.
@@ -88,6 +90,7 @@ __all__ = [
     "RUNNER_REQUEST_INVALID",
     "RUNNER_RESPONSE_INVALID",
     "RUNNER_RUN_CONFLICT",
+    "RUNNER_RUN_NOT_FOUND",
     "RUNNER_WORKFLOW_UNSUPPORTED",
     "RUN_ID_PATTERN",
     "RUN_ID_REQUIREMENT_MESSAGE",

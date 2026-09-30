@@ -158,11 +158,14 @@ GET /v1/runs/{run_id}
 
 运行时失败不会伪造成 workflow `result`，也不会作为 stage-level `status="error"` 混进结果里。Activity / child workflow 异常由 Temporal retry 和 workflow failure 处理；`GET /v1/runs/{run_id}` 在最终失败时返回 `RUNNER_EXECUTION_FAILED`，`message` 应包含 Temporal failure root cause，`details.failure_chain` 可包含从 Temporal wrapper error 到 root cause 的诊断链。
 
+对于合法的 run ID，如果 Runner 没有保存对应的执行记录，`GET /v1/runs/{run_id}` 会返回 HTTP `404` 和 `RUNNER_RUN_NOT_FOUND`。普通路由 `404` 不属于这个错误，不能据此判断 run 已经消失。
+
 ### Runner 错误码
 
 - `RUNNER_REQUEST_INVALID`
 - `RUNNER_WORKFLOW_UNSUPPORTED`
 - `RUNNER_RUN_CONFLICT`
+- `RUNNER_RUN_NOT_FOUND`
 - `RUNNER_RESPONSE_INVALID`
 - `RUNNER_EXECUTION_FAILED`
 

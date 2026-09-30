@@ -122,6 +122,7 @@ Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个�
 
 ```bash
 RUNNER_SERVICE_TOKEN=<用 openssl rand -hex 32 生成>
+TEMPORAL_STATE_ROOT=${PWD}/.agent-temporal-state
 SEC_REVIEW_INPUT_BUNDLE_ROOT=${PWD}/.agent-input-bundles
 SEC_REVIEW_APP_STATE_ROOT=${PWD}/.agent-app-state
 ```
@@ -246,6 +247,7 @@ AGENT_MCP_ENABLED=true
 | `.agent-input-bundles` | GitHub integration 写入，宿主机 worker 读取 | 准备好的 runner 输入材料 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
 | `.agent-app-state` | GitHub integration | 后台发布流程使用的 submitted-run state |
+| `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
 | `.agent-memory` | 宿主机 worker | 启用 memory 时的持久 agent memory store |
 
 ## 运行部署
@@ -283,6 +285,8 @@ sudo systemctl start sec-review-bot.target
 sudo systemctl stop sec-review-bot.target
 sudo systemctl restart sec-review-bot.target
 ```
+
+Temporal development server 的状态保存在 `TEMPORAL_STATE_ROOT` 下，因此上述日常启停和重启会保留 workflow history 与待处理任务。仓库 sample 使用 `.agent-temporal-state`。
 
 查看整体状态和日志：
 
@@ -356,13 +360,21 @@ GitHub integration 使用容器默认 root 用户，因此 input bundle 或 App 
 可用下面命令修复 ownership：
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-temporal-state
 ```
 
-确认不需要保留 run 后也可以直接删除：
+GitHub integration 的 run store 与 Temporal 状态描述的是同一批活跃 run。不要在保留仍需轮询或发布的 `.agent-app-state` 记录时单独删除 `.agent-temporal-state`。重置 run 执行与发布状态时，应先停止完整服务，再同时删除两个状态目录：
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
+sudo systemctl stop sec-review-bot.target
+sudo rm -rf .agent-temporal-state .agent-app-state
+sudo systemctl start sec-review-bot.target
+```
+
+该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。确认没有需要保留的 run 依赖 input bundle 或 artifact 后，可以单独清理它们：
+
+```bash
+sudo rm -rf .agent-input-bundles .agent-artifacts
 ```
 
 `.agent-memory` 会跨多次运行持续保存，不属于常规清理范围。只有在确实需要重置 agent memory 时，才应先停止 worker，再单独删除 `.agent-memory`。该操作会永久删除已提取的 observations 和维护后的 memory。

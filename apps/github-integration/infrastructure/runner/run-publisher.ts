@@ -3,6 +3,7 @@ import { clearImmediate, clearInterval } from 'node:timers'
 
 import {
   getRunnerRunStatus,
+  RUNNER_RUN_NOT_FOUND,
   type RunnerRunStatus
 } from './client.js'
 import {
@@ -107,7 +108,9 @@ export function classifyRunnerPublishFailure (error: unknown): PublishFailureCla
     return {
       retry: false,
       code: asErrorCode(error),
-      reason: 'runner-service-terminal'
+      reason: asErrorCode(error) === RUNNER_RUN_NOT_FOUND
+        ? 'runner-run-not-found'
+        : 'runner-service-terminal'
     }
   }
   if (isDeterministicRunnerPublishError(error)) {

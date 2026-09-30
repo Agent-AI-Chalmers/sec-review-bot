@@ -120,6 +120,7 @@ Common path settings:
 
 ```bash
 RUNNER_SERVICE_TOKEN=<generate with: openssl rand -hex 32>
+TEMPORAL_STATE_ROOT=${PWD}/.agent-temporal-state
 SEC_REVIEW_INPUT_BUNDLE_ROOT=${PWD}/.agent-input-bundles
 SEC_REVIEW_APP_STATE_ROOT=${PWD}/.agent-app-state
 ```
@@ -244,6 +245,7 @@ With the sample configuration, the integrated deployment stores runtime data in 
 | `.agent-input-bundles` | Written by GitHub integration, read by the host worker | Prepared runner input materials |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
 | `.agent-app-state` | GitHub integration | Submitted-task state used by background publishing |
+| `.agent-temporal-state` | Temporal | Workflow history and pending task state |
 | `.agent-memory` | Host worker | Persistent agent memory store, when memory is enabled |
 
 ## Run The Deployment
@@ -281,6 +283,8 @@ sudo systemctl start sec-review-bot.target
 sudo systemctl stop sec-review-bot.target
 sudo systemctl restart sec-review-bot.target
 ```
+
+Temporal development-server state is stored under `TEMPORAL_STATE_ROOT`, so these routine lifecycle operations preserve workflow history and pending tasks. The repository sample uses `.agent-temporal-state`.
 
 Inspect the deployment status and logs:
 
@@ -354,13 +358,21 @@ GitHub integration uses the container's default root user, so input bundles or A
 To repair ownership:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-temporal-state
 ```
 
-After confirming that no tasks need to be retained, you can remove the directories instead:
+The GitHub integration run store and Temporal state describe the same active runs. Do not delete `.agent-temporal-state` while retaining `.agent-app-state` records that still need polling or publication. To reset run execution and publication state, stop the complete service and remove both state directories together:
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts .agent-app-state
+sudo systemctl stop sec-review-bot.target
+sudo rm -rf .agent-temporal-state .agent-app-state
+sudo systemctl start sec-review-bot.target
+```
+
+This permanently deletes workflow history, pending tasks, polling state, and publication state. Input bundles and artifacts can be removed separately after confirming that no retained run needs them:
+
+```bash
+sudo rm -rf .agent-input-bundles .agent-artifacts
 ```
 
 The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.

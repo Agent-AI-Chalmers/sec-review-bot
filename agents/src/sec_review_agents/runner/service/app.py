@@ -10,6 +10,7 @@ from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.runner.core import (
     RUNNER_REQUEST_INVALID,
     RUNNER_RUN_CONFLICT,
+    RUNNER_RUN_NOT_FOUND,
     RUNNER_WORKFLOW_UNSUPPORTED,
     build_runner_error,
     is_supported_workflow,
@@ -194,9 +195,16 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
             )
         run = await runner_gateway.get(run_id)
         if run is None:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Runner run not found.",
+                content={
+                    "run_id": run_id,
+                    "error": build_runner_error(
+                        code=RUNNER_RUN_NOT_FOUND,
+                        category="runtime",
+                        message="Runner run not found.",
+                    ),
+                },
             )
         return JSONResponse(content=_run_response(run))
 

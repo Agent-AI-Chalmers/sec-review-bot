@@ -162,11 +162,14 @@ error fields:
 
 Runtime failures are not disguised as workflow `result` or stage-level `status="error"`. Activity / child workflow exceptions are handled by Temporal retry and workflow failure. When `GET /v1/runs/{run_id}` reaches final failure, it returns `RUNNER_EXECUTION_FAILED`; `message` should contain the Temporal failure root cause, and `details.failure_chain` may contain the diagnostic chain from Temporal wrapper error to root cause.
 
+When the Runner has no stored execution for a valid run ID, `GET /v1/runs/{run_id}` returns HTTP `404` with `RUNNER_RUN_NOT_FOUND`. A generic route `404` is not this error and must not be treated as evidence that the run is gone.
+
 ### Runner Error Codes
 
 - `RUNNER_REQUEST_INVALID`
 - `RUNNER_WORKFLOW_UNSUPPORTED`
 - `RUNNER_RUN_CONFLICT`
+- `RUNNER_RUN_NOT_FOUND`
 - `RUNNER_RESPONSE_INVALID`
 - `RUNNER_EXECUTION_FAILED`
 

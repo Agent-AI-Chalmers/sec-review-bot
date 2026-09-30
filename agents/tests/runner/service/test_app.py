@@ -202,6 +202,28 @@ def test_get_run_returns_worker_result(monkeypatch) -> None:
     assert fetched_body["result"] == {"contract_version": "v4"}
 
 
+def test_get_run_returns_structured_not_found_error(monkeypatch) -> None:
+    monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
+    _use_loopback_host(monkeypatch)
+    client = TestClient(
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
+    )
+
+    fetched = client.get("/v1/runs/run-missing")
+
+    assert fetched.status_code == 404
+    assert fetched.json() == {
+        "run_id": "run-missing",
+        "error": {
+            "category": "runtime",
+            "code": "RUNNER_RUN_NOT_FOUND",
+            "message": "Runner run not found.",
+            "retryable": False,
+            "details": {},
+        },
+    }
+
+
 def test_get_run_rejects_invalid_run_id_before_backend_lookup(monkeypatch) -> None:
     monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
     _use_loopback_host(monkeypatch)
