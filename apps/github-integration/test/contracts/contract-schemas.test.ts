@@ -13,6 +13,13 @@ import {
 
 interface FixtureManifest {
   schema_fixtures: Record<string, string>
+  invalid_schema_fixtures: Record<string, string>
+}
+
+function invalidFixtureSchemas (): Array<[string, string]> {
+  const manifest = contractFixtureManifest('v4') as FixtureManifest
+  assert.equal(typeof manifest.invalid_schema_fixtures, 'object')
+  return Object.entries(manifest.invalid_schema_fixtures)
 }
 
 function fixtureSchemas (): Array<[string, string]> {
@@ -58,11 +65,22 @@ test('shared v4 contract fixtures match JSON schemas', () => {
 
 test('shared v4 contract fixture manifest covers fixture and schema files', () => {
   const schemaFixtures = new Map(fixtureSchemas())
+  const invalidSchemaFixtures = new Map(invalidFixtureSchemas())
   const fixtureNames = contractFixtureFiles('v4').filter((name) => name !== 'manifest.json')
   const schemaNames = new Set(contractSchemaFiles('v4'))
 
-  assert.deepEqual([...schemaFixtures.keys()].sort(), fixtureNames)
-  assert.ok([...schemaFixtures.values()].every((schemaName) => schemaNames.has(schemaName)))
+  assert.deepEqual([...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort(), fixtureNames)
+  assert.ok(
+    [...schemaFixtures.values(), ...invalidSchemaFixtures.values()]
+      .every((schemaName) => schemaNames.has(schemaName))
+  )
+})
+
+test('shared v4 invalid contract fixtures are rejected by JSON schemas', () => {
+  for (const [fixtureName, schemaName] of invalidFixtureSchemas()) {
+    const validate = contractValidator(schemaName)
+    assert.equal(validate(contractFixture('v4', fixtureName)), false, fixtureName)
+  }
 })
 
 test('v4 pull request input schema requires audit objective', () => {

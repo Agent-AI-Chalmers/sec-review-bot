@@ -155,27 +155,27 @@ def test_local_direct_runs_review_only(
 
 
 @pytest.mark.parametrize(
-    ("strategy", "review_intent", "expected_message"),
+    ("strategy", "review_intent", "invalid_field"),
     [
         (
             "two-stage",
             {"objective": "unknown"},
-            "review_intent.objective must be 'audit' or 'repair'.",
+            "review_intent.objective",
         ),
         (
             "two-stage",
             {"objective": "repair", "repair_mode": "unknown"},
-            "review_intent.repair_mode must be 'test-changes-allowed' or 'no-test-changes'.",
+            "review_intent.repair_mode",
         ),
         (
             "single-agent",
             {"objective": "unknown"},
-            "review_intent.objective must be 'audit' or 'repair'.",
+            "review_intent.objective",
         ),
         (
             "single-agent",
             {"objective": "repair", "repair_mode": "unknown"},
-            "review_intent.repair_mode must be 'test-changes-allowed' or 'no-test-changes'.",
+            "review_intent.repair_mode",
         ),
     ],
 )
@@ -183,9 +183,9 @@ def test_local_issue_ablation_direct_rejects_invalid_review_intent(
     tmp_path: Path,
     strategy: IssueReviewStrategy,
     review_intent: dict[str, str],
-    expected_message: str,
+    invalid_field: str,
 ) -> None:
-    with pytest.raises(ValueError, match=expected_message):
+    with pytest.raises(ValueError, match=invalid_field):
         _prepared_issue_ablation_request(
             tmp_path,
             strategy=strategy,

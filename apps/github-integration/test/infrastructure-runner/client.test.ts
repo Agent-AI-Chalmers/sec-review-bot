@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { contractFixture } from '../contract-fixtures.js'
+
 import {
   completedRunnerRunResult,
   submitRunnerRun,
@@ -29,6 +31,10 @@ function jsonResponse (body: unknown, init?: ResponseInit): Response {
   })
 }
 
+function issueInput (): Record<string, unknown> {
+  return structuredClone(contractFixture('v4', 'issue-review-input.json')) as Record<string, unknown>
+}
+
 test.afterEach(() => {
   resetEnv()
   globalThis.fetch = ORIGINAL_FETCH
@@ -41,7 +47,7 @@ test('submitRunnerRun requires HTTP runner service URL', async () => {
     submitRunnerRun({
       workflow: 'issue-review',
       run_id: 'run-1',
-      input: {}
+      input: issueInput()
     }),
     (error: unknown) => {
       const configError = error as Error & { code?: string }
@@ -66,7 +72,7 @@ test('submitRunnerRun posts an HTTP runner run', async () => {
     assert.equal((init?.headers as Record<string, string>).Authorization, 'Bearer dev-token')
     const body = JSON.parse(String(init?.body))
     assert.equal(body.run_id, 'run-1')
-    assert.deepEqual(body.input, {})
+    assert.deepEqual(body.input, issueInput())
     return jsonResponse({
       run_id: body.run_id,
       workflow: 'issue-review',
@@ -77,7 +83,7 @@ test('submitRunnerRun posts an HTTP runner run', async () => {
   const submitted = await submitRunnerRun({
     workflow: 'issue-review',
     run_id: 'run-1',
-    input: {}
+    input: issueInput()
   })
 
   assert.equal(submitted.run_id, 'run-1')
@@ -95,7 +101,7 @@ test('submitRunnerRun marks a lost create response as submission uncertainty', a
   globalThis.fetch = async () => { throw new TypeError('connection closed') }
 
   await assert.rejects(
-    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-uncertain', input: {} }),
+    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-uncertain', input: issueInput() }),
     (error: unknown) => error instanceof RunnerSubmissionUncertainError &&
       /run-uncertain/.test(error.message)
   )
@@ -108,7 +114,7 @@ test('submitRunnerRun marks an invalid successful create response as submission 
   globalThis.fetch = async () => jsonResponse({ run_id: 'run-uncertain' }, { status: 202 })
 
   await assert.rejects(
-    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-uncertain', input: {} }),
+    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-uncertain', input: issueInput() }),
     RunnerSubmissionUncertainError
   )
 })
@@ -129,7 +135,7 @@ test('submitRunnerRun keeps an explicit client rejection deterministic', async (
   }, { status: 400 })
 
   await assert.rejects(
-    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-rejected', input: {} }),
+    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-rejected', input: issueInput() }),
     (error: unknown) => {
       assert.equal(error instanceof RunnerSubmissionUncertainError, false)
       assert.equal((error as AgentRunnerServiceError).code, 'INPUT_INVALID')
@@ -160,7 +166,7 @@ test('submitRunnerRun surfaces a run identity conflict without retrying', async 
   }
 
   await assert.rejects(
-    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-conflict', input: {} }),
+    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-conflict', input: issueInput() }),
     (error: unknown) => {
       assert.equal(error instanceof RunnerSubmissionUncertainError, false)
       const serviceError = error as AgentRunnerServiceError
@@ -187,9 +193,33 @@ test('submitRunnerRun rejects invalid run ids before dispatch', async () => {
     submitRunnerRun({
       workflow: 'issue-review',
       run_id: ' run-1 ',
-      input: {}
+      input: issueInput()
     }),
     /Runner run_id must match/
+  )
+  assert.equal(called, false)
+})
+
+test('submitRunnerRun rejects schema-invalid input before dispatch', async () => {
+  resetEnv()
+  process.env.AGENT_RUNNER_SERVICE_URL = 'http://runner.test/'
+  process.env.AGENT_RUNNER_SERVICE_TOKEN = 'dev-token'
+  let called = false
+  globalThis.fetch = async () => {
+    called = true
+    return jsonResponse({})
+  }
+
+  await assert.rejects(
+    submitRunnerRun({
+      workflow: 'repository-review',
+      run_id: 'run-1',
+      input: contractFixture(
+        'v4',
+        'invalid-repository-review-input-zero-max-file-bytes.json'
+      ) as Record<string, unknown>
+    }),
+    /does not match contract v4/
   )
   assert.equal(called, false)
 })
@@ -202,7 +232,7 @@ test('submitRunnerRun requires runner service token by default', async () => {
     submitRunnerRun({
       workflow: 'issue-review',
       run_id: 'run-1',
-      input: {}
+      input: issueInput()
     }),
     (error: unknown) => {
       const configError = error as Error & { code?: string }
@@ -230,7 +260,7 @@ test('submitRunnerRun permits missing token for HTTP IPv4 loopback runner servic
   const submitted = await submitRunnerRun({
     workflow: 'issue-review',
     run_id: 'run-1',
-    input: {}
+    input: issueInput()
   })
 
   assert.equal(submitted.status, 'running')
@@ -253,7 +283,7 @@ test('submitRunnerRun permits missing token for HTTP IPv6 loopback runner servic
   const submitted = await submitRunnerRun({
     workflow: 'issue-review',
     run_id: 'run-1',
-    input: {}
+    input: issueInput()
   })
 
   assert.equal(submitted.status, 'running')
@@ -267,7 +297,7 @@ test('submitRunnerRun does not permit unauthenticated remote runner service URLs
     submitRunnerRun({
       workflow: 'issue-review',
       run_id: 'run-1',
-      input: {}
+      input: issueInput()
     }),
     (error: unknown) => {
       const configError = error as Error & { code?: string }
@@ -286,7 +316,7 @@ test('submitRunnerRun does not permit unauthenticated HTTPS loopback URLs', asyn
     submitRunnerRun({
       workflow: 'issue-review',
       run_id: 'run-1',
-      input: {}
+      input: issueInput()
     }),
     (error: unknown) => {
       const configError = error as Error & { code?: string }

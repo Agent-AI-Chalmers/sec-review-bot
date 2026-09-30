@@ -2,12 +2,12 @@ import re
 from typing import Any
 
 from sec_review_agents.runner.input_preparation import (
-    INPUT_ALLOWED_FIELDS_BY_WORKFLOW,
     prepare_workflow_input,
     workflow_artifact_root,
 )
+from sec_review_agents.runner.input_schema import INPUT_SCHEMA_BY_WORKFLOW
 
-SUPPORTED_RUNNER_WORKFLOWS = frozenset(INPUT_ALLOWED_FIELDS_BY_WORKFLOW)
+SUPPORTED_RUNNER_WORKFLOWS = frozenset(INPUT_SCHEMA_BY_WORKFLOW)
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 RUN_ID_REQUIREMENT_MESSAGE = (
     "Runner run_id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$."

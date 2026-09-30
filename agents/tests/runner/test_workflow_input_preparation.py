@@ -9,28 +9,6 @@ from sec_review_agents.runner.input_preparation import prepare_workflow_input
 from tests.contract_fixtures import contract_fixture
 
 
-def test_preparation_defines_current_caller_input_allowlists() -> None:
-    issue_fields = input_preparation.INPUT_ALLOWED_FIELDS_BY_WORKFLOW["issue-review"]
-    pr_fields = input_preparation.INPUT_ALLOWED_FIELDS_BY_WORKFLOW[
-        "pull-request-review"
-    ]
-    repository_fields = input_preparation.INPUT_ALLOWED_FIELDS_BY_WORKFLOW[
-        "repository-review"
-    ]
-    assert "runtime_context" not in issue_fields
-    assert "run_id" not in issue_fields
-    assert "kind" not in issue_fields
-    assert "materialization" not in issue_fields
-    assert "artifact_paths" not in issue_fields
-    assert "bundle_paths" not in issue_fields
-    assert "repair_mode" not in issue_fields
-    assert "repair_mode" not in pr_fields
-    assert "repair_mode" not in repository_fields
-    assert "review_intent" in issue_fields
-    assert "review_intent" in pr_fields
-    assert "review_intent" in repository_fields
-
-
 def _write_bundle_manifest(local_root: str, *, incremental: bool = False) -> None:
     root = Path(local_root)
     root.mkdir(parents=True, exist_ok=True)
@@ -317,52 +295,6 @@ def test_workflow_input_preparation_accepts_common_repair_mode(
     assert prepared["review_intent"]["repair_mode"] == "no-test-changes"
 
 
-@pytest.mark.parametrize(
-    ("payload", "workflow", "manifest_incremental", "message"),
-    [
-        (
-            _issue_input("/tmp/local-issue-bad-repair-mode")
-            | {
-                "review_intent": {"objective": "repair", "repair_mode": "fixtures-only"}
-            },
-            "issue-review",
-            False,
-            "review_intent.repair_mode must be",
-        ),
-        (
-            _pull_request_input("/tmp/local-pr-repair-objective")
-            | {"review_intent": {"objective": "repair"}},
-            "pull-request-review",
-            True,
-            "review_intent.objective must be 'audit'",
-        ),
-        (
-            _repository_input("/tmp/local-repository-repair-objective")
-            | {"review_intent": {"objective": "repair"}},
-            "repository-review",
-            False,
-            "review_intent.objective must be 'audit'",
-        ),
-    ],
-)
-def test_workflow_input_preparation_validates_review_intent_semantics(
-    payload: dict,
-    workflow: str,
-    manifest_incremental: bool,
-    message: str,
-) -> None:
-    _write_bundle_manifest(
-        payload["input_bundle_uri"], incremental=manifest_incremental
-    )
-
-    with pytest.raises(ValueError, match=message):
-        prepare_workflow_input(
-            payload,
-            workflow,
-            artifact_root_path=Path(payload["input_bundle_uri"]) / "artifacts",
-        )
-
-
 def test_repository_workflow_input_preparation_derives_stage_artifacts() -> None:
     _write_bundle_manifest("/tmp/local-repository")
     prepared = prepare_workflow_input(
@@ -546,6 +478,25 @@ def test_repository_incremental_input_rejects_missing_window_fields(
         )
 
 
+def test_repository_incremental_input_compares_trimmed_shas() -> None:
+    payload = _repository_input("/tmp/local-repository-incremental")
+    payload["scan_target"] = _repository_scan_target(
+        {
+            "scan_mode": "incremental",
+            "base_sha": " abc123 ",
+            "head_sha": "abc123",
+            "commit_shas": ["abc123"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="base_sha must differ from head_sha"):
+        prepare_workflow_input(
+            payload,
+            "repository-review",
+            artifact_root_path="/tmp/local-repository-incremental/artifacts",
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
@@ -613,39 +564,3 @@ def test_repository_workflow_input_preparation_rejects_bad_event_type() -> None:
             "repository-review",
             artifact_root_path="/tmp/local-repository/artifacts",
         )
-
-
-@pytest.mark.parametrize(
-    ("config", "message"),
-    [
-        (_repository_scan_scope({"paths_ignore": ["dist/**", ""]}), "paths_ignore[1]"),
-        (_repository_scan_scope({"paths_ignore": [123]}), "paths_ignore[0]"),
-        (
-            _repository_scan_scope({"incremental_changed_files": ["src/app.py"]}),
-            "incremental_changed_files[0]",
-        ),
-        (
-            _repository_scan_scope(
-                {
-                    "incremental_changed_files": [
-                        {"path": "src/app.py", "previous_path": None}
-                    ]
-                }
-            ),
-            "incremental_changed_files[0].status",
-        ),
-    ],
-)
-def test_repository_workflow_input_preparation_rejects_malformed_scan_scope_items(
-    config: dict,
-    message: str,
-) -> None:
-    payload = _repository_input()
-    payload["scan_scope"] = config
-    with pytest.raises(ValueError) as error:
-        prepare_workflow_input(
-            payload,
-            "repository-review",
-            artifact_root_path="/tmp/local-repository/artifacts",
-        )
-    assert message in str(error.value)

@@ -11,6 +11,12 @@ const RESULT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
   'repository-review': 'repository-review-result.schema.json'
 }
 
+const INPUT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
+  'issue-review': 'issue-review-input.schema.json',
+  'pull-request-review': 'pull-request-review-input.schema.json',
+  'repository-review': 'repository-review-input.schema.json'
+}
+
 let validators: Map<string, ValidateFunction> | null = null
 
 function contractSchemasRoot (): string {
@@ -22,7 +28,7 @@ function contractSchemasRoot (): string {
   ]
   const root = candidates.find((candidate) => existsSync(path.join(candidate, 'common.schema.json')))
   if (root === undefined) {
-    throw new Error('Could not locate contract v4 schemas for Runner result validation.')
+    throw new Error('Could not locate contract v4 schemas for Runner validation.')
   }
   return root
 }
@@ -44,6 +50,10 @@ function resultValidators (): Map<string, ValidateFunction> {
 
   validators = new Map<string, ValidateFunction>([
     ['review-record.schema.json', ajv.compile(readSchema(root, 'review-record.schema.json'))],
+    ...Object.values(INPUT_SCHEMA_BY_WORKFLOW).map((name): [string, ValidateFunction] => [
+      name,
+      ajv.compile(readSchema(root, name))
+    ]),
     ...Object.values(RESULT_SCHEMA_BY_WORKFLOW).map((name): [string, ValidateFunction] => [
       name,
       ajv.compile(readSchema(root, name))
@@ -67,6 +77,10 @@ function assertSchema (schemaName: string, value: unknown, label: string): void 
 
 export function assertV4WorkflowResult (workflow: WorkflowName, value: unknown): void {
   assertSchema(RESULT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} result`)
+}
+
+export function assertV4WorkflowInput (workflow: WorkflowName, value: unknown): void {
+  assertSchema(INPUT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} input`)
 }
 
 export function assertV4ReviewRecord (value: unknown): void {

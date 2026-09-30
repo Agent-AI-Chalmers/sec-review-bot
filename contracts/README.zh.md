@@ -65,7 +65,9 @@ GitHub integration 是调用方侧的一种实现：它把 GitHub event 和发�
 
 Markdown 规范定义字段语义、兼容规则和集成指导。
 
-Schema 文件是该规范的可执行结构化形式。契约 v4 schemas 使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python 测试使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 校验，TypeScript 测试使用 [Ajv](https://ajv.js.org/) 校验。
+Schema 文件是该规范的可执行结构化形式。契约 v4 schemas 使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python Runner 使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 执行 input schemas，TypeScript integration 使用 [Ajv](https://ajv.js.org/) 执行 input 和 result schemas；两个包的测试也会执行共享 fixtures。
+
+Agents wheel 会在构建时把这些 canonical schemas 作为 package data 收入包中。因此安装后的 Python 工具不依赖仓库级 `contracts/` 路径。
 
 Schemas 是结构性契约检查，不是所有运行时规则或发布规则的完整权威。
 
@@ -75,7 +77,7 @@ Schemas 是结构性契约检查，不是所有运行时规则或发布规则的
 
 Fixture 文件提供测试可执行的具体 JSON 示例，因此也属于契约校验范围。
 
-[`fixtures/v4/manifest.json`](fixtures/v4/manifest.json) 记录哪个 fixture 应由哪个 schema 校验，因此 Python 和 TypeScript 测试共享同一份 fixture 到 schema 的映射。
+[`fixtures/v4/manifest.json`](fixtures/v4/manifest.json) 记录每个 schema 必须接受哪些有效 fixtures、拒绝哪些无效 fixtures，因此 Python 和 TypeScript 会执行同一条结构边界。
 
 当契约字段变化时，应同时更新本目录中的相关书面规范、[schema](schemas/v4)、[fixture](fixtures/v4) 和 [manifest](fixtures/v4/manifest.json) 条目。
 

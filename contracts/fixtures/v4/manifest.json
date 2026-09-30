@@ -11,5 +11,14 @@
     "review-record-deleted-file.json": "review-record.schema.json",
     "review-record-no-actionable.json": "review-record.schema.json",
     "review-record.json": "review-record.schema.json"
+  },
+  "invalid_schema_fixtures": {
+    "invalid-repository-review-input-blank-commit-sha.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-blank-ignore.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-blank-target-branch.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-empty-ignore.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-extra-change-field.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-zero-max-file-bytes.json": "repository-review-input.schema.json"
   }
 }

@@ -22,6 +22,12 @@ def fixture_schemas(version: str) -> dict[str, str]:
     return schema_fixtures
 
 
+def invalid_fixture_schemas(version: str) -> dict[str, str]:
+    schema_fixtures = contract_fixture_manifest(version).get("invalid_schema_fixtures")
+    assert isinstance(schema_fixtures, dict)
+    return schema_fixtures
+
+
 def test_v4_contract_fixture_manifest_covers_fixture_and_schema_files() -> None:
     schema_fixtures = fixture_schemas("v4")
     fixture_names = {
@@ -31,8 +37,12 @@ def test_v4_contract_fixture_manifest_covers_fixture_and_schema_files() -> None:
     }
     schema_names = {schema_file.name for schema_file in contract_schema_files("v4")}
 
-    assert set(schema_fixtures) == fixture_names
-    assert set(schema_fixtures.values()) <= schema_names
+    invalid_schema_fixtures = invalid_fixture_schemas("v4")
+    assert set(schema_fixtures) | set(invalid_schema_fixtures) == fixture_names
+    assert (
+        set(schema_fixtures.values()) | set(invalid_schema_fixtures.values())
+        <= schema_names
+    )
 
 
 def test_v4_contract_fixtures_match_json_schemas() -> None:
@@ -46,6 +56,15 @@ def test_v4_contract_fixtures_match_json_schemas() -> None:
         assert (
             errors == []
         ), f"{fixture_name} failed {schema_name}:\n{format_schema_errors(errors)}"
+
+
+def test_v4_invalid_contract_fixtures_are_rejected_by_json_schemas() -> None:
+    for fixture_name, schema_name in invalid_fixture_schemas("v4").items():
+        validator = contract_validator("v4", schema_name)
+
+        errors = list(validator.iter_errors(contract_fixture("v4", fixture_name)))
+
+        assert errors != [], f"{fixture_name} unexpectedly matched {schema_name}"
 
 
 def test_v4_pull_request_input_schema_requires_audit_objective() -> None:

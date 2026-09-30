@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from sec_review_agents.runner.service import app as service_app
 from sec_review_agents.runner.service.gateway import RunnerRunConflictError
+from tests.contract_fixtures import contract_fixture
 
 
 class FakeRunnerWorkflowGateway:
@@ -39,7 +40,7 @@ class FakeRunnerWorkflowGateway:
 def _request() -> dict[str, Any]:
     return {
         "run_id": "run-service",
-        "input": {},
+        "input": contract_fixture("v4", "issue-review-input.json"),
     }
 
 
@@ -98,7 +99,7 @@ def test_create_run_rejects_invalid_run_id_before_start(monkeypatch) -> None:
         "/v1/workflows/issue-review/runs",
         json={
             "run_id": "../run-service",
-            "input": {},
+            "input": contract_fixture("v4", "issue-review-input.json"),
         },
     )
 
@@ -106,6 +107,28 @@ def test_create_run_rejects_invalid_run_id_before_start(monkeypatch) -> None:
     body = response.json()
     assert body["error"]["code"] == "RUNNER_REQUEST_INVALID"
     assert "run_id must match" in body["error"]["message"]
+    assert gateway.runs == {}
+
+
+def test_create_run_rejects_schema_invalid_input_before_start(monkeypatch) -> None:
+    """The public HTTP boundary must enforce the same v4 shape as contract clients."""
+    monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
+    _use_loopback_host(monkeypatch)
+    gateway = FakeRunnerWorkflowGateway()
+    client = TestClient(service_app.create_app(runner_gateway=gateway))
+
+    response = client.post(
+        "/v1/workflows/repository-review/runs",
+        json={
+            "run_id": "run-service",
+            "input": contract_fixture(
+                "v4", "invalid-repository-review-input-zero-max-file-bytes.json"
+            ),
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "RUNNER_REQUEST_INVALID"
     assert gateway.runs == {}
 
 
