@@ -228,6 +228,8 @@ Webhook 使用 GitHub Delivery ID 识别重复投递。Actions dispatch 使用�
 flowchart LR
   preparing --> queued --> running --> publishing --> published
   preparing --> failed
+  failed -->|提交状态不确定| recovering
+  recovering --> queued
   queued --> failed
   running --> failed
   publishing -->|确定性失败| failed
@@ -235,16 +237,17 @@ flowchart LR
   publish_failed -->|仍有重试次数| publishing
 ```
 
-`preparing` 从请求被持久化接纳时开始，早于 workspace 或 input 准备。`publish_failed` 的重试次数耗尽后会成为终态，但仍保留该持久化状态，方便诊断发布失败。
+`preparing` 从请求被持久化接纳时开始，早于 workspace 或 input 准备。`recovering` 表示 publisher 已独占领取一次状态不确定的 Runner submission，正在查明结果。`publish_failed` 的重试次数耗尽后会成为终态，但仍保留该持久化状态，方便诊断发布失败。
 
 | 持久化 run 状态 | 含义 | Publisher 行为 |
 | --- | --- | --- |
 | `preparing` | 请求已经接纳，但 workspace 和 runner input 仍在准备。 | 不会进入 runner 轮询。 |
+| `recovering` | Publisher 正在检查或安全地重新提交一次响应丢失的 Runner 请求。 | 同一时间只有一个 publisher 持有 recovery claim；过期 claim 可以被重新领取。 |
 | `queued` | Runner run 已提交，但尚未观察到运行中状态。 | 继续轮询 runner service。 |
 | `running` | Runner service 报告 run 仍在执行。 | 继续轮询。 |
 | `publishing` | 某个 publisher 已领取完成的 run，准备执行 GitHub side effects。 | 除非领取已过期，否则其他 publisher 不应再次领取。 |
 | `published` | GitHub 发布完成。 | 终态。 |
-| `failed` | Runner service 失败，或已持久化的完成结果格式错误且结果确定不可通过重试修复。 | 终态。 |
+| `failed` | preparation、submission、Runner execution 或确定性的结果处理失败。 | 通常是终态；`failure_code` 为 `SUBMISSION_STATE_UNCERTAIN` 时由后台自动恢复。 |
 | `publish_failed` | Runner 已返回完成且结果有效，但调用 GitHub 发布结果失败。 | 最多重试到 GitHub 发布失败三次。 |
 
 Publisher 会重试 `publish_failed` run，直到调用 GitHub 发布结果累计失败三次。领取一个完成的 run 准备发布不算一次尝试；只有真正发布失败才计数。
@@ -272,7 +275,7 @@ sec-review-review-runs --status publish_failed
 | `attempts` | 已记录的 GitHub 发布失败次数；领取 run 准备发布不计数。 |
 | `failure_code` | run 中持久化的结构化失败码。 |
 
-`PREPARATION_INTERRUPTED` 表示进程在准备已接纳的 run 时停止。`SUBMISSION_STATE_UNCERTAIN` 表示 Runner submission 可能已经成功，但 `queued` 转换没有写入 store。两种恢复场景都会在同一入口请求重放时复用原 `run_id`。
+`PREPARATION_INTERRUPTED` 表示进程在准备已接纳的 run 时停止；同一入口请求重放时，会使用原 `run_id` 重新准备。`SUBMISSION_STATE_UNCERTAIN` 表示 Runner submission 可能已经成功，但 `queued` 转换没有写入 store。后台 publisher 会查询原 `run_id`；只有 Runner 明确表示该 run 不存在时，才使用已持久化的 input 重新提交，不会重建 bundle。
 
 ## GitHub REST API 版本
 

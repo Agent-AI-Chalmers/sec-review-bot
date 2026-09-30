@@ -16,6 +16,8 @@ interface DiagnosticsOptions {
 
 const DEFAULT_LIMIT = 25
 const RUN_STATUSES: ReviewRunStatus[] = [
+  'preparing',
+  'recovering',
   'queued',
   'running',
   'publishing',

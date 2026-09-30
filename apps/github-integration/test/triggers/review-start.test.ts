@@ -217,9 +217,13 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
       delivery_id: 'delivery-uncertain',
       deps: {
         create_run_id: () => 'run-uncertain',
-        start_review: async () => { throw error },
+        start_review: async (args) => {
+          args.on_prepared?.({ issue: args.issue, run_id: 'run-uncertain', workspace_ref: 'workspace-ref', workflow: 'issue-review', event_type: 'opened' }, { contract_version: 'v4' } as never)
+          throw error
+        },
         store: {
           admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true }) as never,
+          save_prepared_submission: (run_id, context, input) => transitions.push(['prepared', run_id, context, input]),
           mark_queued: () => assert.fail('uncertain submission must not queue yet'),
           markFailed: (run_id, failure) => transitions.push([run_id, failure])
         }
@@ -228,10 +232,11 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
     error
   )
 
-  assert.deepEqual(transitions, [[
+  assert.equal((transitions[0] as unknown[])[0], 'prepared')
+  assert.deepEqual(transitions[1], [
     'run-uncertain',
     { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
-  ]])
+  ])
 })
 
 test('startPullRequestReviewCommand preserves an uncertain Runner submission for replay', async () => {
@@ -246,9 +251,13 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
       delivery_id: 'delivery-pr-uncertain',
       deps: {
         create_run_id: () => 'run-pr-uncertain',
-        start_review: async () => { throw error },
+        start_review: async (args) => {
+          args.on_prepared?.({ pr: args.pr, run_id: 'run-pr-uncertain', files: [], workflow: 'pull-request-review', event_type: 'opened' }, { contract_version: 'v4' } as never)
+          throw error
+        },
         store: {
           admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true }) as never,
+          save_prepared_submission: (run_id, context, input) => transitions.push(['prepared', run_id, context, input]),
           mark_queued: () => assert.fail('uncertain submission must not queue yet'),
           markFailed: (run_id, failure) => transitions.push([run_id, failure])
         }
@@ -257,10 +266,11 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
     error
   )
 
-  assert.deepEqual(transitions, [[
+  assert.equal((transitions[0] as unknown[])[0], 'prepared')
+  assert.deepEqual(transitions[1], [
     'run-pr-uncertain',
     { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
-  ]])
+  ])
 })
 
 test('startPullRequestReviewCommand admits a comment delivery before loading PR context', async () => {

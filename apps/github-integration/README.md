@@ -226,6 +226,8 @@ For an Actions dispatch, HTTP `202 Accepted` means the integration validated and
 flowchart LR
   preparing --> queued --> running --> publishing --> published
   preparing --> failed
+  failed -->|submission state uncertain| recovering
+  recovering --> queued
   queued --> failed
   running --> failed
   publishing -->|deterministic failure| failed
@@ -233,16 +235,17 @@ flowchart LR
   publish_failed -->|retries remain| publishing
 ```
 
-`preparing` begins at durable admission, before workspace or input preparation. A `publish_failed` run becomes terminal when its retry budget is exhausted, but retains that stored status so diagnostics preserve the publication failure.
+`preparing` begins at durable admission, before workspace or input preparation. `recovering` means the publisher has exclusively claimed an uncertain Runner submission. A `publish_failed` run becomes terminal when its retry budget is exhausted, but retains that stored status so diagnostics preserve the publication failure.
 
 | Stored run state | Meaning | Publisher behavior |
 | --- | --- | --- |
 | `preparing` | The request was admitted, but its workspace and runner input are still being prepared. | Not visible to the runner poller. |
+| `recovering` | The publisher is checking or safely re-submitting a Runner request whose response was lost. | One publisher owns the recovery claim; a stale claim can be reclaimed. |
 | `queued` | Runner run was submitted and has not been observed as running. | Poll the runner service. |
 | `running` | Runner service reports the run is still in progress. | Keep polling. |
 | `publishing` | A publisher claimed the completed run for GitHub side effects. | Do not let another publisher claim it unless the claim becomes stale. |
 | `published` | GitHub publication completed. | Terminal. |
-| `failed` | Runner service failed, or the stored completed result is malformed and deterministic. | Terminal. |
+| `failed` | Preparation, submission, Runner execution, or deterministic result handling failed. | Terminal unless `failure_code` is `SUBMISSION_STATE_UNCERTAIN`; that case is recovered in the background. |
 | `publish_failed` | Publishing a completed, valid runner result to GitHub failed. | Retry until GitHub publication has failed three times. |
 
 The publisher retries `publish_failed` runs until GitHub publication has failed three times. Claiming a completed run for publication does not count as an attempt.
@@ -270,7 +273,7 @@ The command reads the local SQLite `review_runs` store. Important columns:
 | `attempts` | Recorded GitHub publication failures; claiming a run does not increment this. |
 | `failure_code` | Structured failure code stored with the run. |
 
-`PREPARATION_INTERRUPTED` means the process stopped while preparing an admitted run. `SUBMISSION_STATE_UNCERTAIN` means Runner submission may have succeeded, but the transition to `queued` was not stored. Replaying the same ingress request reuses the original `run_id` for either recovery case.
+`PREPARATION_INTERRUPTED` means the process stopped while preparing an admitted run. Replaying the same ingress request restarts that preparation under the original `run_id`. `SUBMISSION_STATE_UNCERTAIN` means Runner submission may have succeeded, but the transition to `queued` was not stored. The background publisher checks the original `run_id`; if Runner explicitly reports it missing, the publisher re-submits the persisted input without rebuilding the bundle.
 
 ## GitHub REST API Version
 

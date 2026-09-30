@@ -10,6 +10,7 @@ import {
 } from '../../triggers/repository-review.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import { RunnerSubmissionUncertainError } from '../../infrastructure/runner/client.js'
+import type { SubmittedRepositoryReviewRun } from '../../reviews/repositories/submit.js'
 
 function fakeApp (): App {
   return appWithInstallationOctokit({
@@ -141,7 +142,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       },
       submit_run: async (args) => {
         submit_calls.push(args)
-        return {
+        const submitted: SubmittedRepositoryReviewRun = {
           repo: {
             owner_login: 'octo',
             repo_name: 'example',
@@ -162,6 +163,8 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           workflow: 'repository-review',
           event_type: 'manual'
         }
+        args.on_prepared?.(submitted, { contract_version: 'v4' } as never)
+        return submitted
       },
       create_run_id: () => 'run-1',
       store: {
@@ -169,6 +172,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           saved_runs.push(run)
           return { record: { ...run, status: 'preparing' }, created: true } as never
         },
+        save_prepared_submission: (run_id, context, input) => saved_runs.push({ run_id, context, input }),
         mark_queued: () => {},
         markFailed: () => assert.fail('successful review must not be marked failed')
       }
@@ -176,18 +180,48 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
   })
 
   assert.equal(submitted.run_id, 'run-1')
-  assert.deepEqual(submit_calls, [{
+  assert.equal(submit_calls.length, 1)
+  const submitCall = submit_calls[0] as Record<string, unknown>
+  assert.equal(typeof submitCall.on_prepared, 'function')
+  assert.deepEqual({
+    octokit: submitCall.octokit,
+    run_id: submitCall.run_id,
+    repo_full_name: submitCall.repo_full_name,
+    target_branch: submitCall.target_branch,
+    scan_mode: submitCall.scan_mode,
+    base_sha: submitCall.base_sha,
+    head_sha: submitCall.head_sha,
+    event_type: submitCall.event_type,
+    repair_mode: submitCall.repair_mode,
+    correlation_id: submitCall.correlation_id
+  }, {
     octokit,
     run_id: 'run-1',
     ...resolved
-  }])
-  assert.deepEqual(saved_runs, [{
+  })
+  assert.deepEqual(saved_runs[0], {
     workflow: 'repository-review',
     run_id: 'run-1',
     publish_context: {},
     ingress_kind: 'github_actions_dispatch',
     ingress_key: 'octo/example:actions-run-1'
-  }])
+  })
+  assert.deepEqual(saved_runs[1], {
+    run_id: 'run-1',
+    input: { contract_version: 'v4' },
+    context: {
+      repo: {
+        owner_login: 'octo', repo_name: 'example', repo_full_name: 'octo/example', default_branch: 'main'
+      },
+      workspace_ref: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      scan_target: {
+        target_branch: 'main', default_branch: 'main', event_type: 'manual', scan_mode: 'incremental',
+        base_sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', commit_shas: []
+      },
+      event_type: 'manual'
+    }
+  })
 })
 
 test('dispatchRepositoryReview reuses the run admitted for the same repository dispatch', async () => {
@@ -380,9 +414,20 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           correlation_id: 'actions-run-uncertain'
         }),
         create_run_id: () => 'run-repo-uncertain',
-        submit_run: async () => { throw error },
+        submit_run: async (args) => {
+          args.on_prepared?.({
+            repo: { owner_login: 'octo', repo_name: 'example', repo_full_name: 'octo/example', default_branch: 'main' },
+            run_id: 'run-repo-uncertain',
+            workspace_ref: 'head-sha',
+            scan_target: { target_branch: 'main', default_branch: 'main', event_type: 'manual', scan_mode: 'full', base_sha: null, head_sha: 'head-sha', commit_shas: [] },
+            workflow: 'repository-review',
+            event_type: 'manual'
+          }, { contract_version: 'v4' } as never)
+          throw error
+        },
         store: {
           admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true }) as never,
+          save_prepared_submission: (run_id, context, input) => transitions.push(['prepared', run_id, context, input]),
           mark_queued: () => assert.fail('uncertain submission must not queue yet'),
           markFailed: (run_id, failure) => transitions.push([run_id, failure])
         }
@@ -391,8 +436,9 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
     error
   )
 
-  assert.deepEqual(transitions, [[
+  assert.equal((transitions[0] as unknown[])[0], 'prepared')
+  assert.deepEqual(transitions[1], [
     'run-repo-uncertain',
     { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
-  ]])
+  ])
 })

@@ -14,7 +14,7 @@ type StartPullRequestReview = typeof startPullRequestReviewRun
 type PullRequestReviewRunStore = Pick<
   typeof reviewRunStore,
   'admit_review_run' | 'mark_queued' | 'markFailed'
->
+> & Partial<Pick<typeof reviewRunStore, 'save_prepared_submission'>>
 
 interface StartPullRequestReviewCommandDeps {
   start_review: StartPullRequestReview
@@ -63,12 +63,15 @@ export async function startPullRequestReviewCommand ({
     ingress_kind: 'github_webhook',
     ingress_key: delivery_id
   })
+  on_admitted?.({
+    run_id: admission.record.run_id,
+    status: admission.record.status,
+    replayed: !admission.created
+  })
   if (!admission.created) {
-    on_admitted?.({ run_id: admission.record.run_id, status: admission.record.status, replayed: true })
     return { run_id: admission.record.run_id }
   }
   const run_id = admission.record.run_id
-  on_admitted?.({ run_id, status: 'preparing', replayed: false })
 
   let submitted: SubmittedPullRequestReviewRun
   try {
@@ -81,7 +84,12 @@ export async function startPullRequestReviewCommand ({
       pr: resolvedPr,
       run_id,
       event_type,
-      repair_mode: event_type === 'manual_review' ? repair_mode : null
+      repair_mode: event_type === 'manual_review' ? repair_mode : null,
+      on_prepared: (prepared, input) => store.save_prepared_submission?.(
+        run_id,
+        pullRequestReviewPublishContext(prepared),
+        input
+      )
     })
   } catch (error) {
     store.markFailed(run_id, {

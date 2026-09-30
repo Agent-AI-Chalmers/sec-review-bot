@@ -4,6 +4,9 @@ import { clearImmediate, clearInterval } from 'node:timers'
 import {
   getRunnerRunStatus,
   RUNNER_RUN_NOT_FOUND,
+  RunnerSubmissionUncertainError,
+  submitRunnerRun,
+  type AgentRunnerServiceError,
   type RunnerRunStatus
 } from './client.js'
 import {
@@ -15,7 +18,7 @@ import { splitRepoFullName } from '../github/repository-service.js'
 import { handleIssueReviewRun } from '../../reviews/issues/publish.js'
 import { handlePullRequestReviewRun } from '../../reviews/pull-requests/publish.js'
 import { handleRepositoryReviewRun } from '../../reviews/repositories/publish.js'
-import { logError, logInfo } from '../../utils/logger.js'
+import { logError, logInfo, logWarn } from '../../utils/logger.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from './publish-error-code.js'
 import { isDeterministicRunnerPublishError } from './publish-error.js'
@@ -27,9 +30,11 @@ interface ReviewRunPublisherOptions {
   store?: ReviewRunStore
   intervalMs?: number
   get_runner_run_status?: GetRunnerRunStatus
+  submit_runner_run?: SubmitRunnerRun
 }
 
 type GetRunnerRunStatus = typeof getRunnerRunStatus
+type SubmitRunnerRun = typeof submitRunnerRun
 
 export interface ReviewRunPublisher {
   stop: () => Promise<void>
@@ -254,15 +259,104 @@ async function publishCompletedRun ({
   })
 }
 
+function isMissingRunnerRun (error: unknown): error is AgentRunnerServiceError {
+  return error instanceof Error &&
+    error.name === 'AgentRunnerServiceError' &&
+    'code' in error && error.code === RUNNER_RUN_NOT_FOUND
+}
+
+async function recoverSubmission ({
+  store,
+  run,
+  get_runner_run_status,
+  submit_runner_run
+}: {
+  store: ReviewRunStore
+  run: ReviewRunRecord
+  get_runner_run_status: GetRunnerRunStatus
+  submit_runner_run: SubmitRunnerRun
+}): Promise<void> {
+  const claimToken = store.claimSubmissionRecovery(run.run_id)
+  if (claimToken === null) {
+    return
+  }
+
+  try {
+    await get_runner_run_status({ run_id: run.run_id })
+    if (!store.completeSubmissionRecovery(run.run_id, claimToken)) {
+      return
+    }
+    logInfo('runner_submission_recovered', {
+      resolution: 'existing-run-found',
+      run_id: run.run_id,
+      workflow: run.workflow
+    })
+    return
+  } catch (error) {
+    if (!isMissingRunnerRun(error)) {
+      if (!store.failSubmissionRecovery(run.run_id, claimToken, {
+        code: 'SUBMISSION_STATE_UNCERTAIN',
+        message: asErrorMessage(error)
+      })) return
+      logWarn('runner_submission_recovery_deferred', {
+        error,
+        error_message: asErrorMessage(error),
+        run_id: run.run_id,
+        workflow: run.workflow
+      })
+      return
+    }
+  }
+
+  if (run.runner_input === undefined) {
+    store.failSubmissionRecovery(run.run_id, claimToken, {
+      code: 'SUBMISSION_RECOVERY_INPUT_MISSING',
+      message: 'The persisted Runner input is missing; this submission cannot be recovered.'
+    })
+    return
+  }
+
+  try {
+    // Runner explicitly confirmed that no execution owns this ID. Re-submit
+    // the persisted request without rebuilding or modifying its input bundle.
+    await submit_runner_run({
+      workflow: run.workflow,
+      run_id: run.run_id,
+      input: run.runner_input
+    })
+    if (!store.completeSubmissionRecovery(run.run_id, claimToken)) {
+      return
+    }
+    logInfo('runner_submission_recovered', {
+      resolution: 'resubmitted-persisted-input',
+      run_id: run.run_id,
+      workflow: run.workflow
+    })
+  } catch (error) {
+    store.failSubmissionRecovery(run.run_id, claimToken, {
+      code: error instanceof RunnerSubmissionUncertainError
+        ? 'SUBMISSION_STATE_UNCERTAIN'
+        : asErrorCode(error) ?? 'REVIEW_START_FAILED',
+      message: asErrorMessage(error)
+    })
+  }
+}
+
 export async function publishReviewRunsOnce ({
   app,
   store = reviewRunStore,
-  get_runner_run_status = getRunnerRunStatus
+  get_runner_run_status = getRunnerRunStatus,
+  submit_runner_run = submitRunnerRun
 }: {
   app: App
   store?: ReviewRunStore
   get_runner_run_status?: GetRunnerRunStatus
+  submit_runner_run?: SubmitRunnerRun
 }): Promise<void> {
+  for (const run of store.listSubmissionRecoveries()) {
+    await recoverSubmission({ store, run, get_runner_run_status, submit_runner_run })
+  }
+
   for (const run of store.listActiveRuns()) {
     try {
       await publishCompletedRun({ app, store, run, get_runner_run_status })
@@ -296,7 +390,8 @@ export function startRunnerRunPublisher ({
   app,
   store = reviewRunStore,
   intervalMs = pollIntervalMs(),
-  get_runner_run_status = getRunnerRunStatus
+  get_runner_run_status = getRunnerRunStatus,
+  submit_runner_run = submitRunnerRun
 }: ReviewRunPublisherOptions): ReviewRunPublisher {
   let stopped = false
   let active: Promise<void> | null = null
@@ -304,7 +399,7 @@ export function startRunnerRunPublisher ({
     if (stopped || active !== null) {
       return
     }
-    active = publishReviewRunsOnce({ app, store, get_runner_run_status })
+    active = publishReviewRunsOnce({ app, store, get_runner_run_status, submit_runner_run })
       .catch((error: unknown) => {
         logError('runner_run_publisher_failed', {
           error,
