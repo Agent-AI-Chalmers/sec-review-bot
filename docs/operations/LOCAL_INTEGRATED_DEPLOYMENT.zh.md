@@ -179,13 +179,13 @@ Artifact 默认写入当前 checkout 的 `.agent-artifacts`，模型配置默认
 | `TEMPORAL_NAMESPACE`、`TEMPORAL_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
 | `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
 
-除非 checkout 位置或对应的 Compose 配置发生变化，否则生成的路径和默认值通常不需要调整。
+大多数本地部署可以保留这些默认值。移动 checkout 后，重新运行安装脚本。
 
 以下变量按需添加或修改。
 
 #### Langfuse tracing
 
-[Langfuse](https://langfuse.com/docs) 是可选的外部可观测性服务，不属于本仓库的 Compose 控制平面。可以使用 [Langfuse Cloud](https://cloud.langfuse.com)，也可以单独运行[自托管 Langfuse](https://langfuse.com/self-hosting)。在 Langfuse 中创建 project 和 API keys 后，把下面三项一起写入 `/etc/sec-review-bot/deployment.env`：
+[Langfuse](https://langfuse.com/docs) 是可选的外部可观测性服务，不属于本仓库的 Compose 控制平面。可以使用 [Langfuse Cloud](https://cloud.langfuse.com)，也可以单独运行[自托管 Langfuse](https://langfuse.com/self-hosting)。在 Langfuse 中创建 project 和 API keys 后，把下面三项一起写入 `deploy/systemd/deployment.env`，再重新运行安装脚本：
 
 ```bash
 LANGFUSE_PUBLIC_KEY=your_public_key
@@ -271,7 +271,9 @@ sudo deploy/systemd/install.sh "$USER"
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` 同时管理 Compose 控制平面和 `sec-review-agents-worker@1.service`。控制平面包括 GitHub integration、Runner Service 和 Temporal；worker 在宿主机执行 review activity 并创建 Docker sandbox。Compose 以前台进程受 systemd 监督；任一控制平面容器意外退出时，systemd 会重新启动控制平面。
+`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面和 `sec-review-agents-worker@1.service` 组合起来，使二者可以一起管理。
+
+控制平面包括 GitHub integration、Runner Service 和 Temporal。宿主机 worker 执行 review activity 并创建 Docker sandbox。任一控制平面容器意外退出时，systemd 会重新启动控制平面。
 
 日常启停和重启只操作 target：
 
@@ -301,14 +303,14 @@ sudo journalctl \
 sudo systemctl disable --now sec-review-bot.target
 ```
 
-修改 GitHub integration 或 Runner Service 代码后，重新构建镜像，再重启 target：
+修改代码后，重新构建镜像，再重启完整服务：
 
 ```bash
 docker compose --profile app build
 sudo systemctl restart sec-review-bot.target
 ```
 
-如果更新包含 `deploy/systemd` 下的 unit，再运行一次安装脚本后重启 target。
+修改 `deploy/systemd` 下的安装文件后，先重新运行安装脚本，再重启服务。
 
 验证 Runner Service：
 
@@ -320,7 +322,7 @@ curl -sS http://127.0.0.1:8000/healthz \
 
 ### 组件级操作
 
-正常运行只需要操作 `sec-review-bot.target`。排障或只更新一个组件时，可以单独重启控制平面或 worker：
+排障或只更新一个组件时，可以单独重启控制平面或 worker：
 
 ```bash
 sudo systemctl restart sec-review-bot-control-plane.service
@@ -415,7 +417,7 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 ## 排障
 
 - `403 Resource not accessible by integration`：检查 GitHub App 权限，以及 installation 是否重新批准过新权限。
-- Runner service 返回 unauthorized：确认 `AGENT_RUNNER_SERVICE_TOKEN` 和 `RUNNER_SERVICE_TOKEN` 一致。
+- Runner Service 返回 unauthorized：检查仓库 `.env` 中的 `RUNNER_SERVICE_TOKEN`，再重启完整服务。
 - Repository dispatch 鉴权失败：确认 workflow 配置了 `id-token: write`，请求了 `sec-review-bot` OIDC audience，并且 workflow 路径是 `.github/workflows/sec-review-bot.yml`。
 - Run 一直处于 queued：确认至少有一个宿主机 worker 正在运行，并与 Runner Service 使用相同的 `TEMPORAL_TASK_QUEUE`。
 - Worker 读不到 input bundle：重新运行 `sudo deploy/systemd/install.sh "$USER"`，使安装后的 `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` 与当前 checkout 一致。

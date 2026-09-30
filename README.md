@@ -92,8 +92,10 @@ Create the integrated deployment configuration:
 cp compose.env.sample .env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
+cp deploy/systemd/deployment.env.sample deploy/systemd/deployment.env
 # Fill .env, agents/config/model-providers.toml, apps/github-integration/.env,
-# and place the private key at apps/github-integration/private-key.pem.
+# and deploy/systemd/deployment.env, then place the private key at
+# apps/github-integration/private-key.pem.
 ```
 
 Build the control-plane images and install the integrated service:
@@ -107,7 +109,7 @@ sudo deploy/systemd/install.sh "$USER"
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` manages GitHub integration, Runner Service, Temporal, and the host execution worker as one service. See the [local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) for configuration, status inspection, updates, and component-level development.
+`sec-review-bot.target` is the systemd entry point for the complete service. See the [local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) for configuration, status inspection, updates, and component-level development.
 
 Check the runner service:
 
