@@ -329,7 +329,7 @@ wheels = [
 
 [[package]]
 name = "deepagents"
-version = "0.7.16"
+version = "0.7.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain" },
@@ -340,9 +340,9 @@ dependencies = [
     { name = "packaging" },
     { name = "wcmatch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a1/fd/64fcca7a8e06cdc068abd76ae0dc31c1f5be1afa2de4b33f91fb39a1410a/deepagents-0.7.16.tar.gz", hash = "sha256:ea4aa49dbe424d427dc6aa660150f15f5fafe68a679fa8e1fdda55b2e93472a8", size = 301535, upload-time = "2026-09-21T13:29:56.998Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/9d/f45919f6dd1b575f883b624fbc0ba4ca519d41d55a2496e9810134d4c43c/deepagents-0.7.19.tar.gz", hash = "sha256:5cd493dbfb5b3d2877a20782a2c232857c44febdeb513aca82c2e0bea03379e7", size = 310152, upload-time = "2026-09-24T18:43:45.564Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/f4/38c5efe057abf895158d4232b8a6f93d4841b7a4692a85c8f65e245bc4be/deepagents-0.7.16-py3-none-any.whl", hash = "sha256:384bd824303f6654f7d1ad38190ac25104de05419407d5b26c242365e3fda0ba", size = 328598, upload-time = "2026-09-21T13:29:55.613Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/b7/1a332b78ab742578b7bf8e23791d425eed59f99651cc62f2ddbd3c4c2b9b/deepagents-0.7.19-py3-none-any.whl", hash = "sha256:e09026cc1f392fad1bf601b0a2c590e28e5c8aaca021eced15a6cf022fc8200b", size = 337803, upload-time = "2026-09-24T18:43:44.166Z" },
 ]
 
 [[package]]
@@ -721,7 +721,7 @@ wheels = [
 
 [[package]]
 name = "langchain-openai"
-version = "1.6.3"
+version = "1.6.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -729,9 +729,9 @@ dependencies = [
     { name = "openai" },
     { name = "tiktoken" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/d1/4547d7fdf52a1c08d5b9aa7c088e728baa5eb2855181e6f9a39b12fdf51d/langchain_openai-1.6.3.tar.gz", hash = "sha256:906953395f50a896159b7bac83a5de7ef627160056b69946b22b8cad8f39bbfc", size = 3301342, upload-time = "2026-09-21T18:32:22.629Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/14/6d9c4d07b43c1eaf8a112be3524b951247c44bb195d6224cab8ffb68b3e8/langchain_openai-1.6.6.tar.gz", hash = "sha256:7b3848f42825aca40165463aa37757051165eb292ba7f24658a2f58f9bb221f9", size = 3306663, upload-time = "2026-09-24T11:31:13.55Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/3f/c8cfaf52bbfde3aea0db3ce8aba2f45258bafbe150ee89ee8074e643f4f4/langchain_openai-1.6.3-py3-none-any.whl", hash = "sha256:c4529e694512e8058219998574b58aa8307d8cd3a13f4b1fc682dd31883f63ef", size = 125883, upload-time = "2026-09-21T18:32:21.036Z" },
+    { url = "https://files.pythonhosted.org/packages/77/c6/0f6b0c9faa7d00eef702c133fd3534cb52cbdf56df9f3524666012ec90e0/langchain_openai-1.6.6-py3-none-any.whl", hash = "sha256:60dcaa443ddfdf1559feaf1d25916f394c7dda809aebe22a769fc39f02705be7", size = 127401, upload-time = "2026-09-24T11:31:11.691Z" },
 ]
 
 [[package]]
@@ -748,7 +748,7 @@ wheels = [
 
 [[package]]
 name = "langfuse"
-version = "4.15.4"
+version = "4.15.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -761,9 +761,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b3/0c/ccb04968d47896e9eb7421b6e2e6e8cd510d8fa3e79337092dc734f25543/langfuse-4.15.4.tar.gz", hash = "sha256:b9a36194f4e968206d919313c24ea71c6ea68e21286370b01de752d20b26e7a3", size = 392296, upload-time = "2026-09-16T16:13:05.967Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/19/59253a357d77147e8cd3ad97817519e158af5d3336654656c92c2fc922f1/langfuse-4.15.6.tar.gz", hash = "sha256:af80ed1199e57c2641c9f228066bf9dc324657c06ce6e68660118fa46b237e35", size = 392968, upload-time = "2026-09-24T13:32:47.032Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/bd/8e0cadd69d0855646eda8d584ef4f38ca46cf271553af8ba7f93ae607626/langfuse-4.15.4-py3-none-any.whl", hash = "sha256:8e75c70b1522a722a11ab6c7d88e27534a5d0c3844a1a464ac5eb548b014e9c3", size = 706367, upload-time = "2026-09-16T16:13:07.294Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/c5/927a01c47c0adf53832c6e5e35951e3d4998072ef955f3bb8e87e6d10517/langfuse-4.15.6-py3-none-any.whl", hash = "sha256:2364d5f17342301a8651ef166abb5bb260aaadd94d1ac72aa30c298b3a395d85", size = 706806, upload-time = "2026-09-24T13:32:48.577Z" },
 ]
 
 [[package]]
