@@ -89,13 +89,14 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 
 ## 部署配置
 
-集成部署使用四份配置：
+集成部署使用四份源配置：
 
 - 根目录 `.env`：Compose 控制平面；
 - `apps/github-integration/.env`：GitHub integration；
 - `agents/config/model-providers.toml`：模型 deployment；
-- `deploy/systemd/deployment.env`：安装前的 systemd 部署配置；
-- `/etc/sec-review-bot/deployment.env`：systemd service 实际读取的已安装副本。
+- `deploy/systemd/deployment.env`：安装前的 systemd 部署配置。
+
+安装脚本会将这些设置与当前 checkout 推导出的路径合并，并把 systemd service 实际使用的配置写入 `/etc/sec-review-bot/deployment.env`。
 
 先在仓库根目录创建这四份配置：
 
@@ -110,7 +111,7 @@ chmod 600 .env \
   deploy/systemd/deployment.env
 ```
 
-这些文件含有本地凭据，因此上述命令将它们限制为仅当前用户可读写。Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据、模型 deployment 凭据，以及 `deploy/systemd/deployment.env` 中的绝对路径。systemd 安装脚本会把第四份配置复制到 `/etc`，见下文。
+Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据和模型 deployment 凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
 
 `agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd worker 自动读取。本地 CLI 的配置方式见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -118,14 +119,7 @@ chmod 600 .env \
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-常用路径配置：
-
-```bash
-RUNNER_SERVICE_TOKEN=<用 openssl rand -hex 32 生成>
-TEMPORAL_STATE_ROOT=${PWD}/.agent-temporal-state
-SEC_REVIEW_INPUT_BUNDLE_ROOT=${PWD}/.agent-input-bundles
-SEC_REVIEW_APP_STATE_ROOT=${PWD}/.agent-app-state
-```
+将 `RUNNER_SERVICE_TOKEN` 设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-input-bundles` 和 `.agent-app-state`，不再分别提供配置项。
 
 ### 2. GitHub integration `.env`
 
@@ -167,7 +161,11 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd 集成服务配置
 
-`deploy/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会用 `deploy/systemd/deployment.env` 替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取 `/etc/sec-review-bot/deployment.env`。
+`deploy/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取安装后的文件。
+
+`SEC_REVIEW_BOT_DIR`、`SEC_REVIEW_AGENTS_DIR` 和 `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` 由安装脚本负责。不要把它们加入可编辑的源文件；安装脚本会删除旧值，并根据自身所在的仓库重新生成。这些路径标识当前 checkout，以及 Compose 与宿主机 worker 共享的 input 目录，因此必须一起变化。
+
+Artifact 默认写入当前 checkout 的 `.agent-artifacts`，模型配置默认读取 `agents/config/model-providers.toml`。大多数部署应保留这些默认值。如果需要把 artifact 放到其他磁盘，或者从其他位置读取模型配置，可以在 `deploy/systemd/deployment.env` 中填写绝对路径 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` 或 `MODEL_PROVIDERS_CONFIG_TOML`；安装脚本会保留这两个独立 worker 路径的非空 override。
 
 如果 [`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) 新增了选项，需要手动把相关选项加入 `deploy/systemd/deployment.env`。
 
@@ -175,11 +173,6 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 | Field | 如何配置 |
 | --- | --- |
-| `SEC_REVIEW_BOT_DIR` | 当前仓库的绝对路径，安装前填写。 |
-| `SEC_REVIEW_AGENTS_DIR` | `agents/` 的绝对路径，安装前填写。 |
-| `MODEL_PROVIDERS_CONFIG_TOML` | 模型配置文件的绝对路径，安装前填写。 |
-| `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` | 必须与根目录 `.env` 的 `SEC_REVIEW_INPUT_BUNDLE_ROOT` 指向同一目录。 |
-| `SEC_REVIEW_AGENT_ARTIFACT_ROOT` | Worker 写入运行产物的绝对路径。 |
 | `TEMPORAL_ADDRESS` | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。 |
 | `TEMPORAL_NAMESPACE`、`TEMPORAL_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
 | `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
@@ -286,7 +279,7 @@ sudo systemctl stop sec-review-bot.target
 sudo systemctl restart sec-review-bot.target
 ```
 
-Temporal development server 的状态保存在 `TEMPORAL_STATE_ROOT` 下，因此上述日常启停和重启会保留 workflow history 与待处理任务。仓库 sample 使用 `.agent-temporal-state`。
+Temporal development server 的状态保存在 `.agent-temporal-state` 下，因此上述日常启停和重启会保留 workflow history 与待处理任务。
 
 查看整体状态和日志：
 
@@ -423,6 +416,6 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 - Runner service 返回 unauthorized：确认 `AGENT_RUNNER_SERVICE_TOKEN` 和 `RUNNER_SERVICE_TOKEN` 一致。
 - Repository dispatch 鉴权失败：确认 workflow 配置了 `id-token: write`，请求了 `sec-review-bot` OIDC audience，并且 workflow 路径是 `.github/workflows/sec-review-bot.yml`。
 - Run 一直处于 queued：确认至少有一个宿主机 worker 正在运行，并与 Runner Service 使用相同的 `TEMPORAL_TASK_QUEUE`。
-- Worker 读不到 input bundle：Compose 和宿主机 worker 应使用相同的绝对 `SEC_REVIEW_INPUT_BUNDLE_ROOT`。
-- Worker 把 artifact 写到其他位置：检查 worker 使用的绝对 `SEC_REVIEW_AGENT_ARTIFACT_ROOT`。
+- Worker 读不到 input bundle：重新运行 `sudo deploy/systemd/install.sh "$USER"`，使安装后的 `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` 与当前 checkout 一致。
+- Worker 把 artifact 写到其他位置：检查 `deploy/systemd/deployment.env` 中可选的 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override，再重新运行 `sudo deploy/systemd/install.sh "$USER"`。
 - LLM 调用在 workflow 推进前失败：进入 `agents/` 后运行 `uv run sec-review-agents-check-llm-deployments --fail-fast`。

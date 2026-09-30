@@ -28,6 +28,8 @@ unit_dir=/etc/systemd/system
 config_dir=/etc/sec-review-bot
 deployment_env=$config_dir/deployment.env
 deployment_env_source=$script_dir/deployment.env
+rendered_deployment_env=$(mktemp)
+trap 'rm -f "$rendered_deployment_env"' EXIT HUP INT TERM
 
 if [ ! -x "$repository_root/agents/.venv/bin/sec-review-agents-worker" ]; then
     echo "Missing agents worker executable." >&2
@@ -51,7 +53,56 @@ if [ ! -f "$deployment_env_source" ]; then
     echo "Copy deployment.env.sample to deployment.env and fill in its values first." >&2
     exit 1
 fi
-install -m 0600 "$deployment_env_source" "$deployment_env"
+# Checkout paths shared with Compose must move together. Artifact and model
+# paths have repository-local defaults, but remain independent worker choices.
+awk -v repository_root="$repository_root" '
+    BEGIN {
+        fixed["SEC_REVIEW_BOT_DIR"] = 1
+        fixed["SEC_REVIEW_AGENTS_DIR"] = 1
+        fixed["SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT"] = 1
+        optional["SEC_REVIEW_AGENT_ARTIFACT_ROOT"] = 1
+        optional["MODEL_PROVIDERS_CONFIG_TOML"] = 1
+    }
+    {
+        # systemd ignores leading whitespace before an EnvironmentFile
+        # assignment. Normalize only the lookup copy.
+        key = $0
+        sub(/^[ \t\r]+/, "", key)
+        sub(/=.*/, "", key)
+        if (fixed[key]) next
+        if (optional[key]) {
+            value = $0
+            sub(/^[^=]*=/, "", value)
+            if (value != "") configured[key] = key "=" value
+            next
+        }
+        retained[++retained_count] = $0
+    }
+    END {
+        print "SEC_REVIEW_BOT_DIR=" repository_root
+        print "SEC_REVIEW_AGENTS_DIR=" repository_root "/agents"
+        print "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT=" \
+            repository_root "/.agent-input-bundles"
+
+        if (configured["SEC_REVIEW_AGENT_ARTIFACT_ROOT"] != "") {
+            print configured["SEC_REVIEW_AGENT_ARTIFACT_ROOT"]
+        } else {
+            print "SEC_REVIEW_AGENT_ARTIFACT_ROOT=" \
+                repository_root "/.agent-artifacts"
+        }
+        if (configured["MODEL_PROVIDERS_CONFIG_TOML"] != "") {
+            print configured["MODEL_PROVIDERS_CONFIG_TOML"]
+        } else {
+            print "MODEL_PROVIDERS_CONFIG_TOML=" \
+                repository_root "/agents/config/model-providers.toml"
+        }
+
+        for (line_number = 1; line_number <= retained_count; line_number++) {
+            print retained[line_number]
+        }
+    }
+' "$deployment_env_source" >"$rendered_deployment_env"
+install -m 0600 "$rendered_deployment_env" "$deployment_env"
 
 render_unit() {
     source_path=$1
@@ -75,5 +126,6 @@ render_unit \
 systemctl daemon-reload
 
 echo "Installed Sec Review Bot systemd units for user '$service_user'."
-echo "Copied $deployment_env_source to $deployment_env. Review it, then run:"
+echo "Installed $deployment_env from $deployment_env_source with repository paths."
+echo "Review it, then run:"
 echo "  systemctl enable --now sec-review-bot.target"
