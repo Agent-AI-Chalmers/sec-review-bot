@@ -161,7 +161,9 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 `deploy/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the control-plane service and host worker read the installed file.
 
-The installer owns `SEC_REVIEW_BOT_DIR`, `SEC_REVIEW_AGENTS_DIR`, and `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT`. Do not add them to the editable source file: the installer removes stale values and regenerates them from its own repository location. These paths identify the checkout and the input directory shared by Compose and the host worker, so they must move together.
+The installer owns `SEC_REVIEW_BOT_DIR`, `SEC_REVIEW_AGENTS_DIR`, and `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT`. Do not add them to the editable source file. The installer removes stale values and regenerates them from its own repository location because the checkout paths and the input directory shared by Compose and the host worker must move together.
+
+The installer also generates the internal `SEC_REVIEW_SERVICE_UID` and `SEC_REVIEW_SERVICE_GID` values. Before Compose starts, it creates the repository-local state directories for that service user. This prevents Docker from creating unwritable root-owned bind-mount sources and lets the Temporal container write its SQLite database as the same user.
 
 Artifacts default to `.agent-artifacts`, and model configuration defaults to `agents/config/model-providers.toml` in the current checkout. Most installations should keep these defaults. To store artifacts on another disk or load model configuration from another location, set an absolute `SEC_REVIEW_AGENT_ARTIFACT_ROOT` or `MODEL_PROVIDERS_CONFIG_TOML` in `deploy/systemd/deployment.env`; the installer preserves non-empty overrides for these two independent worker paths.
 

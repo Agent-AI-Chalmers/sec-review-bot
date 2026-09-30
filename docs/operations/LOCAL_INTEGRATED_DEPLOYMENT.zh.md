@@ -163,7 +163,9 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 `deploy/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取安装后的文件。
 
-`SEC_REVIEW_BOT_DIR`、`SEC_REVIEW_AGENTS_DIR` 和 `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` 由安装脚本负责。不要把它们加入可编辑的源文件；安装脚本会删除旧值，并根据自身所在的仓库重新生成。这些路径标识当前 checkout，以及 Compose 与宿主机 worker 共享的 input 目录，因此必须一起变化。
+`SEC_REVIEW_BOT_DIR`、`SEC_REVIEW_AGENTS_DIR` 和 `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` 由安装脚本负责，不要把它们加入可编辑的源文件。安装脚本会删除旧值，并根据自身所在的仓库重新生成。当前 checkout 的路径和 Compose 与宿主机 worker 共享的 input 目录必须一起变化。
+
+安装脚本还会生成内部使用的 `SEC_REVIEW_SERVICE_UID` 和 `SEC_REVIEW_SERVICE_GID`。在 Compose 启动前，它会为该 service user 创建仓库内的状态目录。这样可以避免 Docker 自动创建无法由非 root 容器写入的 root-owned bind mount 源目录，并让 Temporal 容器以同一用户写入 SQLite 数据库。
 
 Artifact 默认写入当前 checkout 的 `.agent-artifacts`，模型配置默认读取 `agents/config/model-providers.toml`。大多数部署应保留这些默认值。如果需要把 artifact 放到其他磁盘，或者从其他位置读取模型配置，可以在 `deploy/systemd/deployment.env` 中填写绝对路径 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` 或 `MODEL_PROVIDERS_CONFIG_TOML`；安装脚本会保留这两个独立 worker 路径的非空 override。
 

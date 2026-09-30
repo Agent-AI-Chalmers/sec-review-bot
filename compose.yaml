@@ -1,6 +1,9 @@
 services:
   temporal:
     image: temporalio/temporal:latest
+    # Match the host service user so the bind-mounted SQLite directory remains
+    # writable without making local workflow state world-writable.
+    user: "${SEC_REVIEW_SERVICE_UID:-1000}:${SEC_REVIEW_SERVICE_GID:-1000}"
     command:
       - server
       - start-dev
