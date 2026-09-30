@@ -79,7 +79,7 @@ def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
         assert read_result.file_data is not None
         assert read_result.file_data["content"] == payload
     finally:
-        backend.container.close()
+        backend.close()
 
 
 @pytest.mark.skipif(
@@ -125,4 +125,4 @@ def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
         assert read_result.file_data is not None
         assert read_result.file_data["content"] == payload
     finally:
-        backend.container.close()
+        backend.close()

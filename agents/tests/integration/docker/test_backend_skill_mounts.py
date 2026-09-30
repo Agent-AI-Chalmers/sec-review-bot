@@ -10,6 +10,7 @@ from sec_review_agents.agents.analysis.repository import (
 from sec_review_agents.agents.verification.repository import (
     create_repository_verification_backend,
 )
+from sec_review_agents.filesystem.docker_backend import DockerSandboxBackend
 from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
@@ -42,6 +43,7 @@ def test_repository_analyzer_docker_tmp_write_and_execute_contract(
             incremental_window_path=None,
             scan_mode="full",
         )
+    assert isinstance(backend, DockerSandboxBackend)
 
     marker = uuid.uuid4().hex
     tmp_file = f"/tmp/ghsb-docker-{marker}.txt"
@@ -55,9 +57,7 @@ def test_repository_analyzer_docker_tmp_write_and_execute_contract(
             f"got output: {execute_result.output}"
         )
     finally:
-        close = getattr(backend, "close", None)
-        if callable(close):
-            close()
+        backend.close()
 
 
 def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None:
@@ -74,6 +74,7 @@ def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None
             incremental_window_path=None,
             scan_mode="full",
         )
+    assert isinstance(backend, DockerSandboxBackend)
 
     try:
         assert hasattr(backend, "execute")
@@ -83,6 +84,4 @@ def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None
             f"got output: {execute_result.output}"
         )
     finally:
-        close = getattr(backend, "close", None)
-        if callable(close):
-            close()
+        backend.close()

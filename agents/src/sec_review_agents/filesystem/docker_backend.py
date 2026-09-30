@@ -103,6 +103,7 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         limits: FilesystemLimits | None = None,
     ) -> None:
         self.container = container
+        self._closed = False
         self.container_name = container.container_name
         self.shell = container.shell
         self.user = container.user
@@ -218,6 +219,26 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             timeout_ms=self.command_timeout_ms,
             expect_success=False,
         )
+
+    def close(self) -> None:
+        """Finish backend cleanup and stop the owned Docker container."""
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            self.finalize()
+        finally:
+            self.container.close()
+
+    async def aclose(self) -> None:
+        """Finish backend cleanup without blocking the async caller."""
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            await self.afinalize()
+        finally:
+            await asyncio.to_thread(self.container.close)
 
     @property
     def id(self) -> str:

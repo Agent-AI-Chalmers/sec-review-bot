@@ -136,7 +136,7 @@ def codegraph_mcp_connections_for_backend(
             }
         except Exception:
             with suppress(Exception):
-                backend.container.close()
+                backend.close()
             raise
 
     if isinstance(backend, BwrapSandboxBackend):

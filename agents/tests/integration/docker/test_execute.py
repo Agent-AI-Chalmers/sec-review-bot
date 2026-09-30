@@ -57,7 +57,7 @@ def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> 
             "git show --stat --patch --root HEAD",
         )
     finally:
-        backend.container.close()
+        backend.close()
 
     assert result.exit_code == 0
     assert result.truncated

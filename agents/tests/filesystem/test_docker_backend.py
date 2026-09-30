@@ -36,7 +36,7 @@ from sec_review_agents.filesystem.sandbox_file_ops import (
     limits_payload,
     sandbox_file_script_source,
 )
-from sec_review_agents.runtime.backend_cleanup import aclose_backend_container
+from sec_review_agents.runtime.backend_cleanup import aclose_backend
 
 
 def _run_file_script(payload: dict[str, object]) -> dict[str, object]:
@@ -168,20 +168,77 @@ async def test_afinalize_uses_async_docker_shell() -> None:
 
 
 @pytest.mark.asyncio
-async def test_aclose_backend_container_prefers_async_finalizer() -> None:
-    """Prefer an async backend finalizer so teardown does not block the loop."""
-    afinalize = AsyncMock()
-    finalize = Mock()
+async def test_aclose_backend_prefers_async_cleanup() -> None:
+    """Prefer async cleanup so backend teardown does not block the event loop."""
+    aclose = AsyncMock()
+    close = Mock()
     backend = SimpleNamespace(
-        afinalize=afinalize,
-        finalize=finalize,
-        container=None,
+        aclose=aclose,
+        close=close,
     )
 
-    await aclose_backend_container(backend)
+    await aclose_backend(backend)
+
+    aclose.assert_awaited_once_with()
+    close.assert_not_called()
+
+
+def test_docker_backend_close_finalizes_before_stopping_container() -> None:
+    backend = _backend()
+
+    with (
+        patch.object(backend, "finalize") as finalize,
+        patch.object(backend.container, "close") as close,
+    ):
+        backend.close()
+
+    finalize.assert_called_once_with()
+    close.assert_called_once_with()
+
+
+def test_docker_backend_close_is_idempotent() -> None:
+    backend = _backend()
+
+    with (
+        patch.object(backend, "finalize") as finalize,
+        patch.object(backend.container, "close") as close,
+    ):
+        backend.close()
+        backend.close()
+
+    finalize.assert_called_once_with()
+    close.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_docker_backend_aclose_finalizes_before_stopping_container() -> None:
+    backend = _backend()
+
+    with (
+        patch.object(backend, "afinalize", new_callable=AsyncMock) as afinalize,
+        patch.object(backend.container, "close") as close,
+    ):
+        await backend.aclose()
 
     afinalize.assert_awaited_once_with()
-    finalize.assert_not_called()
+    close.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_docker_backend_aclose_is_idempotent_after_sync_close() -> None:
+    backend = _backend()
+
+    with (
+        patch.object(backend, "finalize") as finalize,
+        patch.object(backend, "afinalize", new_callable=AsyncMock) as afinalize,
+        patch.object(backend.container, "close") as close,
+    ):
+        backend.close()
+        await backend.aclose()
+
+    finalize.assert_called_once_with()
+    afinalize.assert_not_awaited()
+    close.assert_called_once_with()
 
 
 def test_sandbox_backend_defaults_to_docker_when_available() -> None:
