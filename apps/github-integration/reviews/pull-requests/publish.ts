@@ -1,4 +1,4 @@
-import { createPullRequestReview, type PullRequestReviewEvent } from '../../infrastructure/github/comment-service.js'
+import { createPullRequestReviewUnlessMarkerExists, type PullRequestReviewEvent } from '../../infrastructure/github/comment-service.js'
 import type { PullRequestContext } from '../../infrastructure/github/pull-request-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import { completedRunnerRunResult, type RunnerRunStatus } from '../../infrastructure/runner/client.js'
@@ -23,6 +23,7 @@ interface SuggestionReviewResult {
   html_url: string
   state: string
   count: number
+  reused: boolean
   comments: Array<{
     path: string
     line: number
@@ -105,13 +106,20 @@ export async function handlePullRequestReviewRun ({
     pr: context.pr,
     files: context.files,
     workflow_result,
-    event_type: context.event_type
+    event_type: context.event_type,
+    run_id: run.run_id
   })
 }
 
 function shouldPublishSuggestions (review_record: ReviewRecord | null | undefined): boolean {
   return typeof review_record?.mitigation?.patch_diff === 'string' &&
     review_record.mitigation.patch_diff.trim() !== ''
+}
+
+function pullRequestReviewRunMarker (run_id: string): string {
+  // Publication retries use this identity to recover a review accepted by GitHub
+  // when the response or the following local state update was lost.
+  return `<!-- sec-review-bot:pull-request-review-run:${run_id} -->`
 }
 
 function normalizeLogin (login: unknown): string | null {
@@ -183,26 +191,41 @@ async function publishPullRequestReviewResult ({
   pr,
   files: reviewFiles,
   event_type,
-  workflow_result
+  workflow_result,
+  run_id
 }: {
   octokit: unknown
   pr: PullRequestContext
   files: unknown[]
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   workflow_result: PullRequestReviewWorkflowResult
+  run_id: string
 }): Promise<void> {
   let review: SuggestionReviewResult | null = null
   const review_record = workflow_result.review_record
-  const commentBody = renderAnalysisSummaryCommentFromReviewRecord(review_record)
+  const marker = pullRequestReviewRunMarker(run_id)
+  const commentBody = [marker, renderAnalysisSummaryCommentFromReviewRecord(review_record)].join('\n\n')
   const reviewEvent = reviewEventForRecord(review_record, pr)
 
   if (shouldPublishSuggestions(review_record)) {
+    let suggestionManifest: Awaited<ReturnType<typeof generateSuggestionCandidatesFromReviewRecord>> | null = null
     try {
-      const suggestionManifest = await generateSuggestionCandidatesFromReviewRecord({
+      suggestionManifest = await generateSuggestionCandidatesFromReviewRecord({
         files: reviewFiles as Parameters<typeof generateSuggestionCandidatesFromReviewRecord>[0]['files'],
         review_record
       })
+    } catch (error: unknown) {
+      const errorInfo = asErrorWithResponse(error)
+      logError('suggestion_generation_failed', {
+        error,
+        error_message: errorInfo.message,
+        event_type,
+        pr: pr.pr_number,
+        repo: pr.repo_full_name
+      })
+    }
 
+    if (suggestionManifest !== null) {
       if (suggestionManifest.candidates.length > 0) {
         const reviewBodyWithUnmapped = appendUnmappedSuggestionSection(
           commentBody,
@@ -212,7 +235,8 @@ async function publishPullRequestReviewResult ({
           pr,
           review_body: reviewBodyWithUnmapped,
           event: reviewEvent,
-          candidates: suggestionManifest.candidates
+          candidates: suggestionManifest.candidates,
+          marker
         })) as SuggestionReviewResult
         logInfo('suggestion_review_completed', {
           comment_count: review.count,
@@ -222,7 +246,8 @@ async function publishPullRequestReviewResult ({
             : 0,
           pr: pr.pr_number,
           review_id: review.review_id,
-          review_url: review.html_url
+          review_url: review.html_url,
+          reused: review.reused
         })
       } else {
         logInfo('suggestion_pipeline_completed', {
@@ -231,15 +256,6 @@ async function publishPullRequestReviewResult ({
           reason: suggestionManifest.skipped_reason ?? 'No eligible patch candidate.'
         })
       }
-    } catch (error: unknown) {
-      const errorInfo = asErrorWithResponse(error)
-      logError('suggestion_review_failed', {
-        error,
-        error_message: errorInfo.message,
-        event_type,
-        pr: pr.pr_number,
-        repo: pr.repo_full_name
-      })
     }
   } else if (review_record?.mitigation) {
     logInfo('suggestion_pipeline_skipped', {
@@ -266,12 +282,13 @@ async function publishPullRequestReviewResult ({
     repo: pr.repo_full_name
   })
 
-  const reviewComment = await createPullRequestReview(octokit as GitHubAppOctokit, {
+  const reviewComment = await createPullRequestReviewUnlessMarkerExists(octokit as GitHubAppOctokit, {
     owner_login: pr.owner_login,
     repo_name: pr.repo_name,
     pr_number: pr.pr_number,
     commit_id: pr.head_sha,
     body: commentBody,
+    marker,
     event: reviewEvent,
     comments: []
   })
@@ -280,7 +297,8 @@ async function publishPullRequestReviewResult ({
     event_type,
     pr: pr.pr_number,
     review_id: reviewComment.id,
-    review_url: reviewComment.html_url
+    review_url: reviewComment.html_url,
+    reused: reviewComment.reused
   })
 
 }

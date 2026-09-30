@@ -55,6 +55,16 @@ interface GitHubOpenPullRequest {
   }
 }
 
+export interface GitHubPullRequestReview {
+  id: number
+  body?: string | null
+  html_url: string
+  state: string
+  user?: {
+    type?: string
+  } | null
+}
+
 export interface GitHubAppOctokit {
   auth: (options?: unknown) => Promise<unknown>
   graphql: <T = unknown>(query: string, variables?: Record<string, unknown>) => Promise<T>
@@ -191,6 +201,13 @@ export interface GitHubAppOctokit {
         per_page: number
         page: number
       }) => Promise<{ data: GitHubPullRequestFile[] }>
+      listReviews: (args: {
+        owner: string
+        repo: string
+        pull_number: number
+        per_page: number
+        page: number
+      }) => Promise<{ data: GitHubPullRequestReview[] }>
     }
     repos: {
       compareCommitsWithBasehead: (args: {

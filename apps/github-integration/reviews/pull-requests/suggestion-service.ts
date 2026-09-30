@@ -63,6 +63,7 @@ interface SuggestionPublishedResult {
   html_url: string
   state: string
   count: number
+  reused: boolean
   comments: Array<{
     path: string
     line: number
@@ -480,12 +481,14 @@ export async function publishSuggestionReview (
     pr,
     review_body,
     event,
-    candidates
+    candidates,
+    marker
   }: {
     pr: PullRequestContext
     review_body: string
     event: PullRequestReviewEvent
     candidates: SuggestionCandidate[]
+    marker: string
   }
 ): Promise<SuggestionPublishedResult> {
   const published: SuggestionPublishedResult = {
@@ -494,7 +497,8 @@ export async function publishSuggestionReview (
       pr,
       review_body,
       event,
-      candidates
+      candidates,
+      marker
     }))
   }
 

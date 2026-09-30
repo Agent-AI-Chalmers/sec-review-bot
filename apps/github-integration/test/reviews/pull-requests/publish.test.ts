@@ -79,6 +79,7 @@ test('pull request publish requests changes for confirmed risks without inline s
         }
       },
       pulls: {
+        listReviews: async () => ({ data: [] }),
         createReview: async (args: unknown) => {
           pullReviews.push(args)
           return {
@@ -137,6 +138,7 @@ test('pull request publish requests changes for confirmed risks without inline s
     event: 'REQUEST_CHANGES',
     comments: []
   })
+  assert.match(reviewArgs.body, /<!-- sec-review-bot:pull-request-review-run:run-1 -->/)
   assert.match(reviewArgs.body, /## PR Security Review/)
 })
 
@@ -152,6 +154,7 @@ test('pull request publish approves when analysis is not confirmed', async () =>
         }
       },
       pulls: {
+        listReviews: async () => ({ data: [] }),
         createReview: async (args: unknown) => {
           pullReviews.push(args)
           return {
@@ -221,6 +224,7 @@ test('pull request publish comments instead of approving a PR authored by the ap
   const octokit = {
     rest: {
       pulls: {
+        listReviews: async () => ({ data: [] }),
         createReview: async (args: unknown) => {
           pullReviews.push(args)
           return {
@@ -277,6 +281,7 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
   const octokit = {
     rest: {
       pulls: {
+        listReviews: async () => ({ data: [] }),
         createReview: async (args: unknown) => {
           pullReviews.push(args)
           if ((args as { event: string }).event === 'APPROVE') {
@@ -341,6 +346,7 @@ test('pull request publish falls back to comment when own PR approval error is i
   const octokit = {
     rest: {
       pulls: {
+        listReviews: async () => ({ data: [] }),
         createReview: async (args: unknown) => {
           pullReviews.push(args)
           if ((args as { event: string }).event === 'APPROVE') {
@@ -406,6 +412,7 @@ test('pull request publish requests changes for confirmed risks with inline sugg
   const octokit = {
     rest: {
       pulls: {
+        listReviews: async () => ({ data: [] }),
         createReview: async (args: unknown) => {
           pullReviews.push(args)
           return {
@@ -475,4 +482,60 @@ test('pull request publish requests changes for confirmed risks with inline sugg
   assert.equal(pullReviews.length, 1)
   assert.equal((pullReviews[0] as { event: string }).event, 'REQUEST_CHANGES')
   assert.equal((pullReviews[0] as { comments: unknown[] }).comments.length, 1)
+})
+
+test('pull request publish does not create a fallback review after an uncertain suggestion submission', async () => {
+  let createCalls = 0
+  const octokit = {
+    rest: {
+      pulls: {
+        listReviews: async () => ({ data: [] }),
+        createReview: async () => {
+          createCalls += 1
+          throw new Error('connection reset after request body was sent')
+        }
+      }
+    }
+  }
+
+  await assert.rejects(
+    handlePullRequestReviewRun({
+      run: {
+        run_id: 'run-uncertain',
+        publish_context: {
+          pr: pullRequestContext(),
+          files: [{ filename: 'src/server.js', patch: '@@ -1 +1 @@' }],
+          event_type: 'manual_review'
+        }
+      },
+      status: {
+        run_id: 'run-uncertain',
+        workflow: 'pull-request-review',
+        status: 'succeeded',
+        result: {
+          contract_version: 'v4',
+          review_record: review_record({
+            mitigation: {
+              overview: 'Remove the unsafe default.',
+              changed_files: ['src/server.js'],
+              file_changes: [],
+              patch_diff: [
+                'diff --git a/src/server.js b/src/server.js',
+                'index 1111111..2222222 100644',
+                '--- a/src/server.js',
+                '+++ b/src/server.js',
+                '@@ -1 +1 @@',
+                "-const token = 'debug'",
+                '+const token = process.env.TOKEN'
+              ].join('\n')
+            }
+          })
+        }
+      },
+      installation_octokit_for_repo: async () => octokit
+    }),
+    /connection reset/
+  )
+
+  assert.equal(createCalls, 1)
 })
