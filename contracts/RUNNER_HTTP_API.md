@@ -49,6 +49,14 @@ Allowed `runtime` keys are `workspace_image?: string`. Unknown runtime keys fail
 
 `runtime.workspace_image` is currently an internal / evaluation runner option. The GitHub App does not expose it through repository config. Product integrations must not derive or pass this value from repository configuration, comments, issue / PR content, or other untrusted user-controlled input.
 
+`run_id` is also the create-run idempotency key. The first accepted request binds the ID to the canonical JSON value of `workflow`, `input`, and `runtime`:
+
+- Replaying the same request with the same `run_id` returns the existing run, including after that run has completed.
+- Reusing the same `run_id` with different request content returns HTTP `409` with `RUNNER_RUN_CONFLICT`.
+- A completed, failed, cancelled, or timed-out run ID is not reused for a new Temporal execution.
+
+JSON object key order does not affect request identity. Changes to array order or field values do.
+
 Supported public workflows:
 
 - `issue-review`
@@ -140,6 +148,8 @@ Synchronous request validation errors return HTTP `400` with:
 }
 ```
 
+A conflicting reuse of an existing `run_id` returns HTTP `409` with the same error envelope and code `RUNNER_RUN_CONFLICT`. This error is not retryable; callers must either replay the original request or choose a new `run_id` for a new request.
+
 error fields:
 
 - `category`: input | workflow | llm | runtime | internal
@@ -154,6 +164,7 @@ Runtime failures are not disguised as workflow `result` or stage-level `status="
 
 - `RUNNER_REQUEST_INVALID`
 - `RUNNER_WORKFLOW_UNSUPPORTED`
+- `RUNNER_RUN_CONFLICT`
 - `RUNNER_RESPONSE_INVALID`
 - `RUNNER_EXECUTION_FAILED`
 

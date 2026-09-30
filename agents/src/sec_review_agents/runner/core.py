@@ -13,6 +13,17 @@ RUN_ID_REQUIREMENT_MESSAGE = (
     "Runner run_id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$."
 )
 
+# The caller sent a request that the Runner cannot validate or prepare.
+RUNNER_REQUEST_INVALID = "RUNNER_REQUEST_INVALID"
+# The caller asked the Runner to start a workflow that it does not support.
+RUNNER_WORKFLOW_UNSUPPORTED = "RUNNER_WORKFLOW_UNSUPPORTED"
+# The run ID already belongs to a different workflow request.
+RUNNER_RUN_CONFLICT = "RUNNER_RUN_CONFLICT"
+# A completed workflow returned data that is not a valid Runner response.
+RUNNER_RESPONSE_INVALID = "RUNNER_RESPONSE_INVALID"
+# The workflow execution failed before it could return a valid result.
+RUNNER_EXECUTION_FAILED = "RUNNER_EXECUTION_FAILED"
+
 
 def build_runner_error(
     *,
@@ -73,6 +84,11 @@ def is_supported_workflow(workflow: str) -> bool:
 
 
 __all__ = [
+    "RUNNER_EXECUTION_FAILED",
+    "RUNNER_REQUEST_INVALID",
+    "RUNNER_RESPONSE_INVALID",
+    "RUNNER_RUN_CONFLICT",
+    "RUNNER_WORKFLOW_UNSUPPORTED",
     "RUN_ID_PATTERN",
     "RUN_ID_REQUIREMENT_MESSAGE",
     "SUPPORTED_RUNNER_WORKFLOWS",

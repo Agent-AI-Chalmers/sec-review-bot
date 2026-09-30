@@ -3,11 +3,13 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from sec_review_agents.runner.service import app as service_app
+from sec_review_agents.runner.service.execution import RunnerRunConflictError
 
 
 class FakeRunnerExecutionBackend:
-    def __init__(self) -> None:
+    def __init__(self, *, start_error: Exception | None = None) -> None:
         self.runs: dict[str, dict[str, Any]] = {}
+        self.start_error = start_error
 
     async def start(
         self,
@@ -17,6 +19,8 @@ class FakeRunnerExecutionBackend:
         input_data: dict[str, Any],
         runtime: Any = None,
     ) -> dict[str, Any]:
+        if self.start_error is not None:
+            raise self.start_error
         run = {
             "run_id": run_id,
             "workflow": workflow,
@@ -140,6 +144,42 @@ def test_create_run_starts_temporal_workflow(monkeypatch) -> None:
     assert fetched.status_code == 200
     fetched_body = fetched.json()
     assert fetched_body["status"] == "running"
+
+
+def test_create_run_returns_conflict_for_reused_run_id_with_different_request(
+    monkeypatch,
+) -> None:
+    """A reused run ID must expose request mismatch as a non-retryable conflict."""
+    monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
+    _use_loopback_host(monkeypatch)
+    client = TestClient(
+        service_app.create_app(
+            runner_backend=FakeRunnerExecutionBackend(
+                start_error=RunnerRunConflictError(
+                    "run-service",
+                    requested_workflow="issue-review",
+                    existing_workflow="pull-request-review",
+                )
+            )
+        )
+    )
+
+    response = client.post("/v1/workflows/issue-review/runs", json=_request())
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "run_id": "run-service",
+        "workflow": "issue-review",
+        "error": {
+            "category": "input",
+            "code": "RUNNER_RUN_CONFLICT",
+            "message": (
+                "Runner run_id run-service is already bound to another request."
+            ),
+            "retryable": False,
+            "details": {"existing_workflow": "pull-request-review"},
+        },
+    }
 
 
 def test_get_run_returns_worker_result(monkeypatch) -> None:

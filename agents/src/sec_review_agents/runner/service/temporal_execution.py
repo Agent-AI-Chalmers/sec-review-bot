@@ -1,3 +1,5 @@
+import hashlib
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -7,10 +9,16 @@ from temporalio.client import (
     Client,
     WorkflowExecutionStatus,
 )
+from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 
-from sec_review_agents.runner.core import build_runner_error
+from sec_review_agents.runner.core import (
+    RUNNER_EXECUTION_FAILED,
+    RUNNER_RESPONSE_INVALID,
+    build_runner_error,
+)
+from sec_review_agents.runner.service.execution import RunnerRunConflictError
 from sec_review_agents.runner.service.workflow import (
     RunnerExecutionRequest,
     RunnerExecutionWorkflow,
@@ -23,9 +31,13 @@ from sec_review_agents.runner.temporal_config import (
 )
 from sec_review_agents.utils.env import env_value, parse_int_env
 
+_REQUEST_FINGERPRINT_MEMO_KEY = "request_fingerprint"
+
 
 @dataclass
 class TemporalRunnerExecutionBackend:
+    """Use Temporal to start Runner workflows and read their execution records."""
+
     address: str = DEFAULT_TEMPORAL_ADDRESS
     namespace: str = DEFAULT_TEMPORAL_NAMESPACE
     task_queue: str = DEFAULT_TEMPORAL_TASK_QUEUE
@@ -61,6 +73,11 @@ class TemporalRunnerExecutionBackend:
             timeout_seconds=self.workflow_timeout_seconds,
             runtime=runtime,
         )
+        request_fingerprint = _runner_request_fingerprint(
+            workflow=workflow,
+            input_data=input_data,
+            runtime=runtime,
+        )
         try:
             handle = await client.start_workflow(
                 RunnerExecutionWorkflow.run,
@@ -68,10 +85,22 @@ class TemporalRunnerExecutionBackend:
                 id=run_id,
                 task_queue=self.task_queue,
                 execution_timeout=timedelta(seconds=self.workflow_timeout_seconds),
-                memo={"workflow": workflow},
+                id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+                memo={
+                    "workflow": workflow,
+                    _REQUEST_FINGERPRINT_MEMO_KEY: request_fingerprint,
+                },
             )
         except WorkflowAlreadyStartedError:
             handle = client.get_workflow_handle(run_id)
+            description = await handle.describe()
+            memo = await description.memo()
+            if _request_fingerprint_from_memo(memo) != request_fingerprint:
+                raise RunnerRunConflictError(
+                    run_id,
+                    requested_workflow=workflow,
+                    existing_workflow=_workflow_from_memo(memo),
+                ) from None
         return await _record_from_handle(handle, default_workflow=workflow)
 
     async def get(self, run_id: str) -> dict[str, Any] | None:
@@ -123,7 +152,7 @@ async def _record_from_handle(
                 return record
         record["status"] = "failed"
         record["error"] = build_runner_error(
-            code="RUNNER_RESPONSE_INVALID",
+            code=RUNNER_RESPONSE_INVALID,
             category="runtime",
             message="Temporal workflow completed with an invalid runner response envelope.",
             details={
@@ -155,6 +184,33 @@ def _workflow_from_memo(memo: Mapping[str, Any] | None) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def _request_fingerprint_from_memo(memo: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(memo, Mapping):
+        return None
+    value = memo.get(_REQUEST_FINGERPRINT_MEMO_KEY)
+    return value if isinstance(value, str) and value else None
+
+
+def _runner_request_fingerprint(
+    *,
+    workflow: str,
+    input_data: dict[str, Any],
+    runtime: Any,
+) -> str:
+    canonical_request = json.dumps(
+        {
+            "workflow": workflow,
+            "input": input_data,
+            "runtime": runtime,
+        },
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
+
+
 async def _failed_workflow_error(
     handle: Any,
     *,
@@ -165,7 +221,7 @@ async def _failed_workflow_error(
     except Exception as error:
         root_cause = _root_cause(error)
         return build_runner_error(
-            code="RUNNER_EXECUTION_FAILED",
+            code=RUNNER_EXECUTION_FAILED,
             category="runtime",
             message=_failure_message(root_cause),
             details={
@@ -175,7 +231,7 @@ async def _failed_workflow_error(
             },
         )
     return build_runner_error(
-        code="RUNNER_EXECUTION_FAILED",
+        code=RUNNER_EXECUTION_FAILED,
         category="runtime",
         message=f"Temporal workflow ended with status {temporal_status}.",
         details={"temporal_status": temporal_status},

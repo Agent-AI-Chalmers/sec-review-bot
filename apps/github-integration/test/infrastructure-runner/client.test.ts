@@ -137,6 +137,40 @@ test('submitRunnerRun keeps an explicit client rejection deterministic', async (
   )
 })
 
+test('submitRunnerRun surfaces a run identity conflict without retrying', async () => {
+  resetEnv()
+  process.env.AGENT_RUNNER_SERVICE_URL = 'http://runner.test'
+  process.env.AGENT_RUNNER_SERVICE_TOKEN = 'dev-token'
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    return jsonResponse({
+      run_id: 'run-conflict',
+      workflow: 'issue-review',
+      error: {
+        code: 'RUNNER_RUN_CONFLICT',
+        category: 'input',
+        message: 'Runner run_id run-conflict is already bound to another request.',
+        retryable: false,
+        details: { existing_workflow: 'pull-request-review' }
+      }
+    }, { status: 409 })
+  }
+
+  await assert.rejects(
+    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-conflict', input: {} }),
+    (error: unknown) => {
+      assert.equal(error instanceof RunnerSubmissionUncertainError, false)
+      const serviceError = error as AgentRunnerServiceError
+      assert.equal(serviceError.code, 'RUNNER_RUN_CONFLICT')
+      assert.equal(serviceError.retryable, false)
+      assert.deepEqual(serviceError.details, { existing_workflow: 'pull-request-review' })
+      return true
+    }
+  )
+  assert.equal(calls, 1)
+})
+
 test('submitRunnerRun rejects invalid run ids before dispatch', async () => {
   resetEnv()
   process.env.AGENT_RUNNER_SERVICE_URL = 'http://runner.test/'

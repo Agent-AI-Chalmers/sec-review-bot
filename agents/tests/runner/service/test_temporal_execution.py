@@ -11,6 +11,7 @@ from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionRegistrationRequest,
 )
 from sec_review_agents.review_stages.record import build_review_record
+from sec_review_agents.runner.service.execution import RunnerRunConflictError
 from sec_review_agents.runner.service.temporal_execution import (
     TemporalRunnerExecutionBackend,
     _record_from_handle,
@@ -636,7 +637,8 @@ async def test_temporal_backend_starts_and_reads_runner_workflow(
     workflow: str,
     child_workflow_id: str,
 ) -> None:
-    started, fetched, child_result = await _run_temporal_backend_test(
+    """A run ID may replay only the same canonical request, even after completion."""
+    started, replayed, fetched, child_result = await _run_temporal_backend_test(
         workflow=workflow,
         child_workflow_id=child_workflow_id,
     )
@@ -654,6 +656,7 @@ async def test_temporal_backend_starts_and_reads_runner_workflow(
             "workflow": workflow,
         },
     }
+    assert replayed == fetched
     assert child_result == {
         "ok": True,
         "result": {
@@ -813,7 +816,7 @@ async def _run_temporal_backend_test(
     *,
     workflow: str,
     child_workflow_id: str,
-) -> tuple[dict, dict | None, dict]:
+) -> tuple[dict, dict, dict | None, dict]:
     async with temporal_time_skipping_environment() as env:
         backend = TemporalRunnerExecutionBackend(task_queue="runner-service-test")
         backend._client = env.client
@@ -868,14 +871,25 @@ async def _run_temporal_backend_test(
                 started = await backend.start(
                     workflow=workflow,
                     run_id="run-1",
-                    input_data={},
+                    input_data={"nested": {"a": 1, "b": 2}},
                 )
                 await env.client.get_workflow_handle("run-1").result()
+                replayed = await backend.start(
+                    workflow=workflow,
+                    run_id="run-1",
+                    input_data={"nested": {"b": 2, "a": 1}},
+                )
+                with pytest.raises(RunnerRunConflictError):
+                    await backend.start(
+                        workflow=workflow,
+                        run_id="run-1",
+                        input_data={"different": True},
+                    )
                 fetched = await backend.get("run-1")
                 child_result = await env.client.get_workflow_handle(
                     child_workflow_id
                 ).result()
-                return started, fetched, child_result
+                return started, replayed, fetched, child_result
     raise AssertionError("Temporal test worker exited before returning a result.")
 
 

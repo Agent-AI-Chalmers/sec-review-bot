@@ -8,13 +8,19 @@ from fastapi.responses import JSONResponse
 
 from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.runner.core import (
+    RUNNER_REQUEST_INVALID,
+    RUNNER_RUN_CONFLICT,
+    RUNNER_WORKFLOW_UNSUPPORTED,
     build_runner_error,
     is_supported_workflow,
     validate_run_id,
     validate_run_request_body,
 )
 from sec_review_agents.runner.input_preparation import INPUT_BUNDLE_ROOT_ENV
-from sec_review_agents.runner.service.execution import RunnerExecutionBackend
+from sec_review_agents.runner.service.execution import (
+    RunnerExecutionBackend,
+    RunnerRunConflictError,
+)
 from sec_review_agents.runner.service.temporal_execution import (
     TemporalRunnerExecutionBackend,
 )
@@ -117,7 +123,7 @@ def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastA
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
                     "error": build_runner_error(
-                        code="RUNNER_REQUEST_INVALID",
+                        code=RUNNER_REQUEST_INVALID,
                         category="input",
                         message=validation_error,
                     )
@@ -132,19 +138,36 @@ def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastA
                     "run_id": run_id,
                     "workflow": workflow,
                     "error": build_runner_error(
-                        code="RUNNER_WORKFLOW_UNSUPPORTED",
+                        code=RUNNER_WORKFLOW_UNSUPPORTED,
                         category="workflow",
                         message=f"Unsupported workflow: {workflow}",
                     ),
                 },
             )
 
-        run = await runner_backend.start(
-            workflow=workflow,
-            run_id=run_id,
-            input_data=request["input"],
-            runtime=request.get("runtime"),
-        )
+        try:
+            run = await runner_backend.start(
+                workflow=workflow,
+                run_id=run_id,
+                input_data=request["input"],
+                runtime=request.get("runtime"),
+            )
+        except RunnerRunConflictError as error:
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={
+                    "run_id": error.run_id,
+                    "workflow": error.requested_workflow,
+                    "error": build_runner_error(
+                        code=RUNNER_RUN_CONFLICT,
+                        category="input",
+                        message=str(error),
+                        details={
+                            "existing_workflow": error.existing_workflow,
+                        },
+                    ),
+                },
+            )
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
             content=_run_response(run),
@@ -163,7 +186,7 @@ def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastA
                 content={
                     "run_id": run_id,
                     "error": build_runner_error(
-                        code="RUNNER_REQUEST_INVALID",
+                        code=RUNNER_REQUEST_INVALID,
                         category="input",
                         message=str(error),
                     ),
