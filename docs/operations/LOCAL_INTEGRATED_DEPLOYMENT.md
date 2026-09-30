@@ -177,13 +177,13 @@ Core fields:
 | `TEMPORAL_NAMESPACE`, `TEMPORAL_TASK_QUEUE` | Must match the same-named values in the repository `.env`. |
 | `AGENT_DOCKER_IMAGE` | Image used for Docker sandboxes; the default is a general-purpose image. |
 
-The generated paths and defaults normally need no changes unless the checkout moves or the matching Compose settings change.
+Most local deployments can keep these defaults. Rerun the installer after moving the checkout.
 
 Add or change the following variables as needed.
 
 #### Langfuse Tracing
 
-[Langfuse](https://langfuse.com/docs) is an optional external observability service. It is not part of this repository's Compose control plane. Use [Langfuse Cloud](https://cloud.langfuse.com) or run a separate [self-hosted Langfuse deployment](https://langfuse.com/self-hosting), create a project and API keys there, then set all three variables together in `/etc/sec-review-bot/deployment.env`:
+[Langfuse](https://langfuse.com/docs) is an optional external observability service. It is not part of this repository's Compose control plane. Use [Langfuse Cloud](https://cloud.langfuse.com) or run a separate [self-hosted Langfuse deployment](https://langfuse.com/self-hosting), create a project and API keys there, then set all three variables together in `deploy/systemd/deployment.env` and rerun the installer:
 
 ```bash
 LANGFUSE_PUBLIC_KEY=your_public_key
@@ -269,7 +269,9 @@ Start the complete integrated service and enable it at boot:
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` manages both the Compose control plane and `sec-review-agents-worker@1.service`. The control plane contains GitHub integration, Runner Service, and Temporal. The host worker executes review activities and creates Docker sandboxes. systemd supervises Compose in the foreground and restarts the control plane if any of its containers exits unexpectedly.
+`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-agents-worker@1.service` so they can be managed together.
+
+The control plane contains GitHub integration, Runner Service, and Temporal. The host worker executes review activities and creates Docker sandboxes. systemd restarts the control plane if one of its containers exits unexpectedly.
 
 For routine lifecycle operations, use only the target:
 
@@ -299,14 +301,14 @@ Disable automatic startup and stop the complete service immediately:
 sudo systemctl disable --now sec-review-bot.target
 ```
 
-After changing GitHub integration or Runner Service code, rebuild the images and restart the target:
+After changing code, rebuild the images and restart the complete service:
 
 ```bash
 docker compose --profile app build
 sudo systemctl restart sec-review-bot.target
 ```
 
-If an update changes a unit under `deploy/systemd`, run the installer again before restarting the target.
+After changing installation files under `deploy/systemd`, run the installer again before restarting the service.
 
 Check Runner Service:
 
@@ -318,7 +320,7 @@ curl -sS http://127.0.0.1:8000/healthz \
 
 ### Component-Level Operations
 
-Normal operation only needs `sec-review-bot.target`. For troubleshooting or updating one component, restart the control plane or worker separately:
+For troubleshooting or updating one component, restart the control plane or worker separately:
 
 ```bash
 sudo systemctl restart sec-review-bot-control-plane.service
@@ -413,7 +415,7 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 ## Troubleshooting
 
 - `403 Resource not accessible by integration`: check GitHub App permissions and whether the installation approved changed permissions.
-- Runner Service returns unauthorized: confirm that `AGENT_RUNNER_SERVICE_TOKEN` matches `RUNNER_SERVICE_TOKEN`.
+- Runner Service returns unauthorized: check `RUNNER_SERVICE_TOKEN` in the repository `.env`, then restart the complete service.
 - Repository dispatch authentication fails: confirm that the workflow has `id-token: write`, requests the `sec-review-bot` OIDC audience, and uses the `.github/workflows/sec-review-bot.yml` workflow path.
 - Tasks remain queued: confirm that at least one host worker is running and uses the same `TEMPORAL_TASK_QUEUE` as Runner Service.
 - The worker cannot read an input bundle: rerun `sudo deploy/systemd/install.sh "$USER"` so the installed `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` matches the current checkout.
