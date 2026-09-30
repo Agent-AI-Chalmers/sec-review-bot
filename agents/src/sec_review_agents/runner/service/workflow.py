@@ -4,6 +4,10 @@ from typing import Any
 
 from temporalio import activity, workflow
 
+from sec_review_agents.runner.core import (
+    RUNNER_REQUEST_INVALID,
+    RUNNER_WORKFLOW_UNSUPPORTED,
+)
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
@@ -67,7 +71,7 @@ def prepare_runner_run_activity(request: RunnerExecutionRequest) -> dict[str, An
         return {
             "ok": False,
             "error": build_runner_error(
-                code="RUNNER_REQUEST_INVALID",
+                code=RUNNER_REQUEST_INVALID,
                 category="input",
                 message=str(error),
                 details={"name": error.__class__.__name__},
@@ -77,7 +81,7 @@ def prepare_runner_run_activity(request: RunnerExecutionRequest) -> dict[str, An
         return {
             "ok": False,
             "error": build_runner_error(
-                code="RUNNER_WORKFLOW_UNSUPPORTED",
+                code=RUNNER_WORKFLOW_UNSUPPORTED,
                 category="workflow",
                 message=str(error),
             ),
@@ -127,7 +131,7 @@ class RunnerExecutionWorkflow:
             "ok": False,
             "error": {
                 "category": "workflow",
-                "code": "RUNNER_WORKFLOW_UNSUPPORTED",
+                "code": RUNNER_WORKFLOW_UNSUPPORTED,
                 "message": f"Unsupported workflow: {request.workflow}",
                 "retryable": False,
                 "details": {},

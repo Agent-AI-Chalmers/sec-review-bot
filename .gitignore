@@ -37,6 +37,7 @@ deploy/systemd/deployment.env
 .agent-input-bundles/
 .agent-artifacts/
 .agent-app-state/
+.agent-temporal-state/
 .agent-memory/
 
 evaluation_input

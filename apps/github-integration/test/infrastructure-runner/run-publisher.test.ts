@@ -13,7 +13,11 @@ import {
   shouldRetryRunnerPublishFailure
 } from '../../infrastructure/runner/run-publisher.js'
 import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
-import type { RunnerRunStatus, WorkflowName } from '../../infrastructure/runner/client.js'
+import {
+  RUNNER_RUN_NOT_FOUND,
+  type RunnerRunStatus,
+  type WorkflowName
+} from '../../infrastructure/runner/client.js'
 
 type PublishContext = Record<string, unknown>
 
@@ -200,6 +204,19 @@ test('runner publisher does not retry completed runner service failures', () => 
   assert.equal(shouldRetryRunnerPublishFailure(error), false)
 })
 
+test('runner publisher distinguishes a missing runner execution from GitHub failures', () => {
+  const error = Object.assign(new Error('Runner execution no longer exists.'), {
+    name: 'AgentRunnerServiceError',
+    code: RUNNER_RUN_NOT_FOUND
+  })
+
+  assert.deepEqual(classifyRunnerPublishFailure(error), {
+    retry: false,
+    code: RUNNER_RUN_NOT_FOUND,
+    reason: 'runner-run-not-found'
+  })
+})
+
 test('runner publisher classifies GitHub publish failures by retryability', () => {
   const cases: Array<{
     name: string
@@ -288,6 +305,38 @@ test('runner publisher marks malformed issue results failed without retry', asyn
   assert.equal(run?.status, 'failed')
   assert.equal(run?.failure_code, RUNNER_PUBLISH_ERROR_CODES.issue_result_invalid)
   assert.match(run?.failure_message ?? '', /Issue review result is invalid/)
+  assert.equal(store.listActiveRuns().length, 0)
+})
+
+test('runner publisher terminates a run whose runner execution no longer exists', async () => {
+  const store = createStore()
+  createQueuedRun(store, {
+    workflow: 'issue-review',
+    run_id: 'run-missing',
+    publish_context: publishContextForWorkflow('issue-review')
+  })
+  let statusRequests = 0
+
+  const publishOnce = async (): Promise<void> => publishReviewRunsOnce({
+    app: appStub(),
+    store,
+    get_runner_run_status: async () => {
+      statusRequests += 1
+      throw Object.assign(new Error('Runner execution no longer exists.'), {
+        name: 'AgentRunnerServiceError',
+        code: RUNNER_RUN_NOT_FOUND
+      })
+    }
+  })
+
+  await publishOnce()
+  await publishOnce()
+
+  const run = store.getRun('run-missing')
+  assert.equal(run?.status, 'failed')
+  assert.equal(run?.failure_code, RUNNER_RUN_NOT_FOUND)
+  assert.equal(run?.publish_attempts, 0)
+  assert.equal(statusRequests, 1)
   assert.equal(store.listActiveRuns().length, 0)
 })
 

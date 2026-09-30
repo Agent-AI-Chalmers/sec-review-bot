@@ -1,4 +1,4 @@
-import type { GitHubAppOctokit } from './octokit.js'
+import type { GitHubAppOctokit, GitHubPullRequestReview } from './octokit.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
 
 export type ReviewCommentSide = 'LEFT' | 'RIGHT'
@@ -54,6 +54,10 @@ interface CreatePullRequestReviewArgs {
   body: string
   event?: PullRequestReviewEvent
   comments: PullRequestReviewCommentInput[]
+}
+
+interface CreatePullRequestReviewUnlessMarkerExistsArgs extends CreatePullRequestReviewArgs {
+  marker: string
 }
 
 function isOwnPullRequestApprovalError (error: unknown): boolean {
@@ -237,4 +241,67 @@ export async function createPullRequestReview (
   }
 
   return response.data
+}
+
+async function findPullRequestReviewByMarker (
+  octokit: GitHubAppOctokit,
+  {
+    owner_login,
+    repo_name,
+    pr_number,
+    marker
+  }: Pick<CreatePullRequestReviewUnlessMarkerExistsArgs, 'owner_login' | 'repo_name' | 'pr_number' | 'marker'>
+): Promise<GitHubPullRequestReview | null> {
+  let page = 1
+
+  while (true) {
+    const response = await octokit.rest.pulls.listReviews({
+      owner: owner_login,
+      repo: repo_name,
+      pull_number: pr_number,
+      per_page: 100,
+      page
+    })
+
+    if (response.data.length === 0) {
+      return null
+    }
+
+    for (const review of response.data) {
+      if (review.user?.type !== 'Bot') {
+        continue
+      }
+      if (typeof review.body === 'string' && review.body.includes(marker)) {
+        return review
+      }
+    }
+
+    if (response.data.length < 100) {
+      return null
+    }
+
+    page += 1
+  }
+}
+
+export async function createPullRequestReviewUnlessMarkerExists (
+  octokit: GitHubAppOctokit,
+  args: CreatePullRequestReviewUnlessMarkerExistsArgs
+): Promise<{ id: number, html_url: string, state: string, reused: boolean }> {
+  const existing = await findPullRequestReviewByMarker(octokit, args)
+  if (existing !== null) {
+    // A run marker is the durable publication identity when a GitHub response is lost.
+    return {
+      id: existing.id,
+      html_url: existing.html_url,
+      state: existing.state,
+      reused: true
+    }
+  }
+
+  const created = await createPullRequestReview(octokit, args)
+  return {
+    ...created,
+    reused: false
+  }
 }

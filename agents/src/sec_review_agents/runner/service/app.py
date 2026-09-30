@@ -8,15 +8,22 @@ from fastapi.responses import JSONResponse
 
 from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.runner.core import (
+    RUNNER_REQUEST_INVALID,
+    RUNNER_RUN_CONFLICT,
+    RUNNER_RUN_NOT_FOUND,
+    RUNNER_WORKFLOW_UNSUPPORTED,
     build_runner_error,
     is_supported_workflow,
     validate_run_id,
     validate_run_request_body,
 )
 from sec_review_agents.runner.input_preparation import INPUT_BUNDLE_ROOT_ENV
-from sec_review_agents.runner.service.execution import RunnerExecutionBackend
-from sec_review_agents.runner.service.temporal_execution import (
-    TemporalRunnerExecutionBackend,
+from sec_review_agents.runner.service.gateway import (
+    RunnerRunConflictError,
+    RunnerWorkflowGateway,
+)
+from sec_review_agents.runner.service.temporal_gateway import (
+    TemporalRunnerWorkflowGateway,
 )
 from sec_review_agents.utils.env import env_value
 
@@ -86,16 +93,16 @@ def _run_response(run: dict[str, Any]) -> dict[str, Any]:
     return response
 
 
-def _runner_backend(request: Request) -> RunnerExecutionBackend:
-    return request.app.state.runner_backend
+def _runner_gateway(request: Request) -> RunnerWorkflowGateway:
+    return request.app.state.runner_gateway
 
 
-def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastAPI:
+def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAPI:
     _require_safe_auth_configuration()
     initialize_configured_memory_store()
     app = FastAPI(title="sec-review-agents runner service")
-    app.state.runner_backend = (
-        runner_backend or TemporalRunnerExecutionBackend.from_env()
+    app.state.runner_gateway = (
+        runner_gateway or TemporalRunnerWorkflowGateway.from_env()
     )
 
     @app.get("/healthz", dependencies=[Depends(_require_bearer_token)])
@@ -109,7 +116,7 @@ def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastA
     async def create_run(
         workflow: str,
         request: Any = Body(...),
-        runner_backend: RunnerExecutionBackend = Depends(_runner_backend),
+        runner_gateway: RunnerWorkflowGateway = Depends(_runner_gateway),
     ) -> JSONResponse:
         validation_error = validate_run_request_body(request)
         if validation_error:
@@ -117,7 +124,7 @@ def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastA
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
                     "error": build_runner_error(
-                        code="RUNNER_REQUEST_INVALID",
+                        code=RUNNER_REQUEST_INVALID,
                         category="input",
                         message=validation_error,
                     )
@@ -132,19 +139,36 @@ def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastA
                     "run_id": run_id,
                     "workflow": workflow,
                     "error": build_runner_error(
-                        code="RUNNER_WORKFLOW_UNSUPPORTED",
+                        code=RUNNER_WORKFLOW_UNSUPPORTED,
                         category="workflow",
                         message=f"Unsupported workflow: {workflow}",
                     ),
                 },
             )
 
-        run = await runner_backend.start(
-            workflow=workflow,
-            run_id=run_id,
-            input_data=request["input"],
-            runtime=request.get("runtime"),
-        )
+        try:
+            run = await runner_gateway.start(
+                workflow=workflow,
+                run_id=run_id,
+                input_data=request["input"],
+                runtime=request.get("runtime"),
+            )
+        except RunnerRunConflictError as error:
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={
+                    "run_id": error.run_id,
+                    "workflow": error.requested_workflow,
+                    "error": build_runner_error(
+                        code=RUNNER_RUN_CONFLICT,
+                        category="input",
+                        message=str(error),
+                        details={
+                            "existing_workflow": error.existing_workflow,
+                        },
+                    ),
+                },
+            )
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
             content=_run_response(run),
@@ -153,7 +177,7 @@ def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastA
     @app.get("/v1/runs/{run_id}", dependencies=[Depends(_require_bearer_token)])
     async def get_run(
         run_id: str,
-        runner_backend: RunnerExecutionBackend = Depends(_runner_backend),
+        runner_gateway: RunnerWorkflowGateway = Depends(_runner_gateway),
     ) -> JSONResponse:
         try:
             validate_run_id(run_id)
@@ -163,17 +187,24 @@ def create_app(*, runner_backend: RunnerExecutionBackend | None = None) -> FastA
                 content={
                     "run_id": run_id,
                     "error": build_runner_error(
-                        code="RUNNER_REQUEST_INVALID",
+                        code=RUNNER_REQUEST_INVALID,
                         category="input",
                         message=str(error),
                     ),
                 },
             )
-        run = await runner_backend.get(run_id)
+        run = await runner_gateway.get(run_id)
         if run is None:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Runner run not found.",
+                content={
+                    "run_id": run_id,
+                    "error": build_runner_error(
+                        code=RUNNER_RUN_NOT_FOUND,
+                        category="runtime",
+                        message="Runner run not found.",
+                    ),
+                },
             )
         return JSONResponse(content=_run_response(run))
 

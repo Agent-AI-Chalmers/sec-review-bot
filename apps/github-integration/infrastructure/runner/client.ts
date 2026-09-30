@@ -10,6 +10,8 @@ const DEFAULT_RUNNER_REQUEST_TIMEOUT_MS = 30_000
 const DEFAULT_RUNNER_REQUEST_RETRIES = 2
 const DEFAULT_RUNNER_RETRY_BASE_DELAY_MS = 500
 const RUNNER_RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
+// The integration retained a run that the Runner can no longer retrieve.
+export const RUNNER_RUN_NOT_FOUND = 'RUNNER_RUN_NOT_FOUND'
 
 interface RunnerRequestBody {
   run_id: string
@@ -31,6 +33,7 @@ export interface AgentRunnerServiceError extends Error {
   category: string
   retryable: boolean
   details: JsonObject
+  http_status: number | null
   run_id: string | null
   workflow: WorkflowName | null
 }
@@ -212,6 +215,7 @@ function buildServiceError (response: {
   run_id?: string | null
   workflow?: WorkflowName | null
   error?: RunnerServiceErrorBody
+  http_status?: number | null
 }): AgentRunnerServiceError {
   const error = new Error(response.error?.message ?? 'Agent runner returned an unknown service error.') as AgentRunnerServiceError
 
@@ -220,6 +224,7 @@ function buildServiceError (response: {
   error.category = response.error?.category ?? 'runtime'
   error.retryable = response.error?.retryable ?? false
   error.details = response.error?.details ?? {}
+  error.http_status = response.http_status ?? null
   error.run_id = response.run_id ?? null
   error.workflow = response.workflow ?? null
 
@@ -376,7 +381,8 @@ async function createRunnerRun ({
       throw buildServiceError({
         run_id: typeof createBody.run_id === 'string' ? createBody.run_id : request.run_id,
         workflow,
-        error: createBody.error as RunnerServiceErrorBody
+        error: createBody.error as RunnerServiceErrorBody,
+        http_status: createResponse.status
       })
     }
     throw new Error(`Agent runner service rejected request with HTTP ${createResponse.status}.`)
@@ -405,11 +411,21 @@ async function fetchRunnerRunStatus ({
   const statusBody = await readJsonResponse(statusResponse)
 
   if (!statusResponse.ok) {
+    if (statusResponse.status === 404 && isRecord(statusBody) && isRecord(statusBody.error) && statusBody.error.code === RUNNER_RUN_NOT_FOUND) {
+      // Missing execution state cannot be repaired by retrying GitHub publication.
+      throw buildServiceError({
+        run_id,
+        workflow: null,
+        error: statusBody.error as RunnerServiceErrorBody,
+        http_status: statusResponse.status
+      })
+    }
     if (isRecord(statusBody) && isRecord(statusBody.error)) {
       throw buildServiceError({
         run_id: typeof statusBody.run_id === 'string' ? statusBody.run_id : run_id,
         workflow: typeof statusBody.workflow === 'string' ? statusBody.workflow as WorkflowName : null,
-        error: statusBody.error as RunnerServiceErrorBody
+        error: statusBody.error as RunnerServiceErrorBody,
+        http_status: statusResponse.status
       })
     }
     throw new Error(`Agent runner service failed to fetch run ${run_id} with HTTP ${statusResponse.status}.`)
