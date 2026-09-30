@@ -51,11 +51,13 @@ POST /v1/workflows/{workflow}/runs
 
 `runtime.workspace_image` 目前是内部 / evaluation runner option。GitHub App 不通过仓库配置暴露这个字段。产品侧集成不得从仓库配置、评论、issue / PR 内容或其他不可信用户输入中派生或透传该值。
 
-`run_id` 同时也是创建运行的幂等键。第一个被接纳的请求会把该 ID 绑定到 `workflow`、`input` 和 `runtime` 的规范化 JSON 值：
+`run_id` 同时也是创建运行的幂等键。在对应 workflow 仍处于 Temporal 历史保留期（retention）内时，第一个被接纳的请求会把该 ID 绑定到 `workflow`、`input` 和 `runtime` 的规范化 JSON 值：
 
 - 使用相同 `run_id` 重放相同请求时，返回已有运行；运行已经完成时也一样。
 - 使用相同 `run_id` 提交不同请求内容时，返回 HTTP `409` 和 `RUNNER_RUN_CONFLICT`。
 - 已完成、失败、取消或超时的 run ID 不会被用于启动新的 Temporal execution。
+
+> Temporal 删除过期 workflow history 后，runner 将无法恢复该 ID 与原请求的绑定关系。调用方必须为每个新 run 生成全新且具备足够抗碰撞能力的 `run_id`，并且不得故意复用已经过期的 ID。此 API 契约不提供超出 Temporal 历史保留期的永久去重保证。
 
 JSON object 的 key 顺序不影响请求身份；array 顺序或字段值变化会影响请求身份。
 
@@ -144,7 +146,7 @@ GET /v1/runs/{run_id}
 }
 ```
 
-复用已有 `run_id` 但请求内容不同时，返回 HTTP `409`，并使用相同错误 envelope 和错误码 `RUNNER_RUN_CONFLICT`。该错误不可重试；调用方必须重放原请求，或为新请求选择新的 `run_id`。
+对于仍处于 Temporal 历史保留期内的 `run_id`，复用该 ID 但改变请求内容时会返回 HTTP `409`，并使用相同错误 envelope 和错误码 `RUNNER_RUN_CONFLICT`。该错误不可重试；调用方必须重放原请求，或为新请求选择新的 `run_id`。
 
 错误字段：
 

@@ -49,11 +49,13 @@ Allowed `runtime` keys are `workspace_image?: string`. Unknown runtime keys fail
 
 `runtime.workspace_image` is currently an internal / evaluation runner option. The GitHub App does not expose it through repository config. Product integrations must not derive or pass this value from repository configuration, comments, issue / PR content, or other untrusted user-controlled input.
 
-`run_id` is also the create-run idempotency key. The first accepted request binds the ID to the canonical JSON value of `workflow`, `input`, and `runtime`:
+`run_id` is also the create-run idempotency key. While the corresponding workflow remains available within Temporal retention, the first accepted request binds the ID to the canonical JSON value of `workflow`, `input`, and `runtime`:
 
 - Replaying the same request with the same `run_id` returns the existing run, including after that run has completed.
 - Reusing the same `run_id` with different request content returns HTTP `409` with `RUNNER_RUN_CONFLICT`.
 - A completed, failed, cancelled, or timed-out run ID is not reused for a new Temporal execution.
+
+> After Temporal deletes an expired workflow history, the runner can no longer recover that ID's request binding. Callers must generate a fresh, collision-resistant `run_id` for every new run and must not intentionally reuse expired IDs. Permanent deduplication beyond Temporal retention is not part of this API contract.
 
 JSON object key order does not affect request identity. Changes to array order or field values do.
 
@@ -148,7 +150,7 @@ Synchronous request validation errors return HTTP `400` with:
 }
 ```
 
-A conflicting reuse of an existing `run_id` returns HTTP `409` with the same error envelope and code `RUNNER_RUN_CONFLICT`. This error is not retryable; callers must either replay the original request or choose a new `run_id` for a new request.
+A conflicting reuse of a `run_id` that remains available within Temporal retention returns HTTP `409` with the same error envelope and code `RUNNER_RUN_CONFLICT`. This error is not retryable; callers must either replay the original request or choose a new `run_id` for a new request.
 
 error fields:
 
