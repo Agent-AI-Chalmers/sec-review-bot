@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import crypto from 'node:crypto'
 import fs from 'fs'
 import path from 'path'
 
@@ -10,6 +11,8 @@ type JsonObject = Record<string, unknown>
 export type ReviewRunStatus =
   // The request was accepted, but its workspace and Runner input are still being prepared. There is nothing to poll yet.
   | 'preparing'
+  // A publisher has exclusively claimed an uncertain Runner submission and is resolving it.
+  | 'recovering'
   // The Runner accepted the run, but the integration has not observed it running yet.
   | 'queued'
   // The Runner or Temporal is executing the review workflow.
@@ -27,6 +30,7 @@ export interface CreateReviewRunArgs {
   run_id: string
   workflow: WorkflowName
   publish_context: JsonObject
+  runner_input?: JsonObject
   ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
   ingress_key?: string
 }
@@ -65,6 +69,8 @@ interface ReviewRunRow {
   run_id: string
   workflow: WorkflowName
   publish_context_json: string
+  runner_input_json: string | null
+  recovery_claim_token: string | null
   status: ReviewRunStatus
   created_at: string
   updated_at: string
@@ -78,16 +84,13 @@ interface ReviewRunRow {
 
 const MAX_PUBLISH_ATTEMPTS = 3
 const DEFAULT_PUBLISHING_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
-const RECOVERABLE_ADMISSION_FAILURE_CODES = [
-  'PREPARATION_INTERRUPTED',
-  'SUBMISSION_STATE_UNCERTAIN'
-] as const
-
 const REVIEW_RUN_STORE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS review_runs (
-    run_id TEXT PRIMARY KEY,
-    workflow TEXT NOT NULL,
-    publish_context_json TEXT NOT NULL,
+        run_id TEXT PRIMARY KEY,
+        workflow TEXT NOT NULL,
+        publish_context_json TEXT NOT NULL,
+        runner_input_json TEXT,
+        recovery_claim_token TEXT,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -136,6 +139,9 @@ function rowToRecord (row: ReviewRunRow): ReviewRunRecord {
     run_id: row.run_id,
     workflow: row.workflow,
     publish_context: parseJsonObject(row.publish_context_json, 'publish_context_json'),
+    ...(row.runner_input_json === null
+      ? {}
+      : { runner_input: parseJsonObject(row.runner_input_json, 'runner_input_json') }),
     status: row.status,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -153,7 +159,8 @@ function publishAttemptsRemaining (record: ReviewRunRecord): number {
 }
 
 function isActiveRecord (record: ReviewRunRecord): boolean {
-  return ['queued', 'running', 'publishing'].includes(record.status) ||
+  return ['recovering', 'queued', 'running', 'publishing'].includes(record.status) ||
+    (record.status === 'failed' && record.failure_code === 'SUBMISSION_STATE_UNCERTAIN') ||
     (record.status === 'publish_failed' && publishAttemptsRemaining(record) > 0)
 }
 
@@ -166,7 +173,9 @@ function recordToDiagnosticRecord (record: ReviewRunRecord): ReviewRunDiagnostic
   return {
     ...record,
     is_active: isActiveRecord(record),
-    is_terminal: record.status === 'published' || record.status === 'failed' || retry_exhausted,
+    is_terminal: record.status === 'published' ||
+      (record.status === 'failed' && record.failure_code !== 'SUBMISSION_STATE_UNCERTAIN') ||
+      retry_exhausted,
     retry_exhausted,
     publish_attempts_remaining: publishAttemptsRemaining(record)
   }
@@ -185,12 +194,22 @@ export class ReviewRunStore {
     this.db = new Database(dbPath)
     this.db.pragma('journal_mode = WAL')
     this.db.exec(REVIEW_RUN_STORE_SCHEMA)
-    const columns = this.db.pragma('table_info(review_runs)') as Array<{ name: string }>
+    let columns = this.db.pragma('table_info(review_runs)') as Array<{ name: string }>
     if (!columns.some((column) => column.name === 'ingress_kind')) {
       // review_runs is intentionally an internal, destructive schema. An old
       // local table cannot represent ingress identity, so do not reinterpret it.
       this.db.exec('DROP TABLE review_runs;')
       this.db.exec(REVIEW_RUN_STORE_SCHEMA)
+      columns = this.db.pragma('table_info(review_runs)') as Array<{ name: string }>
+    }
+    if (!columns.some((column) => column.name === 'runner_input_json')) {
+      // Prepared Runner input is additive recovery data. Preserve existing
+      // runs; only legacy uncertain submissions will lack enough data to retry.
+      this.db.exec('ALTER TABLE review_runs ADD COLUMN runner_input_json TEXT;')
+    }
+    if (!columns.some((column) => column.name === 'recovery_claim_token')) {
+      // The token fences a worker whose stale recovery claim was taken over.
+      this.db.exec('ALTER TABLE review_runs ADD COLUMN recovery_claim_token TEXT;')
     }
     this.db.exec(REVIEW_RUN_INGRESS_INDEX)
     this.failInterruptedPreparations()
@@ -210,7 +229,10 @@ export class ReviewRunStore {
         `).get(run.ingress_kind, run.ingress_key) as ReviewRunRow | undefined
         if (existing) {
           const reclaimed = this.reclaimRecoverableAdmission(existing)
-          return reclaimed ?? { record: rowToRecord(existing), created: false }
+          return reclaimed ?? {
+            record: rowToRecord(existing),
+            created: false
+          }
         }
 
         const record = this.insert_preparing_review_run(run)
@@ -234,13 +256,14 @@ export class ReviewRunStore {
     const timestamp = nowIso()
     this.db.prepare(`
       INSERT INTO review_runs (
-        run_id, workflow, publish_context_json, status, created_at, updated_at,
+        run_id, workflow, publish_context_json, runner_input_json, status, created_at, updated_at,
         published_at, publish_attempts, failure_code, failure_message, ingress_kind, ingress_key
-      ) VALUES (?, ?, ?, 'preparing', ?, ?, NULL, 0, NULL, NULL, ?, ?)
+      ) VALUES (?, ?, ?, ?, 'preparing', ?, ?, NULL, 0, NULL, NULL, ?, ?)
     `).run(
       run.run_id,
       run.workflow,
       JSON.stringify(run.publish_context),
+      run.runner_input === undefined ? null : JSON.stringify(run.runner_input),
       timestamp,
       timestamp,
       run.ingress_kind ?? null,
@@ -266,9 +289,9 @@ export class ReviewRunStore {
   }
 
   private reclaimRecoverableAdmission (existing: ReviewRunRow): ReviewRunAdmission | null {
-    if (existing.status !== 'failed' || !RECOVERABLE_ADMISSION_FAILURE_CODES.includes(
-      existing.failure_code as typeof RECOVERABLE_ADMISSION_FAILURE_CODES[number]
-    )) {
+    // An interrupted preparation is known not to have crossed the Runner POST
+    // boundary. Submission uncertainty needs the separate Runner lookup path.
+    if (existing.status !== 'failed' || existing.failure_code !== 'PREPARATION_INTERRUPTED') {
       return null
     }
     const result = this.db.prepare(`
@@ -287,6 +310,71 @@ export class ReviewRunStore {
       throw new Error(`Reclaimed review run was not found: ${existing.run_id}`)
     }
     return { record, created: true }
+  }
+
+  /** Save everything needed to recover before submission crosses the uncertain HTTP boundary. */
+  save_prepared_submission (run_id: string, publish_context: JsonObject, runner_input: JsonObject): void {
+    const result = this.db.prepare(`
+      UPDATE review_runs
+      SET publish_context_json = ?, runner_input_json = ?, updated_at = ?
+      WHERE run_id = ? AND status = 'preparing'
+    `).run(JSON.stringify(publish_context), JSON.stringify(runner_input), nowIso(), run_id)
+    if (result.changes !== 1) {
+      throw new Error(`Review run ${run_id} cannot save prepared submission outside preparing.`)
+    }
+  }
+
+  listSubmissionRecoveries (): ReviewRunRecord[] {
+    const staleClaimBefore = new Date(Date.now() - this.publishingClaimTimeoutMs).toISOString()
+    const rows = this.db.prepare(`
+      SELECT * FROM review_runs
+      WHERE (status = 'failed' AND failure_code = 'SUBMISSION_STATE_UNCERTAIN')
+         OR (status = 'recovering' AND updated_at <= ?)
+      ORDER BY updated_at ASC
+    `).all(staleClaimBefore) as ReviewRunRow[]
+    return rows.map(rowToRecord)
+  }
+
+  /** Exclusively claim an uncertain submission before making a Runner request. */
+  claimSubmissionRecovery (run_id: string): string | null {
+    const timestamp = nowIso()
+    const claimToken = crypto.randomUUID()
+    const staleClaimBefore = new Date(Date.now() - this.publishingClaimTimeoutMs).toISOString()
+    const result = this.db.prepare(`
+      UPDATE review_runs
+      SET status = 'recovering', updated_at = ?, recovery_claim_token = ?
+      WHERE run_id = ? AND (
+        (status = 'failed' AND failure_code = 'SUBMISSION_STATE_UNCERTAIN')
+        OR (status = 'recovering' AND updated_at <= ?)
+      )
+    `).run(timestamp, claimToken, run_id, staleClaimBefore)
+    return result.changes === 1 ? claimToken : null
+  }
+
+  /** Resume normal polling after recovery confirms or recreates the Runner run. */
+  completeSubmissionRecovery (run_id: string, claim_token: string): boolean {
+    const result = this.db.prepare(`
+      UPDATE review_runs
+      SET status = 'queued', updated_at = ?, failure_code = NULL, failure_message = NULL,
+          recovery_claim_token = NULL
+      WHERE run_id = ? AND status = 'recovering' AND recovery_claim_token = ?
+    `).run(nowIso(), run_id, claim_token)
+    return result.changes === 1
+  }
+
+  /** Finish or defer recovery only while this worker still owns the claim. */
+  failSubmissionRecovery (
+    run_id: string,
+    claim_token: string,
+    error: { code?: string | null, message: string }
+  ): boolean {
+    const result = this.db.prepare(`
+      UPDATE review_runs
+      SET status = 'failed', updated_at = ?, failure_code = ?, failure_message = ?,
+          recovery_claim_token = NULL
+      WHERE run_id = ? AND status = 'recovering' AND recovery_claim_token = ?
+    `).run(nowIso(), error.code ?? null, error.message, run_id, claim_token)
+    return result.changes === 1
   }
 
   /** Store the completed publish context and make the run visible to the poller. */
@@ -329,7 +417,8 @@ export class ReviewRunStore {
     }
     if (options.active_only === true) {
       clauses.push(`(
-        status IN ('queued', 'running', 'publishing')
+        status IN ('recovering', 'queued', 'running', 'publishing')
+        OR (status = 'failed' AND failure_code = 'SUBMISSION_STATE_UNCERTAIN')
         OR (status = 'publish_failed' AND publish_attempts < ?)
       )`)
       params.push(MAX_PUBLISH_ATTEMPTS)

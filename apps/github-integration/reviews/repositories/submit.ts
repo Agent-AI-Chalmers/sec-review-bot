@@ -27,6 +27,9 @@ interface RunRepositoryReviewArgs {
   head_sha?: string | null
   event_type?: 'manual' | 'scheduled'
   repair_mode?: RepairMode | null
+  // Runs after preparation and before the Runner POST, so callers can durably
+  // retain the context needed if the submission response is lost.
+  on_prepared?: (submitted: SubmittedRepositoryReviewRun, input: RepositoryReviewInput & Record<string, unknown>) => void
 }
 
 export interface SubmittedRepositoryReviewRun {
@@ -107,7 +110,8 @@ export async function startRepositoryReviewRun ({
   base_sha = null,
   head_sha = null,
   event_type = 'manual',
-  repair_mode = null
+  repair_mode = null,
+  on_prepared
 }: RunRepositoryReviewArgs): Promise<SubmittedRepositoryReviewRun> {
   const { run_id, input, repo, workspace_ref } = await materializeRepositoryReviewInput({
     ...(provided_run_id ? { run_id: provided_run_id } : {}),
@@ -122,6 +126,15 @@ export async function startRepositoryReviewRun ({
   })
 
   assertRepositoryReviewInput(input)
+  const preparedRun: SubmittedRepositoryReviewRun = {
+    repo,
+    run_id,
+    workspace_ref,
+    scan_target: input.scan_target,
+    workflow: 'repository-review',
+    event_type
+  }
+  on_prepared?.(preparedRun, input)
   const submitted = await submitRunnerRun({
     workflow: 'repository-review',
     run_id,
@@ -135,12 +148,5 @@ export async function startRepositoryReviewRun ({
     workflow: submitted.workflow
   })
 
-  return {
-    repo,
-    run_id,
-    workspace_ref,
-    scan_target: input.scan_target,
-    workflow: submitted.workflow,
-    event_type
-  }
+  return { ...preparedRun, workflow: submitted.workflow }
 }

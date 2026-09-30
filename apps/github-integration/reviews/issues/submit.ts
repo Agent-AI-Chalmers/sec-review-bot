@@ -13,6 +13,9 @@ interface RunIssueReviewArgs {
   event_type?: 'opened' | 'manual_review' | null
   review_objective?: 'audit' | 'repair' | null
   repair_mode?: 'test-changes-allowed' | 'no-test-changes' | null
+  // Runs after preparation and before the Runner POST, so callers can durably
+  // retain the context needed if the submission response is lost.
+  on_prepared?: (submitted: SubmittedIssueReviewRun, input: IssueReviewInput & Record<string, unknown>) => void
 }
 
 export interface SubmittedIssueReviewRun {
@@ -89,6 +92,14 @@ export async function startIssueReviewRun (args: RunIssueReviewArgs): Promise<Su
   const input = prepared.input
   const event_type = args.event_type ?? 'manual_review'
   assertIssueReviewInput(input)
+  const preparedRun: SubmittedIssueReviewRun = {
+    issue: args.issue,
+    run_id: prepared.run_id,
+    workspace_ref: prepared.workspace_ref,
+    workflow: 'issue-review',
+    event_type
+  }
+  args.on_prepared?.(preparedRun, input)
   const submitted = await submitRunnerRun({ workflow: 'issue-review', run_id: prepared.run_id, input })
   logInfo('issue_review_runner_run_submitted', {
     event_type,
@@ -97,11 +108,5 @@ export async function startIssueReviewRun (args: RunIssueReviewArgs): Promise<Su
     run_id: prepared.run_id,
     workflow: submitted.workflow
   })
-  return {
-    issue: args.issue,
-    run_id: prepared.run_id,
-    workspace_ref: prepared.workspace_ref,
-    workflow: submitted.workflow,
-    event_type
-  }
+  return { ...preparedRun, workflow: submitted.workflow }
 }

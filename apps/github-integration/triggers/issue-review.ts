@@ -13,7 +13,7 @@ type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
 interface StartIssueReviewCommandDeps {
   start_review: StartIssueReview
-  store: Pick<typeof reviewRunStore, 'admit_review_run' | 'mark_queued' | 'markFailed'>
+  store: Pick<typeof reviewRunStore, 'admit_review_run' | 'mark_queued' | 'markFailed'> & Partial<Pick<typeof reviewRunStore, 'save_prepared_submission'>>
   create_run_id: typeof createRunId
 }
 
@@ -54,19 +54,27 @@ export async function startIssueReviewCommand ({
     ingress_kind: 'github_webhook',
     ingress_key: delivery_id
   })
+  on_admitted?.({
+    run_id: admission.record.run_id,
+    status: admission.record.status,
+    replayed: !admission.created
+  })
   if (!admission.created) {
-    on_admitted?.({ run_id: admission.record.run_id, status: admission.record.status, replayed: true })
     return { run_id: admission.record.run_id }
   }
   const run_id = admission.record.run_id
-  on_admitted?.({ run_id, status: 'preparing', replayed: false })
 
   let submitted: SubmittedIssueReviewRun
   try {
     submitted = await start_review({
       octokit, issue, run_id, event_type,
       review_objective: event_type === 'opened' ? 'audit' : review_objective,
-      repair_mode: event_type === 'opened' ? null : repair_mode
+      repair_mode: event_type === 'opened' ? null : repair_mode,
+      on_prepared: (prepared, input) => store.save_prepared_submission?.(
+        run_id,
+        issueReviewPublishContext(prepared),
+        input
+      )
     })
   } catch (error) {
     store.markFailed(run_id, {

@@ -116,6 +116,68 @@ test('ReviewRunStore reclaims an interrupted ingress with the original run id', 
   store.close()
 })
 
+test('ReviewRunStore keeps uncertain submissions out of ordinary preparation recovery', () => {
+  const store = createStore()
+  store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-uncertain',
+    publish_context: {},
+    ingress_kind: 'github_webhook',
+    ingress_key: 'delivery-uncertain'
+  })
+  store.save_prepared_submission('run-uncertain', { workspace_ref: 'abc' }, { contract_version: 'v4' })
+  store.markFailed('run-uncertain', { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
+
+  const admission = store.admit_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-new',
+    publish_context: {},
+    ingress_kind: 'github_webhook',
+    ingress_key: 'delivery-uncertain'
+  })
+
+  assert.equal(admission.created, false)
+  assert.equal(admission.record.status, 'failed')
+  assert.deepEqual(admission.record.publish_context, { workspace_ref: 'abc' })
+  assert.deepEqual(admission.record.runner_input, { contract_version: 'v4' })
+
+  const claimToken = store.claimSubmissionRecovery('run-uncertain')
+  assert.equal(typeof claimToken, 'string')
+  assert.equal(store.claimSubmissionRecovery('run-uncertain'), null)
+  assert.equal(store.getRun('run-uncertain')?.status, 'recovering')
+  assert.equal(store.completeSubmissionRecovery('run-uncertain', claimToken!), true)
+  assert.equal(store.getRun('run-uncertain')?.status, 'queued')
+  store.close()
+})
+
+test('ReviewRunStore fences a worker after its recovery claim is replaced', async () => {
+  const store = new ReviewRunStore(':memory:', { publishingClaimTimeoutMs: 0 })
+  store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-fenced',
+    publish_context: {}
+  })
+  store.save_prepared_submission('run-fenced', {}, { contract_version: 'v4' })
+  store.markFailed('run-fenced', { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
+
+  const oldClaim = store.claimSubmissionRecovery('run-fenced')
+  assert.equal(typeof oldClaim, 'string')
+  await new Promise(resolve => setTimeout(resolve, 5))
+  const currentClaim = store.claimSubmissionRecovery('run-fenced')
+  assert.equal(typeof currentClaim, 'string')
+  assert.notEqual(currentClaim, oldClaim)
+
+  assert.equal(store.completeSubmissionRecovery('run-fenced', oldClaim!), false)
+  assert.equal(store.failSubmissionRecovery('run-fenced', oldClaim!, {
+    code: 'SUBMISSION_STATE_UNCERTAIN',
+    message: 'stale worker failed'
+  }), false)
+  assert.equal(store.getRun('run-fenced')?.status, 'recovering')
+  assert.equal(store.completeSubmissionRecovery('run-fenced', currentClaim!), true)
+  assert.equal(store.getRun('run-fenced')?.status, 'queued')
+  store.close()
+})
+
 test('ReviewRunStore only queues a run from preparing', () => {
   const store = createStore()
   store.create_preparing_review_run({
@@ -388,6 +450,27 @@ test('ReviewRunStore filters diagnostics by status and lifecycle state', () => {
     run_id: 'run-queued',
     publish_context
   })
+  store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-uncertain',
+    publish_context
+  })
+  store.save_prepared_submission('run-uncertain', publish_context, { contract_version: 'v4' })
+  store.markFailed('run-uncertain', {
+    code: 'SUBMISSION_STATE_UNCERTAIN',
+    message: 'response lost'
+  })
+  store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-recovering',
+    publish_context
+  })
+  store.save_prepared_submission('run-recovering', publish_context, { contract_version: 'v4' })
+  store.markFailed('run-recovering', {
+    code: 'SUBMISSION_STATE_UNCERTAIN',
+    message: 'response lost'
+  })
+  assert.equal(typeof store.claimSubmissionRecovery('run-recovering'), 'string')
   createQueuedRun(store, {
     workflow: 'repository-review',
     run_id: 'run-published',
@@ -433,14 +516,14 @@ test('ReviewRunStore filters diagnostics by status and lifecycle state', () => {
   )
   assert.deepEqual(
     new Set(store.listRunsForDiagnostics({ active_only: true }).map(run => run.run_id)),
-    new Set(['run-queued', 'run-publish-failed'])
+    new Set(['run-uncertain', 'run-recovering', 'run-queued', 'run-publish-failed'])
   )
   assert.deepEqual(
     new Set(store.listRunsForDiagnostics({ failed_only: true }).map(run => run.run_id)),
-    new Set(['run-failed', 'run-publish-failed', 'run-retry-exhausted'])
+    new Set(['run-failed', 'run-uncertain', 'run-publish-failed', 'run-retry-exhausted'])
   )
   assert.deepEqual(
     store.listRunsForDiagnostics({ status: 'failed', active_only: true }).map(run => run.run_id),
-    []
+    ['run-uncertain']
   )
 })

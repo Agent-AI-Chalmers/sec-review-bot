@@ -165,7 +165,7 @@ interface DispatchRepositoryReviewCommandDeps {
   getInstallationOctokit: (repo_full_name: string) => Promise<GitHubAppOctokit>
   resolve_dispatch: typeof resolveRepositoryReviewDispatch
   submit_run: typeof startRepositoryReviewRun
-  store: Pick<typeof reviewRunStore, 'admit_review_run' | 'mark_queued' | 'markFailed'>
+  store: Pick<typeof reviewRunStore, 'admit_review_run' | 'mark_queued' | 'markFailed'> & Partial<Pick<typeof reviewRunStore, 'save_prepared_submission'>>
   create_run_id: typeof createRunId
 }
 
@@ -214,15 +214,18 @@ export async function dispatchRepositoryReview ({
     ingress_kind: 'github_actions_dispatch',
     ingress_key: `${verified_repository}:${correlation_id}`
   })
+  on_admitted?.({
+    run_id: admission.record.run_id,
+    status: admission.record.status,
+    replayed: !admission.created
+  })
   if (!admission.created) {
-    on_admitted?.({ run_id: admission.record.run_id, status: admission.record.status, replayed: true })
     return {
       run_id: admission.record.run_id,
       replayed: true
     }
   }
   const run_id = admission.record.run_id
-  on_admitted?.({ run_id, status: 'preparing', replayed: false })
 
   let octokit: GitHubAppOctokit
   let resolved: Awaited<ReturnType<typeof resolveRepositoryReviewDispatch>>
@@ -241,7 +244,16 @@ export async function dispatchRepositoryReview ({
 
   let submitted: SubmittedRepositoryReviewRun
   try {
-    submitted = await submit_run({ octokit, run_id, ...resolved })
+    submitted = await submit_run({
+      octokit,
+      run_id,
+      ...resolved,
+      on_prepared: (prepared, input) => store.save_prepared_submission?.(
+        run_id,
+        repositoryReviewPublishContext(prepared),
+        input
+      )
+    })
   } catch (error) {
     store.markFailed(run_id, {
       // Submission transport failures may hide an accepted Temporal workflow;

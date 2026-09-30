@@ -15,6 +15,7 @@ import {
 import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import {
   RUNNER_RUN_NOT_FOUND,
+  RunnerSubmissionUncertainError,
   type RunnerRunStatus,
   type WorkflowName
 } from '../../infrastructure/runner/client.js'
@@ -29,6 +30,69 @@ function createQueuedRun (store: ReviewRunStore, run: Parameters<ReviewRunStore[
   store.create_preparing_review_run(run)
   store.mark_queued(run.run_id, run.publish_context)
 }
+
+function createUncertainRun (store: ReviewRunStore): void {
+  store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: 'run-uncertain',
+    publish_context: publishContextForWorkflow('issue-review')
+  })
+  store.save_prepared_submission(
+    'run-uncertain',
+    publishContextForWorkflow('issue-review'),
+    { contract_version: 'v4', issue: { number: 7 } }
+  )
+  store.markFailed('run-uncertain', {
+    code: 'SUBMISSION_STATE_UNCERTAIN',
+    message: 'Runner response was lost.'
+  })
+}
+
+test('publisher retries an uncertain idempotent submission without another ingress delivery', async () => {
+  const store = createStore()
+  createUncertainRun(store)
+
+  await publishReviewRunsOnce({
+    app: appStub(),
+    store,
+    submit_runner_run: async () => {
+      throw new RunnerSubmissionUncertainError('Runner response was lost again.')
+    }
+  })
+
+  assert.equal(store.getRun('run-uncertain')?.status, 'failed')
+  assert.equal(store.getRun('run-uncertain')?.failure_code, 'SUBMISSION_STATE_UNCERTAIN')
+  assert.equal(store.listSubmissionRecoveries().length, 1)
+  store.close()
+})
+
+test('publisher replays the persisted idempotent submission directly', async () => {
+  const store = createStore()
+  createUncertainRun(store)
+  const submissions: unknown[] = []
+
+  await publishReviewRunsOnce({
+    app: appStub(),
+    store,
+    get_runner_run_status: async () => ({
+      run_id: 'run-uncertain',
+      workflow: 'issue-review',
+      status: 'queued'
+    }),
+    submit_runner_run: async (request) => {
+      submissions.push(request)
+      return { run_id: request.run_id, workflow: request.workflow, status: 'queued' }
+    }
+  })
+
+  assert.deepEqual(submissions, [{
+    workflow: 'issue-review',
+    run_id: 'run-uncertain',
+    input: { contract_version: 'v4', issue: { number: 7 } }
+  }])
+  assert.equal(store.getRun('run-uncertain')?.status, 'queued')
+  store.close()
+})
 
 test('stopping the runner publisher waits for its active publish pass', async () => {
   const store = createStore()
