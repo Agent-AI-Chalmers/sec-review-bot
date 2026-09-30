@@ -3,10 +3,10 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from sec_review_agents.runner.service import app as service_app
-from sec_review_agents.runner.service.execution import RunnerRunConflictError
+from sec_review_agents.runner.service.gateway import RunnerRunConflictError
 
 
-class FakeRunnerExecutionBackend:
+class FakeRunnerWorkflowGateway:
     def __init__(self, *, start_error: Exception | None = None) -> None:
         self.runs: dict[str, dict[str, Any]] = {}
         self.start_error = start_error
@@ -51,7 +51,7 @@ def test_healthz(monkeypatch) -> None:
     monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
     _use_loopback_host(monkeypatch)
     client = TestClient(
-        service_app.create_app(runner_backend=FakeRunnerExecutionBackend())
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
     )
 
     response = client.get("/healthz")
@@ -66,7 +66,7 @@ def test_create_app_initializes_configured_memory_dir(monkeypatch, tmp_path) -> 
     memory_dir = tmp_path / "memory"
     monkeypatch.setenv("AGENT_MEMORY_DIR", str(memory_dir))
 
-    TestClient(service_app.create_app(runner_backend=FakeRunnerExecutionBackend()))
+    TestClient(service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway()))
 
     assert (memory_dir / "memory" / "MEMORY.md").is_file()
     assert (memory_dir / "memory" / "topics").is_dir()
@@ -78,7 +78,7 @@ def test_create_run_rejects_invalid_request(monkeypatch) -> None:
     monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
     _use_loopback_host(monkeypatch)
     client = TestClient(
-        service_app.create_app(runner_backend=FakeRunnerExecutionBackend())
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
     )
 
     response = client.post("/v1/workflows/issue-review/runs", json={})
@@ -91,8 +91,8 @@ def test_create_run_rejects_invalid_request(monkeypatch) -> None:
 def test_create_run_rejects_invalid_run_id_before_start(monkeypatch) -> None:
     monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
     _use_loopback_host(monkeypatch)
-    backend = FakeRunnerExecutionBackend()
-    client = TestClient(service_app.create_app(runner_backend=backend))
+    gateway = FakeRunnerWorkflowGateway()
+    client = TestClient(service_app.create_app(runner_gateway=gateway))
 
     response = client.post(
         "/v1/workflows/issue-review/runs",
@@ -106,14 +106,14 @@ def test_create_run_rejects_invalid_run_id_before_start(monkeypatch) -> None:
     body = response.json()
     assert body["error"]["code"] == "RUNNER_REQUEST_INVALID"
     assert "run_id must match" in body["error"]["message"]
-    assert backend.runs == {}
+    assert gateway.runs == {}
 
 
 def test_create_run_rejects_unsupported_workflow_before_start(monkeypatch) -> None:
     monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
     _use_loopback_host(monkeypatch)
-    backend = FakeRunnerExecutionBackend()
-    client = TestClient(service_app.create_app(runner_backend=backend))
+    gateway = FakeRunnerWorkflowGateway()
+    client = TestClient(service_app.create_app(runner_gateway=gateway))
 
     response = client.post("/v1/workflows/not-real/runs", json=_request())
 
@@ -122,14 +122,14 @@ def test_create_run_rejects_unsupported_workflow_before_start(monkeypatch) -> No
     assert body["workflow"] == "not-real"
     assert body["error"]["category"] == "workflow"
     assert body["error"]["code"] == "RUNNER_WORKFLOW_UNSUPPORTED"
-    assert backend.runs == {}
+    assert gateway.runs == {}
 
 
 def test_create_run_starts_temporal_workflow(monkeypatch) -> None:
     monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
     _use_loopback_host(monkeypatch)
-    backend = FakeRunnerExecutionBackend()
-    client = TestClient(service_app.create_app(runner_backend=backend))
+    gateway = FakeRunnerWorkflowGateway()
+    client = TestClient(service_app.create_app(runner_gateway=gateway))
 
     created = client.post("/v1/workflows/issue-review/runs", json=_request())
 
@@ -154,7 +154,7 @@ def test_create_run_returns_conflict_for_reused_run_id_with_different_request(
     _use_loopback_host(monkeypatch)
     client = TestClient(
         service_app.create_app(
-            runner_backend=FakeRunnerExecutionBackend(
+            runner_gateway=FakeRunnerWorkflowGateway(
                 start_error=RunnerRunConflictError(
                     "run-service",
                     requested_workflow="issue-review",
@@ -185,14 +185,14 @@ def test_create_run_returns_conflict_for_reused_run_id_with_different_request(
 def test_get_run_returns_worker_result(monkeypatch) -> None:
     monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
     _use_loopback_host(monkeypatch)
-    backend = FakeRunnerExecutionBackend()
-    backend.runs["run-service"] = {
+    gateway = FakeRunnerWorkflowGateway()
+    gateway.runs["run-service"] = {
         "run_id": "run-service",
         "workflow": "issue-review",
         "status": "succeeded",
         "result": {"contract_version": "v4"},
     }
-    client = TestClient(service_app.create_app(runner_backend=backend))
+    client = TestClient(service_app.create_app(runner_gateway=gateway))
 
     fetched = client.get("/v1/runs/run-service")
 
@@ -205,13 +205,13 @@ def test_get_run_returns_worker_result(monkeypatch) -> None:
 def test_get_run_rejects_invalid_run_id_before_backend_lookup(monkeypatch) -> None:
     monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
     _use_loopback_host(monkeypatch)
-    backend = FakeRunnerExecutionBackend()
-    backend.runs["run service"] = {
+    gateway = FakeRunnerWorkflowGateway()
+    gateway.runs["run service"] = {
         "run_id": "run service",
         "workflow": "issue-review",
         "status": "succeeded",
     }
-    client = TestClient(service_app.create_app(runner_backend=backend))
+    client = TestClient(service_app.create_app(runner_gateway=gateway))
 
     fetched = client.get("/v1/runs/run%20service")
 
@@ -226,7 +226,7 @@ def test_bearer_token_is_required_when_configured(monkeypatch) -> None:
     monkeypatch.setenv("RUNNER_SERVICE_TOKEN", "secret")
     monkeypatch.setenv("SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT", "/tmp/runner-inputs")
     client = TestClient(
-        service_app.create_app(runner_backend=FakeRunnerExecutionBackend())
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
     )
 
     assert client.get("/healthz").status_code == 401
@@ -238,7 +238,7 @@ def test_bearer_token_rejects_near_match(monkeypatch) -> None:
     monkeypatch.setenv("RUNNER_SERVICE_TOKEN", "secret")
     monkeypatch.setenv("SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT", "/tmp/runner-inputs")
     client = TestClient(
-        service_app.create_app(runner_backend=FakeRunnerExecutionBackend())
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
     )
 
     response = client.get("/healthz", headers={"Authorization": "Bearer secretx"})
@@ -252,7 +252,7 @@ def test_bearer_token_rejects_non_ascii_configured_token_without_error(
     monkeypatch.setenv("RUNNER_SERVICE_TOKEN", "secrét")
     monkeypatch.setenv("SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT", "/tmp/runner-inputs")
     client = TestClient(
-        service_app.create_app(runner_backend=FakeRunnerExecutionBackend()),
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway()),
         raise_server_exceptions=False,
     )
 
@@ -267,7 +267,7 @@ def test_create_app_requires_input_bundle_root_with_token(monkeypatch) -> None:
     monkeypatch.setenv("RUNNER_SERVICE_HOST", "127.0.0.1")
 
     try:
-        service_app.create_app(runner_backend=FakeRunnerExecutionBackend())
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
     except RuntimeError as error:
         assert "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT is required" in str(error)
     else:
@@ -279,7 +279,7 @@ def test_create_app_requires_token_unless_host_is_loopback(monkeypatch) -> None:
     monkeypatch.setenv("RUNNER_SERVICE_HOST", "0.0.0.0")
 
     try:
-        service_app.create_app(runner_backend=FakeRunnerExecutionBackend())
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
     except RuntimeError as error:
         assert "RUNNER_SERVICE_TOKEN is required" in str(error)
     else:

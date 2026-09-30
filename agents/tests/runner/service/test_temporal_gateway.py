@@ -11,9 +11,9 @@ from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionRegistrationRequest,
 )
 from sec_review_agents.review_stages.record import build_review_record
-from sec_review_agents.runner.service.execution import RunnerRunConflictError
-from sec_review_agents.runner.service.temporal_execution import (
-    TemporalRunnerExecutionBackend,
+from sec_review_agents.runner.service.gateway import RunnerRunConflictError
+from sec_review_agents.runner.service.temporal_gateway import (
+    TemporalRunnerWorkflowGateway,
     _record_from_handle,
 )
 from sec_review_agents.runner.service.workflow import (
@@ -818,8 +818,8 @@ async def _run_temporal_backend_test(
     child_workflow_id: str,
 ) -> tuple[dict, dict, dict | None, dict]:
     async with temporal_time_skipping_environment() as env:
-        backend = TemporalRunnerExecutionBackend(task_queue="runner-service-test")
-        backend._client = env.client
+        gateway = TemporalRunnerWorkflowGateway(task_queue="runner-service-test")
+        gateway._client = env.client
         with ThreadPoolExecutor(max_workers=2) as executor:
             async with Worker(
                 env.client,
@@ -868,24 +868,24 @@ async def _run_temporal_backend_test(
                 ],
                 activity_executor=executor,
             ):
-                started = await backend.start(
+                started = await gateway.start(
                     workflow=workflow,
                     run_id="run-1",
                     input_data={"nested": {"a": 1, "b": 2}},
                 )
                 await env.client.get_workflow_handle("run-1").result()
-                replayed = await backend.start(
+                replayed = await gateway.start(
                     workflow=workflow,
                     run_id="run-1",
                     input_data={"nested": {"b": 2, "a": 1}},
                 )
                 with pytest.raises(RunnerRunConflictError):
-                    await backend.start(
+                    await gateway.start(
                         workflow=workflow,
                         run_id="run-1",
                         input_data={"different": True},
                     )
-                fetched = await backend.get("run-1")
+                fetched = await gateway.get("run-1")
                 child_result = await env.client.get_workflow_handle(
                     child_workflow_id
                 ).result()
@@ -976,8 +976,8 @@ async def _run_issue_ablation_workflows_test() -> tuple[dict, dict]:
 
 async def _run_temporal_error_envelope_test() -> dict | None:
     async with temporal_time_skipping_environment() as env:
-        backend = TemporalRunnerExecutionBackend(task_queue="runner-service-test")
-        backend._client = env.client
+        gateway = TemporalRunnerWorkflowGateway(task_queue="runner-service-test")
+        gateway._client = env.client
         with ThreadPoolExecutor(max_workers=1) as executor:
             async with Worker(
                 env.client,
@@ -986,22 +986,22 @@ async def _run_temporal_error_envelope_test() -> dict | None:
                 activities=[fake_prepare_runner_run_failure],
                 activity_executor=executor,
             ):
-                await backend.start(
+                await gateway.start(
                     workflow="issue-review",
                     run_id="run-error",
                     input_data={},
                 )
                 await env.client.get_workflow_handle("run-error").result()
-                return await backend.get("run-error")
+                return await gateway.get("run-error")
     raise AssertionError("Temporal test worker exited before returning a result.")
 
 
 async def _run_temporal_failed_workflow_test() -> dict | None:
     async with temporal_time_skipping_environment() as env:
-        backend = TemporalRunnerExecutionBackend(
+        gateway = TemporalRunnerWorkflowGateway(
             task_queue="runner-service-failure-test"
         )
-        backend._client = env.client
+        gateway._client = env.client
         with ThreadPoolExecutor(max_workers=2) as executor:
             async with Worker(
                 env.client,
@@ -1017,12 +1017,12 @@ async def _run_temporal_failed_workflow_test() -> dict | None:
                 ],
                 activity_executor=executor,
             ):
-                await backend.start(
+                await gateway.start(
                     workflow="issue-review",
                     run_id="run-boom",
                     input_data={},
                 )
                 with pytest.raises(Exception):
                     await env.client.get_workflow_handle("run-boom").result()
-                return await backend.get("run-boom")
+                return await gateway.get("run-boom")
     raise AssertionError("Temporal test worker exited before returning a result.")

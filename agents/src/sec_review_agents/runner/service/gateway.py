@@ -17,7 +17,7 @@ class RunnerRunConflictError(Exception):
         self.existing_workflow = existing_workflow
 
 
-class RunnerExecutionBackend(Protocol):
+class RunnerWorkflowGateway(Protocol):
     """Starts workflows and reads their current results for the Runner HTTP service."""
 
     async def start(
@@ -27,12 +27,16 @@ class RunnerExecutionBackend(Protocol):
         run_id: str,
         input_data: dict[str, Any],
         runtime: Any = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        """Submit a workflow request and return its current run record."""
+        ...
 
-    async def get(self, run_id: str) -> dict[str, Any] | None: ...
+    async def get(self, run_id: str) -> dict[str, Any] | None:
+        """Return the current run record, or None when the run does not exist."""
+        ...
 
 
 __all__ = [
-    "RunnerExecutionBackend",
     "RunnerRunConflictError",
+    "RunnerWorkflowGateway",
 ]

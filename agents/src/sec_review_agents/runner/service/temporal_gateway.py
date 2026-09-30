@@ -18,7 +18,7 @@ from sec_review_agents.runner.core import (
     RUNNER_RESPONSE_INVALID,
     build_runner_error,
 )
-from sec_review_agents.runner.service.execution import RunnerRunConflictError
+from sec_review_agents.runner.service.gateway import RunnerRunConflictError
 from sec_review_agents.runner.service.workflow import (
     RunnerExecutionRequest,
     RunnerExecutionWorkflow,
@@ -35,7 +35,7 @@ _REQUEST_FINGERPRINT_MEMO_KEY = "request_fingerprint"
 
 
 @dataclass
-class TemporalRunnerExecutionBackend:
+class TemporalRunnerWorkflowGateway:
     """Use Temporal to start Runner workflows and read their execution records."""
 
     address: str = DEFAULT_TEMPORAL_ADDRESS
@@ -45,7 +45,7 @@ class TemporalRunnerExecutionBackend:
     _client: Client | None = field(default=None, init=False, repr=False)
 
     @classmethod
-    def from_env(cls) -> TemporalRunnerExecutionBackend:
+    def from_env(cls) -> TemporalRunnerWorkflowGateway:
         return cls(
             address=env_value("TEMPORAL_ADDRESS") or DEFAULT_TEMPORAL_ADDRESS,
             namespace=env_value("TEMPORAL_NAMESPACE") or DEFAULT_TEMPORAL_NAMESPACE,
@@ -276,5 +276,5 @@ def _failure_message(error: BaseException) -> str:
 
 
 __all__ = [
-    "TemporalRunnerExecutionBackend",
+    "TemporalRunnerWorkflowGateway",
 ]
