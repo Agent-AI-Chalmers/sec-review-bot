@@ -242,7 +242,7 @@ flowchart LR
 | 持久化 run 状态 | 含义 | Publisher 行为 |
 | --- | --- | --- |
 | `preparing` | 请求已经接纳，但 workspace 和 runner input 仍在准备。 | 不会进入 runner 轮询。 |
-| `recovering` | Publisher 正在检查或安全地重新提交一次响应丢失的 Runner 请求。 | 同一时间只有一个 publisher 持有 recovery claim；过期 claim 可以被重新领取。 |
+| `recovering` | Publisher 正在安全地重放一次响应丢失的 Runner 请求。 | 同一时间只有一个 publisher 持有 recovery claim；过期 claim 可以被重新领取。 |
 | `queued` | Runner run 已提交，但尚未观察到运行中状态。 | 继续轮询 runner service。 |
 | `running` | Runner service 报告 run 仍在执行。 | 继续轮询。 |
 | `publishing` | 某个 publisher 已领取完成的 run，准备执行 GitHub side effects。 | 除非领取已过期，否则其他 publisher 不应再次领取。 |
@@ -275,7 +275,7 @@ sec-review-review-runs --status publish_failed
 | `attempts` | 已记录的 GitHub 发布失败次数；领取 run 准备发布不计数。 |
 | `failure_code` | run 中持久化的结构化失败码。 |
 
-`PREPARATION_INTERRUPTED` 表示进程在准备已接纳的 run 时停止；同一入口请求重放时，会使用原 `run_id` 重新准备。`SUBMISSION_STATE_UNCERTAIN` 表示 Runner submission 可能已经成功，但 `queued` 转换没有写入 store。后台 publisher 会查询原 `run_id`；只有 Runner 明确表示该 run 不存在时，才使用已持久化的 input 重新提交，不会重建 bundle。
+`PREPARATION_INTERRUPTED` 表示进程在准备已接纳的 run 时停止；同一入口请求重放时，会使用原 `run_id` 重新准备。`SUBMISSION_STATE_UNCERTAIN` 表示 Runner submission 可能已经成功，但 `queued` 转换没有写入 store。后台 publisher 会使用相同的 `run_id` 和 request fingerprint，安全地重放已经持久化的幂等 submission；它不会重建 bundle。
 
 ## GitHub REST API 版本
 

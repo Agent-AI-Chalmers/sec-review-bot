@@ -240,7 +240,7 @@ flowchart LR
 | Stored run state | Meaning | Publisher behavior |
 | --- | --- | --- |
 | `preparing` | The request was admitted, but its workspace and runner input are still being prepared. | Not visible to the runner poller. |
-| `recovering` | The publisher is checking or safely re-submitting a Runner request whose response was lost. | One publisher owns the recovery claim; a stale claim can be reclaimed. |
+| `recovering` | The publisher is safely replaying a Runner request whose response was lost. | One publisher owns the recovery claim; a stale claim can be reclaimed. |
 | `queued` | Runner run was submitted and has not been observed as running. | Poll the runner service. |
 | `running` | Runner service reports the run is still in progress. | Keep polling. |
 | `publishing` | A publisher claimed the completed run for GitHub side effects. | Do not let another publisher claim it unless the claim becomes stale. |
@@ -273,7 +273,7 @@ The command reads the local SQLite `review_runs` store. Important columns:
 | `attempts` | Recorded GitHub publication failures; claiming a run does not increment this. |
 | `failure_code` | Structured failure code stored with the run. |
 
-`PREPARATION_INTERRUPTED` means the process stopped while preparing an admitted run. Replaying the same ingress request restarts that preparation under the original `run_id`. `SUBMISSION_STATE_UNCERTAIN` means Runner submission may have succeeded, but the transition to `queued` was not stored. The background publisher checks the original `run_id`; if Runner explicitly reports it missing, the publisher re-submits the persisted input without rebuilding the bundle.
+`PREPARATION_INTERRUPTED` means the process stopped while preparing an admitted run. Replaying the same ingress request restarts that preparation under the original `run_id`. `SUBMISSION_STATE_UNCERTAIN` means Runner submission may have succeeded, but the transition to `queued` was not stored. The background publisher safely repeats the persisted idempotent submission with the same `run_id` and request fingerprint; it never rebuilds the bundle.
 
 ## GitHub REST API Version
 

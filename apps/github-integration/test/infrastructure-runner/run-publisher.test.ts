@@ -15,7 +15,7 @@ import {
 import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import {
   RUNNER_RUN_NOT_FOUND,
-  type AgentRunnerServiceError,
+  RunnerSubmissionUncertainError,
   type RunnerRunStatus,
   type WorkflowName
 } from '../../infrastructure/runner/client.js'
@@ -48,27 +48,16 @@ function createUncertainRun (store: ReviewRunStore): void {
   })
 }
 
-function missingRunnerRunError (): AgentRunnerServiceError {
-  return Object.assign(new Error('Runner run not found.'), {
-    name: 'AgentRunnerServiceError' as const,
-    code: RUNNER_RUN_NOT_FOUND,
-    category: 'not_found',
-    retryable: false,
-    details: {},
-    http_status: 404,
-    run_id: 'run-uncertain',
-    workflow: null
-  })
-}
-
-test('publisher retries uncertain status lookup without another ingress delivery', async () => {
+test('publisher retries an uncertain idempotent submission without another ingress delivery', async () => {
   const store = createStore()
   createUncertainRun(store)
 
   await publishReviewRunsOnce({
     app: appStub(),
     store,
-    get_runner_run_status: async () => { throw new Error('Runner temporarily unavailable.') }
+    submit_runner_run: async () => {
+      throw new RunnerSubmissionUncertainError('Runner response was lost again.')
+    }
   })
 
   assert.equal(store.getRun('run-uncertain')?.status, 'failed')
@@ -77,9 +66,10 @@ test('publisher retries uncertain status lookup without another ingress delivery
   store.close()
 })
 
-test('publisher resumes polling when Runner already owns an uncertain run', async () => {
+test('publisher replays the persisted idempotent submission directly', async () => {
   const store = createStore()
   createUncertainRun(store)
+  const submissions: unknown[] = []
 
   await publishReviewRunsOnce({
     app: appStub(),
@@ -87,29 +77,8 @@ test('publisher resumes polling when Runner already owns an uncertain run', asyn
     get_runner_run_status: async () => ({
       run_id: 'run-uncertain',
       workflow: 'issue-review',
-      status: 'running'
-    })
-  })
-
-  assert.equal(store.getRun('run-uncertain')?.status, 'running')
-  assert.equal(store.listSubmissionRecoveries().length, 0)
-  store.close()
-})
-
-test('publisher re-submits persisted input after Runner confirms the run is missing', async () => {
-  const store = createStore()
-  createUncertainRun(store)
-  const submissions: unknown[] = []
-  let statusCalls = 0
-
-  await publishReviewRunsOnce({
-    app: appStub(),
-    store,
-    get_runner_run_status: async () => {
-      statusCalls += 1
-      if (statusCalls === 1) throw missingRunnerRunError()
-      return { run_id: 'run-uncertain', workflow: 'issue-review', status: 'queued' }
-    },
+      status: 'queued'
+    }),
     submit_runner_run: async (request) => {
       submissions.push(request)
       return { run_id: request.run_id, workflow: request.workflow, status: 'queued' }

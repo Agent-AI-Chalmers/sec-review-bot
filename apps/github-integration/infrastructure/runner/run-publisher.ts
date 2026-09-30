@@ -6,7 +6,6 @@ import {
   RUNNER_RUN_NOT_FOUND,
   RunnerSubmissionUncertainError,
   submitRunnerRun,
-  type AgentRunnerServiceError,
   type RunnerRunStatus
 } from './client.js'
 import {
@@ -259,53 +258,18 @@ async function publishCompletedRun ({
   })
 }
 
-function isMissingRunnerRun (error: unknown): error is AgentRunnerServiceError {
-  return error instanceof Error &&
-    error.name === 'AgentRunnerServiceError' &&
-    'code' in error && error.code === RUNNER_RUN_NOT_FOUND
-}
-
 async function recoverSubmission ({
   store,
   run,
-  get_runner_run_status,
   submit_runner_run
 }: {
   store: ReviewRunStore
   run: ReviewRunRecord
-  get_runner_run_status: GetRunnerRunStatus
   submit_runner_run: SubmitRunnerRun
 }): Promise<void> {
   const claimToken = store.claimSubmissionRecovery(run.run_id)
   if (claimToken === null) {
     return
-  }
-
-  try {
-    await get_runner_run_status({ run_id: run.run_id })
-    if (!store.completeSubmissionRecovery(run.run_id, claimToken)) {
-      return
-    }
-    logInfo('runner_submission_recovered', {
-      resolution: 'existing-run-found',
-      run_id: run.run_id,
-      workflow: run.workflow
-    })
-    return
-  } catch (error) {
-    if (!isMissingRunnerRun(error)) {
-      if (!store.failSubmissionRecovery(run.run_id, claimToken, {
-        code: 'SUBMISSION_STATE_UNCERTAIN',
-        message: asErrorMessage(error)
-      })) return
-      logWarn('runner_submission_recovery_deferred', {
-        error,
-        error_message: asErrorMessage(error),
-        run_id: run.run_id,
-        workflow: run.workflow
-      })
-      return
-    }
   }
 
   if (run.runner_input === undefined) {
@@ -317,8 +281,8 @@ async function recoverSubmission ({
   }
 
   try {
-    // Runner explicitly confirmed that no execution owns this ID. Re-submit
-    // the persisted request without rebuilding or modifying its input bundle.
+    // Runner treats the same run ID and request as the same submission. Replaying
+    // the persisted POST therefore recovers both accepted and missing runs.
     await submit_runner_run({
       workflow: run.workflow,
       run_id: run.run_id,
@@ -328,17 +292,26 @@ async function recoverSubmission ({
       return
     }
     logInfo('runner_submission_recovered', {
-      resolution: 'resubmitted-persisted-input',
+      resolution: 'idempotent-submission-replayed',
       run_id: run.run_id,
       workflow: run.workflow
     })
   } catch (error) {
+    const deferred = error instanceof RunnerSubmissionUncertainError
     store.failSubmissionRecovery(run.run_id, claimToken, {
       code: error instanceof RunnerSubmissionUncertainError
         ? 'SUBMISSION_STATE_UNCERTAIN'
         : asErrorCode(error) ?? 'REVIEW_START_FAILED',
       message: asErrorMessage(error)
     })
+    if (deferred) {
+      logWarn('runner_submission_recovery_deferred', {
+        error,
+        error_message: asErrorMessage(error),
+        run_id: run.run_id,
+        workflow: run.workflow
+      })
+    }
   }
 }
 
@@ -354,7 +327,7 @@ export async function publishReviewRunsOnce ({
   submit_runner_run?: SubmitRunnerRun
 }): Promise<void> {
   for (const run of store.listSubmissionRecoveries()) {
-    await recoverSubmission({ store, run, get_runner_run_status, submit_runner_run })
+    await recoverSubmission({ store, run, submit_runner_run })
   }
 
   for (const run of store.listActiveRuns()) {
