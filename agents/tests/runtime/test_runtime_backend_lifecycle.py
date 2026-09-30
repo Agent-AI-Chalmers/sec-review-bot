@@ -20,7 +20,7 @@ from sec_review_agents.filesystem.docker_runtime import DockerContainerResource
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import (
-    aclose_backend_container,
+    aclose_backend,
     amanaged_backend,
 )
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
@@ -54,39 +54,33 @@ def _docker_container() -> DockerContainerResource:
 
 
 @pytest.mark.asyncio
-async def test_amanaged_backend_closes_docker_container() -> None:
+async def test_amanaged_backend_closes_backend() -> None:
     docker_container = _docker_container()
     backend = _BackendStub(container=docker_container)
 
-    with patch.object(docker_container, "close") as close:
-        async with amanaged_backend(backend) as managed:
-            assert managed is backend
+    async with amanaged_backend(backend) as managed:
+        assert managed is backend
 
-    close.assert_called_once_with()
+    backend.close.assert_called_once_with()
 
 
 @pytest.mark.asyncio
-async def test_amanaged_backend_closes_docker_container_after_error() -> None:
+async def test_amanaged_backend_closes_backend_after_error() -> None:
     docker_container = _docker_container()
     backend = _BackendStub(container=docker_container)
 
-    with (
-        patch.object(docker_container, "close") as close,
-        pytest.raises(RuntimeError, match="boom"),
-    ):
+    with pytest.raises(RuntimeError, match="boom"):
         async with amanaged_backend(backend):
             raise RuntimeError("boom")
 
-    close.assert_called_once_with()
+    backend.close.assert_called_once_with()
 
 
 @pytest.mark.asyncio
-async def test_aclose_backend_container_ignores_non_docker_backends() -> None:
-    backend = SimpleNamespace(close=Mock())
+async def test_aclose_backend_ignores_backend_without_cleanup() -> None:
+    backend = SimpleNamespace()
 
-    await aclose_backend_container(backend)
-
-    backend.close.assert_not_called()
+    await aclose_backend(backend)
 
 
 def test_filesystem_middleware_does_not_evict_stage_input_by_default() -> None:
@@ -281,15 +275,12 @@ async def test_build_agent_runtime_graph_passes_system_prompt() -> None:
 
 
 @pytest.mark.asyncio
-async def test_managed_backend_closes_docker_container_when_create_agent_fails() -> (
-    None
-):
+async def test_managed_backend_closes_backend_when_create_agent_fails() -> None:
     docker_container = _docker_container()
     backend = _BackendStub(container=docker_container)
     model = Mock(name="model")
 
     with (
-        patch.object(docker_container, "close") as close,
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.create_agent",
             side_effect=RuntimeError("create failed"),
@@ -304,7 +295,7 @@ async def test_managed_backend_closes_docker_container_when_create_agent_fails()
                 system_prompt="system",
             )
 
-    close.assert_called_once_with()
+    backend.close.assert_called_once_with()
 
 
 def test_create_summarization_middleware_uses_absolute_token_limits() -> None:
