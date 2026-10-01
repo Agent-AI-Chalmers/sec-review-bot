@@ -13,6 +13,7 @@ from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 
+from sec_review_agents.runner.contract_schema import validate_v4_workflow_result
 from sec_review_agents.runner.core import (
     RUNNER_EXECUTION_FAILED,
     RUNNER_RESPONSE_INVALID,
@@ -143,6 +144,26 @@ async def _record_from_handle(
         response = await handle.result()
         if isinstance(response, dict):
             if response.get("ok") is True and "result" in response:
+                try:
+                    # Stages already normalize model output and preserve useful partial
+                    # work where the workflow contract allows it. This is the final
+                    # public boundary, so it must not guess how to repair identities,
+                    # file changes, or other invalid result data. Rejecting here means
+                    # "succeeded" always promises callers a valid v4 workflow result;
+                    # Temporal history and stage artifacts remain available for diagnosis.
+                    validate_v4_workflow_result(response["result"], workflow or "")
+                except ValueError as error:
+                    record["status"] = "failed"
+                    record["error"] = build_runner_error(
+                        code=RUNNER_RESPONSE_INVALID,
+                        category="runtime",
+                        message=str(error),
+                        details={
+                            "temporal_status": temporal_status_name,
+                            "workflow": workflow,
+                        },
+                    )
+                    return record
                 record["status"] = "succeeded"
                 record["result"] = response["result"]
                 return record

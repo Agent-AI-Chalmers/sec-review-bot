@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import pytest
 
+from sec_review_agents.runner.contract_schema import validate_v4_workflow_result
 from tests.contract_fixtures import (
     contract_fixture,
     contract_fixture_files,
@@ -56,6 +57,28 @@ def test_v4_contract_fixtures_match_json_schemas() -> None:
         assert (
             errors == []
         ), f"{fixture_name} failed {schema_name}:\n{format_schema_errors(errors)}"
+
+
+@pytest.mark.parametrize(
+    ("workflow", "fixture_name"),
+    [
+        ("issue-review", "issue-review-result.json"),
+        ("pull-request-review", "pull-request-review-result.json"),
+        ("repository-review", "repository-review-result.json"),
+    ],
+)
+def test_runner_accepts_shared_v4_workflow_result_fixtures(
+    workflow: str, fixture_name: str
+) -> None:
+    validate_v4_workflow_result(contract_fixture("v4", fixture_name), workflow)
+
+
+def test_runner_rejects_invalid_v4_workflow_result() -> None:
+    with pytest.raises(ValueError, match="Runner result does not match contract v4"):
+        validate_v4_workflow_result(
+            {"contract_version": "v4"},
+            "issue-review",
+        )
 
 
 def test_v4_invalid_contract_fixtures_are_rejected_by_json_schemas() -> None:

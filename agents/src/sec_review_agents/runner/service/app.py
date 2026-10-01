@@ -7,6 +7,7 @@ from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, stat
 from fastapi.responses import JSONResponse
 
 from sec_review_agents.memory.store import initialize_configured_memory_store
+from sec_review_agents.runner.contract_schema import validate_v4_workflow_input
 from sec_review_agents.runner.core import (
     RUNNER_REQUEST_INVALID,
     RUNNER_RUN_CONFLICT,
@@ -18,7 +19,6 @@ from sec_review_agents.runner.core import (
     validate_run_request_body,
 )
 from sec_review_agents.runner.input_preparation import INPUT_BUNDLE_ROOT_ENV
-from sec_review_agents.runner.input_schema import validate_v4_workflow_input
 from sec_review_agents.runner.service.gateway import (
     RunnerRunConflictError,
     RunnerWorkflowGateway,

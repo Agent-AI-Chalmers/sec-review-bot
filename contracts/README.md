@@ -63,7 +63,7 @@ This split is also a security boundary. GitHub identity, permissions, API calls,
 
 The Markdown specifications define field semantics, compatibility rules, and integration guidance.
 
-The schema files are the executable structural form of that specification. Contract v4 schemas use [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12). The Python Runner enforces input schemas with [jsonschema](https://python-jsonschema.readthedocs.io/), and the TypeScript integration enforces input and result schemas with [Ajv](https://ajv.js.org/). Both packages also execute the shared fixtures in tests.
+The schema files are the executable structural form of that specification. Contract v4 schemas use [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12). The Python Runner enforces input and result schemas with [jsonschema](https://python-jsonschema.readthedocs.io/), and the TypeScript integration independently enforces them with [Ajv](https://ajv.js.org/). Both packages also execute the shared fixtures in tests.
 
 The agents wheel includes a build-time copy of these canonical schemas as package data. Installed Python tools therefore do not depend on the repository-level `contracts/` path at runtime.
 

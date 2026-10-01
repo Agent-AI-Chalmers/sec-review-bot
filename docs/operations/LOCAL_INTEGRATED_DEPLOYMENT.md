@@ -366,7 +366,7 @@ sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 
-This permanently deletes workflow history, pending tasks, polling state, and publication state. Input bundles and artifacts can be removed separately after confirming that no retained run needs them:
+This permanently deletes workflow history, pending tasks, polling state, and publication state. The deployment does not automatically expire input bundles or artifacts; they are retained by default for recovery, replay, and diagnostics, and the operator is responsible for monitoring their disk usage. They can be removed manually after confirming that no retained run needs them:
 
 ```bash
 sudo rm -rf .agent-input-bundles .agent-artifacts

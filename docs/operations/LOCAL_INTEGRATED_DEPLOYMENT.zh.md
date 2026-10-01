@@ -368,7 +368,7 @@ sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 
-该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。确认没有需要保留的 run 依赖 input bundle 或 artifact 后，可以单独清理它们：
+该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。部署不会自动过期清理 input bundle 或 artifact；它们默认持续保留，用于恢复、重放和诊断，其磁盘用量由运维人员监控。确认没有需要保留的 run 依赖它们后，可以手动清理：
 
 ```bash
 sudo rm -rf .agent-input-bundles .agent-artifacts

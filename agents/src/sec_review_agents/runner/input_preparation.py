@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from sec_review_agents.runner.input_schema import validate_v4_workflow_input
+from sec_review_agents.runner.contract_schema import validate_v4_workflow_input
 from sec_review_agents.utils.env import env_value
 
 ISSUE_ARTIFACT_PATHS = {
