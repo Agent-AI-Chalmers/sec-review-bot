@@ -183,22 +183,6 @@ async function initializeWorkspaceGitRepository ({
   await runGitCommand(workspace_path, ['config', 'user.email', 'sec-review-bot@localhost'])
 }
 
-async function commitWorkspaceSnapshot ({
-  workspace_path,
-  source_ref
-}: {
-  workspace_path: string
-  source_ref: string
-}): Promise<void> {
-  await runGitCommand(workspace_path, ['add', '--all', '.'])
-  await runGitCommand(workspace_path, [
-    'commit',
-    '--allow-empty',
-    '-m',
-    `chore: initialize workspace snapshot (${source_ref})`
-  ])
-}
-
 async function sanitizeMaterializedGitWorkspace (workspace_path: string): Promise<void> {
   // The agent needs real git objects for diffs, but not remotes, credentials, or fetch metadata.
   await runGitCommand(workspace_path, ['remote', 'remove', 'origin']).catch(() => {})
@@ -336,20 +320,6 @@ export async function materializeWorkspaceWithCommitHistory ({
     git_remote_url: git_remote_url.trim(),
     refs: normalizedRefs,
     ...(git_auth_token ? { git_auth_token } : {})
-  })
-}
-
-export async function initializeWorkspaceAsGitRepository ({
-  workspace_path,
-  source_ref = 'snapshot'
-}: {
-  workspace_path: string
-  source_ref?: string
-}): Promise<void> {
-  await initializeWorkspaceGitRepository({ workspace_path })
-  await commitWorkspaceSnapshot({
-    workspace_path,
-    source_ref
   })
 }
 

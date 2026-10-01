@@ -40,7 +40,12 @@ export function parseRepositoryWorkflowResult (value: unknown): RepositoryWorkfl
   const result = value as Omit<RepositoryWorkflowResult, 'deliveries'> & {
     deliveries: Array<Omit<RepositoryDelivery, 'case_count'>>
   }
+  const deliveryIds = new Set<string>()
   for (const delivery of result.deliveries) {
+    if (deliveryIds.has(delivery.delivery_id)) {
+      throw new Error(`Repository result contains duplicate delivery_id: ${delivery.delivery_id}.`)
+    }
+    deliveryIds.add(delivery.delivery_id)
     requirePublishableFileChanges(delivery.file_changes)
   }
   return {

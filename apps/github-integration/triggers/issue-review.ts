@@ -11,9 +11,15 @@ import { RunnerSubmissionUncertainError } from '../infrastructure/runner/client.
 
 type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
+type IssueReviewRunStore = {
+  admit_review_run: (...args: Parameters<typeof reviewRunStore.admit_review_run>) => Awaited<ReturnType<typeof reviewRunStore.admit_review_run>> | ReturnType<typeof reviewRunStore.admit_review_run>
+  mark_queued: (...args: Parameters<typeof reviewRunStore.mark_queued>) => unknown
+  failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
+  save_prepared_submission?: (...args: Parameters<typeof reviewRunStore.save_prepared_submission>) => unknown
+}
 interface StartIssueReviewCommandDeps {
   start_review: StartIssueReview
-  store: Pick<typeof reviewRunStore, 'admit_review_run' | 'mark_queued' | 'markFailed'> & Partial<Pick<typeof reviewRunStore, 'save_prepared_submission'>>
+  store: IssueReviewRunStore
   create_run_id: typeof createRunId
 }
 
@@ -49,7 +55,7 @@ export async function startIssueReviewCommand ({
   } = deps
   const candidate_run_id = create_run_id()
   const run = { workflow: 'issue-review' as const, run_id: candidate_run_id, publish_context: {} }
-  const admission = store.admit_review_run({
+  const admission = await store.admit_review_run({
     ...run,
     ingress_kind: 'github_webhook',
     ingress_key: delivery_id
@@ -63,6 +69,8 @@ export async function startIssueReviewCommand ({
     return { run_id: admission.record.run_id }
   }
   const run_id = admission.record.run_id
+  const preparationToken = admission.preparation_token
+  if (!preparationToken) throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
 
   let submitted: SubmittedIssueReviewRun
   try {
@@ -70,14 +78,16 @@ export async function startIssueReviewCommand ({
       octokit, issue, run_id, event_type,
       review_objective: event_type === 'opened' ? 'audit' : review_objective,
       repair_mode: event_type === 'opened' ? null : repair_mode,
-      on_prepared: (prepared, input) => store.save_prepared_submission?.(
-        run_id,
-        issueReviewPublishContext(prepared),
-        input
-      )
+      on_prepared: async (prepared, input) => {
+        await store.save_prepared_submission?.(
+          run_id, preparationToken,
+          issueReviewPublishContext(prepared),
+          input
+        )
+      }
     })
   } catch (error) {
-    store.markFailed(run_id, {
+    await store.failPreparation(run_id, preparationToken, {
       // Only transport-level uncertainty is recoverable. Preparation failures
       // are deterministic and must not be replayed as successful submissions.
       code: error instanceof RunnerSubmissionUncertainError ? 'SUBMISSION_STATE_UNCERTAIN' : 'REVIEW_START_FAILED',
@@ -86,9 +96,9 @@ export async function startIssueReviewCommand ({
     throw error
   }
   try {
-    store.mark_queued(run_id, issueReviewPublishContext(submitted))
+    await store.mark_queued(run_id, preparationToken, issueReviewPublishContext(submitted))
   } catch (error) {
-    store.markFailed(run_id, {
+    await store.failPreparation(run_id, preparationToken, {
       code: 'SUBMISSION_STATE_UNCERTAIN',
       message: `Runner accepted the run, but its queued state was not recorded: ${error instanceof Error ? error.message : String(error)}`
     })

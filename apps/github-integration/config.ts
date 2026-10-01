@@ -41,11 +41,17 @@ const input_bundle_staging_root = nodePath.resolve(
   process.cwd(),
   process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] || '.agent-input-bundles'
 )
-const app_state_root = nodePath.resolve(
-  process.cwd(),
-  process.env['SEC_REVIEW_APP_STATE_ROOT'] || '.agent-app-state'
-)
-const review_run_state_db_path = nodePath.join(app_state_root, 'review-runs.sqlite')
+const database_url = process.env['DATABASE_URL']?.trim() || undefined
+const database_pg_options = {
+  host: process.env['PGHOST'],
+  port: process.env['PGPORT'] ? Number.parseInt(process.env['PGPORT'], 10) : undefined,
+  database: process.env['PGDATABASE'],
+  user: process.env['PGUSER'],
+  password: process.env['PGPASSWORD']
+}
+if (!database_url && Object.values(database_pg_options).every(value => value === undefined)) {
+  throw new Error('DATABASE_URL or PGHOST/PGDATABASE/PGUSER/PGPASSWORD is required for the GitHub integration coordination store.')
+}
 
 export {
   app_id,
@@ -59,6 +65,6 @@ export {
   repository_review_dispatch_max_body_bytes,
   repository_review_dispatch_read_timeout_ms,
   input_bundle_staging_root,
-  app_state_root,
-  review_run_state_db_path
+  database_url,
+  database_pg_options
 }

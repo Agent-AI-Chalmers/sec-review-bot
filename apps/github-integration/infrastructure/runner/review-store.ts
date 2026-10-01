@@ -1,30 +1,16 @@
-import Database from 'better-sqlite3'
 import crypto from 'node:crypto'
-import fs from 'fs'
-import path from 'path'
+import { Pool, type PoolClient } from 'pg'
 
-import { review_run_state_db_path } from '../../config.js'
+import { database_pg_options, database_url } from '../../config.js'
 import type { WorkflowName } from './client.js'
+import { applySchemaVersions } from './database/schema-version-runner.js'
+import { DeterministicRunnerPublishError } from './publish-error.js'
+import { RUNNER_PUBLISH_ERROR_CODES } from './publish-error-code.js'
 
 type JsonObject = Record<string, unknown>
-
-export type ReviewRunStatus =
-  // The request was accepted, but its workspace and Runner input are still being prepared. There is nothing to poll yet.
-  | 'preparing'
-  // A publisher has exclusively claimed an uncertain Runner submission and is resolving it.
-  | 'recovering'
-  // The Runner accepted the run, but the integration has not observed it running yet.
-  | 'queued'
-  // The Runner or Temporal is executing the review workflow.
-  | 'running'
-  // The Runner finished successfully, and the integration is publishing the required GitHub output.
-  | 'publishing'
-  // Every required GitHub publish step completed. This is the successful final state.
-  | 'published'
-  // Input preparation, Runner submission or execution, or result validation failed. This is a final state.
-  | 'failed'
-  // The Runner result is valid, but GitHub publishing failed. The publisher may retry while attempts remain.
-  | 'publish_failed'
+export type ReviewRunStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'publishing' | 'published' | 'failed'
+type RunnerStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'failed'
+type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
 
 export interface CreateReviewRunArgs {
   run_id: string
@@ -34,487 +20,580 @@ export interface CreateReviewRunArgs {
   ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
   ingress_key?: string
 }
-
-export interface ReviewRunAdmission {
-  record: ReviewRunRecord
-  created: boolean
-}
-
+export interface ReviewRunAdmission { record: ReviewRunRecord, created: boolean, preparation_token: string | null }
 export interface ReviewRunRecord extends CreateReviewRunArgs {
   status: ReviewRunStatus
   created_at: string
   updated_at: string
   published_at: string | null
-  // Counts failed GitHub publishes, not publisher claims.
-  publish_attempts: number
   failure_code: string | null
   failure_message: string | null
 }
-
 export interface ReviewRunDiagnosticRecord extends ReviewRunRecord {
+  runner_status: RunnerStatus
+  runner_failure_code: string | null
+  runner_failure_message: string | null
+  publication_status: PublicationStatus
+  publication_failure_code: string | null
+  publication_failure_message: string | null
+  failed_steps: PublicationStepRecord[]
   is_active: boolean
   is_terminal: boolean
-  retry_exhausted: boolean
-  publish_attempts_remaining: number
 }
-
 export interface ReviewRunDiagnosticsOptions {
   limit?: number
   status?: ReviewRunStatus
   active_only?: boolean
   failed_only?: boolean
 }
+export interface PublicationStepRecord {
+  step_key: string
+  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+  attempts: number
+  remote_object_id: string | null
+  remote_object_url: string | null
+  failure_code: string | null
+  failure_message: string | null
+}
 
 interface ReviewRunRow {
   run_id: string
   workflow: WorkflowName
-  publish_context_json: string
-  runner_input_json: string | null
-  recovery_claim_token: string | null
-  status: ReviewRunStatus
-  created_at: string
-  updated_at: string
-  published_at: string | null
-  publish_attempts: number
-  failure_code: string | null
-  failure_message: string | null
+  publish_context: JsonObject
+  runner_input: JsonObject | null
+  runner_status: RunnerStatus
+  runner_failure_code: string | null
+  runner_failure_message: string | null
+  publication_status: PublicationStatus
+  created_at: Date | string
+  runner_updated_at: Date | string
+  publication_updated_at: Date | string
+  published_at: Date | string | null
+  publication_failure_code: string | null
+  publication_failure_message: string | null
   ingress_kind: 'github_webhook' | 'github_actions_dispatch' | null
   ingress_key: string | null
 }
 
 const MAX_PUBLISH_ATTEMPTS = 3
-const DEFAULT_PUBLISHING_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
-const REVIEW_RUN_STORE_SCHEMA = `
-  CREATE TABLE IF NOT EXISTS review_runs (
-        run_id TEXT PRIMARY KEY,
-        workflow TEXT NOT NULL,
-        publish_context_json TEXT NOT NULL,
-        runner_input_json TEXT,
-        recovery_claim_token TEXT,
-    status TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    published_at TEXT,
-    publish_attempts INTEGER NOT NULL DEFAULT 0,
-    failure_code TEXT,
-    failure_message TEXT,
-    ingress_kind TEXT,
-    ingress_key TEXT
-  );
-  CREATE INDEX IF NOT EXISTS idx_review_runs_status
-    ON review_runs (status, updated_at);
+const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
+const RUN_SELECT = `
+  SELECT r.run_id, r.workflow, r.publish_context, r.runner_input, r.runner_status,
+    r.runner_failure_code, r.runner_failure_message, r.ingress_kind, r.ingress_key,
+    r.created_at, r.updated_at AS runner_updated_at,
+    p.status AS publication_status, p.updated_at AS publication_updated_at,
+    p.published_at,
+    p.failure_code AS publication_failure_code, p.failure_message AS publication_failure_message
+  FROM review_runs r JOIN publications p ON p.run_id = r.run_id
 `
 
-const REVIEW_RUN_INGRESS_INDEX = `
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_review_runs_ingress
-    ON review_runs (ingress_kind, ingress_key)
-    WHERE ingress_kind IS NOT NULL AND ingress_key IS NOT NULL;
-`
-
-function nowIso (): string {
-  return new Date().toISOString()
+function iso (value: Date | string): string { return value instanceof Date ? value.toISOString() : new Date(value).toISOString() }
+function statusOf (row: ReviewRunRow): ReviewRunStatus {
+  return row.publication_status === 'pending' || row.publication_status === 'not_required'
+    ? row.runner_status
+    : row.publication_status
 }
-
-function isIngressUniqueConstraintError (error: unknown): boolean {
-  return typeof error === 'object' && error !== null &&
-    'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE'
-}
-
-function positiveIntegerOrDefault (value: number | undefined, default_value: number): number {
-  return Number.isFinite(value) && typeof value === 'number' && value >= 0
-    ? Math.floor(value)
-    : default_value
-}
-
-function parseJsonObject (raw: string, label: string): JsonObject {
-  const parsed = JSON.parse(raw)
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`Runner run store has invalid ${label}.`)
-  }
-  return parsed as JsonObject
-}
-
 function rowToRecord (row: ReviewRunRow): ReviewRunRecord {
+  const status = statusOf(row)
+  const publicationFailure = row.publication_status === 'failed'
   return {
-    run_id: row.run_id,
-    workflow: row.workflow,
-    publish_context: parseJsonObject(row.publish_context_json, 'publish_context_json'),
-    ...(row.runner_input_json === null
-      ? {}
-      : { runner_input: parseJsonObject(row.runner_input_json, 'runner_input_json') }),
-    status: row.status,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    published_at: row.published_at,
-    publish_attempts: row.publish_attempts,
-    failure_code: row.failure_code,
-    failure_message: row.failure_message,
+    run_id: row.run_id, workflow: row.workflow, publish_context: row.publish_context,
+    ...(row.runner_input === null ? {} : { runner_input: row.runner_input }),
+    status, created_at: iso(row.created_at),
+    updated_at: iso(row.publication_status === 'pending' ? row.runner_updated_at : row.publication_updated_at),
+    published_at: row.published_at === null ? null : iso(row.published_at),
+    failure_code: publicationFailure ? row.publication_failure_code : row.runner_failure_code,
+    failure_message: publicationFailure ? row.publication_failure_message : row.runner_failure_message,
     ...(row.ingress_kind ? { ingress_kind: row.ingress_kind } : {}),
     ...(row.ingress_key ? { ingress_key: row.ingress_key } : {})
   }
 }
-
-function publishAttemptsRemaining (record: ReviewRunRecord): number {
-  return Math.max(0, MAX_PUBLISH_ATTEMPTS - record.publish_attempts)
-}
-
-function isActiveRecord (record: ReviewRunRecord): boolean {
-  return ['recovering', 'queued', 'running', 'publishing'].includes(record.status) ||
-    (record.status === 'failed' && record.failure_code === 'SUBMISSION_STATE_UNCERTAIN') ||
-    (record.status === 'publish_failed' && publishAttemptsRemaining(record) > 0)
-}
-
-function isRetryExhaustedRecord (record: ReviewRunRecord): boolean {
-  return record.status === 'publish_failed' && publishAttemptsRemaining(record) === 0
-}
-
-function recordToDiagnosticRecord (record: ReviewRunRecord): ReviewRunDiagnosticRecord {
-  const retry_exhausted = isRetryExhaustedRecord(record)
+function toDiagnostic (row: ReviewRunRow, failed_steps: PublicationStepRecord[]): ReviewRunDiagnosticRecord {
+  const record = rowToRecord(row)
+  const is_active = ['recovering', 'queued', 'running', 'publishing'].includes(record.status) ||
+    (record.status === 'failed' && record.failure_code === 'SUBMISSION_STATE_UNCERTAIN')
   return {
     ...record,
-    is_active: isActiveRecord(record),
+    runner_status: row.runner_status,
+    runner_failure_code: row.runner_failure_code,
+    runner_failure_message: row.runner_failure_message,
+    publication_status: row.publication_status,
+    publication_failure_code: row.publication_failure_code,
+    publication_failure_message: row.publication_failure_message,
+    failed_steps,
+    is_active,
     is_terminal: record.status === 'published' ||
-      (record.status === 'failed' && record.failure_code !== 'SUBMISSION_STATE_UNCERTAIN') ||
-      retry_exhausted,
-    retry_exhausted,
-    publish_attempts_remaining: publishAttemptsRemaining(record)
-  }
+    (record.status === 'failed' && record.failure_code !== 'SUBMISSION_STATE_UNCERTAIN') }
+}
+async function transaction<T> (pool: Pool, operation: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await operation(client)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally { client.release() }
 }
 
 export class ReviewRunStore {
-  private readonly db: Database.Database
-  private readonly publishingClaimTimeoutMs: number
+  private readonly pool: Pool
+  private readonly connectorId: string
+  private readonly claimTimeoutMs: number
+  private initialized = false
 
-  constructor (dbPath: string, options: { publishingClaimTimeoutMs?: number } = {}) {
-    this.publishingClaimTimeoutMs = positiveIntegerOrDefault(
-      options.publishingClaimTimeoutMs,
-      DEFAULT_PUBLISHING_CLAIM_TIMEOUT_MS
-    )
-    fs.mkdirSync(path.dirname(dbPath), { recursive: true })
-    this.db = new Database(dbPath)
-    this.db.pragma('journal_mode = WAL')
-    this.db.exec(REVIEW_RUN_STORE_SCHEMA)
-    let columns = this.db.pragma('table_info(review_runs)') as Array<{ name: string }>
-    if (!columns.some((column) => column.name === 'ingress_kind')) {
-      // review_runs is intentionally an internal, destructive schema. An old
-      // local table cannot represent ingress identity, so do not reinterpret it.
-      this.db.exec('DROP TABLE review_runs;')
-      this.db.exec(REVIEW_RUN_STORE_SCHEMA)
-      columns = this.db.pragma('table_info(review_runs)') as Array<{ name: string }>
-    }
-    if (!columns.some((column) => column.name === 'runner_input_json')) {
-      // Prepared Runner input is additive recovery data. Preserve existing
-      // runs; only legacy uncertain submissions will lack enough data to retry.
-      this.db.exec('ALTER TABLE review_runs ADD COLUMN runner_input_json TEXT;')
-    }
-    if (!columns.some((column) => column.name === 'recovery_claim_token')) {
-      // The token fences a worker whose stale recovery claim was taken over.
-      this.db.exec('ALTER TABLE review_runs ADD COLUMN recovery_claim_token TEXT;')
-    }
-    this.db.exec(REVIEW_RUN_INGRESS_INDEX)
-    this.failInterruptedPreparations()
+  constructor ({ connectionString = database_url, connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default', claimTimeoutMs = DEFAULT_CLAIM_TIMEOUT_MS, pool }:
+  { connectionString?: string, connectorId?: string, claimTimeoutMs?: number, pool?: Pool } = {}) {
+    this.pool = pool ?? new Pool(connectionString ? { connectionString } : database_pg_options)
+    this.connectorId = connectorId
+    this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
   }
 
-  /** Create the durable review record before workspace/input preparation starts. */
-  create_preparing_review_run (run: CreateReviewRunArgs): ReviewRunRecord {
-    return this.insert_preparing_review_run(run)
+  async initialize (): Promise<void> {
+    if (this.initialized) return
+    await applySchemaVersions(this.pool)
+    this.initialized = true
   }
+  private ready (): void { if (!this.initialized) throw new Error('ReviewRunStore.initialize() must complete before use.') }
 
-  /** Atomically accepts a new ingress request or returns the run already accepted for that request. */
-  admit_review_run (run: CreateReviewRunArgs & Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>): ReviewRunAdmission {
+  private async getWith (client: PoolClient, runId: string): Promise<ReviewRunRecord | null> {
+    const result = await client.query<ReviewRunRow>(`${RUN_SELECT}
+      WHERE r.run_id=$1 AND r.connector_id=$2`,
+    [runId, this.connectorId])
+    return result.rows[0] === undefined ? null : rowToRecord(result.rows[0])
+  }
+  private async insertWith (client: PoolClient, run: CreateReviewRunArgs): Promise<ReviewRunAdmission> {
+    const preparationToken = crypto.randomUUID()
+    await client.query(`INSERT INTO review_runs
+      (run_id,connector_id,workflow,publish_context,runner_input,runner_status,preparation_claim_token,preparation_claimed_at,ingress_kind,ingress_key)
+      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'preparing',$6,clock_timestamp(),$7,$8)`,
+    [run.run_id, this.connectorId, run.workflow, JSON.stringify(run.publish_context), run.runner_input === undefined ? null : JSON.stringify(run.runner_input), preparationToken, run.ingress_kind ?? null, run.ingress_key ?? null])
+    await client.query(`
+      INSERT INTO publications (run_id,connector_id,status)
+      VALUES ($1,$2,'pending')
+    `, [run.run_id, this.connectorId])
+    const record = await this.getWith(client, run.run_id)
+    if (record === null) throw new Error(`Runner run was not persisted: ${run.run_id}`)
+    return { record, created: true, preparation_token: preparationToken }
+  }
+  async create_preparing_review_run (run: CreateReviewRunArgs): Promise<ReviewRunAdmission> {
+    this.ready()
+    return await transaction(this.pool, async client => await this.insertWith(client, run))
+  }
+  async admit_review_run (run: CreateReviewRunArgs & Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>): Promise<ReviewRunAdmission> {
+    this.ready()
     try {
-      return this.db.transaction(() => {
-        const existing = this.db.prepare(`
-          SELECT * FROM review_runs WHERE ingress_kind = ? AND ingress_key = ?
-        `).get(run.ingress_kind, run.ingress_key) as ReviewRunRow | undefined
-        if (existing) {
-          const reclaimed = this.reclaimRecoverableAdmission(existing)
-          return reclaimed ?? {
-            record: rowToRecord(existing),
-            created: false
-          }
+      return await transaction(this.pool, async client => {
+        const existing = await client.query<ReviewRunRow>(`${RUN_SELECT}
+          WHERE r.connector_id=$1 AND r.ingress_kind=$2 AND r.ingress_key=$3
+          FOR UPDATE OF r`,
+        [this.connectorId, run.ingress_kind, run.ingress_key])
+        const row = existing.rows[0]
+        if (row === undefined) return await this.insertWith(client, run)
+        if (row.runner_status === 'preparing' || (row.runner_status === 'failed' && row.runner_failure_code === 'PREPARATION_INTERRUPTED')) {
+          const token = crypto.randomUUID()
+          const reclaimed = await client.query(`
+            UPDATE review_runs
+            SET runner_status='preparing', runner_failure_code=NULL, runner_failure_message=NULL,
+                preparation_claim_token=$2,
+                preparation_claimed_at=clock_timestamp(),
+                updated_at=clock_timestamp()
+            WHERE run_id=$1
+              AND (
+                (runner_status='preparing' AND preparation_claimed_at <= clock_timestamp()-($3*interval '1 millisecond'))
+                OR (runner_status='failed' AND runner_failure_code='PREPARATION_INTERRUPTED')
+              )
+          `, [row.run_id, token, this.claimTimeoutMs])
+          if (reclaimed.rowCount !== 1) return { record: rowToRecord(row), created: false, preparation_token: null }
+          await client.query(`
+            UPDATE publications
+            SET status='pending', claim_token=NULL, failure_code=NULL,
+                failure_message=NULL, updated_at=clock_timestamp()
+            WHERE run_id=$1 AND connector_id=$2 AND status='not_required'
+          `, [row.run_id, this.connectorId])
+          const record = await this.getWith(client, row.run_id)
+          if (record === null) throw new Error(`Reclaimed review run was not found: ${row.run_id}`)
+          return { record, created: true, preparation_token: token }
         }
-
-        const record = this.insert_preparing_review_run(run)
-        return { record, created: true }
-      })()
-    } catch (error) {
-      if (!isIngressUniqueConstraintError(error)) {
-        throw error
-      }
-      // The transaction prevents a check-then-insert race. If another SQLite
-      // connection won the ingress unique constraint, read its durable record.
-      const concurrent = this.db.prepare(`
-        SELECT * FROM review_runs WHERE ingress_kind = ? AND ingress_key = ?
-      `).get(run.ingress_kind, run.ingress_key) as ReviewRunRow | undefined
-      if (concurrent) return { record: rowToRecord(concurrent), created: false }
-      throw error
+        return { record: rowToRecord(row), created: false, preparation_token: null }
+      })
+    } catch (error: unknown) {
+      if (!(typeof error === 'object' && error !== null && 'code' in error && error.code === '23505')) throw error
+      // A concurrent transaction won the ingress identity. Read its durable run
+      // after PostgreSQL rolls back this transaction.
+      const existing = await this.pool.query<ReviewRunRow>(`${RUN_SELECT}
+        WHERE r.connector_id=$1 AND r.ingress_kind=$2 AND r.ingress_key=$3`,
+      [this.connectorId, run.ingress_kind, run.ingress_key])
+      if (existing.rows[0] === undefined) throw error
+      return { record: rowToRecord(existing.rows[0]), created: false, preparation_token: null }
     }
   }
-
-  private insert_preparing_review_run (run: CreateReviewRunArgs): ReviewRunRecord {
-    const timestamp = nowIso()
-    this.db.prepare(`
-      INSERT INTO review_runs (
-        run_id, workflow, publish_context_json, runner_input_json, status, created_at, updated_at,
-        published_at, publish_attempts, failure_code, failure_message, ingress_kind, ingress_key
-      ) VALUES (?, ?, ?, ?, 'preparing', ?, ?, NULL, 0, NULL, NULL, ?, ?)
-    `).run(
-      run.run_id,
-      run.workflow,
-      JSON.stringify(run.publish_context),
-      run.runner_input === undefined ? null : JSON.stringify(run.runner_input),
-      timestamp,
-      timestamp,
-      run.ingress_kind ?? null,
-      run.ingress_key ?? null
-    )
-    const record = this.getRun(run.run_id)
-    if (record === null) {
-      throw new Error(`Runner run was not persisted: ${run.run_id}`)
-    }
-    return record
-  }
-
-  private failInterruptedPreparations (): void {
-    const timestamp = nowIso()
-    this.db.prepare(`
+  async save_prepared_submission (runId: string, token: string, context: JsonObject, input: JsonObject): Promise<void> {
+    const result = await this.pool.query(`
       UPDATE review_runs
-      SET status = 'failed',
-          updated_at = ?,
-          failure_code = 'PREPARATION_INTERRUPTED',
-          failure_message = 'The integration stopped before Runner submission was durably recorded.'
-      WHERE status = 'preparing'
-    `).run(timestamp)
+      SET publish_context=$3::jsonb, runner_input=$4::jsonb, updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$5
+        AND runner_status='preparing' AND preparation_claim_token=$2
+    `, [runId, token, JSON.stringify(context), JSON.stringify(input), this.connectorId])
+    if (result.rowCount !== 1) throw new Error(`Review run ${runId} cannot save prepared submission outside preparing.`)
   }
-
-  private reclaimRecoverableAdmission (existing: ReviewRunRow): ReviewRunAdmission | null {
-    // An interrupted preparation is known not to have crossed the Runner POST
-    // boundary. Submission uncertainty needs the separate Runner lookup path.
-    if (existing.status !== 'failed' || existing.failure_code !== 'PREPARATION_INTERRUPTED') {
-      return null
-    }
-    const result = this.db.prepare(`
+  async mark_queued (runId: string, token: string, context: JsonObject): Promise<void> {
+    const result = await this.pool.query(`
       UPDATE review_runs
-      SET status = 'preparing',
-          updated_at = ?,
-          failure_code = NULL,
-          failure_message = NULL
-      WHERE run_id = ? AND status = 'failed' AND failure_code = ?
-    `).run(nowIso(), existing.run_id, existing.failure_code)
-    if (result.changes !== 1) {
-      return null
-    }
-    const record = this.getRun(existing.run_id)
-    if (record === null) {
-      throw new Error(`Reclaimed review run was not found: ${existing.run_id}`)
-    }
-    return { record, created: true }
+      SET publish_context=$3::jsonb, runner_status='queued',
+          preparation_claim_token=NULL, preparation_claimed_at=NULL,
+          runner_failure_code=NULL, runner_failure_message=NULL,
+          updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$4
+        AND runner_status='preparing' AND preparation_claim_token=$2
+    `, [runId, token, JSON.stringify(context), this.connectorId])
+    if (result.rowCount !== 1) throw new Error(`Review run ${runId} cannot transition from preparing to queued.`)
   }
+  async getRun (runId: string): Promise<ReviewRunRecord | null> {
+    this.ready()
+    const result = await this.pool.query<ReviewRunRow>(`${RUN_SELECT}
+      WHERE r.run_id=$1 AND r.connector_id=$2`,
+    [runId, this.connectorId])
+    return result.rows[0] === undefined ? null : rowToRecord(result.rows[0])
+  }
+  async expireStalePreparations (): Promise<number> {
+    return await transaction(this.pool, async client => {
+      const expired = await client.query<{ run_id: string }>(`
+        UPDATE review_runs
+        SET runner_status='failed', preparation_claim_token=NULL,
+            preparation_claimed_at=NULL, runner_failure_code='PREPARATION_INTERRUPTED',
+            runner_failure_message='Review preparation did not finish before its claim expired.',
+            updated_at=clock_timestamp()
+        WHERE connector_id=$1 AND runner_status='preparing'
+          AND preparation_claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
+        RETURNING run_id
+      `, [this.connectorId, this.claimTimeoutMs])
+      if (expired.rowCount === 0) return 0
 
-  /** Save everything needed to recover before submission crosses the uncertain HTTP boundary. */
-  save_prepared_submission (run_id: string, publish_context: JsonObject, runner_input: JsonObject): void {
-    const result = this.db.prepare(`
+      await client.query(`
+        UPDATE publications
+        SET status='not_required', claim_token=NULL,
+            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+        WHERE connector_id=$1 AND run_id=ANY($2::text[]) AND status='pending'
+      `, [this.connectorId, expired.rows.map(row => row.run_id)])
+      return expired.rowCount ?? 0
+    })
+  }
+  async listSubmissionRecoveries (): Promise<ReviewRunRecord[]> {
+    const result = await this.pool.query<ReviewRunRow>(`${RUN_SELECT}
+      WHERE r.connector_id=$1
+        AND (
+          (r.runner_status='failed' AND r.runner_failure_code='SUBMISSION_STATE_UNCERTAIN')
+          OR (r.runner_status='recovering' AND r.updated_at <= clock_timestamp()-($2*interval '1 millisecond'))
+        )
+      ORDER BY r.updated_at`,
+    [this.connectorId, this.claimTimeoutMs])
+    return result.rows.map(rowToRecord)
+  }
+  async claimSubmissionRecovery (runId: string): Promise<string | null> {
+    const token = crypto.randomUUID()
+    const result = await this.pool.query<{ recovery_claim_token: string }>(`
       UPDATE review_runs
-      SET publish_context_json = ?, runner_input_json = ?, updated_at = ?
-      WHERE run_id = ? AND status = 'preparing'
-    `).run(JSON.stringify(publish_context), JSON.stringify(runner_input), nowIso(), run_id)
-    if (result.changes !== 1) {
-      throw new Error(`Review run ${run_id} cannot save prepared submission outside preparing.`)
-    }
+      SET runner_status='recovering', recovery_claim_token=$2, updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$3
+        AND (
+          (runner_status='failed' AND runner_failure_code='SUBMISSION_STATE_UNCERTAIN')
+          OR (runner_status='recovering' AND updated_at <= clock_timestamp()-($4*interval '1 millisecond'))
+        )
+      RETURNING recovery_claim_token
+    `, [runId, token, this.connectorId, this.claimTimeoutMs])
+    return result.rows[0]?.recovery_claim_token ?? null
   }
-
-  listSubmissionRecoveries (): ReviewRunRecord[] {
-    const staleClaimBefore = new Date(Date.now() - this.publishingClaimTimeoutMs).toISOString()
-    const rows = this.db.prepare(`
-      SELECT * FROM review_runs
-      WHERE (status = 'failed' AND failure_code = 'SUBMISSION_STATE_UNCERTAIN')
-         OR (status = 'recovering' AND updated_at <= ?)
-      ORDER BY updated_at ASC
-    `).all(staleClaimBefore) as ReviewRunRow[]
-    return rows.map(rowToRecord)
+  async completeSubmissionRecovery (runId: string, token: string): Promise<boolean> {
+    return await transaction(this.pool, async client => {
+      const result = await client.query(`
+        UPDATE review_runs
+        SET runner_status='queued', recovery_claim_token=NULL,
+            runner_failure_code=NULL, runner_failure_message=NULL, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2
+          AND runner_status='recovering' AND recovery_claim_token=$3
+      `, [runId, this.connectorId, token])
+      if (result.rowCount !== 1) return false
+      await client.query(`
+        UPDATE publications
+        SET status='pending', claim_token=NULL, failure_code=NULL,
+            failure_message=NULL, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2 AND status='not_required'
+      `, [runId, this.connectorId])
+      return true
+    })
   }
-
-  /** Exclusively claim an uncertain submission before making a Runner request. */
-  claimSubmissionRecovery (run_id: string): string | null {
-    const timestamp = nowIso()
-    const claimToken = crypto.randomUUID()
-    const staleClaimBefore = new Date(Date.now() - this.publishingClaimTimeoutMs).toISOString()
-    const result = this.db.prepare(`
-      UPDATE review_runs
-      SET status = 'recovering', updated_at = ?, recovery_claim_token = ?
-      WHERE run_id = ? AND (
-        (status = 'failed' AND failure_code = 'SUBMISSION_STATE_UNCERTAIN')
-        OR (status = 'recovering' AND updated_at <= ?)
-      )
-    `).run(timestamp, claimToken, run_id, staleClaimBefore)
-    return result.changes === 1 ? claimToken : null
+  async failSubmissionRecovery (runId: string, token: string, error: { code?: string | null, message: string }): Promise<boolean> {
+    return await transaction(this.pool, async client => {
+      const result = await client.query(`
+        UPDATE review_runs
+        SET runner_status='failed', recovery_claim_token=NULL,
+            runner_failure_code=$4, runner_failure_message=$5, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2
+          AND runner_status='recovering' AND recovery_claim_token=$3
+      `, [runId, this.connectorId, token, error.code ?? null, error.message])
+      if (result.rowCount !== 1) return false
+      await client.query(`
+        UPDATE publications
+        SET status='not_required', claim_token=NULL,
+            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2 AND status='pending'
+      `, [runId, this.connectorId])
+      return true
+    })
   }
-
-  /** Resume normal polling after recovery confirms or recreates the Runner run. */
-  completeSubmissionRecovery (run_id: string, claim_token: string): boolean {
-    const result = this.db.prepare(`
-      UPDATE review_runs
-      SET status = 'queued', updated_at = ?, failure_code = NULL, failure_message = NULL,
-          recovery_claim_token = NULL
-      WHERE run_id = ? AND status = 'recovering' AND recovery_claim_token = ?
-    `).run(nowIso(), run_id, claim_token)
-    return result.changes === 1
+  async listActiveRuns (): Promise<ReviewRunRecord[]> {
+    const result = await this.pool.query<ReviewRunRow>(`${RUN_SELECT}
+      WHERE r.connector_id=$1
+        AND ((r.runner_status IN ('queued','running') AND p.status='pending') OR p.status='publishing')
+      ORDER BY GREATEST(r.updated_at,p.updated_at)`,
+    [this.connectorId])
+    return result.rows.map(rowToRecord)
   }
-
-  /** Finish or defer recovery only while this worker still owns the claim. */
-  failSubmissionRecovery (
-    run_id: string,
-    claim_token: string,
-    error: { code?: string | null, message: string }
-  ): boolean {
-    const result = this.db.prepare(`
-      UPDATE review_runs
-      SET status = 'failed', updated_at = ?, failure_code = ?, failure_message = ?,
-          recovery_claim_token = NULL
-      WHERE run_id = ? AND status = 'recovering' AND recovery_claim_token = ?
-    `).run(nowIso(), error.code ?? null, error.message, run_id, claim_token)
-    return result.changes === 1
-  }
-
-  /** Store the completed publish context and make the run visible to the poller. */
-  mark_queued (run_id: string, publish_context: JsonObject): void {
-    const result = this.db.prepare(`
-      UPDATE review_runs
-      SET publish_context_json = ?, status = 'queued', updated_at = ?, failure_code = NULL, failure_message = NULL
-      WHERE run_id = ? AND status = 'preparing'
-    `).run(JSON.stringify(publish_context), nowIso(), run_id)
-    if (result.changes !== 1) {
-      throw new Error(`Review run ${run_id} cannot transition from preparing to queued.`)
-    }
-  }
-
-  getRun (run_id: string): ReviewRunRecord | null {
-    const row = this.db.prepare('SELECT * FROM review_runs WHERE run_id = ?').get(run_id) as ReviewRunRow | undefined
-    return row ? rowToRecord(row) : null
-  }
-
-  listActiveRuns (): ReviewRunRecord[] {
-    const rows = this.db.prepare(`
-      SELECT *
-      FROM review_runs
-      WHERE status IN ('queued', 'running', 'publishing')
-         -- Permanent GitHub publication rejects should not spin forever in the background publisher.
-         OR (status = 'publish_failed' AND publish_attempts < ?)
-      ORDER BY updated_at ASC
-    `).all(MAX_PUBLISH_ATTEMPTS) as ReviewRunRow[]
-    return rows.map(rowToRecord)
-  }
-
-  listRunsForDiagnostics (options: ReviewRunDiagnosticsOptions = {}): ReviewRunDiagnosticRecord[] {
-    const limit = Math.max(1, positiveIntegerOrDefault(options.limit, 50))
-    const clauses: string[] = []
-    const params: unknown[] = []
-    // Filters compose with AND so operators can narrow diagnostics precisely.
+  async listRunsForDiagnostics (options: ReviewRunDiagnosticsOptions = {}): Promise<ReviewRunDiagnosticRecord[]> {
+    const limit = Math.max(1, Math.floor(options.limit ?? 50))
+    const conditions = ['r.connector_id=$1']
+    const parameters: unknown[] = [this.connectorId]
     if (options.status !== undefined) {
-      clauses.push('status = ?')
-      params.push(options.status)
+      parameters.push(options.status)
+      const statusParameter = `$${parameters.length}`
+      conditions.push(`CASE WHEN p.status IN ('pending','not_required') THEN r.runner_status ELSE p.status END=${statusParameter}`)
     }
     if (options.active_only === true) {
-      clauses.push(`(
-        status IN ('recovering', 'queued', 'running', 'publishing')
-        OR (status = 'failed' AND failure_code = 'SUBMISSION_STATE_UNCERTAIN')
-        OR (status = 'publish_failed' AND publish_attempts < ?)
+      conditions.push(`(
+        p.status='publishing' OR
+        (p.status='pending' AND (
+          r.runner_status IN ('recovering','queued','running') OR
+          (r.runner_status='failed' AND r.runner_failure_code='SUBMISSION_STATE_UNCERTAIN')
+        ))
       )`)
-      params.push(MAX_PUBLISH_ATTEMPTS)
     }
     if (options.failed_only === true) {
-      clauses.push("status IN ('failed', 'publish_failed')")
-    }
-    const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
-    const rows = this.db.prepare(`
-      SELECT *
-      FROM review_runs
-      ${whereClause}
-      ORDER BY updated_at DESC, created_at DESC, run_id ASC
-      LIMIT ?
-    `).all(...params, limit) as ReviewRunRow[]
-    return rows.map(rowToRecord).map(recordToDiagnosticRecord)
-  }
-
-  markRunning (run_id: string): void {
-    this.markStatus(run_id, 'running')
-  }
-
-  markPublishing (run_id: string): boolean {
-    const timestamp = nowIso()
-    const stalePublishingBefore = new Date(Date.now() - this.publishingClaimTimeoutMs).toISOString()
-    // Claim publication atomically to avoid duplicate GitHub side effects.
-    // A stale in-flight publish can be reclaimed without spending a retry;
-    // only a recorded publish failure increments publish_attempts.
-    const result = this.db.prepare(`
-      UPDATE review_runs
-      SET status = 'publishing',
-          updated_at = ?,
-          failure_code = NULL,
-          failure_message = NULL
-      WHERE run_id = ?
-        AND (
-          status IN ('queued', 'running')
-          OR (status = 'publish_failed' AND publish_attempts < ?)
-          OR (status = 'publishing' AND updated_at <= ? AND publish_attempts < ?)
+      conditions.push(`(
+        r.runner_status='failed' OR p.status='failed' OR EXISTS (
+          SELECT 1 FROM publication_steps failed_step
+          WHERE failed_step.connector_id=r.connector_id
+            AND failed_step.run_id=r.run_id
+            AND failed_step.status IN ('failed','terminal_failed')
         )
-    `).run(timestamp, run_id, MAX_PUBLISH_ATTEMPTS, stalePublishingBefore, MAX_PUBLISH_ATTEMPTS)
-    return result.changes === 1
-  }
-
-  markPublished (run_id: string): void {
-    const timestamp = nowIso()
-    this.db.prepare(`
-      UPDATE review_runs
-      SET status = 'published',
-          updated_at = ?,
-          published_at = ?,
-          failure_code = NULL,
-          failure_message = NULL
-      WHERE run_id = ?
-    `).run(timestamp, timestamp, run_id)
-  }
-
-  markFailed (run_id: string, error: { code?: string | null, message: string }): void {
-    this.markFailure(run_id, 'failed', error)
-  }
-
-  markPublishFailed (run_id: string, error: { code?: string | null, message: string }): void {
-    this.markFailure(run_id, 'publish_failed', error)
-  }
-
-  close (): void {
-    if (this.db.open) {
-      this.db.close()
+      )`)
     }
+    parameters.push(limit)
+    const result = await this.pool.query<ReviewRunRow>(`${RUN_SELECT}
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY GREATEST(r.updated_at,p.updated_at) DESC
+      LIMIT $${parameters.length}`, parameters)
+    const records = await Promise.all(result.rows.map(async row => {
+      const steps = await this.listPublicationSteps(row.run_id)
+      return toDiagnostic(row, steps.filter(step => step.status === 'failed' || step.status === 'terminal_failed'))
+    }))
+    return records
   }
-
-  private markStatus (run_id: string, status: ReviewRunStatus): void {
-    this.db.prepare(`
+  async markRunning (runId: string): Promise<void> {
+    await this.pool.query(`
       UPDATE review_runs
-      SET status = ?,
-          updated_at = ?
-      WHERE run_id = ?
-    `).run(status, nowIso(), run_id)
+      SET runner_status='running', updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$2 AND runner_status='queued'
+    `, [runId, this.connectorId])
   }
+  async failRunnerExecution (runId: string, error: { code?: string | null, message: string }): Promise<boolean> {
+    return await transaction(this.pool, async client => {
+      const run = await client.query(`
+        UPDATE review_runs
+        SET runner_status='failed', runner_failure_code=$3,
+            runner_failure_message=$4, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
+      `, [runId, this.connectorId, error.code ?? null, error.message])
+      if (run.rowCount !== 1) return false
+      // A terminal Runner failure has no result to publish. Keep the publication
+      // row only as the durable declaration that publication is not applicable.
+      await client.query(`
+        UPDATE publications
+        SET status='not_required', claim_token=NULL,
+            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2 AND status='pending'
+      `, [runId, this.connectorId])
+      return true
+    })
+  }
+  async claimPublication (runId: string): Promise<string | null> {
+    const token = crypto.randomUUID()
+    const result = await this.pool.query<{ claim_token: string }>(`
+      UPDATE publications p
+      SET status='publishing', claim_token=$2, claimed_at=clock_timestamp(),
+          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+      FROM review_runs r
+      WHERE p.run_id=$1 AND p.connector_id=$3 AND r.run_id=p.run_id
+        AND r.runner_status IN ('queued','running')
+        AND (
+          p.status='pending'
+          OR (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
+        )
+      RETURNING p.claim_token
+    `, [runId, token, this.connectorId, this.claimTimeoutMs])
+    return result.rows[0]?.claim_token ?? null
+  }
+  publicationHeartbeatIntervalMs (): number {
+    return Math.max(100, Math.min(30_000, Math.floor(this.claimTimeoutMs / 3)))
+  }
+  async renewPublicationClaim (runId: string, token: string): Promise<boolean> {
+    const result = await this.pool.query(`
+      UPDATE publications
+      SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$2
+        AND status='publishing' AND claim_token=$3
+    `, [runId, this.connectorId, token])
+    return result.rowCount === 1
+  }
+  async initializePublicationSteps (runId: string, token: string, stepKeys: string[]): Promise<void> {
+    const uniqueKeys = [...new Set(stepKeys)].sort()
+    if (uniqueKeys.length !== stepKeys.length) throw new Error(`Publication ${runId} contains duplicate step keys.`)
+    await transaction(this.pool, async client => {
+      const owner = await client.query(`
+        SELECT 1 FROM publications
+        WHERE run_id=$1 AND connector_id=$2
+          AND status='publishing' AND claim_token=$3
+        FOR UPDATE
+      `, [runId, this.connectorId, token])
+      if (owner.rowCount !== 1) throw new Error(`Publication claim was lost before steps were initialized: ${runId}`)
+      const existing = await client.query<{ step_key: string }>(`
+        SELECT step_key FROM publication_steps
+        WHERE run_id=$1 AND connector_id=$2
+        ORDER BY step_key
+      `, [runId, this.connectorId])
+      if (existing.rowCount === 0) {
+        for (const stepKey of uniqueKeys) {
+          await client.query(`
+            INSERT INTO publication_steps (connector_id,run_id,step_key,status)
+            VALUES ($1,$2,$3,'pending')
+          `, [this.connectorId, runId, stepKey])
+        }
+        return
+      }
+      const persisted = existing.rows.map(row => row.step_key)
+      if (JSON.stringify(persisted) !== JSON.stringify(uniqueKeys)) {
+        throw new Error(`Publication step set changed for run ${runId}.`)
+      }
+    })
+  }
+  async listPublicationSteps (runId: string): Promise<PublicationStepRecord[]> {
+    const result = await this.pool.query<PublicationStepRecord>(`
+      SELECT step_key,status,attempts,remote_object_id,remote_object_url,
+             failure_code,failure_message
+      FROM publication_steps
+      WHERE run_id=$1 AND connector_id=$2
+      ORDER BY step_key
+    `, [runId, this.connectorId])
+    return result.rows
+  }
+  private async claimPublicationStep (runId: string, token: string, stepKey: string): Promise<boolean> {
+    // A running step may belong to the expired publication owner. The new
+    // owner reclaims it under the new publication token, then reconciles the
+    // stable remote identity before issuing another side effect.
+    const result = await this.pool.query(`
+      UPDATE publication_steps s
+      SET status='running', updated_at=clock_timestamp()
+      FROM publications p
+      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
+        AND (s.status IN ('pending','running') OR (s.status='failed' AND s.attempts<$5))
+        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
+        AND p.status='publishing' AND p.claim_token=$4
+    `, [runId, this.connectorId, stepKey, token, MAX_PUBLISH_ATTEMPTS])
+    return result.rowCount === 1
+  }
+  async requirePublicationStepClaim (runId: string, token: string, stepKey: string): Promise<void> {
+    if (await this.claimPublicationStep(runId, token, stepKey)) return
 
-  private markFailure (run_id: string, status: ReviewRunStatus, error: { code?: string | null, message: string }): void {
-    // publish_attempts means "failed GitHub publishes", so deterministic runner
-    // failures move to failed without consuming the GitHub publish retry budget.
-    this.db.prepare(`
-      UPDATE review_runs
-      SET status = ?,
-          updated_at = ?,
-          publish_attempts = CASE
-            WHEN ? = 'publish_failed' THEN publish_attempts + 1
-            ELSE publish_attempts
-          END,
-          failure_code = ?,
-          failure_message = ?
-      WHERE run_id = ?
-    `).run(status, nowIso(), status, error.code ?? null, error.message, run_id)
+    // Retry exhaustion is a persisted step outcome, not merely an exception
+    // observed by one publisher. The current publication owner records it once.
+    await this.pool.query(`
+      UPDATE publication_steps s
+      SET status='terminal_failed', updated_at=clock_timestamp()
+      FROM publications p
+      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
+        AND s.status='failed' AND s.attempts>=$5
+        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
+        AND p.status='publishing' AND p.claim_token=$4
+    `, [runId, this.connectorId, stepKey, token, MAX_PUBLISH_ATTEMPTS])
+    const step = (await this.listPublicationSteps(runId)).find(item => item.step_key === stepKey)
+    if (step?.status === 'terminal_failed') {
+      throw new DeterministicRunnerPublishError(
+        `Publication step exhausted its retry budget: ${stepKey}`,
+        RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+      )
+    }
+    throw new Error(`Publication step is not claimable: ${stepKey}`)
   }
+  async completePublicationStep (runId: string, token: string, stepKey: string, remote: { id?: string | number | null, url?: string | null } = {}): Promise<boolean> {
+    // A publication token fences every step commit, not only the final run
+    // state. This prevents a timed-out worker from recording stale remote data.
+    const result = await this.pool.query(`
+      UPDATE publication_steps s
+      SET status='succeeded', remote_object_id=$5, remote_object_url=$6,
+          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+      FROM publications p
+      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
+        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
+        AND p.status='publishing' AND p.claim_token=$4
+    `, [runId, this.connectorId, stepKey, token, remote.id == null ? null : String(remote.id), remote.url ?? null])
+    return result.rowCount === 1
+  }
+  async failPublicationStep (runId: string, token: string, stepKey: string, error: { code?: string | null, message: string }, options: { retry?: boolean } = {}): Promise<boolean> {
+    const result = await this.pool.query(`
+      UPDATE publication_steps s
+      SET status=$7, attempts=s.attempts+1,
+          failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
+      FROM publications p
+      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
+        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
+        AND p.status='publishing' AND p.claim_token=$4
+    `, [runId, this.connectorId, stepKey, token, error.code ?? null, error.message, options.retry === false ? 'terminal_failed' : 'failed'])
+    return result.rowCount === 1
+  }
+  async completePublication (runId: string, token: string): Promise<boolean> {
+    const result = await this.pool.query(`
+      UPDATE publications
+      SET status='published', claim_token=NULL, published_at=clock_timestamp(),
+          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$2
+        AND status='publishing' AND claim_token=$3
+    `, [runId, this.connectorId, token])
+    return result.rowCount === 1
+  }
+  async failPublication (runId: string, token: string, error: { code?: string | null, message: string }, options: { retry: boolean }): Promise<boolean> {
+    // Only the current owner may spend the publication budget or write a final
+    // state. A stale worker can finish its HTTP call, but it cannot commit here.
+    const result = await this.pool.query(`
+      UPDATE publications
+      SET status=$4, claim_token=NULL, failure_code=$5,
+          failure_message=$6, updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$2
+        AND status='publishing' AND claim_token=$3
+    `, [runId, this.connectorId, token, options.retry ? 'pending' : 'failed', error.code ?? null, error.message])
+    return result.rowCount === 1
+  }
+  async failPreparation (runId: string, token: string, error: { code?: string | null, message: string }): Promise<void> {
+    await transaction(this.pool, async client => {
+      const result = await client.query(`
+        UPDATE review_runs
+        SET runner_status='failed', preparation_claim_token=NULL,
+            preparation_claimed_at=NULL, runner_failure_code=$4,
+            runner_failure_message=$5, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2
+          AND runner_status='preparing' AND preparation_claim_token=$3
+      `, [runId, this.connectorId, token, error.code ?? null, error.message])
+      if (result.rowCount !== 1) throw new Error(`Preparation claim was lost before failing review run ${runId}.`)
+      await client.query(`
+        UPDATE publications
+        SET status='not_required', claim_token=NULL,
+            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2 AND status='pending'
+      `, [runId, this.connectorId])
+    })
+  }
+  async close (): Promise<void> { await this.pool.end() }
 }
 
-export const reviewRunStore = new ReviewRunStore(review_run_state_db_path)
+export const reviewRunStore = new ReviewRunStore()

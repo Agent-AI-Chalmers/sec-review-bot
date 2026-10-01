@@ -62,7 +62,7 @@ install -d -m 0755 "$config_dir"
 install -d -m 0755 -o "$service_uid" -g "$service_gid" \
     "$repository_root/.agent-temporal-state" \
     "$repository_root/.agent-input-bundles" \
-    "$repository_root/.agent-app-state" \
+    "$repository_root/.agent-postgres-state" \
     "$repository_root/.agent-artifacts"
 if [ ! -f "$deployment_env_source" ]; then
     echo "Missing deployment config: $deployment_env_source" >&2

@@ -51,6 +51,16 @@ test('repository result parser accepts the shared v4 blocked result fixture', ()
   assert.deepEqual(result.deliveries, [])
 })
 
+test('repository result rejects duplicate delivery identities', () => {
+  const result = validRepositoryResult()
+  result.deliveries.push(structuredClone(result.deliveries[0]))
+
+  assert.throws(
+    () => parseRepositoryWorkflowResult(result),
+    /duplicate delivery_id/
+  )
+})
+
 test('repository result rejects malformed v4 result before draft PR publishing', () => {
   assert.throws(
     () => parseRepositoryWorkflowResult({

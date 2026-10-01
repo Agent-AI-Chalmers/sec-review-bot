@@ -180,7 +180,6 @@ export interface GitHubAppOctokit {
           start_side?: string
         }>
       }) => Promise<{ data: { id: number, html_url: string, state: string } }>
-      createReviewComment: (args: Record<string, unknown>) => Promise<{ data: Record<string, unknown> }>
       get: (args: {
         owner: string
         repo: string

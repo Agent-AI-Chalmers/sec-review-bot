@@ -89,7 +89,7 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
   - `reviews/issues/` - issue review
   - `reviews/pull-requests/` - PR review、建议评论
   - `reviews/repositories/` - repository review、摘要 issue 与修复 draft PR
-- `infrastructure/runner/` - HTTP runner client、runner input 类型、input bundle manifest / workspace helper、SQLite run state、后台 publisher
+- `infrastructure/runner/` - HTTP runner client、runner input 类型、input bundle manifest / workspace helper、PostgreSQL 协调状态、后台 publisher
 - `infrastructure/github/` - GitHub API 薄封装和 webhook 辅助函数
 - `interfaces/` - HTTP、GitHub Actions 和 GitHub webhook adapter
 - `triggers/` - 把 webhook / Actions / comment 请求转换为 runner review run
@@ -218,11 +218,25 @@ flowchart LR
 
 GitHub integration 负责完整的 `review_runs` 生命周期。Python 和 Temporal 负责执行 agent workflow，但不负责 GitHub 发布状态。
 
+### 数据库 schema 版本
+
+PostgreSQL schema 变更位于 `infrastructure/runner/database/schema-versions`。已执行版本及其 SHA-256 checksum 记录在 `schema_versions`。不要修改已经执行过的版本文件；应新增下一个编号的 SQL 文件，并在 `schema-version-runner.ts` 中注册。应用启动时使用 PostgreSQL advisory lock 串行执行 schema 变更；如果文件 checksum 与数据库账本不一致，应用会拒绝启动。
+
 ### 接纳与重放身份
 
-Webhook 使用 GitHub Delivery ID 识别重复投递。Actions dispatch 使用经过 OIDC 验证的 repository 与必填 `correlation_id`，目前后者取 `GITHUB_RUN_ID`。这些入口身份用于阻止 transport 重试重复启动 review；请求接纳后，每个入口身份都会映射到唯一 `run_id`，供后续准备、agent 执行、轮询和发布使用。
+Webhook 使用 GitHub Delivery ID；Actions dispatch 使用 OIDC 验证的 repository 和 `correlation_id`（当前为 `GITHUB_RUN_ID`）。入口身份写入 `review_runs`，并映射到唯一 `run_id`。
 
-对于 Actions dispatch，HTTP `202 Accepted` 表示 integration 已经校验并持久化记录请求，不表示 agent workflow 或 GitHub 发布已经完成。当 webhook 事件会启动 review 时，其成功响应也只表达同一层含义。
+对于 Actions dispatch，HTTP `202 Accepted` 只表示 integration 已经校验并持久化请求；它不表示 agent workflow 或 GitHub 发布已经完成。Webhook 的成功响应也只表示同一件事。
+
+状态分别记录在以下三张表中：
+
+| 表 | 记录内容 | 状态 |
+| --- | --- | --- |
+| `review_runs` | Runner 观察 | `preparing`、`recovering`、`queued`、`running`、`failed` |
+| `publications` | 发布占用 | `pending`、`publishing`、`published`、`failed`、`not_required` |
+| `publication_steps` | 单个 GitHub 副作用 | `pending`、`running`、`succeeded`、`failed`、`terminal_failed` |
+
+`ReviewRunStatus` 是 store/diagnostics 的合并投影：publication 开始前显示 Runner 状态，之后显示 publication 状态。它不是数据库字段；step 状态不并入其中。
 
 ```mermaid
 flowchart LR
@@ -233,11 +247,10 @@ flowchart LR
   queued --> failed
   running --> failed
   publishing -->|确定性失败| failed
-  publishing -->|可重试的 GitHub 失败| publish_failed
-  publish_failed -->|仍有重试次数| publishing
+  publishing -->|可重试的步骤失败| queued
 ```
 
-`preparing` 从请求被持久化接纳时开始，早于 workspace 或 input 准备。`recovering` 表示 publisher 已独占领取一次状态不确定的 Runner submission，正在查明结果。`publish_failed` 的重试次数耗尽后会成为终态，但仍保留该持久化状态，方便诊断发布失败。
+`preparing` 从请求被持久化接纳时开始，早于 workspace 或 input 准备。`recovering` 表示 publisher 已独占领取一次状态不确定的 Runner submission。Publication ownership 和每个 step 的 attempts 与 Runner observation 分开存储。Runner 确定性失败会把 publication 标为 `not_required`，不会进入 GitHub 发布。
 
 | 持久化 run 状态 | 含义 | Publisher 行为 |
 | --- | --- | --- |
@@ -248,13 +261,16 @@ flowchart LR
 | `publishing` | 某个 publisher 已领取完成的 run，准备执行 GitHub side effects。 | 除非领取已过期，否则其他 publisher 不应再次领取。 |
 | `published` | GitHub 发布完成。 | 终态。 |
 | `failed` | preparation、submission、Runner execution 或确定性的结果处理失败。 | 通常是终态；`failure_code` 为 `SUBMISSION_STATE_UNCERTAIN` 时由后台自动恢复。 |
-| `publish_failed` | Runner 已返回完成且结果有效，但调用 GitHub 发布结果失败。 | 最多重试到 GitHub 发布失败三次。 |
 
-Publisher 会重试 `publish_failed` run，直到调用 GitHub 发布结果累计失败三次。领取一个完成的 run 准备发布不算一次尝试；只有真正发布失败才计数。
+可重试的 publication 失败会把 publication 归还 pending。只有失败的 step 消耗自己的 attempt；Runner 轮询失败不消耗 publication attempt。
+
+Repository 发布中，确定性失败只终止当前 delivery；瞬时失败在下一轮从未完成的 step 继续。所有 delivery step 结束后才发布 summary，summary 只链接成功的 delivery。
 
 > 当前重试策略很简单：后台 publisher 启动时会立刻轮询一次，之后按 `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` 间隔轮询，默认 15 秒。这里还没有指数退避调度。
 
-## Review run 诊断
+## Review run 诊断工具
+
+`tools/runner-run-diagnostics.ts` 是只读运维 CLI，打包为 `sec-review-review-runs`。它读取 PostgreSQL 并输出表格或 JSON，不参与业务状态转换。
 
 执行过 `pnpm install` 和 `pnpm run build` 后，可以运行：
 
@@ -262,18 +278,18 @@ Publisher 会重试 `publish_failed` run，直到调用 GitHub 发布结果累�
 sec-review-review-runs --limit 20
 sec-review-review-runs --active-only
 sec-review-review-runs --failed-only --json
-sec-review-review-runs --status publish_failed
+sec-review-review-runs --status publishing
 ```
 
-该命令读取本地 SQLite `review_runs` store。重要列：
+该命令读取 PostgreSQL review run 协调状态。重要列：
 
 | 列 | 含义 |
 | --- | --- |
 | `active` | integration 仍会处理该 run。 |
 | `terminal` | 该 run 不再需要 integration 处理。 |
-| `retry_exhausted` | run 处于 `publish_failed`，并且没有剩余发布重试次数。 |
-| `attempts` | 已记录的 GitHub 发布失败次数；领取 run 准备发布不计数。 |
-| `failure_code` | run 中持久化的结构化失败码。 |
+| `runner_status` / `publication_status` | 分别表示 Runner 观察层和总体 publication 层，不要把它们当成同一个状态。 |
+| `runner_failure` / `publication_failure` | 分别表示失败属于 Runner 还是 GitHub publication。 |
+| `step_failures` | 具体失败的 publication step，包括 delivery、summary 或 review step。 |
 
 `PREPARATION_INTERRUPTED` 表示进程在准备已接纳的 run 时停止；同一入口请求重放时，会使用原 `run_id` 重新准备。`SUBMISSION_STATE_UNCERTAIN` 表示 Runner submission 可能已经成功，但 `queued` 转换没有写入 store。后台 publisher 会使用相同的 `run_id` 和 request fingerprint，安全地重放已经持久化的幂等 submission；它不会重建 bundle。
 

@@ -29,7 +29,7 @@ interface RunRepositoryReviewArgs {
   repair_mode?: RepairMode | null
   // Runs after preparation and before the Runner POST, so callers can durably
   // retain the context needed if the submission response is lost.
-  on_prepared?: (submitted: SubmittedRepositoryReviewRun, input: RepositoryReviewInput & Record<string, unknown>) => void
+  on_prepared?: (submitted: SubmittedRepositoryReviewRun, input: RepositoryReviewInput & Record<string, unknown>) => void | Promise<void>
 }
 
 export interface SubmittedRepositoryReviewRun {
@@ -134,7 +134,7 @@ export async function startRepositoryReviewRun ({
     workflow: 'repository-review',
     event_type
   }
-  on_prepared?.(preparedRun, input)
+  await on_prepared?.(preparedRun, input)
   const submitted = await submitRunnerRun({
     workflow: 'repository-review',
     run_id,

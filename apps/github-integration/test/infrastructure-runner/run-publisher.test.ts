@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import type { App } from 'octokit'
 
@@ -6,12 +7,8 @@ import { contractFixture } from '../contract-fixtures.js'
 import { appWithInstallationOctokit } from '../github-app-stubs.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
 import { DeterministicRunnerPublishError } from '../../infrastructure/runner/publish-error.js'
-import {
-  classifyRunnerPublishFailure,
-  publishReviewRunsOnce,
-  startRunnerRunPublisher,
-  shouldRetryRunnerPublishFailure
-} from '../../infrastructure/runner/run-publisher.js'
+import { publishReviewRunsOnce, startRunnerRunPublisher } from '../../infrastructure/runner/run-publisher.js'
+import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
 import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import {
   RUNNER_RUN_NOT_FOUND,
@@ -22,35 +19,48 @@ import {
 
 type PublishContext = Record<string, unknown>
 
-function createStore (): ReviewRunStore {
-  return new ReviewRunStore(':memory:')
+async function createStore (options: { connectorId?: string, claimTimeoutMs?: number } = {}): Promise<ReviewRunStore> {
+  const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
+  if (!connectionString) throw new Error('TEST_DATABASE_URL is required for publisher store tests.')
+  const store = new ReviewRunStore({
+    connectionString,
+    connectorId: options.connectorId ?? `publisher-test:${randomUUID()}`,
+    ...(options.claimTimeoutMs === undefined ? {} : { claimTimeoutMs: options.claimTimeoutMs })
+  })
+  await store.initialize()
+  return store
 }
 
-function createQueuedRun (store: ReviewRunStore, run: Parameters<ReviewRunStore['create_preparing_review_run']>[0]): void {
-  store.create_preparing_review_run(run)
-  store.mark_queued(run.run_id, run.publish_context)
+async function createQueuedRun (store: ReviewRunStore, run: Parameters<ReviewRunStore['create_preparing_review_run']>[0]): Promise<void> {
+  const admission = await store.create_preparing_review_run(run)
+  assert.ok(admission.preparation_token)
+  await store.mark_queued(run.run_id, admission.preparation_token, run.publish_context)
 }
 
-function createUncertainRun (store: ReviewRunStore): void {
-  store.create_preparing_review_run({
+async function createUncertainRun (store: ReviewRunStore): Promise<string> {
+  const runId = `run-uncertain-${randomUUID()}`
+  const admission = await store.create_preparing_review_run({
     workflow: 'issue-review',
-    run_id: 'run-uncertain',
+    run_id: runId,
     publish_context: publishContextForWorkflow('issue-review')
   })
-  store.save_prepared_submission(
-    'run-uncertain',
+  assert.ok(admission.preparation_token)
+  await store.save_prepared_submission(
+    runId,
+    admission.preparation_token,
     publishContextForWorkflow('issue-review'),
     { contract_version: 'v4', issue: { number: 7 } }
   )
-  store.markFailed('run-uncertain', {
+  await store.failPreparation(runId, admission.preparation_token, {
     code: 'SUBMISSION_STATE_UNCERTAIN',
     message: 'Runner response was lost.'
   })
+  return runId
 }
 
 test('publisher retries an uncertain idempotent submission without another ingress delivery', async () => {
-  const store = createStore()
-  createUncertainRun(store)
+  const store = await createStore()
+  const runId = await createUncertainRun(store)
 
   await publishReviewRunsOnce({
     app: appStub(),
@@ -60,15 +70,15 @@ test('publisher retries an uncertain idempotent submission without another ingre
     }
   })
 
-  assert.equal(store.getRun('run-uncertain')?.status, 'failed')
-  assert.equal(store.getRun('run-uncertain')?.failure_code, 'SUBMISSION_STATE_UNCERTAIN')
-  assert.equal(store.listSubmissionRecoveries().length, 1)
-  store.close()
+  assert.equal((await store.getRun(runId))?.status, 'failed')
+  assert.equal((await store.getRun(runId))?.failure_code, 'SUBMISSION_STATE_UNCERTAIN')
+  assert.equal((await store.listSubmissionRecoveries()).length, 1)
+  await store.close()
 })
 
 test('publisher replays the persisted idempotent submission directly', async () => {
-  const store = createStore()
-  createUncertainRun(store)
+  const store = await createStore()
+  const runId = await createUncertainRun(store)
   const submissions: unknown[] = []
 
   await publishReviewRunsOnce({
@@ -87,18 +97,19 @@ test('publisher replays the persisted idempotent submission directly', async () 
 
   assert.deepEqual(submissions, [{
     workflow: 'issue-review',
-    run_id: 'run-uncertain',
+    run_id: runId,
     input: { contract_version: 'v4', issue: { number: 7 } }
   }])
-  assert.equal(store.getRun('run-uncertain')?.status, 'queued')
-  store.close()
+  assert.equal((await store.getRun(runId))?.status, 'queued')
+  await store.close()
 })
 
 test('stopping the runner publisher waits for its active publish pass', async () => {
-  const store = createStore()
-  createQueuedRun(store, {
+  const store = await createStore()
+  const runId = `run-shutdown-${randomUUID()}`
+  await createQueuedRun(store, {
     workflow: 'issue-review',
-    run_id: 'run-shutdown',
+    run_id: runId,
     publish_context: publishContextForWorkflow('issue-review')
   })
   let releaseStatus: (() => void) | undefined
@@ -117,7 +128,7 @@ test('stopping the runner publisher waits for its active publish pass', async ()
       statusRequested?.()
       await statusBlocked
       return {
-        run_id: 'run-shutdown',
+        run_id: runId,
         workflow: 'issue-review',
         status: 'running'
       }
@@ -135,7 +146,7 @@ test('stopping the runner publisher waits for its active publish pass', async ()
   releaseStatus?.()
   await stopping
   assert.equal(stopped, true)
-  store.close()
+  await store.close()
 })
 
 function appStub (): App {
@@ -183,9 +194,9 @@ function issueCommentFailureOctokit (error: Error): unknown {
   }
 }
 
-function succeededStatus (workflow: WorkflowName, result: unknown): RunnerRunStatus {
+function succeededStatus (runId: string, workflow: WorkflowName, result: unknown): RunnerRunStatus {
   return {
-    run_id: 'run-1',
+    run_id: runId,
     workflow,
     status: 'succeeded',
     result
@@ -233,52 +244,30 @@ function publishContextForWorkflow (workflow: WorkflowName): PublishContext {
 
 test('runner publisher does not retry deterministic publish validation failures', () => {
   assert.equal(
-    shouldRetryRunnerPublishFailure(new DeterministicRunnerPublishError(
+    classifyPublicationFailure(new DeterministicRunnerPublishError(
       'Repository review result is invalid.',
       RUNNER_PUBLISH_ERROR_CODES.repository_result_invalid
-    )),
+    )).retry,
     false
   )
 })
 
 test('runner publisher only treats named deterministic errors with codes as non-retryable', () => {
   assert.equal(
-    shouldRetryRunnerPublishFailure({ name: 'DeterministicRunnerPublishError' }),
+    classifyPublicationFailure({ name: 'DeterministicRunnerPublishError' }).retry,
     true
   )
   assert.equal(
-    shouldRetryRunnerPublishFailure({
+    classifyPublicationFailure({
       name: 'DeterministicRunnerPublishError',
       code: 'RESULT_INVALID'
-    }),
+    }).retry,
     false
   )
 })
 
 test('runner publisher keeps retrying generic publish failures', () => {
-  assert.equal(shouldRetryRunnerPublishFailure(new Error('GitHub API unavailable.')), true)
-})
-
-test('runner publisher does not retry completed runner service failures', () => {
-  const error = Object.assign(new Error('Agent runner failed.'), {
-    name: 'AgentRunnerServiceError',
-    code: 'RUNNER_FAILED'
-  })
-
-  assert.equal(shouldRetryRunnerPublishFailure(error), false)
-})
-
-test('runner publisher distinguishes a missing runner execution from GitHub failures', () => {
-  const error = Object.assign(new Error('Runner execution no longer exists.'), {
-    name: 'AgentRunnerServiceError',
-    code: RUNNER_RUN_NOT_FOUND
-  })
-
-  assert.deepEqual(classifyRunnerPublishFailure(error), {
-    retry: false,
-    code: RUNNER_RUN_NOT_FOUND,
-    reason: 'runner-run-not-found'
-  })
+  assert.equal(classifyPublicationFailure(new Error('GitHub API unavailable.')).retry, true)
 })
 
 test('runner publisher classifies GitHub publish failures by retryability', () => {
@@ -337,7 +326,7 @@ test('runner publisher classifies GitHub publish failures by retryability', () =
 
   for (const item of cases) {
     assert.deepEqual(
-      classifyRunnerPublishFailure(item.error),
+      classifyPublicationFailure(item.error),
       {
         retry: item.retry,
         code: item.code,
@@ -349,34 +338,37 @@ test('runner publisher classifies GitHub publish failures by retryability', () =
 })
 
 test('runner publisher marks malformed issue results failed without retry', async () => {
-  const store = createStore()
-  createQueuedRun(store, {
+  const store = await createStore()
+  const runId = `run-malformed-issue-${randomUUID()}`
+  await createQueuedRun(store, {
     workflow: 'issue-review',
-    run_id: 'run-1',
+    run_id: runId,
     publish_context: publishContextForWorkflow('issue-review')
   })
 
   await publishReviewRunsOnce({
     app: appStub(),
     store,
-    get_runner_run_status: async () => succeededStatus('issue-review', {
+    get_runner_run_status: async () => succeededStatus(runId, 'issue-review', {
       contract_version: 'v4',
       review_record: {}
     })
   })
 
-  const run = store.getRun('run-1')
+  const run = await store.getRun(runId)
   assert.equal(run?.status, 'failed')
   assert.equal(run?.failure_code, RUNNER_PUBLISH_ERROR_CODES.issue_result_invalid)
   assert.match(run?.failure_message ?? '', /Issue review result is invalid/)
-  assert.equal(store.listActiveRuns().length, 0)
+  assert.equal((await store.listActiveRuns()).length, 0)
+  await store.close()
 })
 
-test('runner publisher terminates a run whose runner execution no longer exists', async () => {
-  const store = createStore()
-  createQueuedRun(store, {
+test('runner publisher terminates a run when Runner no longer has its execution', async () => {
+  const store = await createStore()
+  const runId = `run-missing-${randomUUID()}`
+  await createQueuedRun(store, {
     workflow: 'issue-review',
-    run_id: 'run-missing',
+    run_id: runId,
     publish_context: publishContextForWorkflow('issue-review')
   })
   let statusRequests = 0
@@ -388,58 +380,122 @@ test('runner publisher terminates a run whose runner execution no longer exists'
       statusRequests += 1
       throw Object.assign(new Error('Runner execution no longer exists.'), {
         name: 'AgentRunnerServiceError',
-        code: RUNNER_RUN_NOT_FOUND
+        code: RUNNER_RUN_NOT_FOUND,
+        retryable: false
       })
     }
   })
 
   await publishOnce()
-  await publishOnce()
 
-  const run = store.getRun('run-missing')
+  const run = await store.getRun(runId)
   assert.equal(run?.status, 'failed')
   assert.equal(run?.failure_code, RUNNER_RUN_NOT_FOUND)
-  assert.equal(run?.publish_attempts, 0)
   assert.equal(statusRequests, 1)
-  assert.equal(store.listActiveRuns().length, 0)
+  assert.equal((await store.listActiveRuns()).length, 0)
+  await store.close()
+})
+
+test('runner publisher leaves a run active after a transient status polling failure', async () => {
+  const store = await createStore()
+  const runId = `run-poll-transient-${randomUUID()}`
+  await createQueuedRun(store, {
+    workflow: 'issue-review',
+    run_id: runId,
+    publish_context: publishContextForWorkflow('issue-review')
+  })
+
+  await publishReviewRunsOnce({
+    app: appStub(),
+    store,
+    get_runner_run_status: async () => {
+      throw Object.assign(new Error('Runner service is temporarily unavailable.'), {
+        name: 'AgentRunnerServiceError',
+        code: 'RUNNER_SERVICE_UNAVAILABLE',
+        retryable: true
+      })
+    }
+  })
+
+  const run = await store.getRun(runId)
+  assert.equal(run?.status, 'queued')
+  assert.equal(run?.failure_code, null)
+  assert.equal((await store.listActiveRuns()).length, 1)
+  await store.close()
+})
+
+test('runner publisher records terminal Runner failure before publication', async () => {
+  const store = await createStore()
+  const runId = `run-runner-failed-${randomUUID()}`
+  await createQueuedRun(store, {
+    workflow: 'issue-review',
+    run_id: runId,
+    publish_context: publishContextForWorkflow('issue-review')
+  })
+
+  await publishReviewRunsOnce({
+    app: appStub(),
+    store,
+    get_runner_run_status: async () => ({
+      run_id: runId,
+      workflow: 'issue-review',
+      status: 'failed',
+      error: {
+        category: 'runtime',
+        code: 'RUNNER_EXECUTION_FAILED',
+        message: 'Agent execution failed.',
+        retryable: false,
+        details: {}
+      }
+    })
+  })
+
+  const run = await store.getRun(runId)
+  assert.equal(run?.status, 'failed')
+  assert.equal(run?.failure_code, 'RUNNER_EXECUTION_FAILED')
+  assert.equal(await store.claimPublication(runId), null)
+  await store.close()
 })
 
 test('runner publisher marks malformed pull request results failed without retry', async () => {
-  const store = createStore()
-  createQueuedRun(store, {
+  const store = await createStore()
+  const runId = `run-malformed-pr-${randomUUID()}`
+  await createQueuedRun(store, {
     workflow: 'pull-request-review',
-    run_id: 'run-1',
+    run_id: runId,
     publish_context: publishContextForWorkflow('pull-request-review')
   })
 
   await publishReviewRunsOnce({
     app: appStub(),
     store,
-    get_runner_run_status: async () => succeededStatus('pull-request-review', {
+    get_runner_run_status: async () => succeededStatus(runId, 'pull-request-review', {
       contract_version: 'v4',
       review_record: {}
     })
   })
 
-  const run = store.getRun('run-1')
+  const run = await store.getRun(runId)
   assert.equal(run?.status, 'failed')
   assert.equal(run?.failure_code, RUNNER_PUBLISH_ERROR_CODES.pull_request_result_invalid)
   assert.match(run?.failure_message ?? '', /Pull request review result is invalid/)
-  assert.equal(store.listActiveRuns().length, 0)
+  assert.equal((await store.listActiveRuns()).length, 0)
+  await store.close()
 })
 
 test('runner publisher marks malformed repository results failed without retry', async () => {
-  const store = createStore()
-  createQueuedRun(store, {
+  const store = await createStore()
+  const runId = `run-malformed-repository-${randomUUID()}`
+  await createQueuedRun(store, {
     workflow: 'repository-review',
-    run_id: 'run-1',
+    run_id: runId,
     publish_context: publishContextForWorkflow('repository-review')
   })
 
   await publishReviewRunsOnce({
     app: appStub(),
     store,
-    get_runner_run_status: async () => succeededStatus('repository-review', {
+    get_runner_run_status: async () => succeededStatus(runId, 'repository-review', {
       contract_version: 'v4',
       scan_summary: {},
       deliveries: [],
@@ -447,18 +503,20 @@ test('runner publisher marks malformed repository results failed without retry',
     })
   })
 
-  const run = store.getRun('run-1')
+  const run = await store.getRun(runId)
   assert.equal(run?.status, 'failed')
   assert.equal(run?.failure_code, RUNNER_PUBLISH_ERROR_CODES.repository_result_invalid)
   assert.match(run?.failure_message ?? '', /Repository review result is invalid/)
-  assert.equal(store.listActiveRuns().length, 0)
+  assert.equal((await store.listActiveRuns()).length, 0)
+  await store.close()
 })
 
 test('runner publisher keeps transient publish failures retryable in the store', async () => {
-  const store = createStore()
-  createQueuedRun(store, {
+  const store = await createStore()
+  const runId = `run-transient-publish-${randomUUID()}`
+  await createQueuedRun(store, {
     workflow: 'issue-review',
-    run_id: 'run-1',
+    run_id: runId,
     publish_context: publishContextForWorkflow('issue-review')
   })
 
@@ -470,22 +528,73 @@ test('runner publisher keeps transient publish failures retryable in the store',
     }),
     store,
     get_runner_run_status: async () => succeededStatus(
+      runId,
       'issue-review',
       contractFixture('v4', 'issue-review-result.json')
     )
   })
 
-  const run = store.getRun('run-1')
-  assert.equal(run?.status, 'publish_failed')
-  assert.equal(run?.publish_attempts, 1)
-  assert.equal(store.listActiveRuns()[0]?.run_id, 'run-1')
+  const run = await store.getRun(runId)
+  assert.equal(run?.status, 'queued')
+  assert.equal((await store.listActiveRuns())[0]?.run_id, runId)
+  await store.close()
+})
+
+test('runner publisher renews its claim while a GitHub side effect is in flight', async () => {
+  const connectorId = `publisher-heartbeat:${randomUUID()}`
+  const owner = await createStore({ connectorId, claimTimeoutMs: 150 })
+  const contender = await createStore({ connectorId, claimTimeoutMs: 150 })
+  const runId = `run-heartbeat-${randomUUID()}`
+  await createQueuedRun(owner, {
+    workflow: 'issue-review',
+    run_id: runId,
+    publish_context: publishContextForWorkflow('issue-review')
+  })
+  let releaseComment: (() => void) | undefined
+  const commentBlocked = new Promise<void>(resolve => { releaseComment = resolve })
+  let commentStarted: (() => void) | undefined
+  const commentStart = new Promise<void>(resolve => { commentStarted = resolve })
+  const octokit = {
+    rest: {
+      issues: {
+        listComments: async () => ({ data: [] }),
+        createComment: async () => {
+          commentStarted?.()
+          await commentBlocked
+          return { data: { id: 1, html_url: 'https://example.test/comment/1' } }
+        }
+      }
+    }
+  }
+
+  try {
+    const publishing = publishReviewRunsOnce({
+      app: appWithInstallationOctokit({ installation_octokit: octokit }),
+      store: owner,
+      get_runner_run_status: async () => succeededStatus(
+        runId,
+        'issue-review',
+        contractFixture('v4', 'issue-review-result.json')
+      )
+    })
+    await commentStart
+    await new Promise(resolve => setTimeout(resolve, 250))
+    assert.equal(await contender.claimPublication(runId), null)
+    releaseComment?.()
+    await publishing
+    assert.equal((await owner.getRun(runId))?.status, 'published')
+  } finally {
+    releaseComment?.()
+    await Promise.all([owner.close(), contender.close()])
+  }
 })
 
 test('runner publisher marks deterministic GitHub publish rejections failed without retry', async () => {
-  const store = createStore()
-  createQueuedRun(store, {
+  const store = await createStore()
+  const runId = `run-rejected-publish-${randomUUID()}`
+  await createQueuedRun(store, {
     workflow: 'issue-review',
-    run_id: 'run-1',
+    run_id: runId,
     publish_context: publishContextForWorkflow('issue-review')
   })
 
@@ -497,13 +606,15 @@ test('runner publisher marks deterministic GitHub publish rejections failed with
     }),
     store,
     get_runner_run_status: async () => succeededStatus(
+      runId,
       'issue-review',
       contractFixture('v4', 'issue-review-result.json')
     )
   })
 
-  const run = store.getRun('run-1')
+  const run = await store.getRun(runId)
   assert.equal(run?.status, 'failed')
   assert.equal(run?.failure_code, RUNNER_PUBLISH_ERROR_CODES.github_validation_rejected)
-  assert.equal(store.listActiveRuns().length, 0)
+  assert.equal((await store.listActiveRuns()).length, 0)
+  await store.close()
 })

@@ -117,7 +117,7 @@ The samples contain both usable defaults and empty or placeholder values that mu
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-Set `RUNNER_SERVICE_TOKEN` to a locally generated secret, for example with `openssl rand -hex 32`. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-input-bundles`, and `.agent-app-state`; they are intentionally not separate configuration values.
+Set `RUNNER_SERVICE_TOKEN` to a locally generated secret, for example with `openssl rand -hex 32`. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-input-bundles`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
 
 ### 2. GitHub Integration `.env`
 
@@ -129,7 +129,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose injects the container private-key path, Runner Service address and token, and the input bundle and App state paths. These values do not need to be repeated in `apps/github-integration/.env`.
+Compose injects the container private-key path, Runner Service address and token, PostgreSQL connection, and input bundle path. These values do not need to be repeated in `apps/github-integration/.env`.
 
 ### 3. Model Configuration
 
@@ -239,7 +239,7 @@ With the sample configuration, the integrated deployment stores runtime data in 
 | --- | --- | --- |
 | `.agent-input-bundles` | Written by GitHub integration, read by the host worker | Prepared runner input materials |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
-| `.agent-app-state` | GitHub integration | Submitted-task state used by background publishing |
+| `.agent-postgres-state` | PostgreSQL | Admission, Runner observation, and publication step coordination |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
 | `.agent-memory` | Host worker | Persistent agent memory store, when memory is enabled |
 
@@ -355,14 +355,14 @@ GitHub integration uses the container's default root user, so input bundles or A
 To repair ownership:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-temporal-state
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-postgres-state .agent-temporal-state
 ```
 
-The GitHub integration run store and Temporal state describe the same active runs. Do not delete `.agent-temporal-state` while retaining `.agent-app-state` records that still need polling or publication. To reset run execution and publication state, stop the complete service and remove both state directories together:
+The PostgreSQL coordination store and Temporal state describe the same active runs. Do not delete `.agent-temporal-state` while retaining PostgreSQL records that still need polling or publication. To reset run execution and publication state, stop the complete service and remove both state directories together:
 
 ```bash
 sudo systemctl stop sec-review-bot.target
-sudo rm -rf .agent-temporal-state .agent-app-state
+sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 

@@ -2,6 +2,7 @@ import type { App } from 'octokit'
 import { clearImmediate, clearInterval } from 'node:timers'
 
 import {
+  completedRunnerRunResult,
   getRunnerRunStatus,
   RUNNER_RUN_NOT_FOUND,
   RunnerSubmissionUncertainError,
@@ -18,9 +19,7 @@ import { handleIssueReviewRun } from '../../reviews/issues/publish.js'
 import { handlePullRequestReviewRun } from '../../reviews/pull-requests/publish.js'
 import { handleRepositoryReviewRun } from '../../reviews/repositories/publish.js'
 import { logError, logInfo, logWarn } from '../../utils/logger.js'
-import { asErrorWithResponse } from '../../utils/error-utils.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from './publish-error-code.js'
-import { isDeterministicRunnerPublishError } from './publish-error.js'
+import { classifyPublicationFailure } from './publication-failure.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -44,14 +43,10 @@ type InstallationOctokitForRepo = (repo_full_name: string) => Promise<unknown>
 type RunPublishHandler = (args: {
   run: ReviewRunRecord
   status: RunnerRunStatus
+  store: ReviewRunStore
+  claim_token: string
   installation_octokit_for_repo: InstallationOctokitForRepo
 }) => Promise<void>
-
-interface PublishFailureClassification {
-  retry: boolean
-  code: string | null
-  reason: string
-}
 
 function parsePositiveIntegerEnv (name: string, fallback: number): number {
   const value = process.env[name]
@@ -84,103 +79,9 @@ function asErrorCode (error: unknown): string | null {
   return null
 }
 
-export function shouldRetryRunnerPublishFailure (error: unknown): boolean {
-  return classifyRunnerPublishFailure(error).retry
-}
-
-function isRateLimitOrAbuseLimit (error: unknown): boolean {
-  const errorInfo = asErrorWithResponse(error)
-  const headers = errorInfo.response?.headers ?? {}
-  const retryAfter = headers['retry-after'] ?? headers['Retry-After']
-  const rateRemaining = headers['x-ratelimit-remaining'] ?? headers['X-RateLimit-Remaining']
-  const message = [
-    errorInfo.message,
-    errorInfo.response?.data?.message
-  ].join(' ').toLowerCase()
-
-  return retryAfter !== undefined ||
-    rateRemaining === '0' ||
-    message.includes('rate limit') ||
-    message.includes('secondary rate limit') ||
-    message.includes('abuse')
-}
-
-export function classifyRunnerPublishFailure (error: unknown): PublishFailureClassification {
-  // Runner service failures and malformed stored results are deterministic for
-  // this run; transient GitHub/API publish failures still use publish_failed.
-  if (isRecord(error) && error.name === 'AgentRunnerServiceError') {
-    return {
-      retry: false,
-      code: asErrorCode(error),
-      reason: asErrorCode(error) === RUNNER_RUN_NOT_FOUND
-        ? 'runner-run-not-found'
-        : 'runner-service-terminal'
-    }
-  }
-  if (isDeterministicRunnerPublishError(error)) {
-    return {
-      retry: false,
-      code: asErrorCode(error),
-      reason: 'deterministic-publish-result'
-    }
-  }
-
-  const responseStatus = asErrorWithResponse(error).response?.status
-  if (responseStatus === undefined) {
-    return {
-      retry: true,
-      code: asErrorCode(error),
-      reason: 'unknown-publish-error'
-    }
-  }
-  if (responseStatus >= 500 || responseStatus === 408 || responseStatus === 409 || responseStatus === 429) {
-    return {
-      retry: true,
-      code: asErrorCode(error),
-      reason: 'github-transient-response'
-    }
-  }
-  if (responseStatus === 403 && isRateLimitOrAbuseLimit(error)) {
-    return {
-      retry: true,
-      code: asErrorCode(error),
-      reason: 'github-rate-limited'
-    }
-  }
-  if (responseStatus === 401 || responseStatus === 403) {
-    return {
-      retry: false,
-      code: asErrorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_auth_rejected,
-      reason: 'github-auth-rejected'
-    }
-  }
-  if (responseStatus === 404) {
-    return {
-      retry: false,
-      code: asErrorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_not_found,
-      reason: 'github-not-found'
-    }
-  }
-  if (responseStatus === 422) {
-    return {
-      retry: false,
-      code: asErrorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_validation_rejected,
-      reason: 'github-validation-rejected'
-    }
-  }
-  if (responseStatus >= 400 && responseStatus < 500) {
-    return {
-      retry: false,
-      code: asErrorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_publish_rejected,
-      reason: 'github-deterministic-response'
-    }
-  }
-
-  return {
-    retry: true,
-    code: asErrorCode(error),
-    reason: 'github-unclassified-response'
-  }
+function isTerminalRunnerPollingError (error: unknown): boolean {
+  if (!isRecord(error) || error.name !== 'AgentRunnerServiceError') return false
+  return error.retryable === false || error.code === RUNNER_RUN_NOT_FOUND
 }
 
 // Runner publication happens after the original webhook/dispatch call has ended.
@@ -198,11 +99,15 @@ async function installation_octokit_for_repo ({ app, repo_full_name }: { app: Ap
 async function handleWorkflowRun ({
   app,
   run,
-  status
+  status,
+  store,
+  claim_token
 }: {
   app: App
   run: ReviewRunRecord
   status: RunnerRunStatus
+  store: ReviewRunStore
+  claim_token: string
 }): Promise<void> {
   const handlers: Record<string, RunPublishHandler> = {
     'issue-review': handleIssueReviewRun,
@@ -217,11 +122,59 @@ async function handleWorkflowRun ({
   await handler({
     run,
     status,
+    store,
+    claim_token,
     installation_octokit_for_repo: async (repo_full_name) => installation_octokit_for_repo({
       app,
       repo_full_name
     })
   })
+}
+
+async function runWithPublicationHeartbeat ({
+  store,
+  run,
+  claim_token,
+  operation
+}: {
+  store: ReviewRunStore
+  run: ReviewRunRecord
+  claim_token: string
+  operation: () => Promise<void>
+}): Promise<boolean> {
+  let claimLost = false
+  let renewal: Promise<void> | null = null
+  const renew = async (): Promise<void> => {
+    try {
+      if (!await store.renewPublicationClaim(run.run_id, claim_token)) claimLost = true
+    } catch (error) {
+      // A transient database outage does not prove ownership was lost. The last
+      // successful heartbeat still prevents takeover until its lease expires.
+      logWarn('runner_run_publish_heartbeat_failed', {
+        error,
+        error_message: asErrorMessage(error),
+        run_id: run.run_id,
+        workflow: run.workflow
+      })
+    }
+  }
+
+  await renew()
+  if (claimLost) return false
+  const timer = setInterval(() => {
+    if (renewal !== null) return
+    renewal = renew().finally(() => { renewal = null })
+  }, store.publicationHeartbeatIntervalMs())
+  timer.unref?.()
+  try {
+    await operation()
+    if (renewal !== null) await renewal
+    await renew()
+    return !claimLost
+  } finally {
+    clearInterval(timer)
+    if (renewal !== null) await renewal
+  }
 }
 
 async function publishCompletedRun ({
@@ -235,27 +188,133 @@ async function publishCompletedRun ({
   run: ReviewRunRecord
   get_runner_run_status?: GetRunnerRunStatus
 }): Promise<void> {
-  const status = await get_runner_run_status({ run_id: run.run_id })
+  let status: RunnerRunStatus
+  try {
+    status = await get_runner_run_status({ run_id: run.run_id })
+  } catch (error) {
+    if (isTerminalRunnerPollingError(error)) {
+      await store.failRunnerExecution(run.run_id, {
+        code: asErrorCode(error) ?? 'RUNNER_STATUS_POLL_FAILED',
+        message: asErrorMessage(error)
+      })
+      logError('runner_run_status_poll_terminal_failure', {
+        error,
+        error_message: asErrorMessage(error),
+        run_id: run.run_id,
+        workflow: run.workflow
+      })
+      return
+    }
+    // A transient polling outage has no GitHub side effect and spends no
+    // publication attempt. The active run is retried on the next tick.
+    logWarn('runner_run_status_poll_failed', {
+      error,
+      error_message: asErrorMessage(error),
+      run_id: run.run_id,
+      workflow: run.workflow
+    })
+    return
+  }
   if (status.status !== 'succeeded' && status.status !== 'failed') {
     if (status.status === 'running' && run.status === 'queued') {
-      store.markRunning(run.run_id)
+      await store.markRunning(run.run_id)
     }
     return
   }
 
-  if (!store.markPublishing(run.run_id)) {
+  if (status.status === 'failed') {
+    let error: unknown
+    try {
+      // Normalize the terminal Runner response without entering GitHub
+      // publication. Runner execution and publication have different owners.
+      completedRunnerRunResult(status)
+      error = new Error(`Runner run failed without an error: ${run.run_id}`)
+    } catch (runnerError) {
+      error = runnerError
+    }
+    await store.failRunnerExecution(run.run_id, {
+      code: asErrorCode(error) ?? 'RUNNER_EXECUTION_FAILED',
+      message: asErrorMessage(error)
+    })
+    logError('runner_run_failed', {
+      error,
+      error_message: asErrorMessage(error),
+      failure_code: asErrorCode(error) ?? 'RUNNER_EXECUTION_FAILED',
+      run_id: run.run_id,
+      workflow: run.workflow
+    })
+    return
+  }
+
+  const claimToken = await store.claimPublication(run.run_id)
+  if (claimToken === null) {
     logInfo('runner_run_publish_claim_skipped', {
       run_id: run.run_id,
       workflow: run.workflow
     })
     return
   }
-  await handleWorkflowRun({ app, run, status })
-  store.markPublished(run.run_id)
-  logInfo('runner_run_publish_completed', {
-    run_id: run.run_id,
-    workflow: run.workflow
-  })
+  try {
+    const stillOwnsClaim = await runWithPublicationHeartbeat({
+      store,
+      run,
+      claim_token: claimToken,
+      operation: async () => await handleWorkflowRun({ app, run, status, store, claim_token: claimToken })
+    })
+    if (!stillOwnsClaim) {
+      logWarn('runner_run_publish_claim_lost', {
+        attempted_state: 'published',
+        run_id: run.run_id,
+        workflow: run.workflow
+      })
+      return
+    }
+    const committed = await store.completePublication(run.run_id, claimToken)
+    if (!committed) {
+      // The remote call may have completed after this claim expired. The new
+      // owner now decides the durable state; this stale owner must stay silent.
+      logWarn('runner_run_publish_claim_lost', {
+        attempted_state: 'published',
+        run_id: run.run_id,
+        workflow: run.workflow
+      })
+      return
+    }
+    logInfo('runner_run_publish_completed', {
+      run_id: run.run_id,
+      workflow: run.workflow
+    })
+  } catch (error) {
+    const message = asErrorMessage(error)
+    const classification = classifyPublicationFailure(error)
+    const code = asErrorCode(error) ?? classification.code
+    const committed = await store.failPublication(
+      run.run_id,
+      claimToken,
+      { code, message },
+      { retry: classification.retry }
+    )
+    if (!committed) {
+      logWarn('runner_run_publish_claim_lost', {
+        attempted_state: classification.retry ? 'pending' : 'failed',
+        run_id: run.run_id,
+        workflow: run.workflow
+      })
+      return
+    }
+    const updatedRun = await store.getRun(run.run_id)
+    logError('runner_run_publish_failed', {
+      diagnostic_state: classification.reason,
+      error,
+      error_message: message,
+      failure_code: code,
+      retry: classification.retry,
+      run_id: run.run_id,
+      status_after: updatedRun?.status ?? null,
+      status_before: run.status,
+      workflow: run.workflow
+    })
+  }
 }
 
 async function recoverSubmission ({
@@ -267,13 +326,13 @@ async function recoverSubmission ({
   run: ReviewRunRecord
   submit_runner_run: SubmitRunnerRun
 }): Promise<void> {
-  const claimToken = store.claimSubmissionRecovery(run.run_id)
+  const claimToken = await store.claimSubmissionRecovery(run.run_id)
   if (claimToken === null) {
     return
   }
 
   if (run.runner_input === undefined) {
-    store.failSubmissionRecovery(run.run_id, claimToken, {
+    await store.failSubmissionRecovery(run.run_id, claimToken, {
       code: 'SUBMISSION_RECOVERY_INPUT_MISSING',
       message: 'The persisted Runner input is missing; this submission cannot be recovered.'
     })
@@ -288,7 +347,7 @@ async function recoverSubmission ({
       run_id: run.run_id,
       input: run.runner_input
     })
-    if (!store.completeSubmissionRecovery(run.run_id, claimToken)) {
+    if (!await store.completeSubmissionRecovery(run.run_id, claimToken)) {
       return
     }
     logInfo('runner_submission_recovered', {
@@ -298,7 +357,7 @@ async function recoverSubmission ({
     })
   } catch (error) {
     const deferred = error instanceof RunnerSubmissionUncertainError
-    store.failSubmissionRecovery(run.run_id, claimToken, {
+    await store.failSubmissionRecovery(run.run_id, claimToken, {
       code: error instanceof RunnerSubmissionUncertainError
         ? 'SUBMISSION_STATE_UNCERTAIN'
         : asErrorCode(error) ?? 'REVIEW_START_FAILED',
@@ -326,36 +385,14 @@ export async function publishReviewRunsOnce ({
   get_runner_run_status?: GetRunnerRunStatus
   submit_runner_run?: SubmitRunnerRun
 }): Promise<void> {
-  for (const run of store.listSubmissionRecoveries()) {
+  await store.expireStalePreparations()
+
+  for (const run of await store.listSubmissionRecoveries()) {
     await recoverSubmission({ store, run, submit_runner_run })
   }
 
-  for (const run of store.listActiveRuns()) {
-    try {
-      await publishCompletedRun({ app, store, run, get_runner_run_status })
-    } catch (error) {
-      const message = asErrorMessage(error)
-      const classification = classifyRunnerPublishFailure(error)
-      const code = asErrorCode(error) ?? classification.code
-      if (classification.retry) {
-        store.markPublishFailed(run.run_id, { code, message })
-      } else {
-        store.markFailed(run.run_id, { code, message })
-      }
-      const updatedRun = store.getRun(run.run_id)
-      logError('runner_run_publish_failed', {
-        diagnostic_state: classification.reason,
-        error,
-        error_message: message,
-        failure_code: code,
-        publish_attempts: updatedRun?.publish_attempts ?? run.publish_attempts,
-        retry: classification.retry,
-        run_id: run.run_id,
-        status_after: updatedRun?.status ?? null,
-        status_before: run.status,
-        workflow: run.workflow
-      })
-    }
+  for (const run of await store.listActiveRuns()) {
+    await publishCompletedRun({ app, store, run, get_runner_run_status })
   }
 }
 

@@ -1,529 +1,281 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
+import { Pool } from 'pg'
 
 import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 
-function createStore (): ReviewRunStore {
-  return new ReviewRunStore(':memory:')
+const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
+
+function requireTestDatabase (): string {
+  if (!connectionString) throw new Error('TEST_DATABASE_URL is required for PostgreSQL store tests.')
+  return connectionString
 }
 
-function createQueuedRun (store: ReviewRunStore, run: Parameters<ReviewRunStore['create_preparing_review_run']>[0]) {
-  store.create_preparing_review_run(run)
-  store.mark_queued(run.run_id, run.publish_context)
-  return store.getRun(run.run_id)!
+function connectorId (): string { return `test:${randomUUID()}` }
+
+async function createStore (options: { connectorId?: string, claimTimeoutMs?: number } = {}): Promise<ReviewRunStore> {
+  const store = new ReviewRunStore({
+    connectionString: requireTestDatabase(),
+    connectorId: options.connectorId ?? connectorId(),
+    ...(options.claimTimeoutMs === undefined ? {} : { claimTimeoutMs: options.claimTimeoutMs })
+  })
+  await store.initialize()
+  return store
 }
 
-function temporaryDatabasePath (): string {
-  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'review-run-store-')), 'review-runs.sqlite')
+async function createQueuedRun (store: ReviewRunStore, runId = `run-${randomUUID()}`): Promise<string> {
+  const context = { issue: { repo_full_name: 'octo/example', issue_number: 7 } }
+  const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: context })
+  assert.ok(admission.preparation_token)
+  await store.mark_queued(runId, admission.preparation_token, context)
+  return runId
 }
 
-test('ReviewRunStore can be closed more than once during shutdown', () => {
-  const store = createStore()
-
-  store.close()
-  assert.doesNotThrow(() => store.close())
+test('ReviewRunStore persists queued runs and keeps preparing runs out of polling', async () => {
+  const store = await createStore()
+  try {
+    const queuedId = await createQueuedRun(store)
+    await store.create_preparing_review_run({ workflow: 'issue-review', run_id: `run-${randomUUID()}`, publish_context: {} })
+    assert.equal((await store.getRun(queuedId))?.status, 'queued')
+    assert.deepEqual((await store.listActiveRuns()).map(run => run.run_id), [queuedId])
+  } finally { await store.close() }
 })
 
-test('ReviewRunStore persists and restores queued runner runs', () => {
-  const store = createStore()
+test('ReviewRunStore terminates preparation after its claim expires', async () => {
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = `run-stale-preparation-${randomUUID()}`
+  try {
+    await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
 
-  const record = createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-1',
-    publish_context: {
-      repo: {
-        repo_full_name: 'owner/repo'
-      },
-      workspace_ref: 'base-sha',
-      event_type: 'manual'
+    assert.equal(await store.expireStalePreparations(), 1)
+    const run = await store.getRun(runId)
+    assert.equal(run?.status, 'failed')
+    assert.equal(run?.failure_code, 'PREPARATION_INTERRUPTED')
+    assert.equal(await store.claimPublication(runId), null)
+    assert.equal(await store.expireStalePreparations(), 0)
+  } finally { await store.close() }
+})
+
+test('ReviewRunStore records one immutable schema version across concurrent initialization', async () => {
+  const first = new ReviewRunStore({ connectionString: requireTestDatabase(), connectorId: connectorId() })
+  const second = new ReviewRunStore({ connectionString: requireTestDatabase(), connectorId: connectorId() })
+  try {
+    await Promise.all([first.initialize(), second.initialize()])
+    const observer = new Pool({ connectionString: requireTestDatabase() })
+    const versions = (await observer.query<{ version: number, name: string, checksum: string }>(
+      'SELECT version,name,checksum FROM schema_versions ORDER BY version'
+    )).rows
+    await observer.end()
+    assert.deepEqual(versions.map(item => [item.version, item.name]), [[1, 'initial_coordination_schema']])
+    assert.match(versions[0]?.checksum ?? '', /^[a-f0-9]{64}$/)
+  } finally { await Promise.all([first.close(), second.close()]) }
+})
+
+test('ReviewRunStore initialization does not steal another replica preparation', async () => {
+  const sharedConnector = connectorId()
+  const runId = `run-${randomUUID()}`
+  const first = await createStore({ connectorId: sharedConnector })
+  await first.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
+  await first.close()
+
+  const restarted = await createStore({ connectorId: sharedConnector })
+  try {
+    const record = await restarted.getRun(runId)
+    assert.equal(record?.status, 'preparing')
+    assert.equal(record?.failure_code, null)
+  } finally { await restarted.close() }
+})
+
+test('ReviewRunStore atomically deduplicates concurrent ingress across connections', async () => {
+  const sharedConnector = connectorId()
+  const first = await createStore({ connectorId: sharedConnector })
+  const second = await createStore({ connectorId: sharedConnector })
+  const ingress = {
+    workflow: 'issue-review' as const,
+    publish_context: {},
+    ingress_kind: 'github_webhook' as const,
+    ingress_key: `delivery-${randomUUID()}`
+  }
+  try {
+    const admissions = await Promise.all([
+      first.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` }),
+      second.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` })
+    ])
+    assert.equal(admissions.filter(item => item.created).length, 1)
+    assert.equal(new Set(admissions.map(item => item.record.run_id)).size, 1)
+  } finally { await Promise.all([first.close(), second.close()]) }
+})
+
+test('ReviewRunStore fences a stale preparation owner after ingress takeover', async () => {
+  const sharedConnector = connectorId()
+  const ownerA = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 0 })
+  const ownerB = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 0 })
+  const ingress = {
+    workflow: 'issue-review' as const,
+    publish_context: {},
+    ingress_kind: 'github_webhook' as const,
+    ingress_key: `delivery-${randomUUID()}`
+  }
+  try {
+    const first = await ownerA.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` })
+    const takeover = await ownerB.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` })
+    assert.ok(first.preparation_token)
+    assert.ok(takeover.preparation_token)
+    assert.equal(takeover.record.run_id, first.record.run_id)
+    assert.notEqual(takeover.preparation_token, first.preparation_token)
+
+    await assert.rejects(
+      ownerA.save_prepared_submission(first.record.run_id, first.preparation_token, {}, {}),
+      /cannot save prepared submission/
+    )
+    await assert.rejects(
+      ownerA.mark_queued(first.record.run_id, first.preparation_token, {}),
+      /cannot transition/
+    )
+    await assert.rejects(
+      ownerA.failPreparation(first.record.run_id, first.preparation_token, { message: 'late failure' }),
+      /claim was lost/
+    )
+    await ownerB.mark_queued(takeover.record.run_id, takeover.preparation_token, {})
+    assert.equal((await ownerA.getRun(first.record.run_id))?.status, 'queued')
+  } finally { await Promise.all([ownerA.close(), ownerB.close()]) }
+})
+
+test('ReviewRunStore recovers an uncertain submission with a fenced claim', async () => {
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = `run-${randomUUID()}`
+  try {
+    const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
+    assert.ok(admission.preparation_token)
+    await store.save_prepared_submission(runId, admission.preparation_token, { issue: { issue_number: 7 } }, { contract_version: 'v4' })
+    await store.failPreparation(runId, admission.preparation_token, { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
+    const staleToken = await store.claimSubmissionRecovery(runId)
+    const currentToken = await store.claimSubmissionRecovery(runId)
+    assert.ok(staleToken)
+    assert.ok(currentToken)
+    assert.notEqual(staleToken, currentToken)
+    assert.equal(await store.completeSubmissionRecovery(runId, staleToken), false)
+    assert.equal(await store.completeSubmissionRecovery(runId, currentToken), true)
+    assert.equal((await store.getRun(runId))?.status, 'queued')
+    assert.equal((await store.listActiveRuns()).some(run => run.run_id === runId), true)
+  } finally { await store.close() }
+})
+
+test('ReviewRunStore fences a stale publisher after another connection takes over', async () => {
+  const sharedConnector = connectorId()
+  const ownerA = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 0 })
+  const ownerB = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 0 })
+  const runId = await createQueuedRun(ownerA)
+  try {
+    const staleToken = await ownerA.claimPublication(runId)
+    const currentToken = await ownerB.claimPublication(runId)
+    assert.ok(staleToken)
+    assert.ok(currentToken)
+    assert.notEqual(staleToken, currentToken)
+    assert.equal(await ownerA.completePublication(runId, staleToken), false)
+    assert.equal(await ownerA.failPublication(runId, staleToken, { message: 'late failure' }, { retry: true }), false)
+    assert.equal(await ownerB.completePublication(runId, currentToken), true)
+    const record = await ownerA.getRun(runId)
+    assert.equal(record?.status, 'published')
+  } finally { await Promise.all([ownerA.close(), ownerB.close()]) }
+})
+
+test('ReviewRunStore spends retry budget only for the current publication owner', async () => {
+  const store = await createStore()
+  const runId = await createQueuedRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    assert.equal(await store.failPublication(runId, token, { code: 'HTTP_503', message: 'unavailable' }, { retry: true }), true)
+    const record = await store.getRun(runId)
+    assert.equal(record?.status, 'queued')
+    assert.equal((await store.listActiveRuns())[0]?.run_id, runId)
+  } finally { await store.close() }
+})
+
+test('ReviewRunStore fences publication step commits with the current publication token', async () => {
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = await createQueuedRun(store)
+  try {
+    const staleToken = await store.claimPublication(runId)
+    assert.ok(staleToken)
+    await store.initializePublicationSteps(runId, staleToken, ['repository:summary-issue'])
+    await store.requirePublicationStepClaim(runId, staleToken, 'repository:summary-issue')
+
+    const currentToken = await store.claimPublication(runId)
+    assert.ok(currentToken)
+    assert.equal(await store.completePublicationStep(runId, staleToken, 'repository:summary-issue', { id: 7 }), false)
+    assert.equal(await store.failPublicationStep(runId, staleToken, 'repository:summary-issue', { message: 'late failure' }), false)
+  } finally { await store.close() }
+})
+
+test('ReviewRunStore reports an exhausted publication step as deterministic', async () => {
+  const store = await createStore()
+  const runId = await createQueuedRun(store)
+  try {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const token = await store.claimPublication(runId)
+      assert.ok(token)
+      if (attempt === 0) await store.initializePublicationSteps(runId, token, ['issue:summary-comment'])
+      await store.requirePublicationStepClaim(runId, token, 'issue:summary-comment')
+      assert.equal(await store.failPublicationStep(runId, token, 'issue:summary-comment', { message: 'temporary failure' }), true)
+      assert.equal(await store.failPublication(runId, token, { message: 'temporary failure' }, { retry: true }), true)
     }
-  })
 
-  assert.equal(record.status, 'queued')
-  assert.equal(record.publish_attempts, 0)
-  assert.equal(record.workflow, 'repository-review')
-  assert.equal(record.run_id, 'run-1')
-  assert.deepEqual(record.publish_context, {
-    repo: {
-      repo_full_name: 'owner/repo'
-    },
-    workspace_ref: 'base-sha',
-    event_type: 'manual'
-  })
-
-  assert.equal(store.listActiveRuns().length, 1)
+    const finalToken = await store.claimPublication(runId)
+    assert.ok(finalToken)
+    await assert.rejects(
+      store.requirePublicationStepClaim(runId, finalToken, 'issue:summary-comment'),
+      (error: unknown) => error instanceof Error &&
+        'code' in error && error.code === 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+    )
+    assert.equal((await store.listPublicationSteps(runId))[0]?.status, 'terminal_failed')
+  } finally { await store.close() }
 })
 
-test('ReviewRunStore keeps preparing runs out of the Runner poller', () => {
-  const store = createStore()
-  const record = store.create_preparing_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-preparing',
-    publish_context: {}
-  })
-
-  assert.equal(record.status, 'preparing')
-  assert.deepEqual(store.listActiveRuns(), [])
-  assert.throws(
-    () => store.create_preparing_review_run({
-      workflow: 'issue-review',
-      run_id: 'run-preparing',
-      publish_context: {}
-    }),
-    /UNIQUE constraint failed/
-  )
+test('ReviewRunStore records Runner execution failure without publication failure', async () => {
+  const store = await createStore()
+  const runId = await createQueuedRun(store)
+  try {
+    assert.equal(await store.failRunnerExecution(runId, {
+      code: 'RUNNER_EXECUTION_FAILED',
+      message: 'Agent execution failed.'
+    }), true)
+    const record = await store.getRun(runId)
+    assert.equal(record?.status, 'failed')
+    assert.equal(record?.failure_code, 'RUNNER_EXECUTION_FAILED')
+    assert.equal(await store.claimPublication(runId), null)
+  } finally { await store.close() }
 })
 
-test('ReviewRunStore marks preparations interrupted by a previous process', () => {
-  const dbPath = temporaryDatabasePath()
-  const first = new ReviewRunStore(dbPath)
-  first.create_preparing_review_run({ workflow: 'issue-review', run_id: 'run-interrupted', publish_context: {} })
-  first.close()
-
-  const restarted = new ReviewRunStore(dbPath)
-  const record = restarted.getRun('run-interrupted')
-  assert.equal(record?.status, 'failed')
-  assert.equal(record?.failure_code, 'PREPARATION_INTERRUPTED')
-  restarted.close()
-})
-
-test('ReviewRunStore reclaims an interrupted ingress with the original run id', () => {
-  const store = new ReviewRunStore(temporaryDatabasePath())
-  store.create_preparing_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-reclaim',
-    publish_context: {},
-    ingress_kind: 'github_webhook',
-    ingress_key: 'delivery-reclaim'
-  })
-
-  // Simulate a restart without reopening the database in this focused test.
-  store.markFailed('run-reclaim', { code: 'PREPARATION_INTERRUPTED', message: 'interrupted' })
-  const admission = store.admit_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-new',
-    publish_context: {},
-    ingress_kind: 'github_webhook',
-    ingress_key: 'delivery-reclaim'
-  })
-
-  assert.equal(admission.created, true)
-  assert.equal(admission.record.run_id, 'run-reclaim')
-  assert.equal(admission.record.status, 'preparing')
-  store.close()
-})
-
-test('ReviewRunStore keeps uncertain submissions out of ordinary preparation recovery', () => {
-  const store = createStore()
-  store.create_preparing_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-uncertain',
-    publish_context: {},
-    ingress_kind: 'github_webhook',
-    ingress_key: 'delivery-uncertain'
-  })
-  store.save_prepared_submission('run-uncertain', { workspace_ref: 'abc' }, { contract_version: 'v4' })
-  store.markFailed('run-uncertain', { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
-
-  const admission = store.admit_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-new',
-    publish_context: {},
-    ingress_kind: 'github_webhook',
-    ingress_key: 'delivery-uncertain'
-  })
-
-  assert.equal(admission.created, false)
-  assert.equal(admission.record.status, 'failed')
-  assert.deepEqual(admission.record.publish_context, { workspace_ref: 'abc' })
-  assert.deepEqual(admission.record.runner_input, { contract_version: 'v4' })
-
-  const claimToken = store.claimSubmissionRecovery('run-uncertain')
-  assert.equal(typeof claimToken, 'string')
-  assert.equal(store.claimSubmissionRecovery('run-uncertain'), null)
-  assert.equal(store.getRun('run-uncertain')?.status, 'recovering')
-  assert.equal(store.completeSubmissionRecovery('run-uncertain', claimToken!), true)
-  assert.equal(store.getRun('run-uncertain')?.status, 'queued')
-  store.close()
-})
-
-test('ReviewRunStore fences a worker after its recovery claim is replaced', async () => {
-  const store = new ReviewRunStore(':memory:', { publishingClaimTimeoutMs: 0 })
-  store.create_preparing_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-fenced',
-    publish_context: {}
-  })
-  store.save_prepared_submission('run-fenced', {}, { contract_version: 'v4' })
-  store.markFailed('run-fenced', { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
-
-  const oldClaim = store.claimSubmissionRecovery('run-fenced')
-  assert.equal(typeof oldClaim, 'string')
-  await new Promise(resolve => setTimeout(resolve, 5))
-  const currentClaim = store.claimSubmissionRecovery('run-fenced')
-  assert.equal(typeof currentClaim, 'string')
-  assert.notEqual(currentClaim, oldClaim)
-
-  assert.equal(store.completeSubmissionRecovery('run-fenced', oldClaim!), false)
-  assert.equal(store.failSubmissionRecovery('run-fenced', oldClaim!, {
-    code: 'SUBMISSION_STATE_UNCERTAIN',
-    message: 'stale worker failed'
-  }), false)
-  assert.equal(store.getRun('run-fenced')?.status, 'recovering')
-  assert.equal(store.completeSubmissionRecovery('run-fenced', currentClaim!), true)
-  assert.equal(store.getRun('run-fenced')?.status, 'queued')
-  store.close()
-})
-
-test('ReviewRunStore only queues a run from preparing', () => {
-  const store = createStore()
-  store.create_preparing_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-transition',
-    publish_context: {}
-  })
-
-  store.mark_queued('run-transition', { issue: { issue_number: 7 } })
-  assert.equal(store.getRun('run-transition')?.status, 'queued')
-  assert.throws(
-    () => store.mark_queued('run-transition', {}),
-    /cannot transition from preparing to queued/
-  )
-})
-
-test('ReviewRunStore atomically reuses the run admitted for the same ingress request', () => {
-  const store = createStore()
-  const first = store.admit_review_run({
-    workflow: 'repository-review',
-    run_id: 'run-first',
-    publish_context: {},
-    ingress_kind: 'github_actions_dispatch',
-    ingress_key: 'octo/example:12345'
-  })
-  const replay = store.admit_review_run({
-    workflow: 'repository-review',
-    run_id: 'run-second',
-    publish_context: {},
-    ingress_kind: 'github_actions_dispatch',
-    ingress_key: 'octo/example:12345'
-  })
-
-  assert.equal(first.created, true)
-  assert.equal(replay.created, false)
-  assert.equal(replay.record.run_id, 'run-first')
-  assert.equal(store.getRun('run-second'), null)
-})
-
-test('ReviewRunStore does not treat a run id constraint as an ingress replay', () => {
-  const store = createStore()
-  store.admit_review_run({
-    workflow: 'repository-review',
-    run_id: 'run-shared',
-    publish_context: {},
-    ingress_kind: 'github_actions_dispatch',
-    ingress_key: 'octo/example:first'
-  })
-
-  assert.throws(
-    () => store.admit_review_run({
-      workflow: 'repository-review',
-      run_id: 'run-shared',
-      publish_context: {},
-      ingress_kind: 'github_actions_dispatch',
-      ingress_key: 'octo/example:second'
-    }),
-    (error: unknown) => {
-      assert.equal((error as { code?: string }).code, 'SQLITE_CONSTRAINT_PRIMARYKEY')
-      return true
-    }
-  )
-})
-
-test('ReviewRunStore removes published runs from active list', () => {
-  const store = createStore()
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-2',
-    publish_context: {}
-  })
-
-  store.markRunning('run-2')
-  assert.equal(store.listActiveRuns()[0]?.status, 'running')
-
-  store.markPublished('run-2')
-  assert.equal(store.listActiveRuns().length, 0)
-  assert.equal(store.getRun('run-2')?.status, 'published')
-})
-
-test('ReviewRunStore keeps publish failures active for retry', () => {
-  const store = createStore()
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-3',
-    publish_context: {}
-  })
-
-  store.markPublishing('run-3')
-  store.markPublishFailed('run-3', {
-    code: 'GITHUB_API_TEMPORARY',
-    message: 'GitHub API unavailable.'
-  })
-
-  const failedRecord = store.getRun('run-3')
-  assert.equal(failedRecord?.status, 'publish_failed')
-  assert.equal(failedRecord?.publish_attempts, 1)
-  assert.equal(failedRecord?.failure_code, 'GITHUB_API_TEMPORARY')
-  assert.equal(store.listActiveRuns()[0]?.run_id, 'run-3')
-
-  store.markPublishing('run-3')
-  const retryingRecord = store.getRun('run-3')
-  assert.equal(retryingRecord?.status, 'publishing')
-  assert.equal(retryingRecord?.publish_attempts, 1)
-  assert.equal(retryingRecord?.failure_code, null)
-  assert.equal(retryingRecord?.failure_message, null)
-})
-
-test('ReviewRunStore only claims publishable runs for publishing once', () => {
-  const store = createStore()
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-claim',
-    publish_context: {}
-  })
-
-  assert.equal(store.markPublishing('run-claim'), true)
-  assert.equal(store.markPublishing('run-claim'), false)
-  assert.equal(store.getRun('run-claim')?.publish_attempts, 0)
-})
-
-test('ReviewRunStore reclaims stale publishing runs', async () => {
-  const store = new ReviewRunStore(':memory:', {
-    publishingClaimTimeoutMs: 0
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-stale-publishing',
-    publish_context: {}
-  })
-
-  assert.equal(store.markPublishing('run-stale-publishing'), true)
-  await new Promise(resolve => setTimeout(resolve, 5))
-  assert.equal(store.markPublishing('run-stale-publishing'), true)
-  assert.equal(store.getRun('run-stale-publishing')?.publish_attempts, 0)
-})
-
-test('ReviewRunStore reclaims stale final publish attempt without exhausting retries', async () => {
-  const store = new ReviewRunStore(':memory:', {
-    publishingClaimTimeoutMs: 0
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-final-attempt',
-    publish_context: {}
-  })
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    assert.equal(store.markPublishing('run-final-attempt'), true)
-    store.markPublishFailed('run-final-attempt', {
-      code: 'GITHUB_API_TEMPORARY',
-      message: 'GitHub API unavailable.'
-    })
+test('ReviewRunStore renews a publication claim before another owner can take it', async () => {
+  const sharedConnector = connectorId()
+  const ownerA = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 1_000 })
+  const ownerB = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 1_000 })
+  const runId = await createQueuedRun(ownerA)
+  const observer = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const token = await ownerA.claimPublication(runId)
+    assert.ok(token)
+    await observer.query('UPDATE publications SET claimed_at=clock_timestamp()-interval \'2 seconds\' WHERE run_id=$1 AND connector_id=$2', [runId, sharedConnector])
+    assert.equal(await ownerA.renewPublicationClaim(runId, token), true)
+    assert.equal(await ownerB.claimPublication(runId), null)
+  } finally {
+    await observer.end()
+    await Promise.all([ownerA.close(), ownerB.close()])
   }
-
-  assert.equal(store.markPublishing('run-final-attempt'), true)
-  assert.equal(store.getRun('run-final-attempt')?.publish_attempts, 2)
-  await new Promise(resolve => setTimeout(resolve, 5))
-
-  assert.equal(store.markPublishing('run-final-attempt'), true)
-  const reclaimedRecord = store.getRun('run-final-attempt')
-  assert.equal(reclaimedRecord?.status, 'publishing')
-  assert.equal(reclaimedRecord?.publish_attempts, 2)
-  assert.equal(reclaimedRecord?.failure_code, null)
-  assert.equal(reclaimedRecord?.failure_message, null)
 })
 
-test('ReviewRunStore stops listing publish failures after max publish attempts', () => {
-  const store = createStore()
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-4',
-    publish_context: {}
-  })
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    store.markPublishing('run-4')
-    store.markPublishFailed('run-4', {
-      code: 'GITHUB_API_PERMANENT',
-      message: 'GitHub rejected the publish request.'
-    })
-  }
-
-  const failedRecord = store.getRun('run-4')
-  assert.equal(failedRecord?.status, 'publish_failed')
-  assert.equal(failedRecord?.publish_attempts, 3)
-  assert.equal(store.listActiveRuns().length, 0)
-})
-
-test('ReviewRunStore exposes publish lifecycle diagnostics', () => {
-  const store = createStore()
-  const publish_context = {}
-
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-queued',
-    publish_context
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-published',
-    publish_context
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-failed',
-    publish_context
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-publish-failed',
-    publish_context
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-retry-exhausted',
-    publish_context
-  })
-
-  store.markPublished('run-published')
-  store.markFailed('run-failed', {
-    code: 'RUNNER_FAILED',
-    message: 'Runner failed.'
-  })
-  store.markPublishing('run-publish-failed')
-  store.markPublishFailed('run-publish-failed', {
-    code: 'GITHUB_API_TEMPORARY',
-    message: 'GitHub API unavailable.'
-  })
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    store.markPublishing('run-retry-exhausted')
-    store.markPublishFailed('run-retry-exhausted', {
-      code: 'GITHUB_API_PERMANENT',
-      message: 'GitHub rejected the publish request.'
-    })
-  }
-
-  const diagnostics = new Map(
-    store.listRunsForDiagnostics().map((run) => [run.run_id, run])
-  )
-
-  assert.equal(diagnostics.get('run-queued')?.is_active, true)
-  assert.equal(diagnostics.get('run-queued')?.is_terminal, false)
-  assert.equal(diagnostics.get('run-queued')?.publish_attempts_remaining, 3)
-
-  assert.equal(diagnostics.get('run-published')?.is_active, false)
-  assert.equal(diagnostics.get('run-published')?.is_terminal, true)
-  assert.equal(diagnostics.get('run-published')?.retry_exhausted, false)
-
-  assert.equal(diagnostics.get('run-failed')?.is_active, false)
-  assert.equal(diagnostics.get('run-failed')?.is_terminal, true)
-  assert.equal(diagnostics.get('run-failed')?.retry_exhausted, false)
-
-  assert.equal(diagnostics.get('run-publish-failed')?.is_active, true)
-  assert.equal(diagnostics.get('run-publish-failed')?.is_terminal, false)
-  assert.equal(diagnostics.get('run-publish-failed')?.publish_attempts_remaining, 2)
-
-  assert.equal(diagnostics.get('run-retry-exhausted')?.is_active, false)
-  assert.equal(diagnostics.get('run-retry-exhausted')?.is_terminal, true)
-  assert.equal(diagnostics.get('run-retry-exhausted')?.retry_exhausted, true)
-  assert.equal(diagnostics.get('run-retry-exhausted')?.publish_attempts_remaining, 0)
-})
-
-test('ReviewRunStore filters diagnostics by status and lifecycle state', () => {
-  const store = createStore()
-  const publish_context = {}
-
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-queued',
-    publish_context
-  })
-  store.create_preparing_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-uncertain',
-    publish_context
-  })
-  store.save_prepared_submission('run-uncertain', publish_context, { contract_version: 'v4' })
-  store.markFailed('run-uncertain', {
-    code: 'SUBMISSION_STATE_UNCERTAIN',
-    message: 'response lost'
-  })
-  store.create_preparing_review_run({
-    workflow: 'issue-review',
-    run_id: 'run-recovering',
-    publish_context
-  })
-  store.save_prepared_submission('run-recovering', publish_context, { contract_version: 'v4' })
-  store.markFailed('run-recovering', {
-    code: 'SUBMISSION_STATE_UNCERTAIN',
-    message: 'response lost'
-  })
-  assert.equal(typeof store.claimSubmissionRecovery('run-recovering'), 'string')
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-published',
-    publish_context
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-failed',
-    publish_context
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-publish-failed',
-    publish_context
-  })
-  createQueuedRun(store, {
-    workflow: 'repository-review',
-    run_id: 'run-retry-exhausted',
-    publish_context
-  })
-
-  store.markPublished('run-published')
-  store.markFailed('run-failed', {
-    code: 'RUNNER_FAILED',
-    message: 'Runner failed.'
-  })
-  store.markPublishing('run-publish-failed')
-  store.markPublishFailed('run-publish-failed', {
-    code: 'GITHUB_API_TEMPORARY',
-    message: 'GitHub API unavailable.'
-  })
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    store.markPublishing('run-retry-exhausted')
-    store.markPublishFailed('run-retry-exhausted', {
-      code: 'GITHUB_API_TEMPORARY',
-      message: 'GitHub API unavailable.'
-    })
-  }
-
-  assert.deepEqual(
-    store.listRunsForDiagnostics({ status: 'published' }).map(run => run.run_id),
-    ['run-published']
-  )
-  assert.deepEqual(
-    new Set(store.listRunsForDiagnostics({ active_only: true }).map(run => run.run_id)),
-    new Set(['run-uncertain', 'run-recovering', 'run-queued', 'run-publish-failed'])
-  )
-  assert.deepEqual(
-    new Set(store.listRunsForDiagnostics({ failed_only: true }).map(run => run.run_id)),
-    new Set(['run-failed', 'run-uncertain', 'run-publish-failed', 'run-retry-exhausted'])
-  )
-  assert.deepEqual(
-    store.listRunsForDiagnostics({ status: 'failed', active_only: true }).map(run => run.run_id),
-    ['run-uncertain']
-  )
+test('ReviewRunStore applies diagnostics filters before the limit', async () => {
+  const store = await createStore()
+  const failedRunId = await createQueuedRun(store)
+  await store.failRunnerExecution(failedRunId, { code: 'RUNNER_EXECUTION_FAILED', message: 'failed' })
+  const successfulRunId = await createQueuedRun(store)
+  try {
+    const failed = await store.listRunsForDiagnostics({ failed_only: true, limit: 1 })
+    assert.deepEqual(failed.map(run => run.run_id), [failedRunId])
+    const queued = await store.listRunsForDiagnostics({ status: 'queued', limit: 1 })
+    assert.deepEqual(queued.map(run => run.run_id), [successfulRunId])
+  } finally { await store.close() }
 })

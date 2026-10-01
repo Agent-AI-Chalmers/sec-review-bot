@@ -119,7 +119,7 @@ Sample 中既有可直接使用的默认值，也有必须替换的空值和占�
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-将 `RUNNER_SERVICE_TOKEN` 设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-input-bundles` 和 `.agent-app-state`，不再分别提供配置项。
+将 `RUNNER_SERVICE_TOKEN` 设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-input-bundles` 和 `.agent-postgres-state`，不再分别提供配置项。
 
 ### 2. GitHub integration `.env`
 
@@ -131,7 +131,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose 会注入容器内私钥路径、Runner Service 地址和 token，以及 input bundle 和 App state 路径；这些值不需要在 `apps/github-integration/.env` 中重复配置。
+Compose 会注入容器内私钥路径、Runner Service 地址和 token、PostgreSQL 连接以及 input bundle 路径；这些值不需要在 `apps/github-integration/.env` 中重复配置。
 
 ### 3. 模型配置
 
@@ -241,7 +241,7 @@ AGENT_MCP_ENABLED=true
 | --- | --- | --- |
 | `.agent-input-bundles` | GitHub integration 写入，宿主机 worker 读取 | 准备好的 runner 输入材料 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
-| `.agent-app-state` | GitHub integration | 后台发布流程使用的 submitted-run state |
+| `.agent-postgres-state` | PostgreSQL | admission、Runner observation 与 publication step 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
 | `.agent-memory` | 宿主机 worker | 启用 memory 时的持久 agent memory store |
 
@@ -357,14 +357,14 @@ GitHub integration 使用容器默认 root 用户，因此 input bundle 或 App 
 可用下面命令修复 ownership：
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-app-state .agent-temporal-state
+sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-postgres-state .agent-temporal-state
 ```
 
-GitHub integration 的 run store 与 Temporal 状态描述的是同一批活跃 run。不要在保留仍需轮询或发布的 `.agent-app-state` 记录时单独删除 `.agent-temporal-state`。重置 run 执行与发布状态时，应先停止完整服务，再同时删除两个状态目录：
+PostgreSQL 协调状态与 Temporal 状态描述的是同一批活跃 run。不要在保留仍需轮询或发布的 PostgreSQL 记录时单独删除 `.agent-temporal-state`。重置 run 执行与发布状态时，应先停止完整服务，再同时删除两个状态目录：
 
 ```bash
 sudo systemctl stop sec-review-bot.target
-sudo rm -rf .agent-temporal-state .agent-app-state
+sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 

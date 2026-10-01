@@ -13,6 +13,8 @@ import {
 import { logInfo } from '../../utils/logger.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { assertV4WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
+import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
+import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
 
 interface IssueDraftPullRequest {
   number: number
@@ -76,10 +78,14 @@ function issueReviewResultFromRunStatus (status: RunnerRunStatus): IssueReviewWo
 export async function handleIssueReviewRun ({
   run,
   status,
+  store,
+  claim_token,
   installation_octokit_for_repo
 }: {
   run: CompletedRunnerRun
   status: RunnerRunStatus
+  store: ReviewRunStore
+  claim_token: string
   installation_octokit_for_repo: InstallationOctokitForRepo
 }): Promise<void> {
   const context = parseIssueReviewPublishContext(run.publish_context)
@@ -94,7 +100,9 @@ export async function handleIssueReviewRun ({
     run_id: run.run_id,
     workspace_ref: context.workspace_ref,
     workflow_result,
-    event_type: context.event_type
+    event_type: context.event_type,
+    store,
+    claim_token
   })
 }
 
@@ -104,7 +112,9 @@ async function publishIssueReviewResult ({
   run_id,
   workspace_ref,
   workflow_result,
-  event_type
+  event_type,
+  store,
+  claim_token
 }: {
   octokit: unknown
   issue: IssueContext
@@ -112,6 +122,8 @@ async function publishIssueReviewResult ({
   workspace_ref: string
   workflow_result: IssueReviewWorkflowResult
   event_type: 'opened' | 'manual_review'
+  store: ReviewRunStore
+  claim_token: string
 }): Promise<void> {
   let draftPullRequest: IssueDraftPullRequest | null = null
   const github = octokit as GitHubAppOctokit
@@ -125,19 +137,43 @@ async function publishIssueReviewResult ({
       })
     : null
 
+  await store.initializePublicationSteps(run_id, claim_token, [
+    ...(draftPrPlan?.patch_ready ? ['issue:draft-pr'] : []),
+    'issue:summary-comment'
+  ])
+
   if (draftPrPlan?.patch_ready) {
     logInfo('draft_pr_creation_started', {
       event_type,
       issue: issue.issue_number,
       repo: issue.repo_full_name
     })
-    draftPullRequest = await createDraftPullRequestFromIssueReviewRecord({
-      octokit: github,
-      issue,
-      run_id,
-      workspace_ref,
-      review_record
-    }) as IssueDraftPullRequest | null
+    const step = (await store.listPublicationSteps(run_id)).find(item => item.step_key === 'issue:draft-pr')
+    if (step?.status === 'succeeded' && step.remote_object_id && step.remote_object_url) {
+      draftPullRequest = { number: Number(step.remote_object_id), html_url: step.remote_object_url }
+    } else {
+      await store.requirePublicationStepClaim(run_id, claim_token, 'issue:draft-pr')
+      try {
+        draftPullRequest = await createDraftPullRequestFromIssueReviewRecord({
+          octokit: github,
+          issue,
+          run_id,
+          workspace_ref,
+          review_record
+        }) as IssueDraftPullRequest | null
+        const remote = draftPullRequest === null
+          ? {}
+          : { id: draftPullRequest.number, url: draftPullRequest.html_url }
+        if (!await store.completePublicationStep(run_id, claim_token, 'issue:draft-pr', remote)) throw new Error('Publication claim was lost after publishing the issue draft PR.')
+      } catch (error) {
+        const failure = classifyPublicationFailure(error)
+        await store.failPublicationStep(run_id, claim_token, 'issue:draft-pr', {
+          code: failure.code,
+          message: asErrorMessage(error)
+        }, { retry: failure.retry })
+        throw error
+      }
+    }
     if (draftPullRequest) {
       logInfo('draft_pr_creation_completed', {
         draft_pr_number: draftPullRequest.number,
@@ -165,13 +201,27 @@ async function publishIssueReviewResult ({
     repo: issue.repo_full_name
   })
 
-  const comment = await createIssueCommentUnlessMarkerExists(github, {
-    owner_login: issue.owner_login,
-    repo_name: issue.repo_name,
-    issue_number: issue.issue_number,
-    body: commentBody,
-    marker
-  }) as IssueReviewComment
+  const commentStep = (await store.listPublicationSteps(run_id)).find(item => item.step_key === 'issue:summary-comment')
+  if (commentStep?.status === 'succeeded') return
+  await store.requirePublicationStepClaim(run_id, claim_token, 'issue:summary-comment')
+  let comment: IssueReviewComment
+  try {
+    comment = await createIssueCommentUnlessMarkerExists(github, {
+      owner_login: issue.owner_login,
+      repo_name: issue.repo_name,
+      issue_number: issue.issue_number,
+      body: commentBody,
+      marker
+    }) as IssueReviewComment
+    if (!await store.completePublicationStep(run_id, claim_token, 'issue:summary-comment', { id: comment.id, url: comment.html_url })) throw new Error('Publication claim was lost after publishing the issue summary comment.')
+  } catch (error) {
+    const failure = classifyPublicationFailure(error)
+    await store.failPublicationStep(run_id, claim_token, 'issue:summary-comment', {
+      code: failure.code,
+      message: asErrorMessage(error)
+    }, { retry: failure.retry })
+    throw error
+  }
 
   logInfo('issue_comment_publish_completed', {
     comment_id: comment.id,

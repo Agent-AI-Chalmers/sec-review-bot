@@ -24,19 +24,6 @@ interface IssueCommentSummary {
   } | null
 }
 
-interface CreatePullRequestReviewCommentArgs {
-  owner_login: string
-  repo_name: string
-  pr_number: number
-  commit_id: string
-  path: string
-  body: string
-  line: number
-  side: ReviewCommentSide
-  start_line?: number
-  start_side?: ReviewCommentSide
-}
-
 export interface PullRequestReviewCommentInput {
   path: string
   body: string
@@ -87,7 +74,7 @@ function isOwnPullRequestApprovalError (error: unknown): boolean {
   })
 }
 
-export async function createIssueComment (
+async function createIssueComment (
   octokit: GitHubAppOctokit,
   { owner_login, repo_name, issue_number, body }: CreateIssueCommentArgs
 ): Promise<{ id: number, html_url: string }> {
@@ -169,42 +156,7 @@ export async function createIssueCommentUnlessMarkerExists (
   }
 }
 
-export async function createPullRequestReviewComment (
-  octokit: GitHubAppOctokit,
-  {
-    owner_login,
-    repo_name,
-    pr_number,
-    commit_id,
-    path,
-    body,
-    line,
-    side,
-    start_line,
-    start_side
-  }: CreatePullRequestReviewCommentArgs
-): Promise<Record<string, unknown>> {
-  const response = await octokit.rest.pulls.createReviewComment({
-    owner: owner_login,
-    repo: repo_name,
-    pull_number: pr_number,
-    commit_id: commit_id,
-    path,
-    body,
-    line,
-    side,
-    ...(typeof start_line === 'number'
-      ? {
-          start_line: start_line,
-          start_side: start_side ?? 'RIGHT'
-        }
-      : {})
-  })
-
-  return response.data
-}
-
-export async function createPullRequestReview (
+async function createPullRequestReview (
   octokit: GitHubAppOctokit,
   {
     owner_login,

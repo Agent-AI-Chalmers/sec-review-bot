@@ -15,7 +15,7 @@ interface RunIssueReviewArgs {
   repair_mode?: 'test-changes-allowed' | 'no-test-changes' | null
   // Runs after preparation and before the Runner POST, so callers can durably
   // retain the context needed if the submission response is lost.
-  on_prepared?: (submitted: SubmittedIssueReviewRun, input: IssueReviewInput & Record<string, unknown>) => void
+  on_prepared?: (submitted: SubmittedIssueReviewRun, input: IssueReviewInput & Record<string, unknown>) => void | Promise<void>
 }
 
 export interface SubmittedIssueReviewRun {
@@ -99,7 +99,7 @@ export async function startIssueReviewRun (args: RunIssueReviewArgs): Promise<Su
     workflow: 'issue-review',
     event_type
   }
-  args.on_prepared?.(preparedRun, input)
+  await args.on_prepared?.(preparedRun, input)
   const submitted = await submitRunnerRun({ workflow: 'issue-review', run_id: prepared.run_id, input })
   logInfo('issue_review_runner_run_submitted', {
     event_type,

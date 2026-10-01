@@ -13,17 +13,21 @@ function diagnosticRun (overrides: Partial<ReviewRunDiagnosticRecord> = {}): Rev
     run_id: 'run-1',
     workflow: 'issue-review',
     publish_context: {},
-    status: 'publish_failed',
+    status: 'queued',
     created_at: '2026-06-26T00:00:00.000Z',
     updated_at: '2026-06-26T00:01:00.000Z',
     published_at: null,
-    publish_attempts: 2,
     failure_code: 'GITHUB_API_UNAVAILABLE',
     failure_message: 'GitHub API unavailable.',
+    runner_status: 'queued',
+    runner_failure_code: null,
+    runner_failure_message: null,
+    publication_status: 'pending',
+    publication_failure_code: null,
+    publication_failure_message: null,
+    failed_steps: [],
     is_active: true,
     is_terminal: false,
-    retry_exhausted: false,
-    publish_attempts_remaining: 1,
     ...overrides
   }
 }
@@ -37,13 +41,13 @@ test('runner run diagnostics parses table and json options', () => {
     limit: 25,
     status: null
   })
-  assert.deepEqual(parseDiagnosticsArgs(['--json', '--limit', '5', '--status', 'publish_failed']), {
+  assert.deepEqual(parseDiagnosticsArgs(['--json', '--limit', '5', '--status', 'queued']), {
     active_only: false,
     failed_only: false,
     help: false,
     json: true,
     limit: 5,
-    status: 'publish_failed'
+    status: 'queued'
   })
   assert.deepEqual(parseDiagnosticsArgs(['--limit=7', '--status=failed', '--active-only']), {
     active_only: true,
@@ -115,13 +119,33 @@ test('runner run diagnostics formats run state table', () => {
       status: 'failed',
       is_active: false,
       is_terminal: true,
-      retry_exhausted: false,
-      publish_attempts_remaining: 0,
-      failure_code: 'ISSUE_RESULT_INVALID'
+      runner_status: 'failed',
+      runner_failure_code: 'RUNNER_EXECUTION_FAILED',
+      publication_status: 'not_required',
+      failure_code: 'RUNNER_EXECUTION_FAILED'
     })
   ])
 
-  assert.match(table, /^run_id\s+workflow\s+status\s+active\s+terminal\s+retry_exhausted/m)
-  assert.match(table, /run-1\s+issue-review\s+publish_failed\s+yes\s+no\s+no\s+2\s+1\s+GITHUB_API_UNAVAILABLE/)
-  assert.match(table, /run-2\s+issue-review\s+failed\s+no\s+yes\s+no\s+2\s+0\s+ISSUE_RESULT_INVALID/)
+  assert.match(table, /^run_id\s+workflow\s+runner_status\s+publication_status/m)
+  assert.match(table, /run-1\s+issue-review\s+queued\s+pending\s+yes\s+no/)
+  assert.match(table, /run-2\s+issue-review\s+failed\s+not_required\s+no\s+yes\s+RUNNER_EXECUTION_FAILED/)
+})
+
+test('runner run diagnostics displays publication and step failures separately', () => {
+  const table = formatReviewRunDiagnostics([diagnosticRun({
+    publication_status: 'failed',
+    publication_failure_code: 'GITHUB_VALIDATION_REJECTED',
+    failed_steps: [{
+      step_key: 'repository:delivery:delivery-1',
+      status: 'terminal_failed',
+      attempts: 1,
+      remote_object_id: null,
+      remote_object_url: null,
+      failure_code: 'GITHUB_VALIDATION_REJECTED',
+      failure_message: 'Validation failed.'
+    }]
+  })])
+
+  assert.match(table, /GITHUB_VALIDATION_REJECTED/)
+  assert.match(table, /repository:delivery:delivery-1:GITHUB_VALIDAT\.\.\./)
 })

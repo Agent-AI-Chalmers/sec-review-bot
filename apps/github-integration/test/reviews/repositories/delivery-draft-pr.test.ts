@@ -1,8 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createRepositoryDeliveryDraftPr } from '../../../reviews/repositories/delivery-draft-pr.js'
+import {
+  buildRepositoryDeliveryBranchName,
+  createRepositoryDeliveryDraftPr
+} from '../../../reviews/repositories/delivery-draft-pr.js'
 import type { RepositoryDelivery } from '../../../reviews/repositories/result.js'
+
+test('repository delivery branch identity includes both run and delivery', () => {
+  const delivery = { delivery_id: 'case/shared' } as RepositoryDelivery
+  const first = buildRepositoryDeliveryBranchName('run/one', delivery)
+  const second = buildRepositoryDeliveryBranchName('run/two', delivery)
+
+  assert.notEqual(first, second)
+  assert.match(first, /^sec-review-bot\/repo-scan\/run-one-[a-f0-9]{12}\/case-shared-[a-f0-9]{12}$/)
+})
 import type { FileMode } from '../../../reviews/file-change.js'
 
 type CreateRepositoryDeliveryDraftPrParams = Parameters<typeof createRepositoryDeliveryDraftPr>[0]
@@ -99,6 +111,7 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
   const result = await createRepositoryDeliveryDraftPr({
     octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
     repo,
+    run_id: 'run-delete',
     input,
     delivery
   })
@@ -155,6 +168,7 @@ test('delivery-draft-pr uses scan target branch as PR base when provided', async
   await createRepositoryDeliveryDraftPr({
     octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
     repo,
+    run_id: 'run-target-branch',
     input,
     delivery
   })
@@ -191,6 +205,7 @@ test('delivery-draft-pr rejects unsafe file paths before publishing git objects'
     createRepositoryDeliveryDraftPr({
       octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
       repo,
+      run_id: 'run-unsafe-path',
       input,
       delivery
     }),
@@ -241,6 +256,7 @@ test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR'
     createRepositoryDeliveryDraftPr({
       octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
       repo,
+      run_id: 'run-unsafe-existing-pr',
       input,
       delivery
     }),

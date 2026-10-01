@@ -43,9 +43,15 @@ function sanitizeBranchSegment (value: unknown): string {
     .replace(/^[-/]+|[-/]+$/g, '')
 }
 
-function buildDraftBranchNameFromDelivery (delivery: RepositoryDelivery): string {
-  const delivery_id = String(delivery?.delivery_id ?? 'manual').slice(0, 80)
-  return sanitizeBranchSegment(`sec-review-bot/repo-scan/${delivery_id}`)
+function stableBranchSegment (value: unknown): string {
+  const raw = String(value ?? '').trim() || 'unknown'
+  const readable = sanitizeBranchSegment(raw).replaceAll('/', '-').slice(0, 48) || 'unknown'
+  const digest = crypto.createHash('sha256').update(raw).digest('hex').slice(0, 12)
+  return `${readable}-${digest}`
+}
+
+export function buildRepositoryDeliveryBranchName (run_id: string, delivery: RepositoryDelivery): string {
+  return `sec-review-bot/repo-scan/${stableBranchSegment(run_id)}/${stableBranchSegment(delivery.delivery_id ?? 'manual')}`
 }
 
 function normalizeTargetBranch (value: unknown): string {
@@ -140,12 +146,14 @@ function validateDeliveryFileChangePaths (delivery: RepositoryDelivery): void {
 export async function createRepositoryDeliveryDraftPr ({
   octokit,
   repo,
+  run_id,
   input,
   delivery,
   case_results = []
 }: {
   octokit: GitHubAppOctokit
   repo: RepositoryContext
+  run_id: string
   input: RepositoryReviewInput
   delivery: RepositoryDelivery
   case_results?: RepositoryCaseResult[]
@@ -153,7 +161,7 @@ export async function createRepositoryDeliveryDraftPr ({
   // Validate before idempotent PR reuse so unsafe deliveries never publish or reuse a PR.
   validateDeliveryFileChangePaths(delivery)
 
-  const branch_name = buildDraftBranchNameFromDelivery(delivery)
+  const branch_name = buildRepositoryDeliveryBranchName(run_id, delivery)
   const title = String(buildDeliveryDraftPrTitle(delivery))
   const body = buildDeliveryDraftPrBody({
     repo,
@@ -253,3 +261,4 @@ export async function createRepositoryDeliveryDraftPr ({
     reused: false
   }
 }
+import crypto from 'node:crypto'
