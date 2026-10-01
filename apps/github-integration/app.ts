@@ -18,6 +18,7 @@ import { reviewExecutionTracker } from './infrastructure/review-execution-tracke
 import { logError, logInfo } from './utils/logger.js'
 
 await verifyGitWorkspaceRuntime()
+await reviewRunStore.initialize()
 
 const app = createGitHubApp()
 
@@ -101,7 +102,7 @@ async function shutdown (signal: ShutdownSignal): Promise<void> {
     (result): result is PromiseRejectedResult => result.status === 'rejected'
   )?.reason
   try {
-    reviewRunStore.close()
+    await reviewRunStore.close()
   } catch (error) {
     shutdownError ??= error
   }

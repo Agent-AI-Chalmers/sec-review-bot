@@ -4,14 +4,6 @@ ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
     npm_config_registry=${NPM_CONFIG_REGISTRY}
 
-# better-sqlite3 may compile native bindings when a prebuild is unavailable.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        g++ \
-        make \
-        python3 \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 COPY apps/github-integration/package.json apps/github-integration/pnpm-lock.yaml apps/github-integration/pnpm-workspace.yaml ./

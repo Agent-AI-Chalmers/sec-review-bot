@@ -9,11 +9,6 @@ import {
 
 test('repository renderer derives blocked confirmed case cards from case results', () => {
   const body = renderRepositorySecuritySummaryComment({
-    _repo: {
-      repo_full_name: 'octo-org/example',
-      owner_login: 'octo-org',
-      repo_name: 'example'
-    },
     workflow_result: {
       run_id: 'run-1',
       scan_summary: {
@@ -74,7 +69,6 @@ test('repository renderer derives blocked confirmed case cards from case results
 
 test('repository blocked confirmed case uses disposition reason as mitigation and verification fallback', () => {
   const body = renderRepositorySecuritySummaryComment({
-    _repo: { repo_full_name: 'octo-org/example' },
     workflow_result: {
       run_id: 'run-1',
       case_results: [
@@ -110,7 +104,6 @@ test('repository blocked confirmed case uses disposition reason as mitigation an
 
 test('repository renderer preserves CVSS not-scored state', () => {
   const summary = renderRepositorySecuritySummaryComment({
-    _repo: { repo_full_name: 'octo-org/example' },
     workflow_result: {
       run_id: 'run-1',
       case_results: [
@@ -350,7 +343,6 @@ test('repository draft PR case details use delivery fallback text', () => {
 
 test('repository summary notes shared modified files across deliveries', () => {
   const body = renderRepositorySecuritySummaryComment({
-    _repo: { repo_full_name: 'octo-org/example' },
     workflow_result: {
       run_id: 'run-1'
     },

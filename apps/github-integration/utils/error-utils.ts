@@ -1,4 +1,4 @@
-export interface GitHubErrorResponse {
+interface GitHubErrorResponse {
   status: number | undefined
   headers: Record<string, unknown> | undefined
   data: {
@@ -7,7 +7,7 @@ export interface GitHubErrorResponse {
   } | undefined
 }
 
-export interface ErrorWithResponse {
+interface ErrorWithResponse {
   message: string | undefined
   name: string | undefined
   status: number | undefined
@@ -67,12 +67,4 @@ export function asErrorWithResponse (error: unknown): ErrorWithResponse {
     status: undefined,
     response: undefined
   }
-}
-
-export function getErrorMessage (error: unknown): string {
-  return asErrorWithResponse(error).message ?? String(error)
-}
-
-export function isGitHubErrorResponse (value: unknown): value is GitHubErrorResponse {
-  return toGitHubErrorResponse(value) !== undefined
 }

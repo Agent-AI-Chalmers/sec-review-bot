@@ -22,8 +22,7 @@ const RUN_STATUSES: ReviewRunStatus[] = [
   'running',
   'publishing',
   'published',
-  'failed',
-  'publish_failed'
+  'failed'
 ]
 
 function parsePositiveIntegerOption (name: string, value: string | undefined): number {
@@ -115,13 +114,13 @@ function truncate (value: string, maxLength: number): string {
 function cellValue (run: ReviewRunDiagnosticRecord, column: string): string {
   if (column === 'run_id') return run.run_id
   if (column === 'workflow') return run.workflow
-  if (column === 'status') return run.status
+  if (column === 'runner_status') return run.runner_status
+  if (column === 'publication_status') return run.publication_status
   if (column === 'active') return boolText(run.is_active)
   if (column === 'terminal') return boolText(run.is_terminal)
-  if (column === 'retry_exhausted') return boolText(run.retry_exhausted)
-  if (column === 'attempts') return String(run.publish_attempts)
-  if (column === 'remaining') return String(run.publish_attempts_remaining)
-  if (column === 'failure_code') return run.failure_code ?? ''
+  if (column === 'runner_failure') return run.runner_failure_code ?? ''
+  if (column === 'publication_failure') return run.publication_failure_code ?? ''
+  if (column === 'step_failures') return run.failed_steps.map(step => `${step.step_key}:${step.failure_code ?? step.status}`).join(',')
   if (column === 'updated_at') return run.updated_at
   throw new Error(`Unknown diagnostics column: ${column}`)
 }
@@ -130,13 +129,13 @@ export function formatReviewRunDiagnostics (runs: ReviewRunDiagnosticRecord[]): 
   const columns = [
     'run_id',
     'workflow',
-    'status',
+    'runner_status',
+    'publication_status',
     'active',
     'terminal',
-    'retry_exhausted',
-    'attempts',
-    'remaining',
-    'failure_code',
+    'runner_failure',
+    'publication_failure',
+    'step_failures',
     'updated_at'
   ]
   const rows = runs.map((run) => columns.map((column) => truncate(cellValue(run, column), 48)))
@@ -166,7 +165,7 @@ export function diagnosticsHelp (): string {
     '  --limit <n>        Maximum number of rows to print. Defaults to 25.',
     `  --status <status>  Filter by status: ${RUN_STATUSES.join(', ')}.`,
     '  --active-only      Show only runs still active for the background publisher.',
-    '  --failed-only      Show failed and publish_failed runs.',
+    '  --failed-only      Show terminal failed runs.',
     '  --json             Print JSON instead of a table.',
     '  -h, --help         Show this help text.'
   ].join('\n')
@@ -190,12 +189,17 @@ async function main (): Promise<void> {
 
   process.env.DOTENV_CONFIG_QUIET = process.env.DOTENV_CONFIG_QUIET ?? 'true'
   const { reviewRunStore } = await import('../infrastructure/runner/review-store.js')
-  const runs = reviewRunStore.listRunsForDiagnostics(diagnosticsStoreOptions(options))
-  if (options.json) {
-    console.log(JSON.stringify(runs, null, 2))
-    return
+  await reviewRunStore.initialize()
+  try {
+    const runs = await reviewRunStore.listRunsForDiagnostics(diagnosticsStoreOptions(options))
+    if (options.json) {
+      console.log(JSON.stringify(runs, null, 2))
+      return
+    }
+    console.log(formatReviewRunDiagnostics(runs))
+  } finally {
+    await reviewRunStore.close()
   }
-  console.log(formatReviewRunDiagnostics(runs))
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -11,10 +11,12 @@ import {
 
 type PullRequestReviewEventType = 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 type StartPullRequestReview = typeof startPullRequestReviewRun
-type PullRequestReviewRunStore = Pick<
-  typeof reviewRunStore,
-  'admit_review_run' | 'mark_queued' | 'markFailed'
-> & Partial<Pick<typeof reviewRunStore, 'save_prepared_submission'>>
+type PullRequestReviewRunStore = {
+  admit_review_run: (...args: Parameters<typeof reviewRunStore.admit_review_run>) => Awaited<ReturnType<typeof reviewRunStore.admit_review_run>> | ReturnType<typeof reviewRunStore.admit_review_run>
+  mark_queued: (...args: Parameters<typeof reviewRunStore.mark_queued>) => unknown
+  failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
+  save_prepared_submission?: (...args: Parameters<typeof reviewRunStore.save_prepared_submission>) => unknown
+}
 
 interface StartPullRequestReviewCommandDeps {
   start_review: StartPullRequestReview
@@ -58,7 +60,7 @@ export async function startPullRequestReviewCommand ({
     run_id: candidate_run_id,
     publish_context: {}
   } as const
-  const admission = store.admit_review_run({
+  const admission = await store.admit_review_run({
     ...run,
     ingress_kind: 'github_webhook',
     ingress_key: delivery_id
@@ -72,6 +74,8 @@ export async function startPullRequestReviewCommand ({
     return { run_id: admission.record.run_id }
   }
   const run_id = admission.record.run_id
+  const preparationToken = admission.preparation_token
+  if (!preparationToken) throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
 
   let submitted: SubmittedPullRequestReviewRun
   try {
@@ -85,14 +89,16 @@ export async function startPullRequestReviewCommand ({
       run_id,
       event_type,
       repair_mode: event_type === 'manual_review' ? repair_mode : null,
-      on_prepared: (prepared, input) => store.save_prepared_submission?.(
-        run_id,
-        pullRequestReviewPublishContext(prepared),
-        input
-      )
+      on_prepared: async (prepared, input) => {
+        await store.save_prepared_submission?.(
+          run_id, preparationToken,
+          pullRequestReviewPublishContext(prepared),
+          input
+        )
+      }
     })
   } catch (error) {
-    store.markFailed(run_id, {
+    await store.failPreparation(run_id, preparationToken, {
       // A lost Runner response is recoverable by replaying the same run_id;
       // PR context and input preparation failures remain terminal.
       code: error instanceof RunnerSubmissionUncertainError ? 'SUBMISSION_STATE_UNCERTAIN' : 'REVIEW_START_FAILED',
@@ -102,9 +108,9 @@ export async function startPullRequestReviewCommand ({
   }
 
   try {
-    store.mark_queued(run_id, pullRequestReviewPublishContext(submitted))
+    await store.mark_queued(run_id, preparationToken, pullRequestReviewPublishContext(submitted))
   } catch (error) {
-    store.markFailed(run_id, {
+    await store.failPreparation(run_id, preparationToken, {
       code: 'SUBMISSION_STATE_UNCERTAIN',
       message: `Runner accepted the run, but its queued state was not recorded: ${error instanceof Error ? error.message : String(error)}`
     })

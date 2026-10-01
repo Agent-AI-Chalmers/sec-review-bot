@@ -1,7 +1,11 @@
 .git
 node_modules
 dist
-.agent-app-state
+.agent-postgres-state
+.agent-input-bundles
+.agent-artifacts
+.agent-temporal-state
+.agent-memory
 .env
 *.pem
 *.log

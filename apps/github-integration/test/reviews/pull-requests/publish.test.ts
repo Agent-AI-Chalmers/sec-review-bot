@@ -4,6 +4,14 @@ import test from 'node:test'
 import { handlePullRequestReviewRun } from '../../../reviews/pull-requests/publish.js'
 import { setGitHubAppMetadata } from '../../../infrastructure/github/github-app-metadata-service.js'
 
+const stepStore = {
+  initializePublicationSteps: async () => {},
+  listPublicationSteps: async () => [{ step_key: 'pull-request:review', status: 'pending' }],
+  requirePublicationStepClaim: async () => {},
+  completePublicationStep: async () => true,
+  failPublicationStep: async () => true
+}
+
 function pullRequestContext (overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     action: 'opened',
@@ -111,8 +119,9 @@ test('pull request publish requests changes for confirmed risks without inline s
         contract_version: 'v4',
         review_record: review_record()
       }
-    },
-    installation_octokit_for_repo: async () => octokit
+    },store: stepStore as never,
+claim_token: 'test-claim',
+installation_octokit_for_repo: async () => octokit
   })
 
   assert.equal(issueComments.length, 0)
@@ -209,8 +218,9 @@ test('pull request publish approves when analysis is not confirmed', async () =>
           }
         })
       }
-    },
-    installation_octokit_for_repo: async () => octokit
+    },store: stepStore as never,
+claim_token: 'test-claim',
+installation_octokit_for_repo: async () => octokit
   })
 
   assert.equal(issueComments.length, 0)
@@ -263,8 +273,9 @@ test('pull request publish comments instead of approving a PR authored by the ap
             }
           })
         }
-      },
-      installation_octokit_for_repo: async () => octokit
+      },store: stepStore as never,
+claim_token: 'test-claim',
+installation_octokit_for_repo: async () => octokit
     })
   } finally {
     setGitHubAppMetadata()
@@ -331,8 +342,9 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
           }
         })
       }
-    },
-    installation_octokit_for_repo: async () => octokit
+    },store: stepStore as never,
+claim_token: 'test-claim',
+installation_octokit_for_repo: async () => octokit
   })
 
   assert.deepEqual(
@@ -397,8 +409,9 @@ test('pull request publish falls back to comment when own PR approval error is i
           }
         })
       }
-    },
-    installation_octokit_for_repo: async () => octokit
+    },store: stepStore as never,
+claim_token: 'test-claim',
+installation_octokit_for_repo: async () => octokit
   })
 
   assert.deepEqual(
@@ -475,8 +488,9 @@ test('pull request publish requests changes for confirmed risks with inline sugg
           }
         })
       }
-    },
-    installation_octokit_for_repo: async () => octokit
+    },store: stepStore as never,
+claim_token: 'test-claim',
+installation_octokit_for_repo: async () => octokit
   })
 
   assert.equal(pullReviews.length, 1)
@@ -531,8 +545,9 @@ test('pull request publish does not create a fallback review after an uncertain 
             }
           })
         }
-      },
-      installation_octokit_for_repo: async () => octokit
+      },store: stepStore as never,
+claim_token: 'test-claim',
+installation_octokit_for_repo: async () => octokit
     }),
     /connection reset/
   )

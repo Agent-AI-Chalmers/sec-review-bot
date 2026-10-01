@@ -165,7 +165,12 @@ interface DispatchRepositoryReviewCommandDeps {
   getInstallationOctokit: (repo_full_name: string) => Promise<GitHubAppOctokit>
   resolve_dispatch: typeof resolveRepositoryReviewDispatch
   submit_run: typeof startRepositoryReviewRun
-  store: Pick<typeof reviewRunStore, 'admit_review_run' | 'mark_queued' | 'markFailed'> & Partial<Pick<typeof reviewRunStore, 'save_prepared_submission'>>
+  store: {
+    admit_review_run: (...args: Parameters<typeof reviewRunStore.admit_review_run>) => Awaited<ReturnType<typeof reviewRunStore.admit_review_run>> | ReturnType<typeof reviewRunStore.admit_review_run>
+    mark_queued: (...args: Parameters<typeof reviewRunStore.mark_queued>) => unknown
+    failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
+    save_prepared_submission?: (...args: Parameters<typeof reviewRunStore.save_prepared_submission>) => unknown
+  }
   create_run_id: typeof createRunId
 }
 
@@ -207,7 +212,7 @@ export async function dispatchRepositoryReview ({
   }
   const { repo_full_name, correlation_id } = validated
   const candidate_run_id = create_run_id()
-  const admission = store.admit_review_run({
+  const admission = await store.admit_review_run({
     workflow: 'repository-review',
     run_id: candidate_run_id,
     publish_context: {},
@@ -226,6 +231,8 @@ export async function dispatchRepositoryReview ({
     }
   }
   const run_id = admission.record.run_id
+  const preparationToken = admission.preparation_token
+  if (!preparationToken) throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
 
   let octokit: GitHubAppOctokit
   let resolved: Awaited<ReturnType<typeof resolveRepositoryReviewDispatch>>
@@ -233,7 +240,7 @@ export async function dispatchRepositoryReview ({
     octokit = await getInstallationOctokit(repo_full_name)
     resolved = await resolve_dispatch({ octokit, payload })
   } catch (error) {
-    store.markFailed(run_id, {
+    await store.failPreparation(run_id, preparationToken, {
       code: 'REVIEW_PREPARATION_FAILED',
       message: asErrorMessage(error) || 'Repository review preparation failed.'
     })
@@ -248,14 +255,16 @@ export async function dispatchRepositoryReview ({
       octokit,
       run_id,
       ...resolved,
-      on_prepared: (prepared, input) => store.save_prepared_submission?.(
-        run_id,
-        repositoryReviewPublishContext(prepared),
-        input
-      )
+      on_prepared: async (prepared, input) => {
+        await store.save_prepared_submission?.(
+          run_id, preparationToken,
+          repositoryReviewPublishContext(prepared),
+          input
+        )
+      }
     })
   } catch (error) {
-    store.markFailed(run_id, {
+    await store.failPreparation(run_id, preparationToken, {
       // Submission transport failures may hide an accepted Temporal workflow;
       // replay must retain this run_id instead of creating another workflow.
       code: error instanceof RunnerSubmissionUncertainError ? 'SUBMISSION_STATE_UNCERTAIN' : 'REVIEW_START_FAILED',
@@ -270,9 +279,9 @@ export async function dispatchRepositoryReview ({
     publish_context: repositoryReviewPublishContext(submitted)
   }
   try {
-    store.mark_queued(run_id, queuedRun.publish_context)
+    await store.mark_queued(run_id, preparationToken, queuedRun.publish_context)
   } catch (error) {
-    store.markFailed(run_id, {
+    await store.failPreparation(run_id, preparationToken, {
       code: 'SUBMISSION_STATE_UNCERTAIN',
       message: `Runner accepted the run, but its queued state was not recorded: ${asErrorMessage(error)}`
     })

@@ -170,11 +170,11 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       store: {
         admit_review_run: (run) => {
           saved_runs.push(run)
-          return { record: { ...run, status: 'preparing' }, created: true } as never
+          return { record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' } as never
         },
-        save_prepared_submission: (run_id, context, input) => saved_runs.push({ run_id, context, input }),
+        save_prepared_submission: (run_id, _token, context, input) => saved_runs.push({ run_id, context, input }),
         mark_queued: () => {},
-        markFailed: () => assert.fail('successful review must not be marked failed')
+        failPreparation: () => assert.fail('successful review must not be marked failed')
       }
     }
   })
@@ -256,11 +256,11 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
       },
       store: {
         admit_review_run: () => ({
-          created: false,
+          created: false, preparation_token: null,
           record: { run_id: 'run-original', status: 'running' } as never
         }),
         mark_queued: () => assert.fail('replayed dispatch must not queue again'),
-        markFailed: () => assert.fail('replayed dispatch must not change the original run')
+        failPreparation: () => assert.fail('replayed dispatch must not change the original run')
       }
     }
   })
@@ -294,10 +294,10 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
         store: {
           admit_review_run: (run) => {
             transitions.push(['preparing', run])
-            return { record: { ...run, status: 'preparing' }, created: true } as never
+            return { record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' } as never
           },
           mark_queued: () => assert.fail('invalid dispatch must not queue a run'),
-          markFailed: (run_id, error) => transitions.push(['failed', run_id, error])
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
     }),
@@ -329,7 +329,7 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
         store: {
           admit_review_run: () => assert.fail('invalid contract must not create a run'),
           mark_queued: () => assert.fail('invalid contract must not queue'),
-          markFailed: () => assert.fail('invalid contract has no run to fail')
+          failPreparation: () => assert.fail('invalid contract has no run to fail')
         }
       }
     }),
@@ -366,10 +366,10 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
         store: {
           admit_review_run: (run) => {
             transitions.push(['preparing', run])
-            return { record: { ...run, status: 'preparing' }, created: true } as never
+            return { record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' } as never
           },
           mark_queued: () => assert.fail('failed review must not be queued'),
-          markFailed: (run_id, error) => transitions.push(['failed', run_id, error])
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
     }),
@@ -426,10 +426,10 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           throw error
         },
         store: {
-          admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true }) as never,
-          save_prepared_submission: (run_id, context, input) => transitions.push(['prepared', run_id, context, input]),
+          admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' }) as never,
+          save_prepared_submission: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
           mark_queued: () => assert.fail('uncertain submission must not queue yet'),
-          markFailed: (run_id, failure) => transitions.push([run_id, failure])
+          failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
     }),

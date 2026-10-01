@@ -458,14 +458,12 @@ export function buildRepoReviewSummaryBody ({ repo }: { repo: RepoLike }): strin
 }
 
 export function renderRepositorySecuritySummaryComment ({
-  _repo,
   workflow_result,
   published_delivery_entries,
   event_type,
   target_branch,
   scan_target
 }: {
-  _repo: RepoLike
   workflow_result: WorkflowResultLike
   published_delivery_entries: unknown[]
   event_type: 'manual' | 'scheduled'

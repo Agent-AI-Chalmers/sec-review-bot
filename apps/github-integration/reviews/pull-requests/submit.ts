@@ -173,7 +173,7 @@ export async function startPullRequestReviewRun (args: {
   repair_mode?: RepairMode | null
   // Runs after preparation and before the Runner POST, so callers can durably
   // retain the context needed if the submission response is lost.
-  on_prepared?: (submitted: SubmittedPullRequestReviewRun, input: PullRequestReviewInput & Record<string, unknown>) => void
+  on_prepared?: (submitted: SubmittedPullRequestReviewRun, input: PullRequestReviewInput & Record<string, unknown>) => void | Promise<void>
 }): Promise<SubmittedPullRequestReviewRun> {
   const prepared = await materializePullRequestReviewInput(args)
   assertPullRequestReviewInput(prepared.input)
@@ -184,7 +184,7 @@ export async function startPullRequestReviewRun (args: {
     workflow: 'pull-request-review',
     event_type: args.event_type
   }
-  args.on_prepared?.(preparedRun, prepared.input)
+  await args.on_prepared?.(preparedRun, prepared.input)
   const submitted = await submitRunnerRun({
     workflow: 'pull-request-review',
     run_id: prepared.run_id,
