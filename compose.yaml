@@ -72,6 +72,9 @@ services:
       AGENT_RUNNER_SERVICE_URL: "http://runner-service:8000"
       AGENT_RUNNER_SERVICE_TOKEN: "${RUNNER_SERVICE_TOKEN:?RUNNER_SERVICE_TOKEN is required}"
       AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS:-15000}"
+      # The env_file DATABASE_URL targets PostgreSQL through a host port for
+      # local Node.js runs. Inside Compose, service discovery must own routing.
+      DATABASE_URL: ""
       PGHOST: "postgres"
       PGPORT: "5432"
       PGDATABASE: "${POSTGRES_DB:-sec_review_bot}"
