@@ -13,7 +13,10 @@ from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.features import agent_memory_enabled, agent_skills_enabled
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.mcp.resolver import resolve_agent_mcp_connection_factories
-from sec_review_agents.memory.middleware import MemoryMiddleware
+from sec_review_agents.memory.middleware import (
+    SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
+    MemoryMiddleware,
+)
 from sec_review_agents.memory.store import memory_runtime_available
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
@@ -47,7 +50,12 @@ async def create_verification_agent_graph(
     if agent_skills_enabled():
         agent_middleware.append(SkillsMiddleware(backend=backend, sources=["/skills/"]))
     if memory_enabled:
-        agent_middleware.append(MemoryMiddleware(backend=backend))
+        agent_middleware.append(
+            MemoryMiddleware(
+                backend=backend,
+                system_prompt_template=SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
+            )
+        )
     agent_middleware.append(
         create_filesystem_middleware(
             backend=backend,

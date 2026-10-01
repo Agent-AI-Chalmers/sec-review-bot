@@ -13,7 +13,29 @@ MEMORY_INDEX_PATH = "/memory/MEMORY.md"
 DEFAULT_MEMORY_INDEX_MAX_LINES = 200
 DEFAULT_MEMORY_INDEX_MAX_CHARS = 25_000
 
-MEMORY_SYSTEM_PROMPT = """
+DEFAULT_MEMORY_SYSTEM_PROMPT = """
+## Experience Memory
+
+Reviewed experience memory is available at `{index_path}`.
+
+Use this memory as guidance only. It is not evidence for the current task.
+Treat memory as a source of questions and methods, not current facts or prior
+conclusions. Re-establish all relevant facts from the current task inputs and
+authoritative sources.
+
+The memory index below is the progressive-disclosure entry point. Read topic
+files only when they are relevant to the current task or uncertainty. Do not
+treat source material or backing-store state as memory. Do not write to
+`/memory`. Do not use memory to start a conclusion without current evidence.
+
+### Memory Index
+
+```md
+{memory_index}
+```
+""".strip()
+
+SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT = """
 ## Security Review Experience Memory
 
 Reviewed security-review experience memory is available at `{index_path}`.
@@ -21,6 +43,9 @@ Reviewed security-review experience memory is available at `{index_path}`.
 Use this memory as guidance only. It is not evidence for the current repository,
 patch, or finding. Current security conclusions must still be grounded in the
 current workflow input, repository files, tool results, and stage artifacts.
+Treat memory as a source of questions and review methods, not repository facts
+or prior verdicts. Re-establish all relevant facts from the current code,
+callers, tests, and runtime path.
 
 The memory index below is the progressive-disclosure entry point. Read topic
 files only when they are relevant to the current stage, uncertainty, or review
@@ -69,7 +94,7 @@ class MemoryMiddleware(AgentMiddleware):
         index_path: str = MEMORY_INDEX_PATH,
         index_max_lines: int = DEFAULT_MEMORY_INDEX_MAX_LINES,
         index_max_chars: int = DEFAULT_MEMORY_INDEX_MAX_CHARS,
-        system_prompt_template: str = MEMORY_SYSTEM_PROMPT,
+        system_prompt_template: str = DEFAULT_MEMORY_SYSTEM_PROMPT,
     ) -> None:
         self.backend = backend
         self.index_path = index_path
