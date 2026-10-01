@@ -24,7 +24,7 @@ from sec_review_agents.runner.service.workflow import (
     RunnerExecutionWorkflow,
     prepare_runner_run_activity,
 )
-from sec_review_agents.runner.temporal_config import (
+from sec_review_agents.temporal.config import (
     DEFAULT_TEMPORAL_ADDRESS,
     DEFAULT_TEMPORAL_NAMESPACE,
     DEFAULT_TEMPORAL_TASK_QUEUE,

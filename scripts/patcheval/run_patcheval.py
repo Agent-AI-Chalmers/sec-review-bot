@@ -13,10 +13,10 @@ from sec_review_agents.cli.local_materialization.common import (
     default_local_output_dir,
     result_path_for_bundle,
 )
-from sec_review_agents.runner.temporal_config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 from sec_review_agents.runtime.runtime_config import (
     ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV,
 )
+from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 from scripts.patcheval.issue_bundle import build_patcheval_issue_bundle
