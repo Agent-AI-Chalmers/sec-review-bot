@@ -3,7 +3,7 @@ import {
   type PullRequestReviewEvent,
   type ReviewCommentSide
 } from '../../infrastructure/github/comment-service.js'
-import type { PullRequestContext } from '../../infrastructure/github/pull-request-service.js'
+import type { PersistedPullRequest } from '../../infrastructure/runner/publish-context.js'
 
 interface SuggestionCandidate {
   path: string
@@ -14,7 +14,7 @@ interface SuggestionCandidate {
 }
 
 interface PublishSuggestionReviewArgs {
-  pr: PullRequestContext
+  pr: PersistedPullRequest
   review_body: string
   event: PullRequestReviewEvent
   candidates: SuggestionCandidate[]

@@ -10,14 +10,14 @@ import { DeterministicRunnerPublishError } from '../../infrastructure/runner/pub
 import { publishReviewRunsOnce, startRunnerRunPublisher } from '../../infrastructure/runner/run-publisher.js'
 import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
 import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
+import { parsePublishContextForWorkflow } from '../../infrastructure/runner/publish-context.js'
+import { publishContextForWorkflow } from '../publish-context-fixtures.js'
 import {
   RUNNER_RUN_NOT_FOUND,
   RunnerSubmissionUncertainError,
   type RunnerRunStatus,
   type WorkflowName
 } from '../../infrastructure/runner/client.js'
-
-type PublishContext = Record<string, unknown>
 
 async function createStore (options: { connectorId?: string, claimTimeoutMs?: number } = {}): Promise<ReviewRunStore> {
   const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -34,7 +34,7 @@ async function createStore (options: { connectorId?: string, claimTimeoutMs?: nu
 async function createQueuedRun (store: ReviewRunStore, run: Parameters<ReviewRunStore['create_preparing_review_run']>[0]): Promise<void> {
   const admission = await store.create_preparing_review_run(run)
   assert.ok(admission.preparation_token)
-  await store.mark_queued(run.run_id, admission.preparation_token, run.publish_context)
+  await store.mark_queued(run.run_id, admission.preparation_token, parsePublishContextForWorkflow(run.workflow, run.publish_context))
 }
 
 async function createUncertainRun (store: ReviewRunStore): Promise<string> {
@@ -200,45 +200,6 @@ function succeededStatus (runId: string, workflow: WorkflowName, result: unknown
     workflow,
     status: 'succeeded',
     result
-  }
-}
-
-function publishContextForWorkflow (workflow: WorkflowName): PublishContext {
-  if (workflow === 'issue-review') {
-    return {
-      issue: {
-        issue_number: 7,
-        issue_title: 'Example issue',
-        owner_login: 'octo',
-        repo_name: 'example',
-        repo_full_name: 'octo/example'
-      },
-      workspace_ref: 'workspace-sha',
-      event_type: 'manual_review'
-    }
-  }
-
-  if (workflow === 'pull-request-review') {
-    return {
-      pr: { repo_full_name: 'octo/example' },
-      files: [],
-      event_type: 'manual_review'
-    }
-  }
-
-  return {
-    repo: { repo_full_name: 'octo/example' },
-    workspace_ref: 'workspace-sha',
-    scan_target: {
-      target_branch: 'main',
-      default_branch: 'main',
-      event_type: 'manual',
-      scan_mode: 'full',
-      base_sha: null,
-      head_sha: 'head-sha',
-      commit_shas: []
-    },
-    event_type: 'manual'
   }
 }
 

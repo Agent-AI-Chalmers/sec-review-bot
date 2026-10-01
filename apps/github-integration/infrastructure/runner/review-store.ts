@@ -6,6 +6,7 @@ import type { WorkflowName } from './client.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
 import { DeterministicRunnerPublishError } from './publish-error.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from './publish-error-code.js'
+import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 
 type JsonObject = Record<string, unknown>
 export type ReviewRunStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'publishing' | 'published' | 'failed'
@@ -92,6 +93,11 @@ function statusOf (row: ReviewRunRow): ReviewRunStatus {
   return row.publication_status === 'pending' || row.publication_status === 'not_required'
     ? row.runner_status
     : row.publication_status
+}
+function contextWorkflow (context: PublishContext): WorkflowName {
+  if ('issue' in context) return 'issue-review'
+  if ('pr' in context) return 'pull-request-review'
+  return 'repository-review'
 }
 function rowToRecord (row: ReviewRunRow): ReviewRunRecord {
   const status = statusOf(row)
@@ -230,16 +236,21 @@ export class ReviewRunStore {
       return { record: rowToRecord(existing.rows[0]), created: false, preparation_token: null }
     }
   }
-  async save_prepared_submission (runId: string, token: string, context: JsonObject, input: JsonObject): Promise<void> {
+  async save_prepared_submission (runId: string, token: string, context: PublishContext, input: JsonObject): Promise<void> {
+    // Revalidate at the persistence boundary even when the caller is typed.
+    // Tests, future adapters, and deserialized values can bypass compile-time types.
+    const publishContext = parsePublishContextForWorkflow(contextWorkflow(context), context)
     const result = await this.pool.query(`
       UPDATE review_runs
       SET publish_context=$3::jsonb, runner_input=$4::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$5
         AND runner_status='preparing' AND preparation_claim_token=$2
-    `, [runId, token, JSON.stringify(context), JSON.stringify(input), this.connectorId])
+        AND workflow=$6
+    `, [runId, token, JSON.stringify(publishContext), JSON.stringify(input), this.connectorId, contextWorkflow(publishContext)])
     if (result.rowCount !== 1) throw new Error(`Review run ${runId} cannot save prepared submission outside preparing.`)
   }
-  async mark_queued (runId: string, token: string, context: JsonObject): Promise<void> {
+  async mark_queued (runId: string, token: string, context: PublishContext): Promise<void> {
+    const publishContext = parsePublishContextForWorkflow(contextWorkflow(context), context)
     const result = await this.pool.query(`
       UPDATE review_runs
       SET publish_context=$3::jsonb, runner_status='queued',
@@ -248,7 +259,8 @@ export class ReviewRunStore {
           updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$4
         AND runner_status='preparing' AND preparation_claim_token=$2
-    `, [runId, token, JSON.stringify(context), this.connectorId])
+        AND workflow=$5
+    `, [runId, token, JSON.stringify(publishContext), this.connectorId, contextWorkflow(publishContext)])
     if (result.rowCount !== 1) throw new Error(`Review run ${runId} cannot transition from preparing to queued.`)
   }
   async getRun (runId: string): Promise<ReviewRunRecord | null> {

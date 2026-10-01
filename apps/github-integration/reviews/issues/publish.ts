@@ -1,5 +1,5 @@
 import { createIssueCommentUnlessMarkerExists } from '../../infrastructure/github/comment-service.js'
-import type { IssueContext } from '../../infrastructure/github/issue-service.js'
+import type { PersistedIssue } from '../../infrastructure/runner/publish-context.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import { createDraftPullRequestFromIssueReviewRecord } from './draft-pr.js'
 import { completedRunnerRunResult, type RunnerRunStatus } from '../../infrastructure/runner/client.js'
@@ -117,7 +117,7 @@ async function publishIssueReviewResult ({
   claim_token
 }: {
   octokit: unknown
-  issue: IssueContext
+  issue: PersistedIssue
   run_id: string
   workspace_ref: string
   workflow_result: IssueReviewWorkflowResult

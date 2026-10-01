@@ -106,7 +106,14 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
       ingress_key: 'delivery-issue-1'
     }],
     ['queued', 'run-issue-1', {
-      issue,
+      issue: {
+        owner_login: 'octo',
+        repo_name: 'example-repo',
+        repo_full_name: 'octo/example-repo',
+        default_branch: 'main',
+        issue_number: 12,
+        issue_title: 'Example issue'
+      },
       workspace_ref: 'workspace-ref',
       event_type: 'opened'
     }]
@@ -159,7 +166,14 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
     }],
     ['queued', 'run-pr-1', {
       files: [{ filename: 'src/app.ts' }],
-      pr,
+      pr: {
+        owner_login: 'octo',
+        repo_name: 'example-repo',
+        repo_full_name: 'octo/example-repo',
+        pr_number: 7,
+        pr_author: 'alice',
+        head_sha: 'head-sha'
+      },
       event_type: 'manual_review'
     }]
   ])
