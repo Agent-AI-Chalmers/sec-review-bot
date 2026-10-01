@@ -43,7 +43,7 @@ from sec_review_agents.memory.store import (
     AGENT_MEMORY_DIR_ENV,
     resolve_memory_store_dir,
 )
-from sec_review_agents.runner.temporal_config import (
+from sec_review_agents.temporal.config import (
     DEFAULT_TEMPORAL_ADDRESS,
     DEFAULT_TEMPORAL_NAMESPACE,
     DEFAULT_TEMPORAL_TASK_QUEUE,

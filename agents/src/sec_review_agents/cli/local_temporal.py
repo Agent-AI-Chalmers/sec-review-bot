@@ -16,7 +16,7 @@ from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
     effective_issue_strategy,
 )
-from sec_review_agents.runner.temporal_config import (
+from sec_review_agents.temporal.config import (
     DEFAULT_TEMPORAL_ADDRESS,
     DEFAULT_TEMPORAL_NAMESPACE,
     DEFAULT_TEMPORAL_TASK_QUEUE,

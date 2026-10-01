@@ -24,7 +24,7 @@ from sec_review_agents.memory.maintenance_workflow import (
 )
 from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.observability.log_config import logger
-from sec_review_agents.runner.temporal_config import (
+from sec_review_agents.temporal.config import (
     DEFAULT_TEMPORAL_TASK_QUEUE,
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
 )

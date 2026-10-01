@@ -7,7 +7,7 @@ from sec_review_agents.cli.local_execution import (
     direct_run_for_bundle,
 )
 from sec_review_agents.cli.local_materialization.common import ReviewBundle
-from sec_review_agents.runner.temporal_config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
+from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 
 
 def run_local_direct_workflow(bundle: ReviewBundle) -> dict[str, Any]:

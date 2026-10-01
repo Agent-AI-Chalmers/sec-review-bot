@@ -1,3 +1,5 @@
+"""Shared Temporal connection and workflow defaults."""
+
 DEFAULT_TEMPORAL_ADDRESS = "127.0.0.1:7233"
 DEFAULT_TEMPORAL_NAMESPACE = "default"
 DEFAULT_TEMPORAL_TASK_QUEUE = "sec-review-agents"
