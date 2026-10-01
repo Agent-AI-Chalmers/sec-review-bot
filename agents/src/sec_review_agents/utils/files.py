@@ -1,6 +1,20 @@
 import json
+import shutil
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+
+
+def reset_stage_attempt_artifacts(
+    root: Path,
+    *,
+    filenames: Sequence[str] = (),
+    directories: Sequence[str] = (),
+) -> None:
+    for filename in filenames:
+        (root / filename).unlink(missing_ok=True)
+    for directory in directories:
+        shutil.rmtree(root / directory, ignore_errors=True)
 
 
 def safe_artifact_filename(filename: str) -> str:

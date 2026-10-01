@@ -1,4 +1,6 @@
+import shutil
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 from sec_review_agents.utils.structured_renderer import (
@@ -11,6 +13,55 @@ from sec_review_agents.utils.structured_renderer import (
 # this value should be treated as an agent-behavior change and re-probed.
 MAX_FEEDBACK_RETRY_ATTEMPTS = 1
 MAX_RETRY_HISTORY_PROMPT_ITEMS = 5
+
+
+def _copy_existing_artifact(root: Path, source: str, target: str) -> None:
+    source_path = root / source
+    if not source_path.exists():
+        return
+    target_path = root / target
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source_path, target_path)
+
+
+def archive_initial_feedback_attempt(
+    *,
+    mitigator_root: Path,
+    verifier_root: Path,
+    retry_context: Mapping[str, Any],
+) -> None:
+    """Keep initial feedback artifacts before the first retry overwrites them."""
+    if retry_context.get("retry_index") != 1:
+        return
+
+    for source, target in (
+        ("mitigation-result.json", "mitigation-result.initial.json"),
+        ("workspace.patch", "workspace.initial.patch"),
+    ):
+        _copy_existing_artifact(mitigator_root, source, target)
+
+    _copy_existing_artifact(
+        verifier_root,
+        "verification-result.json",
+        "verification-result.initial.json",
+    )
+
+
+def review_stage_attempt_order(
+    *, stage: str, retry_context: Mapping[str, Any] | None
+) -> int:
+    """Return the ordered transcript position for a review stage attempt."""
+    if stage == "analyzer":
+        return 1
+    base = 2 if stage == "mitigator" else 3 if stage == "verifier" else None
+    if base is None:
+        raise ValueError(f"Unsupported review transcript stage: {stage}")
+    if not isinstance(retry_context, Mapping):
+        return base
+    retry_index = retry_context.get("retry_index")
+    if not isinstance(retry_index, int) or retry_index < 1:
+        return base
+    return base + (retry_index * 2)
 
 
 def should_retry_from_verifier_result(

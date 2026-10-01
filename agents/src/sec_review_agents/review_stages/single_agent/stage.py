@@ -11,9 +11,9 @@ from sec_review_agents.agents.single_agent.agent import (
 from sec_review_agents.review_stages.single_agent.result import (
     build_single_agent_fix_outcome,
 )
-from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from sec_review_agents.utils.files import reset_stage_attempt_artifacts
 from sec_review_agents.workspace.patches import (
     normalize_declared_changed_files,
     persist_workspace_patch,

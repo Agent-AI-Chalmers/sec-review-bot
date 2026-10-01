@@ -30,7 +30,7 @@ async def analyze_pull_request_activity(
     prepared_input: dict[str, Any],
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
-    from sec_review_agents.run_artifacts.transcripts import review_stage_transcript_path
+    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.pull_request.analysis import (
         analyze_pull_request,
@@ -79,14 +79,12 @@ async def mitigate_pull_request_activity(
     retry_context: dict[str, Any] | None,
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
+    from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.mitigation.stage import (
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
-    from sec_review_agents.run_artifacts.transcripts import (
-        retry_stage_order,
-        review_stage_transcript_path,
-    )
+    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.pull_request.mitigation import (
         mitigate_pull_request,
@@ -107,7 +105,9 @@ async def mitigate_pull_request_activity(
     if not _should_run_pr_mitigation(analysis_result):
         review_stage_transcript_path(
             run_artifacts_root,
-            order=retry_stage_order(stage="mitigator", retry_context=retry_context),
+            order=review_stage_attempt_order(
+                stage="mitigator", retry_context=retry_context
+            ),
             stage="mitigator",
             attempt=mitigation_attempt_label(retry_context),
         ).unlink(missing_ok=True)
@@ -134,7 +134,9 @@ async def mitigate_pull_request_activity(
         mitigator_artifacts_path=mitigator_artifacts_path,
         published_transcript_path=review_stage_transcript_path(
             run_artifacts_root,
-            order=retry_stage_order(stage="mitigator", retry_context=retry_context),
+            order=review_stage_attempt_order(
+                stage="mitigator", retry_context=retry_context
+            ),
             stage="mitigator",
             attempt=mitigation_attempt_label(retry_context),
         ),
@@ -153,13 +155,11 @@ async def verify_pull_request_activity(
     retry_context: dict[str, Any] | None,
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
+    from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.verification.stage import (
         verification_attempt_label,
     )
-    from sec_review_agents.run_artifacts.transcripts import (
-        retry_stage_order,
-        review_stage_transcript_path,
-    )
+    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.pull_request.verification import (
         verify_pull_request,
@@ -191,7 +191,9 @@ async def verify_pull_request_activity(
         ),
         published_transcript_path=review_stage_transcript_path(
             run_artifacts_root,
-            order=retry_stage_order(stage="verifier", retry_context=retry_context),
+            order=review_stage_attempt_order(
+                stage="verifier", retry_context=retry_context
+            ),
             stage="verifier",
             attempt=verification_attempt_label(retry_context),
         ),
@@ -207,12 +209,12 @@ def archive_pull_request_feedback_attempt_activity(
     prepared_input: dict[str, Any],
     retry_context: dict[str, Any],
 ) -> None:
-    from sec_review_agents.run_artifacts.stage import (
-        archive_current_feedback_attempt,
+    from sec_review_agents.review_stages.feedback_loop import (
+        archive_initial_feedback_attempt,
     )
     from sec_review_agents.utils.paths import artifact_path
 
-    archive_current_feedback_attempt(
+    archive_initial_feedback_attempt(
         mitigator_root=artifact_path(prepared_input["artifact_paths"], "mitigator"),
         verifier_root=artifact_path(prepared_input["artifact_paths"], "verifier"),
         retry_context=retry_context,
