@@ -35,7 +35,7 @@ async def mitigate_issue_self_check_activity(
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
-    from sec_review_agents.run_artifacts.transcripts import review_stage_transcript_path
+    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.issue.mitigation_self_check import (
         mitigate_issue_with_self_check,

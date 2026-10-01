@@ -113,7 +113,7 @@ def _repository_case_published_transcript_path(
     stage: str,
     attempt: str = "initial",
 ) -> Path:
-    from sec_review_agents.run_artifacts.transcripts import transcript_file
+    from sec_review_agents.runtime.transcripts import transcript_file
     from sec_review_agents.utils.paths import required_path
 
     return transcript_file(
@@ -239,7 +239,7 @@ def prepare_repository_case_review_inputs_activity(
     request: InternalWorkflowRequest,
     cases: Sequence[Mapping[str, Any]],
 ) -> RepositoryCaseRequestBatch:
-    from sec_review_agents.run_artifacts.transcripts import review_transcripts_root
+    from sec_review_agents.runtime.transcripts import review_transcripts_root
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.repository.case_execution_input import (
         prepare_case_execution_input,
@@ -404,11 +404,11 @@ async def mitigate_repository_case_activity(
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
+    from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.mitigation.stage import (
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
-    from sec_review_agents.run_artifacts.transcripts import retry_stage_order
     from sec_review_agents.utils.paths import artifact_path
     from sec_review_agents.workflows.repository_case.stage import (
         MITIGATION_NO_TARGET_REASON,
@@ -424,7 +424,9 @@ async def mitigate_repository_case_activity(
     if not should_run_repository_mitigation(analysis_result):
         _repository_case_published_transcript_path(
             prepared_case,
-            order=retry_stage_order(stage="mitigator", retry_context=retry_context),
+            order=review_stage_attempt_order(
+                stage="mitigator", retry_context=retry_context
+            ),
             stage="mitigator",
             attempt=mitigation_attempt_label(retry_context),
         ).unlink(missing_ok=True)
@@ -441,7 +443,9 @@ async def mitigate_repository_case_activity(
         mitigator_artifacts_path=mitigator_artifacts_path,
         published_transcript_path=_repository_case_published_transcript_path(
             prepared_case,
-            order=retry_stage_order(stage="mitigator", retry_context=retry_context),
+            order=review_stage_attempt_order(
+                stage="mitigator", retry_context=retry_context
+            ),
             stage="mitigator",
             attempt=mitigation_attempt_label(retry_context),
         ),
@@ -457,10 +461,10 @@ async def verify_repository_case_activity(
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
+    from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.verification.stage import (
         verification_attempt_label,
     )
-    from sec_review_agents.run_artifacts.transcripts import retry_stage_order
     from sec_review_agents.utils.paths import artifact_path
     from sec_review_agents.workflows.repository_case.stage import (
         run_repository_case_verification_stage,
@@ -479,7 +483,9 @@ async def verify_repository_case_activity(
         ),
         published_transcript_path=_repository_case_published_transcript_path(
             prepared_case,
-            order=retry_stage_order(stage="verifier", retry_context=retry_context),
+            order=review_stage_attempt_order(
+                stage="verifier", retry_context=retry_context
+            ),
             stage="verifier",
             attempt=verification_attempt_label(retry_context),
         ),
@@ -492,13 +498,13 @@ def archive_repository_case_feedback_attempt_activity(
     retry_context: dict[str, Any],
 ) -> None:
     from sec_review_agents.observability.trace_context import bind_trace_context
-    from sec_review_agents.run_artifacts.stage import (
-        archive_current_feedback_attempt,
+    from sec_review_agents.review_stages.feedback_loop import (
+        archive_initial_feedback_attempt,
     )
     from sec_review_agents.utils.paths import artifact_path
 
     bind_trace_context(workflow="repository-review")
-    archive_current_feedback_attempt(
+    archive_initial_feedback_attempt(
         mitigator_root=artifact_path(prepared_case["artifact_paths"], "mitigator"),
         verifier_root=artifact_path(prepared_case["artifact_paths"], "verifier"),
         retry_context=retry_context,

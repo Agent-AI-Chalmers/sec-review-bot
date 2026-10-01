@@ -9,10 +9,9 @@ from sec_review_agents.agents.analysis.agent import (
     create_analysis_agent_graph,
 )
 from sec_review_agents.review_stages.analysis.result import build_analysis_stage_result
-from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 

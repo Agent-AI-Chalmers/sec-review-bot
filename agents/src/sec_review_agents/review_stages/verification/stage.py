@@ -13,10 +13,9 @@ from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATT
 from sec_review_agents.review_stages.verification.result import (
     build_verification_stage_result,
 )
-from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 

@@ -15,11 +15,10 @@ from sec_review_agents.agents.triage.prompts import (
     build_repository_triage_user_prompt,
 )
 from sec_review_agents.agents.triage.workbench_state import TriageWorkbenchState
-from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.scan_stages.triage.batching import triage_candidate_batches
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
 
 DEFAULT_TRIAGE_PASSES = 2
 DEFAULT_TRIAGE_BATCH_SIZE = 30

@@ -14,7 +14,6 @@ from sec_review_agents.agents.discovery.prompts import (
 from sec_review_agents.observability.diagnostics import (
     log_stage_completed,
 )
-from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.deployment_limits import (
     resolve_bound_deployment_max_input_tokens,
 )
@@ -26,7 +25,7 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryResult,
 )
 from sec_review_agents.utils.env import parse_int_env
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
 
 #########################################################################
 # ====================== File Filtering And Discovery Limits ============

@@ -13,10 +13,13 @@ from sec_review_agents.review_stages.mitigation.result import (
     build_mitigation_stage_result,
     build_skipped_mitigation_result,
 )
-from sec_review_agents.run_artifacts.stage import reset_stage_attempt_artifacts
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from sec_review_agents.utils.files import persist_json, persist_text_artifact
+from sec_review_agents.utils.files import (
+    persist_json,
+    persist_text_artifact,
+    reset_stage_attempt_artifacts,
+)
 from sec_review_agents.workspace.patches import (
     normalize_declared_changed_files,
     persist_workspace_patch,

@@ -7,6 +7,49 @@ from typing import Any
 
 from sec_review_agents.utils.serialization import json_safe
 
+TRANSCRIPTS_DIRNAME = "transcripts"
+
+
+def _slug_component(value: str) -> str:
+    slug = "".join(
+        character.lower() if character.isalnum() else "-" for character in value.strip()
+    ).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or "unknown"
+
+
+def review_transcripts_root(artifact_root_path: Path) -> Path:
+    return artifact_root_path / TRANSCRIPTS_DIRNAME
+
+
+def transcript_file(
+    transcripts_dir: Path,
+    *,
+    order: int,
+    stage: str,
+    attempt: str = "initial",
+) -> Path:
+    if order < 1:
+        raise ValueError("Transcript order must be >= 1.")
+    suffix = f"{_slug_component(stage)}-{_slug_component(attempt)}"
+    return transcripts_dir / f"{order:04d}-{suffix}.json"
+
+
+def review_stage_transcript_path(
+    artifact_root_path: Path,
+    *,
+    order: int,
+    stage: str,
+    attempt: str = "initial",
+) -> Path:
+    return transcript_file(
+        review_transcripts_root(artifact_root_path),
+        order=order,
+        stage=stage,
+        attempt=attempt,
+    )
+
 
 def _message_type(message: Any) -> str:
     message_type = getattr(message, "type", None)
@@ -102,3 +145,14 @@ class TranscriptWriter:
     def write_system_prompt(self, system_prompt: str) -> None:
         """Export the prompt as the first message in the conversation."""
         self.write_messages([{"type": "system", "content": system_prompt}])
+
+
+__all__ = [
+    "TRANSCRIPTS_DIRNAME",
+    "TranscriptWriter",
+    "review_stage_transcript_path",
+    "review_transcripts_root",
+    "serialize_agent_message",
+    "serialize_agent_messages",
+    "transcript_file",
+]
