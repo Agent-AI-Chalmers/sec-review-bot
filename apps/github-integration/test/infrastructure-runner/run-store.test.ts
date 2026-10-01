@@ -4,6 +4,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 
 import { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
+import { publishContextForWorkflow } from '../publish-context-fixtures.js'
 
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
@@ -25,7 +26,7 @@ async function createStore (options: { connectorId?: string, claimTimeoutMs?: nu
 }
 
 async function createQueuedRun (store: ReviewRunStore, runId = `run-${randomUUID()}`): Promise<string> {
-  const context = { issue: { repo_full_name: 'octo/example', issue_number: 7 } }
+  const context = publishContextForWorkflow('issue-review')
   const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: context })
   assert.ok(admission.preparation_token)
   await store.mark_queued(runId, admission.preparation_token, context)
@@ -126,18 +127,18 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
     assert.notEqual(takeover.preparation_token, first.preparation_token)
 
     await assert.rejects(
-      ownerA.save_prepared_submission(first.record.run_id, first.preparation_token, {}, {}),
+      ownerA.save_prepared_submission(first.record.run_id, first.preparation_token, publishContextForWorkflow('issue-review'), {}),
       /cannot save prepared submission/
     )
     await assert.rejects(
-      ownerA.mark_queued(first.record.run_id, first.preparation_token, {}),
+      ownerA.mark_queued(first.record.run_id, first.preparation_token, publishContextForWorkflow('issue-review')),
       /cannot transition/
     )
     await assert.rejects(
       ownerA.failPreparation(first.record.run_id, first.preparation_token, { message: 'late failure' }),
       /claim was lost/
     )
-    await ownerB.mark_queued(takeover.record.run_id, takeover.preparation_token, {})
+    await ownerB.mark_queued(takeover.record.run_id, takeover.preparation_token, publishContextForWorkflow('issue-review'))
     assert.equal((await ownerA.getRun(first.record.run_id))?.status, 'queued')
   } finally { await Promise.all([ownerA.close(), ownerB.close()]) }
 })
@@ -148,7 +149,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
   try {
     const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
     assert.ok(admission.preparation_token)
-    await store.save_prepared_submission(runId, admission.preparation_token, { issue: { issue_number: 7 } }, { contract_version: 'v4' })
+    await store.save_prepared_submission(runId, admission.preparation_token, publishContextForWorkflow('issue-review'), { contract_version: 'v4' })
     await store.failPreparation(runId, admission.preparation_token, { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
     const staleToken = await store.claimSubmissionRecovery(runId)
     const currentToken = await store.claimSubmissionRecovery(runId)

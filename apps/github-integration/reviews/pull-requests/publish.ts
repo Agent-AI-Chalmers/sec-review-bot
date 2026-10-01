@@ -1,10 +1,9 @@
 import { createPullRequestReviewUnlessMarkerExists, type PullRequestReviewEvent } from '../../infrastructure/github/comment-service.js'
-import type { PullRequestContext } from '../../infrastructure/github/pull-request-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import { completedRunnerRunResult, type RunnerRunStatus } from '../../infrastructure/runner/client.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
 import { DeterministicRunnerPublishError } from '../../infrastructure/runner/publish-error.js'
-import { parsePullRequestReviewPublishContext } from '../../infrastructure/runner/publish-context.js'
+import { parsePullRequestReviewPublishContext, type PersistedPullRequest, type PersistedPullRequestFile } from '../../infrastructure/runner/publish-context.js'
 import {
   renderAnalysisSummaryCommentFromReviewRecord
 } from './renderer.js'
@@ -136,13 +135,13 @@ function normalizeLogin (login: unknown): string | null {
     : null
 }
 
-function isAuthoredByCurrentAppBot (pr: PullRequestContext): boolean {
+function isAuthoredByCurrentAppBot (pr: PersistedPullRequest): boolean {
   const author_login = normalizeLogin(pr.pr_author)
   const appBotLogin = normalizeLogin(getGitHubAppMetadata().bot_login)
   return author_login !== null && appBotLogin !== null && author_login === appBotLogin
 }
 
-function reviewEventForRecord (review_record: ReviewRecord, pr: PullRequestContext): PullRequestReviewEvent {
+function reviewEventForRecord (review_record: ReviewRecord, pr: PersistedPullRequest): PullRequestReviewEvent {
   // The app should leave evidence on its own PRs, not create reviewer state for itself.
   if (isAuthoredByCurrentAppBot(pr)) {
     return 'COMMENT'
@@ -205,8 +204,8 @@ async function publishPullRequestReviewResult ({
   claim_token
 }: {
   octokit: unknown
-  pr: PullRequestContext
-  files: unknown[]
+  pr: PersistedPullRequest
+  files: PersistedPullRequestFile[]
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   workflow_result: PullRequestReviewWorkflowResult
   run_id: string
@@ -235,8 +234,8 @@ async function publishPullRequestReviewSideEffect ({
   octokit, pr, files: reviewFiles, event_type, workflow_result, run_id
 }: {
   octokit: unknown
-  pr: PullRequestContext
-  files: unknown[]
+  pr: PersistedPullRequest
+  files: PersistedPullRequestFile[]
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   workflow_result: PullRequestReviewWorkflowResult
   run_id: string
@@ -251,7 +250,7 @@ async function publishPullRequestReviewSideEffect ({
     let suggestionManifest: Awaited<ReturnType<typeof generateSuggestionCandidatesFromReviewRecord>> | null = null
     try {
       suggestionManifest = await generateSuggestionCandidatesFromReviewRecord({
-        files: reviewFiles as Parameters<typeof generateSuggestionCandidatesFromReviewRecord>[0]['files'],
+        files: reviewFiles,
         review_record
       })
     } catch (error: unknown) {

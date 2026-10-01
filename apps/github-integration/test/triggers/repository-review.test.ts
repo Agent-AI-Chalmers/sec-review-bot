@@ -215,9 +215,9 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       },
       workspace_ref: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       scan_target: {
-        target_branch: 'main', default_branch: 'main', event_type: 'manual', scan_mode: 'incremental',
+        target_branch: 'main', scan_mode: 'incremental',
         base_sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', commit_shas: []
+        head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
       },
       event_type: 'manual'
     }

@@ -2,7 +2,7 @@ import type { ReviewRecord } from '../review-record.js'
 
 import { publishPullRequestSuggestionReview } from './suggestion-comments.js'
 import type { PullRequestReviewEvent } from '../../infrastructure/github/comment-service.js'
-import type { PullRequestContext } from '../../infrastructure/github/pull-request-service.js'
+import type { PersistedPullRequest } from '../../infrastructure/runner/publish-context.js'
 
 // This file is the pull-request suggestion pipeline.
 // It owns local suggestion artifacts and the policy that decides whether a
@@ -484,7 +484,7 @@ export async function publishSuggestionReview (
     candidates,
     marker
   }: {
-    pr: PullRequestContext
+    pr: PersistedPullRequest
     review_body: string
     event: PullRequestReviewEvent
     candidates: SuggestionCandidate[]

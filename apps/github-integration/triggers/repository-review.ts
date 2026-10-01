@@ -8,7 +8,7 @@ import {
 } from '../reviews/repositories/submit.js'
 import type { RepairMode } from '../infrastructure/runner/input.js'
 import { repositoryReviewPublishContext } from '../infrastructure/runner/publish-context.js'
-import { reviewRunStore, type CreateReviewRunArgs } from '../infrastructure/runner/review-store.js'
+import { reviewRunStore } from '../infrastructure/runner/review-store.js'
 import { RunnerSubmissionUncertainError } from '../infrastructure/runner/client.js'
 import { createRunId } from '../reviews/shared/input-bundle.js'
 import { logInfo } from '../utils/logger.js'
@@ -273,13 +273,9 @@ export async function dispatchRepositoryReview ({
     throw error
   }
 
-  const queuedRun: CreateReviewRunArgs = {
-    workflow: 'repository-review',
-    run_id: submitted.run_id,
-    publish_context: repositoryReviewPublishContext(submitted)
-  }
+  const publishContext = repositoryReviewPublishContext(submitted)
   try {
-    await store.mark_queued(run_id, preparationToken, queuedRun.publish_context)
+    await store.mark_queued(run_id, preparationToken, publishContext)
   } catch (error) {
     await store.failPreparation(run_id, preparationToken, {
       code: 'SUBMISSION_STATE_UNCERTAIN',

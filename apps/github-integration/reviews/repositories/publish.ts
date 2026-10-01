@@ -23,9 +23,7 @@ import {
   type RepositoryWorkflowResult
 } from './result.js'
 import type { RepositoryContext } from './submit.js'
-import type {
-  RepositoryScanTarget
-} from '../../infrastructure/runner/input.js'
+import type { PersistedRepositoryScanTarget } from '../../infrastructure/runner/publish-context.js'
 import {
   asList,
   isRecord,
@@ -165,7 +163,7 @@ export async function publishDeliveryDraftPrs ({
   repo: RepositoryContext
   run_id: string
   workspace_ref: string
-  scan_target?: RepositoryScanTarget
+  scan_target?: PersistedRepositoryScanTarget
   deliveries: RepositoryDelivery[]
   case_results: RepositoryCaseResult[]
   event_type: 'manual' | 'scheduled'
@@ -299,7 +297,7 @@ async function publishRepositoryReviewResult ({
   repo: RepositoryContext
   run_id: string
   workspace_ref: string
-  scan_target?: RepositoryScanTarget
+  scan_target?: PersistedRepositoryScanTarget
   workflow_result: RepositoryWorkflowResult
   event_type: 'manual' | 'scheduled'
   store: ReviewRunStore

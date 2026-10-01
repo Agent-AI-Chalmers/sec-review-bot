@@ -1,145 +1,260 @@
-import type { IssueContext } from '../github/issue-service.js'
-import type { PullRequestContext } from '../github/pull-request-service.js'
-import type {
-  SubmittedIssueReviewRun
-} from '../../reviews/issues/submit.js'
-import type {
-  SubmittedPullRequestReviewRun
-} from '../../reviews/pull-requests/submit.js'
-import type {
-  RepositoryContext,
-  SubmittedRepositoryReviewRun
-} from '../../reviews/repositories/submit.js'
-import type { RepositoryScanTarget } from './input.js'
+/**
+ * Defines the persisted context needed to publish completed review runs.
+ *
+ * The original webhook or Actions request has ended before publication begins,
+ * so this module projects request-time objects into a small recovery record.
+ * It validates that record both before persistence and after database reads.
+ *
+ * GitHub webhook or Actions dispatch
+ *   -> prepare agent input and persist publish context
+ *   -> submit the run to the Python Runner / agent
+ *   -> end the original HTTP request
+ *   -> retrieve the agent result later
+ *   -> combine the result with publish context
+ *   -> publish a comment, review, or repair PR to GitHub
+ *
+ * Agent results describe what to publish. Publish context identifies where and
+ * under which trigger context the result should be published to GitHub. It is
+ * an internal recovery record, not a copy of the original request payload.
+ */
+import type { SubmittedIssueReviewRun } from '../../reviews/issues/submit.js'
+import type { SubmittedPullRequestReviewRun } from '../../reviews/pull-requests/submit.js'
+import type { SubmittedRepositoryReviewRun } from '../../reviews/repositories/submit.js'
+import { splitRepoFullName } from '../github/repository-service.js'
+import { DeterministicRunnerPublishError } from './publish-error.js'
+import { RUNNER_PUBLISH_ERROR_CODES } from './publish-error-code.js'
 
 type JsonObject = Record<string, unknown>
 
-export interface IssueReviewPublishContext {
-  issue: IssueContext
+export interface PersistedIssue {
+  owner_login: string
+  repo_name: string
+  repo_full_name: string
+  default_branch: string
+  issue_number: number
+  issue_title: string
+}
+
+export interface PersistedPullRequest {
+  owner_login: string
+  repo_name: string
+  repo_full_name: string
+  pr_number: number
+  pr_author: string | null
+  head_sha: string
+}
+
+export interface PersistedPullRequestFile {
+  filename: string
+  patch?: string | null
+}
+
+export interface PersistedRepository {
+  owner_login: string
+  repo_name: string
+  repo_full_name: string
+  default_branch: string
+}
+
+export interface PersistedRepositoryScanTarget {
+  target_branch: string
+  scan_mode: 'full' | 'incremental'
+  base_sha: string | null
+  head_sha: string
+}
+
+export interface IssueReviewPublishContext extends JsonObject {
+  issue: PersistedIssue
   workspace_ref: string
-  // Normalized review trigger; manual_review is an issue_comment command, not a GitHub action.
   event_type: 'opened' | 'manual_review'
 }
 
-export interface PullRequestReviewPublishContext {
-  pr: PullRequestContext
-  files: unknown[]
-  // manual_review means someone asked for review in a PR comment; GitHub sends that as issue_comment.
+export interface PullRequestReviewPublishContext extends JsonObject {
+  pr: PersistedPullRequest
+  files: PersistedPullRequestFile[]
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 }
 
-export interface RepositoryReviewPublishContext {
-  repo: RepositoryContext
+export interface RepositoryReviewPublishContext extends JsonObject {
+  repo: PersistedRepository
   workspace_ref: string
-  scan_target: RepositoryScanTarget
+  scan_target: PersistedRepositoryScanTarget
   event_type: 'manual' | 'scheduled'
 }
 
-function isRecord (value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+export type PublishContext = IssueReviewPublishContext | PullRequestReviewPublishContext | RepositoryReviewPublishContext
+
+function invalid (path: string, expectation: string): never {
+  // Stored corruption cannot be repaired by another publication attempt.
+  throw new DeterministicRunnerPublishError(
+    `Persisted publish context is invalid at ${path}: expected ${expectation}.`,
+    RUNNER_PUBLISH_ERROR_CODES.publish_context_invalid
+  )
 }
 
-export function issueReviewPublishContext (
-  submitted: SubmittedIssueReviewRun
-): Record<string, unknown> {
+function object (value: unknown, path: string): JsonObject {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    invalid(path, 'an object')
+  }
+  return value as JsonObject
+}
+
+function text (value: unknown, path: string): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    invalid(path, 'a non-empty string')
+  }
+  return value
+}
+
+function positiveInteger (value: unknown, path: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    invalid(path, 'a positive integer')
+  }
+  return value
+}
+
+function nullableText (value: unknown, path: string): string | null {
+  if (value !== null && typeof value !== 'string') invalid(path, 'a string or null')
+  return value as string | null
+}
+
+function oneOf<T extends string> (value: unknown, path: string, allowed: readonly T[]): T {
+  if (typeof value !== 'string' || !allowed.includes(value as T)) {
+    invalid(path, allowed.map(item => JSON.stringify(item)).join(' or '))
+  }
+  return value as T
+}
+
+function repositoryIdentity (value: JsonObject, path: string): Pick<PersistedRepository, 'owner_login' | 'repo_name' | 'repo_full_name'> {
+  const owner_login = text(value.owner_login, `${path}.owner_login`)
+  const repo_name = text(value.repo_name, `${path}.repo_name`)
+  const repo_full_name = text(value.repo_full_name, `${path}.repo_full_name`)
+  let fullNameParts: { owner_login: string, repo_name: string }
+  try {
+    fullNameParts = splitRepoFullName(repo_full_name)
+  } catch {
+    return invalid(`${path}.repo_full_name`, 'a valid GitHub owner/repository name')
+  }
+
+  // GitHub repository identity is case-insensitive. All three stored fields must
+  // still name the same repository because different consumers use each form.
+  if (fullNameParts.owner_login.toLowerCase() !== owner_login.toLowerCase() ||
+      fullNameParts.repo_name.toLowerCase() !== repo_name.toLowerCase()) {
+    return invalid(`${path}.repo_full_name`, `the same repository as ${owner_login}/${repo_name}`)
+  }
+  return { owner_login, repo_name, repo_full_name }
+}
+
+function issue (value: unknown): PersistedIssue {
+  const item = object(value, 'publish_context.issue')
   return {
-    issue: submitted.issue as unknown as Record<string, unknown>,
-    workspace_ref: submitted.workspace_ref,
-    event_type: submitted.event_type
+    ...repositoryIdentity(item, 'publish_context.issue'),
+    default_branch: text(item.default_branch, 'publish_context.issue.default_branch'),
+    issue_number: positiveInteger(item.issue_number, 'publish_context.issue.issue_number'),
+    issue_title: text(item.issue_title, 'publish_context.issue.issue_title')
   }
 }
 
-export function pullRequestReviewPublishContext (
-  submitted: SubmittedPullRequestReviewRun
-): Record<string, unknown> {
+function pullRequest (value: unknown): PersistedPullRequest {
+  const item = object(value, 'publish_context.pr')
   return {
+    ...repositoryIdentity(item, 'publish_context.pr'),
+    pr_number: positiveInteger(item.pr_number, 'publish_context.pr.pr_number'),
+    pr_author: nullableText(item.pr_author, 'publish_context.pr.pr_author'),
+    head_sha: text(item.head_sha, 'publish_context.pr.head_sha')
+  }
+}
+
+function pullRequestFile (value: unknown, index: number): PersistedPullRequestFile {
+  const path = `publish_context.files[${index}]`
+  const item = object(value, path)
+  const patch = item.patch
+  if (patch !== undefined && patch !== null && typeof patch !== 'string') {
+    invalid(`${path}.patch`, 'a string or null when present')
+  }
+  return {
+    filename: text(item.filename, `${path}.filename`),
+    ...(patch === undefined ? {} : { patch: patch as string | null })
+  }
+}
+
+function repository (value: unknown): PersistedRepository {
+  const item = object(value, 'publish_context.repo')
+  return {
+    ...repositoryIdentity(item, 'publish_context.repo'),
+    default_branch: text(item.default_branch, 'publish_context.repo.default_branch')
+  }
+}
+
+function scanTarget (value: unknown): PersistedRepositoryScanTarget {
+  const item = object(value, 'publish_context.scan_target')
+  return {
+    target_branch: text(item.target_branch, 'publish_context.scan_target.target_branch'),
+    scan_mode: oneOf(item.scan_mode, 'publish_context.scan_target.scan_mode', ['full', 'incremental']),
+    base_sha: nullableText(item.base_sha, 'publish_context.scan_target.base_sha'),
+    head_sha: text(item.head_sha, 'publish_context.scan_target.head_sha')
+  }
+}
+
+export function issueReviewPublishContext (submitted: SubmittedIssueReviewRun): IssueReviewPublishContext {
+  return parseIssueReviewPublishContext({
+    issue: submitted.issue,
+    workspace_ref: submitted.workspace_ref,
+    event_type: submitted.event_type
+  })
+}
+
+export function pullRequestReviewPublishContext (submitted: SubmittedPullRequestReviewRun): PullRequestReviewPublishContext {
+  return parsePullRequestReviewPublishContext({
+    pr: submitted.pr,
     files: submitted.files,
-    pr: submitted.pr as unknown as Record<string, unknown>,
     event_type: submitted.event_type
-  }
+  })
 }
 
-export function repositoryReviewPublishContext (
-  submitted: SubmittedRepositoryReviewRun
-): Record<string, unknown> {
-  return {
-    repo: submitted.repo as unknown as Record<string, unknown>,
+export function repositoryReviewPublishContext (submitted: SubmittedRepositoryReviewRun): RepositoryReviewPublishContext {
+  return parseRepositoryReviewPublishContext({
+    repo: submitted.repo,
     workspace_ref: submitted.workspace_ref,
-    scan_target: submitted.scan_target as unknown as Record<string, unknown>,
+    scan_target: submitted.scan_target,
     event_type: submitted.event_type
+  })
+}
+
+// Parse again after a database read. TypeScript types disappear at persistence
+// boundaries, and a malformed recovery record must fail before any GitHub call.
+export function parseIssueReviewPublishContext (value: unknown): IssueReviewPublishContext {
+  const context = object(value, 'publish_context')
+  return {
+    issue: issue(context.issue),
+    workspace_ref: text(context.workspace_ref, 'publish_context.workspace_ref'),
+    event_type: oneOf(context.event_type, 'publish_context.event_type', ['opened', 'manual_review'])
   }
 }
 
-export function parseIssueReviewPublishContext (
-  value: JsonObject
-): IssueReviewPublishContext {
-  const issue = isRecord(value.issue) ? value.issue : null
-  if (issue === null) {
-    throw new Error('Issue review publish context is missing issue.')
-  }
-  const workspace_ref = typeof value.workspace_ref === 'string' && value.workspace_ref.trim() !== ''
-    ? value.workspace_ref.trim()
-    : null
-  if (workspace_ref === null) {
-    throw new Error('Issue review publish context is missing workspace_ref.')
-  }
-  const rawEventType = typeof value.event_type === 'string' ? value.event_type.trim() : ''
-  const event_type = rawEventType === 'opened' || rawEventType === 'manual_review'
-    ? rawEventType
-    : 'manual_review'
-
+export function parsePullRequestReviewPublishContext (value: unknown): PullRequestReviewPublishContext {
+  const context = object(value, 'publish_context')
+  if (!Array.isArray(context.files)) invalid('publish_context.files', 'an array')
   return {
-    issue: issue as unknown as IssueContext,
-    workspace_ref,
-    event_type
+    pr: pullRequest(context.pr),
+    files: context.files.map(pullRequestFile),
+    event_type: oneOf(context.event_type, 'publish_context.event_type', ['opened', 'ready_for_review', 'synchronize', 'manual_review'])
   }
 }
 
-export function parsePullRequestReviewPublishContext (
-  value: JsonObject
-): PullRequestReviewPublishContext {
-  const pr = isRecord(value.pr) ? value.pr : null
-  if (pr === null) {
-    throw new Error('Pull request review publish context is missing pr.')
-  }
-  const rawEventType = typeof value.event_type === 'string' ? value.event_type.trim() : ''
-  const event_type = ['opened', 'ready_for_review', 'synchronize', 'manual_review'].includes(rawEventType)
-    ? rawEventType as PullRequestReviewPublishContext['event_type']
-    : 'manual_review'
-
+export function parseRepositoryReviewPublishContext (value: unknown): RepositoryReviewPublishContext {
+  const context = object(value, 'publish_context')
   return {
-    pr: pr as unknown as PullRequestContext,
-    files: Array.isArray(value.files) ? value.files : [],
-    event_type
+    repo: repository(context.repo),
+    workspace_ref: text(context.workspace_ref, 'publish_context.workspace_ref'),
+    scan_target: scanTarget(context.scan_target),
+    event_type: oneOf(context.event_type, 'publish_context.event_type', ['manual', 'scheduled'])
   }
 }
 
-export function parseRepositoryReviewPublishContext (
-  value: JsonObject
-): RepositoryReviewPublishContext {
-  const repo = isRecord(value.repo) ? value.repo : null
-  if (repo === null) {
-    throw new Error('Repository review publish context is missing repo.')
-  }
-  const workspace_ref = typeof value.workspace_ref === 'string' && value.workspace_ref.trim() !== ''
-    ? value.workspace_ref.trim()
-    : null
-  if (workspace_ref === null) {
-    throw new Error('Repository review publish context is missing workspace_ref.')
-  }
-  const scan_target = isRecord(value.scan_target) ? value.scan_target : null
-  if (scan_target === null) {
-    throw new Error('Repository review publish context is missing scan_target.')
-  }
-  const rawEventType = typeof value.event_type === 'string' ? value.event_type.trim() : ''
-  const event_type = rawEventType === 'manual' || rawEventType === 'scheduled'
-    ? rawEventType
-    : 'manual'
-
-  return {
-    repo: repo as unknown as RepositoryContext,
-    workspace_ref,
-    scan_target: scan_target as unknown as RepositoryScanTarget,
-    event_type
-  }
+export function parsePublishContextForWorkflow (workflow: string, value: unknown): PublishContext {
+  if (workflow === 'issue-review') return parseIssueReviewPublishContext(value)
+  if (workflow === 'pull-request-review') return parsePullRequestReviewPublishContext(value)
+  if (workflow === 'repository-review') return parseRepositoryReviewPublishContext(value)
+  return invalid('workflow', 'a supported review workflow')
 }
