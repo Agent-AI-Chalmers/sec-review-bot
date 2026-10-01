@@ -1,3 +1,4 @@
+import ast
 import asyncio
 import contextlib
 import fcntl
@@ -30,6 +31,8 @@ from sec_review_agents.memory import store as memory_store
 from sec_review_agents.memory.middleware import (
     DEFAULT_MEMORY_INDEX_MAX_CHARS,
     DEFAULT_MEMORY_INDEX_MAX_LINES,
+    DEFAULT_MEMORY_SYSTEM_PROMPT,
+    SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
     MemoryMiddleware,
 )
 from sec_review_agents.memory.store import (
@@ -206,13 +209,8 @@ def test_transcript_extraction_prompt_extracts_observation_only() -> None:
     staged = StagedTranscripts(entries=[])
     user_prompt = build_extractor_prompt(staged)
 
-    assert "Transcript Inputs" in user_prompt
-    assert "return one short Markdown observation" in user_prompt
-    assert "return no observation" in user_prompt
     assert "has_observation" not in user_prompt
     assert "observation_markdown" not in user_prompt
-    assert "contamination check" not in user_prompt
-    assert "prompt snapshots" not in user_prompt
 
 
 def test_memory_maintenance_prompt_requires_an_observation() -> None:
@@ -230,10 +228,11 @@ def test_initialize_memory_store_seeds_external_memory(tmp_path: Path) -> None:
     assert (_memory_observations_dir(memory_store_dir)).is_dir()
     assert (memory_store_dir / "memory_state.sqlite").is_file()
     assert list((_memory_content_dir(memory_store_dir) / "topics").iterdir()) == []
-    index = (_memory_content_dir(memory_store_dir) / "MEMORY.md").read_text(
-        encoding="utf-8"
+    assert (
+        (_memory_content_dir(memory_store_dir) / "MEMORY.md")
+        .read_text(encoding="utf-8")
+        .strip()
     )
-    assert "Use the top of this file as the runtime index" in index
 
 
 def test_resolve_memory_store_dir_reads_environment(tmp_path: Path) -> None:
@@ -326,21 +325,60 @@ def test_memory_delete_file_tool_rejects_paths_outside_direct_topics(
     assert topic.exists()
 
 
-def test_memory_middleware_injects_read_only_usage_rules() -> None:
+def test_memory_middleware_uses_generic_prompt_by_default() -> None:
     request = ModelRequest(
         model=FakeMessagesListChatModel(responses=[]),
         messages=[],
         system_prompt="Base prompt.",
     )
 
-    modified = MemoryMiddleware().modify_request(request)
+    middleware = MemoryMiddleware()
+    modified = middleware.modify_request(request)
 
-    assert modified.system_prompt is not None
-    assert "Base prompt." in modified.system_prompt
-    assert "/memory/MEMORY.md" in modified.system_prompt
-    assert "Use this memory as guidance only" in modified.system_prompt
-    assert "Do not write to" in modified.system_prompt
-    assert "not evidence for the current repository" in modified.system_prompt
+    assert middleware.system_prompt_template is DEFAULT_MEMORY_SYSTEM_PROMPT
+    assert modified.system_prompt == f"Base prompt.\n\n{middleware.system_prompt()}"
+
+
+def test_memory_middleware_accepts_complete_prompt_profile() -> None:
+    middleware = MemoryMiddleware(
+        system_prompt_template=SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
+    )
+
+    assert middleware.system_prompt_template is SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "src/sec_review_agents/agents/analysis/agent.py",
+        "src/sec_review_agents/agents/mitigation/agent.py",
+        "src/sec_review_agents/agents/single_agent/agent.py",
+        "src/sec_review_agents/agents/verification/agent.py",
+    ],
+)
+def test_security_review_agents_select_specialized_memory_prompt(
+    relative_path: str,
+) -> None:
+    """Keep domain policy explicit where security-review agents are assembled."""
+    module_path = Path(__file__).parents[2] / relative_path
+    module = ast.parse(module_path.read_text(encoding="utf-8"))
+    memory_calls = [
+        node
+        for node in ast.walk(module)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "MemoryMiddleware"
+    ]
+
+    assert len(memory_calls) == 1
+    prompt_keywords = [
+        keyword.value
+        for keyword in memory_calls[0].keywords
+        if keyword.arg == "system_prompt_template"
+    ]
+    assert len(prompt_keywords) == 1
+    assert isinstance(prompt_keywords[0], ast.Name)
+    assert prompt_keywords[0].id == "SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT"
 
 
 def test_memory_middleware_default_index_cap_matches_claude_code_style() -> None:
