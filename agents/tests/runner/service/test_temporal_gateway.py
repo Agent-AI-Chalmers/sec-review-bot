@@ -98,7 +98,41 @@ class _CompletedNonDictMemoHandle:
         return _CompletedNonDictMemoDescription()
 
     async def result(self) -> dict:
-        return {"ok": True, "result": {"workflow": "issue-review"}}
+        return {"ok": True, "result": _valid_workflow_result("issue-review")}
+
+
+class _CompletedInvalidResultHandle:
+    id = "run-invalid-result"
+
+    async def describe(self) -> _CompletedDescription:
+        return _CompletedDescription()
+
+    async def result(self) -> dict:
+        return {"ok": True, "result": {"contract_version": "v4"}}
+
+
+def _valid_workflow_result(workflow: str) -> dict:
+    review_record = build_review_record(
+        analysis_result=None,
+        mitigation_result=None,
+        verifier_result=None,
+        cvss_result=None,
+    )
+    if workflow == "repository-review":
+        return {
+            "contract_version": "v4",
+            "scan_summary": {
+                "scannable_file_count": 0,
+                "scanned_file_count": 0,
+                "skipped_file_count": 0,
+                "candidate_count": 0,
+                "case_count": 0,
+                "suppressed_candidate_count": 0,
+            },
+            "case_results": [],
+            "deliveries": [],
+        }
+    return {"contract_version": "v4", "review_record": review_record}
 
 
 @activity.defn(name="prepare_runner_run_activity")
@@ -182,9 +216,7 @@ def fake_build_pull_request_review_result(
     _mitigation_result: dict | None,
     _verifier_result: dict | None,
 ) -> dict:
-    return {
-        "workflow": "pull-request-review",
-    }
+    return _valid_workflow_result("pull-request-review")
 
 
 @activity.defn(name="prepare_internal_workflow_activity")
@@ -298,9 +330,7 @@ def fake_build_issue_review_result(
     _mitigation_result: dict | None,
     _verifier_result: dict | None,
 ) -> dict:
-    return {
-        "workflow": "issue-review",
-    }
+    return _valid_workflow_result("issue-review")
 
 
 @activity.defn(name="build_repository_discovery_manifest_activity")
@@ -619,9 +649,7 @@ def fake_build_repository_review_result(
     _case_results: list[dict],
     _delivery_result: dict,
 ) -> dict:
-    return {
-        "workflow": request.workflow,
-    }
+    return _valid_workflow_result(request.workflow)
 
 
 @pytest.mark.parametrize(
@@ -652,16 +680,12 @@ async def test_temporal_backend_starts_and_reads_runner_workflow(
         "run_id": "run-1",
         "workflow": workflow,
         "status": "succeeded",
-        "result": {
-            "workflow": workflow,
-        },
+        "result": _valid_workflow_result(workflow),
     }
     assert replayed == fetched
     assert child_result == {
         "ok": True,
-        "result": {
-            "workflow": workflow,
-        },
+        "result": _valid_workflow_result(workflow),
     }
 
 
@@ -710,6 +734,30 @@ async def test_record_from_handle_maps_invalid_completed_envelope_to_failed_run(
 
 
 @pytest.mark.asyncio
+async def test_record_from_handle_rejects_invalid_public_workflow_result() -> None:
+    fetched = await _record_from_handle(_CompletedInvalidResultHandle())
+
+    assert fetched == {
+        "run_id": "run-invalid-result",
+        "workflow": "issue-review",
+        "status": "failed",
+        "error": {
+            "category": "runtime",
+            "code": "RUNNER_RESPONSE_INVALID",
+            "message": (
+                "Runner result does not match contract v4: "
+                "'review_record' is a required property"
+            ),
+            "retryable": False,
+            "details": {
+                "temporal_status": "COMPLETED",
+                "workflow": "issue-review",
+            },
+        },
+    }
+
+
+@pytest.mark.asyncio
 async def test_record_from_handle_treats_missing_temporal_status_as_failed() -> None:
     fetched = await _record_from_handle(_MissingStatusHandle())
 
@@ -732,7 +780,7 @@ async def test_record_from_handle_uses_default_workflow_when_memo_is_not_mapping
         "run_id": "run-non-dict-memo",
         "workflow": "issue-review",
         "status": "succeeded",
-        "result": {"workflow": "issue-review"},
+        "result": _valid_workflow_result("issue-review"),
     }
 
 

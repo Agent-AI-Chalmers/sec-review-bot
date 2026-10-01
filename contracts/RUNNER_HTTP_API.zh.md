@@ -89,6 +89,8 @@ GET /v1/runs/{run_id}
 
 ### 成功响应
 
+只有当 workflow 完成，且其 result 符合该 workflow 的公开 v4 schema 时，Runner 才会报告 `succeeded`。如果 workflow 已完成但返回了非法的公开 result，Runner 会以 `RUNNER_RESPONSE_INVALID` 报告失败；Runner 不会在这个边界猜测如何修复契约字段。
+
 ```json
 {
   "run_id": "run-001",

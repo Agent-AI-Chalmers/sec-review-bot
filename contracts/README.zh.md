@@ -65,7 +65,7 @@ GitHub integration 是调用方侧的一种实现：它把 GitHub event 和发�
 
 Markdown 规范定义字段语义、兼容规则和集成指导。
 
-Schema 文件是该规范的可执行结构化形式。契约 v4 schemas 使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python Runner 使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 执行 input schemas，TypeScript integration 使用 [Ajv](https://ajv.js.org/) 执行 input 和 result schemas；两个包的测试也会执行共享 fixtures。
+Schema 文件是该规范的可执行结构化形式。契约 v4 schemas 使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python Runner 使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 执行 input 和 result schemas，TypeScript integration 则使用 [Ajv](https://ajv.js.org/) 独立执行这两类 schemas；两个包的测试也会执行共享 fixtures。
 
 Agents wheel 会在构建时把这些 canonical schemas 作为 package data 收入包中。因此安装后的 Python 工具不依赖仓库级 `contracts/` 路径。
 

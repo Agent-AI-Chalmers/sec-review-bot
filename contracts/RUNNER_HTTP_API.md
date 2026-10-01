@@ -93,6 +93,8 @@ GET /v1/runs/{run_id}
 
 ### Succeeded Response
 
+The Runner reports `succeeded` only after the workflow completes and its result matches the public v4 schema for that workflow. A completed workflow that returns an invalid public result is reported as failed with `RUNNER_RESPONSE_INVALID`; the Runner does not guess how to repair contract fields at this boundary.
+
 ```json
 {
   "run_id": "run-001",
