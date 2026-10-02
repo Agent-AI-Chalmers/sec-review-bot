@@ -69,7 +69,7 @@ def test_foundational_packages_do_not_import_upper_layers() -> None:
         "sec_review_agents.memory",
         "sec_review_agents.observability",
         "sec_review_agents.review_stages",
-        "sec_review_agents.runner",
+        "sec_review_agents.entrypoints",
         "sec_review_agents.runtime",
         "sec_review_agents.scan_stages",
         "sec_review_agents.temporal",
@@ -236,14 +236,14 @@ def test_foundational_packages_do_not_import_runner_runtime_input_preparation() 
         violations.extend(
             import_violations(
                 root,
-                ("sec_review_agents.runner.input_preparation",),
+                ("sec_review_agents.entrypoints.input_preparation",),
             )
         )
 
     assert violations == []
 
 
-def test_runner_core_and_service_do_not_leak_into_workflow_input_consumers() -> None:
+def test_run_protocol_and_service_do_not_leak_into_workflow_input_consumers() -> None:
     roots = [
         PACKAGE_ROOT / "cli",
         PACKAGE_ROOT / "workflows",
@@ -255,8 +255,8 @@ def test_runner_core_and_service_do_not_leak_into_workflow_input_consumers() -> 
             import_violations(
                 root,
                 (
-                    "sec_review_agents.runner.core",
-                    "sec_review_agents.runner.service",
+                    "sec_review_agents.entrypoints.run_protocol",
+                    "sec_review_agents.entrypoints.service",
                 ),
             )
         )
@@ -264,7 +264,7 @@ def test_runner_core_and_service_do_not_leak_into_workflow_input_consumers() -> 
     assert violations == []
 
 
-def test_runner_input_preparation_import_does_not_eagerly_load_runner_core() -> None:
+def test_input_preparation_import_does_not_eagerly_load_upper_layers() -> None:
     src_root = str(PACKAGE_ROOT.parent)
     env = {
         **os.environ,
@@ -278,10 +278,9 @@ def test_runner_input_preparation_import_does_not_eagerly_load_runner_core() -> 
 import json
 import sys
 
-import sec_review_agents.runner.input_preparation
+import sec_review_agents.entrypoints.input_preparation
 
 prefixes = (
-    "sec_review_agents.runner.core",
     "sec_review_agents.workflows",
     "sec_review_agents.llm",
     "sec_review_agents.runtime",
@@ -299,11 +298,11 @@ print(json.dumps(sorted(name for name in sys.modules if name.startswith(prefixes
     assert result.stdout.strip() == "[]"
 
 
-def test_runner_core_does_not_import_stage_modules() -> None:
-    runner_path = PACKAGE_ROOT / "runner" / "core.py"
-    assert runner_path.exists()
+def test_run_protocol_does_not_import_stage_modules() -> None:
+    protocol_path = PACKAGE_ROOT / "entrypoints" / "run_protocol.py"
+    assert protocol_path.exists()
     violations = import_violations(
-        runner_path,
+        protocol_path,
         (
             "sec_review_agents.review_stages.analysis.stage",
             "sec_review_agents.review_stages.mitigation.stage",

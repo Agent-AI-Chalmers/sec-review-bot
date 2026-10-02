@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import pytest
 
-from sec_review_agents.runner.contract_schema import validate_v4_workflow_result
+from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_result
 from tests.contract_fixtures import (
     contract_fixture,
     contract_fixture_files,

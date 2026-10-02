@@ -4,6 +4,10 @@ from concurrent.futures import ThreadPoolExecutor
 from temporalio.client import Client
 from temporalio.worker import Worker
 
+from sec_review_agents.entrypoints.service.workflow import (
+    RunnerExecutionWorkflow,
+    prepare_runner_run_activity,
+)
 from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionWorkflow,
     claim_pending_memory_extraction_jobs_activity,
@@ -19,10 +23,6 @@ from sec_review_agents.memory.maintenance_workflow import (
 )
 from sec_review_agents.memory.schedule import (
     ensure_configured_memory_schedules,
-)
-from sec_review_agents.runner.service.workflow import (
-    RunnerExecutionWorkflow,
-    prepare_runner_run_activity,
 )
 from sec_review_agents.temporal.config import (
     DEFAULT_TEMPORAL_ADDRESS,

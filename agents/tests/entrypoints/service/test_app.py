@@ -2,8 +2,8 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from sec_review_agents.runner.service import app as service_app
-from sec_review_agents.runner.service.gateway import RunnerRunConflictError
+from sec_review_agents.entrypoints.service import app as service_app
+from sec_review_agents.entrypoints.service.gateway import RunnerRunConflictError
 from tests.contract_fixtures import contract_fixture
 
 

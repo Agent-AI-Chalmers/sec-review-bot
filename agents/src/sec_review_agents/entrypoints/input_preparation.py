@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from sec_review_agents.runner.contract_schema import validate_v4_workflow_input
+from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_input
+from sec_review_agents.entrypoints.run_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
 
 ISSUE_ARTIFACT_PATHS = {
@@ -28,6 +29,23 @@ REPOSITORY_ARTIFACT_PATHS = {
 INPUT_BUNDLE_MANIFEST_NAME = "manifest.json"
 ARTIFACT_ROOT_ENV = "SEC_REVIEW_AGENT_ARTIFACT_ROOT"
 INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT"
+
+
+def prepare_run_input(
+    caller_input: dict[str, Any],
+    *,
+    run_id: str,
+    workflow: str,
+) -> dict[str, Any]:
+    validated_run_id = validate_run_id(run_id)
+    return prepare_workflow_input(
+        caller_input,
+        workflow,
+        artifact_root_path=workflow_artifact_root(
+            caller_input,
+            run_id=validated_run_id,
+        ),
+    )
 
 
 def prepare_workflow_input(
@@ -243,5 +261,6 @@ def _string_value(value: Any) -> str | None:
 
 
 __all__ = [
+    "prepare_run_input",
     "prepare_workflow_input",
 ]

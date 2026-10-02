@@ -1,11 +1,7 @@
 import re
 from typing import Any
 
-from sec_review_agents.runner.contract_schema import INPUT_SCHEMA_BY_WORKFLOW
-from sec_review_agents.runner.input_preparation import (
-    prepare_workflow_input,
-    workflow_artifact_root,
-)
+from sec_review_agents.entrypoints.contract_schema import INPUT_SCHEMA_BY_WORKFLOW
 
 SUPPORTED_RUNNER_WORKFLOWS = frozenset(INPUT_SCHEMA_BY_WORKFLOW)
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -64,23 +60,6 @@ def validate_run_id(value: object) -> str:
     return value
 
 
-def prepare_runner_input_data(
-    caller_input: dict[str, Any],
-    *,
-    run_id: str,
-    workflow: str,
-) -> dict[str, Any]:
-    validated_run_id = validate_run_id(run_id)
-    return prepare_workflow_input(
-        caller_input,
-        workflow,
-        artifact_root_path=workflow_artifact_root(
-            caller_input,
-            run_id=validated_run_id,
-        ),
-    )
-
-
 def is_supported_workflow(workflow: str) -> bool:
     return workflow in SUPPORTED_RUNNER_WORKFLOWS
 
@@ -97,7 +76,6 @@ __all__ = [
     "SUPPORTED_RUNNER_WORKFLOWS",
     "build_runner_error",
     "is_supported_workflow",
-    "prepare_runner_input_data",
     "validate_run_id",
     "validate_run_request_body",
 ]

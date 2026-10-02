@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from sec_review_agents.runner.service import worker as worker_module
+from sec_review_agents.entrypoints.service import worker as worker_module
 
 
 @pytest.mark.asyncio

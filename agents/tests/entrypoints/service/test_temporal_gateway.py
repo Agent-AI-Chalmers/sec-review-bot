@@ -7,20 +7,20 @@ from temporalio.client import WorkflowExecutionStatus
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
-from sec_review_agents.memory.extraction_workflow import (
-    MemoryExtractionRegistrationRequest,
-)
-from sec_review_agents.review_stages.record import build_review_record
-from sec_review_agents.runner.service.gateway import RunnerRunConflictError
-from sec_review_agents.runner.service.temporal_gateway import (
+from sec_review_agents.entrypoints.service.gateway import RunnerRunConflictError
+from sec_review_agents.entrypoints.service.temporal_gateway import (
     TemporalRunnerWorkflowGateway,
     _record_from_handle,
 )
-from sec_review_agents.runner.service.workflow import (
+from sec_review_agents.entrypoints.service.workflow import (
     RunnerExecutionRequest,
     RunnerExecutionWorkflow,
     prepare_runner_run_activity,
 )
+from sec_review_agents.memory.extraction_workflow import (
+    MemoryExtractionRegistrationRequest,
+)
+from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.issue.single_agent import IssueSingleAgentWorkflow
 from sec_review_agents.workflows.issue.two_stage import IssueTwoStageWorkflow

@@ -13,14 +13,14 @@ from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 
-from sec_review_agents.runner.contract_schema import validate_v4_workflow_result
-from sec_review_agents.runner.core import (
+from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_result
+from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_EXECUTION_FAILED,
     RUNNER_RESPONSE_INVALID,
     build_runner_error,
 )
-from sec_review_agents.runner.service.gateway import RunnerRunConflictError
-from sec_review_agents.runner.service.workflow import (
+from sec_review_agents.entrypoints.service.gateway import RunnerRunConflictError
+from sec_review_agents.entrypoints.service.workflow import (
     RunnerExecutionRequest,
     RunnerExecutionWorkflow,
 )

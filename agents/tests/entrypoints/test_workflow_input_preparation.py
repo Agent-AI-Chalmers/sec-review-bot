@@ -4,8 +4,11 @@ from typing import Any
 
 import pytest
 
-from sec_review_agents.runner import input_preparation
-from sec_review_agents.runner.input_preparation import prepare_workflow_input
+from sec_review_agents.entrypoints import input_preparation
+from sec_review_agents.entrypoints.input_preparation import (
+    prepare_run_input,
+    prepare_workflow_input,
+)
 from tests.contract_fixtures import contract_fixture
 
 
@@ -21,6 +24,46 @@ def _write_bundle_manifest(local_root: str, *, incremental: bool = False) -> Non
     if incremental:
         manifest["incremental_window"] = {"path": "incremental-window"}
     (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle"
+    _write_bundle_manifest(str(bundle_root))
+
+    prepared = prepare_run_input(
+        {
+            "contract_version": "v4",
+            "input_bundle_uri": str(bundle_root),
+            "review_intent": {"objective": "audit"},
+            "issue": {"number": 1},
+        },
+        run_id="run-input-preparation",
+        workflow="issue-review",
+    )
+
+    assert prepared["input_bundle_root_path"] == str(bundle_root)
+    assert prepared["artifact_root_path"] == str(bundle_root / "artifacts")
+    assert prepared["artifact_paths"] == {
+        "analyzer": str(bundle_root / "artifacts" / "analyzer"),
+        "mitigator": str(bundle_root / "artifacts" / "mitigator"),
+        "verifier": str(bundle_root / "artifacts" / "verifier"),
+    }
+    assert prepared["bundle_paths"] == {
+        "workspace_snapshot_tar_path": str(bundle_root / "workspace.snapshot.tar"),
+        "history_path": str(bundle_root / "history"),
+    }
+
+
+def test_prepare_run_input_rejects_unsupported_workflow() -> None:
+    with pytest.raises(ValueError, match="Unsupported workflow"):
+        prepare_run_input(
+            {
+                "contract_version": "v4",
+                "input_bundle_uri": "/tmp/bundle",
+            },
+            run_id="run-input-preparation",
+            workflow="issue-review-single-agent",
+        )
 
 
 def _repository_scan_target(overrides: dict[str, Any] | None = None) -> dict[str, Any]:

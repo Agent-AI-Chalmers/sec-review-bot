@@ -46,8 +46,8 @@ dev = [
 ]
 
 [project.scripts]
-sec-review-agents-service = "sec_review_agents.runner.service.app:main"
-sec-review-agents-worker = "sec_review_agents.runner.service.worker:main"
+sec-review-agents-service = "sec_review_agents.entrypoints.service.app:main"
+sec-review-agents-worker = "sec_review_agents.entrypoints.service.worker:main"
 sec-review-agents-check-llm-deployments = "sec_review_agents.cli.check_llm_deployments:main"
 sec-review-agents-run-local-issue = "sec_review_agents.cli.run_local_issue:main"
 sec-review-agents-run-local-pr = "sec_review_agents.cli.run_local_pr:main"

@@ -93,8 +93,8 @@ The Python package is easiest to read by responsibility:
 3. Workflows: combines stages into product paths.
    - `workflows/`: `issue/`, `pull_request/`, and `repository/` are the three public workflows; `repository_case/` is the per-case review used inside repository workflow.
 
-4. Runner entrypoint: production transport and input preparation.
-   - `runner/`: FastAPI runner service, Temporal worker, workflow dispatch, and workflow input preparation.
+4. Production entrypoints: transport and execution-boundary preparation.
+   - `entrypoints/`: FastAPI Runner Service, Temporal worker, workflow dispatch, and workflow input preparation.
 
 5. Runtime support: infrastructure needed to run agents.
    - `runtime/`, `filesystem/`, `workspace/`, `llm/`, `resources/`, `observability/`: agent runtime, filesystem sandbox, workspace artifacts, model config, prompt / skill resources, and diagnostics.

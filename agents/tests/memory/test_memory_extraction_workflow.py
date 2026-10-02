@@ -56,7 +56,7 @@ def _fake_workflow_logger() -> SimpleNamespace:
 
 
 def test_worker_imports_memory_maintenance_workflow_and_activity() -> None:
-    from sec_review_agents.runner.service import worker
+    from sec_review_agents.entrypoints.service import worker
 
     assert worker.MemoryMaintenanceTriggerWorkflow is MemoryMaintenanceTriggerWorkflow
     assert worker.MemoryMaintenanceWorkflow is MemoryMaintenanceWorkflow

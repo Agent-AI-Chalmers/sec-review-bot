@@ -95,8 +95,8 @@ Python package 按职责读最清楚：
 3. Workflows：把 stage 组合成产品路径。
    - `workflows/`：`issue/`、`pull_request/`、`repository/` 是三个 public workflow；`repository_case/` 是 repository workflow 内部的单 case review。
 
-4. Runner entrypoint：生产传输入口和输入准备。
-   - `runner/`：FastAPI runner service、Temporal worker、workflow dispatch 和 workflow input preparation。
+4. 生产 entrypoints：传输层与执行边界准备。
+   - `entrypoints/`：FastAPI Runner Service、Temporal worker、workflow dispatch 和 workflow input preparation。
 
 5. Runtime support：agent 运行所需基础设施。
    - `runtime/`、`filesystem/`、`workspace/`、`llm/`、`resources/`、`observability/`：agent runtime、filesystem sandbox、workspace 产物、模型配置、prompt / skill 资源和诊断支持。
