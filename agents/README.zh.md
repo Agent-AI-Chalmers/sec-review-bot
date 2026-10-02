@@ -142,7 +142,7 @@ FastAPI service 接收 HTTP run 请求，并通过 Temporal client 启动和查�
 
 - `sec-review-agents-run-local-issue`：本地 issue run 入口；可用 `--strategy default|two-stage|single-agent` 选择默认 multi-stage 路径、two-stage ablation 或 single-agent baseline
 - `sec-review-agents-run-local-pr`：本地 PR run 入口
-- `sec-review-agents-run-local-repository`：本地 repo 扫描 run 入口；可用 `--scan-mode full|incremental` 选择全量或增量扫描
+- `sec-review-agents-run-local-repository`：本地 repo 扫描 run 入口；可用 `--scan-mode full|incremental` 选择全量或增量扫描，并可重复传入 `--paths-ignore PATTERN`，忽略指定路径或 glob
 
 本地运行默认使用临时目录保存 workflow result、workspace snapshot、history 和其他 artifacts。命令结束时会打印 `WORKFLOW_RESULT=...`，可根据该路径查看结果；也可以通过 `--output-dir` 指定固定的输出目录。
 
@@ -195,6 +195,8 @@ sec-review-agents-run-local-pr \
 sec-review-agents-run-local-repository \
   --repo /abs/path/to/repo \
   --target-branch main \
+  --paths-ignore docs \
+  --paths-ignore '**/*.generated.py' \
   --repair-mode test-changes-allowed
 
 # 4) repo 增量扫描

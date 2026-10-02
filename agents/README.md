@@ -140,7 +140,7 @@ After installing dependencies, these commands are available:
 
 - `sec-review-agents-run-local-issue`: local issue run entrypoint. Use `--strategy default|two-stage|single-agent` to choose the default multi-stage path, two-stage ablation, or single-agent baseline.
 - `sec-review-agents-run-local-pr`: local PR run entrypoint.
-- `sec-review-agents-run-local-repository`: local repository scan run entrypoint. Use `--scan-mode full|incremental` to choose full or incremental scan.
+- `sec-review-agents-run-local-repository`: local repository scan run entrypoint. Use `--scan-mode full|incremental` to choose full or incremental scan, and repeat `--paths-ignore PATTERN` to ignore paths or globs.
 
 Local runs use a temporary directory by default for the workflow result, workspace snapshot, history, and other artifacts. At the end of the command, the CLI prints `WORKFLOW_RESULT=...`, which you can use to locate the result; you can also use `--output-dir` to override the output directory.
 
@@ -193,6 +193,8 @@ sec-review-agents-run-local-pr \
 sec-review-agents-run-local-repository \
   --repo /abs/path/to/repo \
   --target-branch main \
+  --paths-ignore docs \
+  --paths-ignore '**/*.generated.py' \
   --repair-mode test-changes-allowed
 
 # 4) incremental repo scan

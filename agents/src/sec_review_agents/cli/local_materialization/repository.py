@@ -173,15 +173,19 @@ def build_local_repository_security_bundle(
     *,
     repo_path: Path,
     output_dir: Path,
-    repo_full_name_value: str | None,
     ref: str = "HEAD",
     target_branch: str | None = None,
     scan_mode: str = "full",
     baseline_ref: str | None = None,
-    event_type: str = "manual",
+    paths_ignore: list[str] | None = None,
     default_branch: str | None = None,
     repair_mode: str = "test-changes-allowed",
 ) -> ReviewBundle:
+    event_type = "manual"
+    resolved_paths_ignore = list(paths_ignore or [])
+    if any(not pattern.strip() for pattern in resolved_paths_ignore):
+        raise ValueError("paths_ignore entries must be non-empty strings.")
+
     run_id = create_local_run_id()
     resolved_ref = resolve_git_ref(repo_path, ref)
     resolved_default_branch = default_branch or repo_default_branch(repo_path)
@@ -267,7 +271,7 @@ def build_local_repository_security_bundle(
 
     scan_scope = {
         "max_file_bytes": 200_000,
-        "paths_ignore": [],
+        "paths_ignore": resolved_paths_ignore,
         "incremental_changed_files": [
             {
                 "path": item.get("path"),
