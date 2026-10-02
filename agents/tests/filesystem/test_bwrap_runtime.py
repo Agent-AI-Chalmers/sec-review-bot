@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from sec_review_agents.filesystem.bwrap_runtime import (
+    BWRAP_NETWORK_INHERIT,
     BWRAP_NETWORK_NONE,
     BwrapMount,
     arun_bwrap_command,
@@ -25,7 +26,7 @@ class _AsyncProcess:
         pass
 
 
-def test_basic_args_include_runtime_libs_and_mounts_without_network() -> None:
+def test_basic_args_include_runtime_libs_and_mounts_with_network_isolated() -> None:
     args = basic_bwrap_args(
         bwrap_bin="/usr/bin/bwrap",
         working_directory="/workspace",
@@ -38,7 +39,7 @@ def test_basic_args_include_runtime_libs_and_mounts_without_network() -> None:
         ],
     )
 
-    assert "--unshare-net" not in args
+    assert "--unshare-net" in args
     assert "--ro-bind" in args
     assert "/usr" in args
     assert "/bin" in args
@@ -85,14 +86,14 @@ def test_basic_options_exclude_bwrap_binary() -> None:
     assert "/usr/bin/bwrap" not in options
 
 
-def test_basic_args_can_disable_network() -> None:
+def test_basic_args_can_explicitly_inherit_network() -> None:
     args = basic_bwrap_args(
         bwrap_bin="/usr/bin/bwrap",
         working_directory="/workspace",
-        network_mode=BWRAP_NETWORK_NONE,
+        network_mode=BWRAP_NETWORK_INHERIT,
     )
 
-    assert "--unshare-net" in args
+    assert "--unshare-net" not in args
 
 
 def test_basic_args_reject_unknown_network_mode() -> None:
@@ -119,7 +120,7 @@ def test_probe_uses_basic_runtime_command() -> None:
         assert is_bwrap_runtime_available("/usr/bin/bwrap")
 
     args = run_mock.call_args.args[0]
-    assert "--unshare-net" not in args
+    assert "--unshare-net" in args
     assert args[-3:] == ["/bin/sh", "-c", "printf bwrap-basic-ok"]
 
 

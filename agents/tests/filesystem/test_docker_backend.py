@@ -410,6 +410,7 @@ def test_container_file_script_zero_grep_budget_only_truncates_when_matches_exis
 
 
 def test_start_container_marks_only_read_only_mounts_readonly() -> None:
+    """Container startup must enforce the repository-owned hardening baseline."""
     with patch(
         "sec_review_agents.filesystem.docker_runtime.run_docker_command",
     ) as run_command:
@@ -443,6 +444,13 @@ def test_start_container_marks_only_read_only_mounts_readonly() -> None:
     writable_mount = next(value for value in args if "dst=/workspace" in value)
     assert "readonly" in read_only_mount
     assert "readonly" not in writable_mount
+    assert args[args.index("--cap-drop") + 1] == "ALL"
+    assert "DAC_OVERRIDE" in args
+    assert "CHOWN" in args
+    assert "no-new-privileges:true" in args
+    assert args[args.index("--pids-limit") + 1] == "512"
+    assert args[args.index("--memory") + 1] == "4g"
+    assert args[args.index("--cpus") + 1] == "2"
 
 
 def test_container_resource_start_is_thread_safe() -> None:
@@ -969,7 +977,7 @@ def test_download_rejects_disallowed_paths_without_initializing_container() -> N
     assert responses[0].error == "permission_denied"
 
 
-def test_upload_returns_agent_path_while_copying_to_container_path() -> None:
+def test_upload_returns_agent_path_while_using_container_route() -> None:
     backend = _backend(
         routes=[
             DockerRoute(
@@ -983,24 +991,20 @@ def test_upload_returns_agent_path_while_copying_to_container_path() -> None:
     with (
         patch.object(backend.container, "ensure_started"),
         patch(
-            "sec_review_agents.filesystem.docker_runtime.exec_shell",
-        ),
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.copy_to_container",
-        ) as copy_to_container,
+            "sec_review_agents.filesystem.docker_runtime.transfer_with_container_helper",
+            return_value=subprocess.CompletedProcess([], 0, b"", b""),
+        ) as transfer,
     ):
         responses = backend.upload_files([("/workspace/app.py", b"content")])
 
     assert len(responses) == 1
     assert responses[0].path == "/workspace/app.py"
     assert responses[0].error is None
-    assert (
-        copy_to_container.call_args.kwargs["target_path"]
-        == "/mnt/material/workspace/app.py"
-    )
+    assert transfer.call_args.kwargs["script"]
+    assert transfer.call_args.kwargs["input_bytes"] == b"content"
 
 
-def test_download_returns_agent_path_while_reading_container_path() -> None:
+def test_download_returns_agent_path_while_using_container_route() -> None:
     backend = _backend(
         routes=[
             DockerRoute(
@@ -1011,16 +1015,12 @@ def test_download_returns_agent_path_while_reading_container_path() -> None:
         ],
     )
 
-    def fake_copy_from_container(*, target, **kwargs):
-        Path(target).write_bytes(b"content")
-
     with (
         patch.object(backend.container, "ensure_started"),
-        patch.object(backend, "_probe_path_kind", return_value="file"),
         patch(
-            "sec_review_agents.filesystem.docker_runtime.copy_from_container",
-            side_effect=fake_copy_from_container,
-        ) as copy_from_container,
+            "sec_review_agents.filesystem.docker_runtime.transfer_with_container_helper",
+            return_value=subprocess.CompletedProcess([], 0, b"content", b""),
+        ) as transfer,
     ):
         responses = backend.download_files(["/workspace/app.py"])
 
@@ -1028,10 +1028,7 @@ def test_download_returns_agent_path_while_reading_container_path() -> None:
     assert responses[0].path == "/workspace/app.py"
     assert responses[0].content == b"content"
     assert responses[0].error is None
-    assert (
-        copy_from_container.call_args.kwargs["source_path"]
-        == "/mnt/material/workspace/app.py"
-    )
+    assert transfer.call_args.kwargs["input_bytes"] is None
 
 
 def test_download_missing_returns_agent_path() -> None:
@@ -1047,7 +1044,12 @@ def test_download_missing_returns_agent_path() -> None:
 
     with (
         patch.object(backend.container, "ensure_started"),
-        patch.object(backend, "_probe_path_kind", return_value="missing"),
+        patch(
+            "sec_review_agents.filesystem.docker_runtime.transfer_with_container_helper",
+            return_value=subprocess.CompletedProcess(
+                [], 1, b"", b"SEC_REVIEW_TRANSFER_ERROR:file_not_found\n"
+            ),
+        ),
     ):
         responses = backend.download_files(["/workspace/missing.py"])
 
