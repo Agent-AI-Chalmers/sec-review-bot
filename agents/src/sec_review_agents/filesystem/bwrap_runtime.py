@@ -10,7 +10,11 @@ BWRAP_NETWORK_INHERIT = "inherit"
 BWRAP_NETWORK_NONE = "none"
 BWRAP_BASE_ARGS = (
     "--die-with-parent",
+    "--new-session",
+    "--unshare-user",
     "--unshare-pid",
+    "--cap-drop",
+    "ALL",
     "--proc",
     "/proc",
     "--dev",
@@ -42,7 +46,7 @@ def basic_bwrap_options(
     *,
     working_directory: str,
     mounts: list[BwrapMount] | tuple[BwrapMount, ...] = (),
-    network_mode: str = BWRAP_NETWORK_INHERIT,
+    network_mode: str = BWRAP_NETWORK_NONE,
 ) -> list[str]:
     """Build the intentionally small default bwrap sandbox option set."""
     # This is the intentionally small "basic" profile. Network isolation is
@@ -72,7 +76,7 @@ def basic_bwrap_args(
     bwrap_bin: str,
     working_directory: str,
     mounts: list[BwrapMount] | tuple[BwrapMount, ...] = (),
-    network_mode: str = BWRAP_NETWORK_INHERIT,
+    network_mode: str = BWRAP_NETWORK_NONE,
 ) -> list[str]:
     """Build a complete bwrap argv from the default option profile."""
     return [
@@ -93,7 +97,7 @@ def run_bwrap_command(
     shell: str,
     command: str,
     timeout_seconds: float | None,
-    network_mode: str = BWRAP_NETWORK_INHERIT,
+    network_mode: str = BWRAP_NETWORK_NONE,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
@@ -122,7 +126,7 @@ async def arun_bwrap_command(
     shell: str,
     command: str,
     timeout_seconds: float | None,
-    network_mode: str = BWRAP_NETWORK_INHERIT,
+    network_mode: str = BWRAP_NETWORK_NONE,
 ) -> subprocess.CompletedProcess[str]:
     args = [
         *basic_bwrap_args(
@@ -166,7 +170,7 @@ async def arun_bwrap_command(
 def is_bwrap_runtime_available(
     bwrap_bin: str | None = None,
     *,
-    network_mode: str = BWRAP_NETWORK_INHERIT,
+    network_mode: str = BWRAP_NETWORK_NONE,
 ) -> bool:
     binary = bwrap_bin or default_bwrap_bin()
     if shutil.which(binary) is None:

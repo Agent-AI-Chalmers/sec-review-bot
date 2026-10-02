@@ -5,7 +5,6 @@ import subprocess
 import threading
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from sec_review_agents.filesystem.command_output import combine_command_output
 from sec_review_agents.utils.env import env_value, parse_bool_env, parse_int_env
@@ -177,6 +176,21 @@ def run_docker_command(
     return result
 
 
+def run_docker_binary_command(
+    args: list[str],
+    *,
+    input_bytes: bytes | None = None,
+    timeout_ms: int | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        args,
+        check=False,
+        input=input_bytes,
+        capture_output=True,
+        timeout=(timeout_ms / 1000) if timeout_ms else None,
+    )
+
+
 async def arun_docker_command(
     args: list[str],
     *,
@@ -252,6 +266,23 @@ def start_container(
         args.append("--rm")
 
     args.extend(["--name", container_name, "--workdir", working_directory])
+
+    # These are explicit project guarantees rather than daemon-dependent
+    # defaults. Resource values remain configurable for heavyweight reviews.
+    args.extend(["--cap-drop", "ALL"])
+    # The default container user is root for image compatibility. These two
+    # capabilities are the minimum needed for host-owned writable bind mounts
+    # and the existing end-of-run ownership normalization.
+    args.extend(["--cap-add", "DAC_OVERRIDE"])
+    args.extend(["--cap-add", "CHOWN"])
+    args.extend(["--security-opt", "no-new-privileges:true"])
+    args.extend(["--pids-limit", env_value("AGENT_DOCKER_PIDS_LIMIT") or "512"])
+    args.extend(["--memory", env_value("AGENT_DOCKER_MEMORY") or "4g"])
+    args.extend(["--cpus", env_value("AGENT_DOCKER_CPUS") or "2"])
+    if seccomp_profile := env_value("AGENT_DOCKER_SECCOMP_PROFILE"):
+        args.extend(["--security-opt", f"seccomp={seccomp_profile}"])
+    if apparmor_profile := env_value("AGENT_DOCKER_APPARMOR_PROFILE"):
+        args.extend(["--security-opt", f"apparmor={apparmor_profile}"])
 
     if network_mode:
         args.extend(["--network", network_mode])
@@ -343,37 +374,23 @@ def configure_git_safe_directory(
     )
 
 
-def copy_to_container(
+def transfer_with_container_helper(
     *,
     container_name: str,
-    source: Path,
-    target_path: str,
+    script: str,
+    input_bytes: bytes | None,
     timeout_ms: int | None,
-) -> subprocess.CompletedProcess[str]:
-    return run_docker_command(
+) -> subprocess.CompletedProcess[bytes]:
+    return run_docker_binary_command(
         [
             default_docker_bin(),
-            "cp",
-            str(source),
-            f"{container_name}:{target_path}",
+            "exec",
+            "-i",
+            container_name,
+            "python3",
+            "-c",
+            script,
         ],
-        timeout_ms=timeout_ms,
-    )
-
-
-def copy_from_container(
-    *,
-    container_name: str,
-    source_path: str,
-    target: Path,
-    timeout_ms: int | None,
-) -> subprocess.CompletedProcess[str]:
-    return run_docker_command(
-        [
-            default_docker_bin(),
-            "cp",
-            f"{container_name}:{source_path}",
-            str(target),
-        ],
+        input_bytes=input_bytes,
         timeout_ms=timeout_ms,
     )

@@ -27,10 +27,8 @@ import json
 import os
 import shlex
 import subprocess
-import tempfile
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
 
 from deepagents.backends.protocol import (
     EditResult,
@@ -51,6 +49,10 @@ from sec_review_agents.filesystem.command_output import text_output, truncate_ou
 from sec_review_agents.filesystem.docker_runtime import (
     DockerContainerResource,
     combine_command_output,
+)
+from sec_review_agents.filesystem.docker_transfer_ops import (
+    docker_transfer_error,
+    docker_transfer_script,
 )
 from sec_review_agents.filesystem.limits import (
     FilesystemLimits,
@@ -372,6 +374,30 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                 else normalize_unix_path(f"{container_prefix}/{suffix}")
             )
         return normalized
+
+    def _transfer_route(
+        self,
+        path: str,
+        *,
+        require_writable: bool = False,
+    ) -> tuple[str, tuple[str, ...]] | None:
+        normalized = normalize_unix_path(path)
+        for binding in sorted(
+            self.routes,
+            key=lambda item: len(normalize_unix_path(item.agent_path)),
+            reverse=True,
+        ):
+            agent_root = normalize_unix_path(binding.agent_path)
+            if not unix_path_has_prefix(normalized, agent_root):
+                continue
+            if require_writable and not binding.writable:
+                return None
+            suffix = normalized[len(agent_root) :].lstrip("/")
+            return (
+                normalize_unix_path(binding.container_path),
+                tuple(part for part in suffix.split("/") if part),
+            )
+        return None
 
     def _to_agent_path(self, path: str) -> str:
         normalized = normalize_unix_path(path)
@@ -1057,50 +1083,50 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         # tool calls should return cheap errors without paying Docker startup cost.
         initialized = False
 
-        with tempfile.TemporaryDirectory(prefix="docker-sandbox-upload-") as temp_dir:
-            for target_path, content in files:
-                if not is_absolute_unix_path(target_path):
-                    responses.append(
-                        FileUploadResponse(path=target_path, error="invalid_path")
-                    )
-                    continue
-                if not self._is_allowed_path(target_path, writable=True):
-                    responses.append(
-                        FileUploadResponse(path=target_path, error="permission_denied")
-                    )
-                    continue
+        for target_path, content in files:
+            if not is_absolute_unix_path(target_path):
+                responses.append(
+                    FileUploadResponse(path=target_path, error="invalid_path")
+                )
+                continue
+            transfer_route = self._transfer_route(target_path, require_writable=True)
+            if transfer_route is None:
+                responses.append(
+                    FileUploadResponse(path=target_path, error="permission_denied")
+                )
+                continue
+            route_root, relative_parts = transfer_route
 
-                normalized_target_path = self._to_container_path(target_path)
-                temp_file_path = Path(temp_dir) / uuid.uuid4().hex
-                temp_file_path.write_bytes(content)
-
-                try:
-                    if not initialized:
-                        self.container.ensure_started()
-                        initialized = True
-                    parent_dir = str(Path(normalized_target_path).parent).replace(
-                        "\\", "/"
-                    )
-                    docker_runtime.exec_shell(
-                        container_name=self.container_name,
-                        shell=self.shell,
-                        command=f"mkdir -p {shlex.quote(parent_dir)}",
-                        timeout_ms=self.command_timeout_ms,
-                    )
-                    docker_runtime.copy_to_container(
-                        container_name=self.container_name,
-                        source=temp_file_path,
-                        target_path=normalized_target_path,
-                        timeout_ms=self.command_timeout_ms,
-                    )
-                    responses.append(FileUploadResponse(path=target_path, error=None))
-                except Exception as error:
+            try:
+                if not initialized:
+                    self.container.ensure_started()
+                    initialized = True
+                result = docker_runtime.transfer_with_container_helper(
+                    container_name=self.container_name,
+                    script=docker_transfer_script(
+                        operation="upload",
+                        root=route_root,
+                        relative_parts=relative_parts,
+                    ),
+                    input_bytes=content,
+                    timeout_ms=self.command_timeout_ms,
+                )
+                if result.returncode != 0:
                     responses.append(
                         FileUploadResponse(
                             path=target_path,
-                            error=infer_file_operation_error(str(error)),
+                            error=docker_transfer_error(result.stderr),
                         )
                     )
+                    continue
+                responses.append(FileUploadResponse(path=target_path, error=None))
+            except Exception as error:
+                responses.append(
+                    FileUploadResponse(
+                        path=target_path,
+                        error=infer_file_operation_error(str(error)),
+                    )
+                )
 
         return responses
 
@@ -1110,95 +1136,68 @@ class DockerSandboxBackend(SandboxBackendProtocol):
     ) -> list[FileUploadResponse]:
         return await asyncio.to_thread(self.upload_files, files)
 
-    def _probe_path_kind(self, target_path: str) -> str:
-        probe = (
-            f"if [ -d {shlex.quote(target_path)} ]; then printf directory; "
-            f"elif [ -f {shlex.quote(target_path)} ]; then printf file; "
-            "else printf missing; fi"
-        )
-        result = docker_runtime.exec_shell(
-            container_name=self.container_name,
-            shell=self.shell,
-            command=probe,
-            timeout_ms=self.command_timeout_ms,
-            expect_success=False,
-        )
-        return (
-            combine_command_output(result.stdout, result.stderr)
-            .replace("[stderr] ", "")
-            .strip()
-        )
-
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
         responses: list[FileDownloadResponse] = []
         # Defer container startup until a path passes local validation; invalid
         # tool calls should return cheap errors without paying Docker startup cost.
         initialized = False
 
-        with tempfile.TemporaryDirectory(prefix="docker-sandbox-download-") as temp_dir:
-            for requested_path in paths:
-                if not is_absolute_unix_path(requested_path):
-                    responses.append(
-                        FileDownloadResponse(
-                            path=requested_path, content=None, error="invalid_path"
-                        )
+        for requested_path in paths:
+            if not is_absolute_unix_path(requested_path):
+                responses.append(
+                    FileDownloadResponse(
+                        path=requested_path, content=None, error="invalid_path"
                     )
-                    continue
-                if not self._is_allowed_path(requested_path):
-                    responses.append(
-                        FileDownloadResponse(
-                            path=requested_path, content=None, error="permission_denied"
-                        )
+                )
+                continue
+            transfer_route = self._transfer_route(requested_path)
+            if transfer_route is None:
+                responses.append(
+                    FileDownloadResponse(
+                        path=requested_path, content=None, error="permission_denied"
                     )
-                    continue
+                )
+                continue
+            route_root, relative_parts = transfer_route
 
-                normalized_requested_path = self._to_container_path(requested_path)
+            try:
                 if not initialized:
                     self.container.ensure_started()
                     initialized = True
-                path_kind = self._probe_path_kind(normalized_requested_path)
-                if path_kind == "missing":
+                result = docker_runtime.transfer_with_container_helper(
+                    container_name=self.container_name,
+                    script=docker_transfer_script(
+                        operation="download",
+                        root=route_root,
+                        relative_parts=relative_parts,
+                    ),
+                    input_bytes=None,
+                    timeout_ms=self.command_timeout_ms,
+                )
+                if result.returncode != 0:
                     responses.append(
                         FileDownloadResponse(
                             path=requested_path,
                             content=None,
-                            error="file_not_found",
+                            error=docker_transfer_error(result.stderr),
                         )
                     )
                     continue
-                if path_kind == "directory":
-                    responses.append(
-                        FileDownloadResponse(
-                            path=requested_path,
-                            content=None,
-                            error="is_directory",
-                        )
+                responses.append(
+                    FileDownloadResponse(
+                        path=requested_path,
+                        content=result.stdout,
+                        error=None,
                     )
-                    continue
-
-                temp_file_path = Path(temp_dir) / uuid.uuid4().hex
-                try:
-                    docker_runtime.copy_from_container(
-                        container_name=self.container_name,
-                        source_path=normalized_requested_path,
-                        target=temp_file_path,
-                        timeout_ms=self.command_timeout_ms,
+                )
+            except Exception as error:
+                responses.append(
+                    FileDownloadResponse(
+                        path=requested_path,
+                        content=None,
+                        error=infer_file_operation_error(str(error)),
                     )
-                    responses.append(
-                        FileDownloadResponse(
-                            path=requested_path,
-                            content=temp_file_path.read_bytes(),
-                            error=None,
-                        )
-                    )
-                except Exception as error:
-                    responses.append(
-                        FileDownloadResponse(
-                            path=requested_path,
-                            content=None,
-                            error=infer_file_operation_error(str(error)),
-                        )
-                    )
+                )
 
         return responses
 

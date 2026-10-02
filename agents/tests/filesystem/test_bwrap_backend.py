@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -15,7 +16,7 @@ from sec_review_agents.filesystem.bwrap_backend import (
     BwrapSandboxBackend,
 )
 from sec_review_agents.filesystem.bwrap_runtime import (
-    BWRAP_NETWORK_NONE,
+    BWRAP_NETWORK_INHERIT,
     is_bwrap_runtime_available,
 )
 
@@ -34,7 +35,7 @@ def _backend(root: Path, *, writable: bool = True) -> BwrapSandboxBackend:
     )
 
 
-def test_execute_uses_basic_bwrap_without_network_namespace(tmp_path: Path) -> None:
+def test_execute_uses_basic_bwrap_with_network_isolated(tmp_path: Path) -> None:
     backend = _backend(tmp_path)
 
     with patch("sec_review_agents.filesystem.bwrap_runtime.subprocess.run") as run_mock:
@@ -49,17 +50,17 @@ def test_execute_uses_basic_bwrap_without_network_namespace(tmp_path: Path) -> N
 
     args = run_mock.call_args.args[0]
     assert result.output == "ok"
-    assert "--unshare-net" not in args
+    assert "--unshare-net" in args
     assert "/var/run/docker.sock" not in args
     assert "--ro-bind" in args
     assert "--bind" in args
     assert args[-3:] == ["/bin/sh", "-c", "echo ok"]
 
 
-def test_execute_can_disable_network_via_env(tmp_path: Path) -> None:
+def test_execute_can_inherit_network_via_env(tmp_path: Path) -> None:
     with patch.dict(
         "os.environ",
-        {"AGENT_BWRAP_NETWORK_MODE": BWRAP_NETWORK_NONE},
+        {"AGENT_BWRAP_NETWORK_MODE": BWRAP_NETWORK_INHERIT},
         clear=False,
     ):
         backend = _backend(tmp_path)
@@ -75,7 +76,7 @@ def test_execute_can_disable_network_via_env(tmp_path: Path) -> None:
         backend.execute("echo ok")
 
     args = run_mock.call_args.args[0]
-    assert "--unshare-net" in args
+    assert "--unshare-net" not in args
 
 
 def test_stdio_shell_command_uses_same_bwrap_profile(tmp_path: Path) -> None:
@@ -85,7 +86,7 @@ def test_stdio_shell_command_uses_same_bwrap_profile(tmp_path: Path) -> None:
 
     assert command == "/usr/bin/bwrap"
     assert args[0] != "/usr/bin/bwrap"
-    assert "--unshare-net" not in args
+    assert "--unshare-net" in args
     assert "--bind" in args
     assert str(tmp_path.resolve()) in args
     assert "/workspace" in args
@@ -218,12 +219,104 @@ def test_upload_rejects_symlink_parent(tmp_path: Path) -> None:
     assert not (outside / "payload.txt").exists()
 
 
+def test_upload_parent_swap_cannot_redirect_write_outside_route(tmp_path: Path) -> None:
+    """A parent rename between resolution and open must not redirect the write."""
+    root = tmp_path / "root"
+    nested = root / "nested"
+    parked = root / "parked"
+    outside = tmp_path / "outside"
+    nested.mkdir(parents=True)
+    outside.mkdir()
+    backend = _backend(root)
+    original_open = os.open
+    swapped = False
+
+    def swap_parent_before_final_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal swapped
+        if path == "payload.txt" and not swapped:
+            nested.rename(parked)
+            nested.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    with patch(
+        "sec_review_agents.filesystem.bwrap_backend.os.open",
+        swap_parent_before_final_open,
+    ):
+        response = backend.upload_files([("/workspace/nested/payload.txt", b"inside")])[
+            0
+        ]
+
+    assert response.error is None
+    assert (parked / "payload.txt").read_bytes() == b"inside"
+    assert not (outside / "payload.txt").exists()
+
+
+def test_download_parent_swap_cannot_redirect_read_outside_route(
+    tmp_path: Path,
+) -> None:
+    """A parent rename between resolution and open must not redirect the read."""
+    root = tmp_path / "root"
+    nested = root / "nested"
+    parked = root / "parked"
+    outside = tmp_path / "outside"
+    nested.mkdir(parents=True)
+    outside.mkdir()
+    (nested / "payload.txt").write_bytes(b"inside")
+    (outside / "payload.txt").write_bytes(b"outside")
+    backend = _backend(root)
+    original_open = os.open
+    swapped = False
+
+    def swap_parent_before_final_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal swapped
+        if path == "payload.txt" and not swapped:
+            nested.rename(parked)
+            nested.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    with patch(
+        "sec_review_agents.filesystem.bwrap_backend.os.open",
+        swap_parent_before_final_open,
+    ):
+        response = backend.download_files(["/workspace/nested/payload.txt"])[0]
+
+    assert response.error is None
+    assert response.content == b"inside"
+
+
 def test_upload_rejects_read_only_binding(tmp_path: Path) -> None:
     backend = _backend(tmp_path, writable=False)
 
     response = backend.upload_files([("/workspace/app.py", b"print(1)")])[0]
 
     assert response.error == "permission_denied"
+
+
+def test_host_transfer_rejects_fifo_without_waiting(tmp_path: Path) -> None:
+    """Host-side transfers must reject FIFOs without waiting for another peer."""
+    fifo = tmp_path / "pipe"
+    os.mkfifo(fifo)
+    backend = _backend(tmp_path)
+
+    upload = backend.upload_files([("/workspace/pipe", b"payload")])[0]
+    download = backend.download_files(["/workspace/pipe"])[0]
+
+    assert upload.error == "permission_denied"
+    assert download.error == "permission_denied"
 
 
 def test_bwrap_probe_is_basic_only() -> None:
@@ -241,5 +334,5 @@ def test_bwrap_probe_is_basic_only() -> None:
         assert is_bwrap_runtime_available("/usr/bin/bwrap")
 
     args = run_mock.call_args.args[0]
-    assert "--unshare-net" not in args
+    assert "--unshare-net" in args
     assert args[-3:] == ["/bin/sh", "-c", "printf bwrap-basic-ok"]

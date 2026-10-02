@@ -14,6 +14,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     is_docker_runtime_available,
 )
 from sec_review_agents.filesystem.path_views import (
+    PathView,
     workspace_view,
 )
 
@@ -63,6 +64,47 @@ def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> 
     assert result.truncated
     assert len(result.output.encode("utf-8")) <= 8192
     assert result.output.startswith("commit ")
+
+
+@pytest.mark.skipif(
+    not _docker_available(),
+    reason="Docker runtime is not available in this environment.",
+)
+def test_docker_transfers_reject_symlink_escape_between_routes(tmp_path: Path) -> None:
+    """Transfers must not follow container symlinks across route boundaries."""
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    (outside / "secret.txt").write_bytes(b"secret")
+    backend = create_backend_with_path_views(
+        container_name_prefix="transfer-symlink-test",
+        path_views=[
+            workspace_view(host_path=workspace, writable=True),
+            PathView(
+                host_path=outside,
+                container_path="/outside",
+                agent_path="/outside",
+                writable=True,
+            ),
+        ],
+    )
+
+    assert isinstance(backend, DockerSandboxBackend)
+    try:
+        result = backend.execute("ln -s /outside /workspace/link")
+        assert result.exit_code == 0
+        download = backend.download_files(["/workspace/link/secret.txt"])[0]
+        upload = backend.upload_files([("/workspace/link/secret.txt", b"overwritten")])[
+            0
+        ]
+    finally:
+        backend.close()
+
+    assert download.error == "permission_denied"
+    assert download.content is None
+    assert upload.error == "permission_denied"
+    assert (outside / "secret.txt").read_bytes() == b"secret"
 
 
 def _create_large_init_commit_repository(

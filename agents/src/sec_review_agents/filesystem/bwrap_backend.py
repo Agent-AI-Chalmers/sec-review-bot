@@ -16,8 +16,10 @@
 # no proxying, and no Docker socket exposure.
 
 import asyncio
+import errno
 import os
 import shlex
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -103,7 +105,7 @@ class BwrapSandboxBackend(SandboxBackendProtocol):
             (
                 network_mode
                 or env_value("AGENT_BWRAP_NETWORK_MODE")
-                or BWRAP_NETWORK_INHERIT
+                or BWRAP_NETWORK_NONE
             )
             .strip()
             .lower()
@@ -287,82 +289,77 @@ class BwrapSandboxBackend(SandboxBackendProtocol):
             return binding
         return None
 
-    def _unresolved_host_path_for_agent_path(
+    def _transfer_path_parts(
         self,
         path: str,
         *,
         require_writable: bool = False,
-    ) -> Path | None:
+    ) -> tuple[Path, tuple[str, ...]] | None:
         binding = self._binding_for_path(path, require_writable=require_writable)
         if binding is None or binding.host_path is None:
             return None
         agent_root = normalize_unix_path(binding.agent_path)
         normalized_path = normalize_unix_path(path)
         relative_path = normalized_path.removeprefix(agent_root).lstrip("/")
-        relative_parts = PurePosixPath("/" + relative_path).parts
-        if ".." in relative_parts:
-            return None
-        host_root = binding.host_path.resolve(strict=True)
-        return (
-            host_root
-            if not relative_path
-            else host_root.joinpath(*PurePosixPath(relative_path).parts)
-        )
+        parts = PurePosixPath(relative_path).parts if relative_path else ()
+        return binding.host_path.resolve(strict=True), parts
 
-    def _safe_existing_host_path_for_agent_path(self, path: str) -> Path | None:
-        """Resolve an existing agent path to a host path within its mount."""
-        # Host-side transfers do not pass through bwrap, so the backend must
-        # enforce the same mount boundary before opening local files.
-        host_path = self._unresolved_host_path_for_agent_path(path)
-        if host_path is None:
-            return None
-        try:
-            resolved_path = host_path.resolve(strict=True)
-            binding = self._binding_for_path(path)
-            if binding is None or binding.host_path is None:
-                return None
-            host_root = binding.host_path.resolve(strict=True)
-            if resolved_path != host_root and host_root not in resolved_path.parents:
-                return None
-            if host_path.is_symlink():
-                return None
-            return host_path
-        except OSError:
-            return None
-
-    def _safe_writable_host_path_for_agent_path(self, path: str) -> Path | None:
-        host_path = self._unresolved_host_path_for_agent_path(
-            path, require_writable=True
+    def _open_transfer_parent(
+        self,
+        path: str,
+        *,
+        create_parents: bool,
+        require_writable: bool = False,
+    ) -> tuple[int, str] | None:
+        transfer_path = self._transfer_path_parts(
+            path,
+            require_writable=require_writable,
         )
-        if host_path is None:
+        if transfer_path is None:
             return None
+        host_root, parts = transfer_path
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            directory_flags |= os.O_CLOEXEC
+        current_fd = os.open(host_root, directory_flags)
         try:
-            binding = self._binding_for_path(path, require_writable=True)
-            if binding is None or binding.host_path is None:
-                return None
-            host_root = binding.host_path.resolve(strict=True)
-            relative_path = host_path.relative_to(host_root)
-            current_path = host_root
-            # New directories may be created inside the mount root, but existing
-            # path components must not be symlinks that redirect writes outside it.
-            for part in relative_path.parts[:-1]:
-                current_path = current_path / part
-                if not current_path.exists():
-                    continue
-                if current_path.is_symlink() or not current_path.is_dir():
-                    return None
-            if host_path.exists() or host_path.is_symlink():
-                resolved_path = host_path.resolve(strict=True)
-                if (
-                    resolved_path != host_root
-                    and host_root not in resolved_path.parents
-                ):
-                    return None
-                if host_path.is_symlink():
-                    return None
-            return host_path
-        except OSError:
-            return None
+            # Keep each directory open while resolving the next component. This
+            # binds the operation to kernel objects, so a concurrent rename or
+            # symlink swap cannot redirect a later open outside the route root.
+            for part in parts[:-1]:
+                try:
+                    next_fd = os.open(part, directory_flags, dir_fd=current_fd)
+                except FileNotFoundError:
+                    if not create_parents:
+                        raise
+                    try:
+                        os.mkdir(part, mode=0o777, dir_fd=current_fd)
+                    except FileExistsError:
+                        pass
+                    next_fd = os.open(part, directory_flags, dir_fd=current_fd)
+                os.close(current_fd)
+                current_fd = next_fd
+            return current_fd, parts[-1] if parts else "."
+        except BaseException:
+            os.close(current_fd)
+            raise
+
+    @staticmethod
+    def _transfer_error(error: OSError) -> str:
+        if error.errno == errno.ENOENT:
+            return "file_not_found"
+        if error.errno == errno.EISDIR:
+            return "is_directory"
+        if error.errno in {
+            errno.EACCES,
+            errno.EAGAIN,
+            errno.ELOOP,
+            errno.ENOTDIR,
+            errno.ENXIO,
+            errno.EROFS,
+        }:
+            return "permission_denied"
+        return infer_file_operation_error(str(error))
 
     def _is_allowed_path(self, path: str, *, writable: bool = False) -> bool:
         if not is_absolute_unix_path(path):
@@ -722,35 +719,49 @@ class BwrapSandboxBackend(SandboxBackendProtocol):
                     FileUploadResponse(path=target_path, error="invalid_path")
                 )
                 continue
-            host_path = self._safe_writable_host_path_for_agent_path(target_path)
-            if host_path is None:
+            try:
+                parent = self._open_transfer_parent(
+                    target_path,
+                    create_parents=True,
+                    require_writable=True,
+                )
+            except OSError as error:
+                responses.append(
+                    FileUploadResponse(
+                        path=target_path,
+                        error=self._transfer_error(error),
+                    )
+                )
+                continue
+            if parent is None:
                 responses.append(
                     FileUploadResponse(path=target_path, error="permission_denied")
                 )
                 continue
+            parent_fd, filename = parent
             try:
-                host_path.parent.mkdir(parents=True, exist_ok=True)
-                if host_path.is_dir():
-                    responses.append(
-                        FileUploadResponse(path=target_path, error="is_directory")
-                    )
-                    continue
-                # O_NOFOLLOW protects the final component from a last-moment
-                # symlink swap after the preflight checks above.
-                flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-                if hasattr(os, "O_NOFOLLOW"):
-                    flags |= os.O_NOFOLLOW
-                fd = os.open(host_path, flags, 0o666)
+                # O_NONBLOCK is required before we know the target type: opening
+                # an attacker-created FIFO for writing can otherwise wait forever.
+                flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NONBLOCK
+                flags |= os.O_NOFOLLOW
+                if hasattr(os, "O_CLOEXEC"):
+                    flags |= os.O_CLOEXEC
+                fd = os.open(filename, flags, 0o666, dir_fd=parent_fd)
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    os.close(fd)
+                    raise OSError(errno.EACCES, "non-regular transfer target", filename)
                 with os.fdopen(fd, "wb") as handle:
                     handle.write(content)
                 responses.append(FileUploadResponse(path=target_path, error=None))
-            except Exception as error:
+            except OSError as error:
                 responses.append(
                     FileUploadResponse(
                         path=target_path,
-                        error=infer_file_operation_error(str(error)),
+                        error=self._transfer_error(error),
                     )
                 )
+            finally:
+                os.close(parent_fd)
         return responses
 
     async def aupload_files(
@@ -771,53 +782,40 @@ class BwrapSandboxBackend(SandboxBackendProtocol):
                     )
                 )
                 continue
-            unresolved_host_path = self._unresolved_host_path_for_agent_path(
-                requested_path
-            )
-            if unresolved_host_path is None:
-                responses.append(
-                    FileDownloadResponse(
-                        path=requested_path,
-                        content=None,
-                        error="permission_denied",
-                    )
-                )
-                continue
-            if not unresolved_host_path.exists():
-                responses.append(
-                    FileDownloadResponse(
-                        path=requested_path,
-                        content=None,
-                        error="file_not_found",
-                    )
-                )
-                continue
-            host_path = self._safe_existing_host_path_for_agent_path(requested_path)
-            if host_path is None:
-                responses.append(
-                    FileDownloadResponse(
-                        path=requested_path,
-                        content=None,
-                        error="permission_denied",
-                    )
-                )
-                continue
             try:
-                if host_path.is_dir():
-                    responses.append(
-                        FileDownloadResponse(
-                            path=requested_path,
-                            content=None,
-                            error="is_directory",
-                        )
+                parent = self._open_transfer_parent(
+                    requested_path,
+                    create_parents=False,
+                )
+            except OSError as error:
+                responses.append(
+                    FileDownloadResponse(
+                        path=requested_path,
+                        content=None,
+                        error=self._transfer_error(error),
                     )
-                    continue
-                # Match upload hardening: refuse final-component symlinks even
-                # if the earlier resolved-path check saw a safe target.
-                flags = os.O_RDONLY
-                if hasattr(os, "O_NOFOLLOW"):
-                    flags |= os.O_NOFOLLOW
-                fd = os.open(host_path, flags)
+                )
+                continue
+            if parent is None:
+                responses.append(
+                    FileDownloadResponse(
+                        path=requested_path,
+                        content=None,
+                        error="permission_denied",
+                    )
+                )
+                continue
+            parent_fd, filename = parent
+            try:
+                # Open non-blocking before fstat so a FIFO or device cannot
+                # suspend the worker while transfer code discovers its type.
+                flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+                if hasattr(os, "O_CLOEXEC"):
+                    flags |= os.O_CLOEXEC
+                fd = os.open(filename, flags, dir_fd=parent_fd)
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    os.close(fd)
+                    raise OSError(errno.EACCES, "non-regular transfer target", filename)
                 with os.fdopen(fd, "rb") as handle:
                     content = handle.read()
                 responses.append(
@@ -827,14 +825,16 @@ class BwrapSandboxBackend(SandboxBackendProtocol):
                         error=None,
                     )
                 )
-            except Exception as error:
+            except OSError as error:
                 responses.append(
                     FileDownloadResponse(
                         path=requested_path,
                         content=None,
-                        error=infer_file_operation_error(str(error)),
+                        error=self._transfer_error(error),
                     )
                 )
+            finally:
+                os.close(parent_fd)
         return responses
 
     async def adownload_files(self, paths: list[str]) -> list[FileDownloadResponse]:
