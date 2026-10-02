@@ -6,7 +6,7 @@ import pytest
 from deepagents.backends import CompositeBackend
 
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
 from sec_review_agents.filesystem.backend_selection import (
     selected_sandbox_backend_kind,
@@ -17,67 +17,63 @@ from sec_review_agents.filesystem.bwrap_backend import (
 )
 from sec_review_agents.filesystem.docker_backend import DockerRoute
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
-from sec_review_agents.filesystem.material_views import (
-    MaterialView,
-    container_tmp_view,
-    host_tmp_view,
-    read_only_material_view,
+from sec_review_agents.filesystem.path_views import (
+    PathView,
+    read_only_path_view,
     tmp_view_for_backend,
     workspace_view,
 )
 
 
-def test_container_tmp_view_uses_container_native_tmp() -> None:
-    assert container_tmp_view() == MaterialView(
+def test_tmp_view_follows_backend_kind() -> None:
+    assert tmp_view_for_backend("docker") == PathView(
         host_path=None,
         container_path="/tmp",
         agent_path="/tmp",
         writable=True,
     )
-
-
-def test_host_tmp_view_uses_host_tempdir() -> None:
-    host_path = Path(tempfile.gettempdir())
-
-    assert host_tmp_view() == MaterialView(
-        host_path=host_path,
-        container_path="/tmp",
+    assert tmp_view_for_backend("local") == PathView(
+        host_path=Path(tempfile.gettempdir()),
         agent_path="/tmp",
         writable=True,
     )
-
-
-@pytest.mark.parametrize("container_path", ["", "   "])
-def test_material_view_rejects_empty_container_path(
-    tmp_path: Path,
-    container_path: str,
-) -> None:
-    with pytest.raises(ValueError, match="container_path must be non-empty"):
-        MaterialView(
-            host_path=tmp_path,
-            container_path=container_path,
-            agent_path="/workspace",
-        )
+    assert tmp_view_for_backend("bwrap") is None
 
 
 @pytest.mark.parametrize("agent_path", ["", "   "])
-def test_material_view_rejects_empty_agent_path(
+def test_path_view_rejects_empty_agent_path(
     tmp_path: Path,
     agent_path: str,
 ) -> None:
     with pytest.raises(ValueError, match="agent_path must be non-empty"):
-        MaterialView(
+        PathView(
             host_path=tmp_path,
             container_path="/workspace",
             agent_path=agent_path,
         )
 
 
+@pytest.mark.parametrize("container_path", ["", "   "])
+def test_path_view_rejects_empty_container_path(
+    tmp_path: Path,
+    container_path: str,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="container_path must be non-empty when provided",
+    ):
+        PathView(
+            host_path=tmp_path,
+            container_path=container_path,
+            agent_path="/workspace",
+        )
+
+
 def test_local_backend_routes_use_agent_path(tmp_path: Path) -> None:
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="test",
-        material_views=[
-            read_only_material_view(
+        path_views=[
+            read_only_path_view(
                 agent_path="/workspace",
                 host_path=tmp_path,
                 container_path="/mnt/material/workspace",
@@ -106,17 +102,11 @@ def test_backend_selection_can_be_forced_to_bwrap() -> None:
         assert selected_sandbox_backend_kind() == "bwrap"
 
 
-def test_tmp_view_follows_backend_kind() -> None:
-    assert tmp_view_for_backend("docker") == container_tmp_view()
-    assert tmp_view_for_backend("local") == host_tmp_view()
-    assert tmp_view_for_backend("bwrap") is None
-
-
 def test_environment_can_select_bwrap_backend_factory(tmp_path: Path) -> None:
     with patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "bwrap"}, clear=True):
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[workspace_view(host_path=tmp_path, writable=True)],
+            path_views=[workspace_view(host_path=tmp_path, writable=True)],
         )
 
     assert isinstance(backend, BwrapSandboxBackend)
@@ -125,9 +115,9 @@ def test_environment_can_select_bwrap_backend_factory(tmp_path: Path) -> None:
 def test_bwrap_backend_uses_agent_paths_without_composite_routes(
     tmp_path: Path,
 ) -> None:
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="test",
-        material_views=[workspace_view(host_path=tmp_path, writable=True)],
+        path_views=[workspace_view(host_path=tmp_path, writable=True)],
         backend_kind="bwrap",
     )
 
@@ -144,9 +134,9 @@ def test_bwrap_backend_uses_agent_paths_without_composite_routes(
 
 
 def test_local_backend_routes_agent_workspace_to_host_backend(tmp_path: Path) -> None:
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="test",
-        material_views=[
+        path_views=[
             workspace_view(host_path=tmp_path, writable=True),
         ],
         use_docker_sandbox=False,
@@ -162,9 +152,9 @@ def test_local_backend_routes_agent_workspace_to_host_backend(tmp_path: Path) ->
 def test_local_backend_routes_respect_writable_views(
     tmp_path: Path,
 ) -> None:
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="test",
-        material_views=[
+        path_views=[
             workspace_view(host_path=tmp_path, writable=False),
         ],
         use_docker_sandbox=False,
@@ -182,15 +172,15 @@ def test_docker_backend_mounts_use_container_path(tmp_path: Path) -> None:
         "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
         return_value=object(),
     ) as docker_backend_cls:
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[
-                read_only_material_view(
+            path_views=[
+                read_only_path_view(
                     agent_path="/workspace",
                     host_path=tmp_path,
                     container_path="/mnt/material/workspace",
                 ),
-                container_tmp_view(),
+                tmp_view_for_backend("docker"),
             ],
             use_docker_sandbox=True,
         )
@@ -228,9 +218,9 @@ def test_docker_backend_adds_deepagents_artifact_roots() -> None:
         "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
         return_value=object(),
     ) as docker_backend_cls:
-        create_backend_with_materials(
+        create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[container_tmp_view()],
+            path_views=[tmp_view_for_backend("docker")],
             use_docker_sandbox=True,
         )
 
@@ -258,21 +248,21 @@ def test_docker_backend_adds_deepagents_artifact_roots() -> None:
     )
 
 
-def test_docker_backend_allows_container_native_material_view() -> None:
+def test_docker_backend_allows_container_native_path_view() -> None:
     with patch(
         "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
         return_value=object(),
     ) as docker_backend_cls:
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[
-                MaterialView(
+            path_views=[
+                PathView(
                     host_path=None,
                     container_path="/opt/native-tools",
                     agent_path="/tools",
                     writable=False,
                 ),
-                container_tmp_view(),
+                tmp_view_for_backend("docker"),
             ],
             use_docker_sandbox=True,
         )
@@ -300,15 +290,15 @@ def test_docker_backend_allows_container_native_material_view() -> None:
     )
 
 
-def test_docker_backend_does_not_add_implicit_tmp_material_view(tmp_path: Path) -> None:
+def test_docker_backend_does_not_add_implicit_tmp_path_view(tmp_path: Path) -> None:
     with patch(
         "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
         return_value=object(),
     ) as docker_backend_cls:
-        create_backend_with_materials(
+        create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[
-                read_only_material_view(
+            path_views=[
+                read_only_path_view(
                     agent_path="/workspace",
                     host_path=tmp_path,
                 )
@@ -327,33 +317,33 @@ def test_docker_backend_does_not_add_implicit_tmp_material_view(tmp_path: Path) 
     )
 
 
-def test_docker_backend_mounts_host_tmp_view() -> None:
-    with patch(
-        "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
-        return_value=object(),
-    ) as docker_backend_cls:
-        create_backend_with_materials(
+def test_docker_backend_rejects_host_tmp_view() -> None:
+    with (
+        patch(
+            "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
+            return_value=object(),
+        ),
+        pytest.raises(
+            ValueError,
+            match="Docker backend path view requires a container_path: /tmp",
+        ),
+    ):
+        create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[host_tmp_view()],
+            path_views=[tmp_view_for_backend("local")],
             use_docker_sandbox=True,
         )
 
-    container = docker_backend_cls.call_args.kwargs["container"]
-    assert len(container.mounts) == 1
-    assert container.mounts[0].host_path == str(Path(tempfile.gettempdir()).resolve())
-    assert container.mounts[0].container_path == "/tmp"
-    assert container.mounts[0].writable
 
-
-def test_local_backend_rejects_container_native_material_view() -> None:
+def test_local_backend_rejects_container_native_path_view() -> None:
     with pytest.raises(
         ValueError,
-        match="Local backend material view requires a host_path: /tools",
+        match="Local backend path view requires a host_path: /tools",
     ):
-        create_backend_with_materials(
+        create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[
-                MaterialView(
+            path_views=[
+                PathView(
                     host_path=None,
                     container_path="/opt/native-tools",
                     agent_path="/tools",
@@ -378,10 +368,10 @@ def test_docker_backend_explicit_image_overrides_environment_image(
             return_value=object(),
         ) as docker_backend_cls,
     ):
-        create_backend_with_materials(
+        create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[
-                read_only_material_view(
+            path_views=[
+                read_only_path_view(
                     agent_path="/workspace",
                     host_path=tmp_path,
                 )
@@ -394,7 +384,7 @@ def test_docker_backend_explicit_image_overrides_environment_image(
     assert container.image == "explicit-image:latest"
 
 
-def test_docker_material_view_rejects_missing_source_directory(tmp_path: Path) -> None:
+def test_docker_path_view_rejects_missing_source_directory(tmp_path: Path) -> None:
     missing_source = tmp_path / "missing-material"
 
     with (
@@ -404,10 +394,10 @@ def test_docker_material_view_rejects_missing_source_directory(tmp_path: Path) -
         ),
         pytest.raises(FileNotFoundError),
     ):
-        create_backend_with_materials(
+        create_backend_with_path_views(
             container_name_prefix="test",
-            material_views=[
-                read_only_material_view(
+            path_views=[
+                read_only_path_view(
                     agent_path="/material",
                     host_path=missing_source,
                 )

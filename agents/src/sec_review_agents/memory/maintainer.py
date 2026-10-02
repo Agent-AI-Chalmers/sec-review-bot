@@ -19,9 +19,9 @@ from sec_review_agents.agents.memory_maintainer.prompts import (
     build_maintenance_prompt,
 )
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
-from sec_review_agents.filesystem.material_views import (
+from sec_review_agents.filesystem.path_views import (
     writable_memory_view,
 )
 from sec_review_agents.llm.factory import create_chat_model
@@ -244,9 +244,9 @@ async def _maintain_memory_with_result_locked(
                 )
             _copy_memory_maintenance_worktree(memory_store_dir, worktree_root)
 
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="memory-maintainer",
-            material_views=[
+            path_views=[
                 writable_memory_view(host_path=worktree_root),
             ],
             use_docker_sandbox=False,

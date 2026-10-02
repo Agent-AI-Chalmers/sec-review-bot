@@ -7,7 +7,7 @@ from deepagents import FilesystemMiddleware
 from langchain_core.messages import HumanMessage, ToolMessage
 
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
 from sec_review_agents.filesystem.docker_backend import DockerSandboxBackend
 from sec_review_agents.filesystem.docker_runtime import (
@@ -38,9 +38,9 @@ class _ModelRequest:
     reason="Docker runtime is not available in this environment.",
 )
 def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="offload-human-test",
-        material_views=[],
+        path_views=[],
         use_docker_sandbox=True,
     )
     assert isinstance(backend, DockerSandboxBackend)
@@ -87,9 +87,9 @@ def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
     reason="Docker runtime is not available in this environment.",
 )
 def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="offload-tool-test",
-        material_views=[],
+        path_views=[],
         use_docker_sandbox=True,
     )
     assert isinstance(backend, DockerSandboxBackend)

@@ -20,8 +20,8 @@ from sec_review_agents.agents.memory_maintainer.prompts import (
     MEMORY_MAINTAINER_SYSTEM_PROMPT,
     build_maintenance_prompt,
 )
-from sec_review_agents.filesystem.backend_factory import create_backend_with_materials
-from sec_review_agents.filesystem.material_views import writable_memory_view
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
+from sec_review_agents.filesystem.path_views import writable_memory_view
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.maintainer import (
     _publish_maintained_memory,
@@ -178,9 +178,9 @@ async def main() -> int:
         _copy_memory_source(memory_store_dir, worktree)
         rows = _stage_observations(observation_paths, worktree=worktree)
 
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="memory-maintenance-experiment",
-            material_views=[writable_memory_view(host_path=worktree)],
+            path_views=[writable_memory_view(host_path=worktree)],
             use_docker_sandbox=False,
         )
         model = create_chat_model(

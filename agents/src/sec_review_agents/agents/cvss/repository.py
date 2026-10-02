@@ -2,9 +2,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from sec_review_agents.filesystem.backend_factory import create_backend_with_materials
-from sec_review_agents.filesystem.material_views import (
-    host_tmp_view,
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
+from sec_review_agents.filesystem.path_views import (
+    tmp_view_for_backend,
     workspace_view,
 )
 from sec_review_agents.resources.loader import join_prompt_sections
@@ -45,11 +45,11 @@ def create_repository_cvss_backend(
     """Create the local writable backend used by repository CVSS scoring."""
     # CVSS runs locally against a stage-owned workspace copy. The workspace is
     # writable so tools can create indexes or caches without touching baseline.
-    return create_backend_with_materials(
+    return create_backend_with_path_views(
         container_name_prefix="repository-cvss",
-        material_views=[
+        path_views=[
             workspace_view(host_path=workspace_root_path, writable=True),
-            host_tmp_view(),
+            tmp_view_for_backend("local"),
         ],
         use_docker_sandbox=False,
     )

@@ -8,9 +8,9 @@ from langchain.agents.middleware import AgentMiddleware
 from pydantic import BaseModel, Field
 
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
-from sec_review_agents.filesystem.material_views import (
+from sec_review_agents.filesystem.path_views import (
     memory_view,
 )
 from sec_review_agents.llm.factory import create_chat_model
@@ -78,9 +78,9 @@ async def test_llm_uses_memory_index_to_read_relevant_topic(tmp_path: Path) -> N
         + "\n",
         encoding="utf-8",
     )
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="memory-middleware-probe",
-        material_views=[memory_view(host_path=runtime_memory_root)],
+        path_views=[memory_view(host_path=runtime_memory_root)],
         use_docker_sandbox=False,
     )
 

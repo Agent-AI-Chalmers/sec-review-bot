@@ -14,10 +14,10 @@ from sec_review_agents.agents.memory_extractor.prompts import (
     build_extractor_prompt,
 )
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
-from sec_review_agents.filesystem.material_views import (
-    read_only_material_view,
+from sec_review_agents.filesystem.path_views import (
+    read_only_path_view,
 )
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.state import (
@@ -281,10 +281,10 @@ async def _extract_memory_observation_for_refs(
         temp_root = Path(tempdir)
         transcript_root = temp_root / "transcripts"
         staged_transcripts = stage_transcripts(transcript_refs, transcript_root)
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="memory-extractor",
-            material_views=[
-                read_only_material_view(
+            path_views=[
+                read_only_path_view(
                     agent_path="/transcripts",
                     host_path=transcript_root,
                 ),

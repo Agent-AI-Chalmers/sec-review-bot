@@ -1,23 +1,23 @@
 from sec_review_agents.agents.discovery.skills import DISCOVERY_AGENT_SKILLS
 from sec_review_agents.features import agent_skills_enabled
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
-from sec_review_agents.filesystem.material_views import (
+from sec_review_agents.filesystem.path_views import (
     skill_view,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
 
 
 def create_repository_discovery_backend():
-    material_views = []
+    path_views = []
     if agent_skills_enabled():
-        material_views.append(
+        path_views.append(
             skill_view(host_path=materialize_agent_skills_view(DISCOVERY_AGENT_SKILLS))
         )
 
-    return create_backend_with_materials(
+    return create_backend_with_path_views(
         container_name_prefix="repository-discovery",
-        material_views=material_views,
+        path_views=path_views,
         use_docker_sandbox=False,
     )
