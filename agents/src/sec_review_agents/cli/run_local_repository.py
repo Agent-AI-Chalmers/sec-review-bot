@@ -63,14 +63,14 @@ def parse_args() -> argparse.Namespace:
         help="Optional incremental head commit SHA (7-40 hex chars). Defaults to target branch head.",
     )
     parser.add_argument(
-        "--event-type",
-        choices=("manual", "scheduled"),
-        default="manual",
-        help="Synthetic repository review event type.",
-    )
-    parser.add_argument(
-        "--repo-full-name",
-        help="Synthetic repo full name, defaults to local/<repo-name>.",
+        "--paths-ignore",
+        action="append",
+        default=[],
+        metavar="PATTERN",
+        help=(
+            "Exclude a workspace-relative path or glob from discovery. "
+            "Repeat the option to exclude multiple patterns."
+        ),
     )
     parser.add_argument(
         "--output-dir",
@@ -174,12 +174,11 @@ def main() -> None:
     bundle = build_local_repository_security_bundle(
         repo_path=repo_path,
         output_dir=output_dir,
-        repo_full_name_value=args.repo_full_name,
         ref=review_ref,
         target_branch=target_branch,
         scan_mode=scan_mode,
         baseline_ref=base_sha,
-        event_type=args.event_type,
+        paths_ignore=args.paths_ignore,
         repair_mode=args.repair_mode,
     )
 

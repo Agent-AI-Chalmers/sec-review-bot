@@ -59,7 +59,6 @@ def test_repository_bundle_does_not_include_repository_identity(tmp_path: Path) 
     bundle = build_local_repository_security_bundle(
         repo_path=repo_path,
         output_dir=output_dir,
-        repo_full_name_value="local/repo",
         ref="main",
         scan_mode="full",
     )
@@ -90,7 +89,6 @@ def test_full_repository_bundle_creates_limited_history_workspace(
     bundle = build_local_repository_security_bundle(
         repo_path=repo_path,
         output_dir=output_dir,
-        repo_full_name_value="local/repo",
         ref="main",
         scan_mode="full",
     )
@@ -132,8 +130,34 @@ def test_incremental_bundle_rejects_non_ancestor_baseline(tmp_path: Path) -> Non
         build_local_repository_security_bundle(
             repo_path=repo_path,
             output_dir=output_dir,
-            repo_full_name_value=None,
             ref=feature_sha,
             scan_mode="incremental",
             baseline_ref=main_sha,
         )
+
+
+def test_repository_bundle_preserves_paths_ignore_patterns(tmp_path: Path) -> None:
+    """Local runs must pass caller-selected exclusions to repository discovery."""
+    repo_path = tmp_path / "repo"
+    output_dir = tmp_path / "out"
+    repo_path.mkdir()
+    output_dir.mkdir()
+
+    _run_git(repo_path, "init", "-b", "main")
+    _run_git(repo_path, "config", "user.name", "Test User")
+    _run_git(repo_path, "config", "user.email", "test@example.com")
+    (repo_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    _run_git(repo_path, "add", "app.py")
+    _run_git(repo_path, "commit", "-m", "init")
+
+    bundle = build_local_repository_security_bundle(
+        repo_path=repo_path,
+        output_dir=output_dir,
+        paths_ignore=["docs", "**/*.generated.py"],
+    )
+
+    assert bundle.input["scan_scope"]["paths_ignore"] == [
+        "docs",
+        "**/*.generated.py",
+    ]
+    assert bundle.input["scan_target"]["event_type"] == "manual"
