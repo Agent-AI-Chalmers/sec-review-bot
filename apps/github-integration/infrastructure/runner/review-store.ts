@@ -30,23 +30,6 @@ export interface ReviewRunRecord extends CreateReviewRunArgs {
   failure_code: string | null
   failure_message: string | null
 }
-export interface ReviewRunDiagnosticRecord extends ReviewRunRecord {
-  runner_status: RunnerStatus
-  runner_failure_code: string | null
-  runner_failure_message: string | null
-  publication_status: PublicationStatus
-  publication_failure_code: string | null
-  publication_failure_message: string | null
-  failed_steps: PublicationStepRecord[]
-  is_active: boolean
-  is_terminal: boolean
-}
-export interface ReviewRunDiagnosticsOptions {
-  limit?: number
-  status?: ReviewRunStatus
-  active_only?: boolean
-  failed_only?: boolean
-}
 export interface PublicationStepRecord {
   step_key: string
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
@@ -113,23 +96,6 @@ function rowToRecord (row: ReviewRunRow): ReviewRunRecord {
     ...(row.ingress_kind ? { ingress_kind: row.ingress_kind } : {}),
     ...(row.ingress_key ? { ingress_key: row.ingress_key } : {})
   }
-}
-function toDiagnostic (row: ReviewRunRow, failed_steps: PublicationStepRecord[]): ReviewRunDiagnosticRecord {
-  const record = rowToRecord(row)
-  const is_active = ['recovering', 'queued', 'running', 'publishing'].includes(record.status) ||
-    (record.status === 'failed' && record.failure_code === 'SUBMISSION_STATE_UNCERTAIN')
-  return {
-    ...record,
-    runner_status: row.runner_status,
-    runner_failure_code: row.runner_failure_code,
-    runner_failure_message: row.runner_failure_message,
-    publication_status: row.publication_status,
-    publication_failure_code: row.publication_failure_code,
-    publication_failure_message: row.publication_failure_message,
-    failed_steps,
-    is_active,
-    is_terminal: record.status === 'published' ||
-    (record.status === 'failed' && record.failure_code !== 'SUBMISSION_STATE_UNCERTAIN') }
 }
 async function transaction<T> (pool: Pool, operation: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect()
@@ -363,45 +329,6 @@ export class ReviewRunStore {
       ORDER BY GREATEST(r.updated_at,p.updated_at)`,
     [this.connectorId])
     return result.rows.map(rowToRecord)
-  }
-  async listRunsForDiagnostics (options: ReviewRunDiagnosticsOptions = {}): Promise<ReviewRunDiagnosticRecord[]> {
-    const limit = Math.max(1, Math.floor(options.limit ?? 50))
-    const conditions = ['r.connector_id=$1']
-    const parameters: unknown[] = [this.connectorId]
-    if (options.status !== undefined) {
-      parameters.push(options.status)
-      const statusParameter = `$${parameters.length}`
-      conditions.push(`CASE WHEN p.status IN ('pending','not_required') THEN r.runner_status ELSE p.status END=${statusParameter}`)
-    }
-    if (options.active_only === true) {
-      conditions.push(`(
-        p.status='publishing' OR
-        (p.status='pending' AND (
-          r.runner_status IN ('recovering','queued','running') OR
-          (r.runner_status='failed' AND r.runner_failure_code='SUBMISSION_STATE_UNCERTAIN')
-        ))
-      )`)
-    }
-    if (options.failed_only === true) {
-      conditions.push(`(
-        r.runner_status='failed' OR p.status='failed' OR EXISTS (
-          SELECT 1 FROM publication_steps failed_step
-          WHERE failed_step.connector_id=r.connector_id
-            AND failed_step.run_id=r.run_id
-            AND failed_step.status IN ('failed','terminal_failed')
-        )
-      )`)
-    }
-    parameters.push(limit)
-    const result = await this.pool.query<ReviewRunRow>(`${RUN_SELECT}
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY GREATEST(r.updated_at,p.updated_at) DESC
-      LIMIT $${parameters.length}`, parameters)
-    const records = await Promise.all(result.rows.map(async row => {
-      const steps = await this.listPublicationSteps(row.run_id)
-      return toDiagnostic(row, steps.filter(step => step.status === 'failed' || step.status === 'terminal_failed'))
-    }))
-    return records
   }
   async markRunning (runId: string): Promise<void> {
     await this.pool.query(`

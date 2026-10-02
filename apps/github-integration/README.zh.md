@@ -236,7 +236,7 @@ Webhook 使用 GitHub Delivery ID；Actions dispatch 使用 OIDC 验证的 repos
 | `publications` | 发布占用 | `pending`、`publishing`、`published`、`failed`、`not_required` |
 | `publication_steps` | 单个 GitHub 副作用 | `pending`、`running`、`succeeded`、`failed`、`terminal_failed` |
 
-`ReviewRunStatus` 是 store/diagnostics 的合并投影：publication 开始前显示 Runner 状态，之后显示 publication 状态。它不是数据库字段；step 状态不并入其中。
+`ReviewRunStatus` 是 store 的合并投影：publication 开始前显示 Runner 状态，之后显示 publication 状态。它不是数据库字段；step 状态不并入其中。
 
 ```mermaid
 flowchart LR
@@ -267,31 +267,6 @@ flowchart LR
 Repository 发布中，确定性失败只终止当前 delivery；瞬时失败在下一轮从未完成的 step 继续。所有 delivery step 结束后才发布 summary，summary 只链接成功的 delivery。
 
 > 当前重试策略很简单：后台 publisher 启动时会立刻轮询一次，之后按 `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` 间隔轮询，默认 15 秒。这里还没有指数退避调度。
-
-## Review run 诊断工具
-
-`tools/runner-run-diagnostics.ts` 是只读运维 CLI，打包为 `sec-review-review-runs`。它读取 PostgreSQL 并输出表格或 JSON，不参与业务状态转换。
-
-执行过 `pnpm install` 和 `pnpm run build` 后，可以运行：
-
-```bash
-sec-review-review-runs --limit 20
-sec-review-review-runs --active-only
-sec-review-review-runs --failed-only --json
-sec-review-review-runs --status publishing
-```
-
-该命令读取 PostgreSQL review run 协调状态。重要列：
-
-| 列 | 含义 |
-| --- | --- |
-| `active` | integration 仍会处理该 run。 |
-| `terminal` | 该 run 不再需要 integration 处理。 |
-| `runner_status` / `publication_status` | 分别表示 Runner 观察层和总体 publication 层，不要把它们当成同一个状态。 |
-| `runner_failure` / `publication_failure` | 分别表示失败属于 Runner 还是 GitHub publication。 |
-| `step_failures` | 具体失败的 publication step，包括 delivery、summary 或 review step。 |
-
-`PREPARATION_INTERRUPTED` 表示进程在准备已接纳的 run 时停止；同一入口请求重放时，会使用原 `run_id` 重新准备。`SUBMISSION_STATE_UNCERTAIN` 表示 Runner submission 可能已经成功，但 `queued` 转换没有写入 store。后台 publisher 会使用相同的 `run_id` 和 request fingerprint，安全地重放已经持久化的幂等 submission；它不会重建 bundle。
 
 ## GitHub REST API 版本
 
