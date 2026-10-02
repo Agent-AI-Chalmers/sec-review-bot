@@ -1,3 +1,5 @@
+"""Use Temporal to start Runner workflows and report their state to the service."""
+
 import hashlib
 import json
 from collections.abc import Mapping
@@ -96,7 +98,10 @@ class TemporalRunnerWorkflowGateway:
             handle = client.get_workflow_handle(run_id)
             description = await handle.describe()
             memo = await description.memo()
-            if _request_fingerprint_from_memo(memo) != request_fingerprint:
+            if (
+                _string_from_memo(memo, _REQUEST_FINGERPRINT_MEMO_KEY)
+                != request_fingerprint
+            ):
                 raise RunnerRunConflictError(
                     run_id,
                     requested_workflow=workflow,
@@ -199,16 +204,16 @@ def _status_from_temporal(status: WorkflowExecutionStatus | None) -> str:
 
 
 def _workflow_from_memo(memo: Mapping[str, Any] | None) -> str | None:
-    if not isinstance(memo, Mapping):
-        return None
-    value = memo.get("workflow")
-    return value if isinstance(value, str) and value else None
+    return _string_from_memo(memo, "workflow")
 
 
-def _request_fingerprint_from_memo(memo: Mapping[str, Any] | None) -> str | None:
+def _string_from_memo(
+    memo: Mapping[str, Any] | None,
+    key: str,
+) -> str | None:
     if not isinstance(memo, Mapping):
         return None
-    value = memo.get(_REQUEST_FINGERPRINT_MEMO_KEY)
+    value = memo.get(key)
     return value if isinstance(value, str) and value else None
 
 

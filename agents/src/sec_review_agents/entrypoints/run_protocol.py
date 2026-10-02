@@ -1,3 +1,5 @@
+"""Define shared run IDs, workflow names, validation, and error responses."""
+
 import re
 from typing import Any
 

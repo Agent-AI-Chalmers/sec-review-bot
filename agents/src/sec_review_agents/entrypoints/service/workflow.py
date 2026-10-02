@@ -1,3 +1,5 @@
+"""Prepare a Runner request and dispatch it to the matching review workflow."""
+
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -26,13 +28,6 @@ class RunnerExecutionRequest:
     input_data: dict[str, Any]
     timeout_seconds: int
     runtime: Any = None
-
-
-_CHILD_WORKFLOW_ID_SUFFIXES = {
-    "issue-review": "issue-review",
-    "pull-request-review": "pull-request-review",
-    "repository-review": "repository-review",
-}
 
 
 @activity.defn
@@ -138,8 +133,7 @@ class RunnerExecutionWorkflow:
 
 
 def _child_workflow_id(request: RunnerExecutionRequest) -> str:
-    suffix = _CHILD_WORKFLOW_ID_SUFFIXES.get(request.workflow, request.workflow)
-    return f"{request.run_id}:{suffix}"
+    return f"{request.run_id}:{request.workflow}"
 
 
 __all__ = [

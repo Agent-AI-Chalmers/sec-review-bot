@@ -1,3 +1,5 @@
+"""Expose the review runner over HTTP and delegate runs to a workflow gateway."""
+
 import os
 from hmac import compare_digest
 from ipaddress import ip_address

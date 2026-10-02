@@ -95,36 +95,54 @@ Python package 按职责读最清楚：
 3. Workflows：把 stage 组合成产品路径。
    - `workflows/`：`issue/`、`pull_request/`、`repository/` 是三个 public workflow；`repository_case/` 是 repository workflow 内部的单 case review。
 
-4. 生产 entrypoints：传输层与执行边界准备。
-   - `entrypoints/`：FastAPI Runner Service、Temporal worker、workflow dispatch 和 workflow input preparation。
+4. 本地与运维命令。
+   - `cli/`：用于开发和运维、完成一次指定任务后退出的命令，以及只服务于本地命令的支持代码。
 
-5. Runtime support：agent 运行所需基础设施。
+5. 生产 entrypoints。
+   - `entrypoints/`：由部署系统启动的长期运行进程，包括 FastAPI service 和 Temporal worker，以及它们专属的 run protocol 与 workflow input preparation 边界。
+
+6. Runtime support：agent 运行所需基础设施。
    - `runtime/`、`filesystem/`、`workspace/`、`llm/`、`resources/`、`observability/`：agent runtime、filesystem sandbox、workspace 产物、模型配置、prompt / skill 资源和诊断支持。
+
+## 执行架构
+
+```mermaid
+flowchart LR
+    http["HTTP 调用方"] --> service["FastAPI service<br/>Uvicorn"]
+    service <-->|"启动 / 查询 workflow"| temporal["Temporal Server"]
+
+    local["run-local-*"] --> materialize["本地准备输入"]
+    materialize --> direct["Direct execution"]
+    materialize -->|"--temporal"| temporal
+
+    temporal <-->|"任务 / 结果"| worker["Temporal Worker"]
+    worker --> execution["Review workflows / activities / agents"]
+    direct --> execution
+```
+
+FastAPI service 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow；它不执行 agent。Temporal Server 持久化 workflow 状态，并把任务派发给主动轮询的 worker。Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions；`run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 worker。
 
 ## 本地运行
 
 本地运行用于开发和调试，不是生产集成路径。
 
-本地运行使用 `sec-review-agents-run-local-*` CLI。它们会通过 `cli/local_materialization/` 在本机准备 workspace snapshot、history 和 incremental window；runner 运行时再派生 artifacts 目录。这些准备工作只服务本地开发，不属于标准 HTTP service 入口的职责。
+本地有三种执行路径：
 
-本地运行有两种执行模式：
+- Direct local run：日常开发默认使用，也是最快的路径。
+- Local `--temporal` run：用于验证 workflow / activity 编排。
+- 手动启动 Service 和 Worker：用于在不启动完整 Compose 栈时验证完整 service path。
 
-- Direct local run：`run-local-*` 默认路径；最快，不需要 HTTP service，也不需要 Temporal。
-- Local `--temporal` run：显式传 `--temporal`；不经过 HTTP service，但会跑内部 workflow / activity 编排。
+两种 `run-local-*` 路径都不参与 memory extraction 或 maintenance；手动启动的 Service 和 Worker 则使用生产 workflow 路径。
 
-local run 一概不参与 memory extraction 或 maintenance。
+### `run-local-*` 命令
 
-### 本地运行命令
+`run-local-*` 命令通过 `cli/local_materialization/` 准备 workspace snapshot、history 和 incremental window，再复用生产 workflow input preparation 边界派生 artifacts 目录。默认使用 direct local execution，不需要 HTTP service 或 Temporal。
 
-安装依赖后，本地运行使用这些 `run-local-*` CLI：
+安装依赖后，可以使用以下命令：
 
 - `sec-review-agents-run-local-issue`：本地 issue run 入口；可用 `--strategy default|two-stage|single-agent` 选择默认 multi-stage 路径、two-stage ablation 或 single-agent baseline
 - `sec-review-agents-run-local-pr`：本地 PR run 入口
 - `sec-review-agents-run-local-repository`：本地 repo 扫描 run 入口；可用 `--scan-mode full|incremental` 选择全量或增量扫描
-
-这些命令默认使用 direct local execution。
-
----
 
 本地运行默认使用临时目录保存 workflow result、workspace snapshot、history 和其他 artifacts。命令结束时会打印 `WORKFLOW_RESULT=...`，可根据该路径查看结果；也可以通过 `--output-dir` 指定固定的输出目录。
 
@@ -189,11 +207,7 @@ sec-review-agents-run-local-repository \
   --repair-mode test-changes-allowed # 可选 head；repair-mode 必填
 ```
 
-### Direct local run
-
-Direct local run 是上面这些命令的默认模式。它不需要 HTTP service，也不需要 Temporal。
-
-### Local `--temporal` run
+### 通过 `run-local-*` 使用 Temporal
 
 只有需要调试内部 Temporal workflow / activity 编排时，才使用 `--temporal`。
 
@@ -222,6 +236,38 @@ TEMPORAL_NAMESPACE=default \
 TEMPORAL_TASK_QUEUE=sec-review-agents \
 sec-review-agents-worker
 ```
+
+### 手动启动 Service 和 Worker
+
+需要在本地验证完整的 HTTP service、Temporal 和 worker 路径时，在不同 terminal 中分别启动这三个进程。
+
+最小本地启动形状：
+
+终端 1，Temporal Server：
+
+```bash
+temporal server start-dev
+```
+
+终端 2，FastAPI service：
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+TEMPORAL_TASK_QUEUE=sec-review-agents \
+sec-review-agents-service
+```
+
+终端 3，Temporal Worker：
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+TEMPORAL_TASK_QUEUE=sec-review-agents \
+sec-review-agents-worker
+```
+
+Service 负责 HTTP、鉴权、run request 校验和启动 Temporal workflow；worker 从 Temporal 获取并执行已注册的 workflow 和 activity task。模型、sandbox、skills 和 activity 并发相关环境变量属于 worker 运行环境。
+
+Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
 ## Agent 运行时配置
 
@@ -261,28 +307,3 @@ AGENT_MCP_ENABLED=true
 ```
 
 正常阶段执行的 CodeGraph 正式路径是 Docker sandbox。
-
-## 独立启动 Runner Service / Worker
-
-需要本地验证 service / worker 路径时，可以直接启动 runner HTTP service 和 Temporal worker。
-
-最小本地启动形状：
-
-```bash
-temporal server start-dev
-
-# 使用真实本地 secret；runner 会消耗 LLM 配额。
-export RUNNER_SERVICE_TOKEN="$(openssl rand -hex 32)"
-
-TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-service
-
-TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-worker
-```
-
-Service 负责 HTTP、鉴权、run request 校验和启动 Temporal workflow；worker 负责从 Temporal task queue 取 workflow / activity task 并调用 runner core。模型、sandbox、skills 和 activity 并发相关环境变量属于 worker 运行环境。
-
-Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)；本文件只覆盖 runner 入口、本地 `run-local-*` CLI 和 agents 运行边界。

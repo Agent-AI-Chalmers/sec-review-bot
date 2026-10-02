@@ -1,3 +1,5 @@
+"""Run the Temporal worker for review workflows and memory maintenance."""
+
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
