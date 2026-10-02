@@ -18,10 +18,10 @@ from sec_review_agents.agents.memory_maintainer.tools import (
     build_memory_delete_file_tool,
 )
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
-from sec_review_agents.filesystem.material_views import (
+from sec_review_agents.filesystem.path_views import (
     memory_view,
     writable_memory_view,
 )
@@ -405,9 +405,9 @@ def test_memory_middleware_injects_memory_index_from_backend(tmp_path: Path) -> 
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="local",
     ):
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="memory-test",
-            material_views=[memory_view(host_path=_memory_content_dir(memory_root))],
+            path_views=[memory_view(host_path=_memory_content_dir(memory_root))],
         )
     request = ModelRequest(
         model=FakeMessagesListChatModel(responses=[]),
@@ -465,9 +465,9 @@ def test_memory_view_is_read_only(tmp_path: Path) -> None:
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="local",
     ):
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="memory-test",
-            material_views=[memory_view(host_path=memory_root)],
+            path_views=[memory_view(host_path=memory_root)],
         )
 
     assert isinstance(backend, CompositeBackend)
@@ -485,9 +485,9 @@ def test_writable_memory_view_allows_memory_writes(tmp_path: Path) -> None:
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="local",
     ):
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="memory-test",
-            material_views=[writable_memory_view(host_path=memory_root)],
+            path_views=[writable_memory_view(host_path=memory_root)],
         )
 
     assert isinstance(backend, CompositeBackend)

@@ -17,16 +17,16 @@ from sec_review_agents.filesystem.docker_runtime import (
     create_docker_container_resource,
 )
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
-from sec_review_agents.filesystem.material_views import MaterialView
+from sec_review_agents.filesystem.path_views import PathView
 
 _DEEPAGENTS_ARTIFACT_VIEWS = (
-    MaterialView(
+    PathView(
         host_path=None,
         container_path="/conversation_history",
         agent_path="/conversation_history",
         writable=True,
     ),
-    MaterialView(
+    PathView(
         host_path=None,
         container_path="/large_tool_results",
         agent_path="/large_tool_results",
@@ -35,10 +35,10 @@ _DEEPAGENTS_ARTIFACT_VIEWS = (
 )
 
 
-def create_backend_with_materials(
+def create_backend_with_path_views(
     *,
     container_name_prefix: str,
-    material_views: list[MaterialView] | None = None,
+    path_views: list[PathView] | None = None,
     working_directory: str = "/workspace",
     image: str | None = None,
     use_docker_sandbox: bool | None = None,
@@ -51,27 +51,27 @@ def create_backend_with_materials(
             else ("docker" if use_docker_sandbox else "local")
         )
     backend_kind = backend_kind.strip().lower()
-    material_views = list(material_views or [])
+    path_views = list(path_views or [])
     if backend_kind == "docker":
-        return _create_docker_material_backend(
+        return _create_docker_backend(
             container_name_prefix=container_name_prefix,
             working_directory=working_directory,
-            material_views=material_views,
+            path_views=path_views,
             image=image,
         )
     if backend_kind == "bwrap":
-        return _create_bwrap_material_backend(
+        return _create_bwrap_backend(
             working_directory=working_directory,
-            material_views=material_views,
+            path_views=path_views,
         )
     if backend_kind != "local":
         raise ValueError("backend_kind must be one of: docker, local, bwrap")
 
     routes: dict[str, BackendProtocol] = {}
-    for view in material_views:
+    for view in path_views:
         if view.host_path is None:
             raise ValueError(
-                f"Local backend material view requires a host_path: {view.agent_path}"
+                f"Local backend path view requires a host_path: {view.agent_path}"
             )
         route = (
             view.agent_path if view.agent_path.endswith("/") else f"{view.agent_path}/"
@@ -83,16 +83,16 @@ def create_backend_with_materials(
     )
 
 
-def _create_bwrap_material_backend(
+def _create_bwrap_backend(
     *,
     working_directory: str,
-    material_views: list[MaterialView],
+    path_views: list[PathView],
 ):
     routes: list[BwrapRoute] = []
-    for view in material_views:
+    for view in path_views:
         if view.host_path is None:
             raise ValueError(
-                f"bwrap backend material view requires a host_path: {view.agent_path}"
+                f"bwrap backend path view requires a host_path: {view.agent_path}"
             )
         routes.append(
             BwrapRoute(
@@ -107,32 +107,34 @@ def _create_bwrap_material_backend(
     )
 
 
-def _create_docker_material_backend(
+def _create_docker_backend(
     *,
     container_name_prefix: str,
     working_directory: str,
-    material_views: list[MaterialView],
+    path_views: list[PathView],
     image: str | None = None,
 ):
-    """Create the Docker backend that owns command execution and material paths."""
+    """Create the Docker backend that owns command execution and path views."""
     # Docker remains one sandbox backend instead of a CompositeBackend route
     # tree: command execution, path mapping, and container cleanup all belong to
     # the same container. Material paths are exposed through routes below.
     # Deepagents filesystem middleware offloads oversized messages and tool
     # results here. Docker needs explicit writable roots for those virtual files.
-    existing_agent_paths = {
-        posixpath.normpath(view.agent_path) for view in material_views
-    }
+    existing_agent_paths = {posixpath.normpath(view.agent_path) for view in path_views}
     for view in _DEEPAGENTS_ARTIFACT_VIEWS:
         if posixpath.normpath(view.agent_path) in existing_agent_paths:
             continue
-        material_views.append(view)
+        path_views.append(view)
         existing_agent_paths.add(posixpath.normpath(view.agent_path))
 
     mounts: list[DockerMount] = []
     routes: list[DockerRoute] = []
 
-    for view in material_views:
+    for view in path_views:
+        if view.container_path is None:
+            raise ValueError(
+                f"Docker backend path view requires a container_path: {view.agent_path}"
+            )
         normalized_container_path = view.container_path.rstrip("/") or "/"
         if view.host_path is not None:
             resolved_host_path = view.host_path.resolve()

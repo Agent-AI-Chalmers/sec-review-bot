@@ -10,7 +10,7 @@ from sec_review_agents.features import (
     AGENT_MEMORY_ENABLED_ENV,
     agent_memory_enabled,
 )
-from sec_review_agents.filesystem.material_views import MaterialView, memory_view
+from sec_review_agents.filesystem.path_views import PathView, memory_view
 from sec_review_agents.memory.state import initialize_memory_state
 from sec_review_agents.utils.env import env_value
 
@@ -224,6 +224,6 @@ def materialize_configured_memory_view() -> Path | None:
     return destination
 
 
-def configured_memory_material_view() -> MaterialView | None:
+def configured_memory_path_view() -> PathView | None:
     memory_root = materialize_configured_memory_view()
     return None if memory_root is None else memory_view(host_path=memory_root)

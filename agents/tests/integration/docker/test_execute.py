@@ -6,14 +6,14 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
 from sec_review_agents.filesystem.docker_backend import DockerSandboxBackend
 from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
-from sec_review_agents.filesystem.material_views import (
+from sec_review_agents.filesystem.path_views import (
     workspace_view,
 )
 
@@ -44,9 +44,9 @@ def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> 
         {"AGENT_DOCKER_MAX_OUTPUT_BYTES": "8192"},
         clear=False,
     ):
-        backend = create_backend_with_materials(
+        backend = create_backend_with_path_views(
             container_name_prefix="init-diff-bound-test",
-            material_views=[
+            path_views=[
                 workspace_view(host_path=workspace, writable=True),
             ],
         )

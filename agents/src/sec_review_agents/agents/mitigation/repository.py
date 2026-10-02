@@ -5,14 +5,14 @@ from typing import Any
 from sec_review_agents.agents.mitigation.skills import MITIGATION_AGENT_SKILLS
 from sec_review_agents.features import agent_memory_enabled, agent_skills_enabled
 from sec_review_agents.filesystem import backend_selection
-from sec_review_agents.filesystem.backend_factory import create_backend_with_materials
-from sec_review_agents.filesystem.material_views import (
-    read_only_material_view,
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
+from sec_review_agents.filesystem.path_views import (
+    read_only_path_view,
     skill_view,
     tmp_view_for_backend,
     workspace_view,
 )
-from sec_review_agents.memory.store import configured_memory_material_view
+from sec_review_agents.memory.store import configured_memory_path_view
 from sec_review_agents.resources.loader import (
     join_prompt_sections,
     load_prompt_resource,
@@ -61,40 +61,40 @@ def create_repository_mitigation_backend(
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
-    memory_view = configured_memory_material_view() if agent_memory_enabled() else None
+    memory_view = configured_memory_path_view() if agent_memory_enabled() else None
     tmp_view = tmp_view_for_backend(backend_kind)
-    material_views = [
+    path_views = [
         workspace_view(host_path=workspace_root, writable=True),
     ]
     if agent_skills_enabled():
-        material_views.append(
+        path_views.append(
             skill_view(host_path=materialize_agent_skills_view(MITIGATION_AGENT_SKILLS))
         )
     if memory_view is not None:
-        material_views.append(memory_view)
+        path_views.append(memory_view)
     if tmp_view is not None:
-        material_views.append(tmp_view)
+        path_views.append(tmp_view)
     if scan_mode == "incremental":
         if incremental_window_path is None:
             raise KeyError("Missing bundle path: incremental_window_path")
         if history_path is None:
             raise KeyError("Missing bundle path: history_path")
-        material_views.extend(
+        path_views.extend(
             [
-                read_only_material_view(
+                read_only_path_view(
                     agent_path="/incremental-window",
                     host_path=incremental_window_path,
                 ),
-                read_only_material_view(
+                read_only_path_view(
                     agent_path="/history",
                     host_path=history_path,
                 ),
             ]
         )
 
-    return create_backend_with_materials(
+    return create_backend_with_path_views(
         container_name_prefix="repository-mitigator",
-        material_views=material_views,
+        path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
     )

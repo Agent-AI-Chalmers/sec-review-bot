@@ -4,7 +4,7 @@
 #
 # This local backend is intentionally not a drop-in reimplementation of the
 # full deepagents filesystem backend. Its job is narrower: give host fallback
-# material views bounded reads, newline-tolerant edits, and explicit writable policy.
+# path views bounded reads, newline-tolerant edits, and explicit writable policy.
 #
 # We implement `glob`, `read`, `grep`, and `ls` here because their cost is not
 # known until after traversal or file reads begin. Delegating to the base
@@ -602,7 +602,7 @@ class LocalFilesystemBackend(FilesystemBackend):
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
         # Uploading bytes mutates target paths just like `write`, so read-only
-        # material views must reject it even though the method is transport-shaped.
+        # path views must reject it even though the method is transport-shaped.
         if not self.writable:
             return [
                 FileUploadResponse(

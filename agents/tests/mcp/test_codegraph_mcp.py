@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_materials,
+    create_backend_with_path_views,
 )
 from sec_review_agents.filesystem.bwrap_backend import (
     BwrapRoute,
@@ -16,7 +16,7 @@ from sec_review_agents.filesystem.docker_backend import (
     DockerSandboxBackend,
 )
 from sec_review_agents.filesystem.docker_runtime import DockerContainerResource
-from sec_review_agents.filesystem.material_views import (
+from sec_review_agents.filesystem.path_views import (
     workspace_view,
 )
 from sec_review_agents.mcp.codegraph import codegraph_mcp_connections_for_backend
@@ -231,9 +231,9 @@ def test_closes_docker_container_when_codegraph_prepare_raises() -> None:
 
 
 def test_skips_local_backend_without_host_workspace_path(tmp_path: Path) -> None:
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="test",
-        material_views=[
+        path_views=[
             workspace_view(host_path=tmp_path, writable=True),
         ],
         use_docker_sandbox=False,
@@ -254,9 +254,9 @@ def test_skips_local_backend_without_host_workspace_path(tmp_path: Path) -> None
 def test_prepares_host_index_and_returns_local_mcp_connection(tmp_path: Path) -> None:
     workspace = tmp_path
     (workspace / ".git" / "info").mkdir(parents=True)
-    backend = create_backend_with_materials(
+    backend = create_backend_with_path_views(
         container_name_prefix="test",
-        material_views=[
+        path_views=[
             workspace_view(host_path=workspace, writable=True),
         ],
         use_docker_sandbox=False,
