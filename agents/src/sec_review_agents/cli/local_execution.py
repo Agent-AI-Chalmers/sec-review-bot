@@ -4,7 +4,7 @@ from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
     effective_issue_strategy,
 )
-from sec_review_agents.runner.input_preparation import prepare_workflow_input
+from sec_review_agents.entrypoints.input_preparation import prepare_workflow_input
 from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 

@@ -1,10 +1,13 @@
+"""Validate caller input and resolve the local paths used by review workflows."""
+
 import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from sec_review_agents.runner.contract_schema import validate_v4_workflow_input
+from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_input
+from sec_review_agents.entrypoints.run_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
 
 ISSUE_ARTIFACT_PATHS = {
@@ -30,45 +33,75 @@ ARTIFACT_ROOT_ENV = "SEC_REVIEW_AGENT_ARTIFACT_ROOT"
 INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT"
 
 
+def prepare_run_input(
+    caller_input: dict[str, Any],
+    *,
+    run_id: str,
+    workflow: str,
+) -> dict[str, Any]:
+    validated_run_id = validate_run_id(run_id)
+    return prepare_workflow_input(
+        caller_input,
+        workflow,
+        artifact_root_path=workflow_artifact_root(
+            caller_input,
+            run_id=validated_run_id,
+        ),
+    )
+
+
 def prepare_workflow_input(
     input_data: dict[str, Any],
     workflow: str,
     *,
     artifact_root_path: str | Path,
 ) -> dict[str, Any]:
-    """Validate caller input and prepare the workflow runtime input."""
+    """Turn public workflow input into the filesystem-ready runtime form.
 
+    The caller supplies the review target and an input bundle URI. This function
+    keeps that public object unchanged and returns a copy enriched with runner-owned
+    paths: ``input_bundle_root_path``, ``artifact_root_path``, ``artifact_paths``,
+    and ``bundle_paths``. All bundle paths are read from the manifest and constrained
+    to remain inside the input bundle.
+    """
+
+    # Validate before adding runner-owned fields, which are not part of the public
+    # workflow input contract.
     validate_v4_workflow_input(input_data, workflow)
     prepared = deepcopy(input_data)
-    _derive_input_bundle_root_path(prepared)
-    _derive_workflow_artifact_paths(
+
+    # Resolve the caller's bundle URI at the trusted filesystem boundary.
+    prepared["input_bundle_root_path"] = str(
+        _resolve_input_bundle_root(prepared.get("input_bundle_uri"))
+    )
+
+    # Artifact paths come from runner configuration, never from caller input.
+    _set_workflow_artifact_paths(
         prepared,
         workflow,
         artifact_root_path=artifact_root_path,
     )
     if workflow == "repository-review":
-        _require_repository_scan_relationships(prepared)
-    _derive_bundle_paths(prepared, workflow)
+        _validate_repository_incremental_range(prepared)
+
+    # Translate bundle-relative manifest entries into paths consumed by workflows.
+    _set_bundle_paths_from_manifest(prepared, workflow)
     return prepared
 
 
 def workflow_artifact_root(input_data: dict[str, Any], *, run_id: str) -> Path:
-    return _artifact_root(
-        input_bundle_root=_input_bundle_root(input_data.get("input_bundle_uri")),
+    return _resolve_artifact_root(
+        input_bundle_root=_resolve_input_bundle_root(
+            input_data.get("input_bundle_uri")
+        ),
         run_id=run_id,
     )
 
 
-def _derive_input_bundle_root_path(input_data: dict[str, Any]) -> None:
-    input_data["input_bundle_root_path"] = str(
-        _input_bundle_root(input_data.get("input_bundle_uri"))
-    )
-
-
-def _input_bundle_root(value: object) -> Path:
-    uri = _string_value(value)
-    if uri is None:
+def _resolve_input_bundle_root(value: object) -> Path:
+    if not isinstance(value, str) or not value.strip():
         raise ValueError("Runner input is missing input_bundle_uri.")
+    uri = value.strip()
 
     parsed = urlparse(uri)
     if parsed.scheme == "file":
@@ -96,7 +129,7 @@ def _input_bundle_root(value: object) -> Path:
     return bundle_root
 
 
-def _derive_workflow_artifact_paths(
+def _set_workflow_artifact_paths(
     input_data: dict[str, Any],
     workflow: str,
     *,
@@ -113,7 +146,7 @@ def _derive_workflow_artifact_paths(
     else:
         raise AssertionError(f"Unsupported prepared workflow: {workflow}")
 
-    # Prepared workflow input is allowed to grow runner-derived artifact roots
+    # Prepared workflow input may include runner-owned artifact paths
     # after caller validation. Keep those fields out of caller input.
     input_data["artifact_root_path"] = str(artifact_root)
     input_data["artifact_paths"] = {
@@ -122,7 +155,7 @@ def _derive_workflow_artifact_paths(
     }
 
 
-def _artifact_root(*, input_bundle_root: Path, run_id: str) -> Path:
+def _resolve_artifact_root(*, input_bundle_root: Path, run_id: str) -> Path:
     configured_root = env_value(ARTIFACT_ROOT_ENV)
     if configured_root is not None:
         artifact_root = Path(configured_root).expanduser().resolve()
@@ -139,7 +172,10 @@ def _artifact_root(*, input_bundle_root: Path, run_id: str) -> Path:
     return input_bundle_root / "artifacts"
 
 
-def _derive_bundle_paths(input_data: dict[str, Any], workflow: str) -> None:
+def _set_bundle_paths_from_manifest(
+    input_data: dict[str, Any],
+    workflow: str,
+) -> None:
     local_root = Path(input_data["input_bundle_root_path"])
     manifest_path = local_root / INPUT_BUNDLE_MANIFEST_NAME
     if not manifest_path.is_file():
@@ -154,17 +190,17 @@ def _derive_bundle_paths(input_data: dict[str, Any], workflow: str) -> None:
 
     bundle_paths: dict[str, str] = {
         "workspace_snapshot_tar_path": str(
-            _bundle_relative_path(
+            _resolve_bundle_path(
                 local_root,
-                _required_manifest_path(
+                _read_required_manifest_path(
                     manifest.get("workspace"), "workspace.snapshot"
                 ),
             )
         ),
         "history_path": str(
-            _bundle_relative_path(
+            _resolve_bundle_path(
                 local_root,
-                _required_manifest_path(manifest.get("history"), "history.path"),
+                _read_required_manifest_path(manifest.get("history"), "history.path"),
             )
         ),
     }
@@ -172,9 +208,11 @@ def _derive_bundle_paths(input_data: dict[str, Any], workflow: str) -> None:
     incremental_window = manifest.get("incremental_window")
     if isinstance(incremental_window, dict):
         bundle_paths["incremental_window_path"] = str(
-            _bundle_relative_path(
+            _resolve_bundle_path(
                 local_root,
-                _required_manifest_path(incremental_window, "incremental_window.path"),
+                _read_required_manifest_path(
+                    incremental_window, "incremental_window.path"
+                ),
             )
         )
     elif workflow == "pull-request-review":
@@ -192,7 +230,7 @@ def _derive_bundle_paths(input_data: dict[str, Any], workflow: str) -> None:
     input_data["bundle_paths"] = bundle_paths
 
 
-def _required_manifest_path(value: object, label: str) -> str:
+def _read_required_manifest_path(value: object, label: str) -> str:
     if not isinstance(value, dict):
         raise ValueError(f"Input bundle manifest requires {label}.")
     leaf = label.rsplit(".", 1)[-1]
@@ -202,7 +240,7 @@ def _required_manifest_path(value: object, label: str) -> str:
     raise ValueError(f"Input bundle manifest requires {label}.")
 
 
-def _bundle_relative_path(local_root: Path, value: str) -> Path:
+def _resolve_bundle_path(local_root: Path, value: str) -> Path:
     path = Path(value)
     if path.is_absolute() or ".." in path.parts:
         raise ValueError(f"Input bundle manifest path must be bundle-relative: {value}")
@@ -219,7 +257,7 @@ def _bundle_relative_path(local_root: Path, value: str) -> Path:
     return candidate
 
 
-def _require_repository_scan_relationships(input_data: dict[str, Any]) -> None:
+def _validate_repository_incremental_range(input_data: dict[str, Any]) -> None:
     scan_target = input_data.get("scan_target") or {}
     if scan_target.get("scan_mode") != "incremental":
         return
@@ -236,12 +274,7 @@ def _require_repository_scan_relationships(input_data: dict[str, Any]) -> None:
         )
 
 
-def _string_value(value: Any) -> str | None:
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    return None
-
-
 __all__ = [
+    "prepare_run_input",
     "prepare_workflow_input",
 ]

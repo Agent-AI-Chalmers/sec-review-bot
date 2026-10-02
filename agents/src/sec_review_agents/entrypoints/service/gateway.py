@@ -1,3 +1,5 @@
+"""Define how the HTTP service starts runs and reads their current state."""
+
 from typing import Any, Protocol
 
 

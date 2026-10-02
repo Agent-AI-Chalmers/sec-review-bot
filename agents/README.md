@@ -93,36 +93,54 @@ The Python package is easiest to read by responsibility:
 3. Workflows: combines stages into product paths.
    - `workflows/`: `issue/`, `pull_request/`, and `repository/` are the three public workflows; `repository_case/` is the per-case review used inside repository workflow.
 
-4. Runner entrypoint: production transport and input preparation.
-   - `runner/`: FastAPI runner service, Temporal worker, workflow dispatch, and workflow input preparation.
+4. Local and operator commands.
+   - `cli/`: commands for development and operations that perform one requested task and exit, plus their local-only support code.
 
-5. Runtime support: infrastructure needed to run agents.
+5. Production entrypoints.
+   - `entrypoints/`: long-lived processes started by the deployment system, including the FastAPI service and Temporal worker, plus their run protocol and workflow input preparation boundaries.
+
+6. Runtime support: infrastructure needed to run agents.
    - `runtime/`, `filesystem/`, `workspace/`, `llm/`, `resources/`, `observability/`: agent runtime, filesystem sandbox, workspace artifacts, model config, prompt / skill resources, and diagnostics.
+
+## Execution Architecture
+
+```mermaid
+flowchart LR
+    http["HTTP caller"] --> service["FastAPI service<br/>Uvicorn"]
+    service <-->|"start / query workflow"| temporal["Temporal Server"]
+
+    local["run-local-*"] --> materialize["Local input materialization"]
+    materialize --> direct["Direct execution"]
+    materialize -->|"--temporal"| temporal
+
+    temporal <-->|"tasks / results"| worker["Temporal Worker"]
+    worker --> execution["Review workflows / activities / agents"]
+    direct --> execution
+```
+
+The FastAPI service receives HTTP run requests and uses the Temporal client to start and query workflows; it does not execute agents. Temporal Server persists workflow state and dispatches tasks to the polling worker. Direct local execution bypasses both the HTTP service and Temporal while reusing activity functions; `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and the worker.
 
 ## Local Runs
 
 Local runs are for development and debugging. They are not the production integration path.
 
-Local runs use `sec-review-agents-run-local-*` CLIs. They prepare workspace snapshots, history, and incremental windows locally through `cli/local_materialization/`; runner execution then derives artifact directories. This preparation is for local development and is not part of the standard HTTP service entrypoint.
+There are three local execution paths:
 
-Local runs have two execution modes:
+- Direct local run: the default and fastest path for ordinary development.
+- Local `--temporal` run: for exercising workflow / activity orchestration.
+- Manually started service and worker: for exercising the complete service path without the full Compose stack.
 
-- Direct local run: the default `run-local-*` path; fastest, and does not need the HTTP service or Temporal.
-- Local `--temporal` run: explicit; does not use the HTTP service, but exercises internal workflow / activity orchestration.
+The two `run-local-*` paths do not participate in memory extraction or maintenance. The manually started service and worker use the production workflow path.
 
-Local runs do not participate in memory extraction or maintenance.
+### `run-local-*` Commands
 
-### Local Run Commands
+The `run-local-*` commands prepare workspace snapshots, history, and incremental windows through `cli/local_materialization/`, then reuse the production workflow input preparation boundary to derive artifact directories. They use direct local execution by default, without the HTTP service or Temporal.
 
-After installing dependencies, local runs use these `run-local-*` CLIs:
+After installing dependencies, these commands are available:
 
 - `sec-review-agents-run-local-issue`: local issue run entrypoint. Use `--strategy default|two-stage|single-agent` to choose the default multi-stage path, two-stage ablation, or single-agent baseline.
 - `sec-review-agents-run-local-pr`: local PR run entrypoint.
 - `sec-review-agents-run-local-repository`: local repository scan run entrypoint. Use `--scan-mode full|incremental` to choose full or incremental scan.
-
-By default these commands use direct local execution.
-
----
 
 Local runs use a temporary directory by default for the workflow result, workspace snapshot, history, and other artifacts. At the end of the command, the CLI prints `WORKFLOW_RESULT=...`, which you can use to locate the result; you can also use `--output-dir` to override the output directory.
 
@@ -187,11 +205,7 @@ sec-review-agents-run-local-repository \
   --repair-mode test-changes-allowed # optional head; repair-mode is required
 ```
 
-### Direct Local Run
-
-Direct local run is the default mode for the commands above. It does not require the HTTP service or Temporal.
-
-### Local `--temporal` Run
+### Use Temporal with `run-local-*`
 
 Use `--temporal` only when you specifically want to exercise internal Temporal workflow / activity orchestration.
 
@@ -220,6 +234,38 @@ TEMPORAL_NAMESPACE=default \
 TEMPORAL_TASK_QUEUE=sec-review-agents \
 sec-review-agents-worker
 ```
+
+### Run the Service and Worker Manually
+
+To exercise the complete HTTP service, Temporal, and worker path locally, start all three processes in separate terminals.
+
+Minimal local startup shape:
+
+Terminal 1, Temporal Server:
+
+```bash
+temporal server start-dev
+```
+
+Terminal 2, FastAPI service:
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+TEMPORAL_TASK_QUEUE=sec-review-agents \
+sec-review-agents-service
+```
+
+Terminal 3, Temporal Worker:
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+TEMPORAL_TASK_QUEUE=sec-review-agents \
+sec-review-agents-worker
+```
+
+The service owns HTTP, authentication, run request validation, and starting Temporal workflows. The worker polls Temporal for registered workflow and activity tasks and executes them. Model, sandbox, skills, and activity concurrency environment variables belong to the worker runtime.
+
+Docker Compose control-plane startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
 
 ## Agent Runtime Configuration
 
@@ -256,28 +302,3 @@ AGENT_MCP_ENABLED=true
 ```
 
 The documented CodeGraph path for normal stage execution is Docker sandbox.
-
-## Standalone Runner Service / Worker
-
-Start the runner HTTP service and Temporal worker directly when you want to exercise the service / worker path locally.
-
-Minimal local startup shape:
-
-```bash
-temporal server start-dev
-
-# Use a real local secret; the runner can spend LLM quota.
-export RUNNER_SERVICE_TOKEN="$(openssl rand -hex 32)"
-
-TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-service
-
-TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-worker
-```
-
-The service owns HTTP, authentication, run request validation, and starting Temporal workflows. The worker takes workflow / activity tasks from the Temporal task queue and calls runner core. Model, sandbox, skills, and activity concurrency environment variables belong to the worker runtime.
-
-Docker Compose control-plane startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md). This file covers runner entrypoints, local `run-local-*` CLIs, and agents runtime boundaries.

@@ -1,3 +1,5 @@
+"""Expose the review runner over HTTP and delegate runs to a workflow gateway."""
+
 import os
 from hmac import compare_digest
 from ipaddress import ip_address
@@ -6,9 +8,9 @@ from typing import Any
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from sec_review_agents.memory.store import initialize_configured_memory_store
-from sec_review_agents.runner.contract_schema import validate_v4_workflow_input
-from sec_review_agents.runner.core import (
+from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_input
+from sec_review_agents.entrypoints.input_preparation import INPUT_BUNDLE_ROOT_ENV
+from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_REQUEST_INVALID,
     RUNNER_RUN_CONFLICT,
     RUNNER_RUN_NOT_FOUND,
@@ -18,14 +20,14 @@ from sec_review_agents.runner.core import (
     validate_run_id,
     validate_run_request_body,
 )
-from sec_review_agents.runner.input_preparation import INPUT_BUNDLE_ROOT_ENV
-from sec_review_agents.runner.service.gateway import (
+from sec_review_agents.entrypoints.service.gateway import (
     RunnerRunConflictError,
     RunnerWorkflowGateway,
 )
-from sec_review_agents.runner.service.temporal_gateway import (
+from sec_review_agents.entrypoints.service.temporal_gateway import (
     TemporalRunnerWorkflowGateway,
 )
+from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.utils.env import env_value
 
 HOST_ENV = "RUNNER_SERVICE_HOST"

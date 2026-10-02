@@ -3,9 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from sec_review_agents.runner.core import (
-    prepare_runner_input_data,
-)
+from sec_review_agents.entrypoints.input_preparation import prepare_run_input
 from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 
 
@@ -40,7 +38,7 @@ def test_runner_runtime_config_is_applied_after_workflow_input_preparation(
         "workspace_image": "benchmark-image:latest",
     }
 
-    prepared_input = prepare_runner_input_data(
+    prepared_input = prepare_run_input(
         input_data,
         run_id="run-runtime-config",
         workflow="issue-review",
@@ -56,12 +54,12 @@ def test_runner_runtime_config_is_applied_after_workflow_input_preparation(
 def test_runner_input_preparation_does_not_mutate_payload_input() -> None:
     input_data = _issue_input()
 
-    first_input = prepare_runner_input_data(
+    first_input = prepare_run_input(
         input_data,
         run_id="run-runtime-config",
         workflow="issue-review",
     )
-    second_input = prepare_runner_input_data(
+    second_input = prepare_run_input(
         input_data,
         run_id="run-runtime-config",
         workflow="issue-review",
@@ -104,7 +102,7 @@ def test_runner_input_rejects_caller_runtime_context() -> None:
     }
 
     with pytest.raises(ValueError, match="runtime_context"):
-        prepare_runner_input_data(
+        prepare_run_input(
             input_data,
             run_id="run-runtime-config",
             workflow="issue-review",
@@ -116,7 +114,7 @@ def test_runner_input_rejects_caller_run_id() -> None:
     input_data["run_id"] = "smuggled-run"
 
     with pytest.raises(ValueError, match="run_id"):
-        prepare_runner_input_data(
+        prepare_run_input(
             input_data,
             run_id="run-runtime-config",
             workflow="issue-review",

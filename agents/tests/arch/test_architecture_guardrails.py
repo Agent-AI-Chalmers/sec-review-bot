@@ -115,10 +115,10 @@ def test_issue_workflow_variants_stay_in_their_own_modules() -> None:
     assert main_class_definitions.isdisjoint(variant_modules.values())
 
 
-def test_workflow_input_preparation_is_a_single_runner_module() -> None:
-    assert (PACKAGE_ROOT / "runner" / "input_preparation.py").is_file()
-    assert not (PACKAGE_ROOT / "runner" / "inputs").exists()
-    assert not (PACKAGE_ROOT / "runner" / "input_normalization.py").exists()
+def test_workflow_input_preparation_is_a_single_entrypoints_module() -> None:
+    assert (PACKAGE_ROOT / "entrypoints" / "input_preparation.py").is_file()
+    assert not (PACKAGE_ROOT / "entrypoints" / "inputs").exists()
+    assert not (PACKAGE_ROOT / "entrypoints" / "input_normalization.py").exists()
 
 
 def test_local_materialization_is_cli_only() -> None:

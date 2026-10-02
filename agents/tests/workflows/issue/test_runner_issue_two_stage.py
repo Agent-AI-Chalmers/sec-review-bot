@@ -1,4 +1,4 @@
-from sec_review_agents.runner.core import is_supported_workflow
+from sec_review_agents.entrypoints.run_protocol import is_supported_workflow
 
 
 def test_issue_review_two_stage_is_not_public_runner_workflow() -> None:

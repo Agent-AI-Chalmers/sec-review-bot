@@ -1,10 +1,12 @@
+"""Prepare a Runner request and dispatch it to the matching review workflow."""
+
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
 from temporalio import activity, workflow
 
-from sec_review_agents.runner.core import (
+from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_REQUEST_INVALID,
     RUNNER_WORKFLOW_UNSUPPORTED,
 )
@@ -28,24 +30,15 @@ class RunnerExecutionRequest:
     runtime: Any = None
 
 
-_CHILD_WORKFLOW_ID_SUFFIXES = {
-    "issue-review": "issue-review",
-    "pull-request-review": "pull-request-review",
-    "repository-review": "repository-review",
-}
-
-
 @activity.defn
 def prepare_runner_run_activity(request: RunnerExecutionRequest) -> dict[str, Any]:
+    from sec_review_agents.entrypoints.input_preparation import prepare_run_input
+    from sec_review_agents.entrypoints.run_protocol import build_runner_error
     from sec_review_agents.observability.diagnostics import (
         bind_workflow_context,
         log_diagnostic,
     )
     from sec_review_agents.observability.trace_context import clear_trace_context
-    from sec_review_agents.runner.core import (
-        build_runner_error,
-        prepare_runner_input_data,
-    )
     from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 
     try:
@@ -59,7 +52,7 @@ def prepare_runner_run_activity(request: RunnerExecutionRequest) -> dict[str, An
             "ok": True,
             "workflow": request.workflow,
             "run_id": request.run_id,
-            "prepared_input": prepare_runner_input_data(
+            "prepared_input": prepare_run_input(
                 request.input_data,
                 run_id=request.run_id,
                 workflow=request.workflow,
@@ -140,8 +133,7 @@ class RunnerExecutionWorkflow:
 
 
 def _child_workflow_id(request: RunnerExecutionRequest) -> str:
-    suffix = _CHILD_WORKFLOW_ID_SUFFIXES.get(request.workflow, request.workflow)
-    return f"{request.run_id}:{suffix}"
+    return f"{request.run_id}:{request.workflow}"
 
 
 __all__ = [

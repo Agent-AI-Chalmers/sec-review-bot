@@ -1,3 +1,3 @@
-"""CLI entrypoints for sec_review_agents."""
+"""Local development and operator commands."""
 
 __all__: list[str] = []
