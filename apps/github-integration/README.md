@@ -234,7 +234,7 @@ The three tables record separate concerns:
 | `publications` | Publication ownership | `pending`, `publishing`, `published`, `failed`, `not_required` |
 | `publication_steps` | One GitHub side effect | `pending`, `running`, `succeeded`, `failed`, `terminal_failed` |
 
-`ReviewRunStatus` is only the merged store/diagnostics projection; it is not a database column, and step status is not merged into it.
+`ReviewRunStatus` is only the merged store projection; it is not a database column, and step status is not merged into it.
 
 ```mermaid
 flowchart LR
@@ -265,33 +265,6 @@ Retryable publication failures return the publication to pending. Only the faile
 For repository publication, a deterministic failure terminates only the current delivery. A transient failure resumes from unfinished steps on the next pass. The summary is published after all delivery steps finish and links only successful deliveries.
 
 > Current retry behavior is simple: the background publisher polls immediately on startup, then every `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` milliseconds, defaulting to 15 seconds. There is no exponential backoff scheduler yet.
-
-## Review Run Diagnostics Tool
-
-`tools/runner-run-diagnostics.ts` is a read-only operations CLI packaged as `sec-review-review-runs`. It reads PostgreSQL and renders table or JSON output; it does not change business state.
-
-After `pnpm install` and `pnpm run build`, run:
-
-```bash
-sec-review-review-runs --limit 20
-sec-review-review-runs --active-only
-sec-review-review-runs --failed-only --json
-sec-review-review-runs --status publishing
-```
-
-The table and JSON output keep Runner failure, publication failure, and failed publication steps separate. This avoids attributing an agent execution failure to GitHub publication or hiding which delivery exhausted its retry budget.
-
-The command reads the PostgreSQL review run coordination store. Important columns:
-
-| Column | Meaning |
-| --- | --- |
-| `active` | The integration will still process the run. |
-| `terminal` | The run needs no further integration work. |
-| `runner_status` / `publication_status` | Runner observation and overall publication state; they answer different questions. |
-| `runner_failure` / `publication_failure` | Whether the recorded failure belongs to Runner execution or GitHub publication. |
-| `step_failures` | The individual failed publication steps, such as a delivery or summary step. |
-
-`PREPARATION_INTERRUPTED` means the process stopped while preparing an admitted run. Replaying the same ingress request restarts that preparation under the original `run_id`. `SUBMISSION_STATE_UNCERTAIN` means Runner submission may have succeeded, but the transition to `queued` was not stored. The background publisher safely repeats the persisted idempotent submission with the same `run_id` and request fingerprint; it never rebuilds the bundle.
 
 ## GitHub REST API Version
 

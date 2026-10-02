@@ -267,16 +267,3 @@ test('ReviewRunStore renews a publication claim before another owner can take it
     await Promise.all([ownerA.close(), ownerB.close()])
   }
 })
-
-test('ReviewRunStore applies diagnostics filters before the limit', async () => {
-  const store = await createStore()
-  const failedRunId = await createQueuedRun(store)
-  await store.failRunnerExecution(failedRunId, { code: 'RUNNER_EXECUTION_FAILED', message: 'failed' })
-  const successfulRunId = await createQueuedRun(store)
-  try {
-    const failed = await store.listRunsForDiagnostics({ failed_only: true, limit: 1 })
-    assert.deepEqual(failed.map(run => run.run_id), [failedRunId])
-    const queued = await store.listRunsForDiagnostics({ status: 'queued', limit: 1 })
-    assert.deepEqual(queued.map(run => run.run_id), [successfulRunId])
-  } finally { await store.close() }
-})
