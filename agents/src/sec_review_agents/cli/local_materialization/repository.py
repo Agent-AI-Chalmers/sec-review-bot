@@ -270,7 +270,6 @@ def build_local_repository_security_bundle(
         )
 
     scan_scope = {
-        "max_file_bytes": 200_000,
         "paths_ignore": resolved_paths_ignore,
         "incremental_changed_files": [
             {

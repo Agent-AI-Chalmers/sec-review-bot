@@ -97,6 +97,8 @@ async def main() -> None:
         chunk_results=chunk_results,
         scan_mode=str(manifest["scan_mode"]),
         chunk_target_tokens=int(manifest["chunk_target_tokens"]),
+        chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
+        chunk_strategy=str(manifest["chunk_strategy"]),
         discovery_artifacts_path=manifest["discovery_artifacts_path"],
     )
 

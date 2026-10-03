@@ -12,7 +12,6 @@ export interface RepositoryScanTarget {
 }
 
 export interface RepositoryScanScope {
-  max_file_bytes: number
   paths_ignore: string[]
   incremental_changed_files: Array<{
     path: string

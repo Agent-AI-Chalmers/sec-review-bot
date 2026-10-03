@@ -216,7 +216,7 @@ test('submitRunnerRun rejects schema-invalid input before dispatch', async () =>
       run_id: 'run-1',
       input: contractFixture(
         'v4',
-        'invalid-repository-review-input-zero-max-file-bytes.json'
+        'invalid-repository-review-input-max-file-bytes.json'
       ) as Record<string, unknown>
     }),
     /does not match contract v4/

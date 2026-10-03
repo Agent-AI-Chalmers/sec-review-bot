@@ -54,7 +54,6 @@ Repository scan scope:
 
 ```ts
 interface RepositoryScanScope {
-  max_file_bytes: number
   paths_ignore: string[]
   incremental_changed_files: Array<{
     path: string
@@ -138,7 +137,7 @@ Each workflow also requires:
 | Object | Required fields |
 | --- | --- |
 | `scan_target` | `target_branch`; `default_branch`; `event_type`; `scan_mode`; `base_sha`; `head_sha`; `commit_shas` |
-| `scan_scope` | `max_file_bytes`; `paths_ignore`; `incremental_changed_files` |
+| `scan_scope` | `paths_ignore`; `incremental_changed_files` |
 
 The `scan_mode` selects the window shape:
 

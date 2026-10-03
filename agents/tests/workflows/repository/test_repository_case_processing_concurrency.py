@@ -461,6 +461,7 @@ async def test_repository_discovery_workflow_refills_chunk_window() -> None:
                 {"chunk_id": "discovery-chunk-0003"},
             ],
             "chunk_target_tokens": 100_000,
+            "chunk_hard_limit_tokens": 500_000,
             "max_concurrency": 2,
             "scan_mode": "full",
         }

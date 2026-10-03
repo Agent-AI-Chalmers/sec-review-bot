@@ -122,7 +122,7 @@ def test_create_run_rejects_schema_invalid_input_before_start(monkeypatch) -> No
         json={
             "run_id": "run-service",
             "input": contract_fixture(
-                "v4", "invalid-repository-review-input-zero-max-file-bytes.json"
+                "v4", "invalid-repository-review-input-max-file-bytes.json"
             ),
         },
     )

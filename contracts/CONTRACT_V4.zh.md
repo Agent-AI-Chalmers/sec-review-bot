@@ -56,7 +56,6 @@ Repository scan scope：
 
 ```ts
 interface RepositoryScanScope {
-  max_file_bytes: number
   paths_ignore: string[]
   incremental_changed_files: Array<{
     path: string
@@ -140,7 +139,7 @@ runner 会在进程边界校验 input。所有 workflow 都需要这些共同字
 | 对象 | 必填字段 |
 | --- | --- |
 | `scan_target` | `target_branch`; `default_branch`; `event_type`; `scan_mode`; `base_sha`; `head_sha`; `commit_shas` |
-| `scan_scope` | `max_file_bytes`; `paths_ignore`; `incremental_changed_files` |
+| `scan_scope` | `paths_ignore`; `incremental_changed_files` |
 
 `scan_mode` 决定窗口形状：
 

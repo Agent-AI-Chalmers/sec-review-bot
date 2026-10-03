@@ -371,15 +371,10 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "max_file_bytes",
         "paths_ignore",
         "incremental_changed_files"
       ],
       "properties": {
-        "max_file_bytes": {
-          "type": "integer",
-          "minimum": 1
-        },
         "paths_ignore": {
           "type": "array",
           "items": {

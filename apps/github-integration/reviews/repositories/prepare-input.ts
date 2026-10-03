@@ -224,7 +224,6 @@ export async function prepareRepositoryReviewInput ({
       commit_shas: commitShasForScanTarget
     },
     scan_scope: {
-      max_file_bytes: 200000,
       paths_ignore: Array.isArray(paths_ignore) ? paths_ignore : [],
       incremental_changed_files: Array.isArray(changedFilesForScanScope)
         ? changedFilesForScanScope.map((item) => ({

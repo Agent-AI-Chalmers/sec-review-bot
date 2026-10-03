@@ -14,7 +14,7 @@
     "commit_shas": []
   },
   "scan_scope": {
-    "max_file_bytes": 0,
+    "max_file_bytes": 200000,
     "paths_ignore": [],
     "incremental_changed_files": []
   }

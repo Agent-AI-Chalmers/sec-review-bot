@@ -16,7 +16,6 @@
     ]
   },
   "scan_scope": {
-    "max_file_bytes": 200000,
     "paths_ignore": [
       "dist/**"
     ],
