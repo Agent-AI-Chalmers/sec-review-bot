@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from sec_review_agents.filesystem.command_output import combine_command_output
+from sec_review_agents.filesystem.limits import DEFAULT_COMMAND_TIMEOUT_MS
 from sec_review_agents.utils.env import env_value, parse_bool_env, parse_int_env
 
 DEFAULT_DOCKER_SANDBOX_IMAGE = "mcr.microsoft.com/devcontainers/universal:6-noble"
@@ -39,6 +40,17 @@ class DockerMount:
     host_path: str
     container_path: str
     writable: bool
+
+    def __post_init__(self) -> None:
+        for field_name in ("host_path", "container_path"):
+            value = getattr(self, field_name)
+            if not value:
+                raise ValueError(f"DockerMount.{field_name} must be non-empty.")
+            if "," in value or "\0" in value:
+                raise ValueError(
+                    f"DockerMount.{field_name} cannot be safely encoded in a "
+                    "Docker --mount specification."
+                )
 
 
 @dataclass
@@ -147,7 +159,10 @@ def create_docker_container_resource(
         auto_remove=parse_bool_env(env_value("AGENT_DOCKER_AUTO_REMOVE"), True),
         network_mode=env_value("AGENT_DOCKER_NETWORK_MODE") or "none",
         user=env_value("AGENT_DOCKER_USER") or None,
-        timeout_ms=parse_int_env(env_value("AGENT_DOCKER_COMMAND_TIMEOUT_MS")),
+        timeout_ms=parse_int_env(
+            env_value("AGENT_COMMAND_TIMEOUT_MS"),
+            DEFAULT_COMMAND_TIMEOUT_MS,
+        ),
     )
 
 

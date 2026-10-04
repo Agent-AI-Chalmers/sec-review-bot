@@ -19,6 +19,7 @@ from sec_review_agents.filesystem.bwrap_runtime import (
     BWRAP_NETWORK_INHERIT,
     is_bwrap_runtime_available,
 )
+from sec_review_agents.filesystem.limits import DEFAULT_COMMAND_TIMEOUT_MS
 
 
 def _backend(root: Path, *, writable: bool = True) -> BwrapSandboxBackend:
@@ -33,6 +34,40 @@ def _backend(root: Path, *, writable: bool = True) -> BwrapSandboxBackend:
         bwrap_bin="/usr/bin/bwrap",
         command_timeout_ms=1000,
     )
+
+
+def test_backend_uses_shared_default_command_timeout(tmp_path: Path) -> None:
+    with patch.dict("os.environ", {}, clear=True):
+        backend = BwrapSandboxBackend(
+            routes=[
+                BwrapRoute(
+                    host_path=tmp_path,
+                    agent_path="/workspace",
+                    writable=True,
+                )
+            ],
+            bwrap_bin="/usr/bin/bwrap",
+        )
+
+    assert backend.command_timeout_ms == DEFAULT_COMMAND_TIMEOUT_MS
+
+
+def test_backend_command_timeout_uses_shared_environment_override(
+    tmp_path: Path,
+) -> None:
+    with patch.dict("os.environ", {"AGENT_COMMAND_TIMEOUT_MS": "1234"}, clear=True):
+        backend = BwrapSandboxBackend(
+            routes=[
+                BwrapRoute(
+                    host_path=tmp_path,
+                    agent_path="/workspace",
+                    writable=True,
+                )
+            ],
+            bwrap_bin="/usr/bin/bwrap",
+        )
+
+    assert backend.command_timeout_ms == 1234
 
 
 def test_execute_uses_basic_bwrap_with_network_isolated(tmp_path: Path) -> None:

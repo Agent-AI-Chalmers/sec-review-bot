@@ -86,6 +86,26 @@ def test_basic_options_exclude_bwrap_binary() -> None:
     assert "/usr/bin/bwrap" not in options
 
 
+def test_basic_options_clear_worker_environment() -> None:
+    options = basic_bwrap_options(working_directory="/workspace")
+
+    assert "--clearenv" in options
+    restored_environment = {
+        options[index + 1]: options[index + 2]
+        for index, value in enumerate(options)
+        if value == "--setenv"
+    }
+    assert restored_environment == {
+        "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "HOME": "/tmp",
+        "TMPDIR": "/tmp",
+        "LANG": "C.UTF-8",
+    }
+    assert "OPENAI_API_KEY" not in restored_environment
+    assert "HTTPS_PROXY" not in restored_environment
+    assert "PYTHONPATH" not in restored_environment
+
+
 def test_basic_args_can_explicitly_inherit_network() -> None:
     args = basic_bwrap_args(
         bwrap_bin="/usr/bin/bwrap",

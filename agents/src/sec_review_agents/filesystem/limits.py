@@ -34,6 +34,10 @@ DEFAULT_IGNORED_DIRS = frozenset(
     }
 )
 
+# One default applies to every execution-capable filesystem backend. Backend-
+# specific environment variables may still override it for deployment needs.
+DEFAULT_COMMAND_TIMEOUT_MS = 10 * 60 * 1000
+
 
 @dataclass(frozen=True)
 class FilesystemLimits:
