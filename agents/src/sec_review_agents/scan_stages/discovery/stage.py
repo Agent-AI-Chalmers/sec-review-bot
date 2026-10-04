@@ -213,9 +213,13 @@ def _resolve_discovery_max_file_bytes() -> tuple[int, str]:
 
 
 def _resolve_discovery_chunk_strategy() -> str:
-    strategy = os.environ.get(
-        "AGENT_DISCOVERY_CHUNK_STRATEGY", DEFAULT_DISCOVERY_CHUNK_STRATEGY
-    ).strip().lower()
+    strategy = (
+        os.environ.get(
+            "AGENT_DISCOVERY_CHUNK_STRATEGY", DEFAULT_DISCOVERY_CHUNK_STRATEGY
+        )
+        .strip()
+        .lower()
+    )
     if strategy not in {"batched", "single-file"}:
         raise ValueError(
             "AGENT_DISCOVERY_CHUNK_STRATEGY must be 'batched' or 'single-file'."
@@ -645,11 +649,7 @@ def discovery_chunk_token_limits(
         "repository-discovery"
     )
     numerator, denominator = target_ratio
-    if (
-        numerator <= 0
-        or denominator <= 0
-        or numerator * 5 > denominator * 4
-    ):
+    if numerator <= 0 or denominator <= 0 or numerator * 5 > denominator * 4:
         raise ValueError("Discovery chunk target ratio must be between 0 and 4/5.")
     target_tokens = deployment_limit_tokens * numerator // denominator
     # Keep room for runtime-added schemas, skills, tool turns, and tokenizer

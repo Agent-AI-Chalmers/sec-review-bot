@@ -354,9 +354,9 @@ def test_discovery_chunk_packing_stops_before_target_overflow(tmp_path: Path) ->
         chunks, skipped = discovery_stage._pack_discovery_chunks(
             entries=entries,
             root=root,
-                target_tokens=50,
-                hard_limit_tokens=250,
-                strategy="batched",
+            target_tokens=50,
+            hard_limit_tokens=250,
+            strategy="batched",
         )
 
     assert skipped == []
