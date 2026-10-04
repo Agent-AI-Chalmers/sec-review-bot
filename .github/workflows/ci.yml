@@ -139,6 +139,12 @@ jobs:
           DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
         run: pnpm test
 
+      - name: Integration test
+        env:
+          TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
+          DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
+        run: pnpm run test:integration
+
   agents:
     name: Agents
     needs: changes

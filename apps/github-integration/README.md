@@ -26,7 +26,18 @@ pnpm run dev
 pnpm run server
 pnpm run lint
 pnpm run build
+pnpm test
 ```
+
+`pnpm test` runs tests that do not require external services. PostgreSQL-backed
+runner tests are kept as an explicit integration suite:
+
+```bash
+TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
+DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
+pnpm run test:integration
+```
+
 
 ## Local Receiver
 
