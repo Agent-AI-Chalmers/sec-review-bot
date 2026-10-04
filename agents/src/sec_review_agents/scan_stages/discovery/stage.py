@@ -70,6 +70,18 @@ TEXT_LIKE_EXTENSIONS = {
     ".yaml",
     ".yml",
 }
+# Discovery is intentionally denylist-based: unknown and uncommon source formats
+# remain scannable, while kinds that are clearly prose or tabular output do not
+# consume an initial model call without evidence linking them to code behavior.
+EXCLUDED_DISCOVERY_EXTENSIONS = {
+    ".csv",
+    ".log",
+    ".md",
+    ".rst",
+    ".text",
+    ".tsv",
+    ".txt",
+}
 EXCLUDED_DIR_NAMES = {
     ".git",
     ".hg",
@@ -89,6 +101,9 @@ EXCLUDED_DIR_NAMES = {
     "vendor",
 }
 DEFAULT_DISCOVERY_MAX_CONCURRENCY = 1
+DEFAULT_DISCOVERY_CHUNK_STRATEGY = "single-file"
+# This is a host-side safety limit for bounded reads and prompt preparation. It
+# is independent of the deployment token limits that decide model input fit.
 DEFAULT_DISCOVERY_MAX_FILE_BYTES = 262_144
 GROUNDED_STATUS = "grounded"
 NEEDS_GROUNDING_STATUS = "needs-grounding"
@@ -138,6 +153,8 @@ def _classify_candidate_file(relative_path: Path) -> tuple[bool, str, str]:
     parts = relative_path.parts
     if any(part in EXCLUDED_DIR_NAMES for part in parts[:-1]):
         return False, "excluded-directory", _path_language(relative_path)
+    if relative_path.suffix.lower() in EXCLUDED_DISCOVERY_EXTENSIONS:
+        return False, "excluded-discovery-kind", _path_language(relative_path)
     return True, "text-candidate", _path_language(relative_path)
 
 
@@ -185,20 +202,29 @@ def _matches_paths_ignore(relative_path: Path, patterns: list[str]) -> bool:
     return False
 
 
-def _resolve_discovery_max_file_bytes(
-    scan_scope: dict[str, Any],
-) -> tuple[int, str]:
-    configured_value = scan_scope.get("max_file_bytes")
-    configured_max_file_bytes = parse_int_env(configured_value, None)
+def _resolve_discovery_max_file_bytes() -> tuple[int, str]:
     env_max_file_bytes = parse_int_env(
         os.environ.get("AGENT_DISCOVERY_MAX_FILE_BYTES"), None
     )
 
-    if configured_max_file_bytes is not None:
-        return max(0, configured_max_file_bytes), "scan_scope.max_file_bytes"
     if env_max_file_bytes is not None:
         return max(0, env_max_file_bytes), "AGENT_DISCOVERY_MAX_FILE_BYTES"
     return DEFAULT_DISCOVERY_MAX_FILE_BYTES, "default"
+
+
+def _resolve_discovery_chunk_strategy() -> str:
+    strategy = (
+        os.environ.get(
+            "AGENT_DISCOVERY_CHUNK_STRATEGY", DEFAULT_DISCOVERY_CHUNK_STRATEGY
+        )
+        .strip()
+        .lower()
+    )
+    if strategy not in {"batched", "single-file"}:
+        raise ValueError(
+            "AGENT_DISCOVERY_CHUNK_STRATEGY must be 'batched' or 'single-file'."
+        )
+    return strategy
 
 
 def _build_scan_manifest(
@@ -207,9 +233,7 @@ def _build_scan_manifest(
     scan_scope: dict[str, Any],
     discovery_artifacts_path: Path,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes(
-        scan_scope
-    )
+    max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes()
     paths_ignore = _normalize_paths_ignore(scan_scope.get("paths_ignore"))
     entries: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
@@ -227,15 +251,6 @@ def _build_scan_manifest(
             )
             size_bytes = absolute_path.stat().st_size
 
-            if max_file_bytes > 0 and size_bytes > max_file_bytes:
-                skipped.append(
-                    {
-                        "path": relative_path_text,
-                        "reason": "oversized",
-                        "size_bytes": size_bytes,
-                    }
-                )
-                continue
             if _matches_paths_ignore(relative_path, paths_ignore):
                 skipped.append(
                     {
@@ -250,6 +265,15 @@ def _build_scan_manifest(
                     {
                         "path": relative_path_text,
                         "reason": include_reason,
+                        "size_bytes": size_bytes,
+                    }
+                )
+                continue
+            if max_file_bytes > 0 and size_bytes > max_file_bytes:
+                skipped.append(
+                    {
+                        "path": relative_path_text,
+                        "reason": "oversized",
                         "size_bytes": size_bytes,
                     }
                 )
@@ -408,9 +432,7 @@ def _build_incremental_scan_manifest(
     changed_files: Sequence[Mapping[str, Any]],
     discovery_artifacts_path: Path,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes(
-        scan_scope
-    )
+    max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes()
     paths_ignore = _normalize_paths_ignore(scan_scope.get("paths_ignore"))
 
     entries: list[dict[str, Any]] = []
@@ -617,13 +639,22 @@ def _normalize_candidate(
 #########################################################################
 # ====================== Chunked LLM Scan Execution ======================
 #########################################################################
-def discovery_chunk_target_tokens() -> int:
+def discovery_chunk_token_limits(
+    target_ratio: tuple[int, int] = (1, 5),
+) -> tuple[int, int, int]:
     # Limit the initial repository payload to 20% of the model input window.
     # The remaining context absorbs tokenizer error, runtime-added schemas and
     # skill guidance, tool turns, and the attention loss seen in very long inputs.
-    target_tokens = (
-        resolve_bound_deployment_max_input_tokens("repository-discovery") // 5
+    deployment_limit_tokens = resolve_bound_deployment_max_input_tokens(
+        "repository-discovery"
     )
+    numerator, denominator = target_ratio
+    if numerator <= 0 or denominator <= 0 or numerator * 5 > denominator * 4:
+        raise ValueError("Discovery chunk target ratio must be between 0 and 4/5.")
+    target_tokens = deployment_limit_tokens * numerator // denominator
+    # Keep room for runtime-added schemas, skills, tool turns, and tokenizer
+    # estimation error when admitting a large single-file payload.
+    hard_limit_tokens = deployment_limit_tokens * 4 // 5
     system_prompt_tokens = count_tokens_approximately(
         [
             {
@@ -634,10 +665,10 @@ def discovery_chunk_target_tokens() -> int:
     )
     if target_tokens <= system_prompt_tokens:
         raise ValueError(
-            "Repository discovery requires 20% of the selected deployment input "
-            "limit to exceed the discovery system prompt size."
+            "Repository discovery requires the selected chunk target to exceed "
+            "the discovery system prompt size."
         )
-    return target_tokens
+    return deployment_limit_tokens, target_tokens, hard_limit_tokens
 
 
 def _estimate_discovery_prompt_tokens(
@@ -666,6 +697,8 @@ def _pack_discovery_chunks(
     entries: Sequence[Mapping[str, Any]],
     root: Path,
     target_tokens: int,
+    hard_limit_tokens: int,
+    strategy: str = DEFAULT_DISCOVERY_CHUNK_STRATEGY,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     chunks: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
@@ -701,6 +734,32 @@ def _pack_discovery_chunks(
             )
             continue
 
+        if strategy == "single-file":
+            candidate_tokens = _estimate_discovery_prompt_tokens(
+                chunk_id=f"discovery-chunk-{len(chunks) + 1:04d}",
+                entries=[entry],
+                sources={path: content},
+            )
+            if candidate_tokens > hard_limit_tokens:
+                skipped.append(
+                    {
+                        "path": path,
+                        "reason": "token-budget-exceeded",
+                        "size_bytes": entry["size_bytes"],
+                        "token_count": candidate_tokens,
+                        "hard_limit_tokens": hard_limit_tokens,
+                    }
+                )
+                continue
+            chunks.append(
+                {
+                    "chunk_id": f"discovery-chunk-{len(chunks) + 1:04d}",
+                    "entries": [dict(entry)],
+                    "token_count": candidate_tokens,
+                }
+            )
+            continue
+
         chunk_id = f"discovery-chunk-{len(chunks) + 1:04d}"
         candidate_entries = [*current_entries, entry]
         candidate_sources = {**current_sources, path: content}
@@ -719,14 +778,16 @@ def _pack_discovery_chunks(
                 entries=candidate_entries,
                 sources=candidate_sources,
             )
-        if not current_entries and candidate_tokens > target_tokens:
+        # The target controls ordinary multi-file chunk size. A complete single
+        # file may exceed it; only the deployment input limit makes it unscannable.
+        if not current_entries and candidate_tokens > hard_limit_tokens:
             skipped.append(
                 {
                     "path": path,
                     "reason": "token-budget-exceeded",
                     "size_bytes": entry["size_bytes"],
                     "token_count": candidate_tokens,
-                    "target_tokens": target_tokens,
+                    "hard_limit_tokens": hard_limit_tokens,
                 }
             )
             continue
@@ -854,7 +915,11 @@ def build_discovery_result_from_chunks(
     chunks: Sequence[Mapping[str, Any]],
     chunk_results: Sequence[Mapping[str, Any]],
     scan_mode: str,
+    deployment_input_limit_tokens: int,
     chunk_target_tokens: int,
+    chunk_target_ratio: str,
+    chunk_hard_limit_tokens: int,
+    chunk_strategy: str = DEFAULT_DISCOVERY_CHUNK_STRATEGY,
     discovery_artifacts_path: Path,
     started_at: float | None = None,
 ) -> DiscoveryResult:
@@ -877,7 +942,11 @@ def build_discovery_result_from_chunks(
         "metadata": {
             "scan_mode": scan_mode,
             "discovery_concurrency": discovery_concurrency,
+            "discovery_deployment_input_limit_tokens": deployment_input_limit_tokens,
             "discovery_chunk_target_tokens": chunk_target_tokens,
+            "discovery_chunk_target_ratio": chunk_target_ratio,
+            "discovery_chunk_hard_limit_tokens": chunk_hard_limit_tokens,
+            "discovery_chunk_strategy": chunk_strategy,
             "discovery_chunk_count": len(chunks),
         },
         "counts": {
@@ -913,6 +982,8 @@ def prepare_discovery_chunks(
     scan_mode: str,
     scan_scope: dict[str, Any],
     discovery_artifacts_path: Path,
+    chunk_target_ratio: tuple[int, int] = (1, 5),
+    chunk_strategy: str | None = None,
 ) -> dict[str, Any]:
     reset_stage_attempt_artifacts(
         discovery_artifacts_path,
@@ -936,11 +1007,21 @@ def prepare_discovery_chunks(
             discovery_artifacts_path=discovery_artifacts_path,
         )
 
-    chunk_target_tokens = discovery_chunk_target_tokens()
+    (
+        deployment_input_limit_tokens,
+        chunk_target_tokens,
+        chunk_hard_limit_tokens,
+    ) = discovery_chunk_token_limits(chunk_target_ratio)
+    resolved_chunk_strategy = chunk_strategy or _resolve_discovery_chunk_strategy()
+    if resolved_chunk_strategy not in {"batched", "single-file"}:
+        raise ValueError("Discovery chunk strategy must be 'batched' or 'single-file'.")
+    chunk_target_ratio_text = f"{chunk_target_ratio[0]}/{chunk_target_ratio[1]}"
     chunks, chunk_skipped_files = _pack_discovery_chunks(
         entries=entries,
         root=workspace_root,
         target_tokens=chunk_target_tokens,
+        hard_limit_tokens=chunk_hard_limit_tokens,
+        strategy=resolved_chunk_strategy,
     )
     skipped_files.extend(chunk_skipped_files)
     persist_json(
@@ -948,7 +1029,11 @@ def prepare_discovery_chunks(
         "discovery-chunks.json",
         {
             "metadata": {
+                "deployment_input_limit_tokens": deployment_input_limit_tokens,
                 "chunk_target_tokens": chunk_target_tokens,
+                "chunk_target_ratio": chunk_target_ratio_text,
+                "chunk_hard_limit_tokens": chunk_hard_limit_tokens,
+                "chunk_strategy": resolved_chunk_strategy,
             },
             "counts": {
                 "chunk_count": len(chunks),
@@ -964,6 +1049,10 @@ def prepare_discovery_chunks(
         "entries": entries,
         "skipped_files": skipped_files,
         "chunks": chunks,
+        "deployment_input_limit_tokens": deployment_input_limit_tokens,
         "chunk_target_tokens": chunk_target_tokens,
+        "chunk_target_ratio": chunk_target_ratio_text,
+        "chunk_hard_limit_tokens": chunk_hard_limit_tokens,
+        "chunk_strategy": resolved_chunk_strategy,
         "max_concurrency": _resolve_discovery_max_concurrency(len(chunks)),
     }

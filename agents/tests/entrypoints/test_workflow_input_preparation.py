@@ -82,7 +82,6 @@ def _repository_scan_target(overrides: dict[str, Any] | None = None) -> dict[str
 
 def _repository_scan_scope(overrides: dict[str, Any] | None = None) -> dict[str, Any]:
     scan_scope: dict[str, Any] = {
-        "max_file_bytes": 200000,
         "paths_ignore": [],
         "incremental_changed_files": [],
     }

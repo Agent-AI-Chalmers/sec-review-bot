@@ -232,15 +232,71 @@ async def test_scan_chunk_uses_current_trace_context(tmp_path: Path) -> None:
     assert result["file_results"][0]["candidate_count"] == 0
 
 
-def test_discovery_chunk_token_budget_uses_one_fifth_deployment_context() -> None:
+def test_discovery_chunk_token_limits_use_bound_deployment_context() -> None:
     with patch(
         "sec_review_agents.scan_stages.discovery.stage.resolve_bound_deployment_max_input_tokens",
         return_value=200_001,
     ) as resolve_limit:
-        target_tokens = discovery_stage.discovery_chunk_target_tokens()
+        deployment_limit_tokens, target_tokens, hard_limit_tokens = (
+            discovery_stage.discovery_chunk_token_limits()
+        )
 
+    assert deployment_limit_tokens == 200_001
     assert target_tokens == 40_000
+    assert hard_limit_tokens == 160_000
     resolve_limit.assert_called_once_with("repository-discovery")
+
+
+def test_discovery_artifacts_record_target_and_hard_token_limits(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    artifacts = tmp_path / "artifacts"
+    workspace.mkdir()
+
+    with patch.object(
+        discovery_stage,
+        "discovery_chunk_token_limits",
+        return_value=(250_000, 50_000, 200_000),
+    ):
+        manifest = discovery_stage.prepare_discovery_chunks(
+            workspace_root=workspace,
+            scan_mode="full",
+            scan_scope={"paths_ignore": []},
+            discovery_artifacts_path=artifacts,
+        )
+
+    chunks_artifact = json.loads(
+        (artifacts / "discovery-chunks.json").read_text(encoding="utf-8")
+    )
+    assert manifest["deployment_input_limit_tokens"] == 250_000
+    assert manifest["chunk_target_tokens"] == 50_000
+    assert manifest["chunk_target_ratio"] == "1/5"
+    assert manifest["chunk_hard_limit_tokens"] == 200_000
+    assert chunks_artifact["metadata"] == {
+        "deployment_input_limit_tokens": 250_000,
+        "chunk_target_tokens": 50_000,
+        "chunk_target_ratio": "1/5",
+        "chunk_hard_limit_tokens": 200_000,
+        "chunk_strategy": "single-file",
+    }
+
+    result = discovery_stage.build_discovery_result_from_chunks(
+        entries=[],
+        skipped_files=[],
+        chunks=[],
+        chunk_results=[],
+        scan_mode="full",
+        deployment_input_limit_tokens=250_000,
+        chunk_target_tokens=50_000,
+        chunk_target_ratio="1/5",
+        chunk_hard_limit_tokens=200_000,
+        discovery_artifacts_path=artifacts,
+    )
+    assert result["metadata"]["discovery_deployment_input_limit_tokens"] == 250_000
+    assert result["metadata"]["discovery_chunk_target_tokens"] == 50_000
+    assert result["metadata"]["discovery_chunk_target_ratio"] == "1/5"
+    assert result["metadata"]["discovery_chunk_hard_limit_tokens"] == 200_000
 
 
 def test_discovery_chunk_token_budget_rejects_limit_below_system_prompt() -> None:
@@ -252,7 +308,19 @@ def test_discovery_chunk_token_budget_rejects_limit_below_system_prompt() -> Non
         ),
         pytest.raises(ValueError, match="exceed the discovery system prompt size"),
     ):
-        discovery_stage.discovery_chunk_target_tokens()
+        discovery_stage.discovery_chunk_token_limits()
+
+
+def test_discovery_chunk_token_limits_accept_experiment_ratio() -> None:
+    with patch(
+        "sec_review_agents.scan_stages.discovery.stage.resolve_bound_deployment_max_input_tokens",
+        return_value=300_000,
+    ):
+        deployment_limit, target, hard_limit = (
+            discovery_stage.discovery_chunk_token_limits((1, 3))
+        )
+
+    assert (deployment_limit, target, hard_limit) == (300_000, 100_000, 240_000)
 
 
 def test_discovery_chunk_packing_stops_before_target_overflow(tmp_path: Path) -> None:
@@ -287,6 +355,8 @@ def test_discovery_chunk_packing_stops_before_target_overflow(tmp_path: Path) ->
             entries=entries,
             root=root,
             target_tokens=50,
+            hard_limit_tokens=250,
+            strategy="batched",
         )
 
     assert skipped == []
@@ -296,7 +366,7 @@ def test_discovery_chunk_packing_stops_before_target_overflow(tmp_path: Path) ->
     ]
 
 
-def test_discovery_chunk_packing_skips_single_file_over_token_budget(
+def test_discovery_chunk_packing_keeps_single_file_over_target(
     tmp_path: Path,
 ) -> None:
     root = tmp_path
@@ -320,6 +390,40 @@ def test_discovery_chunk_packing_skips_single_file_over_token_budget(
             entries=entries,
             root=root,
             target_tokens=100,
+            hard_limit_tokens=500,
+        )
+
+    assert skipped == []
+    assert [[entry["path"] for entry in chunk["entries"]] for chunk in chunks] == [
+        ["src/large.py"]
+    ]
+
+
+def test_discovery_chunk_packing_skips_single_file_over_hard_limit(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path
+    path = root / "src" / "large.py"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("x" * 100, encoding="utf-8")
+    entries = [
+        {
+            "path": "src/large.py",
+            "language": "python",
+            "size_bytes": 100,
+            "include_reason": "text-candidate",
+        }
+    ]
+
+    with patch(
+        "sec_review_agents.scan_stages.discovery.stage._estimate_discovery_prompt_tokens",
+        return_value=501,
+    ):
+        chunks, skipped = discovery_stage._pack_discovery_chunks(
+            entries=entries,
+            root=root,
+            target_tokens=100,
+            hard_limit_tokens=500,
         )
 
     assert chunks == []
@@ -328,7 +432,7 @@ def test_discovery_chunk_packing_skips_single_file_over_token_budget(
             "path": "src/large.py",
             "reason": "token-budget-exceeded",
             "size_bytes": 100,
-            "token_count": 101,
-            "target_tokens": 100,
+            "token_count": 501,
+            "hard_limit_tokens": 500,
         }
     ]

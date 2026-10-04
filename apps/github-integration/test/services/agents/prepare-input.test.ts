@@ -293,6 +293,7 @@ test('repository input preparer writes full and incremental runner bundles', { c
       runId: full.run_id
     })
     assert.equal(full.input.scan_target.scan_mode, 'full')
+    assert.equal('max_file_bytes' in full.input.scan_scope, false)
     assert.equal('repo_full_name' in full.input.scan_target, false)
     assert.equal('repository' in full.input, false)
     const fullManifest = JSON.parse(await fs.readFile(path.join(full.input_bundle_root, 'manifest.json'), 'utf8')) as Record<string, unknown>

@@ -34,7 +34,6 @@ def _input_data(root: Path, paths_ignore: list[str]) -> dict[str, Any]:
         "input_bundle_root_path": str(local_root),
         "artifact_paths": {"discovery": str(run_artifacts / "discovery")},
         "scan_scope": {
-            "max_file_bytes": 200_000,
             "paths_ignore": paths_ignore,
         },
     }
@@ -98,7 +97,6 @@ def test_incremental_scan_manifest_scans_only_changed_files(tmp_path: Path) -> N
         "input_bundle_root_path": str(local_root),
         "artifact_paths": {"discovery": str(run_artifacts / "discovery")},
         "scan_scope": {
-            "max_file_bytes": 200_000,
             "paths_ignore": ["**/*.min.js"],
             "incremental_changed_files": [
                 {

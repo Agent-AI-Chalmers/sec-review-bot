@@ -344,7 +344,10 @@ def fake_build_repository_discovery_manifest(_request: InternalWorkflowRequest) 
                 "entries": [{"path": "src/app.py"}],
             }
         ],
+        "deployment_input_limit_tokens": 625_000,
         "chunk_target_tokens": 100_000,
+        "chunk_target_ratio": "1/5",
+        "chunk_hard_limit_tokens": 500_000,
         "max_concurrency": 1,
         "scan_mode": "full",
     }

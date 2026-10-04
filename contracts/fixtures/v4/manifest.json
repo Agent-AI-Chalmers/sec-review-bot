@@ -19,6 +19,6 @@
     "invalid-repository-review-input-empty-ignore.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-extra-change-field.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
-    "invalid-repository-review-input-zero-max-file-bytes.json": "repository-review-input.schema.json"
+    "invalid-repository-review-input-max-file-bytes.json": "repository-review-input.schema.json"
   }
 }
