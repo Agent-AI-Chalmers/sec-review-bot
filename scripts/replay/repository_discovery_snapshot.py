@@ -63,6 +63,12 @@ def _parse_args() -> argparse.Namespace:
             "AGENT_DISCOVERY_CHUNK_STRATEGY."
         ),
     )
+    parser.add_argument(
+        "--paths-ignore",
+        action="append",
+        default=[],
+        help="Repository-relative discovery ignore pattern; may be repeated.",
+    )
     return parser.parse_args()
 
 
@@ -83,11 +89,12 @@ async def _run_discovery(
     artifacts: Path,
     chunk_target_ratio: Fraction,
     chunk_strategy: str | None,
+    paths_ignore: list[str],
 ) -> dict:
     manifest = prepare_discovery_chunks(
         workspace_root=workspace,
         scan_mode="full",
-        scan_scope={"paths_ignore": []},
+        scan_scope={"paths_ignore": paths_ignore},
         discovery_artifacts_path=artifacts,
         chunk_target_ratio=(
             chunk_target_ratio.numerator,
@@ -158,6 +165,7 @@ async def _main() -> None:
         artifacts=artifacts,
         chunk_target_ratio=args.chunk_target_ratio,
         chunk_strategy=args.chunk_strategy,
+        paths_ignore=args.paths_ignore,
     )
     result_path = output_dir / "discovery-result.json"
     result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
