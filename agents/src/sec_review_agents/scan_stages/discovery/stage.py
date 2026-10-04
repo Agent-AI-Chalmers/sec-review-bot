@@ -635,14 +635,23 @@ def _normalize_candidate(
 #########################################################################
 # ====================== Chunked LLM Scan Execution ======================
 #########################################################################
-def discovery_chunk_token_limits() -> tuple[int, int]:
+def discovery_chunk_token_limits(
+    target_ratio: tuple[int, int] = (1, 5),
+) -> tuple[int, int, int]:
     # Limit the initial repository payload to 20% of the model input window.
     # The remaining context absorbs tokenizer error, runtime-added schemas and
     # skill guidance, tool turns, and the attention loss seen in very long inputs.
     deployment_limit_tokens = resolve_bound_deployment_max_input_tokens(
         "repository-discovery"
     )
-    target_tokens = deployment_limit_tokens // 5
+    numerator, denominator = target_ratio
+    if (
+        numerator <= 0
+        or denominator <= 0
+        or numerator * 5 > denominator * 4
+    ):
+        raise ValueError("Discovery chunk target ratio must be between 0 and 4/5.")
+    target_tokens = deployment_limit_tokens * numerator // denominator
     # Keep room for runtime-added schemas, skills, tool turns, and tokenizer
     # estimation error when admitting a large single-file payload.
     hard_limit_tokens = deployment_limit_tokens * 4 // 5
@@ -656,10 +665,10 @@ def discovery_chunk_token_limits() -> tuple[int, int]:
     )
     if target_tokens <= system_prompt_tokens:
         raise ValueError(
-            "Repository discovery requires 20% of the selected deployment input "
-            "limit to exceed the discovery system prompt size."
+            "Repository discovery requires the selected chunk target to exceed "
+            "the discovery system prompt size."
         )
-    return target_tokens, hard_limit_tokens
+    return deployment_limit_tokens, target_tokens, hard_limit_tokens
 
 
 def _estimate_discovery_prompt_tokens(
@@ -906,7 +915,9 @@ def build_discovery_result_from_chunks(
     chunks: Sequence[Mapping[str, Any]],
     chunk_results: Sequence[Mapping[str, Any]],
     scan_mode: str,
+    deployment_input_limit_tokens: int,
     chunk_target_tokens: int,
+    chunk_target_ratio: str,
     chunk_hard_limit_tokens: int,
     chunk_strategy: str = DEFAULT_DISCOVERY_CHUNK_STRATEGY,
     discovery_artifacts_path: Path,
@@ -931,7 +942,9 @@ def build_discovery_result_from_chunks(
         "metadata": {
             "scan_mode": scan_mode,
             "discovery_concurrency": discovery_concurrency,
+            "discovery_deployment_input_limit_tokens": deployment_input_limit_tokens,
             "discovery_chunk_target_tokens": chunk_target_tokens,
+            "discovery_chunk_target_ratio": chunk_target_ratio,
             "discovery_chunk_hard_limit_tokens": chunk_hard_limit_tokens,
             "discovery_chunk_strategy": chunk_strategy,
             "discovery_chunk_count": len(chunks),
@@ -969,6 +982,8 @@ def prepare_discovery_chunks(
     scan_mode: str,
     scan_scope: dict[str, Any],
     discovery_artifacts_path: Path,
+    chunk_target_ratio: tuple[int, int] = (1, 5),
+    chunk_strategy: str | None = None,
 ) -> dict[str, Any]:
     reset_stage_attempt_artifacts(
         discovery_artifacts_path,
@@ -992,14 +1007,21 @@ def prepare_discovery_chunks(
             discovery_artifacts_path=discovery_artifacts_path,
         )
 
-    chunk_target_tokens, chunk_hard_limit_tokens = discovery_chunk_token_limits()
-    chunk_strategy = _resolve_discovery_chunk_strategy()
+    (
+        deployment_input_limit_tokens,
+        chunk_target_tokens,
+        chunk_hard_limit_tokens,
+    ) = discovery_chunk_token_limits(chunk_target_ratio)
+    resolved_chunk_strategy = chunk_strategy or _resolve_discovery_chunk_strategy()
+    if resolved_chunk_strategy not in {"batched", "single-file"}:
+        raise ValueError("Discovery chunk strategy must be 'batched' or 'single-file'.")
+    chunk_target_ratio_text = f"{chunk_target_ratio[0]}/{chunk_target_ratio[1]}"
     chunks, chunk_skipped_files = _pack_discovery_chunks(
         entries=entries,
         root=workspace_root,
         target_tokens=chunk_target_tokens,
         hard_limit_tokens=chunk_hard_limit_tokens,
-        strategy=chunk_strategy,
+        strategy=resolved_chunk_strategy,
     )
     skipped_files.extend(chunk_skipped_files)
     persist_json(
@@ -1007,9 +1029,11 @@ def prepare_discovery_chunks(
         "discovery-chunks.json",
         {
             "metadata": {
+                "deployment_input_limit_tokens": deployment_input_limit_tokens,
                 "chunk_target_tokens": chunk_target_tokens,
+                "chunk_target_ratio": chunk_target_ratio_text,
                 "chunk_hard_limit_tokens": chunk_hard_limit_tokens,
-                "chunk_strategy": chunk_strategy,
+                "chunk_strategy": resolved_chunk_strategy,
             },
             "counts": {
                 "chunk_count": len(chunks),
@@ -1025,8 +1049,10 @@ def prepare_discovery_chunks(
         "entries": entries,
         "skipped_files": skipped_files,
         "chunks": chunks,
+        "deployment_input_limit_tokens": deployment_input_limit_tokens,
         "chunk_target_tokens": chunk_target_tokens,
+        "chunk_target_ratio": chunk_target_ratio_text,
         "chunk_hard_limit_tokens": chunk_hard_limit_tokens,
-        "chunk_strategy": chunk_strategy,
+        "chunk_strategy": resolved_chunk_strategy,
         "max_concurrency": _resolve_discovery_max_concurrency(len(chunks)),
     }

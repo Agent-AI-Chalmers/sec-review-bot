@@ -12,9 +12,9 @@ import json
 import subprocess
 import tarfile
 import tempfile
+from fractions import Fraction
 from pathlib import Path
 
-import sec_review_agents.scan_stages.discovery.stage as discovery_stage
 from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.scan_stages.discovery.stage import (
     build_discovery_result_from_chunks,
@@ -50,12 +50,10 @@ def _parse_args() -> argparse.Namespace:
         help="Directory for the extracted workspace and discovery artifacts.",
     )
     parser.add_argument(
-        "--chunk-target-tokens",
-        type=int,
-        help=(
-            "Temporary discovery chunk target override. The normal deployment "
-            "derived target is used when omitted."
-        ),
+        "--chunk-target-ratio",
+        type=Fraction,
+        default=Fraction(1, 5),
+        help="Fraction of the deployment input limit used by batched chunks (default: 1/5).",
     )
     parser.add_argument(
         "--chunk-strategy",
@@ -79,12 +77,23 @@ def _extract_path(*, repository: Path, commit: str, path: str, workspace: Path) 
         tar.extractall(workspace, filter="data")
 
 
-async def _run_discovery(*, workspace: Path, artifacts: Path) -> dict:
+async def _run_discovery(
+    *,
+    workspace: Path,
+    artifacts: Path,
+    chunk_target_ratio: Fraction,
+    chunk_strategy: str | None,
+) -> dict:
     manifest = prepare_discovery_chunks(
         workspace_root=workspace,
         scan_mode="full",
         scan_scope={"paths_ignore": []},
         discovery_artifacts_path=artifacts,
+        chunk_target_ratio=(
+            chunk_target_ratio.numerator,
+            chunk_target_ratio.denominator,
+        ),
+        chunk_strategy=chunk_strategy,
     )
     chunks = list(manifest["chunks"])
     semaphore = asyncio.Semaphore(max(1, int(manifest["max_concurrency"])))
@@ -110,7 +119,9 @@ async def _run_discovery(*, workspace: Path, artifacts: Path) -> dict:
         chunks=chunks,
         chunk_results=[item for item in ordered_results if item is not None],
         scan_mode="full",
+        deployment_input_limit_tokens=int(manifest["deployment_input_limit_tokens"]),
         chunk_target_tokens=int(manifest["chunk_target_tokens"]),
+        chunk_target_ratio=str(manifest["chunk_target_ratio"]),
         chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
         chunk_strategy=str(manifest["chunk_strategy"]),
         discovery_artifacts_path=artifacts,
@@ -122,17 +133,8 @@ async def _main() -> None:
     repository = args.repository.resolve()
     if not repository.is_dir():
         raise SystemExit(f"--repository is not a directory: {repository}")
-    if args.chunk_target_tokens is not None:
-        if args.chunk_target_tokens <= 0:
-            raise SystemExit("--chunk-target-tokens must be positive.")
-        resolve_default_limits = discovery_stage.discovery_chunk_token_limits
-        discovery_stage.discovery_chunk_token_limits = (  # type: ignore[method-assign]
-            lambda: (args.chunk_target_tokens, resolve_default_limits()[1])
-        )
-    if args.chunk_strategy is not None:
-        discovery_stage._resolve_discovery_chunk_strategy = (  # type: ignore[method-assign]
-            lambda: args.chunk_strategy
-        )
+    if not 0 < args.chunk_target_ratio < 1:
+        raise SystemExit("--chunk-target-ratio must be between 0 and 1.")
 
     bootstrap_agents_env()
     initialize_configured_memory_store()
@@ -151,7 +153,12 @@ async def _main() -> None:
         path=args.path,
         workspace=workspace,
     )
-    result = await _run_discovery(workspace=workspace, artifacts=artifacts)
+    result = await _run_discovery(
+        workspace=workspace,
+        artifacts=artifacts,
+        chunk_target_ratio=args.chunk_target_ratio,
+        chunk_strategy=args.chunk_strategy,
+    )
     result_path = output_dir / "discovery-result.json"
     result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(

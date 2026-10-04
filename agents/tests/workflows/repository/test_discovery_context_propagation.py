@@ -237,10 +237,11 @@ def test_discovery_chunk_token_limits_use_bound_deployment_context() -> None:
         "sec_review_agents.scan_stages.discovery.stage.resolve_bound_deployment_max_input_tokens",
         return_value=200_001,
     ) as resolve_limit:
-        target_tokens, hard_limit_tokens = (
+        deployment_limit_tokens, target_tokens, hard_limit_tokens = (
             discovery_stage.discovery_chunk_token_limits()
         )
 
+    assert deployment_limit_tokens == 200_001
     assert target_tokens == 40_000
     assert hard_limit_tokens == 160_000
     resolve_limit.assert_called_once_with("repository-discovery")
@@ -256,7 +257,7 @@ def test_discovery_artifacts_record_target_and_hard_token_limits(
     with patch.object(
         discovery_stage,
         "discovery_chunk_token_limits",
-        return_value=(40_000, 200_000),
+        return_value=(250_000, 50_000, 200_000),
     ):
         manifest = discovery_stage.prepare_discovery_chunks(
             workspace_root=workspace,
@@ -268,10 +269,14 @@ def test_discovery_artifacts_record_target_and_hard_token_limits(
     chunks_artifact = json.loads(
         (artifacts / "discovery-chunks.json").read_text(encoding="utf-8")
     )
-    assert manifest["chunk_target_tokens"] == 40_000
+    assert manifest["deployment_input_limit_tokens"] == 250_000
+    assert manifest["chunk_target_tokens"] == 50_000
+    assert manifest["chunk_target_ratio"] == "1/5"
     assert manifest["chunk_hard_limit_tokens"] == 200_000
     assert chunks_artifact["metadata"] == {
-        "chunk_target_tokens": 40_000,
+        "deployment_input_limit_tokens": 250_000,
+        "chunk_target_tokens": 50_000,
+        "chunk_target_ratio": "1/5",
         "chunk_hard_limit_tokens": 200_000,
         "chunk_strategy": "single-file",
     }
@@ -282,11 +287,15 @@ def test_discovery_artifacts_record_target_and_hard_token_limits(
         chunks=[],
         chunk_results=[],
         scan_mode="full",
-        chunk_target_tokens=40_000,
+        deployment_input_limit_tokens=250_000,
+        chunk_target_tokens=50_000,
+        chunk_target_ratio="1/5",
         chunk_hard_limit_tokens=200_000,
         discovery_artifacts_path=artifacts,
     )
-    assert result["metadata"]["discovery_chunk_target_tokens"] == 40_000
+    assert result["metadata"]["discovery_deployment_input_limit_tokens"] == 250_000
+    assert result["metadata"]["discovery_chunk_target_tokens"] == 50_000
+    assert result["metadata"]["discovery_chunk_target_ratio"] == "1/5"
     assert result["metadata"]["discovery_chunk_hard_limit_tokens"] == 200_000
 
 
@@ -300,6 +309,18 @@ def test_discovery_chunk_token_budget_rejects_limit_below_system_prompt() -> Non
         pytest.raises(ValueError, match="exceed the discovery system prompt size"),
     ):
         discovery_stage.discovery_chunk_token_limits()
+
+
+def test_discovery_chunk_token_limits_accept_experiment_ratio() -> None:
+    with patch(
+        "sec_review_agents.scan_stages.discovery.stage.resolve_bound_deployment_max_input_tokens",
+        return_value=300_000,
+    ):
+        deployment_limit, target, hard_limit = (
+            discovery_stage.discovery_chunk_token_limits((1, 3))
+        )
+
+    assert (deployment_limit, target, hard_limit) == (300_000, 100_000, 240_000)
 
 
 def test_discovery_chunk_packing_stops_before_target_overflow(tmp_path: Path) -> None:

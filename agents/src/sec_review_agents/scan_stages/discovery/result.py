@@ -4,7 +4,9 @@ from typing import Any, TypedDict
 class DiscoveryMetadata(TypedDict):
     scan_mode: str
     discovery_concurrency: int
+    discovery_deployment_input_limit_tokens: int
     discovery_chunk_target_tokens: int
+    discovery_chunk_target_ratio: str
     discovery_chunk_hard_limit_tokens: int
     discovery_chunk_strategy: str
     discovery_chunk_count: int
