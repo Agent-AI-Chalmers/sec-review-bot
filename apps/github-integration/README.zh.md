@@ -28,7 +28,17 @@ pnpm run dev
 pnpm run server
 pnpm run lint
 pnpm run build
+pnpm test
 ```
+
+`pnpm test` 运行不依赖外部服务的测试。依赖 PostgreSQL 的 runner 测试单独放在集成测试套件中：
+
+```bash
+TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
+DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
+pnpm run test:integration
+```
+
 
 ## 本地接收端
 
