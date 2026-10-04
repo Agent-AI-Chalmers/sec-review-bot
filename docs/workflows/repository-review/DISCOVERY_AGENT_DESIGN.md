@@ -47,11 +47,11 @@ This limit belongs to the service environment rather than an individual review's
 
 There are two direct ways to organize discovery input.
 
-Option A gives each discovery agent one file. Its advantage is concentrated attention and a sharply defined code scope for every call. The tradeoff is that every file requires a separate model call and reloads the system prompt, output schema, and other fixed context. In a repository with many small files, that repeated overhead can materially increase cost. A single-file view also provides no local cross-file context by itself.
+The `single-file` strategy gives each discovery agent one file. Its advantage is concentrated attention and a sharply defined code scope for every call. The tradeoff is that every file requires a separate model call and reloads the system prompt, output schema, and other fixed context. In a repository with many small files, that repeated overhead can materially increase cost. A single-file view also provides no local cross-file context by itself.
 
-Option B groups several files into a chunk and gives each discovery agent one chunk. This amortizes fixed prompt cost and preserves some cross-file context. The corresponding risk is that larger chunks ask the model to attend to more material at once. Experiments also show that a long context can reduce security-clue recall even when the request remains below the maximum input limit.
+The `batched` strategy groups several files into a chunk and gives each discovery agent one chunk. This amortizes fixed prompt cost and preserves some cross-file context. The corresponding risk is that larger chunks ask the model to attend to more material at once. Experiments also show that a long context can reduce security-clue recall even when the request remains below the maximum input limit.
 
-The current default chooses option A (`single-file`) so each model call has a sharply bounded code scope and concentrated attention. Option B (`batched`) remains available as a worker-side deployment setting through `AGENT_DISCOVERY_CHUNK_STRATEGY`; it is not selectable by a review request. When batching is enabled, the target for an ordinary chunk is one fifth of the selected model's measured context-window input limit, leaving explicit room between efficient batching and concentrated attention.
+The current default is `single-file`, so each model call has a sharply bounded code scope and concentrated attention. `batched` remains available as a worker-side deployment setting through `AGENT_DISCOVERY_CHUNK_STRATEGY`; it is not selectable by a review request. When batching is enabled, the target for an ordinary chunk is one fifth of the selected model's measured context-window input limit, leaving explicit room between efficient batching and concentrated attention.
 
 The design uses two token boundaries:
 
@@ -66,3 +66,7 @@ One fifth constrains ordinary multi-file chunks; it must not prevent a complete 
 The hard limit leaves the remaining one fifth for runtime-added schemas, skill guidance, tool turns, and token-estimation error. Files remain whole rather than being split to satisfy the target. This avoids breaking local semantics at arbitrary positions and keeps candidate locations and scan coverage easier to interpret.
 
 All token boundaries come from the selected model's measured context-window input limit. Prompt size refers to the complete request, including system and user prompts, file metadata, and file contents.
+
+### Experimental Evidence
+
+The `single-file` strategy has a clear recall advantage. A likely explanation is that limiting each call to one file concentrates model attention on local security clues and avoids dilution by multi-file context. Because discovery only needs to surface a lead rather than prove the complete vulnerability, even a cross-file issue should expose a suspicious local anchor in at least one file; later stages can reconstruct the full chain.
