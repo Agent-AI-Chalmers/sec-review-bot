@@ -29,9 +29,13 @@ from sec_review_agents.filesystem.docker_runtime import (
     DockerContainerResource,
     DockerMount,
     arun_docker_command,
+    create_docker_container_resource,
     start_container,
 )
-from sec_review_agents.filesystem.limits import FilesystemLimits
+from sec_review_agents.filesystem.limits import (
+    DEFAULT_COMMAND_TIMEOUT_MS,
+    FilesystemLimits,
+)
 from sec_review_agents.filesystem.sandbox_file_ops import (
     limits_payload,
     sandbox_file_script_source,
@@ -451,6 +455,51 @@ def test_start_container_marks_only_read_only_mounts_readonly() -> None:
     assert args[args.index("--pids-limit") + 1] == "512"
     assert args[args.index("--memory") + 1] == "4g"
     assert args[args.index("--cpus") + 1] == "2"
+
+
+@pytest.mark.parametrize(
+    ("host_path", "container_path"),
+    [
+        ("/host/with,comma", "/workspace"),
+        ("/host/workspace", "/workspace,with-comma"),
+        ("/host/with\0nul", "/workspace"),
+        ("/host/workspace", "/workspace\0with-nul"),
+    ],
+)
+def test_docker_mount_rejects_paths_unsafe_for_mount_spec(
+    host_path: str,
+    container_path: str,
+) -> None:
+    with pytest.raises(ValueError, match="cannot be safely encoded"):
+        DockerMount(
+            host_path=host_path,
+            container_path=container_path,
+            writable=False,
+        )
+
+
+def test_container_resource_uses_shared_default_command_timeout() -> None:
+    with patch.dict("os.environ", {}, clear=True):
+        container = create_docker_container_resource(
+            container_name_prefix="test",
+            mounts=[],
+            working_directory="/workspace",
+            image="test-image",
+        )
+
+    assert container.timeout_ms == DEFAULT_COMMAND_TIMEOUT_MS
+
+
+def test_container_resource_uses_shared_environment_timeout_override() -> None:
+    with patch.dict("os.environ", {"AGENT_COMMAND_TIMEOUT_MS": "1234"}, clear=True):
+        container = create_docker_container_resource(
+            container_name_prefix="test",
+            mounts=[],
+            working_directory="/workspace",
+            image="test-image",
+        )
+
+    assert container.timeout_ms == 1234
 
 
 def test_container_resource_start_is_thread_safe() -> None:

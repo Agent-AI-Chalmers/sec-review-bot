@@ -8,8 +8,31 @@ from sec_review_agents.utils.env import env_value
 
 BWRAP_NETWORK_INHERIT = "inherit"
 BWRAP_NETWORK_NONE = "none"
+BWRAP_SANDBOX_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 BWRAP_BASE_ARGS = (
     "--die-with-parent",
+    # Do not leak worker credentials or sandbox-affecting variables into an
+    # agent command. Restore only the small, deterministic environment needed
+    # to run ordinary system tools after clearing the inherited environment.
+    "--clearenv",
+    # A fixed PATH keeps command lookup predictable without trusting the
+    # worker's PATH or user-specific shell configuration.
+    "--setenv",
+    "PATH",
+    BWRAP_SANDBOX_PATH,
+    # Keep HOME and temporary files inside the private bwrap tmpfs rather than
+    # exposing the worker user's home directory or host temporary directory.
+    "--setenv",
+    "HOME",
+    "/tmp",
+    "--setenv",
+    "TMPDIR",
+    "/tmp",
+    # Use a stable locale. Proxy, credential, Python, and loader variables are
+    # intentionally not restored because they can weaken the sandbox boundary.
+    "--setenv",
+    "LANG",
+    "C.UTF-8",
     "--new-session",
     "--unshare-user",
     "--unshare-pid",

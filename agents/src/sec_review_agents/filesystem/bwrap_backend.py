@@ -53,6 +53,7 @@ from sec_review_agents.filesystem.command_output import (
     truncate_output,
 )
 from sec_review_agents.filesystem.limits import (
+    DEFAULT_COMMAND_TIMEOUT_MS,
     FilesystemLimits,
     default_filesystem_limits,
 )
@@ -116,7 +117,10 @@ class BwrapSandboxBackend(SandboxBackendProtocol):
         self.command_timeout_ms = (
             command_timeout_ms
             if command_timeout_ms is not None
-            else parse_int_env(env_value("AGENT_BWRAP_COMMAND_TIMEOUT_MS"))
+            else parse_int_env(
+                env_value("AGENT_COMMAND_TIMEOUT_MS"),
+                DEFAULT_COMMAND_TIMEOUT_MS,
+            )
         )
         self.max_output_bytes = (
             parse_int_env(env_value("AGENT_BWRAP_MAX_OUTPUT_BYTES"), 1024 * 1024)
