@@ -15,6 +15,30 @@ REPOSITORY_DISCOVERY_INTRO = "\n".join(
     ]
 )
 
+REPOSITORY_DISCOVERY_OUTPUT_RULES = "\n".join(
+    [
+        "# Output Rules",
+        "",
+        "- Every location must include `file`, using one of the provided repository-relative paths.",
+        "- Evidence snippets must be copied verbatim from one of the provided files.",
+    ]
+)
+
+# Keep this reminder at the end of the human message: a lightweight prompt
+# ablation showed fewer failed repository reads without reducing candidate
+# output, while skill references remained available to the discovery agent.
+REPOSITORY_DISCOVERY_FINAL_SCOPE_REMINDER = "\n".join(
+    [
+        "# Final Scope Reminder",
+        "",
+        (
+            "The files above are the complete input for this discovery chunk. "
+            "Analyze only their inline contents; do not call `read_file`, `grep`, "
+            "`glob`, or `ls`, and do not inspect other workspace files."
+        ),
+    ]
+)
+
 
 def build_repository_discovery_system_prompt() -> str:
     return join_prompt_sections(
@@ -87,10 +111,8 @@ def build_repository_discovery_user_prompt(
             },
         ),
         "",
-        "# Output Rules",
-        "",
-        "- Every location must include `file`, using one of the provided repository-relative paths.",
-        "- Evidence snippets must be copied verbatim from one of the provided files.",
+        REPOSITORY_DISCOVERY_OUTPUT_RULES,
     ]
     sections.extend(source_sections)
+    sections.extend(["", REPOSITORY_DISCOVERY_FINAL_SCOPE_REMINDER])
     return "\n".join(sections)
