@@ -31,9 +31,11 @@ REPOSITORY_DISCOVERY_FINAL_SCOPE_REMINDER = "\n".join(
     [
         "# Final Scope Reminder",
         "",
-        "The files above are the complete input for this discovery chunk. "
-        "Analyze only their inline contents; do not call `read_file`, `grep`, "
-        "`glob`, or `ls`, and do not inspect other workspace files.",
+        (
+            "The files above are the complete input for this discovery chunk. "
+            "Analyze only their inline contents; do not call `read_file`, `grep`, "
+            "`glob`, or `ls`, and do not inspect other workspace files."
+        ),
     ]
 )
 
