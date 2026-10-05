@@ -15,6 +15,7 @@ from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 
+from sec_review_agents.artifacts.run_storage import publish_run_artifacts
 from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_result
 from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_EXECUTION_FAILED,
@@ -92,6 +93,7 @@ class TemporalRunnerWorkflowGateway:
                 memo={
                     "workflow": workflow,
                     _REQUEST_FINGERPRINT_MEMO_KEY: request_fingerprint,
+                    "artifact_root_path": input_data.get("artifact_root_path"),
                 },
             )
         except WorkflowAlreadyStartedError:
@@ -133,6 +135,14 @@ async def _record_from_handle(
     *,
     default_workflow: str | None = None,
 ) -> dict[str, Any]:
+    """Project a Temporal execution handle into the public run record.
+
+    The projection combines Temporal status and memo data, publishes terminal
+    diagnostic artifacts when an artifact root is available, and validates a
+    completed workflow's v5 result before reporting it as successful. Artifact
+    publication is deliberately recorded separately from the business result,
+    so a storage failure cannot be mistaken for a successful publication.
+    """
     description = await handle.describe()
     temporal_status = description.status
     temporal_status_name = (
@@ -140,11 +150,28 @@ async def _record_from_handle(
     )
     status = _status_from_temporal(temporal_status)
     workflow = _workflow_from_memo(await description.memo()) or default_workflow
+    memo = await description.memo()
     record: dict[str, Any] = {
         "run_id": handle.id,
         "workflow": workflow,
         "status": status,
     }
+    artifact_root = _string_from_memo(memo, "artifact_root_path")
+    if status in {"succeeded", "failed"} and artifact_root:
+        try:
+            reference = publish_run_artifacts(artifact_root, handle.id)
+            record["artifact_publication"] = {
+                "status": "published" if reference else "not_available",
+                **({"artifact": reference} if reference else {}),
+            }
+        except Exception:
+            # Publication is diagnostic metadata, not the business result.  Keep
+            # the public record stable and do not leak storage endpoint details.
+            record["artifact_publication"] = {
+                "status": "failed",
+                "error_code": "ARTIFACT_UPLOAD_FAILED",
+                "message": "Unable to publish terminal run artifacts.",
+            }
     if description.status is WorkflowExecutionStatus.COMPLETED:
         response = await handle.result()
         if isinstance(response, dict):

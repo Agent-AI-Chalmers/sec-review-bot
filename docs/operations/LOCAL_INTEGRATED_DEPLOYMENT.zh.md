@@ -181,6 +181,8 @@ Artifact 默认写入当前 checkout 的 `.agent-artifacts`，模型配置默认
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9000`。 |
 | `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` | 与仓库 `.env` 中 runner 配置相匹配的 RustFS 只读凭据。 |
 
+Runner service 通过 Compose 使用独立的 artifact-publisher 凭据，只能写入 `runs/*/artifacts/*`；宿主机 worker 不持有对象存储凭据。Runner service 观察到终态 run 后，通过只读 bind mount 读取 worker 的 artifact root。
+
 大多数本地部署可以保留这些默认值。移动 checkout 后，重新运行安装脚本。
 
 以下变量按需添加或修改。

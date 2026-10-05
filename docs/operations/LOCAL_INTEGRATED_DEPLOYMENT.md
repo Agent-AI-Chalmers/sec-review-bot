@@ -179,6 +179,8 @@ Core fields:
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9000`. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Read-only RustFS credential matching the runner values in the repository `.env`. |
 
+The Runner service receives a separate artifact-publisher credential through Compose. It can write only `runs/*/artifacts/*`; the host worker has no object-storage credential. The service reads the worker's artifact root through a read-only bind mount when a terminal run is observed.
+
 Most local deployments can keep these defaults. Rerun the installer after moving the checkout.
 
 Add or change the following variables as needed.
