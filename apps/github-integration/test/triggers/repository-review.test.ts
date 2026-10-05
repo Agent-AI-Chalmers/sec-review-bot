@@ -163,7 +163,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           workflow: 'repository-review',
           event_type: 'manual'
         }
-        args.on_prepared?.(submitted, { contract_version: 'v4' } as never)
+        args.on_prepared?.(submitted, { contract_version: 'v5' } as never)
         return submitted
       },
       create_run_id: () => 'run-1',
@@ -208,7 +208,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
   })
   assert.deepEqual(saved_runs[1], {
     run_id: 'run-1',
-    input: { contract_version: 'v4' },
+    input: { contract_version: 'v5' },
     context: {
       repo: {
         owner_login: 'octo', repo_name: 'example', repo_full_name: 'octo/example', default_branch: 'main'
@@ -422,7 +422,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
             scan_target: { target_branch: 'main', default_branch: 'main', event_type: 'manual', scan_mode: 'full', base_sha: null, head_sha: 'head-sha', commit_shas: [] },
             workflow: 'repository-review',
             event_type: 'manual'
-          }, { contract_version: 'v4' } as never)
+          }, { contract_version: 'v5' } as never)
           throw error
         },
         store: {

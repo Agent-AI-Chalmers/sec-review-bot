@@ -1,5 +1,5 @@
 {
-  "contract_version": "v4",
+  "contract_version": "v5",
   "scan_summary": {
     "scannable_file_count": 12,
     "scanned_file_count": 12,
@@ -14,6 +14,7 @@
       "case_ids": [
         "case-1"
       ],
+      "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n--- a/src/webhook.ts\n+++ b/src/webhook.ts\n@@ -1 +1 @@\n-export function verifyRetrySignature() { return false }\n+export function verifyRetrySignature() { return true }\n",
       "file_changes": [
         {
           "path": "src/webhook.ts",

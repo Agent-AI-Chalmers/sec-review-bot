@@ -1,6 +1,11 @@
 {
-  "contract_version": "v4",
-  "input_bundle_uri": "/tmp/sec-review-fixtures/repository-review-incremental",
+  "contract_version": "v5",
+  "input_bundle": {
+    "uri": "file:///tmp/sec-review-fixtures/repository-review-incremental.tar.zst",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "media_type": "application/vnd.sec-review.input-bundle.v1+tar+zstd",
+    "size_bytes": 0
+  },
   "review_intent": {
     "objective": "audit"
   },
@@ -16,11 +21,14 @@
     ]
   },
   "scan_scope": {
-    "paths_ignore": [],
+    "paths_ignore": [
+      "dist/**"
+    ],
     "incremental_changed_files": [
       {
         "path": "src/webhook.ts",
-        "status": "modified"
+        "status": "modified",
+        "previous_path": null
       }
     ]
   }

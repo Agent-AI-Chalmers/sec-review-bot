@@ -1,12 +1,12 @@
-# Integration Contract v4
+# Integration Contract v5
 
-Language: English | [中文](CONTRACT_V4.zh.md)
+Language: English | [中文](CONTRACT_V5.zh.md)
 
 This document defines the workflow `input` submitted through the runner HTTP API and the `result` returned after a run completes. For the HTTP transport itself, see [RUNNER_HTTP_API.md](RUNNER_HTTP_API.md).
 
-Representative JSON fixtures live under [`fixtures/v4`](fixtures/v4). Python and TypeScript contract tests both read these fixtures.
+Representative JSON fixtures live under [`fixtures/v5`](fixtures/v5). Python and TypeScript contract tests both read these fixtures.
 
-The v4 public result exposes final results for each workflow instead of internal stage execution details:
+The v5 public result exposes final results for each workflow instead of internal stage execution details:
 
 - issue review and pull request review return one `ReviewRecord`.
 - repository review returns a scan summary, case-level `ReviewRecord` projections, and repository-only delivery results.
@@ -17,19 +17,28 @@ This section defines the workflow `input` object inside the HTTP create-run requ
 
 Every workflow input includes:
 
-- `contract_version: "v4"`
-- `input_bundle_uri`
+- `contract_version: "v5"`
+- `input_bundle`
 - `review_intent`
 
 ### Input Bundle Boundary
 
-`input_bundle_uri` points to the caller-provided input bundle root. Current production integration requires that bundle to be readable by the runner worker.
+`input_bundle` is an immutable artifact reference to a complete input bundle archive. The caller prepares and uploads the archive; the runner verifies it and materializes it into a local run-scoped directory before reading the manifest or executing a workflow.
 
-This coupling is deliberate: GitHub App or a local materializer turns GitHub context into local workspace, history, and incremental-window materials; the runner only consumes those materials and executes the workflow.
+The v5 runner currently supports local `file:` URIs. A later storage phase may add durable `s3:` URIs without putting storage endpoint, region, or credentials in workflow input. Presigned HTTP URLs are not durable artifact references.
 
 The caller owns the input bundle. The runner/stages own runtime state such as `artifact_paths`, stage artifact roots, writable stage workspaces, retry state, and delivery assignments.
 
-The bundle root must contain `manifest.json`. The manifest declares paths to materials inside the bundle; the runner parses it into internal `bundle_paths` for workflow/backend use. Callers must not provide `bundle_paths` directly.
+The `tar.zst` archive must contain `manifest.json`, the workspace snapshot, history, and any declared incremental window. The manifest declares bundle-relative paths; the runner parses them into internal local `bundle_paths`. Callers must not provide `bundle_paths` directly.
+
+```ts
+interface InputBundleArtifactRef {
+  uri: string // file:
+  digest: `sha256:${string}`
+  media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
+  size_bytes: number
+}
+```
 
 Repository scan target:
 
@@ -76,8 +85,8 @@ Issue workflows use:
 
 ```ts
 interface IssueReviewInput {
-  contract_version: 'v4'
-  input_bundle_uri: string
+  contract_version: 'v5'
+  input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   issue: Record<string, unknown>
 }
@@ -87,8 +96,8 @@ Pull request workflows use:
 
 ```ts
 interface PullRequestReviewInput {
-  contract_version: 'v4'
-  input_bundle_uri: string
+  contract_version: 'v5'
+  input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   pr: Record<string, unknown>
 }
@@ -98,8 +107,8 @@ Repository workflows use:
 
 ```ts
 interface RepositoryReviewInput {
-  contract_version: 'v4'
-  input_bundle_uri: string
+  contract_version: 'v5'
+  input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   scan_target: RepositoryScanTarget
   scan_scope: RepositoryScanScope
@@ -109,7 +118,7 @@ interface RepositoryReviewInput {
 The runner validates input at the process boundary. All workflows require these common fields:
 
 - `contract_version`
-- `input_bundle_uri`
+- `input_bundle`
 - `review_intent`
 
 `review_intent.objective` declares the review objective:
@@ -229,7 +238,7 @@ Core result shape:
 
 ```ts
 interface IssueWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   review_record: ReviewRecord
 }
 ```
@@ -246,7 +255,7 @@ Core result shape:
 
 ```ts
 interface PullRequestWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   review_record: ReviewRecord
 }
 ```
@@ -267,7 +276,7 @@ Core result shape:
 
 ```ts
 interface RepositoryReviewWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   scan_summary: ScanSummary
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]
@@ -330,7 +339,7 @@ interface RepositoryDelivery {
 
 ### Validation Ownership
 
-JSON Schema owns the transport shape: required fields, JSON types, enums, tagged variants, and additional-field policy. Consumers must validate a complete v4 result before interpreting it; they must not coerce an invalid value into a valid one.
+JSON Schema owns the transport shape: required fields, JSON types, enums, tagged variants, and additional-field policy. Consumers must validate a complete v5 result before interpreting it; they must not coerce an invalid value into a valid one.
 
 Schema does not replace domain code. Cross-field workflow rules remain with the workflow that makes the decision, while consumers remain responsible for side-effect policy such as safe repository paths, GitHub permissions, publication eligibility, and retry behavior.
 

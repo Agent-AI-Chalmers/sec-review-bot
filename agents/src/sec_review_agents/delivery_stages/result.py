@@ -17,6 +17,7 @@ from sec_review_agents.workspace.file_changes import FileChange
 class DeliveryArtifact(BaseModel):
     delivery_id: str
     case_ids: list[str]
+    patch_diff: str
     file_changes: list[FileChange] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
@@ -50,6 +51,9 @@ def _build_delivery_artifact(
     return {
         "delivery_id": delivery_id,
         "case_ids": case_ids,
+        # Keep the generated patch in the public delivery. Consumers should not
+        # need a source checkout merely to reconstruct an existing patch.
+        "patch_diff": str(patch_outcome.get("patch_diff") or ""),
         "file_changes": file_changes,
     }
 

@@ -116,7 +116,7 @@ test('pull request publish requests changes for confirmed risks without inline s
       workflow: 'pull-request-review',
       status: 'succeeded',
       result: {
-        contract_version: 'v4',
+        contract_version: 'v5',
         review_record: review_record()
       }
     },store: stepStore as never,
@@ -192,7 +192,7 @@ test('pull request publish approves when analysis is not confirmed', async () =>
       workflow: 'pull-request-review',
       status: 'succeeded',
       result: {
-        contract_version: 'v4',
+        contract_version: 'v5',
         review_record: review_record({
           analysis: {
             verdict: 'no-actionable-finding',
@@ -264,7 +264,7 @@ test('pull request publish comments instead of approving a PR authored by the ap
         workflow: 'pull-request-review',
         status: 'succeeded',
         result: {
-          contract_version: 'v4',
+          contract_version: 'v5',
           review_record: review_record({
             analysis: {
               verdict: 'no-actionable-finding',
@@ -333,7 +333,7 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
       workflow: 'pull-request-review',
       status: 'succeeded',
       result: {
-        contract_version: 'v4',
+        contract_version: 'v5',
         review_record: review_record({
           analysis: {
             verdict: 'no-actionable-finding',
@@ -400,7 +400,7 @@ test('pull request publish falls back to comment when own PR approval error is i
       workflow: 'pull-request-review',
       status: 'succeeded',
       result: {
-        contract_version: 'v4',
+        contract_version: 'v5',
         review_record: review_record({
           analysis: {
             verdict: 'no-actionable-finding',
@@ -459,7 +459,7 @@ test('pull request publish requests changes for confirmed risks with inline sugg
       workflow: 'pull-request-review',
       status: 'succeeded',
       result: {
-        contract_version: 'v4',
+        contract_version: 'v5',
         review_record: review_record({
           mitigation: {
             overview: 'Remove the unsafe default.',
@@ -527,7 +527,7 @@ test('pull request publish does not create a fallback review after an uncertain 
         workflow: 'pull-request-review',
         status: 'succeeded',
         result: {
-          contract_version: 'v4',
+          contract_version: 'v5',
           review_record: review_record({
             mitigation: {
               overview: 'Remove the unsafe default.',

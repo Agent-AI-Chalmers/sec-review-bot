@@ -24,17 +24,17 @@ RESULT_SCHEMA_BY_WORKFLOW = {
 
 
 def _schema_root() -> Traversable:
-    packaged = files("sec_review_agents.resources").joinpath("contracts", "v4")
+    packaged = files("sec_review_agents.resources").joinpath("contracts", "v5")
     if packaged.joinpath("common.schema.json").is_file():
         return packaged
 
     # A source checkout reads the same canonical files before a wheel has
     # copied them into package data.
     for parent in Path(__file__).resolve().parents:
-        candidate = parent / "contracts" / "schemas" / "v4"
+        candidate = parent / "contracts" / "schemas" / "v5"
         if (candidate / "common.schema.json").is_file():
             return candidate
-    raise RuntimeError("Could not locate contract v4 schemas for Runner validation.")
+    raise RuntimeError("Could not locate contract v5 schemas for Runner validation.")
 
 
 @cache
@@ -76,12 +76,12 @@ def _validate_workflow_contract(
     location = ".".join(str(part) for part in error.absolute_path)
     label = f" at {location}" if location else ""
     raise ValueError(
-        f"Runner {value_label} does not match contract v4{label}: {error.message}"
+        f"Runner {value_label} does not match contract v5{label}: {error.message}"
     )
 
 
-def validate_v4_workflow_input(input_data: Any, workflow: str) -> None:
-    """Reject caller input that does not match the workflow's public v4 shape."""
+def validate_v5_workflow_input(input_data: Any, workflow: str) -> None:
+    """Reject caller input that does not match the workflow's public v5 shape."""
     _validate_workflow_contract(
         input_data,
         workflow,
@@ -90,8 +90,8 @@ def validate_v4_workflow_input(input_data: Any, workflow: str) -> None:
     )
 
 
-def validate_v4_workflow_result(result: Any, workflow: str) -> None:
-    """Reject a workflow result that does not match the public v4 shape."""
+def validate_v5_workflow_result(result: Any, workflow: str) -> None:
+    """Reject a workflow result that does not match the public v5 shape."""
     _validate_workflow_contract(
         result,
         workflow,
@@ -103,6 +103,6 @@ def validate_v4_workflow_result(result: Any, workflow: str) -> None:
 __all__ = [
     "INPUT_SCHEMA_BY_WORKFLOW",
     "RESULT_SCHEMA_BY_WORKFLOW",
-    "validate_v4_workflow_input",
-    "validate_v4_workflow_result",
+    "validate_v5_workflow_input",
+    "validate_v5_workflow_result",
 ]

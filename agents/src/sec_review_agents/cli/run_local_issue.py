@@ -162,7 +162,7 @@ def main() -> None:
         issue_strategy=issue_strategy,
     )
 
-    print(f"LOCAL_ROOT={bundle.input['input_bundle_uri']}")
+    print(f"LOCAL_ROOT={bundle.local_root_path}")
 
     if args.materialize_only:
         return
@@ -174,6 +174,7 @@ def main() -> None:
     )
     result = workflow_result
     result.setdefault("previews", {})["issue_preview"] = write_issue_previews(
+        local_root_path=bundle.local_root_path,
         materialized_input=bundle.input,
         workflow_result=result,
     )

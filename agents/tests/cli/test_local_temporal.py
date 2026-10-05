@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 from sec_review_agents.cli.local_execution import (
@@ -16,6 +15,7 @@ from sec_review_agents.cli.local_temporal import (
 from sec_review_agents.workflows.issue.single_agent import IssueSingleAgentWorkflow
 from sec_review_agents.workflows.issue.two_stage import IssueTwoStageWorkflow
 from sec_review_agents.workflows.issue.workflow import IssueReviewWorkflow
+from tests.input_bundle import write_test_input_bundle
 
 
 def _issue_bundle(strategy: IssueReviewStrategy | None) -> ReviewBundle:
@@ -32,28 +32,17 @@ def _issue_bundle(strategy: IssueReviewStrategy | None) -> ReviewBundle:
 def _prepared_issue_bundle(tmp_path: Path) -> ReviewBundle:
     local_root = tmp_path / "run-1"
     local_root.mkdir()
-    (local_root / "manifest.json").write_text(
-        json.dumps(
-            {
-                "contract_version": "v4",
-                "kind": "runner-input-bundle",
-                "workspace": {"snapshot": "workspace.snapshot.tar"},
-                "history": {"path": "history"},
-            }
-        ),
-        encoding="utf-8",
-    )
     return ReviewBundle(
         workflow="issue-review",
         run_id="run-1",
         input={
-            "contract_version": "v4",
+            "contract_version": "v5",
             "review_intent": {
                 "objective": "repair",
                 "repair_mode": "test-changes-allowed",
             },
             "issue": {"title": "Issue", "body": "Body"},
-            "input_bundle_uri": str(local_root),
+            "input_bundle": write_test_input_bundle(local_root),
         },
         local_root_path=local_root,
         artifact_root_path=local_root / "artifacts",

@@ -15,7 +15,7 @@ import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { getGitHubAppMetadata } from '../../infrastructure/github/github-app-metadata-service.js'
-import { assertV4WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
+import { assertV5WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
 import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
 
@@ -46,7 +46,7 @@ interface SuggestionManifestLike {
 }
 
 export interface PullRequestReviewWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -70,10 +70,10 @@ function pullRequestReviewResultFromRunStatus (status: RunnerRunStatus): PullReq
     return null
   }
   try {
-    assertV4WorkflowResult('pull-request-review', completed.result)
-    const rawResult = completed.result as { contract_version: 'v4', review_record: unknown }
+    assertV5WorkflowResult('pull-request-review', completed.result)
+    const rawResult = completed.result as { contract_version: 'v5', review_record: unknown }
     return {
-      contract_version: 'v4',
+      contract_version: 'v5',
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

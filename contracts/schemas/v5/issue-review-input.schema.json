@@ -1,22 +1,21 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sec-review-bot.local/contracts/schemas/v4/issue-review-input.schema.json",
-  "title": "Contract v4 issue-review input",
+  "$id": "https://sec-review-bot.local/contracts/schemas/v5/issue-review-input.schema.json",
+  "title": "Contract v5 issue-review input",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "contract_version",
-    "input_bundle_uri",
+    "input_bundle",
     "review_intent",
     "issue"
   ],
   "properties": {
     "contract_version": {
-      "const": "v4"
+      "const": "v5"
     },
-    "input_bundle_uri": {
-      "type": "string",
-      "minLength": 1
+    "input_bundle": {
+      "$ref": "common.schema.json#/$defs/inputBundleArtifactRef"
     },
     "review_intent": {
       "$ref": "common.schema.json#/$defs/reviewIntent"

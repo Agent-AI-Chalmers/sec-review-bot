@@ -1,31 +1,20 @@
-import json
 from pathlib import Path
 
 import pytest
 
 from sec_review_agents.entrypoints.input_preparation import prepare_run_input
 from sec_review_agents.runtime.runtime_config import runtime_context_from_config
+from tests.input_bundle import write_test_input_bundle
 
 
 def _issue_input() -> dict:
     local_root = Path("/tmp/local-runtime-config")
     local_root.mkdir(parents=True, exist_ok=True)
-    (local_root / "manifest.json").write_text(
-        json.dumps(
-            {
-                "contract_version": "v4",
-                "kind": "runner-input-bundle",
-                "workspace": {"snapshot": "workspace.snapshot.tar"},
-                "history": {"path": "history"},
-            }
-        ),
-        encoding="utf-8",
-    )
     return {
-        "contract_version": "v4",
+        "contract_version": "v5",
         "review_intent": {"objective": "audit"},
         "issue": {"number": 1},
-        "input_bundle_uri": str(local_root),
+        "input_bundle": write_test_input_bundle(local_root),
     }
 
 

@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 import pytest
@@ -26,6 +25,7 @@ from sec_review_agents.workflows.pull_request.direct import (
 from sec_review_agents.workflows.repository.direct import (
     run_repository_review_direct,
 )
+from tests.input_bundle import write_test_input_bundle
 
 
 def _bundle(
@@ -50,29 +50,18 @@ def _prepared_issue_bundle(
 ) -> ReviewBundle:
     local_root = tmp_path / "run-1"
     local_root.mkdir()
-    (local_root / "manifest.json").write_text(
-        json.dumps(
-            {
-                "contract_version": "v4",
-                "kind": "runner-input-bundle",
-                "workspace": {"snapshot": "workspace.snapshot.tar"},
-                "history": {"path": "history"},
-            }
-        ),
-        encoding="utf-8",
-    )
     return ReviewBundle(
         workflow="issue-review",
         run_id="run-1",
         input={
-            "contract_version": "v4",
+            "contract_version": "v5",
             "review_intent": review_intent
             or {
                 "objective": "repair",
                 "repair_mode": "test-changes-allowed",
             },
             "issue": {"title": "Issue", "body": "Body"},
-            "input_bundle_uri": str(local_root),
+            "input_bundle": write_test_input_bundle(local_root),
         },
         local_root_path=local_root,
         artifact_root_path=local_root / "artifacts",

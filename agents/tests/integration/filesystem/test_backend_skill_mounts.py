@@ -83,7 +83,7 @@ def _default_route_writable(backend, route: str) -> bool:
 
 
 def _local_root(input_data: dict) -> Path:
-    return Path(input_data["input_bundle_uri"])
+    return Path(input_data["input_bundle_root_path"])
 
 
 def _scan_mode(input_data: dict) -> str:
@@ -140,7 +140,7 @@ def _repository_verification_backend(input_data: dict, *, workspace_root_path: P
 
 
 def _repository_delivery_planning_backend(input_data: dict):
-    run_artifacts = Path(input_data["input_bundle_uri"]) / "artifacts"
+    run_artifacts = Path(input_data["input_bundle_root_path"]) / "artifacts"
     return create_repository_delivery_planning_backend(
         patch_root=run_artifacts / "delivery-planning" / "patches",
     )
@@ -166,7 +166,7 @@ def test_repository_review_backends_materialize_agent_skill_views(
         "run_id": "run-1",
         "case": {"case_id": "case-1"},
         "scan_target": {"scan_mode": "full"},
-        "input_bundle_uri": str(local_root),
+        "input_bundle_root_path": str(local_root),
         "artifact_paths": {
             "analyzer": str(analyzer_artifacts),
             "verifier": str(verifier_artifacts),
@@ -348,7 +348,7 @@ def test_repository_analyzer_skills_middleware_loads_analysis_agent_skills(
         "run_id": "run-1",
         "case": {"case_id": "case-1"},
         "scan_target": {"scan_mode": "full"},
-        "input_bundle_uri": str(local_root),
+        "input_bundle_root_path": str(local_root),
         "artifact_paths": {"analyzer": str(analyzer_artifacts)},
     }
     with (
@@ -405,7 +405,7 @@ def test_repository_cvss_backend_exposes_tmp(tmp_path: Path) -> None:
         "run_id": "run-1",
         "case": {"case_id": "case-1"},
         "scan_target": {"scan_mode": "full"},
-        "input_bundle_uri": str(local_root),
+        "input_bundle_root_path": str(local_root),
     }
 
     cvss_backend = _repository_cvss_backend(input_data)
@@ -440,14 +440,14 @@ def test_repository_incremental_routes_are_mode_gated(tmp_path: Path) -> None:
         "run_id": "run-1",
         "case": {"case_id": "case-1"},
         "scan_target": {"scan_mode": "full"},
-        "input_bundle_uri": str(local_root),
+        "input_bundle_root_path": str(local_root),
         "artifact_paths": artifact_paths,
     }
     incr_input = {
         "run_id": "run-1",
         "case": {"case_id": "case-1"},
         "scan_target": {"scan_mode": "incremental"},
-        "input_bundle_uri": str(local_root),
+        "input_bundle_root_path": str(local_root),
         "artifact_paths": artifact_paths,
     }
     with patch(
@@ -517,7 +517,7 @@ def test_repository_analyzer_local_tmp_write_is_host_tmp(tmp_path: Path) -> None
         "run_id": "run-1",
         "case": {"case_id": "case-1"},
         "scan_target": {"scan_mode": "full"},
-        "input_bundle_uri": str(local_root),
+        "input_bundle_root_path": str(local_root),
     }
 
     with patch(
@@ -553,7 +553,7 @@ def test_repository_verifier_rejects_missing_patched_workspace(tmp_path: Path) -
         "run_id": "run-1",
         "case": {"case_id": "case-1"},
         "scan_target": {"scan_mode": "full"},
-        "input_bundle_uri": str(local_root),
+        "input_bundle_root_path": str(local_root),
         "artifact_paths": {"verifier": str(verifier_artifacts)},
     }
 

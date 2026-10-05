@@ -1,6 +1,8 @@
+import hashlib
 import secrets
 import shutil
 import subprocess
+import tarfile
 import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -17,6 +19,7 @@ ReviewWorkflow = Literal[
 ]
 BUNDLE_MANIFEST_NAME = "manifest.json"
 LOCAL_INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_INPUT_BUNDLE_ROOT"
+INPUT_BUNDLE_MEDIA_TYPE = "application/vnd.sec-review.input-bundle.v1+tar+zstd"
 
 
 def create_local_run_id() -> str:
@@ -90,7 +93,7 @@ def write_input_bundle_manifest(
     include_incremental_window: bool,
 ) -> None:
     manifest: dict[str, Any] = {
-        "contract_version": "v4",
+        "contract_version": "v5",
         "kind": "runner-input-bundle",
         "workspace": {
             "snapshot": "workspace.snapshot.tar",
@@ -106,6 +109,43 @@ def write_input_bundle_manifest(
     from sec_review_agents.utils.files import write_json
 
     write_json(paths.local_root_path / BUNDLE_MANIFEST_NAME, manifest)
+
+
+def archive_input_bundle(
+    paths: MaterializedRunPaths,
+    *,
+    include_incremental_window: bool,
+) -> dict[str, object]:
+    """Create the immutable public input artifact from prepared local material."""
+    archive_path = Path(f"{paths.local_root_path}.tar.zst")
+    entries = [
+        BUNDLE_MANIFEST_NAME,
+        "workspace.snapshot.tar",
+        "history",
+        *(["incremental-window"] if include_incremental_window else []),
+    ]
+    archive_path.unlink(missing_ok=True)
+    # The live checkout is staging state, not bundle content. The uncompressed
+    # workspace snapshot remains inside because Runner reuses it when creating
+    # isolated stage workspaces; only the outer transport archive is compressed.
+    with tarfile.open(archive_path, mode="w:zst") as archive:
+        for entry in entries:
+            archive.add(paths.local_root_path / entry, arcname=entry)
+    digest = hashlib.sha256()
+    with archive_path.open("rb") as archive_file:
+        while chunk := archive_file.read(1024 * 1024):
+            digest.update(chunk)
+    size_bytes = archive_path.stat().st_size
+    reference: dict[str, object] = {
+        "uri": archive_path.resolve().as_uri(),
+        "digest": f"sha256:{digest.hexdigest()}",
+        "media_type": INPUT_BUNDLE_MEDIA_TYPE,
+        "size_bytes": size_bytes,
+    }
+    # Local execution consumes the snapshot, not the preparation checkout.
+    # Remove the redundant repository copy only after the archive is complete.
+    shutil.rmtree(workspace_path(paths), ignore_errors=True)
+    return reference
 
 
 def initialize_workspace_git_repo(workspace_path: Path) -> None:

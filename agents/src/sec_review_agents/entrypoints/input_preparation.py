@@ -1,12 +1,15 @@
 """Validate caller input and resolve the local paths used by review workflows."""
 
+import hashlib
 import json
+import shutil
+import tarfile
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_input
+from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_input
 from sec_review_agents.entrypoints.run_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
 
@@ -31,6 +34,10 @@ REPOSITORY_ARTIFACT_PATHS = {
 INPUT_BUNDLE_MANIFEST_NAME = "manifest.json"
 ARTIFACT_ROOT_ENV = "SEC_REVIEW_AGENT_ARTIFACT_ROOT"
 INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT"
+INPUT_BUNDLE_MEDIA_TYPE = "application/vnd.sec-review.input-bundle.v1+tar+zstd"
+MAX_INPUT_BUNDLE_BYTES = 2 * 1024 * 1024 * 1024
+MAX_INPUT_BUNDLE_ENTRIES = 100_000
+MAX_EXTRACTED_INPUT_BUNDLE_BYTES = 8 * 1024 * 1024 * 1024
 
 
 def prepare_run_input(
@@ -67,12 +74,15 @@ def prepare_workflow_input(
 
     # Validate before adding runner-owned fields, which are not part of the public
     # workflow input contract.
-    validate_v4_workflow_input(input_data, workflow)
+    validate_v5_workflow_input(input_data, workflow)
     prepared = deepcopy(input_data)
 
     # Resolve the caller's bundle URI at the trusted filesystem boundary.
     prepared["input_bundle_root_path"] = str(
-        _resolve_input_bundle_root(prepared.get("input_bundle_uri"))
+        _materialize_input_bundle(
+            prepared.get("input_bundle"),
+            destination=Path(artifact_root_path) / "input-bundle",
+        )
     )
 
     # Artifact paths come from runner configuration, never from caller input.
@@ -91,42 +101,95 @@ def prepare_workflow_input(
 
 def workflow_artifact_root(input_data: dict[str, Any], *, run_id: str) -> Path:
     return _resolve_artifact_root(
-        input_bundle_root=_resolve_input_bundle_root(
-            input_data.get("input_bundle_uri")
-        ),
         run_id=run_id,
     )
 
 
-def _resolve_input_bundle_root(value: object) -> Path:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError("Runner input is missing input_bundle_uri.")
-    uri = value.strip()
+def _materialize_input_bundle(value: object, *, destination: Path) -> Path:
+    if not isinstance(value, dict):
+        raise ValueError("Runner input is missing input_bundle.")
+    uri = value.get("uri")
+    digest = value.get("digest")
+    size_bytes = value.get("size_bytes")
+    media_type = value.get("media_type")
+    if not isinstance(uri, str) or not uri.strip():
+        raise ValueError("Runner input input_bundle.uri must be non-empty.")
+    if media_type != INPUT_BUNDLE_MEDIA_TYPE:
+        raise ValueError("Runner input input_bundle.media_type is unsupported.")
 
-    parsed = urlparse(uri)
+    parsed = urlparse(uri.strip())
     if parsed.scheme == "file":
         if parsed.netloc not in {"", "localhost"}:
-            raise ValueError("Runner input input_bundle_uri file URI must be local.")
-        path = Path(unquote(parsed.path))
-    elif parsed.scheme:
-        raise ValueError(f"Unsupported input_bundle_uri scheme: {parsed.scheme}")
+            raise ValueError("Runner input input_bundle file URI must be local.")
+        archive_path = Path(unquote(parsed.path))
     else:
-        path = Path(uri)
+        raise ValueError(f"Unsupported input_bundle URI scheme: {parsed.scheme}")
 
     configured_root = env_value(INPUT_BUNDLE_ROOT_ENV)
-    if configured_root is None:
-        return path
-
-    bundle_root = path.expanduser().resolve()
-    allowed_root = Path(configured_root).expanduser().resolve()
-    try:
-        bundle_root.relative_to(allowed_root)
-    except ValueError as error:
+    resolved_archive = archive_path.expanduser().resolve()
+    if configured_root is not None:
+        allowed_root = Path(configured_root).expanduser().resolve()
+        try:
+            resolved_archive.relative_to(allowed_root)
+        except ValueError as error:
+            raise ValueError(
+                "Runner input input_bundle.uri must resolve under "
+                f"{INPUT_BUNDLE_ROOT_ENV}."
+            ) from error
+    if not resolved_archive.is_file():
+        raise ValueError(f"Input bundle archive not found: {resolved_archive}")
+    archive_size = resolved_archive.stat().st_size
+    if archive_size > MAX_INPUT_BUNDLE_BYTES:
+        raise ValueError("Input bundle archive exceeds the compressed size limit.")
+    if archive_size != size_bytes:
         raise ValueError(
-            "Runner input input_bundle_uri must resolve under "
-            f"{INPUT_BUNDLE_ROOT_ENV}."
-        ) from error
-    return bundle_root
+            "Input bundle archive size does not match input_bundle.size_bytes."
+        )
+    digest_hash = hashlib.sha256()
+    with resolved_archive.open("rb") as archive_file:
+        while chunk := archive_file.read(1024 * 1024):
+            digest_hash.update(chunk)
+    actual_digest = digest_hash.hexdigest()
+    if digest != f"sha256:{actual_digest}":
+        raise ValueError(
+            "Input bundle archive digest does not match input_bundle.digest."
+        )
+
+    if destination.exists():
+        shutil.rmtree(destination)
+    destination.mkdir(parents=True)
+    # The archive is fully local before extraction; agents never perform random
+    # reads against object storage. Python 3.14 handles zstd natively here.
+    with tarfile.open(resolved_archive, mode="r:zst") as archive:
+        _validate_archive_members(archive, destination)
+        archive.extractall(destination, filter="data")
+    return destination
+
+
+def _validate_archive_members(archive: tarfile.TarFile, destination: Path) -> None:
+    resolved_destination = destination.resolve()
+    members = archive.getmembers()
+    if len(members) > MAX_INPUT_BUNDLE_ENTRIES:
+        raise ValueError("Input bundle archive exceeds the entry count limit.")
+    extracted_size = 0
+    for member in members:
+        if member.isdev() or member.issym() or member.islnk():
+            raise ValueError(
+                f"Input bundle archive contains unsafe entry: {member.name}"
+            )
+        if member.isfile():
+            extracted_size += member.size
+            if extracted_size > MAX_EXTRACTED_INPUT_BUNDLE_BYTES:
+                raise ValueError(
+                    "Input bundle archive exceeds the extracted size limit."
+                )
+        candidate = (destination / member.name).resolve()
+        try:
+            candidate.relative_to(resolved_destination)
+        except ValueError as error:
+            raise ValueError(
+                f"Input bundle archive path escapes its destination: {member.name}"
+            ) from error
 
 
 def _set_workflow_artifact_paths(
@@ -155,7 +218,7 @@ def _set_workflow_artifact_paths(
     }
 
 
-def _resolve_artifact_root(*, input_bundle_root: Path, run_id: str) -> Path:
+def _resolve_artifact_root(*, run_id: str) -> Path:
     configured_root = env_value(ARTIFACT_ROOT_ENV)
     if configured_root is not None:
         artifact_root = Path(configured_root).expanduser().resolve()
@@ -169,7 +232,7 @@ def _resolve_artifact_root(*, input_bundle_root: Path, run_id: str) -> Path:
                 f"Runner run_id resolves outside {ARTIFACT_ROOT_ENV}."
             ) from error
         return run_artifact_root
-    return input_bundle_root / "artifacts"
+    return Path(".agent-artifacts").resolve() / run_id
 
 
 def _set_bundle_paths_from_manifest(
@@ -183,8 +246,8 @@ def _set_bundle_paths_from_manifest(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError("Input bundle manifest must be an object.")
-    if manifest.get("contract_version") != "v4":
-        raise ValueError("Input bundle manifest contract_version must be 'v4'.")
+    if manifest.get("contract_version") != "v5":
+        raise ValueError("Input bundle manifest contract_version must be 'v5'.")
     if manifest.get("kind") != "runner-input-bundle":
         raise ValueError("Input bundle manifest kind must be 'runner-input-bundle'.")
 

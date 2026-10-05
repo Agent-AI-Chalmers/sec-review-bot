@@ -51,7 +51,7 @@ def not_run_review_record() -> dict[str, Any]:
 
 def assert_public_workflow_result(result: Mapping[str, Any]) -> None:
     assert FORBIDDEN_INTERNAL_PUBLIC_RESULT_KEYS.intersection(result) == set()
-    assert result.get("contract_version") == "v4"
+    assert result.get("contract_version") == "v5"
 
 
 def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:
@@ -67,8 +67,8 @@ def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:
     assert FORBIDDEN_INTERNAL_MITIGATION_KEYS.intersection(mitigation) == set()
 
 
-def assert_matches_v4_schema(payload: Mapping[str, Any], schema_name: str) -> None:
-    validator = contract_validator("v4", schema_name)
+def assert_matches_v5_schema(payload: Mapping[str, Any], schema_name: str) -> None:
+    validator = contract_validator("v5", schema_name)
     errors = sorted(
         validator.iter_errors(payload),
         key=lambda error: list(error.path),
@@ -81,7 +81,7 @@ def assert_matches_v4_schema(payload: Mapping[str, Any], schema_name: str) -> No
 
 def test_pull_request_result_public_shape() -> None:
     result: dict[str, Any] = {
-        "contract_version": "v4",
+        "contract_version": "v5",
         "review_record": build_review_record(
             analysis_result={
                 "verdict": "no-actionable-finding",
@@ -108,7 +108,7 @@ def test_pull_request_result_public_shape() -> None:
     assert_review_record_shape(result["review_record"])
 
 
-def test_review_record_builder_output_matches_shared_v4_schema() -> None:
+def test_review_record_builder_output_matches_shared_v5_schema() -> None:
     result = build_review_record(
         analysis_result={
             "verdict": "confirmed-vulnerability",
@@ -149,7 +149,7 @@ def test_review_record_builder_output_matches_shared_v4_schema() -> None:
         },
     )
 
-    assert_matches_v4_schema(result, "review-record.schema.json")
+    assert_matches_v5_schema(result, "review-record.schema.json")
 
 
 def test_repository_result_public_shape() -> None:
@@ -196,7 +196,7 @@ def test_repository_result_public_shape() -> None:
     assert_review_record_shape(result["case_results"][0]["review_record"])
 
 
-def test_repository_workflow_result_builder_output_matches_shared_v4_schema() -> None:
+def test_repository_workflow_result_builder_output_matches_shared_v5_schema() -> None:
     result = build_repository_workflow_result(
         discovery_result={
             "counts": {
@@ -217,6 +217,7 @@ def test_repository_workflow_result_builder_output_matches_shared_v4_schema() ->
                 {
                     "delivery_id": "delivery-1",
                     "case_ids": ["case-1"],
+                    "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
                     "file_changes": [
                         {
                             "path": "src/webhook.ts",
@@ -271,7 +272,7 @@ def test_repository_workflow_result_builder_output_matches_shared_v4_schema() ->
         ],
     )
 
-    assert_matches_v4_schema(result, "repository-review-result.schema.json")
+    assert_matches_v5_schema(result, "repository-review-result.schema.json")
 
 
 def test_repository_case_results_drop_internal_case_fields() -> None:

@@ -1,5 +1,5 @@
 {
-  "contract_version": "v4",
+  "contract_version": "v5",
   "review_record": {
     "analysis": {
       "verdict": "confirmed-vulnerability",

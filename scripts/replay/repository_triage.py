@@ -9,9 +9,9 @@ from pathlib import Path
 
 from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
 from sec_review_agents.utils.env import bootstrap_agents_env
-from sec_review_agents.utils.paths import artifact_path, required_path
+from sec_review_agents.utils.paths import artifact_path
 
-from scripts.replay.input_bundle import default_replay_artifact_root, read_json
+from scripts.replay.input_bundle import materialize_replay_input, read_json
 
 
 def _default_input_path_from_run_artifacts(run_artifacts_path: Path) -> Path:
@@ -104,13 +104,7 @@ def _resolve_paths(args: argparse.Namespace) -> tuple[Path, Path, Path | None]:
 def _run_artifacts_path(replay_input: dict, run_artifacts_path: Path | None) -> Path:
     if run_artifacts_path is not None:
         return run_artifacts_path
-    return default_replay_artifact_root(
-        input_bundle_root=required_path(
-            replay_input.get("input_bundle_uri"),
-            label="input_bundle_uri",
-        ),
-        run_id=str(replay_input.get("run_id") or ""),
-    )
+    return Path(".agent-artifacts") / "replay-triage"
 
 
 def _hydrate_artifact_paths(replay_input: dict, run_artifacts_path: Path) -> None:
@@ -128,10 +122,12 @@ async def main() -> None:
     args = _parse_args()
     input_path, discovery_path, requested_run_artifacts_path = _resolve_paths(args)
 
-    replay_input = read_json(input_path)
+    public_input = read_json(input_path)
     discovery_result = read_json(discovery_path)
-    run_artifacts_path = _run_artifacts_path(replay_input, requested_run_artifacts_path)
-    _hydrate_artifact_paths(replay_input, run_artifacts_path)
+    run_artifacts_path = _run_artifacts_path(public_input, requested_run_artifacts_path)
+    replay_input = materialize_replay_input(
+        public_input, workflow="repository-review", artifact_root=run_artifacts_path
+    )
 
     triage_result = await run_repository_triage_stage(
         triage_root=artifact_path(replay_input["artifact_paths"], "triage"),

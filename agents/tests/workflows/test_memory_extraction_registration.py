@@ -35,7 +35,7 @@ async def test_issue_review_registers_memory_extraction_via_activity(
 
     async def fake_execute_activity(activity_fn, *args, timeout_seconds):
         if activity_fn is issue_workflow.build_issue_review_result_activity:
-            return {"contract_version": "v4"}
+            return {"contract_version": "v5"}
         return {}
 
     monkeypatch.setattr(
@@ -54,7 +54,7 @@ async def test_issue_review_registers_memory_extraction_via_activity(
     )
     result = await issue_workflow.IssueReviewWorkflow().run(request)
 
-    assert result == {"ok": True, "result": {"contract_version": "v4"}}
+    assert result == {"ok": True, "result": {"contract_version": "v5"}}
     assert len(calls) == 1
     assert calls[0].job_id == "issue-review-run-1"
 
@@ -70,7 +70,7 @@ async def test_pull_request_review_registers_memory_extraction_via_activity(
 
     async def fake_execute_activity(activity_fn, *args, timeout_seconds):
         if activity_fn is pr_workflow.build_pull_request_review_result_activity:
-            return {"contract_version": "v4"}
+            return {"contract_version": "v5"}
         return {}
 
     monkeypatch.setattr(
@@ -89,7 +89,7 @@ async def test_pull_request_review_registers_memory_extraction_via_activity(
     )
     result = await pr_workflow.PullRequestReviewWorkflow().run(request)
 
-    assert result == {"ok": True, "result": {"contract_version": "v4"}}
+    assert result == {"ok": True, "result": {"contract_version": "v5"}}
     assert len(calls) == 1
     assert calls[0].job_id == "pull-request-review-run-1"
 
@@ -100,7 +100,7 @@ async def test_repository_review_does_not_register_run_level_memory_extraction(
 ) -> None:
     async def fake_execute_activity(activity_fn, *args, timeout_seconds):
         if activity_fn is repository_workflow.build_repository_review_result_activity:
-            return {"contract_version": "v4"}
+            return {"contract_version": "v5"}
         return {}
 
     async def fake_execute_child_workflow(*_args, **_kwargs):
@@ -126,7 +126,7 @@ async def test_repository_review_does_not_register_run_level_memory_extraction(
     )
     result = await repository_workflow.RepositoryReviewWorkflow().run(request)
 
-    assert result == {"ok": True, "result": {"contract_version": "v4"}}
+    assert result == {"ok": True, "result": {"contract_version": "v5"}}
 
 
 @pytest.mark.asyncio
@@ -276,7 +276,7 @@ async def test_issue_review_does_not_register_memory_when_disabled(
 
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         if activity_fn is issue_workflow.build_issue_review_result_activity:
-            return {"contract_version": "v4"}
+            return {"contract_version": "v5"}
         return {}
 
     monkeypatch.setattr(issue_workflow, "execute_activity", fake_execute_activity)

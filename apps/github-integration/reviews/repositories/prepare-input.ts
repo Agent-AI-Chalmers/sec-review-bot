@@ -20,6 +20,7 @@ import {
   type ChangedFileRecord
 } from './incremental-artifacts.js'
 import {
+  archiveInputBundle,
   buildGitRemoteUrl,
   createInputBundleRoot,
   createRunId,
@@ -207,9 +208,13 @@ export async function prepareRepositoryReviewInput ({
     })
   }
 
+  const input_bundle = await archiveInputBundle({
+    input_bundle_root,
+    include_incremental_window: resolvedScanMode === 'incremental'
+  })
   const input: RepositoryReviewInput = {
-    contract_version: 'v4',
-    input_bundle_uri: input_bundle_root,
+    contract_version: 'v5',
+    input_bundle,
     review_intent: {
       objective: 'audit',
       ...(repair_mode ? { repair_mode } : {})

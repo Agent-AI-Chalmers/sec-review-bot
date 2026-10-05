@@ -1,14 +1,14 @@
-# 集成契约 v4
+# 集成契约 v5
 
-语言：[English](CONTRACT_V4.md) | 中文
+语言：[English](CONTRACT_V5.md) | 中文
 
-本文是 [CONTRACT_V4.md](CONTRACT_V4.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文是 [CONTRACT_V5.md](CONTRACT_V5.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-代表性的 JSON 测试样例位于 [`fixtures/v4`](fixtures/v4)。Python 和 TypeScript 契约测试都会读取这些测试样例。
+代表性的 JSON 测试样例位于 [`fixtures/v5`](fixtures/v5)。Python 和 TypeScript 契约测试都会读取这些测试样例。
 
 本文定义通过 runner HTTP API 提交任务时使用的 workflow `input`，以及任务完成后返回的 `result`。HTTP API 见 [Runner HTTP API](RUNNER_HTTP_API.zh.md)。
 
-v4 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的运行细节：
+v5 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的运行细节：
 
 - issue review 和 pull request review 返回单个 `ReviewRecord`。
 - repository review 返回 scan 摘要、case-level `ReviewRecord` 投影，以及 repository-only delivery 结果。
@@ -19,19 +19,28 @@ v4 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的
 
 所有 workflow input 都包含：
 
-- `contract_version: "v4"`
-- `input_bundle_uri`
+- `contract_version: "v5"`
+- `input_bundle`
 - `review_intent`
 
 ### Input Bundle 边界
 
-`input_bundle_uri` 指向调用方提供的 input bundle 根目录。生产集成当前要求该 bundle 在 runner worker 上可读。
+`input_bundle` 是指向完整 input bundle archive 的不可变 artifact reference。调用方准备并上传 archive；runner 校验后，将其 materialize 到 run-scoped 本地目录，再读取 manifest 或执行 workflow。
 
-这个耦合是明确设计：GitHub App 或 local materializer 负责把 GitHub 上下文准备成本地 workspace、history 和 incremental window；runner 只消费这些材料并执行 workflow。
+v5 Runner 当前支持本地 `file:` URI。后续 storage 阶段可以增加持久的 `s3:` URI，但 storage endpoint、region 和 credentials 仍属于部署配置，绝不能来自 workflow input。带有效期的 HTTP presigned URL 不是持久 artifact reference。
 
 调用方负责 input bundle；runner / stage 负责 `artifact_paths`、stage artifact roots、writable stage workspaces、retry state 和 delivery assignments 等运行态信息。
 
-bundle 根目录下的 `manifest.json` 必须存在。manifest 声明 bundle 内部材料路径；runner 会把它解析成内部 `bundle_paths`，供 workflow/backend 使用。调用方不得直接提供 `bundle_paths`。
+`tar.zst` archive 必须包含 `manifest.json`、workspace snapshot、history 和声明的 incremental window。manifest 声明 bundle-relative path；runner 将其解析成内部本地 `bundle_paths`。调用方不得直接提供 `bundle_paths`。
+
+```ts
+interface InputBundleArtifactRef {
+  uri: string // file:
+  digest: `sha256:${string}`
+  media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
+  size_bytes: number
+}
+```
 
 Repository scan target：
 
@@ -78,8 +87,8 @@ Issue workflow 使用：
 
 ```ts
 interface IssueReviewInput {
-  contract_version: 'v4'
-  input_bundle_uri: string
+  contract_version: 'v5'
+  input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   issue: Record<string, unknown>
 }
@@ -89,8 +98,8 @@ Pull request workflow 使用：
 
 ```ts
 interface PullRequestReviewInput {
-  contract_version: 'v4'
-  input_bundle_uri: string
+  contract_version: 'v5'
+  input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   pr: Record<string, unknown>
 }
@@ -100,8 +109,8 @@ Repository workflow 使用：
 
 ```ts
 interface RepositoryReviewInput {
-  contract_version: 'v4'
-  input_bundle_uri: string
+  contract_version: 'v5'
+  input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   scan_target: RepositoryScanTarget
   scan_scope: RepositoryScanScope
@@ -111,7 +120,7 @@ interface RepositoryReviewInput {
 runner 会在进程边界校验 input。所有 workflow 都需要这些共同字段：
 
 - `contract_version`
-- `input_bundle_uri`
+- `input_bundle`
 - `review_intent`
 
 `review_intent.objective` 声明 review 目标：
@@ -231,7 +240,7 @@ Workflow：`issue-review`
 
 ```ts
 interface IssueWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   review_record: ReviewRecord
 }
 ```
@@ -248,7 +257,7 @@ Workflow：`pull-request-review`
 
 ```ts
 interface PullRequestWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   review_record: ReviewRecord
 }
 ```
@@ -269,7 +278,7 @@ Repository review 由 `scan -> case review -> delivery` 组成：
 
 ```ts
 interface RepositoryReviewWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   scan_summary: ScanSummary
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]
@@ -332,7 +341,7 @@ interface RepositoryDelivery {
 
 ### 校验责任
 
-JSON Schema 负责传输结构，包括必填字段、JSON type、enum、tagged variant 和额外字段策略。消费方必须先校验完整的 v4 result，再解释其内容；不能通过宽松类型转换（coercion）把非法值变成合法值。
+JSON Schema 负责传输结构，包括必填字段、JSON type、enum、tagged variant 和额外字段策略。消费方必须先校验完整的 v5 result，再解释其内容；不能通过宽松类型转换（coercion）把非法值变成合法值。
 
 Schema 不代替领域代码。跨字段 workflow 规则仍由作出决策的 workflow 负责；消费方继续负责副作用策略，例如安全的 repository path、GitHub 权限、发布条件和重试行为。
 

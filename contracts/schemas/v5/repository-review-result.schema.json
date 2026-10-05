@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sec-review-bot.local/contracts/schemas/v4/repository-review-result.schema.json",
-  "title": "Contract v4 repository-review result",
+  "$id": "https://sec-review-bot.local/contracts/schemas/v5/repository-review-result.schema.json",
+  "title": "Contract v5 repository-review result",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,7 +12,7 @@
   ],
   "properties": {
     "contract_version": {
-      "const": "v4"
+      "const": "v5"
     },
     "scan_summary": {
       "$ref": "common.schema.json#/$defs/scanSummary"

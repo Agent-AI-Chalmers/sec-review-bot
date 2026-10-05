@@ -149,7 +149,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
   try {
     const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
     assert.ok(admission.preparation_token)
-    await store.save_prepared_submission(runId, admission.preparation_token, publishContextForWorkflow('issue-review'), { contract_version: 'v4' })
+    await store.save_prepared_submission(runId, admission.preparation_token, publishContextForWorkflow('issue-review'), { contract_version: 'v5' })
     await store.failPreparation(runId, admission.preparation_token, { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
     const staleToken = await store.claimSubmissionRecovery(runId)
     const currentToken = await store.claimSubmissionRecovery(runId)

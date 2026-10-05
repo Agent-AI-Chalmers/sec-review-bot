@@ -161,7 +161,7 @@ def main() -> None:
         repair_mode=args.repair_mode,
     )
 
-    print(f"LOCAL_ROOT={bundle.input['input_bundle_uri']}")
+    print(f"LOCAL_ROOT={bundle.local_root_path}")
 
     if args.materialize_only:
         return
@@ -174,6 +174,7 @@ def main() -> None:
     result = workflow_result
     result.setdefault("previews", {})["pull_request_preview"] = (
         write_pull_request_previews(
+            local_root_path=bundle.local_root_path,
             materialized_input=bundle.input,
             workflow_result=result,
         )

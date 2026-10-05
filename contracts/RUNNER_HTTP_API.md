@@ -2,7 +2,7 @@
 
 Language: English | [中文](RUNNER_HTTP_API.zh.md)
 
-This is the HTTP API for the production runner service. Workflow input and result fields are defined in [CONTRACT_V4.md](CONTRACT_V4.md).
+This is the HTTP API for the production runner service. Workflow input and result fields are defined in [CONTRACT_V5.md](CONTRACT_V5.md).
 
 ## Authentication
 
@@ -93,7 +93,7 @@ GET /v1/runs/{run_id}
 
 ### Succeeded Response
 
-The Runner reports `succeeded` only after the workflow completes and its result matches the public v4 schema for that workflow. A completed workflow that returns an invalid public result is reported as failed with `RUNNER_RESPONSE_INVALID`; the Runner does not guess how to repair contract fields at this boundary.
+The Runner reports `succeeded` only after the workflow completes and its result matches the public v5 schema for that workflow. A completed workflow that returns an invalid public result is reported as failed with `RUNNER_RESPONSE_INVALID`; the Runner does not guess how to repair contract fields at this boundary.
 
 ```json
 {

@@ -32,7 +32,7 @@ function jsonResponse (body: unknown, init?: ResponseInit): Response {
 }
 
 function issueInput (): Record<string, unknown> {
-  return structuredClone(contractFixture('v4', 'issue-review-input.json')) as Record<string, unknown>
+  return structuredClone(contractFixture('v5', 'issue-review-input.json')) as Record<string, unknown>
 }
 
 test.afterEach(() => {
@@ -215,11 +215,11 @@ test('submitRunnerRun rejects schema-invalid input before dispatch', async () =>
       workflow: 'repository-review',
       run_id: 'run-1',
       input: contractFixture(
-        'v4',
+        'v5',
         'invalid-repository-review-input-max-file-bytes.json'
       ) as Record<string, unknown>
     }),
-    /does not match contract v4/
+    /does not match contract v5/
   )
   assert.equal(called, false)
 })

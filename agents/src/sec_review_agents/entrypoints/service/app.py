@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_input
+from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_input
 from sec_review_agents.entrypoints.input_preparation import INPUT_BUNDLE_ROOT_ENV
 from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_REQUEST_INVALID,
@@ -150,7 +150,7 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
             )
 
         try:
-            validate_v4_workflow_input(request["input"], workflow)
+            validate_v5_workflow_input(request["input"], workflow)
         except ValueError as error:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,

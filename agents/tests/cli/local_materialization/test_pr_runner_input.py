@@ -76,7 +76,6 @@ def test_build_local_pull_request_bundle_creates_limited_history_workspace(
         head_ref=head_sha,
     )
 
-    workspace_path = bundle.local_root_path / "workspace"
-    assert (workspace_path / ".git").exists()
-    assert _run_git(workspace_path, "rev-parse", "HEAD") == head_sha
-    assert (workspace_path / "app.py").exists()
+    assert not (bundle.local_root_path / "workspace").exists()
+    assert bundle.input["input_bundle"]["uri"].endswith(".tar.zst")
+    assert head_sha

@@ -19,7 +19,7 @@ interface ReviewRecordFixture {
 }
 
 function reviewRecordFixtureNames (): string[] {
-  const manifest = contractFixtureManifest('v4') as FixtureManifest
+  const manifest = contractFixtureManifest('v5') as FixtureManifest
   return Object.entries(manifest.schema_fixtures)
     .filter(([, schemaName]) => schemaName === 'review-record.schema.json')
     .map(([fixtureName]) => fixtureName)
@@ -54,33 +54,33 @@ function validReviewRecord (): ReviewRecordFixture {
   }
 }
 
-test('parseReviewRecord accepts a complete v4 review_record', () => {
+test('parseReviewRecord accepts a complete v5 review_record', () => {
   const record = parseReviewRecord(validReviewRecord())
 
   assert.equal(record.analysis.verdict, 'confirmed-vulnerability')
   assert.deepEqual(record.mitigation.changed_files, [])
 })
 
-test('parseReviewRecord accepts the shared v4 review_record fixture', () => {
-  const record = parseReviewRecord(contractFixture('v4', 'review-record.json'))
+test('parseReviewRecord accepts the shared v5 review_record fixture', () => {
+  const record = parseReviewRecord(contractFixture('v5', 'review-record.json'))
 
   assert.equal(record.analysis.verdict, 'confirmed-vulnerability')
   assert.equal(record.verification.patch_coverage, 'full')
   assert.equal(record.cvss?.severity, 'medium')
 })
 
-test('parseReviewRecord accepts the shared v4 deleted-file review_record fixture', () => {
-  const record = parseReviewRecord(contractFixture('v4', 'review-record-deleted-file.json'))
+test('parseReviewRecord accepts the shared v5 deleted-file review_record fixture', () => {
+  const record = parseReviewRecord(contractFixture('v5', 'review-record-deleted-file.json'))
 
   assert.equal(record.analysis.verdict, 'confirmed-defect')
   assert.equal(record.mitigation.file_changes.at(0)?.status, 'deleted')
   assert.equal(record.cvss?.outcome, 'not-scored')
 })
 
-test('parseReviewRecord accepts every shared v4 review_record schema fixture', () => {
+test('parseReviewRecord accepts every shared v5 review_record schema fixture', () => {
   for (const fixtureName of reviewRecordFixtureNames()) {
     assert.doesNotThrow(
-      () => parseReviewRecord(contractFixture('v4', fixtureName)),
+      () => parseReviewRecord(contractFixture('v5', fixtureName)),
       fixtureName
     )
   }
@@ -113,7 +113,7 @@ test('parseReviewRecord rejects deleted file changes with content', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -129,7 +129,7 @@ test('parseReviewRecord rejects upsert file changes without content encoding', (
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -147,7 +147,7 @@ test('parseReviewRecord rejects file changes with unsupported fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -162,7 +162,7 @@ test('parseReviewRecord rejects unsafe file change paths', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -177,7 +177,7 @@ test('parseReviewRecord rejects file change paths with surrounding whitespace', 
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -187,7 +187,7 @@ test('parseReviewRecord rejects unsupported public fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -204,11 +204,11 @@ test('parseReviewRecord rejects invalid cvss field types', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
-test('parseReviewRecord rejects malformed v4 review_record', () => {
+test('parseReviewRecord rejects malformed v5 review_record', () => {
   assert.throws(
     () => parseReviewRecord({
       analysis: {
@@ -217,7 +217,7 @@ test('parseReviewRecord rejects malformed v4 review_record', () => {
         narratives: []
       }
     }),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -227,7 +227,7 @@ test('parseReviewRecord rejects unknown public enum values', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -237,7 +237,7 @@ test('parseReviewRecord rejects removed public status fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })
 
@@ -247,6 +247,6 @@ test('parseReviewRecord rejects numeric changed_files instead of coercing them',
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v4/
+    /review_record does not match contract v5/
   )
 })

@@ -5,6 +5,7 @@ from pathlib import Path
 from sec_review_agents.cli.local_git import repo_default_branch, resolve_git_ref
 from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
+    archive_input_bundle,
     build_run_paths,
     create_local_run_id,
     ensure_run_directories,
@@ -281,9 +282,13 @@ def build_local_repository_security_bundle(
         ],
     }
 
+    input_bundle = archive_input_bundle(
+        paths,
+        include_incremental_window=resolved_scan_mode == "incremental",
+    )
     input_data = {
-        "contract_version": "v4",
-        "input_bundle_uri": str(paths.local_root_path),
+        "contract_version": "v5",
+        "input_bundle": input_bundle,
         "review_intent": {
             "objective": "audit",
             "repair_mode": repair_mode,

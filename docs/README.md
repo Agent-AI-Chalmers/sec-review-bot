@@ -43,7 +43,7 @@ Use these docs for the contracts between the App side and agent side:
 
 - [Contracts README](../contracts/README.md): Public integration interface and contract entry point.
 - [RUNNER_HTTP_API.md](../contracts/RUNNER_HTTP_API.md): The Agent Runner HTTP API.
-- [CONTRACT_V4.md](../contracts/CONTRACT_V4.md): Workflow result contract.
+- [CONTRACT_V5.md](../contracts/CONTRACT_V5.md): Workflow result contract.
 
 ### workflows/
 

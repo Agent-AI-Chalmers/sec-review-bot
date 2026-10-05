@@ -28,9 +28,16 @@ export interface ReviewIntent {
   repair_mode?: RepairMode
 }
 
+export interface InputBundleArtifactRef {
+  uri: string
+  digest: `sha256:${string}`
+  media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
+  size_bytes: number
+}
+
 interface RunnerWorkflowInputBase {
-  contract_version: 'v4'
-  input_bundle_uri: string
+  contract_version: 'v5'
+  input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
 }
 

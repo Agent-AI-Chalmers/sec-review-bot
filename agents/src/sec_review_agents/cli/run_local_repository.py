@@ -182,7 +182,7 @@ def main() -> None:
         repair_mode=args.repair_mode,
     )
 
-    print(f"LOCAL_ROOT={bundle.input['input_bundle_uri']}")
+    print(f"LOCAL_ROOT={bundle.local_root_path}")
 
     if args.materialize_only:
         return
@@ -194,7 +194,7 @@ def main() -> None:
     )
     result.setdefault("previews", {})["draft_pr_preview"] = (
         write_repository_draft_pr_previews(
-            materialized_input=bundle.input,
+            local_root_path=bundle.local_root_path,
             deliveries=result.get("deliveries") or [],
             case_results=result.get("case_results") or [],
         )

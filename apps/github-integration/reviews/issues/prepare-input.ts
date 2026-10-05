@@ -13,6 +13,7 @@ import {
   materializeWorkspaceWithCommitHistory
 } from '../../infrastructure/runner/git-workspace.js'
 import {
+  archiveInputBundle,
   buildGitRemoteUrl,
   createInputBundleRoot,
   createRunId,
@@ -133,14 +134,18 @@ export async function prepareIssueReviewInput ({
     history_path,
     workspace_ref
   })
+  const input_bundle = await archiveInputBundle({
+    input_bundle_root,
+    include_incremental_window: false
+  })
   const input: IssueReviewInput = {
-    contract_version: 'v4',
+    contract_version: 'v5',
     review_intent: {
       objective: review_objective,
       ...(repair_mode ? { repair_mode } : {})
     },
     issue: historyArtifacts.issueMetadata,
-    input_bundle_uri: input_bundle_root
+    input_bundle
   }
 
   const input_path = path.join(input_bundle_root, 'issue-review-input.json')

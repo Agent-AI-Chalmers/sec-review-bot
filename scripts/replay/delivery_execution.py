@@ -19,7 +19,6 @@ from sec_review_agents.delivery_stages.result import (
 )
 from sec_review_agents.utils.env import bootstrap_agents_env, env_value
 from sec_review_agents.utils.files import persist_json
-from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.repository.result import (
     build_scan_summary,
 )
@@ -27,7 +26,7 @@ from sec_review_agents.workflows.repository.workflow import (
     project_repository_case_result_for_delivery,
 )
 
-from scripts.replay.input_bundle import read_json
+from scripts.replay.input_bundle import materialize_replay_input, read_json
 
 ENV_RUN_ARTIFACTS_PATH = "REPOSITORY_DELIVERY_EXECUTION_RUN_ARTIFACTS_PATH"
 ENV_INPUT_PATH = "REPOSITORY_DELIVERY_EXECUTION_INPUT_PATH"
@@ -61,7 +60,7 @@ def _repository_result_from_delivery_replay(
     case_results: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
-        "contract_version": "v4",
+        "contract_version": "v5",
         "scan_summary": _previous_scan_summary(previous_result),
         "deliveries": [
             item
@@ -127,7 +126,10 @@ async def main() -> None:
         else run_artifacts / "delivery-planning" / "delivery-plan.json"
     )
 
-    replay_input = read_json(input_path)
+    public_input = read_json(input_path)
+    replay_input = materialize_replay_input(
+        public_input, workflow="repository-review", artifact_root=run_artifacts
+    )
     previous_result = _load_result(run_artifacts)
 
     # Delivery replay bypasses runner input preparation and reuses existing
@@ -157,10 +159,6 @@ async def main() -> None:
             "Repository result does not contain keep case_results for delivery execution."
         )
 
-    local_root = required_path(
-        replay_input.get("input_bundle_uri"),
-        label="input_bundle_uri",
-    )
     delivery_case_inputs = [
         project_repository_case_result_for_delivery(item) for item in keep_case_results
     ]
@@ -169,10 +167,8 @@ async def main() -> None:
         deliveries=delivery_plan["deliveries"],
         keep_case_results=delivery_case_inputs,
     )
-    workspace_snapshot_tar_path = required_path(
-        (replay_input.get("bundle_paths") or {}).get("workspace_snapshot_tar_path")
-        or (Path(local_root) / "workspace.snapshot.tar"),
-        label="bundle_paths.workspace_snapshot_tar_path",
+    workspace_snapshot_tar_path = Path(
+        replay_input["bundle_paths"]["workspace_snapshot_tar_path"]
     )
     delivery_execution = build_delivery_execution_input(
         run_artifacts_root=run_artifacts,

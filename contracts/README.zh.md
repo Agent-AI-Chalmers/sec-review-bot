@@ -18,9 +18,9 @@
 从这些文档开始：
 
 - [RUNNER_HTTP_API.zh.md](RUNNER_HTTP_API.zh.md)：调用方如何创建和轮询 workflow run。
-- [CONTRACT_V4.zh.md](CONTRACT_V4.zh.md)：workflow 输入和结果结构。
-- [schemas/v4](schemas/v4)：用于机器校验的 JSON Schema。
-- [fixtures/v4](fixtures/v4)：Python 和 TypeScript 测试共享的可执行 JSON 示例。
+- [CONTRACT_V5.zh.md](CONTRACT_V5.zh.md)：workflow 输入和结果结构。
+- [schemas/v5](schemas/v5)：用于机器校验的 JSON Schema。
+- [fixtures/v5](fixtures/v5)：Python 和 TypeScript 测试共享的可执行 JSON 示例。
 
 HTTP API 和 workflow 契约是稳定的公开接口。
 
@@ -65,7 +65,7 @@ GitHub integration 是调用方侧的一种实现：它把 GitHub event 和发�
 
 Markdown 规范定义字段语义、兼容规则和集成指导。
 
-Schema 文件是该规范的可执行结构化形式。契约 v4 schemas 使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python Runner 使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 执行 input 和 result schemas，TypeScript integration 则使用 [Ajv](https://ajv.js.org/) 独立执行这两类 schemas；两个包的测试也会执行共享 fixtures。
+Schema 文件是该规范的可执行结构化形式。契约 v5 schemas 使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python Runner 使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 执行 input 和 result schemas，TypeScript integration 则使用 [Ajv](https://ajv.js.org/) 独立执行这两类 schemas；两个包的测试也会执行共享 fixtures。
 
 Agents wheel 会在构建时把这些 canonical schemas 作为 package data 收入包中。因此安装后的 Python 工具不依赖仓库级 `contracts/` 路径。
 
@@ -77,13 +77,13 @@ Schemas 是结构性契约检查，不是所有运行时规则或发布规则的
 
 Fixture 文件提供测试可执行的具体 JSON 示例，因此也属于契约校验范围。
 
-[`fixtures/v4/manifest.json`](fixtures/v4/manifest.json) 记录每个 schema 必须接受哪些有效 fixtures、拒绝哪些无效 fixtures，因此 Python 和 TypeScript 会执行同一条结构边界。
+[`fixtures/v5/manifest.json`](fixtures/v5/manifest.json) 记录每个 schema 必须接受哪些有效 fixtures、拒绝哪些无效 fixtures，因此 Python 和 TypeScript 会执行同一条结构边界。
 
-当契约字段变化时，应同时更新本目录中的相关书面规范、[schema](schemas/v4)、[fixture](fixtures/v4) 和 [manifest](fixtures/v4/manifest.json) 条目。
+当契约字段变化时，应同时更新本目录中的相关书面规范、[schema](schemas/v5)、[fixture](fixtures/v5) 和 [manifest](fixtures/v5/manifest.json) 条目。
 
 ## Fixture 使用规则
 
-`fixtures/v4/` 下的 fixtures 是当前项目自有契约的可执行示例。
+`fixtures/v5/` 下的 fixtures 是当前项目自有契约的可执行示例。
 
 它们会被 Python agents 包和 GitHub integration 包共同消费，确保两个实现验证同一组 JSON 结构。
 
@@ -96,7 +96,7 @@ Schema 校验测试应读取 `manifest.json`，不要维护包内各自的 fixtu
 
 ## 产物边界
 
-除非某个字段明确提升进公开 workflow 结果，否则 stage 产物属于运行时诊断。公开结果包括 `review_record`、repository `case_results[]`、repository `deliveries[]`，以及 [CONTRACT_V4.zh.md](CONTRACT_V4.zh.md) 中记录的其他字段。
+除非某个字段明确提升进公开 workflow 结果，否则 stage 产物属于运行时诊断。公开结果包括 `review_record`、repository `case_results[]`、repository `deliveries[]`，以及 [CONTRACT_V5.zh.md](CONTRACT_V5.zh.md) 中记录的其他字段。
 
 调用方应从 workflow result 发布结果，而不是读取整包 stage 产物。如果调用方行为必须依赖某个 stage 产物，要么把所需字段提升进本契约，要么把依赖限制在本地调试工具内。
 
@@ -105,7 +105,7 @@ Schema 校验测试应读取 `manifest.json`，不要维护包内各自的 fixtu
 任何契约变更都应：
 
 - 更新相关 Markdown 规范；
-- 更新 [schemas/v4](schemas/v4) 下的 JSON Schema；
-- 更新或新增 [fixtures/v4](fixtures/v4) 下的 fixtures；
+- 更新 [schemas/v5](schemas/v5) 下的 JSON Schema；
+- 更新或新增 [fixtures/v5](fixtures/v5) 下的 fixtures；
 - 让 Python 和 TypeScript 测试校验同一组 fixtures 和 schemas。
 - 让 [scripts/check_contracts.sh](../scripts/check_contracts.sh) 随契约校验范围保持同步，并在发布变更前运行它。

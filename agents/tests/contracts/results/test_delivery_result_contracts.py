@@ -106,6 +106,7 @@ def test_delivery_result_contract_tracks_required_sections(tmp_path) -> None:
         "delivery_id",
         "case_ids",
         "file_changes",
+        "patch_diff",
     }
 
 
