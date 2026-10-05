@@ -2,7 +2,7 @@
 
 Language: English | [中文](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
-This guide covers local deployment of the GitHub integration / Runner Service / Temporal control plane with a host execution worker.
+This guide covers local deployment of the GitHub integration / Runner Service / Temporal control plane, object storage, and a host execution worker.
 
 Use it to run the complete integrated path locally. For running agents directly without the HTTP Runner Service, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
@@ -16,6 +16,8 @@ flowchart LR
     subgraph compose["Docker Compose"]
         integration["github-integration"] --> runner["Runner Service<br/>submit and query review tasks"]
         runner --> temporal["Temporal<br/>workflow state and task queue"]
+        integration -->|write input bundles| storage["Object Storage<br/>immutable input and result artifacts"]
+        runner -->|write terminal result artifacts| storage
     end
 
     subgraph host["Host"]
@@ -24,13 +26,17 @@ flowchart LR
 
     tunnel --> integration
     temporal --> worker
+    storage -->|read input bundles| worker
+    storage -->|read published artifacts| runner
 ```
 
 Cloudflare Tunnel forwards both public endpoints to the local `github-integration` service. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for configuration.
 
 Runner Service is the HTTP API between GitHub integration and Temporal. It authenticates and validates task requests, starts Temporal workflows, and queries task status; `sec-review-agents-worker` executes the agents.
 
-In terms of responsibilities, the Compose services form the control plane, while the host worker is an execution node similar to a Kubernetes worker node. Without a worker, submitted tasks remain in Temporal waiting for execution.
+Object Storage holds two kinds of run data: the input bundle prepared before execution and the result artifact produced after execution. GitHub integration writes the input bundle. The result publication path writes the terminal artifact. The worker and Runner Service read these objects when needed. The worker does not hold credentials for publishing result artifacts.
+
+Without a worker, submitted tasks remain in Temporal waiting for execution.
 
 Default local endpoints:
 
@@ -40,6 +46,8 @@ Default local endpoints:
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
+| RustFS API | `http://127.0.0.1:9000` |
+| RustFS Console | `http://127.0.0.1:9001` |
 
 ## Prerequisites
 
@@ -87,7 +95,7 @@ The repository review workflow authenticates to the App with GitHub Actions OIDC
 
 ## Deployment Configuration
 
-The integrated deployment uses four source configuration files:
+The integrated deployment uses four source configuration files. Compose `.env` also carries the object-storage endpoint and service credentials; these credentials are passed to the appropriate service only:
 
 - repository-root `.env`: Compose control plane;
 - `apps/github-integration/.env`: GitHub integration;

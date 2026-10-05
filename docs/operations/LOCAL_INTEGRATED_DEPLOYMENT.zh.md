@@ -4,7 +4,7 @@
 
 本文是 [LOCAL_INTEGRATED_DEPLOYMENT.md](LOCAL_INTEGRATED_DEPLOYMENT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是 GitHub integration / 运行服务 / Temporal 控制平面与宿主机执行 worker 的本地部署说明。
+这是 GitHub integration / 运行服务 / Temporal 控制平面、对象存储与宿主机执行 worker 的本地部署说明。
 
 如果你要在本地跑完整集成链路，读本文。不经过 HTTP 运行服务、直接在本地运行 agent，或使用 `run-local-* --temporal` 调试时，见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -18,6 +18,8 @@ flowchart LR
     subgraph compose["Docker Compose"]
         integration["github-integration"] --> runner["Runner Service<br/>提交和查询 review 任务"]
         runner --> temporal["Temporal<br/>workflow 状态和 task queue"]
+        integration -->|写入 input bundle| storage["Object Storage<br/>不可变 input 和 result artifact"]
+        runner -->|写入终态 result artifact| storage
     end
 
     subgraph host["宿主机"]
@@ -26,13 +28,17 @@ flowchart LR
 
     tunnel --> integration
     temporal --> worker
+    storage -->|读取 input bundle| worker
+    storage -->|读取已发布 artifact| runner
 ```
 
 Cloudflare Tunnel 将两个公网 endpoint 转发到本地 `github-integration`。具体配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 Runner Service 是 GitHub integration 与 Temporal 之间的 HTTP API。它负责鉴权、校验任务请求、启动 Temporal workflow 和查询任务状态；agent 由 `sec-review-agents-worker` 执行。
 
-职责上，Compose 中的服务构成控制平面，宿主机 worker 是类似 Kubernetes worker node 的执行节点。没有 worker 时，提交的任务会停留在 Temporal 中等待执行。
+对象存储保存两类运行数据：执行前准备的 input bundle，以及执行结束后生成的 result artifact。GitHub integration 写入 input bundle，结果发布流程写入终态 artifact；worker 和 Runner Service 在需要时从对象存储读取。worker 不持有发布 result artifact 的凭据。
+
+没有 worker 时，提交的任务会停留在 Temporal 中等待执行。
 
 默认本地端口：
 
@@ -42,6 +48,8 @@ Runner Service 是 GitHub integration 与 Temporal 之间的 HTTP API。它负�
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
+| RustFS API | `http://127.0.0.1:9000` |
+| RustFS Console | `http://127.0.0.1:9001` |
 
 ## 前提
 
@@ -89,7 +97,7 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 
 ## 部署配置
 
-集成部署使用四份源配置：
+集成部署使用四份源配置。Compose `.env` 还承载对象存储 endpoint 和服务凭据；这些凭据只传递给各自需要的服务：
 
 - 根目录 `.env`：Compose 控制平面；
 - `apps/github-integration/.env`：GitHub integration；
