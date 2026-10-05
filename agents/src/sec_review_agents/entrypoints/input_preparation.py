@@ -34,6 +34,7 @@ REPOSITORY_ARTIFACT_PATHS = {
 
 INPUT_BUNDLE_MANIFEST_NAME = "manifest.json"
 ARTIFACT_ROOT_ENV = "SEC_REVIEW_AGENT_ARTIFACT_ROOT"
+RUN_INPUT_ROOT_ENV = "SEC_REVIEW_AGENT_RUN_INPUT_ROOT"
 INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT"
 INPUT_BUNDLE_MEDIA_TYPE = "application/vnd.sec-review.input-bundle.v1+tar+zstd"
 MAX_INPUT_BUNDLE_BYTES = 2 * 1024 * 1024 * 1024
@@ -55,6 +56,7 @@ def prepare_run_input(
             caller_input,
             run_id=validated_run_id,
         ),
+        input_root_path=_resolve_run_input_root(run_id=validated_run_id),
     )
 
 
@@ -63,6 +65,7 @@ def prepare_workflow_input(
     workflow: str,
     *,
     artifact_root_path: str | Path,
+    input_root_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """Turn public workflow input into the filesystem-ready runtime form.
 
@@ -82,7 +85,11 @@ def prepare_workflow_input(
     prepared["input_bundle_root_path"] = str(
         _materialize_input_bundle(
             prepared.get("input_bundle"),
-            destination=Path(artifact_root_path) / "input-bundle",
+            destination=(
+                Path(input_root_path)
+                if input_root_path is not None
+                else Path(artifact_root_path) / "input-bundle"
+            ),
         )
     )
 
@@ -139,7 +146,7 @@ def _materialize_input_bundle(value: object, *, destination: Path) -> Path:
     elif parsed.scheme == "s3":
         resolved_archive = download_s3_input_bundle(
             uri.strip(),
-            destination.parent / "input-bundle.tar.zst",
+            destination.with_suffix(".tar.zst"),
             expected_size=size_bytes,
             maximum_size=MAX_INPUT_BUNDLE_BYTES,
         ).resolve()
@@ -242,6 +249,24 @@ def _resolve_artifact_root(*, run_id: str) -> Path:
             ) from error
         return run_artifact_root
     return Path(".agent-artifacts").resolve() / run_id
+
+
+def _resolve_run_input_root(*, run_id: str) -> Path:
+    """Keep materialized caller input outside the publishable artifact tree."""
+    configured_root = env_value(RUN_INPUT_ROOT_ENV)
+    input_root = (
+        Path(configured_root).expanduser().resolve()
+        if configured_root is not None
+        else Path(".agent-run-inputs").resolve()
+    )
+    run_input_root = (input_root / run_id).resolve()
+    try:
+        run_input_root.relative_to(input_root)
+    except ValueError as error:
+        raise ValueError(
+            f"Runner run_id resolves outside {RUN_INPUT_ROOT_ENV}."
+        ) from error
+    return run_input_root
 
 
 def _set_bundle_paths_from_manifest(

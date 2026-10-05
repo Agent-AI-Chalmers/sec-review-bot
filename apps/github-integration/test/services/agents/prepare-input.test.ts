@@ -315,6 +315,13 @@ test('repository input preparer writes full and incremental runner bundles', { c
     const fullManifest = JSON.parse(await fs.readFile(path.join(full.input_bundle_root, 'manifest.json'), 'utf8')) as Record<string, unknown>
     assert.equal('incremental_window' in fullManifest, false)
 
+    await fs.writeFile(path.join(full.input_bundle_root, 'stale-from-failed-attempt.txt'), 'stale')
+    const retriedFull = await prepareRepositoryReviewInput({ run_id: 'run-repo-full', octokit, repo_full_name: 'octo/demo', scan_mode: 'full' })
+    await assert.rejects(
+      fs.access(path.join(retriedFull.input_bundle_root, 'stale-from-failed-attempt.txt')),
+      { code: 'ENOENT' }
+    )
+
     const incremental = await prepareRepositoryReviewInput({ run_id: 'run-repo-incremental', octokit, repo_full_name: 'octo/demo', scan_mode: 'incremental', base_sha: refs.base_sha, head_sha: refs.head_sha })
     await assertRunnerInputArtifact({
       input: incremental.input as unknown as Record<string, unknown>,

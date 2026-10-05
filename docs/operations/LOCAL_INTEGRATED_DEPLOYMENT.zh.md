@@ -167,7 +167,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 安装脚本还会生成内部使用的 `SEC_REVIEW_SERVICE_UID` 和 `SEC_REVIEW_SERVICE_GID`。在 Compose 启动前，它会为该 service user 创建仓库内的状态目录。这样可以避免 Docker 自动创建无法由非 root 容器写入的 root-owned bind mount 源目录，并让 Temporal 容器以同一用户写入 SQLite 数据库。
 
-Artifact 默认写入当前 checkout 的 `.agent-artifacts`，模型配置默认读取 `agents/config/model-providers.toml`。大多数部署应保留这些默认值。如果需要把 artifact 放到其他磁盘，或者从其他位置读取模型配置，可以在 `deploy/systemd/deployment.env` 中填写绝对路径 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` 或 `MODEL_PROVIDERS_CONFIG_TOML`；安装脚本会保留这两个独立 worker 路径的非空 override。
+运行时解包的输入和生成的 artifact 默认分别写入当前 checkout 的 `.agent-run-inputs` 与 `.agent-artifacts`，模型配置默认读取 `agents/config/model-providers.toml`。大多数部署应保留这些默认值。如果需要移动这些目录或从其他位置读取模型配置，可以在 `deploy/systemd/deployment.env` 中填写绝对路径 `SEC_REVIEW_AGENT_RUN_INPUT_ROOT`、`SEC_REVIEW_AGENT_ARTIFACT_ROOT` 或 `MODEL_PROVIDERS_CONFIG_TOML`；安装脚本会保留这些独立 worker 路径的非空 override。
 
 如果 [`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) 新增了选项，需要手动把相关选项加入 `deploy/systemd/deployment.env`。
 
@@ -244,6 +244,7 @@ AGENT_MCP_ENABLED=true
 | Path | Owner | Purpose |
 | --- | --- | --- |
 | `.agent-rustfs-state` | RustFS | integration 与 Runner 交换 input archive 的持久对象存储 |
+| `.agent-run-inputs` | 宿主机 worker | 活跃运行所需的本地输入；不会进入对外发布的诊断材料 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
 | `.agent-postgres-state` | PostgreSQL | admission、Runner observation 与 publication step 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
@@ -361,7 +362,7 @@ GitHub integration 使用容器默认 root 用户写入本地 staging 文件。�
 可用下面命令修复 ownership：
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
+sudo chown -R "$USER:$USER" .agent-run-inputs .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
 ```
 
 PostgreSQL 协调状态与 Temporal 状态描述的是同一批活跃 run。不要在保留仍需轮询或发布的 PostgreSQL 记录时单独删除 `.agent-temporal-state`。重置 run 执行与发布状态时，应先停止完整服务，再同时删除两个状态目录：
@@ -375,7 +376,7 @@ sudo systemctl start sec-review-bot.target
 该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。运行开始前准备的输入材料（上传到 RustFS 的 archive）以及运行结束后生成的诊断材料（diagnostic artifact）当前没有自动保留期限；本地工作目录中的相应文件也一样默认无限期保留，用于恢复、重放和诊断。部署不会配置生命周期过期规则，因此磁盘用量由运维人员监控。确认没有仍需保留的 run 依赖它们后，才可以手动清理：
 
 ```bash
-sudo rm -rf .agent-rustfs-state .agent-artifacts
+sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
 ```
 
 `.agent-memory` 会跨多次运行持续保存，不属于常规清理范围。只有在确实需要重置 agent memory 时，才应先停止 worker，再单独删除 `.agent-memory`。该操作会永久删除已提取的 observations 和维护后的 memory。

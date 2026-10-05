@@ -17,6 +17,7 @@ from temporalio.service import RPCError, RPCStatusCode
 
 from sec_review_agents.artifacts.run_storage import publish_run_artifacts
 from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_result
+from sec_review_agents.entrypoints.input_preparation import workflow_artifact_root
 from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_EXECUTION_FAILED,
     RUNNER_RESPONSE_INVALID,
@@ -93,7 +94,11 @@ class TemporalRunnerWorkflowGateway:
                 memo={
                     "workflow": workflow,
                     _REQUEST_FINGERPRINT_MEMO_KEY: request_fingerprint,
-                    "artifact_root_path": input_data.get("artifact_root_path"),
+                    # The public request cannot choose service filesystem paths.
+                    # Derive the same trusted run root used by preparation.
+                    "artifact_root_path": str(
+                        workflow_artifact_root(input_data, run_id=run_id)
+                    ),
                 },
             )
         except WorkflowAlreadyStartedError:

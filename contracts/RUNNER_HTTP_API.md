@@ -100,9 +100,21 @@ The Runner reports `succeeded` only after the workflow completes and its result 
   "run_id": "run-001",
   "workflow": "issue-review",
   "status": "succeeded",
-  "result": {}
+  "result": {},
+  "artifact_publication": {
+    "status": "published",
+    "artifact": {
+      "kind": "diagnostic_bundle",
+      "uri": "s3://sec-review/runs/run-001/artifacts/diagnostic-tree.v1.tar.zst",
+      "media_type": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+      "digest": "sha256:0123456789abcdef...",
+      "size_bytes": 12345
+    }
+  }
 }
 ```
+
+`artifact_publication` is separate from the workflow result. Its status is `published`, `not_available`, or `failed`; publication failure does not change the workflow's business result.
 
 ### Failed Response
 

@@ -1,6 +1,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+
 from sec_review_agents.artifacts.run_storage import publish_run_artifacts
 
 
@@ -15,6 +17,10 @@ def test_publish_run_artifacts_builds_immutable_reference(
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "publisher")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "secret")
     client = MagicMock()
+    client.head_object.side_effect = ClientError(
+        {"ResponseMetadata": {"HTTPStatusCode": 404}, "Error": {"Code": "NoSuchKey"}},
+        "HeadObject",
+    )
     with patch(
         "sec_review_agents.artifacts.run_storage.boto3.client", return_value=client
     ):
@@ -46,6 +52,10 @@ def test_publish_run_artifacts_does_not_hide_upload_failure(
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "publisher")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "secret")
     client = MagicMock()
+    client.head_object.side_effect = ClientError(
+        {"ResponseMetadata": {"HTTPStatusCode": 404}, "Error": {"Code": "NoSuchKey"}},
+        "HeadObject",
+    )
     client.put_object.side_effect = RuntimeError("storage unavailable")
     with patch(
         "sec_review_agents.artifacts.run_storage.boto3.client", return_value=client
@@ -56,3 +66,32 @@ def test_publish_run_artifacts_does_not_hide_upload_failure(
             assert str(error) == "storage unavailable"
         else:
             raise AssertionError("publication failure must be raised")
+
+
+def test_publish_run_artifacts_reuses_existing_immutable_object(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "run"
+    root.mkdir()
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "publisher")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "secret")
+    client = MagicMock()
+    client.head_object.return_value = {
+        "ContentLength": 42,
+        "ContentType": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+        "Metadata": {"sha256": "a" * 64, "size-bytes": "42"},
+    }
+    with patch(
+        "sec_review_agents.artifacts.run_storage.boto3.client", return_value=client
+    ):
+        reference = publish_run_artifacts(root, "run-existing")
+
+    assert reference == {
+        "kind": "diagnostic_bundle",
+        "uri": "s3://sec-review/runs/run-existing/artifacts/diagnostic-tree.v1.tar.zst",
+        "media_type": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+        "digest": f"sha256:{'a' * 64}",
+        "size_bytes": 42,
+    }
+    client.put_object.assert_not_called()

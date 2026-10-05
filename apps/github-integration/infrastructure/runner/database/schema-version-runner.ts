@@ -4,7 +4,8 @@ import type { Pool, PoolClient } from 'pg'
 
 const SCHEMA_LOCK_ID = 734_620_114
 const SCHEMA_VERSIONS = [
-  { version: 1, name: 'initial_coordination_schema', file: 'schema-versions/001_initial_coordination_schema.sql' }
+  { version: 1, name: 'initial_coordination_schema', file: 'schema-versions/001_initial_coordination_schema.sql' },
+  { version: 2, name: 'runner_artifact_publication', file: 'schema-versions/002_runner_artifact_publication.sql' }
 ] as const
 
 interface AppliedSchemaVersion {

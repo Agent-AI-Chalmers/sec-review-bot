@@ -96,9 +96,21 @@ GET /v1/runs/{run_id}
   "run_id": "run-001",
   "workflow": "issue-review",
   "status": "succeeded",
-  "result": {}
+  "result": {},
+  "artifact_publication": {
+    "status": "published",
+    "artifact": {
+      "kind": "diagnostic_bundle",
+      "uri": "s3://sec-review/runs/run-001/artifacts/diagnostic-tree.v1.tar.zst",
+      "media_type": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+      "digest": "sha256:0123456789abcdef...",
+      "size_bytes": 12345
+    }
+  }
 }
 ```
+
+`artifact_publication` 与 workflow 业务结果相互独立。其状态为 `published`、`not_available` 或 `failed`；诊断材料发布失败不会改变 workflow 的业务结果。
 
 ### 失败响应
 

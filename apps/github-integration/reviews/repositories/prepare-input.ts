@@ -24,6 +24,7 @@ import {
   buildGitRemoteUrl,
   createInputBundleRoot,
   createRunId,
+  ensureCleanDirectory,
   finalizeInputBundleWorkspace
 } from '../shared/input-bundle.js'
 
@@ -115,7 +116,9 @@ export async function prepareRepositoryReviewInput ({
   const incremental_window_path = path.join(input_bundle_root, 'incremental-window')
   const history_path = path.join(input_bundle_root, 'history')
 
-  await fs.mkdir(input_bundle_root, { recursive: true })
+  // A supplied run ID is reused after uncertain submission failures. Remove
+  // partial files from the previous preparation before rebuilding the bundle.
+  await ensureCleanDirectory(input_bundle_root)
   await Promise.all([
     fs.mkdir(incremental_window_path, { recursive: true }),
     fs.mkdir(history_path, { recursive: true })

@@ -59,8 +59,12 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
     bundle_root = tmp_path / "bundle"
     input_bundle = _write_bundle_manifest(str(bundle_root))
     artifact_root = tmp_path / "artifacts" / "run-input-preparation"
+    run_input_root = tmp_path / "run-inputs" / "run-input-preparation"
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(
+        input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "run-inputs")
+    )
 
     try:
         prepared = prepare_run_input(
@@ -76,7 +80,7 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
     finally:
         monkeypatch.undo()
 
-    assert prepared["input_bundle_root_path"] == str(artifact_root / "input-bundle")
+    assert prepared["input_bundle_root_path"] == str(run_input_root)
     assert prepared["artifact_root_path"] == str(artifact_root)
     assert prepared["artifact_paths"] == {
         "analyzer": str(artifact_root / "analyzer"),
@@ -84,10 +88,8 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
         "verifier": str(artifact_root / "verifier"),
     }
     assert prepared["bundle_paths"] == {
-        "workspace_snapshot_tar_path": str(
-            artifact_root / "input-bundle" / "workspace.snapshot.tar"
-        ),
-        "history_path": str(artifact_root / "input-bundle" / "history"),
+        "workspace_snapshot_tar_path": str(run_input_root / "workspace.snapshot.tar"),
+        "history_path": str(run_input_root / "history"),
     }
 
 

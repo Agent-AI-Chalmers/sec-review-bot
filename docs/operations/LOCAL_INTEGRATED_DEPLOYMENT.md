@@ -165,7 +165,7 @@ The installer owns `SEC_REVIEW_BOT_DIR` and `SEC_REVIEW_AGENTS_DIR`. Do not add 
 
 The installer also generates the internal `SEC_REVIEW_SERVICE_UID` and `SEC_REVIEW_SERVICE_GID` values. Before Compose starts, it creates the repository-local state directories for that service user. This prevents Docker from creating unwritable root-owned bind-mount sources and lets the Temporal container write its SQLite database as the same user.
 
-Artifacts default to `.agent-artifacts`, and model configuration defaults to `agents/config/model-providers.toml` in the current checkout. Most installations should keep these defaults. To store artifacts on another disk or load model configuration from another location, set an absolute `SEC_REVIEW_AGENT_ARTIFACT_ROOT` or `MODEL_PROVIDERS_CONFIG_TOML` in `deploy/systemd/deployment.env`; the installer preserves non-empty overrides for these two independent worker paths.
+Materialized run inputs and generated artifacts default to `.agent-run-inputs` and `.agent-artifacts`. Model configuration defaults to `agents/config/model-providers.toml` in the current checkout. Most installations should keep these defaults. To move them, set an absolute `SEC_REVIEW_AGENT_RUN_INPUT_ROOT`, `SEC_REVIEW_AGENT_ARTIFACT_ROOT`, or `MODEL_PROVIDERS_CONFIG_TOML` in `deploy/systemd/deployment.env`; the installer preserves non-empty overrides for these independent worker paths.
 
 If [`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) gains new options, add the relevant options to `deploy/systemd/deployment.env` manually.
 
@@ -242,6 +242,7 @@ With the sample configuration, the integrated deployment stores runtime data in 
 | Path | Owner | Purpose |
 | --- | --- | --- |
 | `.agent-rustfs-state` | RustFS | Persistent object storage for input archives exchanged between integration and Runner |
+| `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published diagnostic bundles |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
 | `.agent-postgres-state` | PostgreSQL | Admission, Runner observation, and publication step coordination |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
@@ -359,7 +360,7 @@ GitHub integration uses the container's default root user for local staging file
 To repair ownership:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
+sudo chown -R "$USER:$USER" .agent-run-inputs .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
 ```
 
 The PostgreSQL coordination store and Temporal state describe the same active runs. Do not delete `.agent-temporal-state` while retaining PostgreSQL records that still need polling or publication. To reset run execution and publication state, stop the complete service and remove both state directories together:
@@ -373,7 +374,7 @@ sudo systemctl start sec-review-bot.target
 This permanently deletes workflow history, pending tasks, polling state, and publication state. The materials prepared before a run starts (the archive uploaded to RustFS) and the diagnostic materials produced after a run ends currently have no automatic retention period; their corresponding local files are also retained indefinitely by default for recovery, replay, and diagnostics. The deployment does not configure lifecycle expiration, so the operator must monitor disk usage. They can be removed manually after confirming that no retained run needs them:
 
 ```bash
-sudo rm -rf .agent-rustfs-state .agent-artifacts
+sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
 ```
 
 The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.
