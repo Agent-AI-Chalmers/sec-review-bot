@@ -241,7 +241,6 @@ With the sample configuration, the integrated deployment stores runtime data in 
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-input-bundles` | GitHub integration | Local staging for input archives before upload; it is not shared with the host worker |
 | `.agent-rustfs-state` | RustFS | Persistent object storage for input archives exchanged between integration and Runner |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
 | `.agent-postgres-state` | PostgreSQL | Admission, Runner observation, and publication step coordination |
@@ -371,13 +370,17 @@ sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 
-This permanently deletes workflow history, pending tasks, polling state, and publication state. The deployment does not automatically expire RustFS input objects or local artifacts; they are retained by default for recovery, replay, and diagnostics, and the operator is responsible for monitoring their disk usage. They can be removed manually after confirming that no retained run needs them:
+This permanently deletes workflow history, pending tasks, polling state, and publication state. The materials prepared before a run starts (the archive uploaded to RustFS) and the diagnostic materials produced after a run ends currently have no automatic retention period; their corresponding local files are also retained indefinitely by default for recovery, replay, and diagnostics. The deployment does not configure lifecycle expiration, so the operator must monitor disk usage. They can be removed manually after confirming that no retained run needs them:
 
 ```bash
 sudo rm -rf .agent-rustfs-state .agent-artifacts
 ```
 
 The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.
+
+### Backup and recovery
+
+RustFS state and PostgreSQL state are independent data sets. Back up `.agent-rustfs-state` and `.agent-postgres-state` together with the deployment configuration, but store passwords and access keys in the secret manager rather than in the backup archive. A recovery must restore RustFS first, run the RustFS initializer to reconcile the bucket and policies, and then restore PostgreSQL so run records can resolve their stored artifact references. The initializer is safe to run repeatedly; it does not replace existing objects.
 
 ```bash
 sudo rm -rf .agent-memory

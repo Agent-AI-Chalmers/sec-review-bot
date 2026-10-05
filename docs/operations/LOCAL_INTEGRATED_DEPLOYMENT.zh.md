@@ -243,7 +243,6 @@ AGENT_MCP_ENABLED=true
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-input-bundles` | GitHub integration | Input archive 上传前的本地 staging；不与宿主机 worker 共享 |
 | `.agent-rustfs-state` | RustFS | integration 与 Runner 交换 input archive 的持久对象存储 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
 | `.agent-postgres-state` | PostgreSQL | admission、Runner observation 与 publication step 协调状态 |
@@ -373,13 +372,17 @@ sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 
-该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。部署不会自动过期清理 RustFS input object 或本地 artifact；它们默认持续保留，用于恢复、重放和诊断，其磁盘用量由运维人员监控。确认没有需要保留的 run 依赖它们后，可以手动清理：
+该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。运行开始前准备的输入材料（上传到 RustFS 的 archive）以及运行结束后生成的诊断材料（diagnostic artifact）当前没有自动保留期限；本地工作目录中的相应文件也一样默认无限期保留，用于恢复、重放和诊断。部署不会配置生命周期过期规则，因此磁盘用量由运维人员监控。确认没有仍需保留的 run 依赖它们后，才可以手动清理：
 
 ```bash
 sudo rm -rf .agent-rustfs-state .agent-artifacts
 ```
 
 `.agent-memory` 会跨多次运行持续保存，不属于常规清理范围。只有在确实需要重置 agent memory 时，才应先停止 worker，再单独删除 `.agent-memory`。该操作会永久删除已提取的 observations 和维护后的 memory。
+
+### 备份与恢复
+
+RustFS 状态和 PostgreSQL 状态是两套独立数据。应将 `.agent-rustfs-state`、`.agent-postgres-state` 与部署配置一起备份，但不要把密码和 access key 写入备份包，应交由 secret manager 单独保存。恢复时先恢复 RustFS，再运行 RustFS 初始化器重新核对 bucket 和策略，最后恢复 PostgreSQL，这样 run 记录中的对象引用才有对应的存储内容。初始化器可以重复运行，不会覆盖已有对象。
 
 ```bash
 sudo rm -rf .agent-memory
