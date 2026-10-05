@@ -25,7 +25,7 @@ Every workflow input includes:
 
 `input_bundle` is an immutable artifact reference to a complete input bundle archive. The caller prepares and uploads the archive; the runner verifies it and materializes it into a local run-scoped directory before reading the manifest or executing a workflow.
 
-The v5 runner currently supports local `file:` URIs. A later storage phase may add durable `s3:` URIs without putting storage endpoint, region, or credentials in workflow input. Presigned HTTP URLs are not durable artifact references.
+The v5 runner supports local `file:` and durable `s3:` URIs. Storage endpoint, region, and credentials are deployment configuration and never come from workflow input. Presigned HTTP URLs are not durable artifact references.
 
 The caller owns the input bundle. The runner/stages own runtime state such as `artifact_paths`, stage artifact roots, writable stage workspaces, retry state, and delivery assignments.
 
@@ -33,7 +33,7 @@ The `tar.zst` archive must contain `manifest.json`, the workspace snapshot, hist
 
 ```ts
 interface InputBundleArtifactRef {
-  uri: string // file:
+  uri: string // file: or s3:
   digest: `sha256:${string}`
   media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
   size_bytes: number

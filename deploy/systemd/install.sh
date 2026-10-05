@@ -61,7 +61,7 @@ install -d -m 0755 "$config_dir"
 # selected service user after an earlier root-owned deployment.
 install -d -m 0755 -o "$service_uid" -g "$service_gid" \
     "$repository_root/.agent-temporal-state" \
-    "$repository_root/.agent-input-bundles" \
+    "$repository_root/.agent-rustfs-state" \
     "$repository_root/.agent-postgres-state" \
     "$repository_root/.agent-artifacts"
 if [ ! -f "$deployment_env_source" ]; then
@@ -79,7 +79,6 @@ awk -v repository_root="$repository_root" \
     BEGIN {
         fixed["SEC_REVIEW_BOT_DIR"] = 1
         fixed["SEC_REVIEW_AGENTS_DIR"] = 1
-        fixed["SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT"] = 1
         fixed["SEC_REVIEW_SERVICE_UID"] = 1
         fixed["SEC_REVIEW_SERVICE_GID"] = 1
         optional["SEC_REVIEW_AGENT_ARTIFACT_ROOT"] = 1
@@ -104,8 +103,6 @@ awk -v repository_root="$repository_root" \
     END {
         print "SEC_REVIEW_BOT_DIR=" repository_root
         print "SEC_REVIEW_AGENTS_DIR=" repository_root "/agents"
-        print "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT=" \
-            repository_root "/.agent-input-bundles"
         print "SEC_REVIEW_SERVICE_UID=" service_uid
         print "SEC_REVIEW_SERVICE_GID=" service_gid
 

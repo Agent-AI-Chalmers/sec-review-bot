@@ -9,6 +9,7 @@ import { pathToFileURL } from 'url'
 import { createZstdCompress } from 'zlib'
 
 import type { InputBundleArtifactRef } from '../../infrastructure/runner/input.js'
+import { publishInputBundle } from '../../infrastructure/artifacts/input-storage.js'
 
 import {
   WORKSPACE_SNAPSHOT_TAR_NAME,
@@ -67,10 +68,12 @@ export async function finalizeInputBundleWorkspace ({
 
 export async function archiveInputBundle ({
   input_bundle_root,
-  include_incremental_window
+  include_incremental_window,
+  run_id
 }: {
   input_bundle_root: string
   include_incremental_window: boolean
+  run_id: string
 }): Promise<InputBundleArtifactRef> {
   const tarPath = `${input_bundle_root}.tar`
   const archivePath = `${tarPath}.zst`
@@ -104,5 +107,5 @@ export async function archiveInputBundle ({
   // The snapshot in the archive is now the durable execution input. Removing
   // the live checkout avoids retaining a second repository copy in staging.
   await fs.rm(path.join(input_bundle_root, 'workspace'), { recursive: true, force: true })
-  return reference
+  return await publishInputBundle(reference, run_id)
 }

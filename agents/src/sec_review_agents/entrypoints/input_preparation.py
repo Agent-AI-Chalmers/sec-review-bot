@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from sec_review_agents.artifacts.input_storage import download_s3_input_bundle
 from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_input
 from sec_review_agents.entrypoints.run_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
@@ -114,6 +115,8 @@ def _materialize_input_bundle(value: object, *, destination: Path) -> Path:
     media_type = value.get("media_type")
     if not isinstance(uri, str) or not uri.strip():
         raise ValueError("Runner input input_bundle.uri must be non-empty.")
+    if not isinstance(size_bytes, int) or isinstance(size_bytes, bool):
+        raise ValueError("Runner input input_bundle.size_bytes must be an integer.")
     if media_type != INPUT_BUNDLE_MEDIA_TYPE:
         raise ValueError("Runner input input_bundle.media_type is unsupported.")
 
@@ -122,20 +125,26 @@ def _materialize_input_bundle(value: object, *, destination: Path) -> Path:
         if parsed.netloc not in {"", "localhost"}:
             raise ValueError("Runner input input_bundle file URI must be local.")
         archive_path = Path(unquote(parsed.path))
+        configured_root = env_value(INPUT_BUNDLE_ROOT_ENV)
+        resolved_archive = archive_path.expanduser().resolve()
+        if configured_root is not None:
+            allowed_root = Path(configured_root).expanduser().resolve()
+            try:
+                resolved_archive.relative_to(allowed_root)
+            except ValueError as error:
+                raise ValueError(
+                    "Runner input input_bundle.uri must resolve under "
+                    f"{INPUT_BUNDLE_ROOT_ENV}."
+                ) from error
+    elif parsed.scheme == "s3":
+        resolved_archive = download_s3_input_bundle(
+            uri.strip(),
+            destination.parent / "input-bundle.tar.zst",
+            expected_size=size_bytes,
+            maximum_size=MAX_INPUT_BUNDLE_BYTES,
+        ).resolve()
     else:
         raise ValueError(f"Unsupported input_bundle URI scheme: {parsed.scheme}")
-
-    configured_root = env_value(INPUT_BUNDLE_ROOT_ENV)
-    resolved_archive = archive_path.expanduser().resolve()
-    if configured_root is not None:
-        allowed_root = Path(configured_root).expanduser().resolve()
-        try:
-            resolved_archive.relative_to(allowed_root)
-        except ValueError as error:
-            raise ValueError(
-                "Runner input input_bundle.uri must resolve under "
-                f"{INPUT_BUNDLE_ROOT_ENV}."
-            ) from error
     if not resolved_archive.is_file():
         raise ValueError(f"Input bundle archive not found: {resolved_archive}")
     archive_size = resolved_archive.stat().st_size

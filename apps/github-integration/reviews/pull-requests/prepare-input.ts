@@ -334,7 +334,8 @@ export async function preparePullRequestReviewInput ({
   }
   const input_bundle = await archiveInputBundle({
     input_bundle_root,
-    include_incremental_window: true
+    include_incremental_window: true,
+    run_id
   })
   const input: PullRequestReviewInput = {
     contract_version: 'v5',

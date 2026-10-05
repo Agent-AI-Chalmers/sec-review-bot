@@ -210,7 +210,8 @@ export async function prepareRepositoryReviewInput ({
 
   const input_bundle = await archiveInputBundle({
     input_bundle_root,
-    include_incremental_window: resolvedScanMode === 'incremental'
+    include_incremental_window: resolvedScanMode === 'incremental',
+    run_id
   })
   const input: RepositoryReviewInput = {
     contract_version: 'v5',

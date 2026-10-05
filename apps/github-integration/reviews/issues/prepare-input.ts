@@ -136,7 +136,8 @@ export async function prepareIssueReviewInput ({
   })
   const input_bundle = await archiveInputBundle({
     input_bundle_root,
-    include_incremental_window: false
+    include_incremental_window: false,
+    run_id
   })
   const input: IssueReviewInput = {
     contract_version: 'v5',

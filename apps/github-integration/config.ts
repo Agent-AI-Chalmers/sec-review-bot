@@ -41,6 +41,14 @@ const input_bundle_staging_root = nodePath.resolve(
   process.cwd(),
   process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] || '.agent-input-bundles'
 )
+const configured_artifact_store = process.env['SEC_REVIEW_ARTIFACT_STORE']?.trim() || 'file'
+if (!['file', 's3'].includes(configured_artifact_store)) {
+  throw new Error('SEC_REVIEW_ARTIFACT_STORE must be file or s3.')
+}
+const artifact_store = configured_artifact_store as 'file' | 's3'
+const artifact_s3_bucket = process.env['SEC_REVIEW_ARTIFACT_S3_BUCKET']?.trim()
+const artifact_s3_endpoint = process.env['SEC_REVIEW_ARTIFACT_S3_ENDPOINT']?.trim()
+const artifact_s3_region = process.env['AWS_REGION']?.trim() || 'us-east-1'
 const database_url = process.env['DATABASE_URL']?.trim() || undefined
 const database_pg_options = {
   host: process.env['PGHOST'],
@@ -65,6 +73,10 @@ export {
   repository_review_dispatch_max_body_bytes,
   repository_review_dispatch_read_timeout_ms,
   input_bundle_staging_root,
+  artifact_store,
+  artifact_s3_bucket,
+  artifact_s3_endpoint,
+  artifact_s3_region,
   database_url,
   database_pg_options
 }

@@ -27,7 +27,7 @@ v5 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的
 
 `input_bundle` 是指向完整 input bundle archive 的不可变 artifact reference。调用方准备并上传 archive；runner 校验后，将其 materialize 到 run-scoped 本地目录，再读取 manifest 或执行 workflow。
 
-v5 Runner 当前支持本地 `file:` URI。后续 storage 阶段可以增加持久的 `s3:` URI，但 storage endpoint、region 和 credentials 仍属于部署配置，绝不能来自 workflow input。带有效期的 HTTP presigned URL 不是持久 artifact reference。
+v5 Runner 支持本地 `file:` 和持久的 `s3:` URI。Storage endpoint、region 和 credentials 属于部署配置，绝不能来自 workflow input。带有效期的 HTTP presigned URL 不是持久 artifact reference。
 
 调用方负责 input bundle；runner / stage 负责 `artifact_paths`、stage artifact roots、writable stage workspaces、retry state 和 delivery assignments 等运行态信息。
 
@@ -35,7 +35,7 @@ v5 Runner 当前支持本地 `file:` URI。后续 storage 阶段可以增加持�
 
 ```ts
 interface InputBundleArtifactRef {
-  uri: string // file:
+  uri: string // file: or s3:
   digest: `sha256:${string}`
   media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
   size_bytes: number

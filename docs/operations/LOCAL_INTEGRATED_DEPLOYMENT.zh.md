@@ -119,7 +119,7 @@ Sample 中既有可直接使用的默认值，也有必须替换的空值和占�
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-将 `RUNNER_SERVICE_TOKEN` 设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-input-bundles` 和 `.agent-postgres-state`，不再分别提供配置项。
+将 `RUNNER_SERVICE_TOKEN` 以及 PostgreSQL/RustFS 密码设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。RustFS 保存不可变 input archive；integration 凭据可写 input object，宿主 worker 凭据只读。
 
 ### 2. GitHub integration `.env`
 
@@ -131,7 +131,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose 会注入容器内私钥路径、Runner Service 地址和 token、PostgreSQL 连接以及 input bundle 路径；这些值不需要在 `apps/github-integration/.env` 中重复配置。
+Compose 会注入容器内私钥路径、Runner Service 地址和 token、PostgreSQL 连接以及 RustFS input storage 配置；这些值不需要在 `apps/github-integration/.env` 中重复配置。
 
 ### 3. 模型配置
 
@@ -163,7 +163,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 `deploy/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取安装后的文件。
 
-`SEC_REVIEW_BOT_DIR`、`SEC_REVIEW_AGENTS_DIR` 和 `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` 由安装脚本负责，不要把它们加入可编辑的源文件。安装脚本会删除旧值，并根据自身所在的仓库重新生成。当前 checkout 的路径和 Compose 与宿主机 worker 共享的 input 目录必须一起变化。
+`SEC_REVIEW_BOT_DIR` 和 `SEC_REVIEW_AGENTS_DIR` 由安装脚本负责，不要把它们加入可编辑的源文件。安装脚本会删除旧值，并根据自身所在的仓库重新生成。Input archive 改由 RustFS 交换，因此 integration 容器和宿主 worker 不再共享 `.agent-input-bundles`。
 
 安装脚本还会生成内部使用的 `SEC_REVIEW_SERVICE_UID` 和 `SEC_REVIEW_SERVICE_GID`。在 Compose 启动前，它会为该 service user 创建仓库内的状态目录。这样可以避免 Docker 自动创建无法由非 root 容器写入的 root-owned bind mount 源目录，并让 Temporal 容器以同一用户写入 SQLite 数据库。
 
@@ -178,6 +178,8 @@ Artifact 默认写入当前 checkout 的 `.agent-artifacts`，模型配置默认
 | `TEMPORAL_ADDRESS` | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。 |
 | `TEMPORAL_NAMESPACE`、`TEMPORAL_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
 | `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
+| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9000`。 |
+| `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` | 与仓库 `.env` 中 runner 配置相匹配的 RustFS 只读凭据。 |
 
 大多数本地部署可以保留这些默认值。移动 checkout 后，重新运行安装脚本。
 
@@ -239,7 +241,8 @@ AGENT_MCP_ENABLED=true
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-input-bundles` | GitHub integration 写入，宿主机 worker 读取 | 准备好的 runner 输入材料 |
+| `.agent-input-bundles` | GitHub integration | Input archive 上传前的本地 staging；不与宿主机 worker 共享 |
+| `.agent-rustfs-state` | RustFS | integration 与 Runner 交换 input archive 的持久对象存储 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
 | `.agent-postgres-state` | PostgreSQL | admission、Runner observation 与 publication step 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
@@ -352,12 +355,12 @@ Temporal 会在共用 task queue 的实例之间分配任务。应先调整单�
 
 ## 清理
 
-GitHub integration 使用容器默认 root 用户，因此 input bundle 或 App state 中可能出现 root-owned 文件。宿主机 worker 会以自身用户身份写入 artifacts。
+GitHub integration 使用容器默认 root 用户写入本地 staging 文件。持久 input archive 位于 RustFS，宿主 worker 会以自身用户身份写入 runtime artifacts。
 
 可用下面命令修复 ownership：
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-postgres-state .agent-temporal-state
+sudo chown -R "$USER:$USER" .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
 ```
 
 PostgreSQL 协调状态与 Temporal 状态描述的是同一批活跃 run。不要在保留仍需轮询或发布的 PostgreSQL 记录时单独删除 `.agent-temporal-state`。重置 run 执行与发布状态时，应先停止完整服务，再同时删除两个状态目录：
@@ -368,10 +371,10 @@ sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 
-该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。部署不会自动过期清理 input bundle 或 artifact；它们默认持续保留，用于恢复、重放和诊断，其磁盘用量由运维人员监控。确认没有需要保留的 run 依赖它们后，可以手动清理：
+该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。部署不会自动过期清理 RustFS input object 或本地 artifact；它们默认持续保留，用于恢复、重放和诊断，其磁盘用量由运维人员监控。确认没有需要保留的 run 依赖它们后，可以手动清理：
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts
+sudo rm -rf .agent-rustfs-state .agent-artifacts
 ```
 
 `.agent-memory` 会跨多次运行持续保存，不属于常规清理范围。只有在确实需要重置 agent memory 时，才应先停止 worker，再单独删除 `.agent-memory`。该操作会永久删除已提取的 observations 和维护后的 memory。
@@ -420,6 +423,6 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 - Runner Service 返回 unauthorized：检查仓库 `.env` 中的 `RUNNER_SERVICE_TOKEN`，再重启完整服务。
 - Repository dispatch 鉴权失败：确认 workflow 配置了 `id-token: write`，请求了 `sec-review-bot` OIDC audience，并且 workflow 路径是 `.github/workflows/sec-review-bot.yml`。
 - Run 一直处于 queued：确认至少有一个宿主机 worker 正在运行，并与 Runner Service 使用相同的 `TEMPORAL_TASK_QUEUE`。
-- Worker 读不到 input bundle：重新运行 `sudo deploy/systemd/install.sh "$USER"`，使安装后的 `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` 与当前 checkout 一致。
+- Worker 读不到 input bundle：检查 RustFS endpoint，并确认安装后的 worker 凭据与 Compose 初始化的只读凭据一致。
 - Worker 把 artifact 写到其他位置：检查 `deploy/systemd/deployment.env` 中可选的 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override，再重新运行 `sudo deploy/systemd/install.sh "$USER"`。
 - LLM 调用在 workflow 推进前失败：进入 `agents/` 后运行 `uv run sec-review-agents-check-llm-deployments --fail-fast`。

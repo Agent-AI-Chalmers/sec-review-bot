@@ -321,6 +321,35 @@ def test_workflow_input_preparation_rejects_nonlocal_file_uri() -> None:
         )
 
 
+def test_workflow_input_preparation_materializes_s3_archive(
+    monkeypatch, tmp_path: Path
+) -> None:
+    reference = _write_bundle_manifest(str(tmp_path / "source"))
+    source_uri = reference["uri"]
+    assert isinstance(source_uri, str)
+    source_archive = Path(unquote(urlparse(source_uri).path))
+    payload = _issue_input(str(tmp_path / "unused"))
+    payload["input_bundle"] = reference | {
+        "uri": "s3://sec-review/runs/run-1/input/input-bundle.v1.tar.zst"
+    }
+
+    def download(_uri, destination, *, expected_size, maximum_size):
+        assert expected_size == reference["size_bytes"]
+        assert maximum_size == input_preparation.MAX_INPUT_BUNDLE_BYTES
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source_archive.read_bytes())
+        return destination
+
+    monkeypatch.setattr(input_preparation, "download_s3_input_bundle", download)
+    prepared = prepare_workflow_input(
+        payload,
+        "issue-review",
+        artifact_root_path=tmp_path / "artifacts",
+    )
+
+    assert Path(prepared["bundle_paths"]["workspace_snapshot_tar_path"]).is_file()
+
+
 def test_workflow_input_preparation_rejects_oversized_archive(
     monkeypatch, tmp_path: Path
 ) -> None:
