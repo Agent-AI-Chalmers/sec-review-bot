@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -35,6 +36,40 @@ def test_publish_run_artifacts_builds_immutable_reference(
     assert request["IfNoneMatch"] == "*"
     assert len(request["Metadata"]["sha256"]) == 64
     assert request["Metadata"]["size-bytes"].isdigit()
+
+
+def test_publish_run_artifacts_uses_writable_system_temp_directory(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The Runner source tree is mounted read-only in the service container."""
+    root = tmp_path / "run"
+    root.mkdir()
+    (root / "transcript.txt").write_text("diagnostic", encoding="utf-8")
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "publisher")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "secret")
+    client = MagicMock()
+    client.head_object.side_effect = ClientError(
+        {"ResponseMetadata": {"HTTPStatusCode": 404}, "Error": {"Code": "NoSuchKey"}},
+        "HeadObject",
+    )
+    named_temporary_file = tempfile.NamedTemporaryFile
+
+    def create_temp_file(*args, **kwargs):
+        assert "dir" not in kwargs
+        return named_temporary_file(*args, **kwargs)
+
+    with (
+        patch(
+            "sec_review_agents.artifacts.run_storage.boto3.client",
+            return_value=client,
+        ),
+        patch(
+            "sec_review_agents.artifacts.run_storage.tempfile.NamedTemporaryFile",
+            side_effect=create_temp_file,
+        ),
+    ):
+        publish_run_artifacts(root, "run-read-only-source")
 
 
 def test_publish_run_artifacts_skips_missing_terminal_tree(tmp_path: Path) -> None:

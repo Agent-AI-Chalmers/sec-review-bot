@@ -48,9 +48,9 @@ def publish_run_artifacts(root: str | Path, run_id: str) -> dict[str, Any] | Non
         if error.response.get("ResponseMetadata", {}).get("HTTPStatusCode") != 404:
             raise
 
-    with tempfile.NamedTemporaryFile(
-        suffix=".tar.zst", dir=source.parent
-    ) as archive_file:
+    # The source tree is a read-only service mount. Build the archive in the
+    # container's writable system temp directory, never beside the source.
+    with tempfile.NamedTemporaryFile(suffix=".tar.zst") as archive_file:
         with tarfile.open(fileobj=archive_file, mode="w:zst") as archive:
             # The archive is created from a read-only service mount after the
             # workflow reaches a terminal state; workers never receive storage credentials.
