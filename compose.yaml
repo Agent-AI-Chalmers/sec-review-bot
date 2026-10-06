@@ -13,8 +13,8 @@ services:
     volumes:
       - "${PWD}/.agent-rustfs-state:/data"
     ports:
-      - "127.0.0.1:${RUSTFS_API_PORT:-9000}:9000"
-      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${RUSTFS_API_PORT:-9100}:9000"
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9101}:9001"
   rustfs-init:
     build:
       context: deploy/object-storage
