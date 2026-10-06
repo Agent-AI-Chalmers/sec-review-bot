@@ -335,9 +335,10 @@ def test_workflow_input_preparation_materializes_s3_archive(
         "uri": "s3://sec-review/runs/run-1/input/input-bundle.v1.tar.zst"
     }
 
-    def download(_uri, destination, *, expected_size, maximum_size):
+    def download(_uri, destination, *, expected_size, maximum_size, expected_key=None):
         assert expected_size == reference["size_bytes"]
         assert maximum_size == input_preparation.MAX_INPUT_BUNDLE_BYTES
+        assert expected_key is None
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(source_archive.read_bytes())
         return destination
@@ -350,6 +351,33 @@ def test_workflow_input_preparation_materializes_s3_archive(
     )
 
     assert Path(prepared["bundle_paths"]["workspace_snapshot_tar_path"]).is_file()
+
+
+def test_prepare_run_input_rejects_file_bundle_in_object_storage_mode(
+    monkeypatch, tmp_path: Path
+) -> None:
+    payload = _issue_input(str(tmp_path / "bundle"))
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "inputs"))
+
+    with pytest.raises(ValueError, match="must use s3 in object-storage mode"):
+        prepare_run_input(payload, run_id="run-1", workflow="issue-review")
+
+
+def test_prepare_run_input_rejects_s3_bundle_from_another_run(
+    monkeypatch, tmp_path: Path
+) -> None:
+    payload = _issue_input(str(tmp_path / "bundle"))
+    payload["input_bundle"] = payload["input_bundle"] | {
+        "uri": "s3://sec-review/runs/run-other/input/input-bundle.v1.tar.zst"
+    }
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "inputs"))
+
+    with pytest.raises(ValueError, match="does not belong to this run"):
+        prepare_run_input(payload, run_id="run-1", workflow="issue-review")
 
 
 def test_workflow_input_preparation_rejects_oversized_archive(

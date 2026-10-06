@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from sec_review_agents.artifacts.input_storage import download_s3_input_bundle
+from sec_review_agents.artifacts.input_storage import (
+    ARTIFACT_S3_BUCKET_ENV,
+    download_s3_input_bundle,
+)
 from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_input
 from sec_review_agents.entrypoints.run_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
@@ -57,6 +60,7 @@ def prepare_run_input(
             run_id=validated_run_id,
         ),
         input_root_path=_resolve_run_input_root(run_id=validated_run_id),
+        expected_run_id=validated_run_id,
     )
 
 
@@ -66,6 +70,7 @@ def prepare_workflow_input(
     *,
     artifact_root_path: str | Path,
     input_root_path: str | Path | None = None,
+    expected_run_id: str | None = None,
 ) -> dict[str, Any]:
     """Turn public workflow input into the filesystem-ready runtime form.
 
@@ -90,6 +95,7 @@ def prepare_workflow_input(
                 if input_root_path is not None
                 else Path(artifact_root_path) / "input-bundle"
             ),
+            expected_run_id=expected_run_id,
         )
     )
 
@@ -113,7 +119,12 @@ def workflow_artifact_root(input_data: dict[str, Any], *, run_id: str) -> Path:
     )
 
 
-def _materialize_input_bundle(value: object, *, destination: Path) -> Path:
+def _materialize_input_bundle(
+    value: object,
+    *,
+    destination: Path,
+    expected_run_id: str | None = None,
+) -> Path:
     if not isinstance(value, dict):
         raise ValueError("Runner input is missing input_bundle.")
     uri = value.get("uri")
@@ -129,6 +140,13 @@ def _materialize_input_bundle(value: object, *, destination: Path) -> Path:
 
     parsed = urlparse(uri.strip())
     if parsed.scheme == "file":
+        if (
+            expected_run_id is not None
+            and env_value(ARTIFACT_S3_BUCKET_ENV) is not None
+        ):
+            raise ValueError(
+                "Runner input input_bundle.uri must use s3 in object-storage mode."
+            )
         if parsed.netloc not in {"", "localhost"}:
             raise ValueError("Runner input input_bundle file URI must be local.")
         archive_path = Path(unquote(parsed.path))
@@ -149,6 +167,11 @@ def _materialize_input_bundle(value: object, *, destination: Path) -> Path:
             destination.with_suffix(".tar.zst"),
             expected_size=size_bytes,
             maximum_size=MAX_INPUT_BUNDLE_BYTES,
+            expected_key=(
+                f"runs/{expected_run_id}/input/input-bundle.v1.tar.zst"
+                if expected_run_id is not None
+                else None
+            ),
         ).resolve()
     else:
         raise ValueError(f"Unsupported input_bundle URI scheme: {parsed.scheme}")

@@ -28,6 +28,7 @@ def test_downloads_configured_s3_object_to_complete_local_file(
             destination,
             expected_size=7,
             maximum_size=100,
+            expected_key="runs/run-1/input/input-bundle.v1.tar.zst",
         )
 
     assert result == destination
@@ -46,6 +47,19 @@ def test_rejects_s3_bucket_outside_runner_configuration(
             tmp_path / "input-bundle.tar.zst",
             expected_size=1,
             maximum_size=100,
+        )
+
+
+def test_rejects_s3_object_outside_expected_run(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+
+    with pytest.raises(ValueError, match="does not belong to this run"):
+        download_s3_input_bundle(
+            "s3://sec-review/runs/run-other/input/input-bundle.v1.tar.zst",
+            tmp_path / "input-bundle.tar.zst",
+            expected_size=1,
+            maximum_size=100,
+            expected_key="runs/run-1/input/input-bundle.v1.tar.zst",
         )
 
 

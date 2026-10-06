@@ -11,7 +11,12 @@ ARTIFACT_S3_ENDPOINT_ENV = "SEC_REVIEW_ARTIFACT_S3_ENDPOINT"
 
 
 def download_s3_input_bundle(
-    uri: str, destination: Path, *, expected_size: int, maximum_size: int
+    uri: str,
+    destination: Path,
+    *,
+    expected_size: int,
+    maximum_size: int,
+    expected_key: str | None = None,
 ) -> Path:
     """Download one S3 object completely before archive validation begins."""
     parsed = urlparse(uri)
@@ -25,6 +30,8 @@ def download_s3_input_bundle(
     key = unquote(parsed.path).lstrip("/")
     if not key or parsed.query or parsed.fragment:
         raise ValueError("Runner input input_bundle.uri must identify one S3 object.")
+    if expected_key is not None and key != expected_key:
+        raise ValueError("Runner input input_bundle.uri does not belong to this run.")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_suffix(f"{destination.suffix}.partial")
