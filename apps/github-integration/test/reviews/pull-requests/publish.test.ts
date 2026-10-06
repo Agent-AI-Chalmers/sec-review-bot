@@ -151,6 +151,70 @@ installation_octokit_for_repo: async () => octokit
   assert.match(reviewArgs.body, /## PR Security Review/)
 })
 
+test('pull request publish leaves plausible risks as non-blocking comments', async () => {
+  const pullReviews: unknown[] = []
+  const octokit = {
+    rest: {
+      pulls: {
+        listReviews: async () => ({ data: [] }),
+        createReview: async (args: unknown) => {
+          pullReviews.push(args)
+          return {
+            data: {
+              id: 2,
+              html_url: 'https://example.test/review/2',
+              state: 'COMMENTED'
+            }
+          }
+        }
+      }
+    }
+  }
+
+  await handlePullRequestReviewRun({
+    run: {
+      run_id: 'run-plausible',
+      publish_context: {
+        pr: pullRequestContext(),
+        files: [],
+        event_type: 'manual_review'
+      }
+    },
+    status: {
+      run_id: 'run-plausible',
+      workflow: 'pull-request-review',
+      status: 'succeeded',
+      result: {
+        contract_version: 'v5',
+        review_record: review_record({
+          analysis: {
+            verdict: 'plausible-risk',
+            overview: 'The trust boundary requires manual review.',
+            narratives: []
+          },
+          verification: {
+            overview: 'Exploitability is not confirmed.',
+            review_target_claim: null,
+            validation_level: 'static',
+            patch_coverage: 'no-patch',
+            regression_status: 'not-applicable',
+            resolution_next_step: 'manual-review',
+            patch_findings: [],
+            verification_findings: [],
+            residual_risks: ['Review the deployment trust boundary.']
+          }
+        })
+      }
+    },
+    store: stepStore as never,
+    claim_token: 'test-claim',
+    installation_octokit_for_repo: async () => octokit
+  })
+
+  assert.equal(pullReviews.length, 1)
+  assert.equal((pullReviews[0] as { event: string }).event, 'COMMENT')
+})
+
 test('pull request publish approves when analysis is not confirmed', async () => {
   const issueComments: unknown[] = []
   const pullReviews: unknown[] = []

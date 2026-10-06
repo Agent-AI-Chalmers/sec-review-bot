@@ -152,8 +152,7 @@ function reviewEventForRecord (review_record: ReviewRecord, pr: PersistedPullReq
   }
   if (
     review_record.analysis.verdict === 'confirmed-vulnerability' ||
-    review_record.analysis.verdict === 'confirmed-defect' ||
-    review_record.analysis.verdict === 'plausible-risk'
+    review_record.analysis.verdict === 'confirmed-defect'
   ) {
     return 'REQUEST_CHANGES'
   }
