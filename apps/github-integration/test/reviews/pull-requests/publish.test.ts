@@ -75,7 +75,7 @@ function review_record (overrides: Record<string, unknown> = {}): Record<string,
   }
 }
 
-test('pull request publish requests changes for confirmed risks without inline suggestions', async () => {
+test('pull request publish leaves confirmed risks as non-blocking comments without inline suggestions', async () => {
   const issueComments: unknown[] = []
   const pullReviews: unknown[] = []
   const octokit = {
@@ -144,7 +144,7 @@ installation_octokit_for_repo: async () => octokit
     pull_number: 7,
     commit_id: 'head-sha',
     body: '<body>',
-    event: 'REQUEST_CHANGES',
+    event: 'COMMENT',
     comments: []
   })
   assert.match(reviewArgs.body, /<!-- sec-review-bot:pull-request-review-run:run-1 -->/)
@@ -484,7 +484,7 @@ installation_octokit_for_repo: async () => octokit
   )
 })
 
-test('pull request publish requests changes for confirmed risks with inline suggestions', async () => {
+test('pull request publish leaves confirmed risks as non-blocking comments with inline suggestions', async () => {
   const pullReviews: unknown[] = []
   const octokit = {
     rest: {
@@ -496,7 +496,7 @@ test('pull request publish requests changes for confirmed risks with inline sugg
             data: {
               id: 2,
               html_url: 'https://example.test/review/2',
-              state: 'CHANGES_REQUESTED'
+              state: 'COMMENTED'
             }
           }
         }
@@ -558,7 +558,7 @@ installation_octokit_for_repo: async () => octokit
   })
 
   assert.equal(pullReviews.length, 1)
-  assert.equal((pullReviews[0] as { event: string }).event, 'REQUEST_CHANGES')
+  assert.equal((pullReviews[0] as { event: string }).event, 'COMMENT')
   assert.equal((pullReviews[0] as { comments: unknown[] }).comments.length, 1)
 })
 
