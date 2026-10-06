@@ -37,8 +37,21 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
   const store = await createStore()
   try {
     const queuedId = await createQueuedRun(store)
+    const artifactPublication = {
+      status: 'published' as const,
+      artifact: {
+        kind: 'diagnostic_bundle',
+        uri: `s3://sec-review/runs/${queuedId}/artifacts/diagnostic-tree.v1.tar.zst`,
+        media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+        digest: `sha256:${'a'.repeat(64)}`,
+        size_bytes: 123
+      }
+    }
+    await store.recordArtifactPublication(queuedId, artifactPublication)
     await store.create_preparing_review_run({ workflow: 'issue-review', run_id: `run-${randomUUID()}`, publish_context: {} })
-    assert.equal((await store.getRun(queuedId))?.status, 'queued')
+    const queued = await store.getRun(queuedId)
+    assert.equal(queued?.status, 'queued')
+    assert.deepEqual(queued?.artifact_publication, artifactPublication)
     assert.deepEqual((await store.listActiveRuns()).map(run => run.run_id), [queuedId])
   } finally { await store.close() }
 })
@@ -68,8 +81,11 @@ test('ReviewRunStore records one immutable schema version across concurrent init
       'SELECT version,name,checksum FROM schema_versions ORDER BY version'
     )).rows
     await observer.end()
-    assert.deepEqual(versions.map(item => [item.version, item.name]), [[1, 'initial_coordination_schema']])
-    assert.match(versions[0]?.checksum ?? '', /^[a-f0-9]{64}$/)
+    assert.deepEqual(versions.map(item => [item.version, item.name]), [
+      [1, 'initial_coordination_schema'],
+      [2, 'runner_artifact_publication']
+    ])
+    for (const version of versions) assert.match(version.checksum, /^[a-f0-9]{64}$/)
   } finally { await Promise.all([first.close(), second.close()]) }
 })
 
@@ -149,7 +165,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
   try {
     const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
     assert.ok(admission.preparation_token)
-    await store.save_prepared_submission(runId, admission.preparation_token, publishContextForWorkflow('issue-review'), { contract_version: 'v4' })
+    await store.save_prepared_submission(runId, admission.preparation_token, publishContextForWorkflow('issue-review'), { contract_version: 'v5' })
     await store.failPreparation(runId, admission.preparation_token, { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
     const staleToken = await store.claimSubmissionRecovery(runId)
     const currentToken = await store.claimSubmissionRecovery(runId)

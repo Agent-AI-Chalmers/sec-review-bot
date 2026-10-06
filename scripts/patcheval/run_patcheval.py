@@ -88,7 +88,7 @@ async def main() -> None:
         single_agent=args.single_agent,
     )
 
-    print(f"LOCAL_ROOT={bundle.input['input_bundle_uri']}")
+    print(f"LOCAL_ROOT={bundle.local_root_path}")
 
     result = await _run_patcheval_issue_bundle(bundle)
 

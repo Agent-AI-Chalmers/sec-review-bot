@@ -49,7 +49,7 @@ async function createUncertainRun (store: ReviewRunStore): Promise<string> {
     runId,
     admission.preparation_token,
     publishContextForWorkflow('issue-review'),
-    { contract_version: 'v4', issue: { number: 7 } }
+    { contract_version: 'v5', issue: { number: 7 } }
   )
   await store.failPreparation(runId, admission.preparation_token, {
     code: 'SUBMISSION_STATE_UNCERTAIN',
@@ -98,7 +98,7 @@ test('publisher replays the persisted idempotent submission directly', async () 
   assert.deepEqual(submissions, [{
     workflow: 'issue-review',
     run_id: runId,
-    input: { contract_version: 'v4', issue: { number: 7 } }
+    input: { contract_version: 'v5', issue: { number: 7 } }
   }])
   assert.equal((await store.getRun(runId))?.status, 'queued')
   await store.close()
@@ -311,7 +311,7 @@ test('runner publisher marks malformed issue results failed without retry', asyn
     app: appStub(),
     store,
     get_runner_run_status: async () => succeededStatus(runId, 'issue-review', {
-      contract_version: 'v4',
+      contract_version: 'v5',
       review_record: {}
     })
   })
@@ -431,7 +431,7 @@ test('runner publisher marks malformed pull request results failed without retry
     app: appStub(),
     store,
     get_runner_run_status: async () => succeededStatus(runId, 'pull-request-review', {
-      contract_version: 'v4',
+      contract_version: 'v5',
       review_record: {}
     })
   })
@@ -457,7 +457,7 @@ test('runner publisher marks malformed repository results failed without retry',
     app: appStub(),
     store,
     get_runner_run_status: async () => succeededStatus(runId, 'repository-review', {
-      contract_version: 'v4',
+      contract_version: 'v5',
       scan_summary: {},
       deliveries: [],
       case_results: [{ case_id: 'case-1' }]
@@ -491,7 +491,7 @@ test('runner publisher keeps transient publish failures retryable in the store',
     get_runner_run_status: async () => succeededStatus(
       runId,
       'issue-review',
-      contractFixture('v4', 'issue-review-result.json')
+      contractFixture('v5', 'issue-review-result.json')
     )
   })
 
@@ -535,7 +535,7 @@ test('runner publisher renews its claim while a GitHub side effect is in flight'
       get_runner_run_status: async () => succeededStatus(
         runId,
         'issue-review',
-        contractFixture('v4', 'issue-review-result.json')
+        contractFixture('v5', 'issue-review-result.json')
       )
     })
     await commentStart
@@ -569,7 +569,7 @@ test('runner publisher marks deterministic GitHub publish rejections failed with
     get_runner_run_status: async () => succeededStatus(
       runId,
       'issue-review',
-      contractFixture('v4', 'issue-review-result.json')
+      contractFixture('v5', 'issue-review-result.json')
     )
   })
 

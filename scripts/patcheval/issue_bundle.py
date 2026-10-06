@@ -3,6 +3,7 @@ from pathlib import Path
 
 from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
+    archive_input_bundle,
     build_run_paths,
     create_local_run_id,
     ensure_run_directories,
@@ -80,7 +81,6 @@ def build_patcheval_issue_bundle_from_case(
         workspace_path=repo_root,
         tar_path=paths.local_root_path / WORKSPACE_SNAPSHOT_TAR_NAME,
     )
-    shutil.rmtree(workspace_path(paths), ignore_errors=True)
     write_input_bundle_manifest(paths, include_incremental_window=False)
 
     issue_metadata = {
@@ -109,13 +109,13 @@ def build_patcheval_issue_bundle_from_case(
         },
     )
     input_data = {
-        "contract_version": "v4",
+        "contract_version": "v5",
         "review_intent": {
             "objective": "repair",
             "repair_mode": "no-test-changes",
         },
         "issue": issue_metadata,
-        "input_bundle_uri": str(paths.local_root_path),
+        "input_bundle": archive_input_bundle(paths, include_incremental_window=False),
     }
     input_path = paths.local_root_path / "issue-review-input.json"
     write_json(input_path, input_data)

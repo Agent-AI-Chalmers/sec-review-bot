@@ -106,7 +106,7 @@ def _prepare_replay_input(
     prepared = dict(caller_input)
     # Manual case replay resumes inside the repository workflow. These artifact
     # roots are internal runtime context, not public runner input fields.
-    prepared["input_bundle_uri"] = str(run_root)
+    prepared["input_bundle_root_path"] = str(run_root)
     prepared["artifact_paths"] = {
         "discovery": str(run_artifacts / "discovery"),
         "triage": str(run_artifacts / "triage"),
@@ -268,7 +268,7 @@ def _repository_result_from_replay(
 ) -> dict[str, Any]:
     scan_summary = result.get("scan_summary")
     return {
-        "contract_version": "v4",
+        "contract_version": "v5",
         "scan_summary": (
             scan_summary
             if isinstance(scan_summary, dict)

@@ -22,13 +22,13 @@ let validators: Map<string, ValidateFunction> | null = null
 function contractSchemasRoot (): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
   const candidates = [
-    ...(configuredRoot ? [path.resolve(configuredRoot, 'schemas', 'v4')] : []),
-    path.resolve(process.cwd(), 'contracts', 'schemas', 'v4'),
-    path.resolve(process.cwd(), '..', '..', 'contracts', 'schemas', 'v4')
+    ...(configuredRoot ? [path.resolve(configuredRoot, 'schemas', 'v5')] : []),
+    path.resolve(process.cwd(), 'contracts', 'schemas', 'v5'),
+    path.resolve(process.cwd(), '..', '..', 'contracts', 'schemas', 'v5')
   ]
   const root = candidates.find((candidate) => existsSync(path.join(candidate, 'common.schema.json')))
   if (root === undefined) {
-    throw new Error('Could not locate contract v4 schemas for Runner validation.')
+    throw new Error('Could not locate contract v5 schemas for Runner validation.')
   }
   return root
 }
@@ -71,18 +71,18 @@ function assertSchema (schemaName: string, value: unknown, label: string): void 
     const details = validate.errors
       ?.map((error) => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
       .join('; ')
-    throw new Error(`${label} does not match contract v4${details ? `: ${details}` : '.'}`)
+    throw new Error(`${label} does not match contract v5${details ? `: ${details}` : '.'}`)
   }
 }
 
-export function assertV4WorkflowResult (workflow: WorkflowName, value: unknown): void {
+export function assertV5WorkflowResult (workflow: WorkflowName, value: unknown): void {
   assertSchema(RESULT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} result`)
 }
 
-export function assertV4WorkflowInput (workflow: WorkflowName, value: unknown): void {
+export function assertV5WorkflowInput (workflow: WorkflowName, value: unknown): void {
   assertSchema(INPUT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} input`)
 }
 
-export function assertV4ReviewRecord (value: unknown): void {
+export function assertV5ReviewRecord (value: unknown): void {
   assertSchema('review-record.schema.json', value, 'review_record')
 }

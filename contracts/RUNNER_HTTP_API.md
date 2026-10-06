@@ -2,7 +2,7 @@
 
 Language: English | [中文](RUNNER_HTTP_API.zh.md)
 
-This is the HTTP API for the production runner service. Workflow input and result fields are defined in [CONTRACT_V4.md](CONTRACT_V4.md).
+This is the HTTP API for the production runner service. Workflow input and result fields are defined in [CONTRACT_V5.md](CONTRACT_V5.md).
 
 ## Authentication
 
@@ -93,16 +93,28 @@ GET /v1/runs/{run_id}
 
 ### Succeeded Response
 
-The Runner reports `succeeded` only after the workflow completes and its result matches the public v4 schema for that workflow. A completed workflow that returns an invalid public result is reported as failed with `RUNNER_RESPONSE_INVALID`; the Runner does not guess how to repair contract fields at this boundary.
+The Runner reports `succeeded` only after the workflow completes and its result matches the public v5 schema for that workflow. A completed workflow that returns an invalid public result is reported as failed with `RUNNER_RESPONSE_INVALID`; the Runner does not guess how to repair contract fields at this boundary.
 
 ```json
 {
   "run_id": "run-001",
   "workflow": "issue-review",
   "status": "succeeded",
-  "result": {}
+  "result": {},
+  "artifact_publication": {
+    "status": "published",
+    "artifact": {
+      "kind": "diagnostic_bundle",
+      "uri": "s3://sec-review/runs/run-001/artifacts/diagnostic-tree.v1.tar.zst",
+      "media_type": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+      "digest": "sha256:0123456789abcdef...",
+      "size_bytes": 12345
+    }
+  }
 }
 ```
+
+`artifact_publication` is separate from the workflow result. Its status is `published`, `not_available`, or `failed`; publication failure does not change the workflow's business result.
 
 ### Failed Response
 

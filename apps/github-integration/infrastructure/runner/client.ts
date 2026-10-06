@@ -1,7 +1,7 @@
 import { isIP } from 'node:net'
 
 import { logInfo } from '../../utils/logger.js'
-import { assertV4WorkflowInput } from './contract-schema.js'
+import { assertV5WorkflowInput } from './contract-schema.js'
 
 export type WorkflowName = 'issue-review' | 'pull-request-review' | 'repository-review'
 
@@ -26,6 +26,19 @@ interface RunnerServiceErrorBody {
   category?: string
   retryable?: boolean
   details?: JsonObject
+}
+
+export interface RunnerArtifactPublication {
+  status: 'published' | 'not_available' | 'failed'
+  artifact?: {
+    kind: string
+    uri: string
+    media_type: string
+    digest: string
+    size_bytes: number
+  }
+  error_code?: string
+  message?: string
 }
 
 export interface AgentRunnerServiceError extends Error {
@@ -72,6 +85,7 @@ export interface RunnerRunStatus {
   status: string
   result?: unknown
   error?: RunnerServiceErrorBody
+  artifact_publication?: RunnerArtifactPublication
 }
 
 interface RunnerServiceQueuedResponse {
@@ -83,6 +97,7 @@ interface RunnerServiceQueuedResponse {
 interface RunnerServiceStatusResponse extends RunnerServiceQueuedResponse {
   result?: unknown
   error?: RunnerServiceErrorBody
+  artifact_publication?: RunnerArtifactPublication
 }
 
 function isRecord (value: unknown): value is JsonObject {
@@ -192,7 +207,7 @@ function validateRunnerInput ({ workflow, input }: { workflow: WorkflowName, inp
   if (!isRecord(input)) {
     throw new Error(`Runner input is missing before ${workflow} dispatch.`)
   }
-  assertV4WorkflowInput(workflow, input)
+  assertV5WorkflowInput(workflow, input)
 }
 
 function logRunnerRequestDiagnostics ({
@@ -328,7 +343,10 @@ function normalizeRunnerRunStatus (value: RunnerServiceStatusResponse): RunnerRu
     workflow: value.workflow ?? null,
     status: value.status,
     ...(Object.hasOwn(value, 'result') ? { result: value.result } : {}),
-    ...(value.error ? { error: value.error } : {})
+    ...(value.error ? { error: value.error } : {}),
+    ...(value.artifact_publication
+      ? { artifact_publication: value.artifact_publication }
+      : {})
   }
 }
 

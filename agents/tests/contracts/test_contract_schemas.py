@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import pytest
 
-from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_result
+from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_result
 from tests.contract_fixtures import (
     contract_fixture,
     contract_fixture_files,
@@ -29,16 +29,16 @@ def invalid_fixture_schemas(version: str) -> dict[str, str]:
     return schema_fixtures
 
 
-def test_v4_contract_fixture_manifest_covers_fixture_and_schema_files() -> None:
-    schema_fixtures = fixture_schemas("v4")
+def test_v5_contract_fixture_manifest_covers_fixture_and_schema_files() -> None:
+    schema_fixtures = fixture_schemas("v5")
     fixture_names = {
         fixture_file.name
-        for fixture_file in contract_fixture_files("v4")
+        for fixture_file in contract_fixture_files("v5")
         if fixture_file.name != "manifest.json"
     }
-    schema_names = {schema_file.name for schema_file in contract_schema_files("v4")}
+    schema_names = {schema_file.name for schema_file in contract_schema_files("v5")}
 
-    invalid_schema_fixtures = invalid_fixture_schemas("v4")
+    invalid_schema_fixtures = invalid_fixture_schemas("v5")
     assert set(schema_fixtures) | set(invalid_schema_fixtures) == fixture_names
     assert (
         set(schema_fixtures.values()) | set(invalid_schema_fixtures.values())
@@ -46,11 +46,11 @@ def test_v4_contract_fixture_manifest_covers_fixture_and_schema_files() -> None:
     )
 
 
-def test_v4_contract_fixtures_match_json_schemas() -> None:
-    for fixture_name, schema_name in fixture_schemas("v4").items():
-        validator = contract_validator("v4", schema_name)
+def test_v5_contract_fixtures_match_json_schemas() -> None:
+    for fixture_name, schema_name in fixture_schemas("v5").items():
+        validator = contract_validator("v5", schema_name)
         errors = sorted(
-            validator.iter_errors(contract_fixture("v4", fixture_name)),
+            validator.iter_errors(contract_fixture("v5", fixture_name)),
             key=lambda error: list(error.path),
         )
 
@@ -67,32 +67,32 @@ def test_v4_contract_fixtures_match_json_schemas() -> None:
         ("repository-review", "repository-review-result.json"),
     ],
 )
-def test_runner_accepts_shared_v4_workflow_result_fixtures(
+def test_runner_accepts_shared_v5_workflow_result_fixtures(
     workflow: str, fixture_name: str
 ) -> None:
-    validate_v4_workflow_result(contract_fixture("v4", fixture_name), workflow)
+    validate_v5_workflow_result(contract_fixture("v5", fixture_name), workflow)
 
 
 def test_runner_rejects_invalid_v4_workflow_result() -> None:
-    with pytest.raises(ValueError, match="Runner result does not match contract v4"):
-        validate_v4_workflow_result(
-            {"contract_version": "v4"},
+    with pytest.raises(ValueError, match="Runner result does not match contract v5"):
+        validate_v5_workflow_result(
+            {"contract_version": "v5"},
             "issue-review",
         )
 
 
-def test_v4_invalid_contract_fixtures_are_rejected_by_json_schemas() -> None:
-    for fixture_name, schema_name in invalid_fixture_schemas("v4").items():
-        validator = contract_validator("v4", schema_name)
+def test_v5_invalid_contract_fixtures_are_rejected_by_json_schemas() -> None:
+    for fixture_name, schema_name in invalid_fixture_schemas("v5").items():
+        validator = contract_validator("v5", schema_name)
 
-        errors = list(validator.iter_errors(contract_fixture("v4", fixture_name)))
+        errors = list(validator.iter_errors(contract_fixture("v5", fixture_name)))
 
         assert errors != [], f"{fixture_name} unexpectedly matched {schema_name}"
 
 
-def test_v4_pull_request_input_schema_requires_audit_objective() -> None:
-    validator = contract_validator("v4", "pull-request-review-input.schema.json")
-    payload = contract_fixture("v4", "pull-request-review-input.json")
+def test_v5_pull_request_input_schema_requires_audit_objective() -> None:
+    validator = contract_validator("v5", "pull-request-review-input.schema.json")
+    payload = contract_fixture("v5", "pull-request-review-input.json")
     payload["review_intent"]["objective"] = "repair"
 
     errors = list(validator.iter_errors(payload))
@@ -100,9 +100,9 @@ def test_v4_pull_request_input_schema_requires_audit_objective() -> None:
     assert errors != []
 
 
-def test_v4_repository_input_schema_requires_audit_objective() -> None:
-    validator = contract_validator("v4", "repository-review-input.schema.json")
-    payload = contract_fixture("v4", "repository-review-input-incremental.json")
+def test_v5_repository_input_schema_requires_audit_objective() -> None:
+    validator = contract_validator("v5", "repository-review-input.schema.json")
+    payload = contract_fixture("v5", "repository-review-input-incremental.json")
     payload["review_intent"]["objective"] = "repair"
 
     errors = list(validator.iter_errors(payload))
@@ -110,9 +110,9 @@ def test_v4_repository_input_schema_requires_audit_objective() -> None:
     assert errors != []
 
 
-def test_v4_repository_full_scan_schema_rejects_incremental_window_fields() -> None:
-    validator = contract_validator("v4", "repository-review-input.schema.json")
-    payload = contract_fixture("v4", "repository-review-input-full.json")
+def test_v5_repository_full_scan_schema_rejects_incremental_window_fields() -> None:
+    validator = contract_validator("v5", "repository-review-input.schema.json")
+    payload = contract_fixture("v5", "repository-review-input-full.json")
     payload["scan_target"]["base_sha"] = "1111111111111111111111111111111111111111"
     payload["scan_target"]["commit_shas"] = ["1111111111111111111111111111111111111111"]
     payload["scan_scope"]["incremental_changed_files"] = [
@@ -131,12 +131,12 @@ def test_v4_repository_full_scan_schema_rejects_incremental_window_fields() -> N
         {"commit_shas": []},
     ],
 )
-def test_v4_repository_incremental_schema_rejects_missing_window_fields(
+def test_v5_repository_incremental_schema_rejects_missing_window_fields(
     scan_target_patch: dict[str, object],
 ) -> None:
-    validator = contract_validator("v4", "repository-review-input.schema.json")
+    validator = contract_validator("v5", "repository-review-input.schema.json")
     payload = deepcopy(
-        contract_fixture("v4", "repository-review-input-incremental.json")
+        contract_fixture("v5", "repository-review-input-incremental.json")
     )
     payload["scan_target"].update(scan_target_patch)
 
@@ -145,10 +145,10 @@ def test_v4_repository_incremental_schema_rejects_missing_window_fields(
     assert errors != []
 
 
-def test_v4_repository_incremental_schema_allows_empty_changed_file_scope() -> None:
-    validator = contract_validator("v4", "repository-review-input.schema.json")
+def test_v5_repository_incremental_schema_allows_empty_changed_file_scope() -> None:
+    validator = contract_validator("v5", "repository-review-input.schema.json")
     payload = deepcopy(
-        contract_fixture("v4", "repository-review-input-incremental.json")
+        contract_fixture("v5", "repository-review-input-incremental.json")
     )
     payload["scan_scope"]["incremental_changed_files"] = []
 
@@ -157,9 +157,9 @@ def test_v4_repository_incremental_schema_allows_empty_changed_file_scope() -> N
     assert errors == []
 
 
-def test_v4_review_record_schema_rejects_unsafe_file_change_paths() -> None:
-    validator = contract_validator("v4", "review-record.schema.json")
-    payload = deepcopy(contract_fixture("v4", "review-record-deleted-file.json"))
+def test_v5_review_record_schema_rejects_unsafe_file_change_paths() -> None:
+    validator = contract_validator("v5", "review-record.schema.json")
+    payload = deepcopy(contract_fixture("v5", "review-record-deleted-file.json"))
 
     for path in [
         "../src/server.ts",

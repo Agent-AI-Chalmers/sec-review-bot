@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
 import { database_pg_options, database_url } from '../../config.js'
-import type { WorkflowName } from './client.js'
+import type { RunnerArtifactPublication, WorkflowName } from './client.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
 import { DeterministicRunnerPublishError } from './publish-error.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from './publish-error-code.js'
@@ -29,6 +29,7 @@ export interface ReviewRunRecord extends CreateReviewRunArgs {
   published_at: string | null
   failure_code: string | null
   failure_message: string | null
+  artifact_publication: RunnerArtifactPublication | null
 }
 export interface PublicationStepRecord {
   step_key: string
@@ -48,6 +49,7 @@ interface ReviewRunRow {
   runner_status: RunnerStatus
   runner_failure_code: string | null
   runner_failure_message: string | null
+  artifact_publication: RunnerArtifactPublication | null
   publication_status: PublicationStatus
   created_at: Date | string
   runner_updated_at: Date | string
@@ -63,7 +65,8 @@ const MAX_PUBLISH_ATTEMPTS = 3
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
 const RUN_SELECT = `
   SELECT r.run_id, r.workflow, r.publish_context, r.runner_input, r.runner_status,
-    r.runner_failure_code, r.runner_failure_message, r.ingress_kind, r.ingress_key,
+    r.runner_failure_code, r.runner_failure_message, r.artifact_publication,
+    r.ingress_kind, r.ingress_key,
     r.created_at, r.updated_at AS runner_updated_at,
     p.status AS publication_status, p.updated_at AS publication_updated_at,
     p.published_at,
@@ -93,6 +96,7 @@ function rowToRecord (row: ReviewRunRow): ReviewRunRecord {
     published_at: row.published_at === null ? null : iso(row.published_at),
     failure_code: publicationFailure ? row.publication_failure_code : row.runner_failure_code,
     failure_message: publicationFailure ? row.publication_failure_message : row.runner_failure_message,
+    artifact_publication: row.artifact_publication,
     ...(row.ingress_kind ? { ingress_kind: row.ingress_kind } : {}),
     ...(row.ingress_key ? { ingress_key: row.ingress_key } : {})
   }
@@ -336,6 +340,14 @@ export class ReviewRunStore {
       SET runner_status='running', updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2 AND runner_status='queued'
     `, [runId, this.connectorId])
+  }
+  async recordArtifactPublication (runId: string, publication: RunnerArtifactPublication | undefined): Promise<void> {
+    if (publication === undefined) return
+    await this.pool.query(`
+      UPDATE review_runs
+      SET artifact_publication=$3::jsonb, updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$2
+    `, [runId, this.connectorId, JSON.stringify(publication)])
   }
   async failRunnerExecution (runId: string, error: { code?: string | null, message: string }): Promise<boolean> {
     return await transaction(this.pool, async client => {

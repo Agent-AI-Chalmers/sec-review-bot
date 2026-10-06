@@ -232,7 +232,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
       deps: {
         create_run_id: () => 'run-uncertain',
         start_review: async (args) => {
-          args.on_prepared?.({ issue: args.issue, run_id: 'run-uncertain', workspace_ref: 'workspace-ref', workflow: 'issue-review', event_type: 'opened' }, { contract_version: 'v4' } as never)
+          args.on_prepared?.({ issue: args.issue, run_id: 'run-uncertain', workspace_ref: 'workspace-ref', workflow: 'issue-review', event_type: 'opened' }, { contract_version: 'v5' } as never)
           throw error
         },
         store: {
@@ -266,7 +266,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
       deps: {
         create_run_id: () => 'run-pr-uncertain',
         start_review: async (args) => {
-          args.on_prepared?.({ pr: args.pr, run_id: 'run-pr-uncertain', files: [], workflow: 'pull-request-review', event_type: 'opened' }, { contract_version: 'v4' } as never)
+          args.on_prepared?.({ pr: args.pr, run_id: 'run-pr-uncertain', files: [], workflow: 'pull-request-review', event_type: 'opened' }, { contract_version: 'v5' } as never)
           throw error
         },
         store: {

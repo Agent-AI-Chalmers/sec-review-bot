@@ -16,9 +16,9 @@ The supported public integration point has two layers:
 Use these documents:
 
 - [RUNNER_HTTP_API.md](RUNNER_HTTP_API.md): how callers create and poll workflow runs.
-- [CONTRACT_V4.md](CONTRACT_V4.md): workflow input and result shapes.
-- [schemas/v4](schemas/v4): JSON Schemas for machine validation.
-- [fixtures/v4](fixtures/v4): executable JSON examples shared by Python and TypeScript tests.
+- [CONTRACT_V5.md](CONTRACT_V5.md): workflow input and result shapes.
+- [schemas/v5](schemas/v5): JSON Schemas for machine validation.
+- [fixtures/v5](fixtures/v5): executable JSON examples shared by Python and TypeScript tests.
 
 The HTTP API and the workflow contract are the stable public interface.
 
@@ -63,7 +63,7 @@ This split is also a security boundary. GitHub identity, permissions, API calls,
 
 The Markdown specifications define field semantics, compatibility rules, and integration guidance.
 
-The schema files are the executable structural form of that specification. Contract v4 schemas use [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12). The Python Runner enforces input and result schemas with [jsonschema](https://python-jsonschema.readthedocs.io/), and the TypeScript integration independently enforces them with [Ajv](https://ajv.js.org/). Both packages also execute the shared fixtures in tests.
+The schema files are the executable structural form of that specification. Contract v5 schemas use [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12). The Python Runner enforces input and result schemas with [jsonschema](https://python-jsonschema.readthedocs.io/), and the TypeScript integration independently enforces them with [Ajv](https://ajv.js.org/). Both packages also execute the shared fixtures in tests.
 
 The agents wheel includes a build-time copy of these canonical schemas as package data. Installed Python tools therefore do not depend on the repository-level `contracts/` path at runtime.
 
@@ -75,13 +75,13 @@ Runtime parsers may also enforce canonical forms that schemas intentionally leav
 
 The fixture files provide concrete JSON examples that tests can execute against, so they are part of contract validation.
 
-[`fixtures/v4/manifest.json`](fixtures/v4/manifest.json) records which valid fixtures must match and which invalid fixtures must be rejected by each schema, so Python and TypeScript exercise the same structural boundary.
+[`fixtures/v5/manifest.json`](fixtures/v5/manifest.json) records which valid fixtures must match and which invalid fixtures must be rejected by each schema, so Python and TypeScript exercise the same structural boundary.
 
-When contract fields change, update the relevant written specification, [schema](schemas/v4), [fixture](fixtures/v4), and [manifest](fixtures/v4/manifest.json) entries in this directory together.
+When contract fields change, update the relevant written specification, [schema](schemas/v5), [fixture](fixtures/v5), and [manifest](fixtures/v5/manifest.json) entries in this directory together.
 
 ## Fixture Usage
 
-The fixtures under `fixtures/v4/` are executable examples of the current project-owned contract.
+The fixtures under `fixtures/v5/` are executable examples of the current project-owned contract.
 
 They are intentionally consumed by both the Python agents package and the GitHub integration package so the two implementations validate the same JSON shapes.
 
@@ -94,7 +94,7 @@ Schema validation tests should read `manifest.json` instead of maintaining packa
 
 ## Artifact Boundary
 
-Stage artifacts are runtime diagnostics unless a field is explicitly promoted into the public workflow result. Public results are `review_record`, repository `case_results[]`, repository `deliveries[]`, and the other fields documented in [CONTRACT_V4.md](CONTRACT_V4.md).
+Stage artifacts are runtime diagnostics unless a field is explicitly promoted into the public workflow result. Public results are `review_record`, repository `case_results[]`, repository `deliveries[]`, and the other fields documented in [CONTRACT_V5.md](CONTRACT_V5.md).
 
 Callers should publish from the workflow result, not by reading whole stage artifact packages. If a stage artifact becomes necessary for caller behavior, either promote the required field into this contract or keep the dependency private to a local debugging tool.
 
@@ -103,7 +103,7 @@ Callers should publish from the workflow result, not by reading whole stage arti
 For any contract change:
 
 - update the relevant Markdown specification;
-- update the JSON Schema in [schemas/v4](schemas/v4);
-- update or add fixtures in [fixtures/v4](fixtures/v4);
+- update the JSON Schema in [schemas/v5](schemas/v5);
+- update or add fixtures in [fixtures/v5](fixtures/v5);
 - make both Python and TypeScript tests validate the same fixtures and schemas.
 - keep [scripts/check_contracts.sh](../scripts/check_contracts.sh) aligned with the contract validation surface and run it before publishing the change.

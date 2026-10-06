@@ -20,9 +20,11 @@ import {
   type ChangedFileRecord
 } from './incremental-artifacts.js'
 import {
+  archiveInputBundle,
   buildGitRemoteUrl,
   createInputBundleRoot,
   createRunId,
+  ensureCleanDirectory,
   finalizeInputBundleWorkspace
 } from '../shared/input-bundle.js'
 
@@ -114,7 +116,9 @@ export async function prepareRepositoryReviewInput ({
   const incremental_window_path = path.join(input_bundle_root, 'incremental-window')
   const history_path = path.join(input_bundle_root, 'history')
 
-  await fs.mkdir(input_bundle_root, { recursive: true })
+  // A supplied run ID is reused after uncertain submission failures. Remove
+  // partial files from the previous preparation before rebuilding the bundle.
+  await ensureCleanDirectory(input_bundle_root)
   await Promise.all([
     fs.mkdir(incremental_window_path, { recursive: true }),
     fs.mkdir(history_path, { recursive: true })
@@ -207,9 +211,14 @@ export async function prepareRepositoryReviewInput ({
     })
   }
 
+  const input_bundle = await archiveInputBundle({
+    input_bundle_root,
+    include_incremental_window: resolvedScanMode === 'incremental',
+    run_id
+  })
   const input: RepositoryReviewInput = {
-    contract_version: 'v4',
-    input_bundle_uri: input_bundle_root,
+    contract_version: 'v5',
+    input_bundle,
     review_intent: {
       objective: 'audit',
       ...(repair_mode ? { repair_mode } : {})

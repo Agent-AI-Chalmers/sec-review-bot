@@ -40,7 +40,7 @@ class FakeRunnerWorkflowGateway:
 def _request() -> dict[str, Any]:
     return {
         "run_id": "run-service",
-        "input": contract_fixture("v4", "issue-review-input.json"),
+        "input": contract_fixture("v5", "issue-review-input.json"),
     }
 
 
@@ -99,7 +99,7 @@ def test_create_run_rejects_invalid_run_id_before_start(monkeypatch) -> None:
         "/v1/workflows/issue-review/runs",
         json={
             "run_id": "../run-service",
-            "input": contract_fixture("v4", "issue-review-input.json"),
+            "input": contract_fixture("v5", "issue-review-input.json"),
         },
     )
 
@@ -122,7 +122,7 @@ def test_create_run_rejects_schema_invalid_input_before_start(monkeypatch) -> No
         json={
             "run_id": "run-service",
             "input": contract_fixture(
-                "v4", "invalid-repository-review-input-max-file-bytes.json"
+                "v5", "invalid-repository-review-input-max-file-bytes.json"
             ),
         },
     )
@@ -213,7 +213,7 @@ def test_get_run_returns_worker_result(monkeypatch) -> None:
         "run_id": "run-service",
         "workflow": "issue-review",
         "status": "succeeded",
-        "result": {"contract_version": "v4"},
+        "result": {"contract_version": "v5"},
     }
     client = TestClient(service_app.create_app(runner_gateway=gateway))
 
@@ -222,7 +222,7 @@ def test_get_run_returns_worker_result(monkeypatch) -> None:
     assert fetched.status_code == 200
     fetched_body = fetched.json()
     assert fetched_body["status"] == "succeeded"
-    assert fetched_body["result"] == {"contract_version": "v4"}
+    assert fetched_body["result"] == {"contract_version": "v5"}
 
 
 def test_get_run_returns_structured_not_found_error(monkeypatch) -> None:
@@ -306,15 +306,16 @@ def test_bearer_token_rejects_non_ascii_configured_token_without_error(
     assert response.status_code == 401
 
 
-def test_create_app_requires_input_bundle_root_with_token(monkeypatch) -> None:
+def test_create_app_requires_configured_input_store_with_token(monkeypatch) -> None:
     monkeypatch.setenv("RUNNER_SERVICE_TOKEN", "secret")
     monkeypatch.delenv("SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT", raising=False)
+    monkeypatch.delenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", raising=False)
     monkeypatch.setenv("RUNNER_SERVICE_HOST", "127.0.0.1")
 
     try:
         service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
     except RuntimeError as error:
-        assert "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT is required" in str(error)
+        assert "SEC_REVIEW_ARTIFACT_S3_BUCKET is required" in str(error)
     else:
         raise AssertionError("create_app accepted token mode without input bundle root")
 

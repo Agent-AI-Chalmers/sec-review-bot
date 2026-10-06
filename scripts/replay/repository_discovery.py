@@ -13,10 +13,11 @@ from sec_review_agents.scan_stages.discovery.stage import (
     scan_discovery_chunk,
 )
 from sec_review_agents.utils.env import bootstrap_agents_env
-from sec_review_agents.utils.paths import artifact_path, required_path
+from sec_review_agents.utils.paths import artifact_path
 
 from scripts.replay.input_bundle import (
     default_replay_artifact_root,
+    materialize_replay_input,
     read_json,
     restore_replay_workspace,
 )
@@ -34,22 +35,6 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _hydrate_artifact_paths(replay_input: dict) -> None:
-    local_root_path = replay_input.get("input_bundle_uri")
-    if not isinstance(local_root_path, str) or not local_root_path.strip():
-        return
-
-    # Stage replay starts after runner input preparation. Hydrate only
-    # prepared-input runtime roots, not caller input.
-    run_artifacts = default_replay_artifact_root(
-        input_bundle_root=Path(local_root_path),
-        run_id=str(replay_input.get("run_id") or ""),
-    )
-    replay_input["artifact_paths"] = {
-        "discovery": str(run_artifacts / "discovery"),
-    }
-
-
 async def main() -> None:
     bootstrap_agents_env()
     args = _parse_args()
@@ -58,8 +43,11 @@ async def main() -> None:
     if not input_path.exists():
         raise FileNotFoundError(f"Input JSON does not exist: {input_path}")
 
-    replay_input = read_json(input_path)
-    _hydrate_artifact_paths(replay_input)
+    public_input = read_json(input_path)
+    run_artifacts = input_path.parent / "artifacts" / "replay-discovery"
+    replay_input = materialize_replay_input(
+        public_input, workflow="repository-review", artifact_root=run_artifacts
+    )
     run_id = (
         Path(artifact_path(replay_input["artifact_paths"], "discovery"))
         .resolve()
@@ -67,10 +55,7 @@ async def main() -> None:
     )
 
     scan_target = replay_input["scan_target"]
-    local_root = required_path(
-        replay_input.get("input_bundle_uri"),
-        label="input_bundle_uri",
-    )
+    local_root = Path(replay_input["input_bundle_root_path"])
     workspace_root = restore_replay_workspace(
         input_bundle_root=local_root,
         artifact_root=default_replay_artifact_root(

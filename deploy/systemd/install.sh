@@ -61,9 +61,10 @@ install -d -m 0755 "$config_dir"
 # selected service user after an earlier root-owned deployment.
 install -d -m 0755 -o "$service_uid" -g "$service_gid" \
     "$repository_root/.agent-temporal-state" \
-    "$repository_root/.agent-input-bundles" \
+    "$repository_root/.agent-rustfs-state" \
     "$repository_root/.agent-postgres-state" \
-    "$repository_root/.agent-artifacts"
+    "$repository_root/.agent-artifacts" \
+    "$repository_root/.agent-run-inputs"
 if [ ! -f "$deployment_env_source" ]; then
     echo "Missing deployment config: $deployment_env_source" >&2
     echo "Copy deployment.env.sample to deployment.env and fill in its values first." >&2
@@ -79,10 +80,10 @@ awk -v repository_root="$repository_root" \
     BEGIN {
         fixed["SEC_REVIEW_BOT_DIR"] = 1
         fixed["SEC_REVIEW_AGENTS_DIR"] = 1
-        fixed["SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT"] = 1
         fixed["SEC_REVIEW_SERVICE_UID"] = 1
         fixed["SEC_REVIEW_SERVICE_GID"] = 1
         optional["SEC_REVIEW_AGENT_ARTIFACT_ROOT"] = 1
+        optional["SEC_REVIEW_AGENT_RUN_INPUT_ROOT"] = 1
         optional["MODEL_PROVIDERS_CONFIG_TOML"] = 1
     }
     {
@@ -104,8 +105,6 @@ awk -v repository_root="$repository_root" \
     END {
         print "SEC_REVIEW_BOT_DIR=" repository_root
         print "SEC_REVIEW_AGENTS_DIR=" repository_root "/agents"
-        print "SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT=" \
-            repository_root "/.agent-input-bundles"
         print "SEC_REVIEW_SERVICE_UID=" service_uid
         print "SEC_REVIEW_SERVICE_GID=" service_gid
 
@@ -114,6 +113,12 @@ awk -v repository_root="$repository_root" \
         } else {
             print "SEC_REVIEW_AGENT_ARTIFACT_ROOT=" \
                 repository_root "/.agent-artifacts"
+        }
+        if (configured["SEC_REVIEW_AGENT_RUN_INPUT_ROOT"] != "") {
+            print configured["SEC_REVIEW_AGENT_RUN_INPUT_ROOT"]
+        } else {
+            print "SEC_REVIEW_AGENT_RUN_INPUT_ROOT=" \
+                repository_root "/.agent-run-inputs"
         }
         if (configured["MODEL_PROVIDERS_CONFIG_TOML"] != "") {
             print configured["MODEL_PROVIDERS_CONFIG_TOML"]

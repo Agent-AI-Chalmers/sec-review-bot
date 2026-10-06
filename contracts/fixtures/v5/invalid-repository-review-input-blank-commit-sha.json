@@ -1,0 +1,27 @@
+{
+  "contract_version": "v5",
+  "input_bundle": {
+    "uri": "file:///tmp/sec-review-fixtures/repository-review-incremental.tar.zst",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "media_type": "application/vnd.sec-review.input-bundle.v1+tar+zstd",
+    "size_bytes": 0
+  },
+  "review_intent": {
+    "objective": "audit"
+  },
+  "scan_target": {
+    "target_branch": "main",
+    "default_branch": "main",
+    "event_type": "scheduled",
+    "scan_mode": "incremental",
+    "base_sha": "1111111111111111111111111111111111111111",
+    "head_sha": "2222222222222222222222222222222222222222",
+    "commit_shas": [
+      "   "
+    ]
+  },
+  "scan_scope": {
+    "paths_ignore": [],
+    "incremental_changed_files": []
+  }
+}

@@ -32,7 +32,7 @@ function jsonResponse (body: unknown, init?: ResponseInit): Response {
 }
 
 function issueInput (): Record<string, unknown> {
-  return structuredClone(contractFixture('v4', 'issue-review-input.json')) as Record<string, unknown>
+  return structuredClone(contractFixture('v5', 'issue-review-input.json')) as Record<string, unknown>
 }
 
 test.afterEach(() => {
@@ -215,11 +215,11 @@ test('submitRunnerRun rejects schema-invalid input before dispatch', async () =>
       workflow: 'repository-review',
       run_id: 'run-1',
       input: contractFixture(
-        'v4',
+        'v5',
         'invalid-repository-review-input-max-file-bytes.json'
       ) as Record<string, unknown>
     }),
-    /does not match contract v4/
+    /does not match contract v5/
   )
   assert.equal(called, false)
 })
@@ -339,7 +339,17 @@ test('getRunnerRunStatus fetches HTTP runner run status', async () => {
       run_id: 'run-1',
       workflow: 'issue-review',
       status: 'succeeded',
-      result: { status: 'completed' }
+      result: { status: 'completed' },
+      artifact_publication: {
+        status: 'published',
+        artifact: {
+          kind: 'diagnostic_bundle',
+          uri: 's3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
+          media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+          digest: `sha256:${'a'.repeat(64)}`,
+          size_bytes: 123
+        }
+      }
     })
   }
 
@@ -347,6 +357,7 @@ test('getRunnerRunStatus fetches HTTP runner run status', async () => {
 
   assert.equal(status.run_id, 'run-1')
   assert.equal(status.status, 'succeeded')
+  assert.equal(status.artifact_publication?.artifact?.size_bytes, 123)
   assert.deepEqual(completedRunnerRunResult(status)?.result, { status: 'completed' })
 })
 

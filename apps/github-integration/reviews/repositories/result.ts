@@ -1,7 +1,7 @@
 import type { FileChange } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import type { ReviewRecord } from '../review-record.js'
-import { assertV4WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
+import { assertV5WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
 
 export interface RepositoryDelivery {
   delivery_id: string
@@ -18,7 +18,7 @@ export interface RepositoryCaseResult {
 }
 
 export interface RepositoryWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   scan_summary: Record<string, unknown>
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]
@@ -36,7 +36,7 @@ function requirePublishableFileChanges (file_changes: FileChange[]): void {
 }
 
 export function parseRepositoryWorkflowResult (value: unknown): RepositoryWorkflowResult {
-  assertV4WorkflowResult('repository-review', value)
+  assertV5WorkflowResult('repository-review', value)
   const result = value as Omit<RepositoryWorkflowResult, 'deliveries'> & {
     deliveries: Array<Omit<RepositoryDelivery, 'case_count'>>
   }

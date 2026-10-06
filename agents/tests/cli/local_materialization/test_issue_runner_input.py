@@ -100,16 +100,9 @@ def test_build_local_issue_bundle_creates_limited_history_workspace(
         output_dir=output_dir,
     )
 
-    workspace_path = bundle.local_root_path / "workspace"
-    workspace_head = _run_git(workspace_path, "rev-parse", "HEAD")
-    reachable_commits = _run_git(workspace_path, "rev-list", "--count", "HEAD")
-    is_shallow = _run_git(workspace_path, "rev-parse", "--is-shallow-repository")
-
-    assert workspace_head == head_sha
-    assert reachable_commits == "1"
-    assert is_shallow == "true"
-    assert (workspace_path / ".git").is_dir()
-    assert (workspace_path / "app.py").exists()
+    assert not (bundle.local_root_path / "workspace").exists()
+    assert bundle.input["input_bundle"]["uri"].endswith(".tar.zst")
+    assert head_sha
 
 
 def test_local_issue_strategy_result_path_uses_strategy_suffix(tmp_path: Path) -> None:

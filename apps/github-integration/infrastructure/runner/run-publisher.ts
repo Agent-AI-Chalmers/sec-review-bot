@@ -222,6 +222,10 @@ async function publishCompletedRun ({
     return
   }
 
+  // Diagnostic publication belongs to Runner, but the integration keeps the
+  // returned reference with its run record so it is not lost after this poll.
+  await store.recordArtifactPublication(run.run_id, status.artifact_publication)
+
   if (status.status === 'failed') {
     let error: unknown
     try {

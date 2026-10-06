@@ -35,6 +35,7 @@ from sec_review_agents.workflows.repository.workflow import (
     RepositoryScanWorkflow,
 )
 from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
+from tests.input_bundle import write_test_input_bundle
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
 
@@ -108,7 +109,7 @@ class _CompletedInvalidResultHandle:
         return _CompletedDescription()
 
     async def result(self) -> dict:
-        return {"ok": True, "result": {"contract_version": "v4"}}
+        return {"ok": True, "result": {"contract_version": "v5"}}
 
 
 def _valid_workflow_result(workflow: str) -> dict:
@@ -120,7 +121,7 @@ def _valid_workflow_result(workflow: str) -> dict:
     )
     if workflow == "repository-review":
         return {
-            "contract_version": "v4",
+            "contract_version": "v5",
             "scan_summary": {
                 "scannable_file_count": 0,
                 "scanned_file_count": 0,
@@ -132,7 +133,7 @@ def _valid_workflow_result(workflow: str) -> dict:
             "case_results": [],
             "deliveries": [],
         }
-    return {"contract_version": "v4", "review_record": review_record}
+    return {"contract_version": "v5", "review_record": review_record}
 
 
 @activity.defn(name="prepare_runner_run_activity")
@@ -683,6 +684,7 @@ async def test_temporal_backend_starts_and_reads_runner_workflow(
         "run_id": "run-1",
         "workflow": workflow,
         "status": "succeeded",
+        "artifact_publication": {"status": "not_available"},
         "result": _valid_workflow_result(workflow),
     }
     assert replayed == fetched
@@ -700,6 +702,7 @@ async def test_temporal_backend_maps_completed_error_envelope_to_failed_run() ->
         "run_id": "run-error",
         "workflow": "issue-review",
         "status": "failed",
+        "artifact_publication": {"status": "not_available"},
         "error": {
             "category": "input",
             "code": "RUNNER_REQUEST_INVALID",
@@ -748,7 +751,7 @@ async def test_record_from_handle_rejects_invalid_public_workflow_result() -> No
             "category": "runtime",
             "code": "RUNNER_RESPONSE_INVALID",
             "message": (
-                "Runner result does not match contract v4: "
+                "Runner result does not match contract v5: "
                 "'review_record' is a required property"
             ),
             "retryable": False,
@@ -816,8 +819,10 @@ def test_prepare_runner_run_activity_maps_missing_manifest_to_input_error(
             workflow="issue-review",
             run_id="run-missing-manifest",
             input_data={
-                "contract_version": "v4",
-                "input_bundle_uri": str(tmp_path),
+                "contract_version": "v5",
+                "input_bundle": write_test_input_bundle(
+                    tmp_path / "missing-manifest", include_manifest=False
+                ),
                 "review_intent": {"objective": "audit"},
                 "issue": {"number": 1},
             },

@@ -12,7 +12,7 @@ import {
 } from './renderer.js'
 import { logInfo } from '../../utils/logger.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { assertV4WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
+import { assertV5WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
 import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
 
@@ -34,7 +34,7 @@ function issueReviewRunMarker (run_id: string): string {
 }
 
 export interface IssueReviewWorkflowResult {
-  contract_version: 'v4'
+  contract_version: 'v5'
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -58,10 +58,10 @@ function issueReviewResultFromRunStatus (status: RunnerRunStatus): IssueReviewWo
     return null
   }
   try {
-    assertV4WorkflowResult('issue-review', completed.result)
-    const rawResult = completed.result as { contract_version: 'v4', review_record: unknown }
+    assertV5WorkflowResult('issue-review', completed.result)
+    const rawResult = completed.result as { contract_version: 'v5', review_record: unknown }
     return {
-      contract_version: 'v4',
+      contract_version: 'v5',
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

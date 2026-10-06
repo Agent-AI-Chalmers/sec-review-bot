@@ -18,7 +18,6 @@ from sec_review_agents.utils.markdown import (
     plain_text,
     write_markdown,
 )
-from sec_review_agents.utils.paths import required_path
 
 
 def _fix_sections(
@@ -165,6 +164,7 @@ def _preview_index_lines(items: list[dict[str, Any]]) -> list[str]:
 
 def write_issue_previews(
     *,
+    local_root_path: Path,
     materialized_input: dict[str, Any],
     workflow_result: dict[str, Any],
 ) -> dict[str, Any]:
@@ -176,14 +176,7 @@ def write_issue_previews(
     review_record = as_dict(workflow_result.get("review_record"))
     mitigation = as_dict(review_record.get("mitigation"))
     draft_pr_ready = bool(as_list(mitigation.get("changed_files")))
-    output_dir = (
-        required_path(
-            materialized_input.get("input_bundle_uri"),
-            label="input_bundle_uri",
-        )
-        / "artifacts"
-        / "previews"
-    )
+    output_dir = local_root_path / "artifacts" / "previews"
     items: list[dict[str, Any]] = []
 
     comment_path = output_dir / "issue-comment.md"

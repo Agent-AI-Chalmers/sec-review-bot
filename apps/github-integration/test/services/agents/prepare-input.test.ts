@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import test from 'node:test'
 import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
 
 import type { GitHubAppOctokit } from '../../../infrastructure/github/octokit.js'
 import type { IssueContext } from '../../../infrastructure/github/issue-service.js'
@@ -94,7 +96,21 @@ async function assertRunnerInputArtifact ({
   inputPath: string
   runId: string
 }): Promise<void> {
-  assert.equal(input['input_bundle_uri'], inputBundleRoot)
+  const inputBundle = input['input_bundle'] as Record<string, unknown>
+  assert.equal(inputBundle['media_type'], 'application/vnd.sec-review.input-bundle.v1+tar+zstd')
+  const archivePath = fileURLToPath(String(inputBundle['uri']))
+  assert.equal(archivePath, `${inputBundleRoot}.tar.zst`)
+  const archive = await fs.readFile(archivePath)
+  assert.equal(inputBundle['size_bytes'], archive.byteLength)
+  assert.equal(
+    inputBundle['digest'],
+    `sha256:${crypto.createHash('sha256').update(archive).digest('hex')}`
+  )
+  const { stdout: archiveListing } = await execFileAsync('tar', ['--zstd', '-tf', archivePath])
+  assert.match(archiveListing, /^manifest\.json$/m)
+  assert.match(archiveListing, new RegExp(`^${WORKSPACE_SNAPSHOT_TAR_NAME}$`, 'm'))
+  assert.doesNotMatch(archiveListing, /^workspace\//m)
+  assert.doesNotMatch(archiveListing, /review-input\.json$/m)
   assert.match(inputBundleRoot, new RegExp(`${runId}$`))
   assertPathIsWithin(suiteInputBundleRoot, inputBundleRoot)
   assertPathIsWithin(inputBundleRoot, inputPath)
@@ -195,7 +211,7 @@ test('issue input preparer keeps materialized git workspace files in snapshot', 
       octokit,
       issue
     })
-    assert.equal(prepared.input.contract_version, 'v4')
+    assert.equal(prepared.input.contract_version, 'v5')
     assert.deepEqual(prepared.input.review_intent, { objective: 'audit' })
     assert.equal(prepared.input.issue.repo_full_name, 'octo/demo')
     await assertRunnerInputArtifact({
@@ -208,7 +224,7 @@ test('issue input preparer keeps materialized git workspace files in snapshot', 
       await fs.readFile(path.join(prepared.input_bundle_root, 'manifest.json'), 'utf8')
     ) as Record<string, unknown>
     assert.deepEqual(manifest, {
-      contract_version: 'v4',
+      contract_version: 'v5',
       kind: 'runner-input-bundle',
       workspace: { snapshot: WORKSPACE_SNAPSHOT_TAR_NAME },
       history: { path: 'history' }
@@ -298,6 +314,13 @@ test('repository input preparer writes full and incremental runner bundles', { c
     assert.equal('repository' in full.input, false)
     const fullManifest = JSON.parse(await fs.readFile(path.join(full.input_bundle_root, 'manifest.json'), 'utf8')) as Record<string, unknown>
     assert.equal('incremental_window' in fullManifest, false)
+
+    await fs.writeFile(path.join(full.input_bundle_root, 'stale-from-failed-attempt.txt'), 'stale')
+    const retriedFull = await prepareRepositoryReviewInput({ run_id: 'run-repo-full', octokit, repo_full_name: 'octo/demo', scan_mode: 'full' })
+    await assert.rejects(
+      fs.access(path.join(retriedFull.input_bundle_root, 'stale-from-failed-attempt.txt')),
+      { code: 'ENOENT' }
+    )
 
     const incremental = await prepareRepositoryReviewInput({ run_id: 'run-repo-incremental', octokit, repo_full_name: 'octo/demo', scan_mode: 'incremental', base_sha: refs.base_sha, head_sha: refs.head_sha })
     await assertRunnerInputArtifact({

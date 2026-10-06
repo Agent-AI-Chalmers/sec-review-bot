@@ -6,6 +6,7 @@ from typing import Any
 from sec_review_agents.cli.local_git import repo_full_name, resolve_git_ref
 from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
+    archive_input_bundle,
     build_run_paths,
     create_local_run_id,
     ensure_run_directories,
@@ -317,14 +318,15 @@ def build_local_pull_request_bundle(
     write_json(history_root / "pr-metadata.json", pr_metadata)
     write_json(history_root / "linked-context.json", linked_issues)
 
+    input_bundle = archive_input_bundle(manifest_paths, include_incremental_window=True)
     input_data = {
-        "contract_version": "v4",
+        "contract_version": "v5",
         "review_intent": {
             "objective": "audit",
             "repair_mode": repair_mode,
         },
         "pr": pr_metadata,
-        "input_bundle_uri": str(manifest_paths.local_root_path),
+        "input_bundle": input_bundle,
     }
 
     input_path = manifest_paths.local_root_path / "pull-request-review-input.json"

@@ -8,7 +8,8 @@ from typing import Any
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from sec_review_agents.entrypoints.contract_schema import validate_v4_workflow_input
+from sec_review_agents.artifacts.input_storage import ARTIFACT_S3_BUCKET_ENV
+from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_input
 from sec_review_agents.entrypoints.input_preparation import INPUT_BUNDLE_ROOT_ENV
 from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_REQUEST_INVALID,
@@ -51,9 +52,13 @@ def _require_safe_auth_configuration() -> None:
     host = env_value(HOST_ENV) or "127.0.0.1"
 
     if _service_token() is not None:
-        if env_value(INPUT_BUNDLE_ROOT_ENV) is None:
+        if (
+            env_value(INPUT_BUNDLE_ROOT_ENV) is None
+            and env_value(ARTIFACT_S3_BUCKET_ENV) is None
+        ):
             raise RuntimeError(
-                f"{INPUT_BUNDLE_ROOT_ENV} is required for runner service mode."
+                f"{INPUT_BUNDLE_ROOT_ENV} or {ARTIFACT_S3_BUCKET_ENV} is required "
+                "for runner service mode."
             )
         return
 
@@ -93,6 +98,8 @@ def _run_response(run: dict[str, Any]) -> dict[str, Any]:
         response["result"] = run["result"]
     if run.get("error") is not None:
         response["error"] = run["error"]
+    if run.get("artifact_publication") is not None:
+        response["artifact_publication"] = run["artifact_publication"]
     return response
 
 
@@ -150,7 +157,7 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
             )
 
         try:
-            validate_v4_workflow_input(request["input"], workflow)
+            validate_v5_workflow_input(request["input"], workflow)
         except ValueError as error:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,

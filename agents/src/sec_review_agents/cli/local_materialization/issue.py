@@ -9,6 +9,7 @@ from sec_review_agents.cli.local_git import (
 )
 from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
+    archive_input_bundle,
     build_run_paths,
     create_local_run_id,
     ensure_run_directories,
@@ -117,14 +118,15 @@ def build_local_issue_bundle(
             "prs": [],
         },
     )
+    input_bundle = archive_input_bundle(paths, include_incremental_window=False)
     input_data = {
-        "contract_version": "v4",
+        "contract_version": "v5",
         "review_intent": {
             "objective": review_objective,
             "repair_mode": repair_mode,
         },
         "issue": issue_metadata,
-        "input_bundle_uri": str(paths.local_root_path),
+        "input_bundle": input_bundle,
     }
     input_path = paths.local_root_path / "issue-review-input.json"
     write_json(input_path, input_data)

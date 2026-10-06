@@ -35,6 +35,7 @@ from sec_review_agents.workflows.repository_case.direct import (
 from sec_review_agents.workflows.review_intent import require_review_intent
 
 from scripts.replay.input_bundle import (
+    materialize_replay_input,
     read_json,
     read_replay_bundle_paths,
 )
@@ -218,7 +219,10 @@ async def main() -> None:
         else run_artifacts / "triage" / "triage-result.json"
     )
 
-    replay_input = read_json(input_path)
+    public_input = read_json(input_path)
+    replay_input = materialize_replay_input(
+        public_input, workflow="repository-review", artifact_root=run_artifacts
+    )
     discovery_result = read_json(discovery_path)
     triage_result = read_json(triage_path)
 
@@ -229,7 +233,7 @@ async def main() -> None:
         "triage": str(run_artifacts / "triage"),
         "cases": str(run_artifacts / "cases"),
     }
-    local_root = Path(replay_input["input_bundle_uri"])
+    local_root = Path(replay_input["input_bundle_root_path"])
     bundle_paths = read_replay_bundle_paths(local_root)
     repair_mode = require_review_intent(replay_input.get("review_intent")).repair_mode
 

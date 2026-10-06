@@ -2,7 +2,7 @@
 
 Language: English | [中文](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
-This guide covers local deployment of the GitHub integration / Runner Service / Temporal control plane with a host execution worker.
+This guide covers local deployment of the GitHub integration / Runner Service / Temporal control plane, object storage, and a host execution worker.
 
 Use it to run the complete integrated path locally. For running agents directly without the HTTP Runner Service, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
@@ -16,6 +16,8 @@ flowchart LR
     subgraph compose["Docker Compose"]
         integration["github-integration"] --> runner["Runner Service<br/>submit and query review tasks"]
         runner --> temporal["Temporal<br/>workflow state and task queue"]
+        integration -->|write input bundles| storage["Object Storage<br/>immutable input and result artifacts"]
+        runner -->|write terminal result artifacts| storage
     end
 
     subgraph host["Host"]
@@ -24,13 +26,17 @@ flowchart LR
 
     tunnel --> integration
     temporal --> worker
+    storage -->|read input bundles| worker
+    storage -->|read published artifacts| runner
 ```
 
 Cloudflare Tunnel forwards both public endpoints to the local `github-integration` service. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for configuration.
 
 Runner Service is the HTTP API between GitHub integration and Temporal. It authenticates and validates task requests, starts Temporal workflows, and queries task status; `sec-review-agents-worker` executes the agents.
 
-In terms of responsibilities, the Compose services form the control plane, while the host worker is an execution node similar to a Kubernetes worker node. Without a worker, submitted tasks remain in Temporal waiting for execution.
+Object Storage holds two kinds of run data: the input bundle prepared before execution and the result artifact produced after execution. GitHub integration writes the input bundle. The result publication path writes the terminal artifact. The worker and Runner Service read these objects when needed. The worker does not hold credentials for publishing result artifacts.
+
+Without a worker, submitted tasks remain in Temporal waiting for execution.
 
 Default local endpoints:
 
@@ -40,6 +46,8 @@ Default local endpoints:
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
+| RustFS API | `http://127.0.0.1:9100` |
+| RustFS Console | `http://127.0.0.1:9101` |
 
 ## Prerequisites
 
@@ -87,7 +95,7 @@ The repository review workflow authenticates to the App with GitHub Actions OIDC
 
 ## Deployment Configuration
 
-The integrated deployment uses four source configuration files:
+The integrated deployment uses four source configuration files. Compose `.env` also carries the object-storage endpoint and service credentials; these credentials are passed to the appropriate service only:
 
 - repository-root `.env`: Compose control plane;
 - `apps/github-integration/.env`: GitHub integration;
@@ -117,7 +125,7 @@ The samples contain both usable defaults and empty or placeholder values that mu
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-Set `RUNNER_SERVICE_TOKEN` to a locally generated secret, for example with `openssl rand -hex 32`. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-input-bundles`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
+Set `RUNNER_SERVICE_TOKEN` and the PostgreSQL/RustFS passwords to locally generated secrets, for example with `openssl rand -hex 32`. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values. RustFS stores immutable input archives; the integration credential can write input objects and the host worker credential is read-only.
 
 ### 2. GitHub Integration `.env`
 
@@ -129,7 +137,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose injects the container private-key path, Runner Service address and token, PostgreSQL connection, and input bundle path. These values do not need to be repeated in `apps/github-integration/.env`.
+Compose injects the container private-key path, Runner Service address and token, PostgreSQL connection, and RustFS input storage configuration. These values do not need to be repeated in `apps/github-integration/.env`.
 
 ### 3. Model Configuration
 
@@ -161,11 +169,11 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 `deploy/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the control-plane service and host worker read the installed file.
 
-The installer owns `SEC_REVIEW_BOT_DIR`, `SEC_REVIEW_AGENTS_DIR`, and `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT`. Do not add them to the editable source file. The installer removes stale values and regenerates them from its own repository location because the checkout paths and the input directory shared by Compose and the host worker must move together.
+The installer owns `SEC_REVIEW_BOT_DIR` and `SEC_REVIEW_AGENTS_DIR`. Do not add them to the editable source file. The installer removes stale values and regenerates them from its own repository location. Input archives are exchanged through RustFS, so the integration container and host worker no longer share `.agent-input-bundles`.
 
 The installer also generates the internal `SEC_REVIEW_SERVICE_UID` and `SEC_REVIEW_SERVICE_GID` values. Before Compose starts, it creates the repository-local state directories for that service user. This prevents Docker from creating unwritable root-owned bind-mount sources and lets the Temporal container write its SQLite database as the same user.
 
-Artifacts default to `.agent-artifacts`, and model configuration defaults to `agents/config/model-providers.toml` in the current checkout. Most installations should keep these defaults. To store artifacts on another disk or load model configuration from another location, set an absolute `SEC_REVIEW_AGENT_ARTIFACT_ROOT` or `MODEL_PROVIDERS_CONFIG_TOML` in `deploy/systemd/deployment.env`; the installer preserves non-empty overrides for these two independent worker paths.
+Materialized run inputs and generated artifacts default to `.agent-run-inputs` and `.agent-artifacts`. Model configuration defaults to `agents/config/model-providers.toml` in the current checkout. Most installations should keep these defaults. To move them, set an absolute `SEC_REVIEW_AGENT_RUN_INPUT_ROOT`, `SEC_REVIEW_AGENT_ARTIFACT_ROOT`, or `MODEL_PROVIDERS_CONFIG_TOML` in `deploy/systemd/deployment.env`; the installer preserves non-empty overrides for these independent worker paths.
 
 If [`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) gains new options, add the relevant options to `deploy/systemd/deployment.env` manually.
 
@@ -176,6 +184,10 @@ Core fields:
 | `TEMPORAL_ADDRESS` | Must use the host port exposed by `TEMPORAL_PORT` in the repository `.env`; the default is `127.0.0.1:7233`. |
 | `TEMPORAL_NAMESPACE`, `TEMPORAL_TASK_QUEUE` | Must match the same-named values in the repository `.env`. |
 | `AGENT_DOCKER_IMAGE` | Image used for Docker sandboxes; the default is a general-purpose image. |
+| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Read-only RustFS credential matching the runner values in the repository `.env`. |
+
+The Runner service receives a separate artifact-publisher credential through Compose. It can write only `runs/*/artifacts/*`; the host worker has no object-storage credential. The service reads the worker's artifact root through a read-only bind mount when a terminal run is observed.
 
 Most local deployments can keep these defaults. Rerun the installer after moving the checkout.
 
@@ -237,7 +249,8 @@ With the sample configuration, the integrated deployment stores runtime data in 
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-input-bundles` | Written by GitHub integration, read by the host worker | Prepared runner input materials |
+| `.agent-rustfs-state` | RustFS | Persistent object storage for input archives exchanged between integration and Runner |
+| `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published diagnostic bundles |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
 | `.agent-postgres-state` | PostgreSQL | Admission, Runner observation, and publication step coordination |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
@@ -350,12 +363,12 @@ Temporal distributes tasks among instances that share a task queue. Tune one pro
 
 ## Cleanup
 
-GitHub integration uses the container's default root user, so input bundles or App state may contain root-owned files. The host worker writes artifacts as its own user.
+GitHub integration uses the container's default root user for local staging files. Durable input archives live in RustFS, and the host worker writes runtime artifacts as its own user.
 
 To repair ownership:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-input-bundles .agent-artifacts .agent-postgres-state .agent-temporal-state
+sudo chown -R "$USER:$USER" .agent-run-inputs .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
 ```
 
 The PostgreSQL coordination store and Temporal state describe the same active runs. Do not delete `.agent-temporal-state` while retaining PostgreSQL records that still need polling or publication. To reset run execution and publication state, stop the complete service and remove both state directories together:
@@ -366,13 +379,17 @@ sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 
-This permanently deletes workflow history, pending tasks, polling state, and publication state. The deployment does not automatically expire input bundles or artifacts; they are retained by default for recovery, replay, and diagnostics, and the operator is responsible for monitoring their disk usage. They can be removed manually after confirming that no retained run needs them:
+This permanently deletes workflow history, pending tasks, polling state, and publication state. The materials prepared before a run starts (the archive uploaded to RustFS) and the diagnostic materials produced after a run ends currently have no automatic retention period; their corresponding local files are also retained indefinitely by default for recovery, replay, and diagnostics. The deployment does not configure lifecycle expiration, so the operator must monitor disk usage. They can be removed manually after confirming that no retained run needs them:
 
 ```bash
-sudo rm -rf .agent-input-bundles .agent-artifacts
+sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
 ```
 
 The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.
+
+### Backup and recovery
+
+RustFS state and PostgreSQL state are independent data sets. Back up `.agent-rustfs-state` and `.agent-postgres-state` together with the deployment configuration, but store passwords and access keys in the secret manager rather than in the backup archive. A recovery must restore RustFS first, run the RustFS initializer to reconcile the bucket and policies, and then restore PostgreSQL so run records can resolve their stored artifact references. The initializer is safe to run repeatedly; it does not replace existing objects.
 
 ```bash
 sudo rm -rf .agent-memory
@@ -418,6 +435,6 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 - Runner Service returns unauthorized: check `RUNNER_SERVICE_TOKEN` in the repository `.env`, then restart the complete service.
 - Repository dispatch authentication fails: confirm that the workflow has `id-token: write`, requests the `sec-review-bot` OIDC audience, and uses the `.github/workflows/sec-review-bot.yml` workflow path.
 - Tasks remain queued: confirm that at least one host worker is running and uses the same `TEMPORAL_TASK_QUEUE` as Runner Service.
-- The worker cannot read an input bundle: rerun `sudo deploy/systemd/install.sh "$USER"` so the installed `SEC_REVIEW_AGENT_INPUT_BUNDLE_ROOT` matches the current checkout.
+- The worker cannot read an input bundle: check the RustFS endpoint and ensure the installed worker credential matches the read-only credential initialized by Compose.
 - The worker writes artifacts elsewhere: check the optional `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override in `deploy/systemd/deployment.env`, then rerun `sudo deploy/systemd/install.sh "$USER"`.
 - LLM calls fail before workflow progress: from `agents/`, run `uv run sec-review-agents-check-llm-deployments --fail-fast`.

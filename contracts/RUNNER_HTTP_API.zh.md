@@ -4,7 +4,7 @@
 
 本文是 [RUNNER_HTTP_API.md](RUNNER_HTTP_API.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是生产 runner service 的 HTTP API。workflow 的输入和结果字段见 [契约 v4](CONTRACT_V4.zh.md)。
+这是生产 runner service 的 HTTP API。workflow 的输入和结果字段见 [契约 v5](CONTRACT_V5.zh.md)。
 
 ## 认证
 
@@ -89,16 +89,28 @@ GET /v1/runs/{run_id}
 
 ### 成功响应
 
-只有当 workflow 完成，且其 result 符合该 workflow 的公开 v4 schema 时，Runner 才会报告 `succeeded`。如果 workflow 已完成但返回了非法的公开 result，Runner 会以 `RUNNER_RESPONSE_INVALID` 报告失败；Runner 不会在这个边界猜测如何修复契约字段。
+只有当 workflow 完成，且其 result 符合该 workflow 的公开 v5 schema 时，Runner 才会报告 `succeeded`。如果 workflow 已完成但返回了非法的公开 result，Runner 会以 `RUNNER_RESPONSE_INVALID` 报告失败；Runner 不会在这个边界猜测如何修复契约字段。
 
 ```json
 {
   "run_id": "run-001",
   "workflow": "issue-review",
   "status": "succeeded",
-  "result": {}
+  "result": {},
+  "artifact_publication": {
+    "status": "published",
+    "artifact": {
+      "kind": "diagnostic_bundle",
+      "uri": "s3://sec-review/runs/run-001/artifacts/diagnostic-tree.v1.tar.zst",
+      "media_type": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+      "digest": "sha256:0123456789abcdef...",
+      "size_bytes": 12345
+    }
+  }
 }
 ```
+
+`artifact_publication` 与 workflow 业务结果相互独立。其状态为 `published`、`not_available` 或 `failed`；诊断材料发布失败不会改变 workflow 的业务结果。
 
 ### 失败响应
 

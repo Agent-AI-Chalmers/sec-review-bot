@@ -43,7 +43,7 @@ App 侧和 agent 侧之间的契约，看这里：
 
 - [Contracts README](../contracts/README.md) / [中文](../contracts/README.zh.md)：公开集成接口和契约入口。
 - [RUNNER_HTTP_API.md](../contracts/RUNNER_HTTP_API.md) / [中文](../contracts/RUNNER_HTTP_API.zh.md)：Agent Runner HTTP API。
-- [CONTRACT_V4.md](../contracts/CONTRACT_V4.md) / [中文](../contracts/CONTRACT_V4.zh.md)：workflow 输入和结果契约。
+- [CONTRACT_V5.md](../contracts/CONTRACT_V5.md) / [中文](../contracts/CONTRACT_V5.zh.md)：workflow 输入和结果契约。
 
 ### workflows/
 

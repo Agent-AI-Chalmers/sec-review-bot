@@ -10,7 +10,7 @@ def _materialized_input(local_root: Path) -> dict:
     return {
         "issue": {"number": 7, "title": "Dangerous preview endpoint"},
         "pr": {"number": 11},
-        "input_bundle_uri": str(local_root),
+        "input_bundle_root_path": str(local_root),
     }
 
 
@@ -75,6 +75,7 @@ def test_writes_issue_comment_and_draft_pr_previews(tmp_path: Path) -> None:
     local_root = tmp_path / "run-1"
     run_artifacts = local_root / "artifacts"
     result = write_issue_previews(
+        local_root_path=local_root,
         materialized_input=_materialized_input(local_root),
         workflow_result=_workflow_result(),
     )
@@ -111,6 +112,7 @@ def test_writes_pull_request_review_body_preview(tmp_path: Path) -> None:
     local_root = tmp_path / "run-1"
     run_artifacts = local_root / "artifacts"
     result = write_pull_request_previews(
+        local_root_path=local_root,
         materialized_input=_materialized_input(local_root),
         workflow_result=_workflow_result(),
     )
@@ -155,6 +157,7 @@ def test_pull_request_preview_summarizes_review_stages(tmp_path: Path) -> None:
     )
 
     write_pull_request_previews(
+        local_root_path=local_root,
         materialized_input=_materialized_input(local_root),
         workflow_result=workflow_result,
     )
@@ -185,6 +188,7 @@ def test_pull_request_preview_reports_patch_and_manual_review(tmp_path: Path) ->
     )
 
     write_pull_request_previews(
+        local_root_path=local_root,
         materialized_input=_materialized_input(local_root),
         workflow_result=workflow_result,
     )

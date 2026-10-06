@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 from sec_review_agents.cli.local_previewing.shared import (
@@ -14,7 +15,6 @@ from sec_review_agents.utils.markdown import (
     plain_text,
     write_markdown,
 )
-from sec_review_agents.utils.paths import required_path
 
 
 def _review_record(workflow_result: dict[str, Any]) -> dict[str, Any]:
@@ -136,20 +136,14 @@ def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
 
 def write_pull_request_previews(
     *,
+    local_root_path: Path,
     materialized_input: dict[str, Any],
     workflow_result: dict[str, Any],
 ) -> dict[str, Any]:
     pr = as_dict(materialized_input.get("pr"))
     pr_number = pr.get("number") or "unknown"
     review_record = _review_record(workflow_result)
-    output_dir = (
-        required_path(
-            materialized_input.get("input_bundle_uri"),
-            label="input_bundle_uri",
-        )
-        / "artifacts"
-        / "previews"
-    )
+    output_dir = local_root_path / "artifacts" / "previews"
     review_body_path = output_dir / "review-body.md"
     write_markdown(
         review_body_path,

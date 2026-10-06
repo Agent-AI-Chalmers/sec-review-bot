@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from sec_review_agents.entrypoints.input_preparation import prepare_workflow_input
 from sec_review_agents.utils.env import env_value
 from sec_review_agents.workspace.snapshots import (
     ARTIFACT_WORKSPACE_DIR_NAME,
@@ -10,6 +11,17 @@ from sec_review_agents.workspace.snapshots import (
 
 INPUT_BUNDLE_MANIFEST_NAME = "manifest.json"
 ARTIFACT_ROOT_ENV = "SEC_REVIEW_AGENT_ARTIFACT_ROOT"
+
+
+def materialize_replay_input(
+    public_input: dict[str, Any], *, workflow: str, artifact_root: Path
+) -> dict[str, Any]:
+    """Resolve a public archive reference before replaying internal stages."""
+    return prepare_workflow_input(
+        public_input,
+        workflow,
+        artifact_root_path=artifact_root,
+    )
 
 
 def read_json(path: Path) -> Any:

@@ -8,18 +8,19 @@ from sec_review_agents.cli.local_previewing.repository import (
 def test_writes_publishable_preview_outside_patch_synthesis(tmp_path: Path) -> None:
     local_root = tmp_path / "local"
     run_artifacts = local_root / "artifacts"
-    workspace = local_root / "workspace"
-    workspace.mkdir(parents=True)
-    (workspace / "src").mkdir()
-    (workspace / "src" / "server.js").write_text(
-        "const root = process.cwd()\n",
-        encoding="utf-8",
-    )
     artifact = {
         "delivery_id": "case-1",
         "strategy": "single",
         "case_count": 1,
         "case_ids": ["case-1"],
+        "patch_diff": (
+            "diff --git a/src/server.js b/src/server.js\n"
+            "--- a/src/server.js\n"
+            "+++ b/src/server.js\n"
+            "@@ -1 +1 @@\n"
+            "-const root = process.cwd()\n"
+            "+const root = PREVIEW_ROOT\n"
+        ),
         "file_changes": [
             {
                 "path": "src/server.js",
@@ -88,11 +89,8 @@ def test_writes_publishable_preview_outside_patch_synthesis(tmp_path: Path) -> N
             },
         },
     }
-    materialized_input = {
-        "input_bundle_uri": str(local_root),
-    }
     result = write_repository_draft_pr_previews(
-        materialized_input=materialized_input,
+        local_root_path=local_root,
         deliveries=[artifact],
         case_results=[case_result],
     )
@@ -149,17 +147,8 @@ def test_writes_publishable_preview_outside_patch_synthesis(tmp_path: Path) -> N
 def test_preview_notes_shared_modified_files_across_deliveries(tmp_path: Path) -> None:
     local_root = tmp_path / "local"
     run_artifacts = local_root / "artifacts"
-    workspace = local_root / "workspace"
-    workspace.mkdir(parents=True)
-    (workspace / "src").mkdir()
-    (workspace / "src" / "server.js").write_text(
-        "initial\n",
-        encoding="utf-8",
-    )
     write_repository_draft_pr_previews(
-        materialized_input={
-            "input_bundle_uri": str(local_root),
-        },
+        local_root_path=local_root,
         deliveries=[
             {
                 "delivery_id": "case-1",
@@ -173,6 +162,7 @@ def test_preview_notes_shared_modified_files_across_deliveries(tmp_path: Path) -
                     }
                 ],
                 "case_ids": ["case-1"],
+                "patch_diff": "first patch\n",
             },
             {
                 "delivery_id": "case-2",
@@ -186,6 +176,7 @@ def test_preview_notes_shared_modified_files_across_deliveries(tmp_path: Path) -
                     }
                 ],
                 "case_ids": ["case-2"],
+                "patch_diff": "second patch\n",
             },
         ],
     )
@@ -213,18 +204,8 @@ def test_final_patch_preview_handles_deleted_and_binary_file_changes(
 ) -> None:
     local_root = tmp_path / "local"
     run_artifacts = local_root / "artifacts"
-    workspace = local_root / "workspace"
-    workspace.mkdir(parents=True)
-    (workspace / "src").mkdir()
-    (workspace / "src" / "remove.txt").write_text(
-        "delete me\n",
-        encoding="utf-8",
-    )
-
     write_repository_draft_pr_previews(
-        materialized_input={
-            "input_bundle_uri": str(local_root),
-        },
+        local_root_path=local_root,
         deliveries=[
             {
                 "delivery_id": "case-1",
@@ -243,6 +224,17 @@ def test_final_patch_preview_handles_deleted_and_binary_file_changes(
                     },
                 ],
                 "case_ids": ["case-1"],
+                "patch_diff": (
+                    "diff --git a/src/remove.txt b/src/remove.txt\n"
+                    "deleted file mode 100644\n"
+                    "--- a/src/remove.txt\n"
+                    "+++ /dev/null\n"
+                    "@@ -1 +0,0 @@\n"
+                    "-delete me\n"
+                    "diff --git a/src/logo.bin b/src/logo.bin\n"
+                    "new file mode 100644\n"
+                    "Binary files /dev/null and b/src/logo.bin differ\n"
+                ),
             }
         ],
     )
@@ -250,8 +242,7 @@ def test_final_patch_preview_handles_deleted_and_binary_file_changes(
     content = (run_artifacts / "previews" / "case-1.md").read_text(encoding="utf-8")
     assert "## Final Patch Preview" in content
     assert "-delete me" in content
-    assert "Skipped non-text file changes:" in content
-    assert "- `src/logo.bin`" in content
+    assert "Binary files /dev/null and b/src/logo.bin differ" in content
     assert "AAE=" not in content
 
 
@@ -259,9 +250,7 @@ def test_writes_blocked_confirmed_cases_preview(tmp_path: Path) -> None:
     local_root = tmp_path / "local"
     run_artifacts = local_root / "artifacts"
     result = write_repository_draft_pr_previews(
-        materialized_input={
-            "input_bundle_uri": str(local_root),
-        },
+        local_root_path=local_root,
         deliveries=[],
         case_results=[
             {

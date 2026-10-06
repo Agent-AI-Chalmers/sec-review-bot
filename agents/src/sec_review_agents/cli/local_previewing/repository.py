@@ -15,10 +15,8 @@ from sec_review_agents.utils.markdown import (
     folded_block,
     inline_code,
     md,
-    unified_diff_text,
     write_markdown,
 )
-from sec_review_agents.utils.paths import required_path
 
 LOCAL_PREVIEW_NOTICE = (
     "_Local developer preview only; the GitHub App may publish different final "
@@ -371,64 +369,13 @@ def _build_blocked_confirmed_cases_preview(
     return blocks
 
 
-def _workspace_root(local_root_path: object) -> Path | None:
-    if isinstance(local_root_path, str) and local_root_path.strip():
-        return Path(local_root_path) / "workspace"
-    return None
-
-
-def _decode_file_change_text(file_change: dict[str, Any]) -> str | None:
-    if file_change.get("status") == "deleted":
-        return ""
-    if file_change.get("content_encoding") != "utf-8":
-        return None
-    content = file_change.get("content")
-    if not isinstance(content, str):
-        return None
-    return content
-
-
-def _read_baseline_text(workspace_root: Path | None, relative_path: str) -> str | None:
-    if workspace_root is None:
-        return ""
-    path = workspace_root / relative_path
-    try:
-        return path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return ""
-    except UnicodeDecodeError:
-        return None
-
-
 def _build_final_patch_preview(
     *,
-    materialized_input: dict[str, Any],
     delivery_artifact: dict[str, Any],
 ) -> list[str]:
-    workspace_root = _workspace_root(materialized_input.get("input_bundle_uri"))
-    diff_parts: list[str] = []
-    skipped_paths: list[str] = []
-    for file_change in as_list(delivery_artifact.get("file_changes")):
-        if not isinstance(file_change, dict):
-            continue
-        relative_path = str(file_change.get("path") or "").strip()
-        if not relative_path:
-            continue
-        before = _read_baseline_text(workspace_root, relative_path)
-        after = _decode_file_change_text(file_change)
-        if before is None or after is None:
-            skipped_paths.append(relative_path)
-            continue
-        diff_parts.append(
-            unified_diff_text(
-                before=before,
-                after=after,
-                relative_path=relative_path,
-            )
-        )
     return final_patch_block_from_diff(
-        patch="".join(diff_parts),
-        skipped_paths=skipped_paths,
+        patch=str(delivery_artifact.get("patch_diff") or ""),
+        skipped_paths=[],
     )
 
 
@@ -520,18 +467,11 @@ def _publishable_delivery_artifacts(
 
 def write_repository_draft_pr_previews(
     *,
-    materialized_input: dict[str, Any],
+    local_root_path: Path,
     deliveries: list[Any],
     case_results: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    output_dir = (
-        required_path(
-            materialized_input.get("input_bundle_uri"),
-            label="input_bundle_uri",
-        )
-        / "artifacts"
-        / "previews"
-    )
+    output_dir = local_root_path / "artifacts" / "previews"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     preview_items: list[dict[str, Any]] = []
@@ -552,7 +492,6 @@ def write_repository_draft_pr_previews(
                 body,
                 "",
                 *_build_final_patch_preview(
-                    materialized_input=materialized_input,
                     delivery_artifact=artifact,
                 ),
             ],
