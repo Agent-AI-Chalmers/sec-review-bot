@@ -150,12 +150,20 @@ function reviewEventForRecord (review_record: ReviewRecord, pr: PersistedPullReq
   if (review_record.analysis.verdict === 'no-actionable-finding') {
     return 'APPROVE'
   }
+
   if (
     review_record.analysis.verdict === 'confirmed-vulnerability' ||
     review_record.analysis.verdict === 'confirmed-defect'
   ) {
-    return 'REQUEST_CHANGES'
+    // Confirmed findings would normally request changes. A regular GitHub App
+    // can submit REQUEST_CHANGES without becoming a requestable reviewer,
+    // however, leaving no reliable Re-request review path to replace that
+    // blocking state. Degrade to COMMENT until GitHub exposes that lifecycle:
+    // https://github.com/SchweizerischeBundesbahnen/github-workflows-polarion/issues/70
+    return 'COMMENT'
   }
+
+  // Plausible risks require human judgment and are non-blocking by design.
   return 'COMMENT'
 }
 
