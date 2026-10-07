@@ -76,6 +76,7 @@ The main public workflow IDs are `issue-review`, `pull-request-review`, and `rep
 
 ### architecture/
 
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Runtime entities, end-to-end data flow, cross-service contracts, sources of truth, and credential ownership.
 
 ### operations/
 

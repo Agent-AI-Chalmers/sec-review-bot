@@ -6,6 +6,7 @@ import crypto from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 
 const MAX_SESSION_BODY_BYTES = 1024 * 1024
+const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 10_000
 
 function securityHeaders(response: ServerResponse): void {
   response.setHeader(
@@ -89,13 +90,28 @@ export function createControlPlaneUiServer({
         response.end()
         return
       }
-      const upstream = await fetch(`${controlPlaneUrl}/v1${request.url.slice(4)}`, {
-        headers: { authorization: `Bearer ${controlPlaneToken}` }
-      })
-      response.writeHead(upstream.status, {
-        'content-type': upstream.headers.get('content-type') ?? 'application/json'
-      })
-      response.end(Buffer.from(await upstream.arrayBuffer()))
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), CONTROL_PLANE_REQUEST_TIMEOUT_MS)
+      try {
+        const upstream = await fetch(`${controlPlaneUrl}/v1${request.url.slice(4)}`, {
+          headers: { authorization: `Bearer ${controlPlaneToken}` },
+          signal: controller.signal
+        })
+        response.writeHead(upstream.status, {
+          'content-type': upstream.headers.get('content-type') ?? 'application/json'
+        })
+        response.end(Buffer.from(await upstream.arrayBuffer()))
+      } catch (error) {
+        const timedOut = error instanceof Error && error.name === 'AbortError'
+        response.writeHead(timedOut ? 504 : 502, { 'content-type': 'application/json' })
+        response.end(
+          JSON.stringify({
+            error: timedOut ? 'control_plane_timeout' : 'control_plane_unavailable'
+          })
+        )
+      } finally {
+        clearTimeout(timeout)
+      }
       return
     }
     const requested = request.url === '/' ? 'index.html' : (request.url?.slice(1) ?? 'index.html')

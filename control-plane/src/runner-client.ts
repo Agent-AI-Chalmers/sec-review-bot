@@ -17,6 +17,8 @@ interface RunnerResponse {
   artifact_publication?: unknown
 }
 
+const RUNNER_STATUSES = new Set(['queued', 'running', 'succeeded', 'failed'])
+
 export const RUNNER_RUN_NOT_FOUND = 'RUNNER_RUN_NOT_FOUND'
 export interface RunnerRunStatus {
   run_id: string
@@ -147,6 +149,13 @@ function parseResponse(
 ): RunnerResponse {
   if (!isRecord(body) || typeof body.status !== 'string')
     throw new Error('Runner returned an invalid run response.')
+  if (!RUNNER_STATUSES.has(body.status)) {
+    throw Object.assign(new Error(`Runner returned an unknown status: ${body.status}.`), {
+      name: 'AgentRunnerServiceError' as const,
+      code: 'RUNNER_INVALID_STATUS',
+      retryable: false
+    })
+  }
   if (body.run_id !== expectedRunId)
     throw new Error(`Runner returned an unexpected run_id for ${expectedRunId}.`)
   if (

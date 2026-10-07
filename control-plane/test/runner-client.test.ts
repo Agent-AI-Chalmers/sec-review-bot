@@ -109,3 +109,18 @@ test('status response preserves a valid terminal result', async () => {
     result: { answer: 42 }
   })
 })
+
+test('status response rejects an unknown Runner state', async () => {
+  configureRunner()
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({ run_id: 'run-1', workflow: 'issue-review', status: 'completed' }),
+      { status: 200 }
+    )
+
+  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+    assert.equal((error as { code?: string }).code, 'RUNNER_INVALID_STATUS')
+    assert.equal((error as { retryable?: boolean }).retryable, false)
+    return true
+  })
+})

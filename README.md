@@ -18,11 +18,11 @@ Sec Review Bot uses AI agents to audit codebases and handle security-review task
 
 ## Capabilities
 
-| Capability | What happens |
-| --- | --- |
-| Issue review | Audits reported issues and can produce reviewed fixes or draft PRs when repair is requested. |
-| Pull request review | Reviews PR changes and can publish review suggestions. |
-| Repository review | Runs full-repository or incremental scans with discovery, triage, case processing, and delivery planning. |
+| Capability          | What happens                                                                                              |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| Issue review        | Audits reported issues and can produce reviewed fixes or draft PRs when repair is requested.              |
+| Pull request review | Reviews PR changes and can publish review suggestions.                                                    |
+| Repository review   | Runs full-repository or incremental scans with discovery, triage, case processing, and delivery planning. |
 
 ## What It Looks Like
 
@@ -40,14 +40,34 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
 
 ## Architecture
 
-This repository is a monorepo with three main subsystems:
+This repository contains four runtime entities: GitHub integration, Review Control Plane, Control Plane UI, and Agent Runner. They cooperate through authenticated HTTP, `ArtifactRef`, and durable PostgreSQL state, while keeping separate responsibilities, configuration, and deployment boundaries.
 
 - [`apps/github-integration/`](apps/github-integration/): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
 - [`apps/control-plane-ui/`](apps/control-plane-ui/): independently deployed, read-only web console for inspecting Control Plane runs
 - [`control-plane/`](control-plane/): independently deployed TypeScript service for review-run admission and durable coordination
 - [`agents/src/sec_review_agents`](agents/src/sec_review_agents/): Python multi-agent runner and review logic
 
-`github-integration` does not call agent code directly. It submits runs to the HTTP runner service, and the service uses Temporal to hand work to the worker.
+`github-integration` does not call the Runner directly. It submits and observes review runs through the Control Plane, which coordinates the HTTP Runner service and Temporal worker.
+
+```mermaid
+flowchart LR
+  github[GitHub]
+  integration[apps/github-integration]
+  control[control-plane]
+  ui[apps/control-plane-ui]
+  agents[agents]
+  storage[(Object Storage)]
+  state[(PostgreSQL)]
+
+  github -->|webhook or Actions request| integration
+  integration -->|authenticated review request| control
+  control -->|run submission and observation| agents
+  integration -->|input ArtifactRef| storage
+  agents -->|terminal artifact| storage
+  control <-->|run and publication state| state
+  ui -->|read-only query API| control
+  integration -->|GitHub publication| github
+```
 
 ## Runtime Stack
 
@@ -75,12 +95,12 @@ If you only want to inspect or run the agent side, start from:
 
 ## Supported Workflows
 
-| Path | Trigger | Output |
-| --- | --- | --- |
-| Issue audit | `issues.opened`, `@<app-slug> review audit` | Issue comment |
-| Issue repair | `@<app-slug> review repair` | Issue comment or draft PR |
-| Pull request review | PR webhook, `@<app-slug> review` | PR review / suggestions |
-| Repository review | scheduled / manually dispatched GitHub Action | Repository summary and deliveries |
+| Path                | Trigger                                       | Output                            |
+| ------------------- | --------------------------------------------- | --------------------------------- |
+| Issue audit         | `issues.opened`, `@<app-slug> review audit`   | Issue comment                     |
+| Issue repair        | `@<app-slug> review repair`                   | Issue comment or draft PR         |
+| Pull request review | PR webhook, `@<app-slug> review`              | PR review / suggestions           |
+| Repository review   | scheduled / manually dispatched GitHub Action | Repository summary and deliveries |
 
 Full trigger behavior is documented in the [GitHub integration triggers guide](apps/github-integration/README.md#triggers).
 
@@ -127,12 +147,12 @@ In Compose, Control Plane UI is exposed at `127.0.0.1:8091`, Temporal Web UI at 
 
 Package-specific setup and commands live in the package READMEs.
 
-| Goal | Start here |
-| --- | --- |
+| Goal                                           | Start here                                                                          |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
 | Run the full local stack and execution workers | [Local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) |
-| GitHub integration development | [GitHub integration guide](apps/github-integration/README.md) |
-| Agent backend development and local runs | [Agents local run guide](agents/README.md) |
-| GitHub inbound routing to local | [Local GitHub inbound setup](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md) |
+| GitHub integration development                 | [GitHub integration guide](apps/github-integration/README.md)                       |
+| Agent backend development and local runs       | [Agents local run guide](agents/README.md)                                          |
+| GitHub inbound routing to local                | [Local GitHub inbound setup](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md)         |
 
 ## Publication
 

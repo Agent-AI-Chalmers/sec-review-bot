@@ -34,6 +34,22 @@ const operations = [
 ] as const
 type Operation = (typeof operations)[number]
 const allowedOperations = new Set<string>(operations)
+const reviewStatuses = new Set<ReviewRunStatus>([
+  'preparing',
+  'recovering',
+  'queued',
+  'running',
+  'succeeded',
+  'publishing',
+  'published',
+  'failed'
+])
+const workflows = new Set<ControlPlaneWorkflow>([
+  'issue-review',
+  'pull-request-review',
+  'repository-review'
+])
+type ListQueryOptions = NonNullable<Parameters<ReviewRunStore['listRuns']>[0]>
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
@@ -61,6 +77,53 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
 function sendJson(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, { 'content-type': 'application/json' })
   response.end(JSON.stringify(value))
+}
+
+function invalidQuery(message: string): Error {
+  return Object.assign(new Error(message), { statusCode: 400, code: 'INVALID_QUERY' })
+}
+
+function parseListQuery(url: URL): ListQueryOptions {
+  const rawLimit = url.searchParams.get('limit')
+  const limit = rawLimit === null ? 50 : Number(rawLimit)
+  if (rawLimit !== null && (!/^\d+$/.test(rawLimit) || !Number.isSafeInteger(limit))) {
+    throw invalidQuery('limit must be an integer.')
+  }
+  if (limit < 1 || limit > 100) throw invalidQuery('limit must be between 1 and 100.')
+
+  const options: ListQueryOptions = { limit }
+  const cursor = url.searchParams.get('cursor')
+  if (cursor !== null) {
+    let decoded: string
+    try {
+      decoded = Buffer.from(cursor, 'base64url').toString('utf8')
+    } catch {
+      throw invalidQuery('cursor must be a valid run list cursor.')
+    }
+    const [createdAt, runId, extra] = decoded.split('|')
+    if (!createdAt || !runId || extra !== undefined || Number.isNaN(Date.parse(createdAt))) {
+      throw invalidQuery('cursor must be a valid run list cursor.')
+    }
+    options.cursor = cursor
+  }
+  const status = url.searchParams.get('status')
+  if (status !== null) {
+    if (!reviewStatuses.has(status as ReviewRunStatus)) throw invalidQuery('status is invalid.')
+    options.status = status as ReviewRunStatus
+  }
+  const workflow = url.searchParams.get('workflow')
+  if (workflow !== null) {
+    if (!workflows.has(workflow as ControlPlaneWorkflow)) throw invalidQuery('workflow is invalid.')
+    options.workflow = workflow as ControlPlaneWorkflow
+  }
+  for (const name of ['from', 'to'] as const) {
+    const value = url.searchParams.get(name)
+    if (value !== null) {
+      if (Number.isNaN(Date.parse(value))) throw invalidQuery(`${name} must be a valid date.`)
+      options[name] = value
+    }
+  }
+  return options
 }
 
 function logEvent(event: string, fields: Record<string, unknown> = {}): void {
@@ -204,26 +267,12 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       }
       if (listQuery) {
         const url = new URL(request.url ?? '/', 'http://control-plane.local')
-        const limit = Number.parseInt(url.searchParams.get('limit') ?? '50', 10)
-        const listOptions: Parameters<ReviewRunStore['listRuns']>[0] = {
-          limit: Number.isFinite(limit) ? limit : 50
-        }
-        const cursor = url.searchParams.get('cursor')
-        if (cursor !== null) listOptions.cursor = cursor
-        const status = url.searchParams.get('status') as ReviewRunStatus | null
-        if (status !== null) listOptions.status = status
-        const workflow = url.searchParams.get('workflow') as ControlPlaneWorkflow | null
-        if (workflow !== null) listOptions.workflow = workflow
-        const from = url.searchParams.get('from')
-        if (from !== null) listOptions.from = from
-        const to = url.searchParams.get('to')
-        if (to !== null) listOptions.to = to
+        const listOptions = parseListQuery(url)
         const runs = await store.listRuns(listOptions)
         const observed = runs.map(observeRun)
         const last = runs.at(-1)
         const next_cursor =
-          last === undefined ||
-          runs.length < Math.min(Math.max(Number.isFinite(limit) ? limit : 50, 1), 100)
+          last === undefined || runs.length < listOptions.limit!
             ? null
             : Buffer.from(`${last.created_at}|${last.run_id}`).toString('base64url')
         sendJson(response, 200, { runs: observed, next_cursor })

@@ -54,3 +54,29 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     ])
   }
 })
+
+test('BFF returns a gateway error when Control Plane is unavailable', async () => {
+  const ui = createControlPlaneUiServer({
+    controlPlaneUrl: 'http://127.0.0.1:1',
+    controlPlaneToken: 'read-secret',
+    accessToken: 'login-secret'
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  try {
+    const base = `http://127.0.0.1:${address.port}`
+    const login = await fetch(`${base}/api/session`, {
+      method: 'POST',
+      body: JSON.stringify({ token: 'login-secret' })
+    })
+    const cookie = login.headers.get('set-cookie')
+    assert.equal(login.status, 204)
+    assert(cookie)
+    const query = await fetch(`${base}/api/runs`, { headers: { cookie } })
+    assert.equal(query.status, 502)
+    assert.deepEqual(await query.json(), { error: 'control_plane_unavailable' })
+  } finally {
+    await new Promise<void>((resolve) => ui.close(() => resolve()))
+  }
+})

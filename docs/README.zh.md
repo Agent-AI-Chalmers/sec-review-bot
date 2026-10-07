@@ -76,6 +76,7 @@ App 侧和 agent 侧之间的契约，看这里：
 
 ### architecture/
 
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体、端到端数据流、跨服务契约、事实来源和凭据所有权。
 
 ### operations/
 
@@ -88,4 +89,3 @@ App 侧和 agent 侧之间的契约，看这里：
 ### roadmap/
 
 - [FUTURE_WORK.md](roadmap/FUTURE_WORK.md) / [中文](roadmap/FUTURE_WORK.zh.md)：将来工作。
-- [REVIEW_CONTROL_PLANE_IMPLEMENTATION.zh.md](roadmap/REVIEW_CONTROL_PLANE_IMPLEMENTATION.zh.md)：Review Control Plane 的临时实施记录和分阶段计划。
