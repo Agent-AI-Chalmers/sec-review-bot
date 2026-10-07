@@ -139,6 +139,40 @@ test('ReviewRunStore terminates preparation after its claim expires', async () =
   }
 })
 
+test('ReviewRunStore renews only the current preparation owner', async () => {
+  const store = await createStore({ claimTimeoutMs: 1_000 })
+  const runId = `run-renewed-preparation-${randomUUID()}`
+  const observer = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    assert.equal(store.preparationHeartbeatIntervalMs(), 333)
+    const admission = await store.create_preparing_review_run({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await observer.query(
+      `UPDATE review_runs SET preparation_claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE run_id=$1`,
+      [runId]
+    )
+
+    assert.equal(await store.renewPreparationClaim(runId, admission.preparation_token), true)
+    assert.equal(await store.renewPreparationClaim(runId, randomUUID()), false)
+    assert.equal(await store.expireStalePreparations(), 0)
+
+    await observer.query(
+      `UPDATE review_runs SET preparation_claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE run_id=$1`,
+      [runId]
+    )
+    assert.equal(await store.expireStalePreparations(), 1)
+  } finally {
+    await observer.end()
+    await store.close()
+  }
+})
+
 test('ReviewRunStore keeps an admitted run queryable after preparation fails', async () => {
   const store = await createStore()
   const runId = `run-preparation-failed-${randomUUID()}`

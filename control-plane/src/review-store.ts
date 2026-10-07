@@ -331,6 +331,26 @@ export class ReviewRunStore {
     if (result.rowCount !== 1)
       throw new Error(`Review run ${runId} cannot save prepared submission outside preparing.`)
   }
+  async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
+    this.ready()
+    const result = await this.pool.query(
+      `
+      UPDATE review_runs
+      SET preparation_claimed_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$2
+        AND runner_status='preparing' AND preparation_claim_token=$3
+    `,
+      [runId, this.connectorId, token]
+    )
+    // The token predicate is the fencing boundary: a stale preparer must not
+    // extend a claim after another ingress replay has taken ownership.
+    return result.rowCount === 1
+  }
+  preparationHeartbeatIntervalMs(): number {
+    // The lease owner defines this cadence so clients cannot silently drift
+    // beyond a deployment-specific preparation timeout.
+    return Math.max(1, Math.min(60_000, Math.floor(this.claimTimeoutMs / 3)))
+  }
   async mark_queued(runId: string, token: string, context: PublishContext): Promise<void> {
     const run = await this.getRun(runId)
     if (run === null) throw new Error(`Review run does not exist: ${runId}`)

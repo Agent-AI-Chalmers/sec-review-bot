@@ -46,7 +46,7 @@ COMMENT ON COLUMN review_runs.workflow_result IS
 COMMENT ON COLUMN review_runs.preparation_claim_token IS
   'Fencing token held by the current input preparer; stale owners cannot save input or queue the run.';
 COMMENT ON COLUMN review_runs.preparation_claimed_at IS
-  'Time the current preparation claim was acquired, used to detect and reclaim abandoned preparation.';
+  'Last successful acquisition or renewal time for the current preparation claim, used to detect abandoned preparation.';
 COMMENT ON COLUMN review_runs.recovery_claim_token IS
   'Fencing token held while reconciling a Runner submission whose acceptance was uncertain.';
 COMMENT ON COLUMN review_runs.ingress_kind IS

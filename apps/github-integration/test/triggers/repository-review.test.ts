@@ -10,6 +10,11 @@ import {
 } from '../../src/triggers/repository-review.js'
 import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
 import { ControlPlaneSubmissionError } from '../../src/infrastructure/runner/review-store.js'
+
+const preparationClaim = {
+  renewPreparationClaim: async () => true,
+  preparationHeartbeatIntervalMs: async () => 60_000
+}
 import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
 
 function fakeApp(): App {
@@ -171,6 +176,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       },
       create_run_id: () => 'run-1',
       store: {
+        ...preparationClaim,
         admit_review_run: (run) => {
           saved_runs.push(run)
           return {
@@ -269,6 +275,7 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
         throw new Error('replayed dispatch must not submit another run')
       },
       store: {
+        ...preparationClaim,
         admit_review_run: () => ({
           created: false,
           preparation_token: null,
@@ -307,6 +314,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
           throw new Error('submit_run should not be called')
         },
         store: {
+          ...preparationClaim,
           admit_review_run: (run) => {
             transitions.push(['preparing', run])
             return {
@@ -347,6 +355,7 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
         resolve_dispatch: async () => assert.fail('invalid contract must not resolve refs'),
         submit_run: async () => assert.fail('invalid contract must not submit'),
         store: {
+          ...preparationClaim,
           admit_review_run: () => assert.fail('invalid contract must not create a run'),
           submit_prepared_run: () => assert.fail('invalid contract must not queue'),
           failPreparation: () => assert.fail('invalid contract has no run to fail')
@@ -389,6 +398,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           throw new Error('bundle preparation failed')
         },
         store: {
+          ...preparationClaim,
           admit_review_run: (run) => {
             transitions.push(['preparing', run])
             return {
@@ -481,6 +491,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           throw error
         },
         store: {
+          ...preparationClaim,
           admit_review_run: (run) =>
             ({
               record: { ...run, status: 'preparing' },

@@ -79,7 +79,7 @@ flowchart LR
 
 ## Claims and recovery
 
-Preparation, submission recovery, publication, and publication-step commits use claim tokens to fence stale owners. A timed-out owner may finish an external request, but it cannot commit state after another owner acquires a new token.
+Preparation, submission recovery, publication, and publication-step commits use claim tokens to fence stale owners. While input preparation is active, GitHub integration renews its preparation claim; genuinely abandoned preparation expires after the claim timeout. A timed-out owner may finish an external request, but it cannot commit state after another owner acquires a new token.
 
 `run_id` is globally unique in PostgreSQL. `ingress_kind` and `ingress_key` provide connector-scoped ingress idempotency. `connector_id` fences reads, claims, publications, and publication steps. Durable-operation logs include both `connector_id` and `run_id`.
 

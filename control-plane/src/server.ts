@@ -22,6 +22,8 @@ const operations = [
   'admit_review_run',
   'getRun',
   'failPreparation',
+  'renewPreparationClaim',
+  'preparationHeartbeatIntervalMs',
   'claimNextPublication',
   'renewPublicationClaim',
   'initializePublicationSteps',

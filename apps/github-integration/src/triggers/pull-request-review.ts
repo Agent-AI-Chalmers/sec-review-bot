@@ -1,4 +1,8 @@
 import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
+import {
+  PreparationClaimLostError,
+  startPreparationClaimHeartbeat
+} from '../infrastructure/control-plane/preparation-claim.js'
 
 import type { PullRequestContext } from '../infrastructure/github/pull-request-service.js'
 import { pullRequestReviewPublishContext } from '../infrastructure/runner/publish-context.js'
@@ -21,6 +25,10 @@ type PullRequestReviewRunStore = {
     | ReturnType<typeof reviewRunStore.admit_review_run>
   failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
   submit_prepared_run: (...args: Parameters<typeof reviewRunStore.submit_prepared_run>) => unknown
+  renewPreparationClaim: (
+    ...args: Parameters<typeof reviewRunStore.renewPreparationClaim>
+  ) => Promise<boolean>
+  preparationHeartbeatIntervalMs: typeof reviewRunStore.preparationHeartbeatIntervalMs
 }
 
 interface StartPullRequestReviewCommandDeps {
@@ -80,6 +88,7 @@ export async function startPullRequestReviewCommand({
   const preparationToken = admission.preparation_token
   if (!preparationToken)
     throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
+  const heartbeat = await startPreparationClaimHeartbeat(store, run_id, preparationToken)
 
   let submitted: SubmittedPullRequestReviewRun
   try {
@@ -97,6 +106,9 @@ export async function startPullRequestReviewCommand({
       event_type,
       repair_mode: event_type === 'manual_review' ? repair_mode : null,
       on_prepared: async (prepared, input) => {
+        // Confirm the lease immediately before crossing the durable submission
+        // boundary; the submission itself remains token-fenced by Control Plane.
+        await heartbeat.assertOwned()
         await store.submit_prepared_run(
           run_id,
           preparationToken,
@@ -106,13 +118,20 @@ export async function startPullRequestReviewCommand({
       }
     })
   } catch (error) {
-    if (!(error instanceof ControlPlaneSubmissionError)) {
+    const ownsClaim = await heartbeat.stop()
+    if (
+      ownsClaim &&
+      !(error instanceof ControlPlaneSubmissionError) &&
+      !(error instanceof PreparationClaimLostError)
+    ) {
       await store.failPreparation(run_id, preparationToken, {
         code: 'REVIEW_START_FAILED',
         message: error instanceof Error ? error.message : String(error)
       })
     }
     throw error
+  } finally {
+    await heartbeat.stop()
   }
 
   return submitted

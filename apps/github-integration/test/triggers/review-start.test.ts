@@ -7,6 +7,11 @@ import type { IssueContext } from '../../src/infrastructure/github/issue-service
 import type { PullRequestContext } from '../../src/infrastructure/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/infrastructure/runner/review-store.js'
 
+const preparationClaim = {
+  renewPreparationClaim: async () => true,
+  preparationHeartbeatIntervalMs: async () => 60_000
+}
+
 function issueContext(): IssueContext {
   return {
     action: 'opened',
@@ -95,6 +100,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         return prepared
       },
       store: {
+        ...preparationClaim,
         admit_review_run: (run) => {
           transitions.push(['preparing', run])
           return { record: run, created: true, preparation_token: 'claim' } as never
@@ -164,6 +170,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         return prepared
       },
       store: {
+        ...preparationClaim,
         admit_review_run: (run) => {
           transitions.push(['preparing', run])
           return { record: run, created: true, preparation_token: 'claim' } as never
@@ -224,6 +231,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
           throw new Error('workspace clone failed')
         },
         store: {
+          ...preparationClaim,
           admit_review_run: (run) => {
             transitions.push(['preparing', run])
             return { record: run, created: true, preparation_token: 'claim' } as never
@@ -280,6 +288,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
           throw error
         },
         store: {
+          ...preparationClaim,
           admit_review_run: (run) =>
             ({
               record: { ...run, status: 'preparing' },
@@ -328,6 +337,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
           throw error
         },
         store: {
+          ...preparationClaim,
           admit_review_run: (run) =>
             ({
               record: { ...run, status: 'preparing' },
@@ -363,6 +373,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
         create_run_id: () => 'run-context-failure',
         start_review: async () => assert.fail('review must not start without PR context'),
         store: {
+          ...preparationClaim,
           admit_review_run: (run) => {
             transitions.push(['preparing', run.run_id])
             return {
@@ -404,6 +415,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
         throw new Error('replayed delivery must not start')
       },
       store: {
+        ...preparationClaim,
         admit_review_run: () => ({
           created: false,
           preparation_token: null,
@@ -433,6 +445,7 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
         throw new Error('replayed delivery must not start')
       },
       store: {
+        ...preparationClaim,
         admit_review_run: () => ({
           created: false,
           preparation_token: null,

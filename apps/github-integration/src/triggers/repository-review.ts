@@ -1,5 +1,9 @@
 import type { App } from 'octokit'
 import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
+import {
+  PreparationClaimLostError,
+  startPreparationClaimHeartbeat
+} from '../infrastructure/control-plane/preparation-claim.js'
 
 import type { GitHubAppOctokit } from '../infrastructure/github/octokit.js'
 import {
@@ -190,6 +194,10 @@ interface DispatchRepositoryReviewCommandDeps {
       | ReturnType<typeof reviewRunStore.admit_review_run>
     failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
     submit_prepared_run: (...args: Parameters<typeof reviewRunStore.submit_prepared_run>) => unknown
+    renewPreparationClaim: (
+      ...args: Parameters<typeof reviewRunStore.renewPreparationClaim>
+    ) => Promise<boolean>
+    preparationHeartbeatIntervalMs: typeof reviewRunStore.preparationHeartbeatIntervalMs
   }
   create_run_id: typeof createRunId
 }
@@ -259,6 +267,7 @@ export async function dispatchRepositoryReview({
   const preparationToken = admission.preparation_token
   if (!preparationToken)
     throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
+  const heartbeat = await startPreparationClaimHeartbeat(store, run_id, preparationToken)
 
   let octokit: GitHubAppOctokit
   let resolved: Awaited<ReturnType<typeof resolveRepositoryReviewDispatch>>
@@ -266,10 +275,12 @@ export async function dispatchRepositoryReview({
     octokit = await getInstallationOctokit(repo_full_name)
     resolved = await resolve_dispatch({ octokit, payload })
   } catch (error) {
-    await store.failPreparation(run_id, preparationToken, {
-      code: 'REVIEW_PREPARATION_FAILED',
-      message: asErrorMessage(error) || 'Repository review preparation failed.'
-    })
+    if (await heartbeat.stop()) {
+      await store.failPreparation(run_id, preparationToken, {
+        code: 'REVIEW_PREPARATION_FAILED',
+        message: asErrorMessage(error) || 'Repository review preparation failed.'
+      })
+    }
     throw new RepositoryReviewDispatchValidationError(
       asErrorMessage(error) || 'Repository review dispatch request is invalid.'
     )
@@ -282,6 +293,9 @@ export async function dispatchRepositoryReview({
       run_id,
       ...resolved,
       on_prepared: async (prepared, input) => {
+        // Confirm the lease immediately before crossing the durable submission
+        // boundary; the submission itself remains token-fenced by Control Plane.
+        await heartbeat.assertOwned()
         await store.submit_prepared_run(
           run_id,
           preparationToken,
@@ -291,13 +305,20 @@ export async function dispatchRepositoryReview({
       }
     })
   } catch (error) {
-    if (!(error instanceof ControlPlaneSubmissionError)) {
+    const ownsClaim = await heartbeat.stop()
+    if (
+      ownsClaim &&
+      !(error instanceof ControlPlaneSubmissionError) &&
+      !(error instanceof PreparationClaimLostError)
+    ) {
       await store.failPreparation(run_id, preparationToken, {
         code: 'REVIEW_START_FAILED',
         message: asErrorMessage(error) || 'Repository review could not be started.'
       })
     }
     throw error
+  } finally {
+    await heartbeat.stop()
   }
 
   logInfo('repository_review_dispatch_queued', {

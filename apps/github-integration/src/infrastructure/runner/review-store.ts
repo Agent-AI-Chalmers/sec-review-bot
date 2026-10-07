@@ -160,6 +160,14 @@ class ControlPlaneReviewRunStoreClient {
     return await this.call<ReviewRunRecord | null>('getRun', runId)
   }
 
+  async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
+    return await this.call('renewPreparationClaim', runId, token)
+  }
+
+  async preparationHeartbeatIntervalMs(): Promise<number> {
+    return await this.call('preparationHeartbeatIntervalMs')
+  }
+
   async claimNextPublication(): Promise<PublicationWork | null> {
     const work = await this.call<PublicationWork | null>('claimNextPublication')
     return work === null
@@ -239,6 +247,8 @@ export type ReviewRunStore = Pick<
   | 'mark_queued'
   | 'submit_prepared_run'
   | 'getRun'
+  | 'renewPreparationClaim'
+  | 'preparationHeartbeatIntervalMs'
   | 'renewPublicationClaim'
   | 'publicationHeartbeatIntervalMs'
   | 'claimNextPublication'

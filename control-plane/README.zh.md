@@ -79,7 +79,7 @@ flowchart LR
 
 ## Claim 和恢复
 
-Preparation、submission recovery、publication 和 publication step 提交使用 claim token 隔离过期 owner。超时 owner 可以完成已发出的外部请求，但在新 owner 获得 token 后不能再提交状态。
+Preparation、submission recovery、publication 和 publication step 提交使用 claim token 隔离过期 owner。Input preparation 活跃期间，GitHub integration 会续租 preparation claim；只有真正被遗弃的 preparation 才会在 claim timeout 后过期。超时 owner 可以完成已发出的外部请求，但在新 owner 获得 token 后不能再提交状态。
 
 `run_id` 在 PostgreSQL 中全局唯一。`ingress_kind` 和 `ingress_key` 提供 connector 范围的入口幂等。`connector_id` 隔离读取、claim、publication 和 publication step。持久化操作日志同时包含 `connector_id` 和 `run_id`。
 
