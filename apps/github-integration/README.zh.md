@@ -46,6 +46,8 @@ pnpm run test:integration
 
 非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET`、`CONTROL_PLANE_SERVICE_URL` 和 `CONTROL_PLANE_SERVICE_TOKEN`。
 
+`CONTROL_PLANE_REQUEST_TIMEOUT_MS` 限制每次 Control Plane RPC 的最长等待时间，默认 30 秒。publication lease 续租失败或超时会被视为 ownership 已丢失：publisher 不再启动新的 GitHub mutation，而是等待 lease takeover 恢复。
+
 ```bash
 pnpm run server
 ```

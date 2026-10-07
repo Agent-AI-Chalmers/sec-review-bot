@@ -6,6 +6,9 @@ import {
   createPullRequestReviewUnlessMarkerExists
 } from '../../src/infrastructure/github/comment-service.js'
 import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
+import { PublicationClaimLostError } from '../../src/infrastructure/runner/publication-claim.js'
+
+const assertPublicationClaim = async (): Promise<void> => {}
 
 test('createIssueCommentUnlessMarkerExists skips creation when marker already exists', async () => {
   let createCalls = 0
@@ -40,7 +43,8 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
     repo_name: 'example',
     issue_number: 1,
     body: '<!-- sec-review-bot:repository-summary-run:run-1 -->\nnew body',
-    marker: '<!-- sec-review-bot:repository-summary-run:run-1 -->'
+    marker: '<!-- sec-review-bot:repository-summary-run:run-1 -->',
+    assert_publication_claim: assertPublicationClaim
   })
 
   assert.equal(result.id, 123)
@@ -74,12 +78,43 @@ test('createIssueCommentUnlessMarkerExists creates when marker is absent', async
     repo_name: 'example',
     issue_number: 1,
     body: '<!-- sec-review-bot:repository-summary-run:run-1 -->\nbody',
-    marker: '<!-- sec-review-bot:repository-summary-run:run-1 -->'
+    marker: '<!-- sec-review-bot:repository-summary-run:run-1 -->',
+    assert_publication_claim: assertPublicationClaim
   })
 
   assert.equal(result.id, 456)
   assert.equal(result.reused, false)
   assert.equal(createCalls, 1)
+})
+
+test('issue comment creation stops after marker lookup when publication claim is lost', async () => {
+  let createCalls = 0
+  const octokit = {
+    rest: {
+      issues: {
+        listComments: async () => ({ data: [] }),
+        createComment: async () => {
+          createCalls += 1
+          return { data: { id: 456, html_url: 'https://example.test/comment/456' } }
+        }
+      }
+    }
+  } as unknown as GitHubAppOctokit
+
+  await assert.rejects(
+    createIssueCommentUnlessMarkerExists(octokit, {
+      owner_login: 'octo',
+      repo_name: 'example',
+      issue_number: 1,
+      body: 'new body',
+      marker: '<!-- run-1 -->',
+      assert_publication_claim: async () => {
+        throw new PublicationClaimLostError('run-1')
+      }
+    }),
+    PublicationClaimLostError
+  )
+  assert.equal(createCalls, 0)
 })
 
 test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', async () => {
@@ -115,7 +150,8 @@ test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', asy
     body: `${marker}\nnew body`,
     marker,
     event: 'REQUEST_CHANGES',
-    comments: []
+    comments: [],
+    assert_publication_claim: assertPublicationClaim
   })
 
   assert.deepEqual(result, {
@@ -156,10 +192,58 @@ test('createPullRequestReviewUnlessMarkerExists creates when marker is absent', 
     body: `${marker}\nbody`,
     marker,
     event: 'REQUEST_CHANGES',
-    comments: []
+    comments: [],
+    assert_publication_claim: assertPublicationClaim
   })
 
   assert.equal(result.id, 456)
   assert.equal(result.reused, false)
   assert.equal(createCalls, 1)
+})
+
+test('approval fallback rechecks publication ownership before creating a comment review', async () => {
+  let createCalls = 0
+  let ownershipChecks = 0
+  const octokit = {
+    rest: {
+      pulls: {
+        listReviews: async () => ({ data: [] }),
+        createReview: async () => {
+          createCalls += 1
+          if (createCalls === 1) {
+            throw {
+              response: {
+                status: 422,
+                data: { message: 'Cannot approve your own pull request' }
+              }
+            }
+          }
+          return {
+            data: {
+              id: 456,
+              html_url: 'https://example.test/review/456',
+              state: 'COMMENTED'
+            }
+          }
+        }
+      }
+    }
+  } as unknown as GitHubAppOctokit
+
+  await createPullRequestReviewUnlessMarkerExists(octokit, {
+    owner_login: 'octo',
+    repo_name: 'example',
+    pr_number: 7,
+    commit_id: 'head-sha',
+    body: 'review body',
+    marker: '<!-- run-1 -->',
+    event: 'APPROVE',
+    comments: [],
+    assert_publication_claim: async () => {
+      ownershipChecks += 1
+    }
+  })
+
+  assert.equal(createCalls, 2)
+  assert.equal(ownershipChecks, 2)
 })

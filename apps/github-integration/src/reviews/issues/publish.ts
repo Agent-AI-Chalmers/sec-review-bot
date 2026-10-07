@@ -18,6 +18,10 @@ import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { assertV5WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
 import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
+import {
+  isPublicationClaimLostError,
+  PublicationClaimLostError
+} from '../../infrastructure/runner/publication-claim.js'
 
 interface IssueDraftPullRequest {
   number: number
@@ -83,12 +87,14 @@ export async function handleIssueReviewRun({
   status,
   store,
   claim_token,
+  assert_publication_claim,
   installation_octokit_for_repo
 }: {
   run: CompletedRunnerRun
   status: RunnerRunStatus
   store: ReviewRunStore
   claim_token: string
+  assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo
 }): Promise<void> {
   const context = parseIssueReviewPublishContext(run.publish_context)
@@ -105,7 +111,8 @@ export async function handleIssueReviewRun({
     workflow_result,
     event_type: context.event_type,
     store,
-    claim_token
+    claim_token,
+    assert_publication_claim
   })
 }
 
@@ -117,7 +124,8 @@ async function publishIssueReviewResult({
   workflow_result,
   event_type,
   store,
-  claim_token
+  claim_token,
+  assert_publication_claim
 }: {
   octokit: unknown
   issue: PersistedIssue
@@ -127,6 +135,7 @@ async function publishIssueReviewResult({
   event_type: 'opened' | 'manual_review'
   store: ReviewRunStore
   claim_token: string
+  assert_publication_claim: () => Promise<void>
 }): Promise<void> {
   let draftPullRequest: IssueDraftPullRequest | null = null
   const github = octokit as GitHubAppOctokit
@@ -159,20 +168,25 @@ async function publishIssueReviewResult({
     } else {
       await store.requirePublicationStepClaim(run_id, claim_token, 'issue:draft-pr')
       try {
+        // A lease is permission to start a side effect, not merely permission
+        // to record it afterward. If ownership cannot be proved, fail closed.
+        await assert_publication_claim()
         draftPullRequest = (await createDraftPullRequestFromIssueReviewRecord({
           octokit: github,
           issue,
           run_id,
           workspace_ref,
-          review_record
+          review_record,
+          assert_publication_claim
         })) as IssueDraftPullRequest | null
         const remote =
           draftPullRequest === null
             ? {}
             : { id: draftPullRequest.number, url: draftPullRequest.html_url }
         if (!(await store.completePublicationStep(run_id, claim_token, 'issue:draft-pr', remote)))
-          throw new Error('Publication claim was lost after publishing the issue draft PR.')
+          throw new PublicationClaimLostError(run_id)
       } catch (error) {
+        if (isPublicationClaimLostError(error)) throw error
         const failure = classifyPublicationFailure(error)
         await store.failPublicationStep(
           run_id,
@@ -221,12 +235,14 @@ async function publishIssueReviewResult({
   await store.requirePublicationStepClaim(run_id, claim_token, 'issue:summary-comment')
   let comment: IssueReviewComment
   try {
+    await assert_publication_claim()
     comment = (await createIssueCommentUnlessMarkerExists(github, {
       owner_login: issue.owner_login,
       repo_name: issue.repo_name,
       issue_number: issue.issue_number,
       body: commentBody,
-      marker
+      marker,
+      assert_publication_claim
     })) as IssueReviewComment
     if (
       !(await store.completePublicationStep(run_id, claim_token, 'issue:summary-comment', {
@@ -234,8 +250,9 @@ async function publishIssueReviewResult({
         url: comment.html_url
       }))
     )
-      throw new Error('Publication claim was lost after publishing the issue summary comment.')
+      throw new PublicationClaimLostError(run_id)
   } catch (error) {
+    if (isPublicationClaimLostError(error)) throw error
     const failure = classifyPublicationFailure(error)
     await store.failPublicationStep(
       run_id,

@@ -101,7 +101,8 @@ function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
 async function buildTreeElementsFromFileChanges(
   octokit: GitHubAppOctokit,
   file_changes: FileChange[],
-  issue: IssueContext
+  issue: IssueContext,
+  assertPublicationClaim: () => Promise<void>
 ): Promise<
   Array<{
     path: string
@@ -128,6 +129,7 @@ async function buildTreeElementsFromFileChanges(
       continue
     }
 
+    await assertPublicationClaim()
     const blobResponse = await octokit.rest.git.createBlob({
       owner: issue.owner_login,
       repo: issue.repo_name,
@@ -150,13 +152,15 @@ export async function createDraftPullRequestFromIssueReviewRecord({
   issue,
   run_id,
   workspace_ref,
-  review_record
+  review_record,
+  assert_publication_claim
 }: {
   octokit: GitHubAppOctokit
   issue: IssueContext
   run_id: string
   workspace_ref: string
   review_record: ReviewRecord | null | undefined
+  assert_publication_claim: () => Promise<void>
 }): Promise<{
   branch_name: string
   title: string
@@ -202,12 +206,18 @@ export async function createDraftPullRequestFromIssueReviewRecord({
     commit_sha: head_sha
   })
   const baseTreeSha = commitResponse.data.tree.sha
-  const tree = await buildTreeElementsFromFileChanges(octokit, file_changes, issue)
+  const tree = await buildTreeElementsFromFileChanges(
+    octokit,
+    file_changes,
+    issue,
+    assert_publication_claim
+  )
 
   if (tree.length === 0) {
     throw new Error('Draft PR creation requires at least one changed file.')
   }
 
+  await assert_publication_claim()
   const treeResponse = await octokit.rest.git.createTree({
     owner,
     repo,
@@ -216,6 +226,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
   })
 
   const commitMessage = `Mitigate issue #${issue.issue_number}`
+  await assert_publication_claim()
   const newCommitResponse = await octokit.rest.git.createCommit({
     owner,
     repo,
@@ -225,6 +236,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
   })
 
   try {
+    await assert_publication_claim()
     await octokit.rest.git.createRef({
       owner,
       repo,
@@ -237,6 +249,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
     }
     // A previous attempt may have created the run-specific branch but failed
     // before opening the PR. Reuse that branch as the retry checkpoint.
+    await assert_publication_claim()
     await octokit.rest.git.updateRef({
       owner,
       repo,
@@ -246,6 +259,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
     })
   }
 
+  await assert_publication_claim()
   const pullRequestResponse = await octokit.rest.pulls.create({
     owner,
     repo,

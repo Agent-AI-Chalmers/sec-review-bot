@@ -1,15 +1,25 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createDraftPullRequestFromIssueReviewRecord } from '../../../src/reviews/issues/draft-pr.js'
+import { createDraftPullRequestFromIssueReviewRecord as createDraftPullRequestWithClaim } from '../../../src/reviews/issues/draft-pr.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import type { FileMode } from '../../../src/reviews/file-change.js'
+import { PublicationClaimLostError } from '../../../src/infrastructure/runner/publication-claim.js'
 
-type CreateDraftPrParams = Parameters<typeof createDraftPullRequestFromIssueReviewRecord>[0]
+type CreateDraftPrParams = Parameters<typeof createDraftPullRequestWithClaim>[0]
 type CreateDraftPrOctokit = CreateDraftPrParams['octokit']
 type CreateDraftPrIssue = CreateDraftPrParams['issue']
 type TestMitigation = Omit<Partial<ReviewRecord['mitigation']>, 'file_changes'> & {
   file_changes?: unknown[]
+}
+
+async function createDraftPullRequestFromIssueReviewRecord(
+  args: Omit<CreateDraftPrParams, 'assert_publication_claim'>
+): ReturnType<typeof createDraftPullRequestWithClaim> {
+  return await createDraftPullRequestWithClaim({
+    ...args,
+    assert_publication_claim: async () => {}
+  })
 }
 
 function reviewRecordWithMitigation(mitigation: TestMitigation): ReviewRecord {
@@ -211,6 +221,46 @@ test('issue draft PR retry updates a branch left by a partial prior attempt', as
       force: true
     }
   ])
+})
+
+test('issue draft PR stops before the next GitHub write after claim loss', async () => {
+  const octokit = createOctokitMock()
+  let ownershipChecks = 0
+
+  await assert.rejects(
+    createDraftPullRequestWithClaim({
+      octokit: octokit as unknown as CreateDraftPrOctokit,
+      issue: {
+        issue_number: 42,
+        owner_login: 'octo-org',
+        repo_name: 'example-repo',
+        default_branch: 'main'
+      },
+      run_id: 'run-12345678',
+      workspace_ref: 'base-sha',
+      review_record: reviewRecordWithMitigation({
+        file_changes: [
+          {
+            path: 'src/app.txt',
+            status: 'upsert',
+            content: 'fixed\n',
+            content_encoding: 'utf-8'
+          }
+        ]
+      }),
+      assert_publication_claim: async () => {
+        ownershipChecks += 1
+        if (ownershipChecks === 2) throw new PublicationClaimLostError('run-12345678')
+      }
+    }),
+    PublicationClaimLostError
+  )
+
+  assert.equal(octokit.calls.blobs.length, 1)
+  assert.equal(octokit.calls.trees.length, 0)
+  assert.equal(octokit.calls.commits.length, 0)
+  assert.equal(octokit.calls.refs.length, 0)
+  assert.equal(octokit.calls.pulls.length, 0)
 })
 
 test('issue draft PR publishes from review_record file_changes without workspace reads', async () => {

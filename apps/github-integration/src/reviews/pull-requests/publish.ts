@@ -26,6 +26,10 @@ import { getGitHubAppMetadata } from '../../infrastructure/github/github-app-met
 import { assertV5WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
 import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
+import {
+  isPublicationClaimLostError,
+  PublicationClaimLostError
+} from '../../infrastructure/runner/publication-claim.js'
 
 interface SuggestionReviewResult {
   review_id: number
@@ -102,12 +106,14 @@ export async function handlePullRequestReviewRun({
   status,
   store,
   claim_token,
+  assert_publication_claim,
   installation_octokit_for_repo
 }: {
   run: CompletedRunnerRun
   status: RunnerRunStatus
   store: ReviewRunStore
   claim_token: string
+  assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo
 }): Promise<void> {
   const context = parsePullRequestReviewPublishContext(run.publish_context)
@@ -124,7 +130,8 @@ export async function handlePullRequestReviewRun({
     event_type: context.event_type,
     run_id: run.run_id,
     store,
-    claim_token
+    claim_token,
+    assert_publication_claim
   })
 }
 
@@ -222,7 +229,8 @@ async function publishPullRequestReviewResult({
   workflow_result,
   run_id,
   store,
-  claim_token
+  claim_token,
+  assert_publication_claim
 }: {
   octokit: unknown
   pr: PersistedPullRequest
@@ -232,6 +240,7 @@ async function publishPullRequestReviewResult({
   run_id: string
   store: ReviewRunStore
   claim_token: string
+  assert_publication_claim: () => Promise<void>
 }): Promise<void> {
   const stepKey = 'pull-request:review'
   await store.initializePublicationSteps(run_id, claim_token, [stepKey])
@@ -239,17 +248,21 @@ async function publishPullRequestReviewResult({
   if (persisted?.status === 'succeeded') return
   await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
   try {
+    // Never begin a GitHub mutation on the strength of an expired heartbeat.
+    await assert_publication_claim()
     await publishPullRequestReviewSideEffect({
       octokit,
       pr,
       files: reviewFiles,
       event_type,
       workflow_result,
-      run_id
+      run_id,
+      assert_publication_claim
     })
     if (!(await store.completePublicationStep(run_id, claim_token, stepKey)))
-      throw new Error('Publication claim was lost after publishing the pull request review.')
+      throw new PublicationClaimLostError(run_id)
   } catch (error) {
+    if (isPublicationClaimLostError(error)) throw error
     const failure = classifyPublicationFailure(error)
     await store.failPublicationStep(
       run_id,
@@ -271,7 +284,8 @@ async function publishPullRequestReviewSideEffect({
   files: reviewFiles,
   event_type,
   workflow_result,
-  run_id
+  run_id,
+  assert_publication_claim
 }: {
   octokit: unknown
   pr: PersistedPullRequest
@@ -279,6 +293,7 @@ async function publishPullRequestReviewSideEffect({
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   workflow_result: PullRequestReviewWorkflowResult
   run_id: string
+  assert_publication_claim: () => Promise<void>
 }): Promise<void> {
   let review: SuggestionReviewResult | null = null
   const review_record = workflow_result.review_record
@@ -319,7 +334,8 @@ async function publishPullRequestReviewSideEffect({
           review_body: reviewBodyWithUnmapped,
           event: reviewEvent,
           candidates: suggestionManifest.candidates,
-          marker
+          marker,
+          assert_publication_claim
         })) as SuggestionReviewResult
         logInfo('suggestion_review_completed', {
           comment_count: review.count,
@@ -377,7 +393,8 @@ async function publishPullRequestReviewSideEffect({
       body: commentBody,
       marker,
       event: reviewEvent,
-      comments: []
+      comments: [],
+      assert_publication_claim
     }
   )
 

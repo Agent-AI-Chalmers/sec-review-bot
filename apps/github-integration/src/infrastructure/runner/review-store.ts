@@ -74,26 +74,47 @@ function serviceToken(): string {
   return value
 }
 
+function requestTimeoutMs(): number {
+  const parsed = Number.parseInt(process.env.CONTROL_PLANE_REQUEST_TIMEOUT_MS ?? '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30_000
+}
+
 class ControlPlaneReviewRunStoreClient {
   readonly connector_id = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
 
   private async call<T>(operation: string, ...args: unknown[]): Promise<T> {
-    const response = await fetch(`${serviceUrl()}/v1/store`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${serviceToken()}`,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({ operation, args })
-    })
-    const body = (await response.json()) as { result?: T; error?: string; code?: string }
-    if (!response.ok) {
-      throw Object.assign(
-        new Error(body.error ?? `Control Plane returned HTTP ${response.status}.`),
-        { code: body.code ?? null }
-      )
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs())
+    timeout.unref?.()
+    try {
+      const response = await fetch(`${serviceUrl()}/v1/store`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${serviceToken()}`,
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({ operation, args }),
+        signal: controller.signal
+      })
+      const body = (await response.json()) as { result?: T; error?: string; code?: string }
+      if (!response.ok) {
+        throw Object.assign(
+          new Error(body.error ?? `Control Plane returned HTTP ${response.status}.`),
+          { code: body.code ?? null }
+        )
+      }
+      return body.result as T
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw Object.assign(new Error(`Control Plane ${operation} request timed out.`), {
+          code: 'CONTROL_PLANE_REQUEST_TIMEOUT',
+          cause: error
+        })
+      }
+      throw error
+    } finally {
+      clearTimeout(timeout)
     }
-    return body.result as T
   }
 
   private async validateContext(runId: string, context: PublishContext): Promise<PublishContext> {
@@ -170,12 +191,30 @@ class ControlPlaneReviewRunStoreClient {
 
   async claimNextPublication(): Promise<PublicationWork | null> {
     const work = await this.call<PublicationWork | null>('claimNextPublication')
-    return work === null
-      ? null
-      : {
-          ...work,
-          publish_context: parsePublishContextForWorkflow(work.workflow, work.publish_context)
-        }
+    if (work === null) return null
+    try {
+      return {
+        ...work,
+        publish_context: parsePublishContextForWorkflow(work.workflow, work.publish_context)
+      }
+    } catch (error) {
+      // Validation happens after the durable claim because connector-specific
+      // context does not belong in Control Plane. A corrupt record must still
+      // consume that claim into a terminal failure instead of timing out forever.
+      await this.failPublication(
+        work.run_id,
+        work.claim_token,
+        {
+          code:
+            error instanceof Error && 'code' in error && typeof error.code === 'string'
+              ? error.code
+              : 'PUBLISH_CONTEXT_INVALID',
+          message: error instanceof Error ? error.message : String(error)
+        },
+        { retry: false }
+      )
+      throw error
+    }
   }
 
   async renewPublicationClaim(runId: string, token: string): Promise<boolean> {

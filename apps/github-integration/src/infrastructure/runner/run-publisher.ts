@@ -8,6 +8,7 @@ import { handlePullRequestReviewRun } from '../../reviews/pull-requests/publish.
 import { handleRepositoryReviewRun } from '../../reviews/repositories/publish.js'
 import { logError, logInfo, logWarn } from '../../utils/logger.js'
 import { classifyPublicationFailure } from './publication-failure.js'
+import { isPublicationClaimLostError, PublicationClaimLostError } from './publication-claim.js'
 import { reviewRunStore, type PublicationWork, type ReviewRunStore } from './review-store.js'
 import type { RunnerRunStatus } from './client.js'
 
@@ -48,7 +49,12 @@ async function installationOctokitForRepo(app: App, repoFullName: string): Promi
   return await app.getInstallationOctokit(installation.data.id)
 }
 
-async function publishWork(app: App, store: ReviewRunStore, work: PublicationWork): Promise<void> {
+async function publishWork(
+  app: App,
+  store: ReviewRunStore,
+  work: PublicationWork,
+  assertOwned: () => Promise<void>
+): Promise<void> {
   const status: RunnerRunStatus = {
     run_id: work.run_id,
     workflow: work.workflow,
@@ -63,6 +69,7 @@ async function publishWork(app: App, store: ReviewRunStore, work: PublicationWor
     status,
     store,
     claim_token: work.claim_token,
+    assert_publication_claim: assertOwned,
     installation_octokit_for_repo: async (repo: string) =>
       await installationOctokitForRepo(app, repo)
   }
@@ -71,33 +78,54 @@ async function publishWork(app: App, store: ReviewRunStore, work: PublicationWor
   else await handleRepositoryReviewRun(common)
 }
 
-async function withHeartbeat(
+export async function withPublicationHeartbeat(
   store: ReviewRunStore,
   work: PublicationWork,
-  operation: () => Promise<void>
+  operation: (assertOwned: () => Promise<void>) => Promise<void>
 ): Promise<boolean> {
   let lost = false
   let active: Promise<void> | null = null
   const renew = async (): Promise<void> => {
     try {
-      if (!(await store.renewPublicationClaim(work.run_id, work.claim_token))) lost = true
+      if (!(await store.renewPublicationClaim(work.run_id, work.claim_token))) {
+        lost = true
+        throw new PublicationClaimLostError(work.run_id)
+      }
     } catch (error) {
+      lost = true
       logWarn('review_publication_heartbeat_failed', { error, run_id: work.run_id })
+      throw error instanceof PublicationClaimLostError
+        ? error
+        : new PublicationClaimLostError(work.run_id, { cause: error })
     }
   }
-  await renew()
-  if (lost) return false
+  const renewSerially = async (): Promise<void> => {
+    // Lease ownership is monotonic within one publication attempt. A later
+    // successful RPC cannot make work started during an uncertain interval safe.
+    if (lost) throw new PublicationClaimLostError(work.run_id)
+    active ??= renew().finally(() => {
+      active = null
+    })
+    await active
+    if (lost) throw new PublicationClaimLostError(work.run_id)
+  }
+  try {
+    await renewSerially()
+  } catch {
+    return false
+  }
   const timer = setInterval(() => {
-    if (active === null)
-      active = renew().finally(() => {
-        active = null
-      })
+    void renewSerially().catch(() => undefined)
   }, store.publicationHeartbeatIntervalMs())
   timer.unref?.()
   try {
-    await operation()
+    await operation(renewSerially)
     if (active !== null) await active
-    await renew()
+    try {
+      await renewSerially()
+    } catch {
+      return false
+    }
     return !lost
   } finally {
     clearInterval(timer)
@@ -116,10 +144,10 @@ export async function publishReviewRunsOnce({
   const work = await store.claimNextPublication()
   if (work === null) return
   try {
-    const ownsClaim = await withHeartbeat(
+    const ownsClaim = await withPublicationHeartbeat(
       store,
       work,
-      async () => await publishWork(app, store, work)
+      async (assertOwned) => await publishWork(app, store, work, assertOwned)
     )
     if (!ownsClaim || !(await store.completePublication(work.run_id, work.claim_token))) {
       logWarn('review_publication_claim_lost', { run_id: work.run_id, workflow: work.workflow })
@@ -127,6 +155,12 @@ export async function publishReviewRunsOnce({
     }
     logInfo('review_publication_completed', { run_id: work.run_id, workflow: work.workflow })
   } catch (error) {
+    if (isPublicationClaimLostError(error)) {
+      // Ownership is unknown, so neither success nor failure may be committed.
+      // The lease timeout is the only authority allowed to hand work to a new owner.
+      logWarn('review_publication_claim_lost', { run_id: work.run_id, workflow: work.workflow })
+      return
+    }
     const classification = classifyPublicationFailure(error)
     const committed = await store.failPublication(
       work.run_id,

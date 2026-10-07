@@ -490,13 +490,15 @@ export async function publishSuggestionReview(
     review_body,
     event,
     candidates,
-    marker
+    marker,
+    assert_publication_claim
   }: {
     pr: PersistedPullRequest
     review_body: string
     event: PullRequestReviewEvent
     candidates: SuggestionCandidate[]
     marker: string
+    assert_publication_claim: () => Promise<void>
   }
 ): Promise<SuggestionPublishedResult> {
   const published: SuggestionPublishedResult = {
@@ -508,7 +510,8 @@ export async function publishSuggestionReview(
         review_body,
         event,
         candidates,
-        marker
+        marker,
+        assert_publication_claim
       }
     ))
   }

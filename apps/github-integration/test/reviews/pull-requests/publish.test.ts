@@ -122,6 +122,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     },
     store: stepStore as never,
     claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
   })
 
@@ -212,6 +213,7 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
     },
     store: stepStore as never,
     claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
   })
 
@@ -289,6 +291,7 @@ test('pull request publish approves when analysis is not confirmed', async () =>
     },
     store: stepStore as never,
     claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
   })
 
@@ -345,6 +348,7 @@ test('pull request publish comments instead of approving a PR authored by the ap
       },
       store: stepStore as never,
       claim_token: 'test-claim',
+      assert_publication_claim: async () => {},
       installation_octokit_for_repo: async () => octokit
     })
   } finally {
@@ -415,6 +419,7 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
     },
     store: stepStore as never,
     claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
   })
 
@@ -483,6 +488,7 @@ test('pull request publish falls back to comment when own PR approval error is i
     },
     store: stepStore as never,
     claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
   })
 
@@ -563,6 +569,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
     },
     store: stepStore as never,
     claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
   })
 
@@ -621,6 +628,7 @@ test('pull request publish does not create a fallback review after an uncertain 
       },
       store: stepStore as never,
       claim_token: 'test-claim',
+      assert_publication_claim: async () => {},
       installation_octokit_for_repo: async () => octokit
     }),
     /connection reset/

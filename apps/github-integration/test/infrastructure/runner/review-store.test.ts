@@ -99,3 +99,75 @@ test('repository preparation can replace the admitted empty publish context', as
     { contract_version: 'v5' }
   )
 })
+
+test('Control Plane calls have a bounded request timeout', async (t) => {
+  const previousUrl = process.env.CONTROL_PLANE_SERVICE_URL
+  const previousToken = process.env.CONTROL_PLANE_SERVICE_TOKEN
+  const previousTimeout = process.env.CONTROL_PLANE_REQUEST_TIMEOUT_MS
+  process.env.CONTROL_PLANE_SERVICE_URL = 'http://control-plane.test'
+  process.env.CONTROL_PLANE_SERVICE_TOKEN = 'test-token'
+  process.env.CONTROL_PLANE_REQUEST_TIMEOUT_MS = '10'
+  t.after(() => {
+    if (previousUrl === undefined) delete process.env.CONTROL_PLANE_SERVICE_URL
+    else process.env.CONTROL_PLANE_SERVICE_URL = previousUrl
+    if (previousToken === undefined) delete process.env.CONTROL_PLANE_SERVICE_TOKEN
+    else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
+    if (previousTimeout === undefined) delete process.env.CONTROL_PLANE_REQUEST_TIMEOUT_MS
+    else process.env.CONTROL_PLANE_REQUEST_TIMEOUT_MS = previousTimeout
+  })
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async (_input: string | URL | Request, init?: RequestInit): Promise<Response> =>
+      await new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+          reject(Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' }))
+        )
+      })
+  )
+
+  await assert.rejects(
+    reviewRunStore.renewPublicationClaim('run-1', 'claim-1'),
+    (error: unknown) =>
+      error instanceof Error && 'code' in error && error.code === 'CONTROL_PLANE_REQUEST_TIMEOUT'
+  )
+})
+
+test('an invalid claimed publish context is persisted as terminal failure', async (t) => {
+  const previousUrl = process.env.CONTROL_PLANE_SERVICE_URL
+  const previousToken = process.env.CONTROL_PLANE_SERVICE_TOKEN
+  process.env.CONTROL_PLANE_SERVICE_URL = 'http://control-plane.test'
+  process.env.CONTROL_PLANE_SERVICE_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousUrl === undefined) delete process.env.CONTROL_PLANE_SERVICE_URL
+    else process.env.CONTROL_PLANE_SERVICE_URL = previousUrl
+    if (previousToken === undefined) delete process.env.CONTROL_PLANE_SERVICE_TOKEN
+    else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
+  })
+  const requests: Array<{ operation: string; args: unknown[] }> = []
+  t.mock.method(globalThis, 'fetch', async (_input: string | URL | Request, init?: RequestInit) => {
+    const request = JSON.parse(String(init?.body)) as { operation: string; args: unknown[] }
+    requests.push(request)
+    if (request.operation === 'claimNextPublication') {
+      return Response.json({
+        result: {
+          ...preparingRun,
+          status: 'publishing',
+          workflow_result: {},
+          claim_token: 'claim-1',
+          publish_context: {}
+        }
+      })
+    }
+    if (request.operation === 'failPublication') return Response.json({ result: true })
+    return Response.json({ error: 'unexpected operation' }, { status: 500 })
+  })
+
+  await assert.rejects(
+    reviewRunStore.claimNextPublication(),
+    /Persisted publish context is invalid/
+  )
+  assert.equal(requests[1]?.operation, 'failPublication')
+  assert.deepEqual(requests[1]?.args.slice(0, 2), ['run-1', 'claim-1'])
+  assert.deepEqual(requests[1]?.args.at(-1), { retry: false })
+})

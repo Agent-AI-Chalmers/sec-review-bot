@@ -13,6 +13,7 @@ interface CreateIssueCommentArgs {
 
 interface CreateIssueCommentUnlessMarkerExistsArgs extends CreateIssueCommentArgs {
   marker: string
+  assert_publication_claim: () => Promise<void>
 }
 
 interface IssueCommentSummary {
@@ -45,6 +46,7 @@ interface CreatePullRequestReviewArgs {
 
 interface CreatePullRequestReviewUnlessMarkerExistsArgs extends CreatePullRequestReviewArgs {
   marker: string
+  assert_publication_claim: () => Promise<void>
 }
 
 function isOwnPullRequestApprovalError(error: unknown): boolean {
@@ -75,8 +77,10 @@ function isOwnPullRequestApprovalError(error: unknown): boolean {
 
 async function createIssueComment(
   octokit: GitHubAppOctokit,
-  { owner_login, repo_name, issue_number, body }: CreateIssueCommentArgs
+  { owner_login, repo_name, issue_number, body }: CreateIssueCommentArgs,
+  assertPublicationClaim: () => Promise<void>
 ): Promise<{ id: number; html_url: string }> {
+  await assertPublicationClaim()
   const response = await octokit.rest.issues.createComment({
     owner: owner_login,
     repo: repo_name,
@@ -94,7 +98,7 @@ async function findIssueCommentByMarker(
     repo_name,
     issue_number,
     marker
-  }: Omit<CreateIssueCommentUnlessMarkerExistsArgs, 'body'>
+  }: Omit<CreateIssueCommentUnlessMarkerExistsArgs, 'body' | 'assert_publication_claim'>
 ): Promise<IssueCommentSummary | null> {
   let page = 1
 
@@ -130,7 +134,14 @@ async function findIssueCommentByMarker(
 
 export async function createIssueCommentUnlessMarkerExists(
   octokit: GitHubAppOctokit,
-  { owner_login, repo_name, issue_number, body, marker }: CreateIssueCommentUnlessMarkerExistsArgs
+  {
+    owner_login,
+    repo_name,
+    issue_number,
+    body,
+    marker,
+    assert_publication_claim
+  }: CreateIssueCommentUnlessMarkerExistsArgs
 ): Promise<{ id: number; html_url: string; reused: boolean }> {
   const existing = await findIssueCommentByMarker(octokit, {
     owner_login,
@@ -148,12 +159,11 @@ export async function createIssueCommentUnlessMarkerExists(
     }
   }
 
-  const created = await createIssueComment(octokit, {
-    owner_login,
-    repo_name,
-    issue_number,
-    body
-  })
+  const created = await createIssueComment(
+    octokit,
+    { owner_login, repo_name, issue_number, body },
+    assert_publication_claim
+  )
   return {
     ...created,
     reused: false
@@ -169,8 +179,9 @@ async function createPullRequestReview(
     commit_id,
     body,
     event = 'COMMENT',
-    comments
-  }: CreatePullRequestReviewArgs
+    comments,
+    assert_publication_claim
+  }: CreatePullRequestReviewArgs & { assert_publication_claim: () => Promise<void> }
 ): Promise<{ id: number; html_url: string; state: string }> {
   const request = {
     owner: owner_login,
@@ -184,12 +195,14 @@ async function createPullRequestReview(
 
   let response: Awaited<ReturnType<GitHubAppOctokit['rest']['pulls']['createReview']>>
   try {
+    await assert_publication_claim()
     response = await octokit.rest.pulls.createReview(request)
   } catch (error: unknown) {
     if (event !== 'APPROVE' || !isOwnPullRequestApprovalError(error)) {
       throw error
     }
     // GitHub is the final authority on whether this identity may approve the PR.
+    await assert_publication_claim()
     response = await octokit.rest.pulls.createReview({
       ...request,
       event: 'COMMENT'

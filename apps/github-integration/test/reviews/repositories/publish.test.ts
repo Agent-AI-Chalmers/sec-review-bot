@@ -78,6 +78,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
     event_type: 'manual',
     store,
     claim_token: 'claim-1',
+    assert_publication_claim: async () => {},
     create_delivery_draft_pr: async ({ delivery }) => ({
       title: `Fix ${delivery.delivery_id}`,
       number: 12,
@@ -131,6 +132,7 @@ test('repository delivery continues after a deterministic failure', async () => 
     event_type: 'manual',
     store,
     claim_token: 'claim-1',
+    assert_publication_claim: async () => {},
     create_delivery_draft_pr: async ({ delivery }) => {
       attempted.push(delivery.delivery_id)
       if (delivery.delivery_id === 'delivery-a') {
@@ -191,6 +193,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
     event_type: 'manual',
     store,
     claim_token: 'claim-2',
+    assert_publication_claim: async () => {},
     create_delivery_draft_pr: async () => ({
       title: 'Fix B',
       number: 12,

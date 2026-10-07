@@ -102,7 +102,8 @@ function encodeGitFileContent(content_buffer: Buffer): { content: string; encodi
 async function buildTreeElements(
   octokit: GitHubAppOctokit,
   delivery: RepositoryDelivery,
-  repo: RepositoryContext
+  repo: RepositoryContext,
+  assertPublicationClaim: () => Promise<void>
 ): Promise<GitTreeElement[]> {
   const file_entries: FileChange[] = Array.isArray(delivery.file_changes)
     ? delivery.file_changes
@@ -125,6 +126,7 @@ async function buildTreeElements(
         ? Buffer.from(change.content, 'base64')
         : Buffer.from(change.content, 'utf8')
     const blob = encodeGitFileContent(content_buffer)
+    await assertPublicationClaim()
     const blobResponse = await octokit.rest.git.createBlob({
       owner: repo.owner_login,
       repo: repo.repo_name,
@@ -157,7 +159,8 @@ export async function createRepositoryDeliveryDraftPr({
   run_id,
   input,
   delivery,
-  case_results = []
+  case_results = [],
+  assert_publication_claim
 }: {
   octokit: GitHubAppOctokit
   repo: RepositoryContext
@@ -165,6 +168,7 @@ export async function createRepositoryDeliveryDraftPr({
   input: RepositoryReviewInput
   delivery: RepositoryDelivery
   case_results?: RepositoryCaseResult[]
+  assert_publication_claim: () => Promise<void>
 }): Promise<DraftPullRequestSummary> {
   // Validate before idempotent PR reuse so unsafe deliveries never publish or reuse a PR.
   validateDeliveryFileChangePaths(delivery)
@@ -207,12 +211,13 @@ export async function createRepositoryDeliveryDraftPr({
     commit_sha: head_sha
   })
   const baseTreeSha = commitResponse.data.tree.sha
-  const tree = await buildTreeElements(octokit, delivery, repo)
+  const tree = await buildTreeElements(octokit, delivery, repo, assert_publication_claim)
 
   if (tree.length === 0) {
     throw new Error('Repository security delivery requires at least one changed file.')
   }
 
+  await assert_publication_claim()
   const treeResponse = await octokit.rest.git.createTree({
     owner: repo.owner_login,
     repo: repo.repo_name,
@@ -220,6 +225,7 @@ export async function createRepositoryDeliveryDraftPr({
     tree
   })
 
+  await assert_publication_claim()
   const newCommitResponse = await octokit.rest.git.createCommit({
     owner: repo.owner_login,
     repo: repo.repo_name,
@@ -229,6 +235,7 @@ export async function createRepositoryDeliveryDraftPr({
   })
 
   try {
+    await assert_publication_claim()
     await octokit.rest.git.createRef({
       owner: repo.owner_login,
       repo: repo.repo_name,
@@ -241,6 +248,7 @@ export async function createRepositoryDeliveryDraftPr({
       throw error
     }
 
+    await assert_publication_claim()
     await octokit.rest.git.updateRef({
       owner: repo.owner_login,
       repo: repo.repo_name,
@@ -250,6 +258,7 @@ export async function createRepositoryDeliveryDraftPr({
     })
   }
 
+  await assert_publication_claim()
   const pullRequestResponse = await octokit.rest.pulls.create({
     owner: repo.owner_login,
     repo: repo.repo_name,

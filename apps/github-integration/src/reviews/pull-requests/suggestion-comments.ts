@@ -19,11 +19,19 @@ interface PublishSuggestionReviewArgs {
   event: PullRequestReviewEvent
   candidates: SuggestionCandidate[]
   marker: string
+  assert_publication_claim: () => Promise<void>
 }
 
 export async function publishPullRequestSuggestionReview(
   octokit: Parameters<typeof createPullRequestReviewUnlessMarkerExists>[0],
-  { pr, review_body, event, candidates, marker }: PublishSuggestionReviewArgs
+  {
+    pr,
+    review_body,
+    event,
+    candidates,
+    marker,
+    assert_publication_claim
+  }: PublishSuggestionReviewArgs
 ): Promise<{
   review_id: number
   html_url: string
@@ -40,6 +48,7 @@ export async function publishPullRequestSuggestionReview(
     body: review_body,
     event,
     marker,
+    assert_publication_claim,
     comments: candidates.map((candidate) => ({
       path: candidate.path,
       body: candidate.body,

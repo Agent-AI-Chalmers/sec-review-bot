@@ -8,6 +8,10 @@ import {
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
 import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
+import {
+  isPublicationClaimLostError,
+  PublicationClaimLostError
+} from '../../infrastructure/runner/publication-claim.js'
 import { DeterministicRunnerPublishError } from '../../infrastructure/runner/publish-error.js'
 import { parseRepositoryReviewPublishContext } from '../../infrastructure/runner/publish-context.js'
 import { createRepositoryDeliveryDraftPr } from './delivery-draft-pr.js'
@@ -162,6 +166,7 @@ export async function publishDeliveryDraftPrs({
   event_type,
   store,
   claim_token,
+  assert_publication_claim,
   create_delivery_draft_pr = createRepositoryDeliveryDraftPr
 }: {
   octokit: GitHubAppOctokit
@@ -174,6 +179,7 @@ export async function publishDeliveryDraftPrs({
   event_type: 'manual' | 'scheduled'
   store: ReviewRunStore
   claim_token: string
+  assert_publication_claim: () => Promise<void>
   create_delivery_draft_pr?: typeof createRepositoryDeliveryDraftPr
 }): Promise<PublishedDeliveryEntry[]> {
   const published_delivery_entries: PublishedDeliveryEntry[] = []
@@ -210,6 +216,7 @@ export async function publishDeliveryDraftPrs({
         }
       } else {
         await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
+        await assert_publication_claim()
         draftPullRequest = (await create_delivery_draft_pr({
           octokit,
           repo,
@@ -221,7 +228,8 @@ export async function publishDeliveryDraftPrs({
               : {})
           },
           delivery,
-          case_results
+          case_results,
+          assert_publication_claim
         })) as DraftPullRequestSummary
         if (
           !(await store.completePublicationStep(run_id, claim_token, stepKey, {
@@ -229,7 +237,7 @@ export async function publishDeliveryDraftPrs({
             url: draftPullRequest.html_url
           }))
         ) {
-          throw new Error(`Publication claim was lost after completing ${stepKey}.`)
+          throw new PublicationClaimLostError(run_id)
         }
       }
       published_delivery_entries.push({
@@ -251,6 +259,7 @@ export async function publishDeliveryDraftPrs({
         reused: draftPullRequest.reused
       })
     } catch (error) {
+      if (isPublicationClaimLostError(error)) throw error
       const errorMessage = asErrorMessage(error)
       const failure = classifyPublicationFailure(error)
       await store.failPublicationStep(
@@ -284,7 +293,8 @@ export async function publishDeliveryDraftPrs({
 
 async function ensureSummaryIssueNumber(
   octokit: GitHubAppOctokit,
-  repo: RepositoryContext
+  repo: RepositoryContext,
+  assertPublicationClaim: () => Promise<void>
 ): Promise<number> {
   const existing = await findRepositorySecuritySummaryIssue(octokit, {
     owner_login: repo.owner_login,
@@ -296,6 +306,7 @@ async function ensureSummaryIssueNumber(
     return existing.number
   }
 
+  await assertPublicationClaim()
   const created = await octokit.rest.issues.create({
     owner: repo.owner_login,
     repo: repo.repo_name,
@@ -315,7 +326,8 @@ async function publishRepositoryReviewResult({
   workflow_result,
   event_type,
   store,
-  claim_token
+  claim_token,
+  assert_publication_claim
 }: {
   octokit: unknown
   repo: RepositoryContext
@@ -326,6 +338,7 @@ async function publishRepositoryReviewResult({
   event_type: 'manual' | 'scheduled'
   store: ReviewRunStore
   claim_token: string
+  assert_publication_claim: () => Promise<void>
 }): Promise<void> {
   const github = octokit as GitHubAppOctokit
   const deliveryStepKeys = (workflow_result.deliveries ?? []).map(
@@ -346,6 +359,7 @@ async function publishRepositoryReviewResult({
     event_type,
     store,
     claim_token,
+    assert_publication_claim,
     ...(scan_target ? { scan_target } : {})
   })
 
@@ -357,14 +371,16 @@ async function publishRepositoryReviewResult({
   } else {
     await store.requirePublicationStepClaim(run_id, claim_token, 'repository:summary-issue')
     try {
-      summaryIssueNumber = await ensureSummaryIssueNumber(github, repo)
+      await assert_publication_claim()
+      summaryIssueNumber = await ensureSummaryIssueNumber(github, repo, assert_publication_claim)
       if (
         !(await store.completePublicationStep(run_id, claim_token, 'repository:summary-issue', {
           id: summaryIssueNumber
         }))
       )
-        throw new Error('Publication claim was lost after resolving the summary issue.')
+        throw new PublicationClaimLostError(run_id)
     } catch (error) {
+      if (isPublicationClaimLostError(error)) throw error
       const failure = classifyPublicationFailure(error)
       await store.failPublicationStep(
         run_id,
@@ -399,12 +415,14 @@ async function publishRepositoryReviewResult({
   await store.requirePublicationStepClaim(run_id, claim_token, 'repository:summary-comment')
   let comment
   try {
+    await assert_publication_claim()
     comment = await createIssueCommentUnlessMarkerExists(github, {
       owner_login: repo.owner_login,
       repo_name: repo.repo_name,
       issue_number: summaryIssueNumber,
       body: commentBody,
-      marker
+      marker,
+      assert_publication_claim
     })
     if (
       !(await store.completePublicationStep(run_id, claim_token, 'repository:summary-comment', {
@@ -412,8 +430,9 @@ async function publishRepositoryReviewResult({
         url: comment.html_url
       }))
     )
-      throw new Error('Publication claim was lost after publishing the summary comment.')
+      throw new PublicationClaimLostError(run_id)
   } catch (error) {
+    if (isPublicationClaimLostError(error)) throw error
     const failure = classifyPublicationFailure(error)
     await store.failPublicationStep(
       run_id,
@@ -442,12 +461,14 @@ export async function handleRepositoryReviewRun({
   status,
   store,
   claim_token,
+  assert_publication_claim,
   installation_octokit_for_repo
 }: {
   run: CompletedRunnerRun
   status: RunnerRunStatus
   store: ReviewRunStore
   claim_token: string
+  assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo
 }): Promise<void> {
   const context = parseRepositoryReviewPublishContext(run.publish_context)
@@ -465,6 +486,7 @@ export async function handleRepositoryReviewRun({
     workflow_result,
     event_type: context.event_type,
     store,
-    claim_token
+    claim_token,
+    assert_publication_claim
   })
 }

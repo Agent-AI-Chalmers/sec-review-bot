@@ -45,6 +45,8 @@ A complete review also needs the runner service and worker. To run the whole sta
 
 For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `CONTROL_PLANE_SERVICE_URL`, and `CONTROL_PLANE_SERVICE_TOKEN`.
 
+`CONTROL_PLANE_REQUEST_TIMEOUT_MS` bounds every Control Plane RPC and defaults to 30 seconds. In particular, a publication lease renewal that fails or times out is treated as lost ownership: the publisher stops before starting another GitHub mutation and leaves recovery to lease takeover.
+
 ```bash
 pnpm run server
 ```

@@ -3,9 +3,10 @@ import test from 'node:test'
 
 import {
   buildRepositoryDeliveryBranchName,
-  createRepositoryDeliveryDraftPr
+  createRepositoryDeliveryDraftPr as createRepositoryDeliveryDraftPrWithClaim
 } from '../../../src/reviews/repositories/delivery-draft-pr.js'
 import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
+import { PublicationClaimLostError } from '../../../src/infrastructure/runner/publication-claim.js'
 
 test('repository delivery branch identity includes both run and delivery', () => {
   const delivery = { delivery_id: 'case/shared' } as RepositoryDelivery
@@ -17,10 +18,21 @@ test('repository delivery branch identity includes both run and delivery', () =>
 })
 import type { FileMode } from '../../../src/reviews/file-change.js'
 
-type CreateRepositoryDeliveryDraftPrParams = Parameters<typeof createRepositoryDeliveryDraftPr>[0]
+type CreateRepositoryDeliveryDraftPrParams = Parameters<
+  typeof createRepositoryDeliveryDraftPrWithClaim
+>[0]
 type CreateRepositoryDeliveryDraftPrOctokit = CreateRepositoryDeliveryDraftPrParams['octokit']
 type CreateRepositoryDeliveryDraftPrRepo = CreateRepositoryDeliveryDraftPrParams['repo']
 type CreateRepositoryDeliveryDraftPrInput = CreateRepositoryDeliveryDraftPrParams['input']
+
+async function createRepositoryDeliveryDraftPr(
+  args: Omit<CreateRepositoryDeliveryDraftPrParams, 'assert_publication_claim'>
+): ReturnType<typeof createRepositoryDeliveryDraftPrWithClaim> {
+  return await createRepositoryDeliveryDraftPrWithClaim({
+    ...args,
+    assert_publication_claim: async () => {}
+  })
+}
 
 function createOctokitMock({
   existingPullRequests = []
@@ -172,6 +184,48 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
   assert.equal(octokit.calls.commits.length, 1)
   assert.equal(octokit.calls.refs.length, 1)
   assert.equal(octokit.calls.pulls.length, 1)
+})
+
+test('delivery-draft-pr stops before the next GitHub write after claim loss', async () => {
+  const octokit = createOctokitMock()
+  let ownershipChecks = 0
+
+  await assert.rejects(
+    createRepositoryDeliveryDraftPrWithClaim({
+      octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+      repo: {
+        owner_login: 'octo-org',
+        repo_name: 'example-repo',
+        default_branch: 'main'
+      },
+      run_id: 'run-claim-loss',
+      input: { workspace_ref: 'base-sha' },
+      delivery: {
+        delivery_id: 'delivery-1',
+        case_ids: ['case-1'],
+        case_count: 1,
+        file_changes: [
+          {
+            path: 'src/app.txt',
+            status: 'upsert',
+            content: 'fixed\n',
+            content_encoding: 'utf-8'
+          }
+        ]
+      },
+      assert_publication_claim: async () => {
+        ownershipChecks += 1
+        if (ownershipChecks === 2) throw new PublicationClaimLostError('run-claim-loss')
+      }
+    }),
+    PublicationClaimLostError
+  )
+
+  assert.equal(octokit.calls.blobs.length, 1)
+  assert.equal(octokit.calls.trees.length, 0)
+  assert.equal(octokit.calls.commits.length, 0)
+  assert.equal(octokit.calls.refs.length, 0)
+  assert.equal(octokit.calls.pulls.length, 0)
 })
 
 test('delivery-draft-pr uses scan target branch as PR base when provided', async () => {
