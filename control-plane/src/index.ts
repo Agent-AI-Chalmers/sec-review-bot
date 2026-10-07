@@ -7,6 +7,7 @@ export type {
   ReviewRunCoordinator
 } from './contracts.js'
 export { admitReviewRun, type ReviewRunAdmissionStore } from './admission.js'
+export { submitPreparedRun } from './prepared-submission.js'
 export {
   coordinateReviewRunsOnce,
   startReviewRunCoordinatorLoop,
@@ -17,6 +18,7 @@ export {
   ReviewRunStore,
   type CreateReviewRunArgs,
   type PublicationStepRecord,
+  type PublicationWork,
   type PublishContext,
   type PublishContextValidator,
   type ReviewRunAdmission,
@@ -29,8 +31,6 @@ export {
   type SubmissionRecoveryResult
 } from './submission-recovery.js'
 export {
-  coordinateTerminalRun,
-  type ObservedRunnerStatus,
-  type TerminalCoordinationDependencies,
-  type TerminalCoordinationResult
+  observeRunnerRun,
+  type RunnerObservationResult
 } from './terminal-coordination.js'

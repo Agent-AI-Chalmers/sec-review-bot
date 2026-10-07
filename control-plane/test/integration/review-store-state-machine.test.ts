@@ -32,6 +32,12 @@ async function createQueuedRun (store: ReviewRunStore, runId = `run-${randomUUID
   return runId
 }
 
+async function createSuccessfulRun (store: ReviewRunStore, runId = `run-${randomUUID()}`): Promise<string> {
+  await createQueuedRun(store, runId)
+  assert.equal(await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'not_available' }), true)
+  return runId
+}
+
 test('ReviewRunStore prevents cross-connector access to a globally unique run identity', async () => {
   const connectorA = connectorId()
   const connectorB = connectorId()
@@ -49,6 +55,8 @@ test('ReviewRunStore prevents cross-connector access to a globally unique run id
     assert.equal(await second.getRun(runId), null)
     assert.equal((await first.listActiveRuns()).length, 1)
     assert.equal((await second.listActiveRuns()).length, 0)
+    assert.equal(await first.claimPublication(runId), null)
+    await first.recordRunnerSuccess(runId, { run_id: runId }, { status: 'not_available' })
     assert.notEqual(await first.claimPublication(runId), null)
     assert.equal(await second.claimPublication(runId), null)
   } finally {
@@ -248,7 +256,7 @@ test('ReviewRunStore fences a stale publisher after another connection takes ove
   const sharedConnector = connectorId()
   const ownerA = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 0 })
   const ownerB = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 0 })
-  const runId = await createQueuedRun(ownerA)
+  const runId = await createSuccessfulRun(ownerA)
   try {
     const staleToken = await ownerA.claimPublication(runId)
     const currentToken = await ownerB.claimPublication(runId)
@@ -265,20 +273,20 @@ test('ReviewRunStore fences a stale publisher after another connection takes ove
 
 test('ReviewRunStore spends retry budget only for the current publication owner', async () => {
   const store = await createStore()
-  const runId = await createQueuedRun(store)
+  const runId = await createSuccessfulRun(store)
   try {
     const token = await store.claimPublication(runId)
     assert.ok(token)
     assert.equal(await store.failPublication(runId, token, { code: 'HTTP_503', message: 'unavailable' }, { retry: true }), true)
     const record = await store.getRun(runId)
-    assert.equal(record?.status, 'queued')
-    assert.equal((await store.listActiveRuns())[0]?.run_id, runId)
+    assert.equal(record?.status, 'succeeded')
+    assert.deepEqual(await store.listActiveRuns(), [])
   } finally { await store.close() }
 })
 
 test('ReviewRunStore fences publication step commits with the current publication token', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
-  const runId = await createQueuedRun(store)
+  const runId = await createSuccessfulRun(store)
   try {
     const staleToken = await store.claimPublication(runId)
     assert.ok(staleToken)
@@ -294,7 +302,7 @@ test('ReviewRunStore fences publication step commits with the current publicatio
 
 test('ReviewRunStore reports an exhausted publication step as deterministic', async () => {
   const store = await createStore()
-  const runId = await createQueuedRun(store)
+  const runId = await createSuccessfulRun(store)
   try {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const token = await store.claimPublication(runId)
@@ -335,7 +343,7 @@ test('ReviewRunStore renews a publication claim before another owner can take it
   const sharedConnector = connectorId()
   const ownerA = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 1_000 })
   const ownerB = await createStore({ connectorId: sharedConnector, claimTimeoutMs: 1_000 })
-  const runId = await createQueuedRun(ownerA)
+  const runId = await createSuccessfulRun(ownerA)
   const observer = new Pool({ connectionString: requireTestDatabase() })
   try {
     const token = await ownerA.claimPublication(runId)

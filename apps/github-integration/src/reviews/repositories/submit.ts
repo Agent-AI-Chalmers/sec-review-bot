@@ -2,7 +2,6 @@ import { splitRepoFullName } from '../../infrastructure/github/repository-servic
 import { prepareRepositoryReviewInput } from './prepare-input.js'
 import { fetchRepositoryTriggerConfig } from '../../infrastructure/github/repo-config-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import { submitRunnerRun } from '../../infrastructure/runner/client.js'
 import { logInfo } from '../../utils/logger.js'
 import type {
   RepairMode,
@@ -134,19 +133,15 @@ export async function startRepositoryReviewRun ({
     workflow: 'repository-review',
     event_type
   }
-  await on_prepared?.(preparedRun, input)
-  const submitted = await submitRunnerRun({
-    workflow: 'repository-review',
-    run_id,
-    input
-  })
+  if (on_prepared === undefined) throw new Error('Repository review submission callback is required.')
+  await on_prepared(preparedRun, input)
 
   logInfo('repository_review_runner_run_submitted', {
     event_type,
     repo: repo.repo_full_name,
     run_id: run_id,
-    workflow: submitted.workflow
+    workflow: preparedRun.workflow
   })
 
-  return { ...preparedRun, workflow: submitted.workflow }
+  return preparedRun
 }

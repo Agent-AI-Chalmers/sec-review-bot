@@ -9,7 +9,7 @@ import {
   RepositoryReviewDispatchValidationError
 } from '../../src/triggers/repository-review.js'
 import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
-import { RunnerSubmissionUncertainError } from '../../src/infrastructure/runner/client.js'
+import { ControlPlaneSubmissionError } from '../../src/infrastructure/runner/review-store.js'
 import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
 
 function fakeApp (): App {
@@ -172,8 +172,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           saved_runs.push(run)
           return { record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' } as never
         },
-        save_prepared_submission: (run_id, _token, context, input) => saved_runs.push({ run_id, context, input }),
-        mark_queued: () => {},
+        submit_prepared_run: (run_id, _token, context, input) => saved_runs.push({ run_id, context, input }),
         failPreparation: () => assert.fail('successful review must not be marked failed')
       }
     }
@@ -259,7 +258,7 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
           created: false, preparation_token: null,
           record: { run_id: 'run-original', status: 'running' } as never
         }),
-        mark_queued: () => assert.fail('replayed dispatch must not queue again'),
+        submit_prepared_run: () => assert.fail('replayed dispatch must not queue again'),
         failPreparation: () => assert.fail('replayed dispatch must not change the original run')
       }
     }
@@ -296,7 +295,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
             transitions.push(['preparing', run])
             return { record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' } as never
           },
-          mark_queued: () => assert.fail('invalid dispatch must not queue a run'),
+          submit_prepared_run: () => assert.fail('invalid dispatch must not queue a run'),
           failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
@@ -328,7 +327,7 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
         submit_run: async () => assert.fail('invalid contract must not submit'),
         store: {
           admit_review_run: () => assert.fail('invalid contract must not create a run'),
-          mark_queued: () => assert.fail('invalid contract must not queue'),
+          submit_prepared_run: () => assert.fail('invalid contract must not queue'),
           failPreparation: () => assert.fail('invalid contract has no run to fail')
         }
       }
@@ -368,7 +367,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
             transitions.push(['preparing', run])
             return { record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' } as never
           },
-          mark_queued: () => assert.fail('failed review must not be queued'),
+          submit_prepared_run: () => assert.fail('failed review must not be queued'),
           failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
@@ -390,7 +389,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
 
 test('dispatchRepositoryReview preserves an uncertain Runner submission for replay', async () => {
   const transitions: unknown[] = []
-  const error = new RunnerSubmissionUncertainError('Runner response was lost.')
+  const error = new ControlPlaneSubmissionError('Runner response was lost.', 'SUBMISSION_STATE_UNCERTAIN')
 
   await assert.rejects(
     dispatchRepositoryReview({
@@ -427,8 +426,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
         },
         store: {
           admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' }) as never,
-          save_prepared_submission: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
-          mark_queued: () => assert.fail('uncertain submission must not queue yet'),
+          submit_prepared_run: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
@@ -437,8 +435,5 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
   )
 
   assert.equal((transitions[0] as unknown[])[0], 'prepared')
-  assert.deepEqual(transitions[1], [
-    'run-repo-uncertain',
-    { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
-  ])
+  assert.equal(transitions.length, 1)
 })

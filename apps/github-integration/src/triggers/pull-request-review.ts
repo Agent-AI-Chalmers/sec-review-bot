@@ -5,7 +5,7 @@ import { pullRequestReviewPublishContext } from '../infrastructure/runner/publis
 import { reviewRunStore } from '../infrastructure/runner/review-store.js'
 import { createRunId } from '../reviews/shared/input-bundle.js'
 import type { RepairMode } from '../infrastructure/runner/input.js'
-import { RunnerSubmissionUncertainError } from '../infrastructure/runner/client.js'
+import { ControlPlaneSubmissionError } from '../infrastructure/runner/review-store.js'
 import {
   startPullRequestReviewRun,
   type SubmittedPullRequestReviewRun
@@ -15,9 +15,8 @@ type PullRequestReviewEventType = 'opened' | 'ready_for_review' | 'synchronize' 
 type StartPullRequestReview = typeof startPullRequestReviewRun
 type PullRequestReviewRunStore = {
   admit_review_run: (...args: Parameters<typeof reviewRunStore.admit_review_run>) => Awaited<ReturnType<typeof reviewRunStore.admit_review_run>> | ReturnType<typeof reviewRunStore.admit_review_run>
-  mark_queued: (...args: Parameters<typeof reviewRunStore.mark_queued>) => unknown
   failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
-  save_prepared_submission?: (...args: Parameters<typeof reviewRunStore.save_prepared_submission>) => unknown
+  submit_prepared_run: (...args: Parameters<typeof reviewRunStore.submit_prepared_run>) => unknown
 }
 
 interface StartPullRequestReviewCommandDeps {
@@ -89,7 +88,7 @@ export async function startPullRequestReviewCommand ({
       event_type,
       repair_mode: event_type === 'manual_review' ? repair_mode : null,
       on_prepared: async (prepared, input) => {
-        await store.save_prepared_submission?.(
+        await store.submit_prepared_run(
           run_id, preparationToken,
           pullRequestReviewPublishContext(prepared),
           input
@@ -97,22 +96,12 @@ export async function startPullRequestReviewCommand ({
       }
     })
   } catch (error) {
-    await store.failPreparation(run_id, preparationToken, {
-      // A lost Runner response is recoverable by replaying the same run_id;
-      // PR context and input preparation failures remain terminal.
-      code: error instanceof RunnerSubmissionUncertainError ? 'SUBMISSION_STATE_UNCERTAIN' : 'REVIEW_START_FAILED',
-      message: error instanceof Error ? error.message : String(error)
-    })
-    throw error
-  }
-
-  try {
-    await store.mark_queued(run_id, preparationToken, pullRequestReviewPublishContext(submitted))
-  } catch (error) {
-    await store.failPreparation(run_id, preparationToken, {
-      code: 'SUBMISSION_STATE_UNCERTAIN',
-      message: `Runner accepted the run, but its queued state was not recorded: ${error instanceof Error ? error.message : String(error)}`
-    })
+    if (!(error instanceof ControlPlaneSubmissionError)) {
+      await store.failPreparation(run_id, preparationToken, {
+        code: 'REVIEW_START_FAILED',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    }
     throw error
   }
 

@@ -5,7 +5,6 @@ import {
 } from '../../infrastructure/github/pull-request-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import { preparePullRequestReviewInput } from './prepare-input.js'
-import { submitRunnerRun } from '../../infrastructure/runner/client.js'
 import { logInfo } from '../../utils/logger.js'
 import type { PullRequestReviewInput, RepairMode } from '../../infrastructure/runner/input.js'
 
@@ -171,8 +170,7 @@ export async function startPullRequestReviewRun (args: {
   pr: PullRequestContext
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   repair_mode?: RepairMode | null
-  // Runs after preparation and before the Runner POST, so callers can durably
-  // retain the context needed if the submission response is lost.
+  // The caller hands the prepared input to Control Plane for durable submission.
   on_prepared?: (submitted: SubmittedPullRequestReviewRun, input: PullRequestReviewInput & Record<string, unknown>) => void | Promise<void>
 }): Promise<SubmittedPullRequestReviewRun> {
   const prepared = await materializePullRequestReviewInput(args)
@@ -184,18 +182,14 @@ export async function startPullRequestReviewRun (args: {
     workflow: 'pull-request-review',
     event_type: args.event_type
   }
-  await args.on_prepared?.(preparedRun, prepared.input)
-  const submitted = await submitRunnerRun({
-    workflow: 'pull-request-review',
-    run_id: prepared.run_id,
-    input: prepared.input
-  })
+  if (args.on_prepared === undefined) throw new Error('Pull request review submission callback is required.')
+  await args.on_prepared(preparedRun, prepared.input)
   logInfo('pull_request_review_runner_run_submitted', {
     event_type: args.event_type,
     pr: args.pr.pr_number,
     repo: args.pr.repo_full_name,
     run_id: prepared.run_id,
-    workflow: submitted.workflow
+    workflow: preparedRun.workflow
   })
-  return { ...preparedRun, workflow: submitted.workflow }
+  return preparedRun
 }

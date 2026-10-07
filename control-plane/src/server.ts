@@ -2,16 +2,18 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto'
 
 import { ReviewRunStore } from './review-store.js'
+import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from './coordinator.js'
+import { observeRunnerRun } from './terminal-coordination.js'
+import { getRunnerRunStatus, RUNNER_RUN_NOT_FOUND, RunnerSubmissionUncertainError, submitRunnerRun } from './runner-client.js'
+import { recoverReviewRunSubmission } from './submission-recovery.js'
+import { submitPreparedRun } from './prepared-submission.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
 const operations = [
-  'admit_review_run', 'save_prepared_submission', 'mark_queued', 'getRun',
-  'expireStalePreparations', 'listSubmissionRecoveries', 'claimSubmissionRecovery',
-  'completeSubmissionRecovery', 'failSubmissionRecovery', 'listActiveRuns',
-  'markRunning', 'recordArtifactPublication', 'failRunnerExecution',
-  'claimPublication', 'renewPublicationClaim', 'initializePublicationSteps',
+  'submit_prepared_run', 'admit_review_run', 'getRun', 'failPreparation',
+  'claimNextPublication', 'renewPublicationClaim', 'initializePublicationSteps',
   'listPublicationSteps', 'requirePublicationStepClaim', 'completePublicationStep',
-  'failPublicationStep', 'completePublication', 'failPublication', 'failPreparation'
+  'failPublicationStep', 'completePublication', 'failPublication'
 ] as const
 type Operation = typeof operations[number]
 const allowedOperations = new Set<string>(operations)
@@ -54,6 +56,24 @@ export async function startControlPlaneServer (): Promise<{ close: () => Promise
     connectorId: process.env.CONNECTOR_ID?.trim() || 'github-app:default'
   })
   await store.initialize()
+  const intervalMs = Number.parseInt(process.env.AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS || '15000', 10)
+  const coordinator = startReviewRunCoordinatorLoop({
+    intervalMs: Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : 15_000,
+    runOnce: async () => await coordinateReviewRunsOnce(store, {
+      recoverSubmission: async run => { await recoverReviewRunSubmission(store, run, {
+        submit: submitRunnerRun,
+        classifyError: error => ({
+          uncertain: error instanceof RunnerSubmissionUncertainError,
+          code: error instanceof RunnerSubmissionUncertainError ? 'SUBMISSION_STATE_UNCERTAIN' : error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : 'REVIEW_START_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        })
+      }) },
+      observeActiveRun: async run => { await observeRunnerRun(store, run, getRunnerRunStatus, error =>
+        typeof error === 'object' && error !== null && 'name' in error && error.name === 'AgentRunnerServiceError' &&
+        (('retryable' in error && error.retryable === false) || ('code' in error && error.code === RUNNER_RUN_NOT_FOUND))) }
+    }),
+    onError: error => { console.error('control_plane_runner_coordination_failed', error) }
+  })
   const server = createServer(async (request, response) => {
     try {
       if (request.method === 'GET' && request.url === '/healthz') {
@@ -76,13 +96,21 @@ export async function startControlPlaneServer (): Promise<{ close: () => Promise
       const args = body.operation === 'admit_review_run' && typeof body.args[0] === 'object' && body.args[0] !== null
         ? [{ ...(body.args[0] as Record<string, unknown>), run_id: randomUUID() }]
         : body.args
+      if (body.operation === 'submit_prepared_run') {
+        const [runId, preparationToken, publishContext, input] = args as [string, string, Record<string, unknown>, Record<string, unknown>]
+        sendJson(response, 200, { result: await submitPreparedRun(store, { runId, preparationToken, publishContext, input }, submitRunnerRun) })
+        return
+      }
       const method = store[body.operation] as (...operationArgs: unknown[]) => Promise<unknown>
       sendJson(response, 200, { result: await method.apply(store, args) })
     } catch (error) {
       const status = typeof error === 'object' && error !== null && 'statusCode' in error && typeof error.statusCode === 'number'
         ? error.statusCode
         : 500
-      sendJson(response, status, { error: error instanceof Error ? error.message : String(error) })
+      sendJson(response, status, {
+        error: error instanceof Error ? error.message : String(error),
+        code: typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string' ? error.code : undefined
+      })
     }
   })
   const port = Number.parseInt(process.env.CONTROL_PLANE_PORT || '8090', 10)
@@ -93,6 +121,7 @@ export async function startControlPlaneServer (): Promise<{ close: () => Promise
   return {
     close: async () => {
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+      await coordinator.stop()
       await store.close()
     }
   }

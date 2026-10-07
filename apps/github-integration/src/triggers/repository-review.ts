@@ -10,7 +10,7 @@ import {
 import type { RepairMode } from '../infrastructure/runner/input.js'
 import { repositoryReviewPublishContext } from '../infrastructure/runner/publish-context.js'
 import { reviewRunStore } from '../infrastructure/runner/review-store.js'
-import { RunnerSubmissionUncertainError } from '../infrastructure/runner/client.js'
+import { ControlPlaneSubmissionError } from '../infrastructure/runner/review-store.js'
 import { createRunId } from '../reviews/shared/input-bundle.js'
 import { logInfo } from '../utils/logger.js'
 
@@ -168,9 +168,8 @@ interface DispatchRepositoryReviewCommandDeps {
   submit_run: typeof startRepositoryReviewRun
   store: {
     admit_review_run: (...args: Parameters<typeof reviewRunStore.admit_review_run>) => Awaited<ReturnType<typeof reviewRunStore.admit_review_run>> | ReturnType<typeof reviewRunStore.admit_review_run>
-    mark_queued: (...args: Parameters<typeof reviewRunStore.mark_queued>) => unknown
     failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
-    save_prepared_submission?: (...args: Parameters<typeof reviewRunStore.save_prepared_submission>) => unknown
+    submit_prepared_run: (...args: Parameters<typeof reviewRunStore.submit_prepared_run>) => unknown
   }
   create_run_id: typeof createRunId
 }
@@ -254,7 +253,7 @@ export async function dispatchRepositoryReview ({
       run_id,
       ...resolved,
       on_prepared: async (prepared, input) => {
-        await store.save_prepared_submission?.(
+        await store.submit_prepared_run(
           run_id, preparationToken,
           repositoryReviewPublishContext(prepared),
           input
@@ -262,23 +261,12 @@ export async function dispatchRepositoryReview ({
       }
     })
   } catch (error) {
-    await store.failPreparation(run_id, preparationToken, {
-      // Submission transport failures may hide an accepted Temporal workflow;
-      // replay must retain this run_id instead of creating another workflow.
-      code: error instanceof RunnerSubmissionUncertainError ? 'SUBMISSION_STATE_UNCERTAIN' : 'REVIEW_START_FAILED',
-      message: asErrorMessage(error) || 'Repository review could not be started.'
-    })
-    throw error
-  }
-
-  const publishContext = repositoryReviewPublishContext(submitted)
-  try {
-    await store.mark_queued(run_id, preparationToken, publishContext)
-  } catch (error) {
-    await store.failPreparation(run_id, preparationToken, {
-      code: 'SUBMISSION_STATE_UNCERTAIN',
-      message: `Runner accepted the run, but its queued state was not recorded: ${asErrorMessage(error)}`
-    })
+    if (!(error instanceof ControlPlaneSubmissionError)) {
+      await store.failPreparation(run_id, preparationToken, {
+        code: 'REVIEW_START_FAILED',
+        message: asErrorMessage(error) || 'Repository review could not be started.'
+      })
+    }
     throw error
   }
 

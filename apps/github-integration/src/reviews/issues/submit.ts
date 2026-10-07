@@ -1,7 +1,6 @@
 import type { IssueContext } from '../../infrastructure/github/issue-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import { prepareIssueReviewInput } from './prepare-input.js'
-import { submitRunnerRun } from '../../infrastructure/runner/client.js'
 import { logInfo } from '../../utils/logger.js'
 import type { IssueReviewInput } from '../../infrastructure/runner/input.js'
 import { createRunId } from '../shared/input-bundle.js'
@@ -13,8 +12,7 @@ interface RunIssueReviewArgs {
   event_type?: 'opened' | 'manual_review' | null
   review_objective?: 'audit' | 'repair' | null
   repair_mode?: 'test-changes-allowed' | 'no-test-changes' | null
-  // Runs after preparation and before the Runner POST, so callers can durably
-  // retain the context needed if the submission response is lost.
+  // The caller hands the prepared input to Control Plane for durable submission.
   on_prepared?: (submitted: SubmittedIssueReviewRun, input: IssueReviewInput & Record<string, unknown>) => void | Promise<void>
 }
 
@@ -99,14 +97,14 @@ export async function startIssueReviewRun (args: RunIssueReviewArgs): Promise<Su
     workflow: 'issue-review',
     event_type
   }
-  await args.on_prepared?.(preparedRun, input)
-  const submitted = await submitRunnerRun({ workflow: 'issue-review', run_id: prepared.run_id, input })
+  if (args.on_prepared === undefined) throw new Error('Issue review submission callback is required.')
+  await args.on_prepared(preparedRun, input)
   logInfo('issue_review_runner_run_submitted', {
     event_type,
     issue: args.issue.issue_number,
     repo: args.issue.repo_full_name,
     run_id: prepared.run_id,
-    workflow: submitted.workflow
+    workflow: preparedRun.workflow
   })
-  return { ...preparedRun, workflow: submitted.workflow }
+  return preparedRun
 }

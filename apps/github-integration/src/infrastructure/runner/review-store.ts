@@ -2,10 +2,15 @@ import type { RunnerArtifactPublication, WorkflowName } from './client.js'
 import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 
 type JsonObject = Record<string, unknown>
-export type ReviewRunStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'publishing' | 'published' | 'failed'
+export type ReviewRunStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'publishing' | 'published' | 'failed'
 export interface CreateReviewRunArgs { run_id: string, workflow: WorkflowName, publish_context: JsonObject, runner_input?: JsonObject, ingress_kind?: 'github_webhook' | 'github_actions_dispatch', ingress_key?: string }
 export interface ReviewRunRecord extends CreateReviewRunArgs { status: ReviewRunStatus, created_at: string, updated_at: string, published_at: string | null, failure_code: string | null, failure_message: string | null, artifact_publication: RunnerArtifactPublication | null }
 export interface ReviewRunAdmission { record: ReviewRunRecord, created: boolean, preparation_token: string | null }
+export interface PublicationWork extends ReviewRunRecord { workflow_result: unknown, claim_token: string }
+export class ControlPlaneSubmissionError extends Error {
+  readonly code: string | null
+  constructor (message: string, code: string | null) { super(message); this.name = 'ControlPlaneSubmissionError'; this.code = code }
+}
 export interface PublicationStepRecord { step_key: string, status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed', attempts: number, remote_object_id: string | null, remote_object_url: string | null, failure_code: string | null, failure_message: string | null }
 
 function serviceUrl (): string {
@@ -23,8 +28,8 @@ class ControlPlaneReviewRunStoreClient {
   readonly connector_id = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
   private async call<T> (operation: string, ...args: unknown[]): Promise<T> {
     const response = await fetch(`${serviceUrl()}/v1/store`, { method: 'POST', headers: { authorization: `Bearer ${serviceToken()}`, 'content-type': 'application/json' }, body: JSON.stringify({ operation, args }) })
-    const body = await response.json() as { result?: T, error?: string }
-    if (!response.ok) throw new Error(body.error ?? `Control Plane returned HTTP ${response.status}.`)
+    const body = await response.json() as { result?: T, error?: string, code?: string }
+    if (!response.ok) throw Object.assign(new Error(body.error ?? `Control Plane returned HTTP ${response.status}.`), { code: body.code ?? null })
     return body.result as T
   }
   private validateRun (run: ReviewRunRecord): ReviewRunRecord { return { ...run, publish_context: parsePublishContextForWorkflow(run.workflow, run.publish_context) } }
@@ -38,17 +43,14 @@ class ControlPlaneReviewRunStoreClient {
   async admit_review_run (run: CreateReviewRunArgs & Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>): Promise<ReviewRunAdmission> { parsePublishContextForWorkflow(run.workflow, run.publish_context); const admission = await this.call<ReviewRunAdmission>('admit_review_run', run); return { ...admission, record: this.validateRun(admission.record) } }
   async save_prepared_submission (runId: string, token: string, context: PublishContext, input: JsonObject): Promise<void> { await this.call('save_prepared_submission', runId, token, await this.validateContext(runId, context), input) }
   async mark_queued (runId: string, token: string, context: PublishContext): Promise<void> { await this.call('mark_queued', runId, token, await this.validateContext(runId, context)) }
+  async submit_prepared_run (runId: string, token: string, context: PublishContext, input: JsonObject): Promise<void> {
+    const publishContext = await this.validateContext(runId, context)
+    try { await this.call('submit_prepared_run', runId, token, publishContext, input) } catch (error) {
+      throw new ControlPlaneSubmissionError(error instanceof Error ? error.message : String(error), error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : null)
+    }
+  }
   async getRun (runId: string): Promise<ReviewRunRecord | null> { const run = await this.call<ReviewRunRecord | null>('getRun', runId); return run === null ? null : this.validateRun(run) }
-  async expireStalePreparations (): Promise<number> { return await this.call('expireStalePreparations') }
-  async listSubmissionRecoveries (): Promise<ReviewRunRecord[]> { return (await this.call<ReviewRunRecord[]>('listSubmissionRecoveries')).map(run => this.validateRun(run)) }
-  async claimSubmissionRecovery (runId: string): Promise<string | null> { return await this.call('claimSubmissionRecovery', runId) }
-  async completeSubmissionRecovery (runId: string, token: string): Promise<boolean> { return await this.call('completeSubmissionRecovery', runId, token) }
-  async failSubmissionRecovery (runId: string, token: string, error: { code?: string | null, message: string }): Promise<boolean> { return await this.call('failSubmissionRecovery', runId, token, error) }
-  async listActiveRuns (): Promise<ReviewRunRecord[]> { return (await this.call<ReviewRunRecord[]>('listActiveRuns')).map(run => this.validateRun(run)) }
-  async markRunning (runId: string): Promise<void> { await this.call('markRunning', runId) }
-  async recordArtifactPublication (runId: string, publication: RunnerArtifactPublication | undefined): Promise<void> { await this.call('recordArtifactPublication', runId, publication) }
-  async failRunnerExecution (runId: string, error: { code?: string | null, message: string }): Promise<boolean> { return await this.call('failRunnerExecution', runId, error) }
-  async claimPublication (runId: string): Promise<string | null> { return await this.call('claimPublication', runId) }
+  async claimNextPublication (): Promise<PublicationWork | null> { const work = await this.call<PublicationWork | null>('claimNextPublication'); return work === null ? null : { ...work, publish_context: parsePublishContextForWorkflow(work.workflow, work.publish_context) } }
   async renewPublicationClaim (runId: string, token: string): Promise<boolean> { return await this.call('renewPublicationClaim', runId, token) }
   publicationHeartbeatIntervalMs (): number { return 60_000 }
   async initializePublicationSteps (runId: string, token: string, keys: string[]): Promise<void> { await this.call('initializePublicationSteps', runId, token, keys) }
@@ -61,11 +63,9 @@ class ControlPlaneReviewRunStoreClient {
   async failPreparation (runId: string, token: string, error: { code?: string | null, message: string }): Promise<void> { await this.call('failPreparation', runId, token, error) }
 }
 export type ReviewRunStore = Pick<ControlPlaneReviewRunStoreClient,
-  | 'connector_id' | 'admit_review_run' | 'save_prepared_submission' | 'mark_queued'
-  | 'getRun' | 'expireStalePreparations' | 'listSubmissionRecoveries'
-  | 'claimSubmissionRecovery' | 'completeSubmissionRecovery' | 'failSubmissionRecovery'
-  | 'listActiveRuns' | 'markRunning' | 'recordArtifactPublication' | 'failRunnerExecution'
-  | 'claimPublication' | 'renewPublicationClaim' | 'publicationHeartbeatIntervalMs'
+  | 'connector_id' | 'admit_review_run' | 'save_prepared_submission' | 'mark_queued' | 'submit_prepared_run'
+  | 'getRun' | 'renewPublicationClaim' | 'publicationHeartbeatIntervalMs'
+  | 'claimNextPublication'
   | 'initializePublicationSteps' | 'listPublicationSteps' | 'requirePublicationStepClaim'
   | 'completePublicationStep' | 'failPublicationStep' | 'completePublication'
   | 'failPublication' | 'failPreparation'>

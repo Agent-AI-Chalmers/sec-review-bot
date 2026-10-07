@@ -275,7 +275,7 @@ Retryable publication failures return the publication to pending. Only the faile
 
 For repository publication, a deterministic failure terminates only the current delivery. A transient failure resumes from unfinished steps on the next pass. The summary is published after all delivery steps finish and links only successful deliveries.
 
-> Current retry behavior is simple: the background publisher polls immediately on startup, then every `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` milliseconds, defaulting to 15 seconds. There is no exponential backoff scheduler yet.
+> Control Plane observes Runner independently. The integration polls Control Plane for claimable terminal publication work every `CONTROL_PLANE_PUBLICATION_POLL_INTERVAL_MS` milliseconds, defaulting to 15 seconds.
 
 ## GitHub REST API Version
 

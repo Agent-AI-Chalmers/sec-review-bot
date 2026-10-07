@@ -112,6 +112,9 @@ services:
       CONTROL_PLANE_SERVICE_TOKEN: "${CONTROL_PLANE_SERVICE_TOKEN:?CONTROL_PLANE_SERVICE_TOKEN is required}"
       CONNECTOR_ID: "${CONNECTOR_ID:-github-app:default}"
       DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sec_review_bot}"
+      AGENT_RUNNER_SERVICE_URL: "http://runner-service:8000"
+      AGENT_RUNNER_SERVICE_TOKEN: "${RUNNER_SERVICE_TOKEN:?RUNNER_SERVICE_TOKEN is required}"
+      AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS:-15000}"
     ports:
       - "127.0.0.1:${CONTROL_PLANE_HOST_PORT:-8090}:8090"
     healthcheck:
@@ -122,6 +125,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      runner-service:
+        condition: service_started
 
   github-integration:
     profiles: ["app"]
@@ -136,9 +141,7 @@ services:
       - apps/github-integration/.env
     environment:
       PRIVATE_KEY_PATH: "/run/secrets/github-app-private-key.pem"
-      AGENT_RUNNER_SERVICE_URL: "http://runner-service:8000"
-      AGENT_RUNNER_SERVICE_TOKEN: "${RUNNER_SERVICE_TOKEN:?RUNNER_SERVICE_TOKEN is required}"
-      AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS:-15000}"
+      CONTROL_PLANE_PUBLICATION_POLL_INTERVAL_MS: "${CONTROL_PLANE_PUBLICATION_POLL_INTERVAL_MS:-15000}"
       CONTROL_PLANE_SERVICE_URL: "http://control-plane:8090"
       CONTROL_PLANE_SERVICE_TOKEN: "${CONTROL_PLANE_SERVICE_TOKEN:?CONTROL_PLANE_SERVICE_TOKEN is required}"
       GITHUB_INTEGRATION_GIT_HTTP_PROXY: "${GITHUB_INTEGRATION_GIT_HTTP_PROXY:-}"
@@ -160,8 +163,6 @@ services:
         condition: service_completed_successfully
       control-plane:
         condition: service_healthy
-      runner-service:
-        condition: service_started
 
 secrets:
   github-app-private-key:

@@ -14,8 +14,8 @@ flowchart LR
     dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
 
     subgraph compose["Docker Compose"]
-        integration["github-integration"] --> control["Review Control Plane<br/>admission and durable state"]
-        integration --> runner["Runner Service<br/>submit and query review tasks"]
+        integration["github-integration"] --> control["Review Control Plane<br/>admit and coordinate review runs"]
+        control --> runner["Runner Service<br/>submit and query review tasks"]
         control --> postgres[(PostgreSQL)]
         runner --> temporal["Temporal<br/>workflow state and task queue"]
         integration -->|write input bundles| storage["Object Storage<br/>immutable input and result artifacts"]
@@ -34,7 +34,7 @@ flowchart LR
 
 Cloudflare Tunnel forwards both public endpoints to the local `github-integration` service. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for configuration.
 
-Runner Service is the HTTP API between GitHub integration and Temporal. It authenticates and validates task requests, starts Temporal workflows, and queries task status; `sec-review-agents-worker` executes the agents.
+Runner Service is the HTTP API between Control Plane and Temporal. It authenticates and validates task requests, starts Temporal workflows, and exposes task status; `sec-review-agents-worker` executes the agents.
 
 Object Storage holds two kinds of run data: the input bundle prepared before execution and the result artifact produced after execution. GitHub integration writes the input bundle. The result publication path writes the terminal artifact. The worker and Runner Service read these objects when needed. The worker does not hold credentials for publishing result artifacts.
 
@@ -140,7 +140,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose injects the container private-key path, Runner Service address and token, Control Plane address and token, and RustFS input storage configuration. PostgreSQL credentials are injected only into Control Plane. These values do not need to be repeated in `apps/github-integration/.env`.
+Compose injects the Runner Service address and token only into Control Plane for initial submission, submission recovery, and terminal observation. It injects the container private-key path, Control Plane address and token, and RustFS input storage configuration into the integration. PostgreSQL and Runner credentials are not available to the integration. These values do not need to be repeated in `apps/github-integration/.env`.
 
 ### 3. Model Configuration
 

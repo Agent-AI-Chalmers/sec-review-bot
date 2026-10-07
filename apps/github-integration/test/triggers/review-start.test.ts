@@ -5,7 +5,7 @@ import { startIssueReviewCommand } from '../../src/triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-review.js'
 import type { IssueContext } from '../../src/infrastructure/github/issue-service.js'
 import type { PullRequestContext } from '../../src/infrastructure/github/pull-request-service.js'
-import { RunnerSubmissionUncertainError } from '../../src/infrastructure/runner/client.js'
+import { ControlPlaneSubmissionError } from '../../src/infrastructure/runner/review-store.js'
 
 function issueContext (): IssueContext {
   return {
@@ -72,25 +72,27 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
     delivery_id: 'delivery-issue-1',
     deps: {
       create_run_id: () => 'run-issue-1',
-      start_review: async ({ issue: submittedIssue, run_id, event_type, review_objective, repair_mode }) => {
+      start_review: async ({ issue: submittedIssue, run_id, event_type, review_objective, repair_mode, on_prepared }) => {
         assert.equal(run_id, 'run-issue-1')
         assert.equal(event_type, 'opened')
         assert.equal(review_objective, 'audit')
         assert.equal(repair_mode, null)
-        return {
+        const prepared = {
           issue: submittedIssue,
           run_id: 'run-issue-1',
           workspace_ref: 'workspace-ref',
           workflow: 'issue-review',
-          event_type: 'opened'
+          event_type: 'opened' as const
         }
+        await on_prepared?.(prepared, { contract_version: 'v5' } as never)
+        return prepared
       },
       store: {
         admit_review_run: (run) => {
           transitions.push(['preparing', run])
           return { record: run, created: true, preparation_token: 'claim' } as never
         },
-        mark_queued: (run_id, _token, publish_context) => transitions.push(['queued', run_id, publish_context]),
+        submit_prepared_run: (run_id, _token, publish_context) => transitions.push(['queued', run_id, publish_context]),
         failPreparation: () => assert.fail('successful review must not be marked failed')
       }
     }
@@ -132,24 +134,26 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
     repair_mode: 'no-test-changes',
     deps: {
       create_run_id: () => 'run-pr-1',
-      start_review: async ({ pr: submittedPr, run_id, event_type, repair_mode }) => {
+      start_review: async ({ pr: submittedPr, run_id, event_type, repair_mode, on_prepared }) => {
         assert.equal(run_id, 'run-pr-1')
         assert.equal(event_type, 'manual_review')
         assert.equal(repair_mode, 'no-test-changes')
-        return {
+        const prepared = {
           pr: submittedPr,
           run_id: 'run-pr-1',
           files: [{ filename: 'src/app.ts' }],
           workflow: 'pull-request-review',
-          event_type: 'manual_review'
+          event_type: 'manual_review' as const
         }
+        await on_prepared?.(prepared, { contract_version: 'v5' } as never)
+        return prepared
       },
       store: {
         admit_review_run: (run) => {
           transitions.push(['preparing', run])
           return { record: run, created: true, preparation_token: 'claim' } as never
         },
-        mark_queued: (run_id, _token, publish_context) => transitions.push(['queued', run_id, publish_context]),
+        submit_prepared_run: (run_id, _token, publish_context) => transitions.push(['queued', run_id, publish_context]),
         failPreparation: () => assert.fail('successful review must not be marked failed')
       }
     }
@@ -201,7 +205,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
             transitions.push(['preparing', run])
             return { record: run, created: true, preparation_token: 'claim' } as never
           },
-          mark_queued: () => assert.fail('failed review must not be queued'),
+          submit_prepared_run: () => assert.fail('failed review must not be queued'),
           failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
@@ -223,7 +227,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
 
 test('startIssueReviewCommand preserves an uncertain Runner submission for replay', async () => {
   const transitions: unknown[] = []
-  const error = new RunnerSubmissionUncertainError('Runner response was lost.')
+  const error = new ControlPlaneSubmissionError('Runner response was lost.', 'SUBMISSION_STATE_UNCERTAIN')
 
   await assert.rejects(
     startIssueReviewCommand({
@@ -239,8 +243,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
         },
         store: {
           admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' }) as never,
-          save_prepared_submission: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
-          mark_queued: () => assert.fail('uncertain submission must not queue yet'),
+          submit_prepared_run: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
@@ -249,15 +252,12 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
   )
 
   assert.equal((transitions[0] as unknown[])[0], 'prepared')
-  assert.deepEqual(transitions[1], [
-    'run-uncertain',
-    { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
-  ])
+  assert.equal(transitions.length, 1)
 })
 
 test('startPullRequestReviewCommand preserves an uncertain Runner submission for replay', async () => {
   const transitions: unknown[] = []
-  const error = new RunnerSubmissionUncertainError('Runner response was lost.')
+  const error = new ControlPlaneSubmissionError('Runner response was lost.', 'SUBMISSION_STATE_UNCERTAIN')
 
   await assert.rejects(
     startPullRequestReviewCommand({
@@ -273,8 +273,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
         },
         store: {
           admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' }) as never,
-          save_prepared_submission: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
-          mark_queued: () => assert.fail('uncertain submission must not queue yet'),
+          submit_prepared_run: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
@@ -283,10 +282,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
   )
 
   assert.equal((transitions[0] as unknown[])[0], 'prepared')
-  assert.deepEqual(transitions[1], [
-    'run-pr-uncertain',
-    { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'Runner response was lost.' }
-  ])
+  assert.equal(transitions.length, 1)
 })
 
 test('startPullRequestReviewCommand admits a comment delivery before loading PR context', async () => {
@@ -309,7 +305,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
             transitions.push(['preparing', run.run_id])
             return { record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' } as never
           },
-          mark_queued: () => assert.fail('failed context lookup must not queue'),
+          submit_prepared_run: () => assert.fail('failed context lookup must not queue'),
           failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
@@ -342,7 +338,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
           created: false, preparation_token: null,
           record: { run_id: 'run-original', status: 'queued' } as never
         }),
-        mark_queued: () => assert.fail('replayed delivery must not queue again'),
+        submit_prepared_run: () => assert.fail('replayed delivery must not queue again'),
         failPreparation: () => assert.fail('replayed delivery must not change the original run')
       }
     }
@@ -370,7 +366,7 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
           created: false, preparation_token: null,
           record: { run_id: 'run-original', status: 'queued' } as never
         }),
-        mark_queued: () => assert.fail('replayed delivery must not queue again'),
+        submit_prepared_run: () => assert.fail('replayed delivery must not queue again'),
         failPreparation: () => assert.fail('replayed delivery must not change the original run')
       }
     }

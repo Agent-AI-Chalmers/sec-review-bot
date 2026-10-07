@@ -16,8 +16,8 @@ flowchart LR
     dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
 
     subgraph compose["Docker Compose"]
-        integration["github-integration"] --> control["Review Control Plane<br/>接纳和持久化状态"]
-        integration --> runner["Runner Service<br/>提交和查询 review 任务"]
+        integration["github-integration"] --> control["Review Control Plane<br/>接纳和协调 review run"]
+        control --> runner["Runner Service<br/>提交和查询 review 任务"]
         control --> postgres[(PostgreSQL)]
         runner --> temporal["Temporal<br/>workflow 状态和 task queue"]
         integration -->|写入 input bundle| storage["Object Storage<br/>不可变 input 和 result artifact"]
@@ -36,7 +36,7 @@ flowchart LR
 
 Cloudflare Tunnel 将两个公网 endpoint 转发到本地 `github-integration`。具体配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
-Runner Service 是 GitHub integration 与 Temporal 之间的 HTTP API。它负责鉴权、校验任务请求、启动 Temporal workflow 和查询任务状态；agent 由 `sec-review-agents-worker` 执行。
+Runner Service 是 Control Plane 与 Temporal 之间的 HTTP API。它负责鉴权、校验任务请求、启动 Temporal workflow，并提供任务状态查询；agent 由 `sec-review-agents-worker` 执行。
 
 对象存储保存两类运行数据：执行前准备的 input bundle，以及执行结束后生成的 result artifact。GitHub integration 写入 input bundle，结果发布流程写入终态 artifact；worker 和 Runner Service 在需要时从对象存储读取。worker 不持有发布 result artifact 的凭据。
 
@@ -142,7 +142,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose 会注入容器内私钥路径、Runner Service 地址和 token、Control Plane 地址和 token，以及 RustFS input storage 配置。PostgreSQL 凭据只注入 Control Plane；这些值不需要在 `apps/github-integration/.env` 中重复配置。
+Compose 只把 Runner Service 地址和 token 注入 Control Plane，用于初次提交、提交恢复和终态观察。Integration 只接收容器内私钥路径、Control Plane 地址和 token，以及 RustFS input storage 配置，不持有 PostgreSQL 或 Runner 凭据。这些值不需要在 `apps/github-integration/.env` 中重复配置。
 
 ### 3. 模型配置
 

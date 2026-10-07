@@ -8,8 +8,8 @@ import { DeterministicControlPlaneError } from './errors.js'
 type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject
 export type PublishContextValidator = (workflow: WorkflowName, context: JsonObject) => PublishContext
-export type ReviewRunStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'publishing' | 'published' | 'failed'
-type RunnerStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'failed'
+export type ReviewRunStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'publishing' | 'published' | 'failed'
+type RunnerStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
 type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
 
 export interface CreateReviewRunArgs {
@@ -30,6 +30,10 @@ export interface ReviewRunRecord extends CreateReviewRunArgs {
   failure_message: string | null
   artifact_publication: RunnerArtifactPublication | null
 }
+export interface PublicationWork extends ReviewRunRecord {
+  workflow_result: unknown
+  claim_token: string
+}
 export interface PublicationStepRecord {
   step_key: string
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
@@ -49,6 +53,7 @@ interface ReviewRunRow {
   runner_failure_code: string | null
   runner_failure_message: string | null
   artifact_publication: RunnerArtifactPublication | null
+  workflow_result: unknown | null
   publication_status: PublicationStatus
   created_at: Date | string
   runner_updated_at: Date | string
@@ -64,7 +69,7 @@ const MAX_PUBLISH_ATTEMPTS = 3
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
 const RUN_SELECT = `
   SELECT r.run_id, r.workflow, r.publish_context, r.runner_input, r.runner_status,
-    r.runner_failure_code, r.runner_failure_message, r.artifact_publication,
+    r.runner_failure_code, r.runner_failure_message, r.artifact_publication, r.workflow_result,
     r.ingress_kind, r.ingress_key,
     r.created_at, r.updated_at AS runner_updated_at,
     p.status AS publication_status, p.updated_at AS publication_updated_at,
@@ -332,8 +337,8 @@ export class ReviewRunStore {
   async listActiveRuns (): Promise<ReviewRunRecord[]> {
     const result = await this.pool.query<ReviewRunRow>(`${RUN_SELECT}
       WHERE r.connector_id=$1
-        AND ((r.runner_status IN ('queued','running') AND p.status='pending') OR p.status='publishing')
-      ORDER BY GREATEST(r.updated_at,p.updated_at)`,
+        AND r.runner_status IN ('queued','running')
+      ORDER BY r.updated_at`,
     [this.connectorId])
     return result.rows.map(rowToRecord)
   }
@@ -351,6 +356,16 @@ export class ReviewRunStore {
       SET artifact_publication=$3::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2
     `, [runId, this.connectorId, JSON.stringify(publication)])
+  }
+  async recordRunnerSuccess (runId: string, workflowResult: unknown, publication: RunnerArtifactPublication | undefined): Promise<boolean> {
+    const result = await this.pool.query(`
+      UPDATE review_runs
+      SET runner_status='succeeded', workflow_result=$3::jsonb,
+          artifact_publication=$4::jsonb, runner_failure_code=NULL,
+          runner_failure_message=NULL, updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
+    `, [runId, this.connectorId, JSON.stringify(workflowResult), publication === undefined ? null : JSON.stringify(publication)])
+    return result.rowCount === 1
   }
   async failRunnerExecution (runId: string, error: { code?: string | null, message: string }): Promise<boolean> {
     return await transaction(this.pool, async client => {
@@ -380,7 +395,7 @@ export class ReviewRunStore {
           failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
       FROM review_runs r
       WHERE p.run_id=$1 AND p.connector_id=$3 AND r.run_id=p.run_id
-        AND r.runner_status IN ('queued','running')
+        AND r.runner_status='succeeded' AND r.workflow_result IS NOT NULL
         AND (
           p.status='pending'
           OR (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
@@ -388,6 +403,35 @@ export class ReviewRunStore {
       RETURNING p.claim_token
     `, [runId, token, this.connectorId, this.claimTimeoutMs])
     return result.rows[0]?.claim_token ?? null
+  }
+  async claimNextPublication (): Promise<PublicationWork | null> {
+    return await transaction(this.pool, async client => {
+      const candidate = await client.query<{ run_id: string }>(`
+        SELECT p.run_id
+        FROM publications p JOIN review_runs r ON r.run_id=p.run_id
+        WHERE p.connector_id=$1 AND r.connector_id=$1
+          AND r.runner_status='succeeded' AND r.workflow_result IS NOT NULL
+          AND (p.status='pending' OR
+            (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
+        ORDER BY p.updated_at
+        FOR UPDATE OF p SKIP LOCKED
+        LIMIT 1
+      `, [this.connectorId, this.claimTimeoutMs])
+      const runId = candidate.rows[0]?.run_id
+      if (runId === undefined) return null
+      const token = crypto.randomUUID()
+      await client.query(`
+        UPDATE publications SET status='publishing', claim_token=$3,
+          claimed_at=clock_timestamp(), failure_code=NULL, failure_message=NULL,
+          updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2
+      `, [runId, this.connectorId, token])
+      const result = await client.query<ReviewRunRow>(`${RUN_SELECT}
+        WHERE r.run_id=$1 AND r.connector_id=$2`, [runId, this.connectorId])
+      const row = result.rows[0]
+      if (row === undefined || row.workflow_result === null) throw new Error(`Claimed publication work is incomplete: ${runId}`)
+      return { ...rowToRecord(row), workflow_result: row.workflow_result, claim_token: token }
+    })
   }
   publicationHeartbeatIntervalMs (): number {
     return Math.max(100, Math.min(30_000, Math.floor(this.claimTimeoutMs / 3)))
