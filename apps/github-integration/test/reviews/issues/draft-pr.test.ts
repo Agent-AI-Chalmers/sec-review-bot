@@ -4,7 +4,7 @@ import test from 'node:test'
 import { createDraftPullRequestFromIssueReviewRecord as createDraftPullRequestWithClaim } from '../../../src/reviews/issues/draft-pr.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import type { FileMode } from '../../../src/reviews/file-change.js'
-import { PublicationClaimLostError } from '../../../src/infrastructure/runner/publication-claim.js'
+import { PublicationClaimLostError } from '../../../src/control-plane/publication-claim.js'
 
 type CreateDraftPrParams = Parameters<typeof createDraftPullRequestWithClaim>[0]
 type CreateDraftPrOctokit = CreateDraftPrParams['octokit']

@@ -1,19 +1,16 @@
-import { createIssueCommentUnlessMarkerExists } from '../../infrastructure/github/comment-service.js'
-import { findRepositorySecuritySummaryIssue } from '../../infrastructure/github/repository-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import {
-  completedRunnerRunResult,
-  type RunnerRunStatus
-} from '../../infrastructure/runner/client.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
-import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
-import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
+import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
+import { findRepositorySecuritySummaryIssue } from '../../github/repository-service.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
+import { completedRunnerRunResult, type RunnerRunStatus } from '../../runner/client.js'
+import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
+import type { ControlPlaneClient } from '../../control-plane/client.js'
+import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
   isPublicationClaimLostError,
   PublicationClaimLostError
-} from '../../infrastructure/runner/publication-claim.js'
-import { DeterministicRunnerPublishError } from '../../infrastructure/runner/publish-error.js'
-import { parseRepositoryReviewPublishContext } from '../../infrastructure/runner/publish-context.js'
+} from '../../control-plane/publication-claim.js'
+import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
+import { parseRepositoryReviewPublishContext } from '../../control-plane/publish-context.js'
 import { createRepositoryDeliveryDraftPr } from './delivery-draft-pr.js'
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
 import {
@@ -30,7 +27,7 @@ import {
   type RepositoryWorkflowResult
 } from './result.js'
 import type { RepositoryContext } from './submit.js'
-import type { PersistedRepositoryScanTarget } from '../../infrastructure/runner/publish-context.js'
+import type { PersistedRepositoryScanTarget } from '../../control-plane/publish-context.js'
 import { asList, isRecord, nonEmptyText, optionalNumber, type AnyRecord } from '../view-utils.js'
 
 interface PublishedDeliveryEntry {
@@ -177,7 +174,7 @@ export async function publishDeliveryDraftPrs({
   deliveries: RepositoryDelivery[]
   case_results: RepositoryCaseResult[]
   event_type: 'manual' | 'scheduled'
-  store: ReviewRunStore
+  store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
   create_delivery_draft_pr?: typeof createRepositoryDeliveryDraftPr
@@ -336,7 +333,7 @@ async function publishRepositoryReviewResult({
   scan_target?: PersistedRepositoryScanTarget
   workflow_result: RepositoryWorkflowResult
   event_type: 'manual' | 'scheduled'
-  store: ReviewRunStore
+  store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {
@@ -466,7 +463,7 @@ export async function handleRepositoryReviewRun({
 }: {
   run: CompletedRunnerRun
   status: RunnerRunStatus
-  store: ReviewRunStore
+  store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo

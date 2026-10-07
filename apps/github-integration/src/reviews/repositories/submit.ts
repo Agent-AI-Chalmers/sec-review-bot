@@ -1,13 +1,9 @@
-import { splitRepoFullName } from '../../infrastructure/github/repository-service.js'
+import { splitRepoFullName } from '../../github/repository-service.js'
 import { prepareRepositoryReviewInput } from './prepare-input.js'
-import { fetchRepositoryTriggerConfig } from '../../infrastructure/github/repo-config-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+import { fetchRepositoryTriggerConfig } from '../../github/repo-config-service.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { logInfo } from '../../utils/logger.js'
-import type {
-  RepairMode,
-  RepositoryScanTarget,
-  RepositoryReviewInput
-} from '../../infrastructure/runner/input.js'
+import type { RepairMode, RepositoryScanTarget, RepositoryReviewInput } from '../../runner/input.js'
 
 export interface RepositoryContext {
   owner_login: string

@@ -3,9 +3,9 @@ import test from 'node:test'
 
 import { publishDeliveryDraftPrs } from '../../../src/reviews/repositories/publish.js'
 import type {
-  ReviewRunStore,
+  ControlPlaneClient,
   PublicationStepRecord
-} from '../../../src/infrastructure/runner/review-store.js'
+} from '../../../src/control-plane/client.js'
 import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
 
 function delivery(delivery_id: string): RepositoryDelivery {
@@ -61,7 +61,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
       return true
     },
     failPublicationStep: async () => true
-  } as unknown as ReviewRunStore
+  } as unknown as ControlPlaneClient
 
   const published = await publishDeliveryDraftPrs({
     octokit: {} as never,
@@ -115,7 +115,7 @@ test('repository delivery continues after a deterministic failure', async () => 
       failures.push({ stepKey, retry: options.retry })
       return true
     }
-  } as unknown as ReviewRunStore
+  } as unknown as ControlPlaneClient
 
   const published = await publishDeliveryDraftPrs({
     octokit: {} as never,
@@ -176,7 +176,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
     },
     completePublicationStep: async () => true,
     failPublicationStep: async () => true
-  } as unknown as ReviewRunStore
+  } as unknown as ControlPlaneClient
 
   const published = await publishDeliveryDraftPrs({
     octokit: {} as never,

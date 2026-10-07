@@ -5,11 +5,11 @@ import {
   fetchTimelineLinkedPullRequests,
   getIssueDefaultBranchHeadSha,
   type IssueContext
-} from '../../infrastructure/github/issue-service.js'
-import { getInstallationAccessToken } from '../../infrastructure/github/installation-auth.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import type { IssueReviewInput } from '../../infrastructure/runner/input.js'
-import { materializeWorkspaceWithCommitHistory } from '../../infrastructure/runner/git-workspace.js'
+} from '../../github/issue-service.js'
+import { getInstallationAccessToken } from '../../github/installation-auth.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { IssueReviewInput } from '../../runner/input.js'
+import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
   archiveInputBundle,
   buildGitRemoteUrl,

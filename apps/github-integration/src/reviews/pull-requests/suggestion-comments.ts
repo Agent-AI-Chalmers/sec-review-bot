@@ -2,8 +2,8 @@ import {
   createPullRequestReviewUnlessMarkerExists,
   type PullRequestReviewEvent,
   type ReviewCommentSide
-} from '../../infrastructure/github/comment-service.js'
-import type { PersistedPullRequest } from '../../infrastructure/runner/publish-context.js'
+} from '../../github/comment-service.js'
+import type { PersistedPullRequest } from '../../control-plane/publish-context.js'
 
 interface SuggestionCandidate {
   path: string

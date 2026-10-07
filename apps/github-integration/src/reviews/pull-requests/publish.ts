@@ -1,19 +1,16 @@
 import {
   createPullRequestReviewUnlessMarkerExists,
   type PullRequestReviewEvent
-} from '../../infrastructure/github/comment-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import {
-  completedRunnerRunResult,
-  type RunnerRunStatus
-} from '../../infrastructure/runner/client.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
-import { DeterministicRunnerPublishError } from '../../infrastructure/runner/publish-error.js'
+} from '../../github/comment-service.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
+import { completedRunnerRunResult, type RunnerRunStatus } from '../../runner/client.js'
+import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
+import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 import {
   parsePullRequestReviewPublishContext,
   type PersistedPullRequest,
   type PersistedPullRequestFile
-} from '../../infrastructure/runner/publish-context.js'
+} from '../../control-plane/publish-context.js'
 import { renderAnalysisSummaryCommentFromReviewRecord } from './renderer.js'
 import {
   generateSuggestionCandidatesFromReviewRecord,
@@ -22,14 +19,14 @@ import {
 import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { getGitHubAppMetadata } from '../../infrastructure/github/github-app-metadata-service.js'
-import { assertV5WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
-import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
-import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
+import { getGitHubAppMetadata } from '../../github/github-app-metadata-service.js'
+import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
+import type { ControlPlaneClient } from '../../control-plane/client.js'
+import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
   isPublicationClaimLostError,
   PublicationClaimLostError
-} from '../../infrastructure/runner/publication-claim.js'
+} from '../../control-plane/publication-claim.js'
 
 interface SuggestionReviewResult {
   review_id: number
@@ -111,7 +108,7 @@ export async function handlePullRequestReviewRun({
 }: {
   run: CompletedRunnerRun
   status: RunnerRunStatus
-  store: ReviewRunStore
+  store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo
@@ -238,7 +235,7 @@ async function publishPullRequestReviewResult({
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   workflow_result: PullRequestReviewWorkflowResult
   run_id: string
-  store: ReviewRunStore
+  store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {

@@ -1,8 +1,8 @@
-import type { IssueContext } from '../../infrastructure/github/issue-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+import type { IssueContext } from '../../github/issue-service.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { prepareIssueReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
-import type { IssueReviewInput } from '../../infrastructure/runner/input.js'
+import type { IssueReviewInput } from '../../runner/input.js'
 import { createRunId } from '../shared/input-bundle.js'
 
 interface RunIssueReviewArgs {

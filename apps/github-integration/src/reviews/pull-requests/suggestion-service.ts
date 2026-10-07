@@ -1,8 +1,8 @@
 import type { ReviewRecord } from '../review-record.js'
 
 import { publishPullRequestSuggestionReview } from './suggestion-comments.js'
-import type { PullRequestReviewEvent } from '../../infrastructure/github/comment-service.js'
-import type { PersistedPullRequest } from '../../infrastructure/runner/publish-context.js'
+import type { PullRequestReviewEvent } from '../../github/comment-service.js'
+import type { PersistedPullRequest } from '../../control-plane/publish-context.js'
 
 // This file is the pull-request suggestion pipeline.
 // It owns local suggestion artifacts and the policy that decides whether a

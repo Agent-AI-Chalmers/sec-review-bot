@@ -1,6 +1,6 @@
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
 import { buildDeliveryDraftPrBody } from './renderer.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { FileChange, FileMode, TextEncoding } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import type { RepositoryCaseResult, RepositoryDelivery } from './result.js'

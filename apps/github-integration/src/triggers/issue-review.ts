@@ -1,35 +1,37 @@
-import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
+import { admitReviewRun } from '../control-plane/admission.js'
 import {
   PreparationClaimLostError,
   startPreparationClaimHeartbeat
-} from '../infrastructure/control-plane/preparation-claim.js'
+} from '../control-plane/preparation-claim.js'
 
-import type { IssueContext } from '../infrastructure/github/issue-service.js'
-import { issueReviewPublishContext } from '../infrastructure/runner/publish-context.js'
+import type { IssueContext } from '../github/issue-service.js'
+import { issueReviewPublishContext } from '../control-plane/publish-context.js'
 import { startIssueReviewRun, type SubmittedIssueReviewRun } from '../reviews/issues/submit.js'
-import type { RepairMode } from '../infrastructure/runner/input.js'
+import type { RepairMode } from '../runner/input.js'
 import { createRunId } from '../reviews/shared/input-bundle.js'
-import { reviewRunStore } from '../infrastructure/runner/review-store.js'
-import { ControlPlaneSubmissionError } from '../infrastructure/runner/review-store.js'
+import { controlPlaneClient } from '../control-plane/client.js'
+import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 
 type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
-type IssueReviewRunStore = {
+type IssueReviewControlPlaneClient = {
   admit_review_run: (
-    ...args: Parameters<typeof reviewRunStore.admit_review_run>
+    ...args: Parameters<typeof controlPlaneClient.admit_review_run>
   ) =>
-    | Awaited<ReturnType<typeof reviewRunStore.admit_review_run>>
-    | ReturnType<typeof reviewRunStore.admit_review_run>
-  failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
-  submit_prepared_run: (...args: Parameters<typeof reviewRunStore.submit_prepared_run>) => unknown
+    | Awaited<ReturnType<typeof controlPlaneClient.admit_review_run>>
+    | ReturnType<typeof controlPlaneClient.admit_review_run>
+  failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
+  submit_prepared_run: (
+    ...args: Parameters<typeof controlPlaneClient.submit_prepared_run>
+  ) => unknown
   renewPreparationClaim: (
-    ...args: Parameters<typeof reviewRunStore.renewPreparationClaim>
+    ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
   ) => Promise<boolean>
-  preparationHeartbeatIntervalMs: typeof reviewRunStore.preparationHeartbeatIntervalMs
+  preparationHeartbeatIntervalMs: typeof controlPlaneClient.preparationHeartbeatIntervalMs
 }
 interface StartIssueReviewCommandDeps {
   start_review: StartIssueReview
-  store: IssueReviewRunStore
+  store: IssueReviewControlPlaneClient
   create_run_id: typeof createRunId
 }
 
@@ -60,7 +62,7 @@ export async function startIssueReviewCommand({
 }: StartIssueReviewCommandArgs): Promise<StartedIssueReview> {
   const {
     start_review = startIssueReviewRun,
-    store = reviewRunStore,
+    store = controlPlaneClient,
     create_run_id = createRunId
   } = deps
   const admission = await admitReviewRun(

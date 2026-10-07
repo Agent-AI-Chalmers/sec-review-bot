@@ -8,14 +8,14 @@ import { promisify } from 'util'
 import { pathToFileURL } from 'url'
 import { createZstdCompress } from 'zlib'
 
-import type { InputBundleArtifactRef } from '../../infrastructure/runner/input.js'
-import { publishInputBundle } from '../../infrastructure/artifacts/input-storage.js'
+import type { InputBundleArtifactRef } from '../../runner/input.js'
+import { publishInputBundle } from '../../artifacts/input-storage.js'
 
 import {
   WORKSPACE_SNAPSHOT_TAR_NAME,
   createWorkspaceSnapshotTar
-} from '../../infrastructure/runner/git-workspace.js'
-import { writeInputBundleManifest } from '../../infrastructure/runner/input-bundle-manifest.js'
+} from '../../artifacts/git-workspace.js'
+import { writeInputBundleManifest } from '../../runner/input-bundle-manifest.js'
 import { input_bundle_staging_root } from '../../config.js'
 
 const execFileAsync = promisify(execFile)

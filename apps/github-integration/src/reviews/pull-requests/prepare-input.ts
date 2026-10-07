@@ -7,12 +7,12 @@ import {
   type PullRequestContext,
   type PullRequestFile,
   type PullRequestFileSummary
-} from '../../infrastructure/github/pull-request-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import type { PullRequestReviewInput } from '../../infrastructure/runner/input.js'
-import type { RepairMode } from '../../infrastructure/runner/input.js'
-import { getInstallationAccessToken } from '../../infrastructure/github/installation-auth.js'
-import { materializeWorkspaceWithCommitHistory } from '../../infrastructure/runner/git-workspace.js'
+} from '../../github/pull-request-service.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { PullRequestReviewInput } from '../../runner/input.js'
+import type { RepairMode } from '../../runner/input.js'
+import { getInstallationAccessToken } from '../../github/installation-auth.js'
+import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
   archiveInputBundle,
   buildGitRemoteUrl,

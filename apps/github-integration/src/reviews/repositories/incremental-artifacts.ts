@@ -1,7 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
 
 export interface RepositoryContext {
   owner_login: string

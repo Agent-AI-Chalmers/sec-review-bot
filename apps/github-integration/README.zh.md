@@ -101,9 +101,11 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
   - `reviews/issues/` - issue review
   - `reviews/pull-requests/` - PR review、建议评论
   - `reviews/repositories/` - repository review、摘要 issue 与修复 draft PR
-- `infrastructure/runner/` - Control Plane client、runner input 类型、input bundle manifest / workspace helper 和后台 publisher
-- `infrastructure/github/` - GitHub API 薄封装和 webhook 辅助函数
-- `interfaces/` - HTTP、GitHub Actions 和 GitHub webhook adapter
+- `github/` - GitHub API 薄封装和 webhook 辅助函数
+- `control-plane/` - Control Plane client、claim 处理与发布协调
+- `runner/` - 此 connector 消费的 Runner input、result 与错误契约
+- `artifacts/` - input bundle 存储与 Git workspace 准备
+- `ingress/` - HTTP、GitHub Actions 和 GitHub webhook 的入站处理
 - `triggers/` - 把 webhook / Actions / comment 请求转换为提交给 Control Plane 的 review 请求
 - `utils/` - 轻量日志与辅助函数
 

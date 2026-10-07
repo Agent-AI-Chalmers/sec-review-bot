@@ -6,7 +6,7 @@ import {
   createRepositoryDeliveryDraftPr as createRepositoryDeliveryDraftPrWithClaim
 } from '../../../src/reviews/repositories/delivery-draft-pr.js'
 import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
-import { PublicationClaimLostError } from '../../../src/infrastructure/runner/publication-claim.js'
+import { PublicationClaimLostError } from '../../../src/control-plane/publication-claim.js'
 
 test('repository delivery branch identity includes both run and delivery', () => {
   const delivery = { delivery_id: 'case/shared' } as RepositoryDelivery

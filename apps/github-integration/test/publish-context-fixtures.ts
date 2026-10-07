@@ -1,5 +1,5 @@
-import type { WorkflowName } from '../src/infrastructure/runner/client.js'
-import type { PublishContext } from '../src/infrastructure/runner/publish-context.js'
+import type { WorkflowName } from '../src/runner/client.js'
+import type { PublishContext } from '../src/control-plane/publish-context.js'
 
 export function publishContextForWorkflow(workflow: WorkflowName): PublishContext {
   if (workflow === 'issue-review') {

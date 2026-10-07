@@ -8,8 +8,8 @@ import {
   resolveRepositoryReviewDispatch,
   RepositoryReviewDispatchValidationError
 } from '../../src/triggers/repository-review.js'
-import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
-import { ControlPlaneSubmissionError } from '../../src/infrastructure/runner/review-store.js'
+import type { GitHubAppOctokit } from '../../src/github/octokit.js'
+import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 
 const preparationClaim = {
   renewPreparationClaim: async () => true,

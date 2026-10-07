@@ -1,14 +1,11 @@
 import fs from 'fs/promises'
 import path from 'path'
 
-import {
-  getRepositoryContext,
-  getRepositoryRefSha
-} from '../../infrastructure/github/repository-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import type { RepairMode, RepositoryReviewInput } from '../../infrastructure/runner/input.js'
-import { getInstallationAccessToken } from '../../infrastructure/github/installation-auth.js'
-import { materializeWorkspaceWithCommitHistory } from '../../infrastructure/runner/git-workspace.js'
+import { getRepositoryContext, getRepositoryRefSha } from '../../github/repository-service.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { RepairMode, RepositoryReviewInput } from '../../runner/input.js'
+import { getInstallationAccessToken } from '../../github/installation-auth.js'
+import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
   isAncestorCommit,
   materializeIncrementalArtifacts,

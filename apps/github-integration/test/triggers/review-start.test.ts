@@ -3,9 +3,9 @@ import test from 'node:test'
 
 import { startIssueReviewCommand } from '../../src/triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-review.js'
-import type { IssueContext } from '../../src/infrastructure/github/issue-service.js'
-import type { PullRequestContext } from '../../src/infrastructure/github/pull-request-service.js'
-import { ControlPlaneSubmissionError } from '../../src/infrastructure/runner/review-store.js'
+import type { IssueContext } from '../../src/github/issue-service.js'
+import type { PullRequestContext } from '../../src/github/pull-request-service.js'
+import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 
 const preparationClaim = {
   renewPreparationClaim: async () => true,

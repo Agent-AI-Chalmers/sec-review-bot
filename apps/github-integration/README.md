@@ -100,9 +100,11 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
   - `reviews/issues/` - issue review
   - `reviews/pull-requests/` - pull request review and suggestion comments
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
-- `infrastructure/runner/` - Control Plane client, runner input types, input bundle manifest / workspace helpers, and publication worker
-- `infrastructure/github/` - thin GitHub API wrappers and webhook helpers
-- `interfaces/` - HTTP, GitHub Actions, and GitHub webhook adapters
+- `github/` - thin GitHub API wrappers and webhook helpers
+- `control-plane/` - Control Plane client, claim handling, and publication coordination
+- `runner/` - Runner input, result, and error contracts consumed by this connector
+- `artifacts/` - input bundle storage and Git workspace preparation
+- `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling
 - `triggers/` - turns webhook / Actions / comment requests into Control Plane review submissions
 - `utils/` - lightweight logging and helpers
 

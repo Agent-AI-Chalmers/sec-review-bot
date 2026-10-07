@@ -4,7 +4,7 @@ import {
   hasReviewRecordPatchReadyForPromotion,
   normalizePromotionFilePath
 } from './renderer.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { ReviewRecord } from '../review-record.js'
 import type { FileChange, FileMode } from '../file-change.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'

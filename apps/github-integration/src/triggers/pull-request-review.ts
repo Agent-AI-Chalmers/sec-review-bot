@@ -1,15 +1,15 @@
-import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
+import { admitReviewRun } from '../control-plane/admission.js'
 import {
   PreparationClaimLostError,
   startPreparationClaimHeartbeat
-} from '../infrastructure/control-plane/preparation-claim.js'
+} from '../control-plane/preparation-claim.js'
 
-import type { PullRequestContext } from '../infrastructure/github/pull-request-service.js'
-import { pullRequestReviewPublishContext } from '../infrastructure/runner/publish-context.js'
-import { reviewRunStore } from '../infrastructure/runner/review-store.js'
+import type { PullRequestContext } from '../github/pull-request-service.js'
+import { pullRequestReviewPublishContext } from '../control-plane/publish-context.js'
+import { controlPlaneClient } from '../control-plane/client.js'
 import { createRunId } from '../reviews/shared/input-bundle.js'
-import type { RepairMode } from '../infrastructure/runner/input.js'
-import { ControlPlaneSubmissionError } from '../infrastructure/runner/review-store.js'
+import type { RepairMode } from '../runner/input.js'
+import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import {
   startPullRequestReviewRun,
   type SubmittedPullRequestReviewRun
@@ -17,23 +17,25 @@ import {
 
 type PullRequestReviewEventType = 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 type StartPullRequestReview = typeof startPullRequestReviewRun
-type PullRequestReviewRunStore = {
+type PullRequestReviewControlPlaneClient = {
   admit_review_run: (
-    ...args: Parameters<typeof reviewRunStore.admit_review_run>
+    ...args: Parameters<typeof controlPlaneClient.admit_review_run>
   ) =>
-    | Awaited<ReturnType<typeof reviewRunStore.admit_review_run>>
-    | ReturnType<typeof reviewRunStore.admit_review_run>
-  failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
-  submit_prepared_run: (...args: Parameters<typeof reviewRunStore.submit_prepared_run>) => unknown
+    | Awaited<ReturnType<typeof controlPlaneClient.admit_review_run>>
+    | ReturnType<typeof controlPlaneClient.admit_review_run>
+  failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
+  submit_prepared_run: (
+    ...args: Parameters<typeof controlPlaneClient.submit_prepared_run>
+  ) => unknown
   renewPreparationClaim: (
-    ...args: Parameters<typeof reviewRunStore.renewPreparationClaim>
+    ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
   ) => Promise<boolean>
-  preparationHeartbeatIntervalMs: typeof reviewRunStore.preparationHeartbeatIntervalMs
+  preparationHeartbeatIntervalMs: typeof controlPlaneClient.preparationHeartbeatIntervalMs
 }
 
 interface StartPullRequestReviewCommandDeps {
   start_review: StartPullRequestReview
-  store: PullRequestReviewRunStore
+  store: PullRequestReviewControlPlaneClient
   create_run_id: typeof createRunId
 }
 
@@ -64,7 +66,7 @@ export async function startPullRequestReviewCommand({
 }: StartPullRequestReviewCommandArgs): Promise<StartedPullRequestReview> {
   const {
     start_review = startPullRequestReviewRun,
-    store = reviewRunStore,
+    store = controlPlaneClient,
     create_run_id = createRunId
   } = deps
   const admission = await admitReviewRun(

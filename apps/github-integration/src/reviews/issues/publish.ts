@@ -1,27 +1,24 @@
-import { createIssueCommentUnlessMarkerExists } from '../../infrastructure/github/comment-service.js'
-import type { PersistedIssue } from '../../infrastructure/runner/publish-context.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
+import type { PersistedIssue } from '../../control-plane/publish-context.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { createDraftPullRequestFromIssueReviewRecord } from './draft-pr.js'
-import {
-  completedRunnerRunResult,
-  type RunnerRunStatus
-} from '../../infrastructure/runner/client.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
-import { DeterministicRunnerPublishError } from '../../infrastructure/runner/publish-error.js'
-import { parseIssueReviewPublishContext } from '../../infrastructure/runner/publish-context.js'
+import { completedRunnerRunResult, type RunnerRunStatus } from '../../runner/client.js'
+import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
+import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
+import { parseIssueReviewPublishContext } from '../../control-plane/publish-context.js'
 import {
   buildSuggestedDraftPrPlanFromReviewRecord,
   renderIssueReviewCommentFromReviewRecord
 } from './renderer.js'
 import { logInfo } from '../../utils/logger.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { assertV5WorkflowResult } from '../../infrastructure/runner/contract-schema.js'
-import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
-import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
+import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
+import type { ControlPlaneClient } from '../../control-plane/client.js'
+import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
   isPublicationClaimLostError,
   PublicationClaimLostError
-} from '../../infrastructure/runner/publication-claim.js'
+} from '../../control-plane/publication-claim.js'
 
 interface IssueDraftPullRequest {
   number: number
@@ -92,7 +89,7 @@ export async function handleIssueReviewRun({
 }: {
   run: CompletedRunnerRun
   status: RunnerRunStatus
-  store: ReviewRunStore
+  store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo
@@ -133,7 +130,7 @@ async function publishIssueReviewResult({
   workspace_ref: string
   workflow_result: IssueReviewWorkflowResult
   event_type: 'opened' | 'manual_review'
-  store: ReviewRunStore
+  store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {

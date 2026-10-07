@@ -8,10 +8,10 @@ import test from 'node:test'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
-import type { GitHubAppOctokit } from '../../../src/infrastructure/github/octokit.js'
-import type { IssueContext } from '../../../src/infrastructure/github/issue-service.js'
-import type { PullRequestContext } from '../../../src/infrastructure/github/pull-request-service.js'
-import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/infrastructure/runner/git-workspace.js'
+import type { GitHubAppOctokit } from '../../../src/github/octokit.js'
+import type { IssueContext } from '../../../src/github/issue-service.js'
+import type { PullRequestContext } from '../../../src/github/pull-request-service.js'
+import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/artifacts/git-workspace.js'
 
 const execFileAsync = promisify(execFile)
 const PRIVATE_RUNNER_INPUT_KEYS = new Set([

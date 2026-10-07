@@ -2,11 +2,11 @@ import {
   type PullRequestContext,
   listFilesChangedBetweenCommits,
   listPullRequestFiles
-} from '../../infrastructure/github/pull-request-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+} from '../../github/pull-request-service.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { preparePullRequestReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
-import type { PullRequestReviewInput, RepairMode } from '../../infrastructure/runner/input.js'
+import type { PullRequestReviewInput, RepairMode } from '../../runner/input.js'
 
 export interface SubmittedPullRequestReviewRun {
   pr: PullRequestContext

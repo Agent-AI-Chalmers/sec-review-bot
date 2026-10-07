@@ -3,17 +3,17 @@ import { createNodeMiddleware } from '@octokit/webhooks'
 
 import { createGitHubApp } from './github-app.js'
 import { port, repository_review_dispatch_path, webhook_path } from './config.js'
-import { setGitHubAppMetadata } from './infrastructure/github/github-app-metadata-service.js'
-import { createAppHttpHandler } from './interfaces/http/app-http-handler.js'
-import { handleRepositoryReviewDispatch } from './interfaces/github/actions/repository-review-http-handler.js'
-import { handleIssueCommentCreated } from './interfaces/github/webhooks/issue-comment-created.js'
-import { handleIssueOpened } from './interfaces/github/webhooks/issue-opened.js'
-import { handlePullRequestOpened } from './interfaces/github/webhooks/pull-request-opened.js'
-import { handlePullRequestReadyForReview } from './interfaces/github/webhooks/pull-request-ready-for-review.js'
-import { handlePullRequestSynchronize } from './interfaces/github/webhooks/pull-request-synchronize.js'
-import { verifyGitWorkspaceRuntime } from './infrastructure/runner/git-workspace.js'
-import { startRunnerRunPublisher } from './infrastructure/runner/run-publisher.js'
-import { reviewExecutionTracker } from './infrastructure/review-execution-tracker.js'
+import { setGitHubAppMetadata } from './github/github-app-metadata-service.js'
+import { createAppHttpHandler } from './ingress/http/app-http-handler.js'
+import { handleRepositoryReviewDispatch } from './ingress/github/actions/repository-review-http-handler.js'
+import { handleIssueCommentCreated } from './ingress/github/webhooks/issue-comment-created.js'
+import { handleIssueOpened } from './ingress/github/webhooks/issue-opened.js'
+import { handlePullRequestOpened } from './ingress/github/webhooks/pull-request-opened.js'
+import { handlePullRequestReadyForReview } from './ingress/github/webhooks/pull-request-ready-for-review.js'
+import { handlePullRequestSynchronize } from './ingress/github/webhooks/pull-request-synchronize.js'
+import { verifyGitWorkspaceRuntime } from './artifacts/git-workspace.js'
+import { startPublicationCoordinator } from './control-plane/publication-coordinator.js'
+import { backgroundPreparations } from './reviews/background-preparations.js'
 import { logError, logInfo } from './utils/logger.js'
 
 await verifyGitWorkspaceRuntime()
@@ -33,7 +33,7 @@ app.webhooks.on('issues.opened', handleIssueOpened)
 app.webhooks.on('pull_request.opened', handlePullRequestOpened)
 app.webhooks.on('pull_request.ready_for_review', handlePullRequestReadyForReview)
 app.webhooks.on('pull_request.synchronize', handlePullRequestSynchronize)
-const publisher = startRunnerRunPublisher({ app })
+const publicationCoordinator = startPublicationCoordinator({ app })
 
 app.webhooks.onError((error) => {
   if (error.name === 'AggregateError') {
@@ -96,7 +96,7 @@ async function shutdown(signal: ShutdownSignal): Promise<void> {
   const serverResult = await Promise.allSettled([closeServer()])
   const results = [
     ...serverResult,
-    ...(await Promise.allSettled([publisher.stop(), reviewExecutionTracker.stop()]))
+    ...(await Promise.allSettled([publicationCoordinator.stop(), backgroundPreparations.stop()]))
   ]
   const shutdownError = results.find(
     (result): result is PromiseRejectedResult => result.status === 'rejected'
