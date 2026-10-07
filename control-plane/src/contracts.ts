@@ -42,5 +42,5 @@ export interface ReviewRunAdmissionRequest {
 }
 
 export interface ReviewRunCoordinator {
-  admit (request: ReviewRunAdmissionRequest): Promise<AdmittedReviewRun>
+  admit(request: ReviewRunAdmissionRequest): Promise<AdmittedReviewRun>
 }

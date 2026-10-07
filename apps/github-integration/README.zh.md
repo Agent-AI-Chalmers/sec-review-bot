@@ -20,13 +20,14 @@ pnpm --dir apps/github-integration install
 
 请使用 Node 24.x。
 
-> *Node 24 是当前 package 的 LTS 基线。[Node.js release schedule](https://github.com/nodejs/Release#release-schedule) 当前把 Node 26 的 Active LTS start 列为 2026-10-28；到那之后，可以评估把默认 runtime 切到 Node 26。*
+> _Node 24 是当前 package 的 LTS 基线。[Node.js release schedule](https://github.com/nodejs/Release#release-schedule) 当前把 Node 26 的 Active LTS start 列为 2026-10-28；到那之后，可以评估把默认 runtime 切到 Node 26。_
 
 ## 命令
 
 ```bash
 pnpm run dev
 pnpm run server
+pnpm run format:check
 pnpm run lint
 pnpm run build
 pnpm test
@@ -38,7 +39,6 @@ pnpm test
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
 pnpm run test:integration
 ```
-
 
 ## 本地接收端
 
@@ -240,10 +240,10 @@ Webhook 使用 GitHub Delivery ID；Actions dispatch 使用 OIDC 验证的 repos
 
 状态分别记录在以下三张表中：
 
-| 表 | 记录内容 | 状态 |
-| --- | --- | --- |
-| `review_runs` | Runner 观察 | `preparing`、`recovering`、`queued`、`running`、`failed` |
-| `publications` | 发布占用 | `pending`、`publishing`、`published`、`failed`、`not_required` |
+| 表                  | 记录内容           | 状态                                                           |
+| ------------------- | ------------------ | -------------------------------------------------------------- |
+| `review_runs`       | Runner 观察        | `preparing`、`recovering`、`queued`、`running`、`failed`       |
+| `publications`      | 发布占用           | `pending`、`publishing`、`published`、`failed`、`not_required` |
 | `publication_steps` | 单个 GitHub 副作用 | `pending`、`running`、`succeeded`、`failed`、`terminal_failed` |
 
 `ReviewRunStatus` 是 store 的合并投影：publication 开始前显示 Runner 状态，之后显示 publication 状态。它不是数据库字段；step 状态不并入其中。
@@ -262,15 +262,15 @@ flowchart LR
 
 `preparing` 从请求被持久化接纳时开始，早于 workspace 或 input 准备。`recovering` 表示 publisher 已独占领取一次状态不确定的 Runner submission。Publication ownership 和每个 step 的 attempts 与 Runner observation 分开存储。Runner 确定性失败会把 publication 标为 `not_required`，不会进入 GitHub 发布。
 
-| 持久化 run 状态 | 含义 | Publisher 行为 |
-| --- | --- | --- |
-| `preparing` | 请求已经接纳，但 workspace 和 runner input 仍在准备。 | 不会进入 runner 轮询。 |
-| `recovering` | Publisher 正在安全地重放一次响应丢失的 Runner 请求。 | 同一时间只有一个 publisher 持有 recovery claim；过期 claim 可以被重新领取。 |
-| `queued` | Runner run 已提交，但尚未观察到运行中状态。 | 继续轮询 runner service。 |
-| `running` | Runner service 报告 run 仍在执行。 | 继续轮询。 |
-| `publishing` | 某个 publisher 已领取完成的 run，准备执行 GitHub side effects。 | 除非领取已过期，否则其他 publisher 不应再次领取。 |
-| `published` | GitHub 发布完成。 | 终态。 |
-| `failed` | preparation、submission、Runner execution 或确定性的结果处理失败。 | 通常是终态；`failure_code` 为 `SUBMISSION_STATE_UNCERTAIN` 时由后台自动恢复。 |
+| 持久化 run 状态 | 含义                                                               | Publisher 行为                                                                |
+| --------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `preparing`     | 请求已经接纳，但 workspace 和 runner input 仍在准备。              | 不会进入 runner 轮询。                                                        |
+| `recovering`    | Publisher 正在安全地重放一次响应丢失的 Runner 请求。               | 同一时间只有一个 publisher 持有 recovery claim；过期 claim 可以被重新领取。   |
+| `queued`        | Runner run 已提交，但尚未观察到运行中状态。                        | 继续轮询 runner service。                                                     |
+| `running`       | Runner service 报告 run 仍在执行。                                 | 继续轮询。                                                                    |
+| `publishing`    | 某个 publisher 已领取完成的 run，准备执行 GitHub side effects。    | 除非领取已过期，否则其他 publisher 不应再次领取。                             |
+| `published`     | GitHub 发布完成。                                                  | 终态。                                                                        |
+| `failed`        | preparation、submission、Runner execution 或确定性的结果处理失败。 | 通常是终态；`failure_code` 为 `SUBMISSION_STATE_UNCERTAIN` 时由后台自动恢复。 |
 
 可重试的 publication 失败会把 publication 归还 pending。只有失败的 step 消耗自己的 attempt；Runner 轮询失败不消耗 publication attempt。
 

@@ -5,7 +5,7 @@ import { handleIssueOpenedWithDeps } from '../../../../src/interfaces/github/web
 import { setGitHubAppMetadata } from '../../../../src/infrastructure/github/github-app-metadata-service.js'
 import { RepositoryTriggerConfigError } from '../../../../src/infrastructure/github/repo-config-service.js'
 
-function automaticConfig () {
+function automaticConfig() {
   return {
     trigger_mode: 'automatic' as const,
     paths_ignore: [],
@@ -15,7 +15,7 @@ function automaticConfig () {
   }
 }
 
-function manualOnlyConfig () {
+function manualOnlyConfig() {
   return {
     trigger_mode: 'manual_only' as const,
     paths_ignore: [],
@@ -25,7 +25,7 @@ function manualOnlyConfig () {
   }
 }
 
-function createIssueOpenedPayload () {
+function createIssueOpenedPayload() {
   return {
     action: 'opened',
     repository: {
@@ -82,8 +82,8 @@ test('issue-opened skips self-originated payload before issue extraction', async
     let configFetched = false
 
     await handleIssueOpenedWithDeps(
-    {
-      id: 'delivery-test',
+      {
+        id: 'delivery-test',
         octokit: {},
         payload: {
           sender: {
@@ -147,7 +147,8 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
         fetchRepositoryTriggerConfigFn: async () => {
           throw configError
         },
-        isRepositoryTriggerConfigErrorFn: (error): error is RepositoryTriggerConfigError => Boolean(error)
+        isRepositoryTriggerConfigErrorFn: (error): error is RepositoryTriggerConfigError =>
+          Boolean(error)
       }
     ),
     configError

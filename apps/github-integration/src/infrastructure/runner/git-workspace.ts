@@ -31,11 +31,11 @@ interface GitAskPassAuth {
   env: Record<string, string | undefined>
 }
 
-function shellSingleQuote (value: string): string {
+function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`
 }
 
-async function createGitAskPassAuth (git_auth_token: string): Promise<GitAskPassAuth> {
+async function createGitAskPassAuth(git_auth_token: string): Promise<GitAskPassAuth> {
   // Keep the installation token out of git argv; argv can be visible to other local processes.
   const authDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-git-auth-'))
   await fs.chmod(authDir, 0o700)
@@ -61,10 +61,7 @@ async function createGitAskPassAuth (git_auth_token: string): Promise<GitAskPass
   )
 
   return {
-    config: [
-      'credential.helper=',
-      'credential.interactive=never'
-    ],
+    config: ['credential.helper=', 'credential.interactive=never'],
     env: {
       GIT_ASKPASS: askPassPath,
       SSH_ASKPASS: askPassPath,
@@ -76,7 +73,7 @@ async function createGitAskPassAuth (git_auth_token: string): Promise<GitAskPass
   }
 }
 
-async function runGitCommand (
+async function runGitCommand(
   workspace_path: string,
   args: string[],
   options: GitCommandOptions = {}
@@ -94,7 +91,7 @@ async function runGitCommand (
   })
 }
 
-export async function retryGitFetch (
+export async function retryGitFetch(
   operation: () => Promise<void>,
   sleep: Sleep = delay
 ): Promise<void> {
@@ -107,7 +104,7 @@ export async function retryGitFetch (
         throw error
       }
 
-      const delay_ms = GIT_FETCH_INITIAL_RETRY_DELAY_MS * (2 ** (attempt - 1))
+      const delay_ms = GIT_FETCH_INITIAL_RETRY_DELAY_MS * 2 ** (attempt - 1)
       logWarn('git_fetch_retry_scheduled', {
         attempt,
         next_attempt: attempt + 1,
@@ -118,23 +115,21 @@ export async function retryGitFetch (
   }
 }
 
-async function delay (delay_ms: number): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, delay_ms))
+async function delay(delay_ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, delay_ms))
 }
 
-async function runGitFetchWithRetry (
+async function runGitFetchWithRetry(
   workspace_path: string,
   args: string[],
   options: GitCommandOptions
 ): Promise<void> {
-  await retryGitFetch(() => runGitCommand(
-    workspace_path,
-    args,
-    withConfiguredGitFetchProxy(options)
-  ))
+  await retryGitFetch(() =>
+    runGitCommand(workspace_path, args, withConfiguredGitFetchProxy(options))
+  )
 }
 
-export function withConfiguredGitFetchProxy (
+export function withConfiguredGitFetchProxy(
   options: GitCommandOptions,
   configured_proxy = process.env.GITHUB_INTEGRATION_GIT_HTTP_PROXY
 ): GitCommandOptions {
@@ -155,7 +150,7 @@ export function withConfiguredGitFetchProxy (
   }
 }
 
-async function requireWorkspaceCommand (command: string, args: string[]): Promise<void> {
+async function requireWorkspaceCommand(command: string, args: string[]): Promise<void> {
   try {
     await execFileAsync(command, args)
   } catch (error) {
@@ -167,12 +162,12 @@ async function requireWorkspaceCommand (command: string, args: string[]): Promis
   }
 }
 
-export async function verifyGitWorkspaceRuntime (): Promise<void> {
+export async function verifyGitWorkspaceRuntime(): Promise<void> {
   await requireWorkspaceCommand('git', ['--version'])
   await requireWorkspaceCommand('tar', ['--version'])
 }
 
-async function initializeWorkspaceGitRepository ({
+async function initializeWorkspaceGitRepository({
   workspace_path
 }: {
   workspace_path: string
@@ -183,7 +178,7 @@ async function initializeWorkspaceGitRepository ({
   await runGitCommand(workspace_path, ['config', 'user.email', 'sec-review-bot@localhost'])
 }
 
-async function sanitizeMaterializedGitWorkspace (workspace_path: string): Promise<void> {
+async function sanitizeMaterializedGitWorkspace(workspace_path: string): Promise<void> {
   // The agent needs real git objects for diffs, but not remotes, credentials, or fetch metadata.
   await runGitCommand(workspace_path, ['remote', 'remove', 'origin']).catch(() => {})
   await fs.rm(path.join(workspace_path, '.git', 'FETCH_HEAD'), { force: true })
@@ -193,7 +188,7 @@ async function sanitizeMaterializedGitWorkspace (workspace_path: string): Promis
   await runGitCommand(workspace_path, ['gc', '--prune=now'])
 }
 
-async function compactWorkspaceGitObjectsBeforeSnapshot (workspace_path: string): Promise<void> {
+async function compactWorkspaceGitObjectsBeforeSnapshot(workspace_path: string): Promise<void> {
   const gitDir = path.join(workspace_path, '.git')
   try {
     const stat = await fs.stat(gitDir)
@@ -212,7 +207,7 @@ async function compactWorkspaceGitObjectsBeforeSnapshot (workspace_path: string)
   })
 }
 
-async function replaceWorkspaceWithMaterializedRepository ({
+async function replaceWorkspaceWithMaterializedRepository({
   workspace_path,
   materialized_path
 }: {
@@ -224,7 +219,7 @@ async function replaceWorkspaceWithMaterializedRepository ({
   await fs.rename(materialized_path, workspace_path)
 }
 
-async function materializeWorkspaceFromRealGitHistory ({
+async function materializeWorkspaceFromRealGitHistory({
   workspace_path,
   git_remote_url,
   refs,
@@ -236,7 +231,9 @@ async function materializeWorkspaceFromRealGitHistory ({
   git_auth_token?: string
 }): Promise<void> {
   await fs.mkdir(path.dirname(workspace_path), { recursive: true })
-  const materialized_path = await fs.mkdtemp(path.join(path.dirname(workspace_path), '.workspace-fetch-'))
+  const materialized_path = await fs.mkdtemp(
+    path.join(path.dirname(workspace_path), '.workspace-fetch-')
+  )
 
   try {
     await initializeWorkspaceGitRepository({ workspace_path: materialized_path })
@@ -261,9 +258,7 @@ async function materializeWorkspaceFromRealGitHistory ({
       await runGitFetchWithRetry(
         materialized_path,
         fetchArgs,
-        auth
-          ? { config: auth.config, env: auth.env }
-          : {}
+        auth ? { config: auth.config, env: auth.env } : {}
       )
     } finally {
       await auth?.cleanup()
@@ -285,7 +280,7 @@ async function materializeWorkspaceFromRealGitHistory ({
   }
 }
 
-export async function materializeWorkspaceWithCommitHistory ({
+export async function materializeWorkspaceWithCommitHistory({
   workspace_path,
   refs,
   git_remote_url,
@@ -323,7 +318,7 @@ export async function materializeWorkspaceWithCommitHistory ({
   })
 }
 
-export async function createWorkspaceSnapshotTar ({
+export async function createWorkspaceSnapshotTar({
   workspace_path,
   tar_path
 }: {

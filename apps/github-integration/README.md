@@ -18,13 +18,14 @@ pnpm --dir apps/github-integration install
 
 Use Node 24.x.
 
-> *Node 24 is the current LTS baseline for this package. The [Node.js release schedule](https://github.com/nodejs/Release#release-schedule) currently lists Node 26's Active LTS start as 2026-10-28; after that, this package can evaluate moving the default runtime to Node 26.*
+> _Node 24 is the current LTS baseline for this package. The [Node.js release schedule](https://github.com/nodejs/Release#release-schedule) currently lists Node 26's Active LTS start as 2026-10-28; after that, this package can evaluate moving the default runtime to Node 26._
 
 ## Commands
 
 ```bash
 pnpm run dev
 pnpm run server
+pnpm run format:check
 pnpm run lint
 pnpm run build
 pnpm test
@@ -37,7 +38,6 @@ suite uses the Control Plane test database for publisher boundary tests:
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
 pnpm run test:integration
 ```
-
 
 ## Local Receiver
 
@@ -239,10 +239,10 @@ For an Actions dispatch, HTTP `202 Accepted` means the integration validated and
 
 The three tables record separate concerns:
 
-| Table | Records | Status |
-| --- | --- | --- |
-| `review_runs` | Runner observation | `preparing`, `recovering`, `queued`, `running`, `failed` |
-| `publications` | Publication ownership | `pending`, `publishing`, `published`, `failed`, `not_required` |
+| Table               | Records                | Status                                                         |
+| ------------------- | ---------------------- | -------------------------------------------------------------- |
+| `review_runs`       | Runner observation     | `preparing`, `recovering`, `queued`, `running`, `failed`       |
+| `publications`      | Publication ownership  | `pending`, `publishing`, `published`, `failed`, `not_required` |
 | `publication_steps` | One GitHub side effect | `pending`, `running`, `succeeded`, `failed`, `terminal_failed` |
 
 `ReviewRunStatus` is only the merged store projection; it is not a database column, and step status is not merged into it.
@@ -261,15 +261,15 @@ flowchart LR
 
 `preparing` begins at durable admission, before workspace or input preparation. `recovering` means the publisher has exclusively claimed an uncertain Runner submission. Publication ownership and per-step attempts are stored separately from Runner observation. A terminal Runner failure marks publication `not_required`; it never enters GitHub publication.
 
-| Stored run state | Meaning | Publisher behavior |
-| --- | --- | --- |
-| `preparing` | The request was admitted, but its workspace and runner input are still being prepared. | Not visible to the runner poller. |
-| `recovering` | The publisher is safely replaying a Runner request whose response was lost. | One publisher owns the recovery claim; a stale claim can be reclaimed. |
-| `queued` | Runner run was submitted and has not been observed as running. | Poll the runner service. |
-| `running` | Runner service reports the run is still in progress. | Keep polling. |
-| `publishing` | A publisher claimed the completed run for GitHub side effects. | Do not let another publisher claim it unless the claim becomes stale. |
-| `published` | GitHub publication completed. | Terminal. |
-| `failed` | Preparation, submission, Runner execution, or deterministic result handling failed. | Terminal unless `failure_code` is `SUBMISSION_STATE_UNCERTAIN`; that case is recovered in the background. |
+| Stored run state | Meaning                                                                                | Publisher behavior                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `preparing`      | The request was admitted, but its workspace and runner input are still being prepared. | Not visible to the runner poller.                                                                         |
+| `recovering`     | The publisher is safely replaying a Runner request whose response was lost.            | One publisher owns the recovery claim; a stale claim can be reclaimed.                                    |
+| `queued`         | Runner run was submitted and has not been observed as running.                         | Poll the runner service.                                                                                  |
+| `running`        | Runner service reports the run is still in progress.                                   | Keep polling.                                                                                             |
+| `publishing`     | A publisher claimed the completed run for GitHub side effects.                         | Do not let another publisher claim it unless the claim becomes stale.                                     |
+| `published`      | GitHub publication completed.                                                          | Terminal.                                                                                                 |
+| `failed`         | Preparation, submission, Runner execution, or deterministic result handling failed.    | Terminal unless `failure_code` is `SUBMISSION_STATE_UNCERTAIN`; that case is recovered in the background. |
 
 Retryable publication failures return the publication to pending. Only the failed step spends its own attempt budget; Runner polling failures spend no publication attempts.
 

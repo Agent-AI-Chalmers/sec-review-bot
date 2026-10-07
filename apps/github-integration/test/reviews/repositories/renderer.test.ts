@@ -64,7 +64,9 @@ test('repository renderer derives blocked confirmed case cards from case results
   assert.match(body, /<summary>Verification<\/summary>/)
   assert.ok(body.indexOf('<summary>Analysis</summary>') < body.indexOf('<summary>CVSS</summary>'))
   assert.ok(body.indexOf('<summary>CVSS</summary>') < body.indexOf('<summary>Mitigation</summary>'))
-  assert.ok(body.indexOf('<summary>Mitigation</summary>') < body.indexOf('<summary>Verification</summary>'))
+  assert.ok(
+    body.indexOf('<summary>Mitigation</summary>') < body.indexOf('<summary>Verification</summary>')
+  )
 })
 
 test('repository blocked confirmed case uses disposition reason as mitigation and verification fallback', () => {
@@ -386,6 +388,9 @@ test('repository summary notes shared modified files across deliveries', () => {
   assert.match(body, /Shared modified file `src\/server\.js`/)
   assert.match(body, /\[`case-1`\]\(https:\/\/example\.test\/pull\/1\)/)
   assert.match(body, /\[`case-2`\]\(https:\/\/example\.test\/pull\/2\)/)
-  assert.match(body, /These delivery PRs touch the same file; review publish order if publishing them together\./)
+  assert.match(
+    body,
+    /These delivery PRs touch the same file; review publish order if publishing them together\./
+  )
   assert.doesNotMatch(body, /Shared modified file `Dockerfile`/)
 })

@@ -28,7 +28,10 @@ interface RunRepositoryReviewArgs {
   repair_mode?: RepairMode | null
   // Runs after preparation and before the Runner POST, so callers can durably
   // retain the context needed if the submission response is lost.
-  on_prepared?: (submitted: SubmittedRepositoryReviewRun, input: RepositoryReviewInput & Record<string, unknown>) => void | Promise<void>
+  on_prepared?: (
+    submitted: SubmittedRepositoryReviewRun,
+    input: RepositoryReviewInput & Record<string, unknown>
+  ) => void | Promise<void>
 }
 
 export interface SubmittedRepositoryReviewRun {
@@ -40,13 +43,15 @@ export interface SubmittedRepositoryReviewRun {
   event_type: 'manual' | 'scheduled'
 }
 
-function assertRepositoryReviewInput (input: RepositoryReviewInput): asserts input is RepositoryReviewInput & Record<string, unknown> {
+function assertRepositoryReviewInput(
+  input: RepositoryReviewInput
+): asserts input is RepositoryReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Repository review input is missing before runner invocation.')
   }
 }
 
-async function materializeRepositoryReviewInput ({
+async function materializeRepositoryReviewInput({
   run_id,
   octokit,
   repo_full_name,
@@ -100,7 +105,7 @@ async function materializeRepositoryReviewInput ({
   }
 }
 
-export async function startRepositoryReviewRun ({
+export async function startRepositoryReviewRun({
   run_id: provided_run_id,
   octokit,
   repo_full_name,
@@ -133,7 +138,8 @@ export async function startRepositoryReviewRun ({
     workflow: 'repository-review',
     event_type
   }
-  if (on_prepared === undefined) throw new Error('Repository review submission callback is required.')
+  if (on_prepared === undefined)
+    throw new Error('Repository review submission callback is required.')
   await on_prepared(preparedRun, input)
 
   logInfo('repository_review_runner_run_submitted', {

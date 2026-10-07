@@ -1,27 +1,26 @@
 import { getGitHubAppMetadata } from './github-app-metadata-service.js'
 
-function escapeRegExp (value: string): string {
+function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function buildMentionCandidates (): string[] {
+function buildMentionCandidates(): string[] {
   const metadata = getGitHubAppMetadata()
-  const slug = typeof metadata.slug === 'string' && metadata.slug.trim() !== ''
-    ? metadata.slug.trim().toLowerCase()
-    : null
-  const bot_login = typeof metadata.bot_login === 'string' && metadata.bot_login.trim() !== ''
-    ? metadata.bot_login.trim().toLowerCase()
-    : null
+  const slug =
+    typeof metadata.slug === 'string' && metadata.slug.trim() !== ''
+      ? metadata.slug.trim().toLowerCase()
+      : null
+  const bot_login =
+    typeof metadata.bot_login === 'string' && metadata.bot_login.trim() !== ''
+      ? metadata.bot_login.trim().toLowerCase()
+      : null
 
-  return [
-    slug,
-    bot_login,
-    slug ? `${slug}-bot` : null,
-    slug ? `${slug}-bot[bot]` : null
-  ].filter((item): item is string => Boolean(item))
+  return [slug, bot_login, slug ? `${slug}-bot` : null, slug ? `${slug}-bot[bot]` : null].filter(
+    (item): item is string => Boolean(item)
+  )
 }
 
-function stripMarkdownQuotedLines (body: string): string {
+function stripMarkdownQuotedLines(body: string): string {
   // GitHub quote replies copy the original comment as Markdown blockquotes.
   // Commands inside those quoted lines are historical text, not a new request.
   return body
@@ -30,7 +29,7 @@ function stripMarkdownQuotedLines (body: string): string {
     .join('\n')
 }
 
-export function extractCommentCommand (body: unknown): {
+export function extractCommentCommand(body: unknown): {
   command: 'review'
   mention: string
   issue_review_objective: 'audit' | 'repair' | null
@@ -61,28 +60,37 @@ export function extractCommentCommand (body: unknown): {
     const issueReviewObjectiveToken = tokens[1] ?? ''
     const issueRepairModeToken = tokens[2] ?? ''
     const plainReviewRepairModeToken = tokens[1] ?? ''
-    const issue_review_objective = issueReviewObjectiveToken === 'audit' || issueReviewObjectiveToken === 'repair'
-      ? issueReviewObjectiveToken
-      : null
-    const repair_mode = (
+    const issue_review_objective =
+      issueReviewObjectiveToken === 'audit' || issueReviewObjectiveToken === 'repair'
+        ? issueReviewObjectiveToken
+        : null
+    const repair_mode =
       (issue_review_objective === 'repair' && issueRepairModeToken === 'no-test-changes') ||
       (issue_review_objective === null && plainReviewRepairModeToken === 'no-test-changes')
-    )
-      ? 'no-test-changes'
-      : null
+        ? 'no-test-changes'
+        : null
 
     if (command !== 'review') {
       continue
     }
 
-    const expectedTokenCount = issue_review_objective === null
-      ? (repair_mode === null ? 1 : 2)
-      : (repair_mode === null ? 2 : 3)
+    const expectedTokenCount =
+      issue_review_objective === null
+        ? repair_mode === null
+          ? 1
+          : 2
+        : repair_mode === null
+          ? 2
+          : 3
     if (tokens.length !== expectedTokenCount) {
       return null
     }
 
-    if (issueReviewObjectiveToken !== '' && issue_review_objective === null && repair_mode === null) {
+    if (
+      issueReviewObjectiveToken !== '' &&
+      issue_review_objective === null &&
+      repair_mode === null
+    ) {
       return null
     }
 

@@ -1,6 +1,7 @@
 import type { GitHubAppOctokit } from './octokit.js'
 
-export type RepositoryPermission = 'none' | 'read' | 'triage' | 'write' | 'maintain' | 'admin' | 'unknown'
+export type RepositoryPermission =
+  'none' | 'read' | 'triage' | 'write' | 'maintain' | 'admin' | 'unknown'
 
 const PERMISSION_RANK: Record<RepositoryPermission, number> = {
   unknown: 0,
@@ -20,7 +21,7 @@ export interface ManualCommandAuthorizationDecision {
   reason: 'allowed' | 'missing-sender' | 'insufficient-permission' | 'permission-lookup-failed'
 }
 
-export function normalizeRepositoryPermission (value: unknown): RepositoryPermission {
+export function normalizeRepositoryPermission(value: unknown): RepositoryPermission {
   if (
     value === 'none' ||
     value === 'read' ||
@@ -35,7 +36,7 @@ export function normalizeRepositoryPermission (value: unknown): RepositoryPermis
   return 'unknown'
 }
 
-export async function authorizeManualCommentCommand ({
+export async function authorizeManualCommentCommand({
   octokit,
   owner_login,
   repo_name,
@@ -46,9 +47,8 @@ export async function authorizeManualCommentCommand ({
   repo_name: string
   sender_login: string | undefined
 }): Promise<ManualCommandAuthorizationDecision> {
-  const normalizedSender = typeof sender_login === 'string' && sender_login.trim() !== ''
-    ? sender_login.trim()
-    : null
+  const normalizedSender =
+    typeof sender_login === 'string' && sender_login.trim() !== '' ? sender_login.trim() : null
 
   if (!normalizedSender) {
     return {

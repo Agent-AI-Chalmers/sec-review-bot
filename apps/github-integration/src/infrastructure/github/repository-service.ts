@@ -25,9 +25,11 @@ interface RepositoryIssue {
   pull_request?: unknown
 }
 
-function splitRepoFullName (repo_full_name: string): RepoParts {
+function splitRepoFullName(repo_full_name: string): RepoParts {
   const text = String(repo_full_name || '').trim()
-  const match = /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})$/.exec(text)
+  const match = /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})$/.exec(
+    text
+  )
 
   if (!match) {
     throw new Error(`Invalid repository full name: ${repo_full_name}`)
@@ -44,7 +46,10 @@ function splitRepoFullName (repo_full_name: string): RepoParts {
   }
 }
 
-export async function getRepositoryContext (octokit: GitHubAppOctokit, repo_full_name: string): Promise<RepositoryContext> {
+export async function getRepositoryContext(
+  octokit: GitHubAppOctokit,
+  repo_full_name: string
+): Promise<RepositoryContext> {
   const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
   const response = await octokit.rest.repos.get({
     owner: owner_login,
@@ -61,7 +66,7 @@ export async function getRepositoryContext (octokit: GitHubAppOctokit, repo_full
   }
 }
 
-export async function getRepositoryRefSha (
+export async function getRepositoryRefSha(
   octokit: GitHubAppOctokit,
   { owner_login, repo_name, ref }: RepoParts & { ref: string }
 ): Promise<string> {
@@ -87,7 +92,7 @@ export async function getRepositoryRefSha (
   }
 }
 
-export async function listOpenRepositorySecurityPullRequests (
+export async function listOpenRepositorySecurityPullRequests(
   octokit: GitHubAppOctokit,
   { owner_login, repo_name }: RepoParts
 ): Promise<OpenRepositorySecurityPullRequest[]> {
@@ -131,7 +136,7 @@ export async function listOpenRepositorySecurityPullRequests (
   return items
 }
 
-export async function findRepositorySecuritySummaryIssue (
+export async function findRepositorySecuritySummaryIssue(
   octokit: GitHubAppOctokit,
   { owner_login, repo_name, title }: RepoParts & { title: string }
 ): Promise<RepositoryIssue | null> {
@@ -168,6 +173,4 @@ export async function findRepositorySecuritySummaryIssue (
   }
 }
 
-export {
-  splitRepoFullName
-}
+export { splitRepoFullName }

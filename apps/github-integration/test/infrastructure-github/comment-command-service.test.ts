@@ -108,10 +108,13 @@ test('extractCommentCommand parses command after quoted text', () => {
     name: 'Sec Review Bot'
   })
 
-  assert.deepEqual(extractCommentCommand('> @sec-review-bot review\n\n@sec-review-bot review repair'), {
-    command: 'review',
-    mention: 'sec-review-bot',
-    issue_review_objective: 'repair',
-    repair_mode: null
-  })
+  assert.deepEqual(
+    extractCommentCommand('> @sec-review-bot review\n\n@sec-review-bot review repair'),
+    {
+      command: 'review',
+      mention: 'sec-review-bot',
+      issue_review_objective: 'repair',
+      repair_mode: null
+    }
+  )
 })

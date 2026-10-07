@@ -6,14 +6,9 @@ import {
   getRepositoryRefSha
 } from '../../infrastructure/github/repository-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import type {
-  RepairMode,
-  RepositoryReviewInput
-} from '../../infrastructure/runner/input.js'
+import type { RepairMode, RepositoryReviewInput } from '../../infrastructure/runner/input.js'
 import { getInstallationAccessToken } from '../../infrastructure/github/installation-auth.js'
-import {
-  materializeWorkspaceWithCommitHistory
-} from '../../infrastructure/runner/git-workspace.js'
+import { materializeWorkspaceWithCommitHistory } from '../../infrastructure/runner/git-workspace.js'
 import {
   isAncestorCommit,
   materializeIncrementalArtifacts,
@@ -39,7 +34,7 @@ interface RepositoryContext {
 
 type RepositoryScanMode = 'full' | 'incremental'
 
-function normalizeScanMode (value: unknown): RepositoryScanMode {
+function normalizeScanMode(value: unknown): RepositoryScanMode {
   const raw = typeof value === 'string' ? value.trim().toLowerCase() : ''
   if (raw === 'full' || raw === 'incremental') {
     return raw
@@ -47,7 +42,7 @@ function normalizeScanMode (value: unknown): RepositoryScanMode {
   throw new Error(`Unsupported repository scan_mode: ${String(value)}`)
 }
 
-async function materializeWorkspace (
+async function materializeWorkspace(
   octokit: GitHubAppOctokit,
   repo: RepositoryContext,
   workspace_path: string,
@@ -63,11 +58,11 @@ async function materializeWorkspace (
   })
 }
 
-async function writeJsonArtifact (artifact_path: string, value: unknown): Promise<void> {
+async function writeJsonArtifact(artifact_path: string, value: unknown): Promise<void> {
   await fs.writeFile(artifact_path, JSON.stringify(value, null, 2), 'utf8')
 }
 
-export async function prepareRepositoryReviewInput ({
+export async function prepareRepositoryReviewInput({
   run_id: provided_run_id,
   octokit,
   repo_full_name,
@@ -125,9 +120,8 @@ export async function prepareRepositoryReviewInput ({
   ])
 
   const resolvedScanMode = normalizeScanMode(scan_mode)
-  const requestedBaseSha = typeof base_sha === 'string' && base_sha.trim() !== ''
-    ? base_sha.trim()
-    : null
+  const requestedBaseSha =
+    typeof base_sha === 'string' && base_sha.trim() !== '' ? base_sha.trim() : null
   let resolvedBaseSha: string | null = null
 
   let changedFilesForScanScope: ChangedFileRecord[] | null = null
@@ -162,7 +156,7 @@ export async function prepareRepositoryReviewInput ({
       throw new Error('incremental scan window is invalid.')
     }
 
-    let incrementalResult: { changed_files: ChangedFileRecord[], commit_shas: string[] }
+    let incrementalResult: { changed_files: ChangedFileRecord[]; commit_shas: string[] }
     try {
       incrementalResult = await materializeIncrementalArtifacts({
         octokit,
@@ -190,9 +184,12 @@ export async function prepareRepositoryReviewInput ({
     }
   }
 
-  const historyRefs = resolvedScanMode === 'incremental' && typeof resolvedBaseSha === 'string' && resolvedBaseSha.trim() !== ''
-    ? [resolvedBaseSha, resolvedHeadSha]
-    : [resolvedHeadSha]
+  const historyRefs =
+    resolvedScanMode === 'incremental' &&
+    typeof resolvedBaseSha === 'string' &&
+    resolvedBaseSha.trim() !== ''
+      ? [resolvedBaseSha, resolvedHeadSha]
+      : [resolvedHeadSha]
   await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
   await finalizeInputBundleWorkspace({
     input_bundle_root,
@@ -236,10 +233,10 @@ export async function prepareRepositoryReviewInput ({
       paths_ignore: Array.isArray(paths_ignore) ? paths_ignore : [],
       incremental_changed_files: Array.isArray(changedFilesForScanScope)
         ? changedFilesForScanScope.map((item) => ({
-          path: item.path,
-          status: item.status,
-          previous_path: item.previous_path
-        }))
+            path: item.path,
+            status: item.status,
+            previous_path: item.previous_path
+          }))
         : []
     }
   }

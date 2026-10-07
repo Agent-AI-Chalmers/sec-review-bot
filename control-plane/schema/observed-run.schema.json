@@ -3,11 +3,32 @@
   "$id": "https://sec-review-bot.local/schemas/observed-run.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["run_id", "workflow", "status", "created_at", "updated_at", "published_at", "failure_code", "failure_message", "artifact_publication"],
+  "required": [
+    "run_id",
+    "workflow",
+    "status",
+    "created_at",
+    "updated_at",
+    "published_at",
+    "failure_code",
+    "failure_message",
+    "artifact_publication"
+  ],
   "properties": {
     "run_id": { "type": "string", "minLength": 1 },
     "workflow": { "enum": ["issue-review", "pull-request-review", "repository-review"] },
-    "status": { "enum": ["preparing", "recovering", "queued", "running", "succeeded", "publishing", "published", "failed"] },
+    "status": {
+      "enum": [
+        "preparing",
+        "recovering",
+        "queued",
+        "running",
+        "succeeded",
+        "publishing",
+        "published",
+        "failed"
+      ]
+    },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
     "published_at": { "type": ["string", "null"], "format": "date-time" },

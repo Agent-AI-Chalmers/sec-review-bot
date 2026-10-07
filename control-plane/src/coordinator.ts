@@ -2,15 +2,17 @@ import { clearImmediate, clearInterval } from 'node:timers'
 
 import type { ReviewRunRecord, ReviewRunStore } from './review-store.js'
 
-type CoordinationStore = Pick<ReviewRunStore,
-  'expireStalePreparations' | 'listSubmissionRecoveries' | 'listActiveRuns'>
+type CoordinationStore = Pick<
+  ReviewRunStore,
+  'expireStalePreparations' | 'listSubmissionRecoveries' | 'listActiveRuns'
+>
 
 export interface ReviewRunCoordinationHandlers {
   recoverSubmission: (run: ReviewRunRecord) => Promise<void>
   observeActiveRun: (run: ReviewRunRecord) => Promise<void>
 }
 
-export async function coordinateReviewRunsOnce (
+export async function coordinateReviewRunsOnce(
   store: CoordinationStore,
   handlers: ReviewRunCoordinationHandlers
 ): Promise<void> {
@@ -30,7 +32,7 @@ export interface ReviewRunCoordinatorLoop {
 }
 
 /** Runs at most one coordination pass at a time and drains it during shutdown. */
-export function startReviewRunCoordinatorLoop ({
+export function startReviewRunCoordinatorLoop({
   intervalMs,
   runOnce,
   onError
@@ -45,7 +47,9 @@ export function startReviewRunCoordinatorLoop ({
     if (stopped || active !== null) return
     active = runOnce()
       .catch(onError)
-      .finally(() => { active = null })
+      .finally(() => {
+        active = null
+      })
   }
 
   const timer = setInterval(tick, intervalMs)

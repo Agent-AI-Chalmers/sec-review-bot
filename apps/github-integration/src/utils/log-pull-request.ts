@@ -1,31 +1,29 @@
 import { logInfo } from './logger.js'
 
-function asRecord (value: unknown): Record<string, unknown> {
+function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : {}
 }
 
-function asString (value: unknown, fallback = ''): string {
+function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
 }
 
-function displayString (value: unknown): string {
+function displayString(value: unknown): string {
   const text = asString(value).trim()
   return text || '(missing)'
 }
 
-function displayNumber (value: unknown): number | string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? value
-    : '(missing)'
+function displayNumber(value: unknown): number | string {
+  return typeof value === 'number' && Number.isFinite(value) ? value : '(missing)'
 }
 
-function asBoolean (value: unknown, fallback = false): boolean {
+function asBoolean(value: unknown, fallback = false): boolean {
   return typeof value === 'boolean' ? value : fallback
 }
 
-export function logPullRequestPayload (payload: unknown): void {
+export function logPullRequestPayload(payload: unknown): void {
   const rawPayload = asRecord(payload)
   const repository = asRecord(rawPayload.repository)
   const sender = asRecord(rawPayload.sender)
@@ -54,7 +52,8 @@ export function logPullRequestPayload (payload: unknown): void {
   const commits = displayNumber(pullRequest.commits)
   const additions = displayNumber(pullRequest.additions)
   const deletions = displayNumber(pullRequest.deletions)
-  const from_fork = asString(pullRequestHeadRepo.full_name) !== asString(pullRequestBaseRepo.full_name)
+  const from_fork =
+    asString(pullRequestHeadRepo.full_name) !== asString(pullRequestBaseRepo.full_name)
 
   logInfo('webhook_received_completed', {
     action,

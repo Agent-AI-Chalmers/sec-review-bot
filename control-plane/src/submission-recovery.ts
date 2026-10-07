@@ -1,17 +1,19 @@
 import type { ReviewRunRecord, ReviewRunStore } from './review-store.js'
 
-type SubmissionRecoveryStore = Pick<ReviewRunStore,
-  'claimSubmissionRecovery' | 'completeSubmissionRecovery' | 'failSubmissionRecovery'>
+type SubmissionRecoveryStore = Pick<
+  ReviewRunStore,
+  'claimSubmissionRecovery' | 'completeSubmissionRecovery' | 'failSubmissionRecovery'
+>
 
-type SubmissionError = { code?: string | null, message: string }
+type SubmissionError = { code?: string | null; message: string }
 
 export type SubmissionRecoveryResult =
   | { status: 'claim_unavailable' }
   | { status: 'input_missing' }
   | { status: 'recovered' }
   | { status: 'claim_lost' }
-  | { status: 'deferred', error: unknown }
-  | { status: 'failed', error: unknown }
+  | { status: 'deferred'; error: unknown }
+  | { status: 'failed'; error: unknown }
 
 export interface SubmissionRecoveryDependencies {
   submit: (request: {
@@ -26,7 +28,7 @@ export interface SubmissionRecoveryDependencies {
  * Replays the persisted request with the original run identity. Runner owns
  * request idempotency; Control Plane owns the recovery claim and durable state.
  */
-export async function recoverReviewRunSubmission (
+export async function recoverReviewRunSubmission(
   store: SubmissionRecoveryStore,
   run: ReviewRunRecord,
   dependencies: SubmissionRecoveryDependencies
@@ -48,7 +50,7 @@ export async function recoverReviewRunSubmission (
       run_id: run.run_id,
       input: run.runner_input
     })
-    return await store.completeSubmissionRecovery(run.run_id, claimToken)
+    return (await store.completeSubmissionRecovery(run.run_id, claimToken))
       ? { status: 'recovered' }
       : { status: 'claim_lost' }
   } catch (error) {
@@ -57,8 +59,6 @@ export async function recoverReviewRunSubmission (
       code: classified.code ?? null,
       message: classified.message
     })
-    return classified.uncertain
-      ? { status: 'deferred', error }
-      : { status: 'failed', error }
+    return classified.uncertain ? { status: 'deferred', error } : { status: 'failed', error }
   }
 }

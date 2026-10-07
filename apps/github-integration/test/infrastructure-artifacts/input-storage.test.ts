@@ -18,7 +18,7 @@ test.before(() => {
 
 test.beforeEach(() => s3.reset())
 
-async function reference () {
+async function reference() {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'input-storage-'))
   const source = path.join(directory, 'bundle.tar.zst')
   await fs.writeFile(source, 'bundle')
@@ -31,7 +31,9 @@ async function reference () {
 }
 
 test('uploads an immutable input bundle to its deterministic run key', async () => {
-  s3.on(HeadObjectCommand).rejects(Object.assign(new Error('not found'), { $metadata: { httpStatusCode: 404 } }))
+  s3.on(HeadObjectCommand).rejects(
+    Object.assign(new Error('not found'), { $metadata: { httpStatusCode: 404 } })
+  )
   s3.on(PutObjectCommand).resolves({})
   const { publishInputBundle } = await import('../../src/infrastructure/artifacts/input-storage.js')
 

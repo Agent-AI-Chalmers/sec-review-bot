@@ -21,33 +21,34 @@ import { input_bundle_staging_root } from '../../config.js'
 const execFileAsync = promisify(execFile)
 export const INPUT_BUNDLE_MEDIA_TYPE = 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
 
-export function sanitizePathSegment (value: string): string {
+export function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, '-')
 }
 
-export function createRunId (): string {
-  const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')
+export function createRunId(): string {
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d+Z$/, 'Z')
   const suffix = crypto.randomBytes(4).toString('hex')
   return `run-${timestamp}-${suffix}`
 }
 
-export async function ensureCleanDirectory (dir_path: string): Promise<void> {
+export async function ensureCleanDirectory(dir_path: string): Promise<void> {
   await fs.rm(dir_path, { recursive: true, force: true })
   await fs.mkdir(dir_path, { recursive: true })
 }
 
-export function buildGitRemoteUrl (owner_login: string, repo_name: string): string {
+export function buildGitRemoteUrl(owner_login: string, repo_name: string): string {
   const serverUrl = (process.env.GITHUB_SERVER_URL || 'https://github.com').replace(/\/+$/, '')
   return `${serverUrl}/${owner_login}/${repo_name}.git`
 }
 
-export function createInputBundleRoot (
-  ...segments: string[]
-): string {
+export function createInputBundleRoot(...segments: string[]): string {
   return path.resolve(input_bundle_staging_root, ...segments.map(sanitizePathSegment))
 }
 
-export async function finalizeInputBundleWorkspace ({
+export async function finalizeInputBundleWorkspace({
   input_bundle_root,
   workspace_path,
   include_incremental_window
@@ -66,7 +67,7 @@ export async function finalizeInputBundleWorkspace ({
   })
 }
 
-export async function archiveInputBundle ({
+export async function archiveInputBundle({
   input_bundle_root,
   include_incremental_window,
   run_id
@@ -89,11 +90,7 @@ export async function archiveInputBundle ({
   // reuse it to create isolated workspaces. Only the transport bundle is zstd
   // compressed, and the live staging checkout is deliberately not included.
   await execFileAsync('tar', ['-cf', tarPath, '-C', input_bundle_root, ...entries])
-  await pipeline(
-    createReadStream(tarPath),
-    createZstdCompress(),
-    createWriteStream(archivePath)
-  )
+  await pipeline(createReadStream(tarPath), createZstdCompress(), createWriteStream(archivePath))
   await fs.rm(tarPath, { force: true })
   const digest = crypto.createHash('sha256')
   await pipeline(createReadStream(archivePath), digest)

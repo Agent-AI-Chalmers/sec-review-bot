@@ -1,7 +1,10 @@
 import type { EmitterWebhookEvent } from '@octokit/webhooks'
 
 import { startIssueReviewCommand } from '../../../triggers/issue-review.js'
-import { extractIssueContext, type IssueContext } from '../../../infrastructure/github/issue-service.js'
+import {
+  extractIssueContext,
+  type IssueContext
+} from '../../../infrastructure/github/issue-service.js'
 import {
   fetchRepositoryTriggerConfig,
   isAutomaticTriggerModeEnabled,
@@ -36,15 +39,19 @@ interface HandlerDeps {
     issue: IssueContext
     event_type: 'opened'
     delivery_id: string
-    on_admitted?: (admission: { run_id: string, status: string, replayed: boolean }) => void
+    on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   }) => Promise<unknown>
 }
 
-export async function handleIssueOpened ({ id, octokit, payload }: IssueOpenedWebhookEvent): Promise<void> {
+export async function handleIssueOpened({
+  id,
+  octokit,
+  payload
+}: IssueOpenedWebhookEvent): Promise<void> {
   await handleIssueOpenedWithDeps({ id, octokit, payload })
 }
 
-export async function handleIssueOpenedWithDeps (
+export async function handleIssueOpenedWithDeps(
   { id, octokit, payload }: WebhookHandlerArgs,
   {
     fetchRepositoryTriggerConfigFn = fetchRepositoryTriggerConfig,
@@ -105,13 +112,17 @@ export async function handleIssueOpenedWithDeps (
 
   try {
     let resolveAdmission: (() => void) | undefined
-    const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+    const admitted = new Promise<void>((resolve) => {
+      resolveAdmission = resolve
+    })
     const execution = startIssueReviewCommandFn({
       octokit,
       issue,
       event_type: 'opened',
       delivery_id: id,
-      on_admitted: () => { resolveAdmission?.() }
+      on_admitted: () => {
+        resolveAdmission?.()
+      }
     })
     reviewExecutionTracker.start(execution, {
       ingress: 'issues.opened',

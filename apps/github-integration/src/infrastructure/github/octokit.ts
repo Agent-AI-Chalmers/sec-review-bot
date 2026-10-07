@@ -126,7 +126,7 @@ export interface GitHubAppOctokit {
         repo: string
         issue_number: number
         body: string
-      }) => Promise<{ data: { id: number, html_url: string } }>
+      }) => Promise<{ data: { id: number; html_url: string } }>
       listComments: (args: {
         owner: string
         repo: string
@@ -163,7 +163,7 @@ export interface GitHubAppOctokit {
         base: string
         body: string | null
         draft: boolean
-      }) => Promise<{ data: { html_url: string, number: number } }>
+      }) => Promise<{ data: { html_url: string; number: number } }>
       createReview: (args: {
         owner: string
         repo: string
@@ -179,7 +179,7 @@ export interface GitHubAppOctokit {
           start_line?: number
           start_side?: string
         }>
-      }) => Promise<{ data: { id: number, html_url: string, state: string } }>
+      }) => Promise<{ data: { id: number; html_url: string; state: string } }>
       get: (args: {
         owner: string
         repo: string
@@ -225,10 +225,7 @@ export interface GitHubAppOctokit {
         repo: string
         ref: string
       }) => Promise<{ data: ArrayBuffer | Buffer | string }>
-      get: (args: {
-        owner: string
-        repo: string
-      }) => Promise<{
+      get: (args: { owner: string; repo: string }) => Promise<{
         data: {
           full_name: string
           default_branch: string

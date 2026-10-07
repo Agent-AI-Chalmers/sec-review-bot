@@ -15,7 +15,7 @@ setGitHubAppMetadata({
   name: 'Sec Review Bot'
 })
 
-function createIssueCommentPayload ({
+function createIssueCommentPayload({
   body = '@sec-review-bot review audit',
   is_pull_request = false
 }: {
@@ -55,7 +55,7 @@ function createIssueCommentPayload ({
   }
 }
 
-function authorizationDecision (
+function authorizationDecision(
   overrides: Partial<ManualCommandAuthorizationDecision> = {}
 ): ManualCommandAuthorizationDecision {
   return {
@@ -68,7 +68,7 @@ function authorizationDecision (
   }
 }
 
-function pullRequestContext (): PullRequestContext {
+function pullRequestContext(): PullRequestContext {
   return {
     action: 'manual_review',
     previous_head_sha: null,
@@ -101,7 +101,7 @@ function pullRequestContext (): PullRequestContext {
   }
 }
 
-function submittedIssueRun (issue: IssueContext): SubmittedIssueReviewRun {
+function submittedIssueRun(issue: IssueContext): SubmittedIssueReviewRun {
   return {
     issue,
     run_id: 'run-issue-test',
@@ -111,7 +111,7 @@ function submittedIssueRun (issue: IssueContext): SubmittedIssueReviewRun {
   }
 }
 
-function submittedPullRequestRun (pr: PullRequestContext): SubmittedPullRequestReviewRun {
+function submittedPullRequestRun(pr: PullRequestContext): SubmittedPullRequestReviewRun {
   return {
     pr,
     run_id: 'run-pr-test',
@@ -132,11 +132,12 @@ test('issue-comment-created skips manual command when commenter lacks write perm
       payload: createIssueCommentPayload()
     },
     {
-      authorizeManualCommentCommandFn: async () => authorizationDecision({
-        allowed: false,
-        permission: 'read',
-        reason: 'insufficient-permission'
-      }),
+      authorizeManualCommentCommandFn: async () =>
+        authorizationDecision({
+          allowed: false,
+          permission: 'read',
+          reason: 'insufficient-permission'
+        }),
       startIssueReviewCommandFn: async () => {
         issueReviewCalled = true
         throw new Error('issue review should not be called')
@@ -200,8 +201,7 @@ test('issue-comment-created starts pull request manual review for write commente
   )
 
   assert.equal(pullRequestReviewCalled, true)
-}
-)
+})
 
 test('issue-comment-created delegates PR context loading until after command admission', async () => {
   let contextLoaded = false

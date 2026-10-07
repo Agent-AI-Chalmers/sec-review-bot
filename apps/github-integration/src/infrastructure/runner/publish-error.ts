@@ -9,7 +9,7 @@ export class DeterministicRunnerPublishError extends Error {
 
   // Use this for deterministic publication failures, such as malformed runner
   // results. Retrying the same stored run cannot repair those inputs.
-  constructor (
+  constructor(
     message: string,
     code: RunnerPublishErrorCode = RUNNER_PUBLISH_ERROR_CODES.runner_publish_non_retryable,
     options: ErrorOptionsWithCause = {}
@@ -20,15 +20,17 @@ export class DeterministicRunnerPublishError extends Error {
   }
 }
 
-function isRecord (value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-export function isDeterministicRunnerPublishError (error: unknown): error is DeterministicRunnerPublishError {
-  return error instanceof DeterministicRunnerPublishError ||
-    (
-      isRecord(error) &&
+export function isDeterministicRunnerPublishError(
+  error: unknown
+): error is DeterministicRunnerPublishError {
+  return (
+    error instanceof DeterministicRunnerPublishError ||
+    (isRecord(error) &&
       error.name === 'DeterministicRunnerPublishError' &&
-      typeof error.code === 'string'
-    )
+      typeof error.code === 'string')
+  )
 }

@@ -16,14 +16,16 @@ test('S3 input upload is immutable and idempotent', async (t) => {
   process.env['SEC_REVIEW_ARTIFACT_STORE'] = 's3'
   process.env['SEC_REVIEW_ARTIFACT_S3_ENDPOINT'] = endpoint
   process.env['SEC_REVIEW_ARTIFACT_S3_BUCKET'] = bucket
-  const { publishInputBundle } = await import('../../../src/infrastructure/artifacts/input-storage.js')
+  const { publishInputBundle } =
+    await import('../../../src/infrastructure/artifacts/input-storage.js')
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 's3-input-storage-'))
   const source = path.join(directory, 'input-bundle.tar.zst')
   const content = Buffer.from('s3-integration-input-bundle')
   await fs.writeFile(source, content)
   const reference = {
     uri: pathToFileURL(source).href,
-    digest: `sha256:${crypto.createHash('sha256').update(content).digest('hex')}` as `sha256:${string}`,
+    digest:
+      `sha256:${crypto.createHash('sha256').update(content).digest('hex')}` as `sha256:${string}`,
     media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd' as const,
     size_bytes: content.byteLength
   }

@@ -24,7 +24,7 @@ export interface RepositoryWorkflowResult {
   deliveries: RepositoryDelivery[]
 }
 
-function requirePublishableFileChanges (file_changes: FileChange[]): void {
+function requirePublishableFileChanges(file_changes: FileChange[]): void {
   const seen = new Set<string>()
   for (const change of file_changes) {
     const normalizedPath = validateContractPublishableRepoRelativePath(change.path)
@@ -35,7 +35,7 @@ function requirePublishableFileChanges (file_changes: FileChange[]): void {
   }
 }
 
-export function parseRepositoryWorkflowResult (value: unknown): RepositoryWorkflowResult {
+export function parseRepositoryWorkflowResult(value: unknown): RepositoryWorkflowResult {
   assertV5WorkflowResult('repository-review', value)
   const result = value as Omit<RepositoryWorkflowResult, 'deliveries'> & {
     deliveries: Array<Omit<RepositoryDelivery, 'case_count'>>

@@ -16,13 +16,15 @@ export interface SubmittedPullRequestReviewRun {
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 }
 
-function assertPullRequestReviewInput (input: PullRequestReviewInput): asserts input is PullRequestReviewInput & Record<string, unknown> {
+function assertPullRequestReviewInput(
+  input: PullRequestReviewInput
+): asserts input is PullRequestReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Pull request review input is missing before runner invocation.')
   }
 }
 
-async function listSynchronizeScopeFiles ({
+async function listSynchronizeScopeFiles({
   octokit,
   pr
 }: {
@@ -49,7 +51,7 @@ async function listSynchronizeScopeFiles ({
   })
 }
 
-async function resolveEventFiles ({
+async function resolveEventFiles({
   octokit,
   pr,
   event_type
@@ -69,7 +71,7 @@ async function resolveEventFiles ({
   })
 }
 
-function describeFetchedFiles (
+function describeFetchedFiles(
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review',
   files: Array<unknown>
 ): string {
@@ -80,7 +82,7 @@ function describeFetchedFiles (
   return `Fetched ${files.length} changed files. Materializing analysis input...`
 }
 
-async function materializePullRequestReviewInput ({
+async function materializePullRequestReviewInput({
   run_id,
   octokit,
   pr,
@@ -92,7 +94,7 @@ async function materializePullRequestReviewInput ({
   pr: PullRequestContext
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   repair_mode?: RepairMode | null
-}): Promise<{ run_id: string, input: PullRequestReviewInput, files: unknown[] }> {
+}): Promise<{ run_id: string; input: PullRequestReviewInput; files: unknown[] }> {
   logInfo('pull_request_review_workflow_started', {
     event_type,
     pr: pr.pr_number,
@@ -139,7 +141,9 @@ async function materializePullRequestReviewInput ({
   const reviewFiles = prepared?.files ?? files
 
   if (!analysisInput || typeof analysisInput !== 'object' || Array.isArray(analysisInput)) {
-    throw new Error(`Pull request input materialization returned an invalid value for PR #${pr.pr_number}.`)
+    throw new Error(
+      `Pull request input materialization returned an invalid value for PR #${pr.pr_number}.`
+    )
   }
 
   logInfo('pull_request_review_input_completed', {
@@ -164,14 +168,17 @@ async function materializePullRequestReviewInput ({
   }
 }
 
-export async function startPullRequestReviewRun (args: {
+export async function startPullRequestReviewRun(args: {
   run_id?: string
   octokit: unknown
   pr: PullRequestContext
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   repair_mode?: RepairMode | null
   // The caller hands the prepared input to Control Plane for durable submission.
-  on_prepared?: (submitted: SubmittedPullRequestReviewRun, input: PullRequestReviewInput & Record<string, unknown>) => void | Promise<void>
+  on_prepared?: (
+    submitted: SubmittedPullRequestReviewRun,
+    input: PullRequestReviewInput & Record<string, unknown>
+  ) => void | Promise<void>
 }): Promise<SubmittedPullRequestReviewRun> {
   const prepared = await materializePullRequestReviewInput(args)
   assertPullRequestReviewInput(prepared.input)
@@ -182,7 +189,8 @@ export async function startPullRequestReviewRun (args: {
     workflow: 'pull-request-review',
     event_type: args.event_type
   }
-  if (args.on_prepared === undefined) throw new Error('Pull request review submission callback is required.')
+  if (args.on_prepared === undefined)
+    throw new Error('Pull request review submission callback is required.')
   await args.on_prepared(preparedRun, prepared.input)
   logInfo('pull_request_review_runner_run_submitted', {
     event_type: args.event_type,

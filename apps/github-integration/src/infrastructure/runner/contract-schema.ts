@@ -19,25 +19,27 @@ const INPUT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
 
 let validators: Map<string, ValidateFunction> | null = null
 
-function contractSchemasRoot (): string {
+function contractSchemasRoot(): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
   const candidates = [
     ...(configuredRoot ? [path.resolve(configuredRoot, 'schemas', 'v5')] : []),
     path.resolve(process.cwd(), 'contracts', 'schemas', 'v5'),
     path.resolve(process.cwd(), '..', '..', 'contracts', 'schemas', 'v5')
   ]
-  const root = candidates.find((candidate) => existsSync(path.join(candidate, 'common.schema.json')))
+  const root = candidates.find((candidate) =>
+    existsSync(path.join(candidate, 'common.schema.json'))
+  )
   if (root === undefined) {
     throw new Error('Could not locate contract v5 schemas for Runner validation.')
   }
   return root
 }
 
-function readSchema (root: string, name: string): AnySchemaObject {
+function readSchema(root: string, name: string): AnySchemaObject {
   return JSON.parse(readFileSync(path.join(root, name), 'utf8')) as AnySchemaObject
 }
 
-function resultValidators (): Map<string, ValidateFunction> {
+function resultValidators(): Map<string, ValidateFunction> {
   if (validators !== null) {
     return validators
   }
@@ -62,7 +64,7 @@ function resultValidators (): Map<string, ValidateFunction> {
   return validators
 }
 
-function assertSchema (schemaName: string, value: unknown, label: string): void {
+function assertSchema(schemaName: string, value: unknown, label: string): void {
   const validate = resultValidators().get(schemaName)
   if (validate === undefined) {
     throw new Error(`Contract validator is not configured for ${schemaName}.`)
@@ -75,14 +77,14 @@ function assertSchema (schemaName: string, value: unknown, label: string): void 
   }
 }
 
-export function assertV5WorkflowResult (workflow: WorkflowName, value: unknown): void {
+export function assertV5WorkflowResult(workflow: WorkflowName, value: unknown): void {
   assertSchema(RESULT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} result`)
 }
 
-export function assertV5WorkflowInput (workflow: WorkflowName, value: unknown): void {
+export function assertV5WorkflowInput(workflow: WorkflowName, value: unknown): void {
   assertSchema(INPUT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} input`)
 }
 
-export function assertV5ReviewRecord (value: unknown): void {
+export function assertV5ReviewRecord(value: unknown): void {
   assertSchema('review-record.schema.json', value, 'review_record')
 }

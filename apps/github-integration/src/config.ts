@@ -8,10 +8,9 @@ const CURRENT_DIR_PATH = nodePath.dirname(CURRENT_FILE_PATH)
 const PACKAGE_ENV_PATH = nodePath.resolve(CURRENT_DIR_PATH, '.env')
 const DIST_ENV_PATH = nodePath.resolve(CURRENT_DIR_PATH, '..', '.env')
 
-const ENV_FILE_PATH = [
-  PACKAGE_ENV_PATH,
-  DIST_ENV_PATH
-].find((candidatePath) => fs.existsSync(candidatePath))
+const ENV_FILE_PATH = [PACKAGE_ENV_PATH, DIST_ENV_PATH].find((candidatePath) =>
+  fs.existsSync(candidatePath)
+)
 
 if (ENV_FILE_PATH) {
   dotenv.config({

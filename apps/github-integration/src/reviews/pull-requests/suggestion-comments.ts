@@ -21,22 +21,16 @@ interface PublishSuggestionReviewArgs {
   marker: string
 }
 
-export async function publishPullRequestSuggestionReview (
+export async function publishPullRequestSuggestionReview(
   octokit: Parameters<typeof createPullRequestReviewUnlessMarkerExists>[0],
-  {
-    pr,
-    review_body,
-    event,
-    candidates,
-    marker
-  }: PublishSuggestionReviewArgs
+  { pr, review_body, event, candidates, marker }: PublishSuggestionReviewArgs
 ): Promise<{
   review_id: number
   html_url: string
   state: string
   count: number
   reused: boolean
-  comments: Array<{ path: string, line: number, start_line: number }>
+  comments: Array<{ path: string; line: number; start_line: number }>
 }> {
   const review = await createPullRequestReviewUnlessMarkerExists(octokit, {
     owner_login: pr.owner_login,

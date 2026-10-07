@@ -17,17 +17,17 @@ export interface ChangedFileRecord {
   changes: number
 }
 
-function asRecord (value: unknown): Record<string, unknown> {
+function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : {}
 }
 
-async function writeJsonArtifact (artifact_path: string, value: unknown): Promise<void> {
+async function writeJsonArtifact(artifact_path: string, value: unknown): Promise<void> {
   await fs.writeFile(artifact_path, JSON.stringify(value, null, 2), 'utf8')
 }
 
-export async function materializeIncrementalArtifacts ({
+export async function materializeIncrementalArtifacts({
   octokit,
   repo,
   incremental_window_path,
@@ -58,9 +58,7 @@ export async function materializeIncrementalArtifacts ({
     basehead: `${base_sha}...${head_sha}`
   })
   const files = Array.isArray(compare.data?.files) ? compare.data.files : []
-  const commitsRaw = Array.isArray(compare.data?.commits)
-    ? compare.data.commits as unknown[]
-    : []
+  const commitsRaw = Array.isArray(compare.data?.commits) ? (compare.data.commits as unknown[]) : []
 
   const compareDiff = await octokit.request('GET /repos/{owner}/{repo}/compare/{basehead}', {
     owner: repo.owner_login,
@@ -79,17 +77,22 @@ export async function materializeIncrementalArtifacts ({
     if (!currentPath) {
       continue
     }
-    const statusRaw = String(item?.status ?? '').trim().toLowerCase()
-    const status = statusRaw === 'renamed'
-      ? 'renamed'
-      : statusRaw === 'added'
+    const statusRaw = String(item?.status ?? '')
+      .trim()
+      .toLowerCase()
+    const status =
+      statusRaw === 'renamed'
+        ? 'renamed'
+        : statusRaw === 'added'
           ? 'added'
           : statusRaw === 'removed'
-              ? 'deleted'
-              : 'modified'
+            ? 'deleted'
+            : 'modified'
     const additions = Number.isFinite(Number(item?.additions)) ? Number(item?.additions) : 0
     const deletions = Number.isFinite(Number(item?.deletions)) ? Number(item?.deletions) : 0
-    const changes = Number.isFinite(Number(item?.changes)) ? Number(item?.changes) : additions + deletions
+    const changes = Number.isFinite(Number(item?.changes))
+      ? Number(item?.changes)
+      : additions + deletions
     changed_files.push({
       path: currentPath,
       status,
@@ -147,7 +150,7 @@ export async function materializeIncrementalArtifacts ({
   }
 }
 
-export async function isAncestorCommit ({
+export async function isAncestorCommit({
   octokit,
   repo,
   base_sha,
@@ -163,5 +166,9 @@ export async function isAncestorCommit ({
     repo: repo.repo_name,
     basehead: `${base_sha}...${head_sha}`
   })
-  return String(compare.data?.status ?? '').trim().toLowerCase() === 'ahead'
+  return (
+    String(compare.data?.status ?? '')
+      .trim()
+      .toLowerCase() === 'ahead'
+  )
 }

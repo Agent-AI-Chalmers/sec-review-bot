@@ -58,7 +58,7 @@ const EMPTY_VERIFICATION: ReviewRecord['verification'] = {
   residual_risks: []
 }
 
-function uniqueNonEmptyStrings (items: unknown, limit = Infinity): string[] {
+function uniqueNonEmptyStrings(items: unknown, limit = Infinity): string[] {
   const seen = new Set<string>()
   const normalizedItems: string[] = []
 
@@ -86,27 +86,25 @@ function uniqueNonEmptyStrings (items: unknown, limit = Infinity): string[] {
   return normalizedItems
 }
 
-function asNonEmptyString (value: unknown): string {
-  return typeof value === 'string' && value.trim() !== ''
-    ? value.trim()
-    : ''
+function asNonEmptyString(value: unknown): string {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : ''
 }
 
-function buildVerifierHeadline (verification: unknown): string {
+function buildVerifierHeadline(verification: unknown): string {
   const safeVerifier = isRecord(verification) ? verification : {}
   const patch_coverage = asNonEmptyString(safeVerifier.patch_coverage) || 'unknown'
 
   return `Verifier assessed patch=${patch_coverage}.`
 }
 
-function escapeHtmlCommentValue (value: unknown): string {
+function escapeHtmlCommentValue(value: unknown): string {
   return String(value ?? '')
     .replace(/-->/g, '--&gt;')
     .replace(/\r?\n/g, ' ')
     .trim()
 }
 
-function renderIssueAnalysisSection (analysis: unknown): string | null {
+function renderIssueAnalysisSection(analysis: unknown): string | null {
   const safeAnalysis = isRecord(analysis) ? analysis : {}
   if (!analysis) {
     return null
@@ -123,7 +121,7 @@ function renderIssueAnalysisSection (analysis: unknown): string | null {
   return lines.join('\n')
 }
 
-function renderIssueMitigationSection (mitigation: unknown): string | null {
+function renderIssueMitigationSection(mitigation: unknown): string | null {
   const safeMitigation = isRecord(mitigation) ? mitigation : {}
   if (!mitigation) {
     return null
@@ -131,9 +129,7 @@ function renderIssueMitigationSection (mitigation: unknown): string | null {
 
   const changed_files = asList<string>(safeMitigation.changed_files)
 
-  const lines = [
-    String(safeMitigation.overview ?? 'Issue mitigation completed.')
-  ]
+  const lines = [String(safeMitigation.overview ?? 'Issue mitigation completed.')]
 
   if (changed_files.length > 0) {
     lines.push('', ...renderChangedFilesLines(changed_files))
@@ -142,7 +138,7 @@ function renderIssueMitigationSection (mitigation: unknown): string | null {
   return lines.join('\n')
 }
 
-function renderIssueVerificationSection (verification: unknown): string | null {
+function renderIssueVerificationSection(verification: unknown): string | null {
   const safeVerification = isRecord(verification) ? verification : {}
   if (!verification) {
     return null
@@ -158,22 +154,15 @@ function renderIssueVerificationSection (verification: unknown): string | null {
   return lines.join('\n')
 }
 
-function renderFoldedSection (summary: string, body: string | null): string | null {
+function renderFoldedSection(summary: string, body: string | null): string | null {
   if (!body) {
     return null
   }
 
-  return [
-    '<details>',
-    `<summary>${summary}</summary>`,
-    '',
-    body,
-    '',
-    '</details>'
-  ].join('\n')
+  return ['<details>', `<summary>${summary}</summary>`, '', body, '', '</details>'].join('\n')
 }
 
-function renderIssueCodeModificationSummary (
+function renderIssueCodeModificationSummary(
   mitigation: unknown,
   draftPrPlan: DraftPrPlanLike | null,
   draftPullRequest: DraftPullRequestLike | null
@@ -183,9 +172,7 @@ function renderIssueCodeModificationSummary (
     return null
   }
 
-  const changed_files = Array.isArray(draftPrPlan.changed_files)
-    ? draftPrPlan.changed_files
-    : []
+  const changed_files = Array.isArray(draftPrPlan.changed_files) ? draftPrPlan.changed_files : []
   const lines = [
     '## Code Modification Summary',
     '',
@@ -197,7 +184,7 @@ function renderIssueCodeModificationSummary (
       '',
       String(
         safeMitigation.overview ??
-        'No concrete patch is ready yet, so the issue should stay as a summary thread until a code change is produced.'
+          'No concrete patch is ready yet, so the issue should stay as a summary thread until a code change is produced.'
       )
     )
     return lines.join('\n')
@@ -229,7 +216,7 @@ function renderIssueCodeModificationSummary (
   return lines.join('\n')
 }
 
-function renderSuggestedDraftPrSection (
+function renderSuggestedDraftPrSection(
   issue: IssueLike,
   draftPrPlan: DraftPrPlanLike | null,
   draftPullRequest: DraftPullRequestLike | null
@@ -261,16 +248,21 @@ function renderSuggestedDraftPrSection (
     lines.push(...residual_risks.map((item) => `- Residual Risk: ${item}`))
   }
 
-  lines.push('', 'Keep the issue comment short; put the full remediation narrative and any larger diff context into the draft PR.')
+  lines.push(
+    '',
+    'Keep the issue comment short; put the full remediation narrative and any larger diff context into the draft PR.'
+  )
 
   return lines.join('\n')
 }
 
-export function hasReviewRecordPatchReadyForPromotion (review_record: ReviewRecord | null | undefined): boolean {
+export function hasReviewRecordPatchReadyForPromotion(
+  review_record: ReviewRecord | null | undefined
+): boolean {
   return asList(review_record?.mitigation?.file_changes).length > 0
 }
 
-export function normalizePromotionFilePath (filePath: unknown): string {
+export function normalizePromotionFilePath(filePath: unknown): string {
   const rawValue = String(filePath ?? '').trim()
 
   if (!rawValue) {
@@ -294,7 +286,7 @@ export function normalizePromotionFilePath (filePath: unknown): string {
   return validateRepoRelativePath(normalized)
 }
 
-function normalizeDisplayFilePath (filePath: unknown): string {
+function normalizeDisplayFilePath(filePath: unknown): string {
   try {
     return normalizePromotionFilePath(filePath)
   } catch {
@@ -303,17 +295,21 @@ function normalizeDisplayFilePath (filePath: unknown): string {
   }
 }
 
-function normalizeDisplayFiles (items: unknown): string[] {
+function normalizeDisplayFiles(items: unknown): string[] {
   return Array.isArray(items)
-    ? [...new Set(
-        items
-          .map((item) => normalizeDisplayFilePath(item))
-          .filter((item): item is string => Boolean(item))
-      )]
+    ? [
+        ...new Set(
+          items
+            .map((item) => normalizeDisplayFilePath(item))
+            .filter((item): item is string => Boolean(item))
+        )
+      ]
     : []
 }
 
-function buildPatchPreviewFromReviewRecord (review_record: ReviewRecord | null | undefined): string | null {
+function buildPatchPreviewFromReviewRecord(
+  review_record: ReviewRecord | null | undefined
+): string | null {
   const patch = asNonEmptyString(review_record?.mitigation?.patch_diff)
   if (!patch) {
     return null
@@ -327,7 +323,7 @@ function buildPatchPreviewFromReviewRecord (review_record: ReviewRecord | null |
   return previewLines.join('\n').trim() || null
 }
 
-function renderFoldedBlock (summary: string, bodyLines: unknown): string[] {
+function renderFoldedBlock(summary: string, bodyLines: unknown): string[] {
   const lines = Array.isArray(bodyLines)
     ? bodyLines.filter((line) => line !== null && line !== undefined && line !== '')
     : []
@@ -346,15 +342,14 @@ function renderFoldedBlock (summary: string, bodyLines: unknown): string[] {
   ]
 }
 
-export function buildDraftPullRequestTitleFromReviewRecord (issue: IssueLike): string {
+export function buildDraftPullRequestTitleFromReviewRecord(issue: IssueLike): string {
   const shortTitle =
-    asNonEmptyString(issue.issue_title) ||
-    `Mitigate security issue #${issue.issue_number}`
+    asNonEmptyString(issue.issue_title) || `Mitigate security issue #${issue.issue_number}`
 
   return `[sec] ${shortTitle}`
 }
 
-export function buildDraftPullRequestBodyFromReviewRecord ({
+export function buildDraftPullRequestBodyFromReviewRecord({
   issue,
   review_record
 }: {
@@ -407,7 +402,9 @@ export function buildDraftPullRequestBodyFromReviewRecord ({
     `<!-- sec-review-bot-validation-level: ${verification.validation_level ?? 'unknown'} -->`,
     `<!-- sec-review-bot-changed-file-count: ${changed_files.length} -->`,
     `<!-- sec-review-bot-residual-risk-count: ${residual_risks.length} -->`,
-    ...residual_risks.map((item) => `<!-- sec-review-bot-residual-risk: ${escapeHtmlCommentValue(item)} -->`),
+    ...residual_risks.map(
+      (item) => `<!-- sec-review-bot-residual-risk: ${escapeHtmlCommentValue(item)} -->`
+    ),
     '',
     '## Summary',
     '',
@@ -420,8 +417,8 @@ export function buildDraftPullRequestBodyFromReviewRecord ({
     '',
     String(
       mitigation.overview ||
-      analysis.overview ||
-      `This change mitigates the security issue reported in #${issue.issue_number}.`
+        analysis.overview ||
+        `This change mitigates the security issue reported in #${issue.issue_number}.`
     ),
     ''
   ]
@@ -433,7 +430,9 @@ export function buildDraftPullRequestBodyFromReviewRecord ({
   if (visibleResidualRisks.length > 0) {
     const visibleRiskLines = visibleResidualRisks.map((item) => `- ${item}`)
     if (residual_risks.length > visibleResidualRisks.length) {
-      visibleRiskLines.push(`- (+${residual_risks.length - visibleResidualRisks.length} more item(s) in PR metadata comments)`)
+      visibleRiskLines.push(
+        `- (+${residual_risks.length - visibleResidualRisks.length} more item(s) in PR metadata comments)`
+      )
     }
     lines.push(...renderFoldedBlock('Residual Risks', visibleRiskLines), '')
   }
@@ -443,7 +442,7 @@ export function buildDraftPullRequestBodyFromReviewRecord ({
   return lines.join('\n')
 }
 
-export async function buildSuggestedDraftPrPlanFromReviewRecord ({
+export async function buildSuggestedDraftPrPlanFromReviewRecord({
   issue,
   review_record
 }: {
@@ -452,9 +451,7 @@ export async function buildSuggestedDraftPrPlanFromReviewRecord ({
 }): Promise<DraftPrPlanLike> {
   const changed_files = normalizeDisplayFiles(review_record?.mitigation?.changed_files)
   const patch_ready = hasReviewRecordPatchReadyForPromotion(review_record)
-  const patch_preview = patch_ready
-    ? buildPatchPreviewFromReviewRecord(review_record)
-    : null
+  const patch_preview = patch_ready ? buildPatchPreviewFromReviewRecord(review_record) : null
   const verification = review_record?.verification ?? EMPTY_VERIFICATION
   const title = buildDraftPullRequestTitleFromReviewRecord(issue)
 
@@ -482,7 +479,7 @@ export async function buildSuggestedDraftPrPlanFromReviewRecord ({
   }
 }
 
-export function renderIssueReviewCommentFromReviewRecord ({
+export function renderIssueReviewCommentFromReviewRecord({
   issue,
   review_record,
   draftPrPlan,
@@ -525,9 +522,9 @@ export function renderIssueReviewCommentFromReviewRecord ({
     `**Next Step:** ${inlineCode(draftPrPlan?.recommended_action ?? 'issue-only')}`,
     '',
     String(
-      verification.patch_coverage ? buildVerifierHeadline(verification) : (
-        analysis.overview ?? `Security review completed for issue #${issue.issue_number}.`
-      )
+      verification.patch_coverage
+        ? buildVerifierHeadline(verification)
+        : (analysis.overview ?? `Security review completed for issue #${issue.issue_number}.`)
     )
   ].join('\n')
 
@@ -538,15 +535,14 @@ export function renderIssueReviewCommentFromReviewRecord ({
       : renderIssueCodeModificationSummary(mitigation, draftPrPlan, draftPullRequest),
     draftPullRequest?.html_url
       ? null
-      : renderFoldedSection('Suggested Draft PR', renderSuggestedDraftPrSection(issue, draftPrPlan, draftPullRequest)),
-    draftPullRequest?.html_url
-      ? null
-      : renderFoldedSection('Analysis', analysisSection),
-    draftPullRequest?.html_url
-      ? null
-      : renderFoldedSection('Mitigation', mitigationSection),
-    draftPullRequest?.html_url
-      ? null
-      : renderFoldedSection('Verification', verificationSection)
-  ].filter((item): item is string => Boolean(item)).join('\n\n')
+      : renderFoldedSection(
+          'Suggested Draft PR',
+          renderSuggestedDraftPrSection(issue, draftPrPlan, draftPullRequest)
+        ),
+    draftPullRequest?.html_url ? null : renderFoldedSection('Analysis', analysisSection),
+    draftPullRequest?.html_url ? null : renderFoldedSection('Mitigation', mitigationSection),
+    draftPullRequest?.html_url ? null : renderFoldedSection('Verification', verificationSection)
+  ]
+    .filter((item): item is string => Boolean(item))
+    .join('\n\n')
 }

@@ -7,10 +7,14 @@ test('ReviewExecutionTracker waits for admitted preparation work during shutdown
   const tracker = new ReviewExecutionTracker()
   let finish: (() => void) | undefined
   let stopped = false
-  const execution = new Promise<void>((resolve) => { finish = resolve })
+  const execution = new Promise<void>((resolve) => {
+    finish = resolve
+  })
 
   tracker.start(execution)
-  const stopping = tracker.stop().then(() => { stopped = true })
+  const stopping = tracker.stop().then(() => {
+    stopped = true
+  })
   await Promise.resolve()
 
   assert.equal(stopped, false)
@@ -20,7 +24,7 @@ test('ReviewExecutionTracker waits for admitted preparation work during shutdown
 })
 
 test('ReviewExecutionTracker logs background failures with ingress context', async () => {
-  const logs: Array<{ event: string, fields: Record<string, unknown> }> = []
+  const logs: Array<{ event: string; fields: Record<string, unknown> }> = []
   const tracker = new ReviewExecutionTracker((event, fields) => logs.push({ event, fields }))
 
   tracker.start(Promise.reject(new Error('workspace failed')), {

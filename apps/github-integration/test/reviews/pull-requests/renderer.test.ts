@@ -7,14 +7,17 @@ test('pull request renderer preserves inline code in review prose', () => {
   const body = renderAnalysisSummaryCommentFromReviewRecord({
     analysis: {
       verdict: 'no-actionable-finding',
-      overview: 'The PR updates `agents/src/sec_review_agents/resources/prompts/memory/extract-system.md`.',
-      narratives: [{
-        priority: 1,
-        title: 'Prompt refinement',
-        verdict: 'no-actionable-finding',
-        description: '`MemoryObservationOutput` remains unchanged.',
-        locations: []
-      }]
+      overview:
+        'The PR updates `agents/src/sec_review_agents/resources/prompts/memory/extract-system.md`.',
+      narratives: [
+        {
+          priority: 1,
+          title: 'Prompt refinement',
+          verdict: 'no-actionable-finding',
+          description: '`MemoryObservationOutput` remains unchanged.',
+          locations: []
+        }
+      ]
     },
     mitigation: {
       overview: null,
@@ -30,15 +33,16 @@ test('pull request renderer preserves inline code in review prose', () => {
       regression_status: 'not-run',
       resolution_next_step: 'none',
       patch_findings: [],
-      verification_findings: [
-        '`agents/tests/memory/test_memory.py` covers the prompt contract.'
-      ],
+      verification_findings: ['`agents/tests/memory/test_memory.py` covers the prompt contract.'],
       residual_risks: []
     },
     cvss: null
   })
 
-  assert.match(body, /`agents\/src\/sec_review_agents\/resources\/prompts\/memory\/extract-system\.md`/)
+  assert.match(
+    body,
+    /`agents\/src\/sec_review_agents\/resources\/prompts\/memory\/extract-system\.md`/
+  )
   assert.match(body, /`MemoryObservationOutput` remains unchanged\./)
   assert.match(body, /`load_prompt_resource`/)
   assert.match(body, /`agents\/tests\/memory\/test_memory\.py`/)

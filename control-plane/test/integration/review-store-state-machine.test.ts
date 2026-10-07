@@ -7,14 +7,19 @@ import { ReviewRunStore } from '../../src/index.js'
 
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
-function requireTestDatabase (): string {
-  if (!connectionString) throw new Error('TEST_DATABASE_URL is required for PostgreSQL store tests.')
+function requireTestDatabase(): string {
+  if (!connectionString)
+    throw new Error('TEST_DATABASE_URL is required for PostgreSQL store tests.')
   return connectionString
 }
 
-function connectorId (): string { return `test:${randomUUID()}` }
+function connectorId(): string {
+  return `test:${randomUUID()}`
+}
 
-async function createStore (options: { connectorId?: string, claimTimeoutMs?: number } = {}): Promise<ReviewRunStore> {
+async function createStore(
+  options: { connectorId?: string; claimTimeoutMs?: number } = {}
+): Promise<ReviewRunStore> {
   const store = new ReviewRunStore({
     connectionString: requireTestDatabase(),
     connectorId: options.connectorId ?? connectorId(),
@@ -24,17 +29,30 @@ async function createStore (options: { connectorId?: string, claimTimeoutMs?: nu
   return store
 }
 
-async function createQueuedRun (store: ReviewRunStore, runId = `run-${randomUUID()}`): Promise<string> {
+async function createQueuedRun(
+  store: ReviewRunStore,
+  runId = `run-${randomUUID()}`
+): Promise<string> {
   const context = {}
-  const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: context })
+  const admission = await store.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: runId,
+    publish_context: context
+  })
   assert.ok(admission.preparation_token)
   await store.mark_queued(runId, admission.preparation_token, context)
   return runId
 }
 
-async function createSuccessfulRun (store: ReviewRunStore, runId = `run-${randomUUID()}`): Promise<string> {
+async function createSuccessfulRun(
+  store: ReviewRunStore,
+  runId = `run-${randomUUID()}`
+): Promise<string> {
   await createQueuedRun(store, runId)
-  assert.equal(await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'not_available' }), true)
+  assert.equal(
+    await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'not_available' }),
+    true
+  )
   return runId
 }
 
@@ -51,7 +69,10 @@ test('ReviewRunStore prevents cross-connector access to a globally unique run id
     // run_id is currently a global primary key, while connector_id fences
     // reads and claims. A second connector must not create or see the first
     // connector's run under that identity.
-    await assert.rejects(createQueuedRun(second, runId), /duplicate key value violates unique constraint/)
+    await assert.rejects(
+      createQueuedRun(second, runId),
+      /duplicate key value violates unique constraint/
+    )
     assert.equal(await second.getRun(runId), null)
     assert.equal((await first.listActiveRuns()).length, 1)
     assert.equal((await second.listActiveRuns()).length, 0)
@@ -80,19 +101,32 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
       }
     }
     await store.recordArtifactPublication(queuedId, artifactPublication)
-    await store.create_preparing_review_run({ workflow: 'issue-review', run_id: `run-${randomUUID()}`, publish_context: {} })
+    await store.create_preparing_review_run({
+      workflow: 'issue-review',
+      run_id: `run-${randomUUID()}`,
+      publish_context: {}
+    })
     const queued = await store.getRun(queuedId)
     assert.equal(queued?.status, 'queued')
     assert.deepEqual(queued?.artifact_publication, artifactPublication)
-    assert.deepEqual((await store.listActiveRuns()).map(run => run.run_id), [queuedId])
-  } finally { await store.close() }
+    assert.deepEqual(
+      (await store.listActiveRuns()).map((run) => run.run_id),
+      [queuedId]
+    )
+  } finally {
+    await store.close()
+  }
 })
 
 test('ReviewRunStore terminates preparation after its claim expires', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-stale-preparation-${randomUUID()}`
   try {
-    await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
+    await store.create_preparing_review_run({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
 
     assert.equal(await store.expireStalePreparations(), 1)
     const run = await store.getRun(runId)
@@ -100,7 +134,9 @@ test('ReviewRunStore terminates preparation after its claim expires', async () =
     assert.equal(run?.failure_code, 'PREPARATION_INTERRUPTED')
     assert.equal(await store.claimPublication(runId), null)
     assert.equal(await store.expireStalePreparations(), 0)
-  } finally { await store.close() }
+  } finally {
+    await store.close()
+  }
 })
 
 test('ReviewRunStore keeps an admitted run queryable after preparation fails', async () => {
@@ -142,31 +178,48 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
     })
     assert.equal(replay.created, false)
     assert.equal(replay.record.run_id, runId)
-  } finally { await store.close() }
+  } finally {
+    await store.close()
+  }
 })
 
 test('ReviewRunStore records one immutable schema version across concurrent initialization', async () => {
-  const first = new ReviewRunStore({ connectionString: requireTestDatabase(), connectorId: connectorId() })
-  const second = new ReviewRunStore({ connectionString: requireTestDatabase(), connectorId: connectorId() })
+  const first = new ReviewRunStore({
+    connectionString: requireTestDatabase(),
+    connectorId: connectorId()
+  })
+  const second = new ReviewRunStore({
+    connectionString: requireTestDatabase(),
+    connectorId: connectorId()
+  })
   try {
     await Promise.all([first.initialize(), second.initialize()])
     const observer = new Pool({ connectionString: requireTestDatabase() })
-    const versions = (await observer.query<{ version: number, name: string, checksum: string }>(
-      'SELECT version,name,checksum FROM schema_versions ORDER BY version'
-    )).rows
+    const versions = (
+      await observer.query<{ version: number; name: string; checksum: string }>(
+        'SELECT version,name,checksum FROM schema_versions ORDER BY version'
+      )
+    ).rows
     await observer.end()
-    assert.deepEqual(versions.map(item => [item.version, item.name]), [
-      [1, 'initial_coordination_schema']
-    ])
+    assert.deepEqual(
+      versions.map((item) => [item.version, item.name]),
+      [[1, 'initial_coordination_schema']]
+    )
     for (const version of versions) assert.match(version.checksum, /^[a-f0-9]{64}$/)
-  } finally { await Promise.all([first.close(), second.close()]) }
+  } finally {
+    await Promise.all([first.close(), second.close()])
+  }
 })
 
 test('ReviewRunStore initialization does not steal another replica preparation', async () => {
   const sharedConnector = connectorId()
   const runId = `run-${randomUUID()}`
   const first = await createStore({ connectorId: sharedConnector })
-  await first.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
+  await first.create_preparing_review_run({
+    workflow: 'issue-review',
+    run_id: runId,
+    publish_context: {}
+  })
   await first.close()
 
   const restarted = await createStore({ connectorId: sharedConnector })
@@ -174,7 +227,9 @@ test('ReviewRunStore initialization does not steal another replica preparation',
     const record = await restarted.getRun(runId)
     assert.equal(record?.status, 'preparing')
     assert.equal(record?.failure_code, null)
-  } finally { await restarted.close() }
+  } finally {
+    await restarted.close()
+  }
 })
 
 test('ReviewRunStore atomically deduplicates concurrent ingress across connections', async () => {
@@ -192,9 +247,11 @@ test('ReviewRunStore atomically deduplicates concurrent ingress across connectio
       first.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` }),
       second.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` })
     ])
-    assert.equal(admissions.filter(item => item.created).length, 1)
-    assert.equal(new Set(admissions.map(item => item.record.run_id)).size, 1)
-  } finally { await Promise.all([first.close(), second.close()]) }
+    assert.equal(admissions.filter((item) => item.created).length, 1)
+    assert.equal(new Set(admissions.map((item) => item.record.run_id)).size, 1)
+  } finally {
+    await Promise.all([first.close(), second.close()])
+  }
 })
 
 test('ReviewRunStore fences a stale preparation owner after ingress takeover', async () => {
@@ -224,22 +281,38 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
       /cannot transition/
     )
     await assert.rejects(
-      ownerA.failPreparation(first.record.run_id, first.preparation_token, { message: 'late failure' }),
+      ownerA.failPreparation(first.record.run_id, first.preparation_token, {
+        message: 'late failure'
+      }),
       /claim was lost/
     )
     await ownerB.mark_queued(takeover.record.run_id, takeover.preparation_token, {})
     assert.equal((await ownerA.getRun(first.record.run_id))?.status, 'queued')
-  } finally { await Promise.all([ownerA.close(), ownerB.close()]) }
+  } finally {
+    await Promise.all([ownerA.close(), ownerB.close()])
+  }
 })
 
 test('ReviewRunStore recovers an uncertain submission with a fenced claim', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-${randomUUID()}`
   try {
-    const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
+    const admission = await store.create_preparing_review_run({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
     assert.ok(admission.preparation_token)
-    await store.save_prepared_submission(runId, admission.preparation_token, {}, { contract_version: 'v5' })
-    await store.failPreparation(runId, admission.preparation_token, { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
+    await store.save_prepared_submission(
+      runId,
+      admission.preparation_token,
+      {},
+      { contract_version: 'v5' }
+    )
+    await store.failPreparation(runId, admission.preparation_token, {
+      code: 'SUBMISSION_STATE_UNCERTAIN',
+      message: 'response lost'
+    })
     const staleToken = await store.claimSubmissionRecovery(runId)
     const currentToken = await store.claimSubmissionRecovery(runId)
     assert.ok(staleToken)
@@ -248,8 +321,13 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
     assert.equal(await store.completeSubmissionRecovery(runId, staleToken), false)
     assert.equal(await store.completeSubmissionRecovery(runId, currentToken), true)
     assert.equal((await store.getRun(runId))?.status, 'queued')
-    assert.equal((await store.listActiveRuns()).some(run => run.run_id === runId), true)
-  } finally { await store.close() }
+    assert.equal(
+      (await store.listActiveRuns()).some((run) => run.run_id === runId),
+      true
+    )
+  } finally {
+    await store.close()
+  }
 })
 
 test('ReviewRunStore fences a stale publisher after another connection takes over', async () => {
@@ -264,11 +342,16 @@ test('ReviewRunStore fences a stale publisher after another connection takes ove
     assert.ok(currentToken)
     assert.notEqual(staleToken, currentToken)
     assert.equal(await ownerA.completePublication(runId, staleToken), false)
-    assert.equal(await ownerA.failPublication(runId, staleToken, { message: 'late failure' }, { retry: true }), false)
+    assert.equal(
+      await ownerA.failPublication(runId, staleToken, { message: 'late failure' }, { retry: true }),
+      false
+    )
     assert.equal(await ownerB.completePublication(runId, currentToken), true)
     const record = await ownerA.getRun(runId)
     assert.equal(record?.status, 'published')
-  } finally { await Promise.all([ownerA.close(), ownerB.close()]) }
+  } finally {
+    await Promise.all([ownerA.close(), ownerB.close()])
+  }
 })
 
 test('ReviewRunStore spends retry budget only for the current publication owner', async () => {
@@ -277,11 +360,21 @@ test('ReviewRunStore spends retry budget only for the current publication owner'
   try {
     const token = await store.claimPublication(runId)
     assert.ok(token)
-    assert.equal(await store.failPublication(runId, token, { code: 'HTTP_503', message: 'unavailable' }, { retry: true }), true)
+    assert.equal(
+      await store.failPublication(
+        runId,
+        token,
+        { code: 'HTTP_503', message: 'unavailable' },
+        { retry: true }
+      ),
+      true
+    )
     const record = await store.getRun(runId)
     assert.equal(record?.status, 'succeeded')
     assert.deepEqual(await store.listActiveRuns(), [])
-  } finally { await store.close() }
+  } finally {
+    await store.close()
+  }
 })
 
 test('ReviewRunStore fences publication step commits with the current publication token', async () => {
@@ -295,9 +388,19 @@ test('ReviewRunStore fences publication step commits with the current publicatio
 
     const currentToken = await store.claimPublication(runId)
     assert.ok(currentToken)
-    assert.equal(await store.completePublicationStep(runId, staleToken, 'repository:summary-issue', { id: 7 }), false)
-    assert.equal(await store.failPublicationStep(runId, staleToken, 'repository:summary-issue', { message: 'late failure' }), false)
-  } finally { await store.close() }
+    assert.equal(
+      await store.completePublicationStep(runId, staleToken, 'repository:summary-issue', { id: 7 }),
+      false
+    )
+    assert.equal(
+      await store.failPublicationStep(runId, staleToken, 'repository:summary-issue', {
+        message: 'late failure'
+      }),
+      false
+    )
+  } finally {
+    await store.close()
+  }
 })
 
 test('ReviewRunStore reports an exhausted publication step as deterministic', async () => {
@@ -307,36 +410,59 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const token = await store.claimPublication(runId)
       assert.ok(token)
-      if (attempt === 0) await store.initializePublicationSteps(runId, token, ['issue:summary-comment'])
+      if (attempt === 0)
+        await store.initializePublicationSteps(runId, token, ['issue:summary-comment'])
       await store.requirePublicationStepClaim(runId, token, 'issue:summary-comment')
-      assert.equal(await store.failPublicationStep(runId, token, 'issue:summary-comment', { message: 'temporary failure' }), true)
-      assert.equal(await store.failPublication(runId, token, { message: 'temporary failure' }, { retry: true }), true)
+      assert.equal(
+        await store.failPublicationStep(runId, token, 'issue:summary-comment', {
+          message: 'temporary failure'
+        }),
+        true
+      )
+      assert.equal(
+        await store.failPublication(
+          runId,
+          token,
+          { message: 'temporary failure' },
+          { retry: true }
+        ),
+        true
+      )
     }
 
     const finalToken = await store.claimPublication(runId)
     assert.ok(finalToken)
     await assert.rejects(
       store.requirePublicationStepClaim(runId, finalToken, 'issue:summary-comment'),
-      (error: unknown) => error instanceof Error &&
-        'code' in error && error.code === 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+      (error: unknown) =>
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'PUBLICATION_STEP_RETRY_EXHAUSTED'
     )
     assert.equal((await store.listPublicationSteps(runId))[0]?.status, 'terminal_failed')
-  } finally { await store.close() }
+  } finally {
+    await store.close()
+  }
 })
 
 test('ReviewRunStore records Runner execution failure without publication failure', async () => {
   const store = await createStore()
   const runId = await createQueuedRun(store)
   try {
-    assert.equal(await store.failRunnerExecution(runId, {
-      code: 'RUNNER_EXECUTION_FAILED',
-      message: 'Agent execution failed.'
-    }), true)
+    assert.equal(
+      await store.failRunnerExecution(runId, {
+        code: 'RUNNER_EXECUTION_FAILED',
+        message: 'Agent execution failed.'
+      }),
+      true
+    )
     const record = await store.getRun(runId)
     assert.equal(record?.status, 'failed')
     assert.equal(record?.failure_code, 'RUNNER_EXECUTION_FAILED')
     assert.equal(await store.claimPublication(runId), null)
-  } finally { await store.close() }
+  } finally {
+    await store.close()
+  }
 })
 
 test('ReviewRunStore renews a publication claim before another owner can take it', async () => {
@@ -348,7 +474,10 @@ test('ReviewRunStore renews a publication claim before another owner can take it
   try {
     const token = await ownerA.claimPublication(runId)
     assert.ok(token)
-    await observer.query('UPDATE publications SET claimed_at=clock_timestamp()-interval \'2 seconds\' WHERE run_id=$1 AND connector_id=$2', [runId, sharedConnector])
+    await observer.query(
+      "UPDATE publications SET claimed_at=clock_timestamp()-interval '2 seconds' WHERE run_id=$1 AND connector_id=$2",
+      [runId, sharedConnector]
+    )
     assert.equal(await ownerA.renewPublicationClaim(runId, token), true)
     assert.equal(await ownerB.claimPublication(runId), null)
   } finally {

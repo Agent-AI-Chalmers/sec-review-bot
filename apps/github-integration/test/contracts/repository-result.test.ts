@@ -18,8 +18,10 @@ interface RepositoryResultFixture {
   [key: string]: unknown
 }
 
-function validRepositoryResult (): RepositoryResultFixture {
-  return structuredClone(contractFixture('v5', 'repository-review-result.json')) as RepositoryResultFixture
+function validRepositoryResult(): RepositoryResultFixture {
+  return structuredClone(
+    contractFixture('v5', 'repository-review-result.json')
+  ) as RepositoryResultFixture
 }
 
 test('repository result rejects malformed delivery file changes before draft PR publishing', () => {
@@ -29,14 +31,13 @@ test('repository result rejects malformed delivery file changes before draft PR 
     status: 'deleted'
   })
 
-  assert.throws(
-    () => parseRepositoryWorkflowResult(result),
-    /duplicate file change entries/
-  )
+  assert.throws(() => parseRepositoryWorkflowResult(result), /duplicate file change entries/)
 })
 
 test('repository result parser accepts the shared v5 repository result fixture', () => {
-  const result = parseRepositoryWorkflowResult(contractFixture('v5', 'repository-review-result.json'))
+  const result = parseRepositoryWorkflowResult(
+    contractFixture('v5', 'repository-review-result.json')
+  )
 
   assert.equal(result.contract_version, 'v5')
   assert.equal(result.case_results.at(0)?.case_id, 'case-1')
@@ -44,7 +45,9 @@ test('repository result parser accepts the shared v5 repository result fixture',
 })
 
 test('repository result parser accepts the shared v5 blocked result fixture', () => {
-  const result = parseRepositoryWorkflowResult(contractFixture('v5', 'repository-review-result-blocked.json'))
+  const result = parseRepositoryWorkflowResult(
+    contractFixture('v5', 'repository-review-result-blocked.json')
+  )
 
   assert.equal(result.contract_version, 'v5')
   assert.equal(result.case_results.at(0)?.disposition, 'blocked')
@@ -55,19 +58,17 @@ test('repository result rejects duplicate delivery identities', () => {
   const result = validRepositoryResult()
   result.deliveries.push(structuredClone(result.deliveries[0]))
 
-  assert.throws(
-    () => parseRepositoryWorkflowResult(result),
-    /duplicate delivery_id/
-  )
+  assert.throws(() => parseRepositoryWorkflowResult(result), /duplicate delivery_id/)
 })
 
 test('repository result rejects malformed v5 result before draft PR publishing', () => {
   assert.throws(
-    () => parseRepositoryWorkflowResult({
-      scan_summary: {},
-      case_results: [],
-      deliveries: []
-    }),
+    () =>
+      parseRepositoryWorkflowResult({
+        scan_summary: {},
+        case_results: [],
+        deliveries: []
+      }),
     /repository-review result does not match contract v5/
   )
 })
@@ -126,9 +127,6 @@ for (const [path, message] of [
     const result = validRepositoryResult()
     result.deliveries[0].file_changes[0].path = path
 
-    assert.throws(
-      () => parseRepositoryWorkflowResult(result),
-      message
-    )
+    assert.throws(() => parseRepositoryWorkflowResult(result), message)
   })
 }

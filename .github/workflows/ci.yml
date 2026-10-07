@@ -133,10 +133,13 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm run lint
+        run: |
+          pnpm run format:check
+          pnpm run lint
 
       - name: Check Control Plane
         run: |
+          pnpm --dir ../../control-plane run format:check
           pnpm --dir ../../control-plane run lint
           pnpm --dir ../../control-plane run typecheck
           pnpm --dir ../../control-plane test

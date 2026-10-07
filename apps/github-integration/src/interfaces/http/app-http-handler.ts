@@ -17,18 +17,23 @@ interface AppHttpHandlerOptions {
   webhook_middleware: NodeHttpMiddleware
 }
 
-function writeJson (response: ServerResponse, status_code: number, value: Record<string, unknown>): void {
+function writeJson(
+  response: ServerResponse,
+  status_code: number,
+  value: Record<string, unknown>
+): void {
   response.statusCode = status_code
   response.setHeader('content-type', 'application/json; charset=utf-8')
   response.end(JSON.stringify(value))
 }
 
-function requestUrlFromNodeRequest (request: IncomingMessage, port: string | number): URL | null {
+function requestUrlFromNodeRequest(request: IncomingMessage, port: string | number): URL | null {
   const requestPath = typeof request.url === 'string' && request.url.length > 0 ? request.url : '/'
   // Some probes/proxies send an empty Host header; treat that as missing and use a safe local fallback.
-  const requestHost = typeof request.headers.host === 'string' && request.headers.host.trim().length > 0
-    ? request.headers.host.trim()
-    : `localhost:${port}`
+  const requestHost =
+    typeof request.headers.host === 'string' && request.headers.host.trim().length > 0
+      ? request.headers.host.trim()
+      : `localhost:${port}`
 
   try {
     return new URL(requestPath, `http://${requestHost}`)
@@ -37,7 +42,7 @@ function requestUrlFromNodeRequest (request: IncomingMessage, port: string | num
   }
 }
 
-export function createAppHttpHandler ({
+export function createAppHttpHandler({
   app,
   port,
   repository_review_dispatch_path,

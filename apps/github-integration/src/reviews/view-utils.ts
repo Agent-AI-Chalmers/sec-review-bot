@@ -1,18 +1,20 @@
 export type AnyRecord = Record<string, unknown>
 
-export function asList<T = unknown> (value: unknown): T[] {
-  return Array.isArray(value) ? value as T[] : []
+export function asList<T = unknown>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : []
 }
 
-export function isRecord (value: unknown): value is AnyRecord {
+export function isRecord(value: unknown): value is AnyRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-export function nonEmptyText (value: unknown): string {
-  return String(value ?? '').replace(/\s+/g, ' ').trim()
+export function nonEmptyText(value: unknown): string {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
-export function optionalNumber (value: unknown): number | null {
+export function optionalNumber(value: unknown): number | null {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null
   }
@@ -23,7 +25,7 @@ export function optionalNumber (value: unknown): number | null {
   return null
 }
 
-export function cvssSeverityRank (severity: unknown): number {
+export function cvssSeverityRank(severity: unknown): number {
   switch (String(severity ?? '').toLowerCase()) {
     case 'critical':
       return 5
@@ -40,7 +42,7 @@ export function cvssSeverityRank (severity: unknown): number {
   }
 }
 
-export function displayText (value: unknown, fallback = ''): string {
+export function displayText(value: unknown, fallback = ''): string {
   if (typeof value === 'string') {
     return value
   }
@@ -50,7 +52,7 @@ export function displayText (value: unknown, fallback = ''): string {
   return fallback
 }
 
-export function inlineCode (value: unknown, fallback = 'unknown'): string {
+export function inlineCode(value: unknown, fallback = 'unknown'): string {
   const text = displayText(value, fallback)
   const longestRun = Math.max(0, ...Array.from(text.matchAll(/`+/g), (match) => match[0].length))
   const fence = '`'.repeat(longestRun + 1)
@@ -58,14 +60,14 @@ export function inlineCode (value: unknown, fallback = 'unknown'): string {
   return `${fence}${padding}${text}${padding}${fence}`
 }
 
-export function formatFindingSummary (item: unknown): string {
+export function formatFindingSummary(item: unknown): string {
   if (isRecord(item)) {
     return nonEmptyText(item.summary)
   }
   return nonEmptyText(item)
 }
 
-export function renderChangedFilesLines (
+export function renderChangedFilesLines(
   changedFiles: unknown,
   options: { emptyText?: string } = {}
 ): string[] {
@@ -77,27 +79,21 @@ export function renderChangedFilesLines (
     return options.emptyText ? [options.emptyText] : []
   }
 
-  return [
-    'Changed files:',
-    '',
-    ...items.map((item) => `- ${inlineCode(item)}`)
-  ]
+  return ['Changed files:', '', ...items.map((item) => `- ${inlineCode(item)}`)]
 }
 
-export function renderLabeledListLines (
+export function renderLabeledListLines(
   label: string,
   items: unknown,
   formatter: (item: unknown) => string = nonEmptyText
 ): string[] {
-  const lines = asList(items).map(formatter).filter((item) => item.length > 0)
+  const lines = asList(items)
+    .map(formatter)
+    .filter((item) => item.length > 0)
   if (lines.length === 0) {
     return []
   }
-  return [
-    '',
-    `${label}:`,
-    ...lines.map((item) => `- ${item}`)
-  ]
+  return ['', `${label}:`, ...lines.map((item) => `- ${item}`)]
 }
 
 export interface VerificationSummaryLineOptions {
@@ -110,7 +106,7 @@ export interface VerificationSummaryLineOptions {
   listItemFormatter?: (item: unknown) => string
 }
 
-export function renderVerificationSummaryLines (
+export function renderVerificationSummaryLines(
   verification: AnyRecord,
   options: VerificationSummaryLineOptions = {}
 ): string[] {
@@ -136,9 +132,7 @@ export function renderVerificationSummaryLines (
 
   const resolutionNextStep = nonEmptyText(verification.resolution_next_step)
   if (resolutionNextStep || options.includeUnknownResolutionNextStep) {
-    lines.push(
-      `- Resolution next step: ${inlineCode(resolutionNextStep || 'unknown')}`
-    )
+    lines.push(`- Resolution next step: ${inlineCode(resolutionNextStep || 'unknown')}`)
   }
 
   lines.push(`- Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`)
@@ -156,27 +150,19 @@ export function renderVerificationSummaryLines (
   }
 
   lines.push(
-    ...renderLabeledListLines(
-      'Patch findings',
-      verification.patch_findings,
-      listItemFormatter
-    ),
+    ...renderLabeledListLines('Patch findings', verification.patch_findings, listItemFormatter),
     ...renderLabeledListLines(
       'Verification findings',
       verification.verification_findings,
       listItemFormatter
     ),
-    ...renderLabeledListLines(
-      'Residual risks',
-      verification.residual_risks,
-      listItemFormatter
-    )
+    ...renderLabeledListLines('Residual risks', verification.residual_risks, listItemFormatter)
   )
 
   return lines
 }
 
-function renderStringListSection (heading: string, values: unknown): string[] {
+function renderStringListSection(heading: string, values: unknown): string[] {
   const items = asList(values)
     .map((item) => nonEmptyText(item))
     .filter((item) => item.length > 0)
@@ -185,15 +171,10 @@ function renderStringListSection (heading: string, values: unknown): string[] {
     return []
   }
 
-  return [
-    '',
-    `${heading}:`,
-    '',
-    ...items.map((item) => `- ${item}`)
-  ]
+  return ['', `${heading}:`, '', ...items.map((item) => `- ${item}`)]
 }
 
-function renderLocationList (locations: unknown): string[] {
+function renderLocationList(locations: unknown): string[] {
   const items = asList<AnyRecord>(locations).filter(isRecord)
   if (items.length === 0) {
     return []
@@ -213,7 +194,7 @@ function renderLocationList (locations: unknown): string[] {
   ]
 }
 
-function renderReviewedNearbyPaths (paths: unknown): string[] {
+function renderReviewedNearbyPaths(paths: unknown): string[] {
   const items = asList<AnyRecord>(paths).filter(isRecord)
   if (items.length === 0) {
     return []
@@ -234,7 +215,7 @@ function renderReviewedNearbyPaths (paths: unknown): string[] {
   ]
 }
 
-function renderControlReview (control_review: unknown): string[] {
+function renderControlReview(control_review: unknown): string[] {
   if (!isRecord(control_review)) {
     return []
   }
@@ -248,7 +229,7 @@ function renderControlReview (control_review: unknown): string[] {
   return lines.length > 0 ? ['', 'Control review:', ...lines] : []
 }
 
-function sortedAnalysisNarratives (narratives: unknown): AnyRecord[] {
+function sortedAnalysisNarratives(narratives: unknown): AnyRecord[] {
   return asList<AnyRecord>(narratives)
     .filter(isRecord)
     .sort((left, right) => {
@@ -258,7 +239,7 @@ function sortedAnalysisNarratives (narratives: unknown): AnyRecord[] {
     })
 }
 
-function analysisNarrativeBodyLines (item: AnyRecord): string[] {
+function analysisNarrativeBodyLines(item: AnyRecord): string[] {
   const flow_review = isRecord(item.flow_review) ? item.flow_review : {}
   const support_review = isRecord(item.support_review) ? item.support_review : {}
   const scope_review = isRecord(item.scope_review) ? item.scope_review : {}
@@ -269,7 +250,10 @@ function analysisNarrativeBodyLines (item: AnyRecord): string[] {
     ['Validation level', item.validation_level],
     ['Scope shape', scope_review.scope_shape],
     ['Shared boundary', scope_review.shared_boundary],
-    ['CWE', [cwe_mapping.cwe_id, cwe_mapping.cwe_name].map(nonEmptyText).filter(Boolean).join(' - ')]
+    [
+      'CWE',
+      [cwe_mapping.cwe_id, cwe_mapping.cwe_name].map(nonEmptyText).filter(Boolean).join(' - ')
+    ]
   ]
     .map(([key, value]) => [key, nonEmptyText(value)] as const)
     .filter(([, value]) => value.length > 0)
@@ -304,7 +288,7 @@ function analysisNarrativeBodyLines (item: AnyRecord): string[] {
   return lines
 }
 
-export function renderAnalysisNarratives (narratives: unknown): string[] {
+export function renderAnalysisNarratives(narratives: unknown): string[] {
   const items = sortedAnalysisNarratives(narratives)
   if (items.length === 0) {
     return []

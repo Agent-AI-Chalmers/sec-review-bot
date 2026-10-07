@@ -21,7 +21,7 @@ export interface PublicationStepSummary {
   failure_code: string | null
 }
 
-export function observeRun (run: ReviewRunRecord): ObservedRun {
+export function observeRun(run: ReviewRunRecord): ObservedRun {
   return {
     run_id: run.run_id,
     workflow: run.workflow,

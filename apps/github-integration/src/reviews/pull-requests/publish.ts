@@ -1,12 +1,20 @@
-import { createPullRequestReviewUnlessMarkerExists, type PullRequestReviewEvent } from '../../infrastructure/github/comment-service.js'
+import {
+  createPullRequestReviewUnlessMarkerExists,
+  type PullRequestReviewEvent
+} from '../../infrastructure/github/comment-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import { completedRunnerRunResult, type RunnerRunStatus } from '../../infrastructure/runner/client.js'
+import {
+  completedRunnerRunResult,
+  type RunnerRunStatus
+} from '../../infrastructure/runner/client.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
 import { DeterministicRunnerPublishError } from '../../infrastructure/runner/publish-error.js'
-import { parsePullRequestReviewPublishContext, type PersistedPullRequest, type PersistedPullRequestFile } from '../../infrastructure/runner/publish-context.js'
 import {
-  renderAnalysisSummaryCommentFromReviewRecord
-} from './renderer.js'
+  parsePullRequestReviewPublishContext,
+  type PersistedPullRequest,
+  type PersistedPullRequestFile
+} from '../../infrastructure/runner/publish-context.js'
+import { renderAnalysisSummaryCommentFromReviewRecord } from './renderer.js'
 import {
   generateSuggestionCandidatesFromReviewRecord,
   publishSuggestionReview
@@ -57,21 +65,23 @@ type CompletedRunnerRun = {
   publish_context: Record<string, unknown>
 }
 
-function asErrorMessage (error: unknown): string {
+function asErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
   return String(error)
 }
 
-function pullRequestReviewResultFromRunStatus (status: RunnerRunStatus): PullRequestReviewWorkflowResult | null {
+function pullRequestReviewResultFromRunStatus(
+  status: RunnerRunStatus
+): PullRequestReviewWorkflowResult | null {
   const completed = completedRunnerRunResult(status)
   if (completed === null) {
     return null
   }
   try {
     assertV5WorkflowResult('pull-request-review', completed.result)
-    const rawResult = completed.result as { contract_version: 'v5', review_record: unknown }
+    const rawResult = completed.result as { contract_version: 'v5'; review_record: unknown }
     return {
       contract_version: 'v5',
       review_record: parseReviewRecord(rawResult.review_record)
@@ -87,7 +97,7 @@ function pullRequestReviewResultFromRunStatus (status: RunnerRunStatus): PullReq
   }
 }
 
-export async function handlePullRequestReviewRun ({
+export async function handlePullRequestReviewRun({
   run,
   status,
   store,
@@ -118,30 +128,33 @@ export async function handlePullRequestReviewRun ({
   })
 }
 
-function shouldPublishSuggestions (review_record: ReviewRecord | null | undefined): boolean {
-  return typeof review_record?.mitigation?.patch_diff === 'string' &&
+function shouldPublishSuggestions(review_record: ReviewRecord | null | undefined): boolean {
+  return (
+    typeof review_record?.mitigation?.patch_diff === 'string' &&
     review_record.mitigation.patch_diff.trim() !== ''
+  )
 }
 
-function pullRequestReviewRunMarker (run_id: string): string {
+function pullRequestReviewRunMarker(run_id: string): string {
   // Publication retries use this identity to recover a review accepted by GitHub
   // when the response or the following local state update was lost.
   return `<!-- sec-review-bot:pull-request-review-run:${run_id} -->`
 }
 
-function normalizeLogin (login: unknown): string | null {
-  return typeof login === 'string' && login.trim() !== ''
-    ? login.trim().toLowerCase()
-    : null
+function normalizeLogin(login: unknown): string | null {
+  return typeof login === 'string' && login.trim() !== '' ? login.trim().toLowerCase() : null
 }
 
-function isAuthoredByCurrentAppBot (pr: PersistedPullRequest): boolean {
+function isAuthoredByCurrentAppBot(pr: PersistedPullRequest): boolean {
   const author_login = normalizeLogin(pr.pr_author)
   const appBotLogin = normalizeLogin(getGitHubAppMetadata().bot_login)
   return author_login !== null && appBotLogin !== null && author_login === appBotLogin
 }
 
-function reviewEventForRecord (review_record: ReviewRecord, pr: PersistedPullRequest): PullRequestReviewEvent {
+function reviewEventForRecord(
+  review_record: ReviewRecord,
+  pr: PersistedPullRequest
+): PullRequestReviewEvent {
   // The app should leave evidence on its own PRs, not create reviewer state for itself.
   if (isAuthoredByCurrentAppBot(pr)) {
     return 'COMMENT'
@@ -167,7 +180,10 @@ function reviewEventForRecord (review_record: ReviewRecord, pr: PersistedPullReq
   return 'COMMENT'
 }
 
-function appendUnmappedSuggestionSection (review_body: string, manifest: SuggestionManifestLike): string {
+function appendUnmappedSuggestionSection(
+  review_body: string,
+  manifest: SuggestionManifestLike
+): string {
   const unmapped = Array.isArray(manifest.unmapped_changes) ? manifest.unmapped_changes : []
   if (unmapped.length === 0) {
     return review_body
@@ -187,9 +203,7 @@ function appendUnmappedSuggestionSection (review_body: string, manifest: Suggest
     const hunk = item.hunk ?? {}
     const new_start = Number(hunk.new_start ?? 0)
     const new_count = Number(hunk.new_count ?? 0)
-    const range = new_start > 0 && new_count > 0
-      ? ` [new:${new_start}, count:${new_count}]`
-      : ''
+    const range = new_start > 0 && new_count > 0 ? ` [new:${new_start}, count:${new_count}]` : ''
     lines.push(`- \`${path}\`${range}: ${reason}`)
   }
 
@@ -200,7 +214,7 @@ function appendUnmappedSuggestionSection (review_body: string, manifest: Suggest
   return `${review_body}\n${lines.join('\n')}`
 }
 
-async function publishPullRequestReviewResult ({
+async function publishPullRequestReviewResult({
   octokit,
   pr,
   files: reviewFiles,
@@ -225,20 +239,39 @@ async function publishPullRequestReviewResult ({
   if (persisted?.status === 'succeeded') return
   await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
   try {
-    await publishPullRequestReviewSideEffect({ octokit, pr, files: reviewFiles, event_type, workflow_result, run_id })
-    if (!await store.completePublicationStep(run_id, claim_token, stepKey)) throw new Error('Publication claim was lost after publishing the pull request review.')
+    await publishPullRequestReviewSideEffect({
+      octokit,
+      pr,
+      files: reviewFiles,
+      event_type,
+      workflow_result,
+      run_id
+    })
+    if (!(await store.completePublicationStep(run_id, claim_token, stepKey)))
+      throw new Error('Publication claim was lost after publishing the pull request review.')
   } catch (error) {
     const failure = classifyPublicationFailure(error)
-    await store.failPublicationStep(run_id, claim_token, stepKey, {
-      code: failure.code,
-      message: asErrorMessage(error)
-    }, { retry: failure.retry })
+    await store.failPublicationStep(
+      run_id,
+      claim_token,
+      stepKey,
+      {
+        code: failure.code,
+        message: asErrorMessage(error)
+      },
+      { retry: failure.retry }
+    )
     throw error
   }
 }
 
-async function publishPullRequestReviewSideEffect ({
-  octokit, pr, files: reviewFiles, event_type, workflow_result, run_id
+async function publishPullRequestReviewSideEffect({
+  octokit,
+  pr,
+  files: reviewFiles,
+  event_type,
+  workflow_result,
+  run_id
 }: {
   octokit: unknown
   pr: PersistedPullRequest
@@ -250,11 +283,15 @@ async function publishPullRequestReviewSideEffect ({
   let review: SuggestionReviewResult | null = null
   const review_record = workflow_result.review_record
   const marker = pullRequestReviewRunMarker(run_id)
-  const commentBody = [marker, renderAnalysisSummaryCommentFromReviewRecord(review_record)].join('\n\n')
+  const commentBody = [marker, renderAnalysisSummaryCommentFromReviewRecord(review_record)].join(
+    '\n\n'
+  )
   const reviewEvent = reviewEventForRecord(review_record, pr)
 
   if (shouldPublishSuggestions(review_record)) {
-    let suggestionManifest: Awaited<ReturnType<typeof generateSuggestionCandidatesFromReviewRecord>> | null = null
+    let suggestionManifest: Awaited<
+      ReturnType<typeof generateSuggestionCandidatesFromReviewRecord>
+    > | null = null
     try {
       suggestionManifest = await generateSuggestionCandidatesFromReviewRecord({
         files: reviewFiles,
@@ -287,7 +324,9 @@ async function publishPullRequestReviewSideEffect ({
         logInfo('suggestion_review_completed', {
           comment_count: review.count,
           event_type,
-          unmapped_count: Array.isArray((suggestionManifest as SuggestionManifestLike).unmapped_changes)
+          unmapped_count: Array.isArray(
+            (suggestionManifest as SuggestionManifestLike).unmapped_changes
+          )
             ? ((suggestionManifest as SuggestionManifestLike).unmapped_changes?.length ?? 0)
             : 0,
           pr: pr.pr_number,
@@ -328,16 +367,19 @@ async function publishPullRequestReviewSideEffect ({
     repo: pr.repo_full_name
   })
 
-  const reviewComment = await createPullRequestReviewUnlessMarkerExists(octokit as GitHubAppOctokit, {
-    owner_login: pr.owner_login,
-    repo_name: pr.repo_name,
-    pr_number: pr.pr_number,
-    commit_id: pr.head_sha,
-    body: commentBody,
-    marker,
-    event: reviewEvent,
-    comments: []
-  })
+  const reviewComment = await createPullRequestReviewUnlessMarkerExists(
+    octokit as GitHubAppOctokit,
+    {
+      owner_login: pr.owner_login,
+      repo_name: pr.repo_name,
+      pr_number: pr.pr_number,
+      commit_id: pr.head_sha,
+      body: commentBody,
+      marker,
+      event: reviewEvent,
+      comments: []
+    }
+  )
 
   logInfo('analysis_review_publish_completed', {
     event_type,
@@ -346,5 +388,4 @@ async function publishPullRequestReviewSideEffect ({
     review_url: reviewComment.html_url,
     reused: reviewComment.reused
   })
-
 }

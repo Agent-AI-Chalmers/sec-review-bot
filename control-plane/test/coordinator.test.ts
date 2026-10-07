@@ -19,17 +19,25 @@ const run = {
 test('coordination expires preparations before recovery and active observation', async () => {
   const events: string[] = []
   const store = {
-    async expireStalePreparations () {
+    async expireStalePreparations() {
       events.push('expire')
       return 0
     },
-    async listSubmissionRecoveries () { return [{ ...run, run_id: 'recover-1' }] },
-    async listActiveRuns () { return [{ ...run, run_id: 'active-1' }] }
+    async listSubmissionRecoveries() {
+      return [{ ...run, run_id: 'recover-1' }]
+    },
+    async listActiveRuns() {
+      return [{ ...run, run_id: 'active-1' }]
+    }
   }
 
   await coordinateReviewRunsOnce(store, {
-    async recoverSubmission (run) { events.push(`recover:${run.run_id}`) },
-    async observeActiveRun (run) { events.push(`observe:${run.run_id}`) }
+    async recoverSubmission(run) {
+      events.push(`recover:${run.run_id}`)
+    },
+    async observeActiveRun(run) {
+      events.push(`observe:${run.run_id}`)
+    }
   })
 
   assert.deepEqual(events, ['expire', 'recover:recover-1', 'observe:active-1'])
@@ -37,18 +45,22 @@ test('coordination expires preparations before recovery and active observation',
 
 test('coordinator loop does not overlap passes and stop drains the active pass', async () => {
   let release: () => void = () => {}
-  const gate = new Promise<void>(resolve => { release = resolve })
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
   let passes = 0
   const loop = startReviewRunCoordinatorLoop({
     intervalMs: 1,
-    async runOnce () {
+    async runOnce() {
       passes += 1
       await gate
     },
-    onError: error => { throw error }
+    onError: (error) => {
+      throw error
+    }
   })
 
-  await new Promise(resolve => setTimeout(resolve, 10))
+  await new Promise((resolve) => setTimeout(resolve, 10))
   const stopping = loop.stop()
   assert.equal(passes, 1)
   release()

@@ -1,18 +1,18 @@
 import type { GitHubAppOctokit } from './octokit.js'
 
-function isRecord (value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function asRecord (value: unknown): Record<string, unknown> {
+function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {}
 }
 
-function asString (value: unknown, fallback = ''): string {
+function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
 }
 
-function asNumber (value: unknown, fallback = 0): number {
+function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
@@ -36,7 +36,7 @@ export interface IssueContext {
 }
 
 export class IssueContextExtractionError extends Error {
-  constructor (message: string) {
+  constructor(message: string) {
     super(message)
     this.name = 'IssueContextExtractionError'
   }
@@ -59,19 +59,19 @@ interface LinkedPullRequest {
   head_ref: string | null
 }
 
-function requireText (value: string, label: string): void {
+function requireText(value: string, label: string): void {
   if (value.trim() === '') {
     throw new IssueContextExtractionError(`Issue webhook payload is missing ${label}.`)
   }
 }
 
-function requirePositiveInteger (value: number, label: string): void {
+function requirePositiveInteger(value: number, label: string): void {
   if (!Number.isInteger(value) || value <= 0) {
     throw new IssueContextExtractionError(`Issue webhook payload is missing ${label}.`)
   }
 }
 
-function requireIssueContext (context: IssueContext): IssueContext {
+function requireIssueContext(context: IssueContext): IssueContext {
   requireText(context.repo_name, 'repository.name')
   requireText(context.repo_full_name, 'repository.full_name')
   requireText(context.owner_login, 'repository.owner.login')
@@ -82,7 +82,7 @@ function requireIssueContext (context: IssueContext): IssueContext {
   return context
 }
 
-export function extractIssueContext (payload: unknown): IssueContext {
+export function extractIssueContext(payload: unknown): IssueContext {
   const rawPayload = asRecord(payload)
   const repository = asRecord(rawPayload.repository)
   const repositoryOwner = asRecord(repository.owner)
@@ -104,8 +104,8 @@ export function extractIssueContext (payload: unknown): IssueContext {
     issue_state: asString(issue.state),
     labels: Array.isArray(issue.labels)
       ? issue.labels
-        .map((label) => typeof label?.name === 'string' ? label.name : null)
-        .filter((label): label is string => Boolean(label))
+          .map((label) => (typeof label?.name === 'string' ? label.name : null))
+          .filter((label): label is string => Boolean(label))
       : [],
 
     html_url: asString(issue.html_url),
@@ -115,7 +115,10 @@ export function extractIssueContext (payload: unknown): IssueContext {
   })
 }
 
-export async function getIssueDefaultBranchHeadSha (octokit: GitHubAppOctokit, issue: IssueContext): Promise<string> {
+export async function getIssueDefaultBranchHeadSha(
+  octokit: GitHubAppOctokit,
+  issue: IssueContext
+): Promise<string> {
   const response = await octokit.rest.repos.getBranch({
     owner: issue.owner_login,
     repo: issue.repo_name,
@@ -125,7 +128,7 @@ export async function getIssueDefaultBranchHeadSha (octokit: GitHubAppOctokit, i
   return response.data.commit.sha
 }
 
-function isSameRepositoryPullRequestSource (
+function isSameRepositoryPullRequestSource(
   source_issue: Record<string, unknown>,
   context: {
     owner_login: string
@@ -140,7 +143,7 @@ function isSameRepositoryPullRequestSource (
   return repositoryUrl.endsWith(`/repos/${owner_login.toLowerCase()}/${repo_name.toLowerCase()}`)
 }
 
-async function listTimelineCrossReferencedPullRequestRefs (
+async function listTimelineCrossReferencedPullRequestRefs(
   octokit: GitHubAppOctokit,
   issue: IssueContext
 ): Promise<LinkedPullRequestRef[]> {
@@ -174,7 +177,12 @@ async function listTimelineCrossReferencedPullRequestRefs (
         continue
       }
 
-      if (!isSameRepositoryPullRequestSource(source_issue, { owner_login: issue.owner_login, repo_name: issue.repo_name })) {
+      if (
+        !isSameRepositoryPullRequestSource(source_issue, {
+          owner_login: issue.owner_login,
+          repo_name: issue.repo_name
+        })
+      ) {
         continue
       }
 
@@ -200,7 +208,7 @@ async function listTimelineCrossReferencedPullRequestRefs (
   return refs
 }
 
-export async function fetchTimelineLinkedPullRequests (
+export async function fetchTimelineLinkedPullRequests(
   octokit: GitHubAppOctokit,
   issue: IssueContext
 ): Promise<{
@@ -234,7 +242,12 @@ export async function fetchTimelineLinkedPullRequests (
       if (!pullRequest || Object.keys(pullRequest).length === 0) {
         continue
       }
-      if (!isSameRepositoryPullRequestSource(source_issue, { owner_login: issue.owner_login, repo_name: issue.repo_name })) {
+      if (
+        !isSameRepositoryPullRequestSource(source_issue, {
+          owner_login: issue.owner_login,
+          repo_name: issue.repo_name
+        })
+      ) {
         continue
       }
 

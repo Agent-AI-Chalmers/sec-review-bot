@@ -33,16 +33,18 @@ interface RepositoryTriggerConfigErrorOptions {
 }
 
 interface RepoGetContentResponse {
-  data: {
-    content?: string
-  } | Array<unknown>
+  data:
+    | {
+        content?: string
+      }
+    | Array<unknown>
 }
 
-function isRecord (value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function parseRepositoryConfig (content: string): ParsedSecReviewBotConfig {
+function parseRepositoryConfig(content: string): ParsedSecReviewBotConfig {
   let parsed: unknown
   try {
     parsed = parseYaml(content)
@@ -69,14 +71,10 @@ export class RepositoryTriggerConfigError extends Error {
   path: string | null
   reason: string
 
-  constructor (message: string, {
-    owner_login,
-    repo_name,
-    ref,
-    path,
-    reason,
-    cause
-  }: RepositoryTriggerConfigErrorOptions = {}) {
+  constructor(
+    message: string,
+    { owner_login, repo_name, ref, path, reason, cause }: RepositoryTriggerConfigErrorOptions = {}
+  ) {
     super(message, { cause })
     this.name = 'RepositoryTriggerConfigError'
     this.owner_login = owner_login ?? null
@@ -87,12 +85,16 @@ export class RepositoryTriggerConfigError extends Error {
   }
 }
 
-export function isRepositoryTriggerConfigError (error: unknown): error is RepositoryTriggerConfigError {
-  return error instanceof RepositoryTriggerConfigError ||
+export function isRepositoryTriggerConfigError(
+  error: unknown
+): error is RepositoryTriggerConfigError {
+  return (
+    error instanceof RepositoryTriggerConfigError ||
     (isRecord(error) && error.name === 'RepositoryTriggerConfigError')
+  )
 }
 
-function decodeRepositoryFileContent (data: RepoGetContentResponse['data']): string | null {
+function decodeRepositoryFileContent(data: RepoGetContentResponse['data']): string | null {
   if (!isRecord(data) || typeof data.content !== 'string') {
     return null
   }
@@ -100,14 +102,17 @@ function decodeRepositoryFileContent (data: RepoGetContentResponse['data']): str
   return Buffer.from(data.content, 'base64').toString('utf-8')
 }
 
-function extractTriggerMode (content: string): TriggerMode {
+function extractTriggerMode(content: string): TriggerMode {
   const config = parseRepositoryConfig(content)
   const value = config.trigger_mode
 
   if (typeof value !== 'string') {
-    throw new RepositoryTriggerConfigError('Missing sec_review_bot.trigger_mode in trigger config.', {
-      reason: 'missing-trigger-mode'
-    })
+    throw new RepositoryTriggerConfigError(
+      'Missing sec_review_bot.trigger_mode in trigger config.',
+      {
+        reason: 'missing-trigger-mode'
+      }
+    )
   }
 
   const normalized = value.trim().toLowerCase()
@@ -125,7 +130,7 @@ function extractTriggerMode (content: string): TriggerMode {
   })
 }
 
-function extractPathsIgnore (content: string): string[] {
+function extractPathsIgnore(content: string): string[] {
   const config = parseRepositoryConfig(content)
   const value = config.paths_ignore
 
@@ -134,24 +139,33 @@ function extractPathsIgnore (content: string): string[] {
   }
 
   if (!Array.isArray(value)) {
-    throw new RepositoryTriggerConfigError('Invalid sec_review_bot.paths_ignore value: expected an array.', {
-      reason: 'invalid-paths-ignore'
-    })
+    throw new RepositoryTriggerConfigError(
+      'Invalid sec_review_bot.paths_ignore value: expected an array.',
+      {
+        reason: 'invalid-paths-ignore'
+      }
+    )
   }
 
   const patterns: string[] = []
   for (const item of value) {
     if (typeof item !== 'string') {
-      throw new RepositoryTriggerConfigError('Invalid sec_review_bot.paths_ignore item: expected string entries.', {
-        reason: 'invalid-paths-ignore'
-      })
+      throw new RepositoryTriggerConfigError(
+        'Invalid sec_review_bot.paths_ignore item: expected string entries.',
+        {
+          reason: 'invalid-paths-ignore'
+        }
+      )
     }
 
     const normalized = item.trim()
     if (!normalized) {
-      throw new RepositoryTriggerConfigError('Invalid sec_review_bot.paths_ignore item: empty pattern is not allowed.', {
-        reason: 'invalid-paths-ignore'
-      })
+      throw new RepositoryTriggerConfigError(
+        'Invalid sec_review_bot.paths_ignore item: empty pattern is not allowed.',
+        {
+          reason: 'invalid-paths-ignore'
+        }
+      )
     }
     patterns.push(normalized)
   }
@@ -159,11 +173,13 @@ function extractPathsIgnore (content: string): string[] {
   return patterns
 }
 
-export function isAutomaticTriggerModeEnabled (config: Partial<RepositoryTriggerConfig> | null | undefined): boolean {
+export function isAutomaticTriggerModeEnabled(
+  config: Partial<RepositoryTriggerConfig> | null | undefined
+): boolean {
   return (config?.trigger_mode ?? DEFAULT_TRIGGER_MODE) !== MANUAL_ONLY_TRIGGER_MODE
 }
 
-function isNotFoundError (error: unknown): boolean {
+function isNotFoundError(error: unknown): boolean {
   return asErrorWithResponse(error).status === 404
 }
 
@@ -173,13 +189,9 @@ interface FetchRepositoryTriggerConfigArgs {
   ref?: string
 }
 
-export async function fetchRepositoryTriggerConfig (
+export async function fetchRepositoryTriggerConfig(
   octokit: GitHubAppOctokit,
-  {
-    owner_login,
-    repo_name,
-    ref
-  }: FetchRepositoryTriggerConfigArgs
+  { owner_login, repo_name, ref }: FetchRepositoryTriggerConfigArgs
 ): Promise<RepositoryTriggerConfig> {
   const configRef = ref ?? null
   try {

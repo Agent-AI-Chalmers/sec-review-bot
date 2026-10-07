@@ -77,7 +77,7 @@ interface WorkspaceSuggestionBlock {
   replacement: string
 }
 
-function parseHunkHeader (headerLine: string): HunkHeader | null {
+function parseHunkHeader(headerLine: string): HunkHeader | null {
   const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(headerLine)
 
   if (!match) {
@@ -92,7 +92,7 @@ function parseHunkHeader (headerLine: string): HunkHeader | null {
   }
 }
 
-function parseWorkspacePatch (patch_content: string): WorkspacePatchFile[] {
+function parseWorkspacePatch(patch_content: string): WorkspacePatchFile[] {
   const lines = patch_content.split('\n')
   const files: WorkspacePatchFile[] = []
   let current_file: WorkspacePatchFile | null = null
@@ -148,14 +148,12 @@ function parseWorkspacePatch (patch_content: string): WorkspacePatchFile[] {
   return files
 }
 
-function normalizeWorkspacePatchPath (rawPath: string): string {
+function normalizeWorkspacePatchPath(rawPath: string): string {
   const normalized = rawPath.replace(/\\/g, '/').replace(/^\/+/, '')
-  return normalized.startsWith('workspace/')
-    ? normalized.slice('workspace/'.length)
-    : normalized
+  return normalized.startsWith('workspace/') ? normalized.slice('workspace/'.length) : normalized
 }
 
-function parsePatchHunks (patch_content: string): HunkHeader[] {
+function parsePatchHunks(patch_content: string): HunkHeader[] {
   if (typeof patch_content !== 'string' || patch_content.trim() === '') {
     return []
   }
@@ -167,15 +165,11 @@ function parsePatchHunks (patch_content: string): HunkHeader[] {
     .filter((item): item is HunkHeader => item !== null)
 }
 
-function buildSuggestionBody (replacement: string): string {
-  return [
-    '```suggestion',
-    replacement,
-    '```'
-  ].join('\n')
+function buildSuggestionBody(replacement: string): string {
+  return ['```suggestion', replacement, '```'].join('\n')
 }
 
-function toLineRange (start: number, count: number): { start: number, end: number } | null {
+function toLineRange(start: number, count: number): { start: number; end: number } | null {
   if (start <= 0 || count <= 0) {
     return null
   }
@@ -185,14 +179,17 @@ function toLineRange (start: number, count: number): { start: number, end: numbe
   }
 }
 
-function rangesOverlap (
-  left: { start: number, end: number },
-  right: { start: number, end: number }
+function rangesOverlap(
+  left: { start: number; end: number },
+  right: { start: number; end: number }
 ): boolean {
   return left.start <= right.end && right.start <= left.end
 }
 
-function findAnchoringHunkForBlock (block: WorkspaceSuggestionBlock, prHunks: HunkHeader[]): HunkHeader | null {
+function findAnchoringHunkForBlock(
+  block: WorkspaceSuggestionBlock,
+  prHunks: HunkHeader[]
+): HunkHeader | null {
   const blockRange = toLineRange(block.start_line, block.line - block.start_line + 1)
   if (!blockRange) {
     return null
@@ -211,7 +208,9 @@ function findAnchoringHunkForBlock (block: WorkspaceSuggestionBlock, prHunks: Hu
   return null
 }
 
-function splitWorkspaceHunkIntoSuggestionBlocks (workspaceHunk: WorkspaceHunk): WorkspaceSuggestionBlock[] {
+function splitWorkspaceHunkIntoSuggestionBlocks(
+  workspaceHunk: WorkspaceHunk
+): WorkspaceSuggestionBlock[] {
   const blocks: WorkspaceSuggestionBlock[] = []
   const lines = workspaceHunk.lines
   if (lines.length === 0) {
@@ -331,7 +330,7 @@ function splitWorkspaceHunkIntoSuggestionBlocks (workspaceHunk: WorkspaceHunk): 
   return blocks
 }
 
-function buildSuggestionManifest ({
+function buildSuggestionManifest({
   patch_content,
   files,
   review_record
@@ -399,7 +398,9 @@ function buildSuggestionManifest ({
         const anchoringHunk = findAnchoringHunkForBlock(block, prHunks)
         if (!anchoringHunk) {
           const reason = 'Workspace hunk has no overlapping PR hunk.'
-          skipReasons.add(`File ${workspacePatchFile.path} has no overlapping PR hunk for a workspace hunk.`)
+          skipReasons.add(
+            `File ${workspacePatchFile.path} has no overlapping PR hunk for a workspace hunk.`
+          )
           manifest.unmapped_changes.push({
             path: workspacePatchFile.path,
             reason,
@@ -413,8 +414,11 @@ function buildSuggestionManifest ({
 
         const anchoringRange = toLineRange(anchoringHunk.new_start, anchoringHunk.new_count)
         if (!anchoringRange) {
-          const reason = 'Workspace hunk has no right-side line range for inline suggestion anchoring.'
-          skipReasons.add(`File ${workspacePatchFile.path} has no right-side line range for inline suggestion anchoring.`)
+          const reason =
+            'Workspace hunk has no right-side line range for inline suggestion anchoring.'
+          skipReasons.add(
+            `File ${workspacePatchFile.path} has no right-side line range for inline suggestion anchoring.`
+          )
           manifest.unmapped_changes.push({
             path: workspacePatchFile.path,
             reason,
@@ -445,26 +449,30 @@ function buildSuggestionManifest ({
   }
 
   if (manifest.candidates.length === 0) {
-    manifest.skipped_reason = skipReasons.size > 0
-      ? Array.from(skipReasons)[0] ?? 'No eligible patch candidate.'
-      : 'No eligible patch candidate.'
+    manifest.skipped_reason =
+      skipReasons.size > 0
+        ? (Array.from(skipReasons)[0] ?? 'No eligible patch candidate.')
+        : 'No eligible patch candidate.'
   }
 
   return manifest
 }
 
-export async function generateSuggestionCandidatesFromReviewRecord ({
+export async function generateSuggestionCandidatesFromReviewRecord({
   files,
   review_record
 }: {
   files: PullRequestFile[]
   review_record: ReviewRecord | null | undefined
 }): Promise<SuggestionManifest> {
-  const patch_content = typeof review_record?.mitigation?.patch_diff === 'string'
-    ? review_record.mitigation.patch_diff
-    : ''
+  const patch_content =
+    typeof review_record?.mitigation?.patch_diff === 'string'
+      ? review_record.mitigation.patch_diff
+      : ''
   if (patch_content.trim() === '') {
-    throw new Error('Pull request suggestion generation requires review_record.mitigation.patch_diff.')
+    throw new Error(
+      'Pull request suggestion generation requires review_record.mitigation.patch_diff.'
+    )
   }
   const manifest = buildSuggestionManifest({
     patch_content,
@@ -475,7 +483,7 @@ export async function generateSuggestionCandidatesFromReviewRecord ({
   return manifest
 }
 
-export async function publishSuggestionReview (
+export async function publishSuggestionReview(
   octokit: unknown,
   {
     pr,
@@ -493,13 +501,16 @@ export async function publishSuggestionReview (
 ): Promise<SuggestionPublishedResult> {
   const published: SuggestionPublishedResult = {
     published_at: new Date().toISOString(),
-    ...(await publishPullRequestSuggestionReview(octokit as Parameters<typeof publishPullRequestSuggestionReview>[0], {
-      pr,
-      review_body,
-      event,
-      candidates,
-      marker
-    }))
+    ...(await publishPullRequestSuggestionReview(
+      octokit as Parameters<typeof publishPullRequestSuggestionReview>[0],
+      {
+        pr,
+        review_body,
+        event,
+        candidates,
+        marker
+      }
+    ))
   }
 
   return published

@@ -51,13 +51,15 @@ app.webhooks.onError((error) => {
 
 const localWebhookUrl = `http://localhost:${port}${webhook_path}`
 const middleware = createNodeMiddleware(app.webhooks, { path: webhook_path })
-const server = http.createServer(createAppHttpHandler({
-  app,
-  port,
-  repository_review_dispatch_path,
-  repository_review_dispatch_handler: handleRepositoryReviewDispatch,
-  webhook_middleware: middleware
-}))
+const server = http.createServer(
+  createAppHttpHandler({
+    app,
+    port,
+    repository_review_dispatch_path,
+    repository_review_dispatch_handler: handleRepositoryReviewDispatch,
+    webhook_middleware: middleware
+  })
+)
 
 server.listen(port, () => {
   logInfo('server_started', {
@@ -68,9 +70,9 @@ server.listen(port, () => {
 
 let shutdownStarted = false
 const shutdownSignals = ['SIGINT', 'SIGTERM'] as const
-type ShutdownSignal = typeof shutdownSignals[number]
+type ShutdownSignal = (typeof shutdownSignals)[number]
 
-function closeServer (): Promise<void> {
+function closeServer(): Promise<void> {
   return new Promise((resolve, reject) => {
     server.close((error) => {
       if (error) {
@@ -82,7 +84,7 @@ function closeServer (): Promise<void> {
   })
 }
 
-async function shutdown (signal: ShutdownSignal): Promise<void> {
+async function shutdown(signal: ShutdownSignal): Promise<void> {
   if (shutdownStarted) {
     return
   }
@@ -94,7 +96,7 @@ async function shutdown (signal: ShutdownSignal): Promise<void> {
   const serverResult = await Promise.allSettled([closeServer()])
   const results = [
     ...serverResult,
-    ...await Promise.allSettled([publisher.stop(), reviewExecutionTracker.stop()])
+    ...(await Promise.allSettled([publisher.stop(), reviewExecutionTracker.stop()]))
   ]
   const shutdownError = results.find(
     (result): result is PromiseRejectedResult => result.status === 'rejected'

@@ -17,7 +17,7 @@ interface IssueContext {
   default_branch: string
 }
 
-function sanitizeBranchSegment (value: unknown): string {
+function sanitizeBranchSegment(value: unknown): string {
   return String(value ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9._/-]+/g, '-')
@@ -25,12 +25,14 @@ function sanitizeBranchSegment (value: unknown): string {
     .replace(/^[-/]+|[-/]+$/g, '')
 }
 
-function buildDraftBranchName (issue: IssueContext, run_id: string | undefined): string {
-  const shortRunId = String(run_id ?? 'manual').replace(/^run-/, '').slice(-8)
+function buildDraftBranchName(issue: IssueContext, run_id: string | undefined): string {
+  const shortRunId = String(run_id ?? 'manual')
+    .replace(/^run-/, '')
+    .slice(-8)
   return sanitizeBranchSegment(`sec-review-bot/issue-${issue.issue_number}-${shortRunId}`)
 }
 
-function normalizePublishableFileChanges (file_changes: unknown): FileChange[] {
+function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
   if (!Array.isArray(file_changes)) {
     return []
   }
@@ -51,7 +53,9 @@ function normalizePublishableFileChanges (file_changes: unknown): FileChange[] {
 
     if (rawChange.status === 'deleted') {
       if (rawChange.mode) {
-        throw new Error(`Issue draft PR file change marked ${normalizedPath} deleted but also included a mode.`)
+        throw new Error(
+          `Issue draft PR file change marked ${normalizedPath} deleted but also included a mode.`
+        )
       }
       seen.add(normalizedPath)
       normalizedChanges.push({
@@ -61,21 +65,20 @@ function normalizePublishableFileChanges (file_changes: unknown): FileChange[] {
       continue
     }
 
-    const content = typeof rawChange.content === 'string'
-      ? rawChange.content
-      : null
-    const content_encoding = rawChange.content_encoding === 'base64'
-      ? 'base64'
-      : rawChange.content_encoding === 'utf-8'
-        ? 'utf-8'
-        : null
+    const content = typeof rawChange.content === 'string' ? rawChange.content : null
+    const content_encoding =
+      rawChange.content_encoding === 'base64'
+        ? 'base64'
+        : rawChange.content_encoding === 'utf-8'
+          ? 'utf-8'
+          : null
     const rawMode = String(rawChange.mode ?? '').trim()
-    const mode: FileMode | null = rawMode === '100644' || rawMode === '100755'
-      ? rawMode
-      : null
+    const mode: FileMode | null = rawMode === '100644' || rawMode === '100755' ? rawMode : null
 
     if (rawMode && mode === null) {
-      throw new Error(`Issue draft PR file change has unsupported file mode for ${normalizedPath}: ${rawMode}`)
+      throw new Error(
+        `Issue draft PR file change has unsupported file mode for ${normalizedPath}: ${rawMode}`
+      )
     }
 
     if (content === null || content_encoding === null) {
@@ -95,16 +98,18 @@ function normalizePublishableFileChanges (file_changes: unknown): FileChange[] {
   return normalizedChanges
 }
 
-async function buildTreeElementsFromFileChanges (
+async function buildTreeElementsFromFileChanges(
   octokit: GitHubAppOctokit,
   file_changes: FileChange[],
   issue: IssueContext
-): Promise<Array<{
-  path: string
-  mode: FileMode
-  type: 'blob'
-  sha: string | null
-}>> {
+): Promise<
+  Array<{
+    path: string
+    mode: FileMode
+    type: 'blob'
+    sha: string | null
+  }>
+> {
   const tree_elements: Array<{
     path: string
     mode: FileMode
@@ -140,7 +145,7 @@ async function buildTreeElementsFromFileChanges (
   return tree_elements
 }
 
-export async function createDraftPullRequestFromIssueReviewRecord ({
+export async function createDraftPullRequestFromIssueReviewRecord({
   octokit,
   issue,
   run_id,

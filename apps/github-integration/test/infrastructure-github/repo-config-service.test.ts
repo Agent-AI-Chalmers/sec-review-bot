@@ -15,9 +15,7 @@ interface TestErrorWithStatus extends Error {
 
 type Content_by_path = Record<string, string | Error>
 
-function createOctokitWithContent (
-  contentByPath: Content_by_path = {}
-): GitHubAppOctokit {
+function createOctokitWithContent(contentByPath: Content_by_path = {}): GitHubAppOctokit {
   return {
     auth: async () => ({}),
     graphql: async () => ({}),
@@ -106,10 +104,7 @@ test('fetchRepositoryTriggerConfig parses automatic trigger mode from repository
 
 test('fetchRepositoryTriggerConfig parses manual_only trigger mode from repository config', async () => {
   const octokit = createOctokitWithContent({
-    [CONFIG_PATH]: [
-      'sec_review_bot:',
-      '  trigger_mode: manual_only'
-    ].join('\n')
+    [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: manual_only'].join('\n')
   })
 
   const config = await fetchRepositoryTriggerConfig(octokit, {
@@ -179,10 +174,7 @@ test('fetchRepositoryTriggerConfig throws for missing sec_review_bot.trigger_mod
 
 test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', async () => {
   const octokit = createOctokitWithContent({
-    [CONFIG_PATH]: [
-      'sec_review_bot:',
-      '  trigger_mode: always_on'
-    ].join('\n')
+    [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: always_on'].join('\n')
   })
 
   await assert.rejects(
@@ -204,11 +196,9 @@ test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', 
 
 test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async () => {
   const octokit = createOctokitWithContent({
-    [CONFIG_PATH]: [
-      'sec_review_bot:',
-      '  trigger_mode: automatic',
-      '  paths_ignore: invalid'
-    ].join('\n')
+    [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic', '  paths_ignore: invalid'].join(
+      '\n'
+    )
   })
 
   await assert.rejects(

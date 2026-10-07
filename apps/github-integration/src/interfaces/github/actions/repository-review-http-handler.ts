@@ -36,7 +36,11 @@ interface DispatchAdmission {
   replayed: boolean
 }
 
-function writeJson (response: ServerResponse, status_code: number, value: Record<string, unknown>): void {
+function writeJson(
+  response: ServerResponse,
+  status_code: number,
+  value: Record<string, unknown>
+): void {
   response.writeHead(status_code, {
     'content-type': 'application/json; charset=utf-8'
   })
@@ -44,7 +48,7 @@ function writeJson (response: ServerResponse, status_code: number, value: Record
 }
 
 class DispatchBodyReadError extends Error {
-  constructor (
+  constructor(
     message: string,
     readonly status_code: number
   ) {
@@ -53,12 +57,15 @@ class DispatchBodyReadError extends Error {
   }
 }
 
-function positiveIntegerOrDefault (value: number, default_value: number): number {
+function positiveIntegerOrDefault(value: number, default_value: number): number {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : default_value
 }
 
-async function readBody (request: IncomingMessage): Promise<Buffer> {
-  const maxBodyBytes = positiveIntegerOrDefault(repository_review_dispatch_max_body_bytes, 1_048_576)
+async function readBody(request: IncomingMessage): Promise<Buffer> {
+  const maxBodyBytes = positiveIntegerOrDefault(
+    repository_review_dispatch_max_body_bytes,
+    1_048_576
+  )
   const readTimeoutMs = positiveIntegerOrDefault(repository_review_dispatch_read_timeout_ms, 10_000)
 
   // Keep request size and time bounded before parsing or authentication work.
@@ -87,7 +94,7 @@ async function readBody (request: IncomingMessage): Promise<Buffer> {
       reject(error)
     }
 
-    function onData (chunk: Buffer | string): void {
+    function onData(chunk: Buffer | string): void {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
       totalBytes += buffer.byteLength
       if (totalBytes > maxBodyBytes) {
@@ -98,7 +105,7 @@ async function readBody (request: IncomingMessage): Promise<Buffer> {
       chunks.push(buffer)
     }
 
-    function onEnd (): void {
+    function onEnd(): void {
       if (done) {
         return
       }
@@ -107,7 +114,7 @@ async function readBody (request: IncomingMessage): Promise<Buffer> {
       resolve(Buffer.concat(chunks, totalBytes))
     }
 
-    function onError (error: Error): void {
+    function onError(error: Error): void {
       fail(error)
     }
 
@@ -117,14 +124,20 @@ async function readBody (request: IncomingMessage): Promise<Buffer> {
   })
 }
 
-function asErrorMessage (error: unknown): string {
+function asErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
   return String(error)
 }
 
-export async function handleRepositoryReviewDispatch ({ app, request, response, dispatchReview = dispatchRepositoryReview, oidcVerifier }: DispatchContext): Promise<void> {
+export async function handleRepositoryReviewDispatch({
+  app,
+  request,
+  response,
+  dispatchReview = dispatchRepositoryReview,
+  oidcVerifier
+}: DispatchContext): Promise<void> {
   if (request.method !== 'POST') {
     writeJson(response, 405, {
       ok: false,
@@ -221,7 +234,9 @@ export async function handleRepositoryReviewDispatch ({ app, request, response, 
   }
 
   let resolveAdmission: (admission: DispatchAdmission) => void
-  const admissionPromise = new Promise<DispatchAdmission>((resolve) => { resolveAdmission = resolve })
+  const admissionPromise = new Promise<DispatchAdmission>((resolve) => {
+    resolveAdmission = resolve
+  })
   const execution = dispatchReview({
     app,
     payload,
@@ -236,7 +251,11 @@ export async function handleRepositoryReviewDispatch ({ app, request, response, 
   try {
     const admission = await Promise.race([
       admissionPromise,
-      execution.then((submitted) => ({ run_id: submitted.run_id, status: 'queued', replayed: false }))
+      execution.then((submitted) => ({
+        run_id: submitted.run_id,
+        status: 'queued',
+        replayed: false
+      }))
     ])
     writeJson(response, 202, {
       ok: true,

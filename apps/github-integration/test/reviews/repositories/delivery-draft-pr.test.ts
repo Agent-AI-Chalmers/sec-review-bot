@@ -22,7 +22,7 @@ type CreateRepositoryDeliveryDraftPrOctokit = CreateRepositoryDeliveryDraftPrPar
 type CreateRepositoryDeliveryDraftPrRepo = CreateRepositoryDeliveryDraftPrParams['repo']
 type CreateRepositoryDeliveryDraftPrInput = CreateRepositoryDeliveryDraftPrParams['input']
 
-function createOctokitMock ({
+function createOctokitMock({
   existingPullRequests = []
 }: {
   existingPullRequests?: Array<{
@@ -33,31 +33,55 @@ function createOctokitMock ({
   }>
 } = {}) {
   const calls = {
-    blobs: [] as Array<{ content: string, encoding: 'utf-8' | 'base64' }>,
-    trees: [] as Array<Array<{ path: string, mode: FileMode, type: 'blob', sha: string | null }>>,
-    commits: [] as Array<{ message: string, tree: string, parents: string[] }>,
-    refs: [] as Array<{ ref: string, sha: string }>,
-    pulls: [] as Array<{ title: string, head: string, base: string, body: string | null, draft: boolean }>
+    blobs: [] as Array<{ content: string; encoding: 'utf-8' | 'base64' }>,
+    trees: [] as Array<Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>>,
+    commits: [] as Array<{ message: string; tree: string; parents: string[] }>,
+    refs: [] as Array<{ ref: string; sha: string }>,
+    pulls: [] as Array<{
+      title: string
+      head: string
+      base: string
+      body: string | null
+      draft: boolean
+    }>
   }
 
   return {
     calls,
     rest: {
       git: {
-        createBlob: async ({ content, encoding }: { content: string, encoding: 'utf-8' | 'base64' }) => {
+        createBlob: async ({
+          content,
+          encoding
+        }: {
+          content: string
+          encoding: 'utf-8' | 'base64'
+        }) => {
           calls.blobs.push({ content, encoding })
           return { data: { sha: `blob-${calls.blobs.length}` } }
         },
         getCommit: async () => ({ data: { tree: { sha: 'base-tree-sha' } } }),
-        createTree: async ({ tree }: { tree: Array<{ path: string, mode: FileMode, type: 'blob', sha: string | null }> }) => {
+        createTree: async ({
+          tree
+        }: {
+          tree: Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>
+        }) => {
           calls.trees.push(tree)
           return { data: { sha: 'tree-sha' } }
         },
-        createCommit: async ({ message, tree, parents }: { message: string, tree: string, parents: string[] }) => {
+        createCommit: async ({
+          message,
+          tree,
+          parents
+        }: {
+          message: string
+          tree: string
+          parents: string[]
+        }) => {
           calls.commits.push({ message, tree, parents })
           return { data: { sha: 'commit-sha' } }
         },
-        createRef: async ({ ref, sha }: { ref: string, sha: string }) => {
+        createRef: async ({ ref, sha }: { ref: string; sha: string }) => {
           calls.refs.push({ ref, sha })
           return { data: {} }
         },
@@ -65,7 +89,19 @@ function createOctokitMock ({
       },
       pulls: {
         list: async () => ({ data: existingPullRequests }),
-        create: async ({ title, head, base, body, draft }: { title: string, head: string, base: string, body: string | null, draft: boolean }) => {
+        create: async ({
+          title,
+          head,
+          base,
+          body,
+          draft
+        }: {
+          title: string
+          head: string
+          base: string
+          body: string | null
+          draft: boolean
+        }) => {
           calls.pulls.push({ title, head, base, body, draft })
           return {
             data: {

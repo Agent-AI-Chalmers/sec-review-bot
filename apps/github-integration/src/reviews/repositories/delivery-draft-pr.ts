@@ -35,7 +35,7 @@ interface DraftPullRequestSummary {
   reused: boolean
 }
 
-function sanitizeBranchSegment (value: unknown): string {
+function sanitizeBranchSegment(value: unknown): string {
   return String(value ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9._/-]+/g, '-')
@@ -43,18 +43,21 @@ function sanitizeBranchSegment (value: unknown): string {
     .replace(/^[-/]+|[-/]+$/g, '')
 }
 
-function stableBranchSegment (value: unknown): string {
+function stableBranchSegment(value: unknown): string {
   const raw = String(value ?? '').trim() || 'unknown'
   const readable = sanitizeBranchSegment(raw).replaceAll('/', '-').slice(0, 48) || 'unknown'
   const digest = crypto.createHash('sha256').update(raw).digest('hex').slice(0, 12)
   return `${readable}-${digest}`
 }
 
-export function buildRepositoryDeliveryBranchName (run_id: string, delivery: RepositoryDelivery): string {
+export function buildRepositoryDeliveryBranchName(
+  run_id: string,
+  delivery: RepositoryDelivery
+): string {
   return `sec-review-bot/repo-scan/${stableBranchSegment(run_id)}/${stableBranchSegment(delivery.delivery_id ?? 'manual')}`
 }
 
-function normalizeTargetBranch (value: unknown): string {
+function normalizeTargetBranch(value: unknown): string {
   const raw = String(value ?? '').trim()
   if (!raw) {
     return ''
@@ -62,7 +65,7 @@ function normalizeTargetBranch (value: unknown): string {
   return raw.startsWith('refs/heads/') ? raw.slice('refs/heads/'.length) : raw
 }
 
-function buildRepositorySecurityDeliveryCommitMessage (delivery: RepositoryDelivery): string {
+function buildRepositorySecurityDeliveryCommitMessage(delivery: RepositoryDelivery): string {
   const title = String(buildDeliveryDraftPrTitle(delivery) ?? '').trim()
   const normalizedTitle = title
     .replace(/^\[sec\]\s*/i, '')
@@ -80,7 +83,7 @@ function buildRepositorySecurityDeliveryCommitMessage (delivery: RepositoryDeliv
   return `sec: ${normalizedTitle}`
 }
 
-function encodeGitFileContent (content_buffer: Buffer): { content: string, encoding: TextEncoding } {
+function encodeGitFileContent(content_buffer: Buffer): { content: string; encoding: TextEncoding } {
   const isBinary = content_buffer.includes(0)
 
   if (isBinary) {
@@ -96,12 +99,14 @@ function encodeGitFileContent (content_buffer: Buffer): { content: string, encod
   }
 }
 
-async function buildTreeElements (
+async function buildTreeElements(
   octokit: GitHubAppOctokit,
   delivery: RepositoryDelivery,
   repo: RepositoryContext
 ): Promise<GitTreeElement[]> {
-  const file_entries: FileChange[] = Array.isArray(delivery.file_changes) ? delivery.file_changes : []
+  const file_entries: FileChange[] = Array.isArray(delivery.file_changes)
+    ? delivery.file_changes
+    : []
   const tree_elements: GitTreeElement[] = []
   for (const change of file_entries) {
     const filePath = validateContractPublishableRepoRelativePath(change.path)
@@ -115,9 +120,10 @@ async function buildTreeElements (
       continue
     }
 
-    const content_buffer = change.content_encoding === 'base64'
-      ? Buffer.from(change.content, 'base64')
-      : Buffer.from(change.content, 'utf8')
+    const content_buffer =
+      change.content_encoding === 'base64'
+        ? Buffer.from(change.content, 'base64')
+        : Buffer.from(change.content, 'utf8')
     const blob = encodeGitFileContent(content_buffer)
     const blobResponse = await octokit.rest.git.createBlob({
       owner: repo.owner_login,
@@ -136,14 +142,16 @@ async function buildTreeElements (
   return tree_elements
 }
 
-function validateDeliveryFileChangePaths (delivery: RepositoryDelivery): void {
-  const file_entries: FileChange[] = Array.isArray(delivery.file_changes) ? delivery.file_changes : []
+function validateDeliveryFileChangePaths(delivery: RepositoryDelivery): void {
+  const file_entries: FileChange[] = Array.isArray(delivery.file_changes)
+    ? delivery.file_changes
+    : []
   for (const change of file_entries) {
     validateContractPublishableRepoRelativePath(change.path)
   }
 }
 
-export async function createRepositoryDeliveryDraftPr ({
+export async function createRepositoryDeliveryDraftPr({
   octokit,
   repo,
   run_id,

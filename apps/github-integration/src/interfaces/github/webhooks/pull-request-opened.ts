@@ -2,7 +2,10 @@ import type { EmitterWebhookEvent } from '@octokit/webhooks'
 
 import { logPullRequestPayload } from '../../../utils/log-pull-request.js'
 import { startPullRequestReviewCommand } from '../../../triggers/pull-request-review.js'
-import { extractPullRequestContext, type PullRequestContext } from '../../../infrastructure/github/pull-request-service.js'
+import {
+  extractPullRequestContext,
+  type PullRequestContext
+} from '../../../infrastructure/github/pull-request-service.js'
 import {
   fetchRepositoryTriggerConfig,
   isAutomaticTriggerModeEnabled,
@@ -17,7 +20,10 @@ import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { reviewExecutionTracker } from '../../../infrastructure/review-execution-tracker.js'
 
-type PullRequestOpenedWebhookEvent = Pick<EmitterWebhookEvent<'pull_request.opened'>, 'id' | 'payload'> & {
+type PullRequestOpenedWebhookEvent = Pick<
+  EmitterWebhookEvent<'pull_request.opened'>,
+  'id' | 'payload'
+> & {
   octokit: unknown
 }
 
@@ -36,15 +42,19 @@ interface HandlerDeps {
     pr: PullRequestContext
     event_type: 'opened'
     delivery_id: string
-    on_admitted?: (admission: { run_id: string, status: string, replayed: boolean }) => void
+    on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   }) => Promise<unknown>
 }
 
-export async function handlePullRequestOpened ({ id, octokit, payload }: PullRequestOpenedWebhookEvent): Promise<void> {
+export async function handlePullRequestOpened({
+  id,
+  octokit,
+  payload
+}: PullRequestOpenedWebhookEvent): Promise<void> {
   await handlePullRequestOpenedWithDeps({ id, octokit, payload })
 }
 
-export async function handlePullRequestOpenedWithDeps (
+export async function handlePullRequestOpenedWithDeps(
   { id, octokit, payload }: WebhookHandlerArgs,
   {
     fetchRepositoryTriggerConfigFn = fetchRepositoryTriggerConfig,
@@ -107,13 +117,17 @@ export async function handlePullRequestOpenedWithDeps (
 
   try {
     let resolveAdmission: (() => void) | undefined
-    const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+    const admitted = new Promise<void>((resolve) => {
+      resolveAdmission = resolve
+    })
     const execution = startPullRequestReviewCommandFn({
       octokit,
       pr,
       event_type: 'opened',
       delivery_id: id,
-      on_admitted: () => { resolveAdmission?.() }
+      on_admitted: () => {
+        resolveAdmission?.()
+      }
     })
     reviewExecutionTracker.start(execution, {
       ingress: 'pull_request.opened',

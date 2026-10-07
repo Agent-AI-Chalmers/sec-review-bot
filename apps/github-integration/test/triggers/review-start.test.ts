@@ -7,7 +7,7 @@ import type { IssueContext } from '../../src/infrastructure/github/issue-service
 import type { PullRequestContext } from '../../src/infrastructure/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/infrastructure/runner/review-store.js'
 
-function issueContext (): IssueContext {
+function issueContext(): IssueContext {
   return {
     action: 'opened',
     repo_name: 'example-repo',
@@ -28,7 +28,7 @@ function issueContext (): IssueContext {
   }
 }
 
-function pullRequestContext (): PullRequestContext {
+function pullRequestContext(): PullRequestContext {
   return {
     action: 'opened',
     previous_head_sha: null,
@@ -72,7 +72,14 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
     delivery_id: 'delivery-issue-1',
     deps: {
       create_run_id: () => 'run-issue-1',
-      start_review: async ({ issue: submittedIssue, run_id, event_type, review_objective, repair_mode, on_prepared }) => {
+      start_review: async ({
+        issue: submittedIssue,
+        run_id,
+        event_type,
+        review_objective,
+        repair_mode,
+        on_prepared
+      }) => {
         assert.equal(run_id, 'run-issue-1')
         assert.equal(event_type, 'opened')
         assert.equal(review_objective, 'audit')
@@ -92,7 +99,8 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           transitions.push(['preparing', run])
           return { record: run, created: true, preparation_token: 'claim' } as never
         },
-        submit_prepared_run: (run_id, _token, publish_context) => transitions.push(['queued', run_id, publish_context]),
+        submit_prepared_run: (run_id, _token, publish_context) =>
+          transitions.push(['queued', run_id, publish_context]),
         failPreparation: () => assert.fail('successful review must not be marked failed')
       }
     }
@@ -100,25 +108,32 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
 
   assert.equal(submitted.run_id, 'run-issue-1')
   assert.deepEqual(transitions, [
-    ['preparing', {
-      workflow: 'issue-review',
-      run_id: 'run-issue-1',
-      publish_context: {},
-      ingress_kind: 'github_webhook',
-      ingress_key: 'delivery-issue-1'
-    }],
-    ['queued', 'run-issue-1', {
-      issue: {
-        owner_login: 'octo',
-        repo_name: 'example-repo',
-        repo_full_name: 'octo/example-repo',
-        default_branch: 'main',
-        issue_number: 12,
-        issue_title: 'Example issue'
-      },
-      workspace_ref: 'workspace-ref',
-      event_type: 'opened'
-    }]
+    [
+      'preparing',
+      {
+        workflow: 'issue-review',
+        run_id: 'run-issue-1',
+        publish_context: {},
+        ingress_kind: 'github_webhook',
+        ingress_key: 'delivery-issue-1'
+      }
+    ],
+    [
+      'queued',
+      'run-issue-1',
+      {
+        issue: {
+          owner_login: 'octo',
+          repo_name: 'example-repo',
+          repo_full_name: 'octo/example-repo',
+          default_branch: 'main',
+          issue_number: 12,
+          issue_title: 'Example issue'
+        },
+        workspace_ref: 'workspace-ref',
+        event_type: 'opened'
+      }
+    ]
   ])
 })
 
@@ -153,7 +168,8 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
           transitions.push(['preparing', run])
           return { record: run, created: true, preparation_token: 'claim' } as never
         },
-        submit_prepared_run: (run_id, _token, publish_context) => transitions.push(['queued', run_id, publish_context]),
+        submit_prepared_run: (run_id, _token, publish_context) =>
+          transitions.push(['queued', run_id, publish_context]),
         failPreparation: () => assert.fail('successful review must not be marked failed')
       }
     }
@@ -161,25 +177,32 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
 
   assert.equal(submitted.run_id, 'run-pr-1')
   assert.deepEqual(transitions, [
-    ['preparing', {
-      workflow: 'pull-request-review',
-      run_id: 'run-pr-1',
-      publish_context: {},
-      ingress_kind: 'github_webhook',
-      ingress_key: 'delivery-pr-1'
-    }],
-    ['queued', 'run-pr-1', {
-      files: [{ filename: 'src/app.ts' }],
-      pr: {
-        owner_login: 'octo',
-        repo_name: 'example-repo',
-        repo_full_name: 'octo/example-repo',
-        pr_number: 7,
-        pr_author: 'alice',
-        head_sha: 'head-sha'
-      },
-      event_type: 'manual_review'
-    }]
+    [
+      'preparing',
+      {
+        workflow: 'pull-request-review',
+        run_id: 'run-pr-1',
+        publish_context: {},
+        ingress_kind: 'github_webhook',
+        ingress_key: 'delivery-pr-1'
+      }
+    ],
+    [
+      'queued',
+      'run-pr-1',
+      {
+        files: [{ filename: 'src/app.ts' }],
+        pr: {
+          owner_login: 'octo',
+          repo_name: 'example-repo',
+          repo_full_name: 'octo/example-repo',
+          pr_number: 7,
+          pr_author: 'alice',
+          head_sha: 'head-sha'
+        },
+        event_type: 'manual_review'
+      }
+    ]
   ])
 })
 
@@ -214,20 +237,26 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
   )
 
   assert.deepEqual(transitions, [
-    ['preparing', {
-      workflow: 'pull-request-review',
-      run_id: 'run-pr-failed',
-      publish_context: {},
-      ingress_kind: 'github_webhook',
-      ingress_key: 'delivery-pr-failed'
-    }],
+    [
+      'preparing',
+      {
+        workflow: 'pull-request-review',
+        run_id: 'run-pr-failed',
+        publish_context: {},
+        ingress_kind: 'github_webhook',
+        ingress_key: 'delivery-pr-failed'
+      }
+    ],
     ['failed', 'run-pr-failed', { code: 'REVIEW_START_FAILED', message: 'workspace clone failed' }]
   ])
 })
 
 test('startIssueReviewCommand preserves an uncertain Runner submission for replay', async () => {
   const transitions: unknown[] = []
-  const error = new ControlPlaneSubmissionError('Runner response was lost.', 'SUBMISSION_STATE_UNCERTAIN')
+  const error = new ControlPlaneSubmissionError(
+    'Runner response was lost.',
+    'SUBMISSION_STATE_UNCERTAIN'
+  )
 
   await assert.rejects(
     startIssueReviewCommand({
@@ -238,12 +267,27 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
       deps: {
         create_run_id: () => 'run-uncertain',
         start_review: async (args) => {
-          args.on_prepared?.({ issue: args.issue, run_id: 'run-uncertain', workspace_ref: 'workspace-ref', workflow: 'issue-review', event_type: 'opened' }, { contract_version: 'v5' } as never)
+          args.on_prepared?.(
+            {
+              issue: args.issue,
+              run_id: 'run-uncertain',
+              workspace_ref: 'workspace-ref',
+              workflow: 'issue-review',
+              event_type: 'opened'
+            },
+            { contract_version: 'v5' } as never
+          )
           throw error
         },
         store: {
-          admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' }) as never,
-          submit_prepared_run: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
+          admit_review_run: (run) =>
+            ({
+              record: { ...run, status: 'preparing' },
+              created: true,
+              preparation_token: 'claim'
+            }) as never,
+          submit_prepared_run: (run_id, _token, context, input) =>
+            transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
@@ -257,7 +301,10 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
 
 test('startPullRequestReviewCommand preserves an uncertain Runner submission for replay', async () => {
   const transitions: unknown[] = []
-  const error = new ControlPlaneSubmissionError('Runner response was lost.', 'SUBMISSION_STATE_UNCERTAIN')
+  const error = new ControlPlaneSubmissionError(
+    'Runner response was lost.',
+    'SUBMISSION_STATE_UNCERTAIN'
+  )
 
   await assert.rejects(
     startPullRequestReviewCommand({
@@ -268,12 +315,27 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
       deps: {
         create_run_id: () => 'run-pr-uncertain',
         start_review: async (args) => {
-          args.on_prepared?.({ pr: args.pr, run_id: 'run-pr-uncertain', files: [], workflow: 'pull-request-review', event_type: 'opened' }, { contract_version: 'v5' } as never)
+          args.on_prepared?.(
+            {
+              pr: args.pr,
+              run_id: 'run-pr-uncertain',
+              files: [],
+              workflow: 'pull-request-review',
+              event_type: 'opened'
+            },
+            { contract_version: 'v5' } as never
+          )
           throw error
         },
         store: {
-          admit_review_run: (run) => ({ record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' }) as never,
-          submit_prepared_run: (run_id, _token, context, input) => transitions.push(['prepared', run_id, context, input]),
+          admit_review_run: (run) =>
+            ({
+              record: { ...run, status: 'preparing' },
+              created: true,
+              preparation_token: 'claim'
+            }) as never,
+          submit_prepared_run: (run_id, _token, context, input) =>
+            transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }
       }
@@ -303,7 +365,11 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
         store: {
           admit_review_run: (run) => {
             transitions.push(['preparing', run.run_id])
-            return { record: { ...run, status: 'preparing' }, created: true, preparation_token: 'claim' } as never
+            return {
+              record: { ...run, status: 'preparing' },
+              created: true,
+              preparation_token: 'claim'
+            } as never
           },
           submit_prepared_run: () => assert.fail('failed context lookup must not queue'),
           failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
@@ -316,7 +382,11 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
   assert.deepEqual(transitions, [
     ['preparing', 'run-context-failure'],
     ['context'],
-    ['failed', 'run-context-failure', { code: 'REVIEW_START_FAILED', message: 'GitHub PR lookup failed' }]
+    [
+      'failed',
+      'run-context-failure',
+      { code: 'REVIEW_START_FAILED', message: 'GitHub PR lookup failed' }
+    ]
   ])
 })
 
@@ -335,7 +405,8 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
       },
       store: {
         admit_review_run: () => ({
-          created: false, preparation_token: null,
+          created: false,
+          preparation_token: null,
           record: { run_id: 'run-original', status: 'queued' } as never
         }),
         submit_prepared_run: () => assert.fail('replayed delivery must not queue again'),
@@ -363,7 +434,8 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
       },
       store: {
         admit_review_run: () => ({
-          created: false, preparation_token: null,
+          created: false,
+          preparation_token: null,
           record: { run_id: 'run-original', status: 'queued' } as never
         }),
         submit_prepared_run: () => assert.fail('replayed delivery must not queue again'),

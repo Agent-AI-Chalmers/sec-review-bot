@@ -28,19 +28,22 @@ test('view utils render changed files with a safe inline code fence', () => {
 
 test('view utils render verification summary with stable order and finding summaries', () => {
   assert.deepEqual(
-    renderVerificationSummaryLines({
-      patch_coverage: 'full',
-      regression_status: 'not-run',
-      resolution_next_step: 'none',
-      validation_level: 'static',
-      review_target_claim: 'The patch covers retry payloads.',
-      patch_findings: [{ summary: 'Patch updates retry validation.' }],
-      verification_findings: ['No regression suite was run.'],
-      residual_risks: []
-    }, {
-      includeOverview: false,
-      includeUnknownResolutionNextStep: true
-    }),
+    renderVerificationSummaryLines(
+      {
+        patch_coverage: 'full',
+        regression_status: 'not-run',
+        resolution_next_step: 'none',
+        validation_level: 'static',
+        review_target_claim: 'The patch covers retry payloads.',
+        patch_findings: [{ summary: 'Patch updates retry validation.' }],
+        verification_findings: ['No regression suite was run.'],
+        residual_risks: []
+      },
+      {
+        includeOverview: false,
+        includeUnknownResolutionNextStep: true
+      }
+    ),
     [
       '- Patch coverage: `full`',
       '- Regression status: `not-run`',
@@ -62,18 +65,22 @@ test('view utils render verification summary with stable order and finding summa
 
 test('view utils preserve inline code in review prose', () => {
   assert.deepEqual(
-    renderVerificationSummaryLines({
-      patch_coverage: 'full',
-      regression_status: 'passed',
-      resolution_next_step: 'none',
-      validation_level: 'static',
-      review_target_claim: 'The patch updates `agents/src/sec_review_agents/resources/prompts/memory/extract-system.md`.',
-      patch_findings: [],
-      verification_findings: ['`MemoryObservationOutput` remains unchanged.'],
-      residual_risks: []
-    }, {
-      includeOverview: false
-    }),
+    renderVerificationSummaryLines(
+      {
+        patch_coverage: 'full',
+        regression_status: 'passed',
+        resolution_next_step: 'none',
+        validation_level: 'static',
+        review_target_claim:
+          'The patch updates `agents/src/sec_review_agents/resources/prompts/memory/extract-system.md`.',
+        patch_findings: [],
+        verification_findings: ['`MemoryObservationOutput` remains unchanged.'],
+        residual_risks: []
+      },
+      {
+        includeOverview: false
+      }
+    ),
     [
       '- Patch coverage: `full`',
       '- Regression status: `passed`',

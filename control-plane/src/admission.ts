@@ -30,7 +30,7 @@ export interface ReviewRunAdmissionStore {
  * Assigns identity before input preparation so every post-admission failure is
  * queryable. The store resolves ingress replays to the original run identity.
  */
-export async function admitReviewRun (
+export async function admitReviewRun(
   store: ReviewRunAdmissionStore,
   request: ReviewRunAdmissionRequest,
   createRunId: () => string = randomUUID

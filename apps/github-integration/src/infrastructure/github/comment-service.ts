@@ -47,7 +47,7 @@ interface CreatePullRequestReviewUnlessMarkerExistsArgs extends CreatePullReques
   marker: string
 }
 
-function isOwnPullRequestApprovalError (error: unknown): boolean {
+function isOwnPullRequestApprovalError(error: unknown): boolean {
   const errorInfo = asErrorWithResponse(error)
   if (errorInfo.response?.status !== 422) {
     return false
@@ -65,8 +65,7 @@ function isOwnPullRequestApprovalError (error: unknown): boolean {
           return String(item)
         })
       : [String(responseErrors ?? '')])
-  ]
-    .filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+  ].filter((item): item is string => typeof item === 'string' && item.trim() !== '')
 
   return errorTexts.some((item) => {
     const text = item.toLowerCase()
@@ -74,10 +73,10 @@ function isOwnPullRequestApprovalError (error: unknown): boolean {
   })
 }
 
-async function createIssueComment (
+async function createIssueComment(
   octokit: GitHubAppOctokit,
   { owner_login, repo_name, issue_number, body }: CreateIssueCommentArgs
-): Promise<{ id: number, html_url: string }> {
+): Promise<{ id: number; html_url: string }> {
   const response = await octokit.rest.issues.createComment({
     owner: owner_login,
     repo: repo_name,
@@ -88,9 +87,14 @@ async function createIssueComment (
   return response.data
 }
 
-async function findIssueCommentByMarker (
+async function findIssueCommentByMarker(
   octokit: GitHubAppOctokit,
-  { owner_login, repo_name, issue_number, marker }: Omit<CreateIssueCommentUnlessMarkerExistsArgs, 'body'>
+  {
+    owner_login,
+    repo_name,
+    issue_number,
+    marker
+  }: Omit<CreateIssueCommentUnlessMarkerExistsArgs, 'body'>
 ): Promise<IssueCommentSummary | null> {
   let page = 1
 
@@ -124,10 +128,10 @@ async function findIssueCommentByMarker (
   }
 }
 
-export async function createIssueCommentUnlessMarkerExists (
+export async function createIssueCommentUnlessMarkerExists(
   octokit: GitHubAppOctokit,
   { owner_login, repo_name, issue_number, body, marker }: CreateIssueCommentUnlessMarkerExistsArgs
-): Promise<{ id: number, html_url: string, reused: boolean }> {
+): Promise<{ id: number; html_url: string; reused: boolean }> {
   const existing = await findIssueCommentByMarker(octokit, {
     owner_login,
     repo_name,
@@ -156,7 +160,7 @@ export async function createIssueCommentUnlessMarkerExists (
   }
 }
 
-async function createPullRequestReview (
+async function createPullRequestReview(
   octokit: GitHubAppOctokit,
   {
     owner_login,
@@ -167,7 +171,7 @@ async function createPullRequestReview (
     event = 'COMMENT',
     comments
   }: CreatePullRequestReviewArgs
-): Promise<{ id: number, html_url: string, state: string }> {
+): Promise<{ id: number; html_url: string; state: string }> {
   const request = {
     owner: owner_login,
     repo: repo_name,
@@ -195,14 +199,17 @@ async function createPullRequestReview (
   return response.data
 }
 
-async function findPullRequestReviewByMarker (
+async function findPullRequestReviewByMarker(
   octokit: GitHubAppOctokit,
   {
     owner_login,
     repo_name,
     pr_number,
     marker
-  }: Pick<CreatePullRequestReviewUnlessMarkerExistsArgs, 'owner_login' | 'repo_name' | 'pr_number' | 'marker'>
+  }: Pick<
+    CreatePullRequestReviewUnlessMarkerExistsArgs,
+    'owner_login' | 'repo_name' | 'pr_number' | 'marker'
+  >
 ): Promise<GitHubPullRequestReview | null> {
   let page = 1
 
@@ -236,10 +243,10 @@ async function findPullRequestReviewByMarker (
   }
 }
 
-export async function createPullRequestReviewUnlessMarkerExists (
+export async function createPullRequestReviewUnlessMarkerExists(
   octokit: GitHubAppOctokit,
   args: CreatePullRequestReviewUnlessMarkerExistsArgs
-): Promise<{ id: number, html_url: string, state: string, reused: boolean }> {
+): Promise<{ id: number; html_url: string; state: string; reused: boolean }> {
   const existing = await findPullRequestReviewByMarker(octokit, args)
   if (existing !== null) {
     // A run marker is the durable publication identity when a GitHub response is lost.

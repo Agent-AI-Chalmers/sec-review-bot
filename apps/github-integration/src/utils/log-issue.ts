@@ -1,27 +1,25 @@
 import { logInfo } from './logger.js'
 
-function asRecord (value: unknown): Record<string, unknown> {
+function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : {}
 }
 
-function asString (value: unknown, fallback = ''): string {
+function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
 }
 
-function displayString (value: unknown): string {
+function displayString(value: unknown): string {
   const text = asString(value).trim()
   return text || '(missing)'
 }
 
-function displayNumber (value: unknown): number | string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? value
-    : '(missing)'
+function displayNumber(value: unknown): number | string {
+  return typeof value === 'number' && Number.isFinite(value) ? value : '(missing)'
 }
 
-export function logIssuePayload (payload: unknown): void {
+export function logIssuePayload(payload: unknown): void {
   const rawPayload = asRecord(payload)
   const repository = asRecord(rawPayload.repository)
   const sender = asRecord(rawPayload.sender)
@@ -36,8 +34,8 @@ export function logIssuePayload (payload: unknown): void {
   const sender_login = asString(sender.login, '') || undefined
   const labels = Array.isArray(issue.labels)
     ? issue.labels
-      .map((label) => label?.name)
-      .filter((label): label is string => typeof label === 'string' && label.length > 0)
+        .map((label) => label?.name)
+        .filter((label): label is string => typeof label === 'string' && label.length > 0)
     : []
 
   logInfo('webhook_received_completed', {

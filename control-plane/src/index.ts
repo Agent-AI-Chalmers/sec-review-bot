@@ -30,7 +30,4 @@ export {
   type SubmissionRecoveryDependencies,
   type SubmissionRecoveryResult
 } from './submission-recovery.js'
-export {
-  observeRunnerRun,
-  type RunnerObservationResult
-} from './terminal-coordination.js'
+export { observeRunnerRun, type RunnerObservationResult } from './terminal-coordination.js'

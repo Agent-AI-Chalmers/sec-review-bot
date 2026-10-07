@@ -2,10 +2,7 @@ import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
 
 import type { IssueContext } from '../infrastructure/github/issue-service.js'
 import { issueReviewPublishContext } from '../infrastructure/runner/publish-context.js'
-import {
-  startIssueReviewRun,
-  type SubmittedIssueReviewRun
-} from '../reviews/issues/submit.js'
+import { startIssueReviewRun, type SubmittedIssueReviewRun } from '../reviews/issues/submit.js'
 import type { RepairMode } from '../infrastructure/runner/input.js'
 import { createRunId } from '../reviews/shared/input-bundle.js'
 import { reviewRunStore } from '../infrastructure/runner/review-store.js'
@@ -14,7 +11,11 @@ import { ControlPlaneSubmissionError } from '../infrastructure/runner/review-sto
 type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
 type IssueReviewRunStore = {
-  admit_review_run: (...args: Parameters<typeof reviewRunStore.admit_review_run>) => Awaited<ReturnType<typeof reviewRunStore.admit_review_run>> | ReturnType<typeof reviewRunStore.admit_review_run>
+  admit_review_run: (
+    ...args: Parameters<typeof reviewRunStore.admit_review_run>
+  ) =>
+    | Awaited<ReturnType<typeof reviewRunStore.admit_review_run>>
+    | ReturnType<typeof reviewRunStore.admit_review_run>
   failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
   submit_prepared_run: (...args: Parameters<typeof reviewRunStore.submit_prepared_run>) => unknown
 }
@@ -31,7 +32,7 @@ interface StartIssueReviewCommandArgs {
   review_objective?: 'audit' | 'repair' | null
   repair_mode?: RepairMode | null
   delivery_id: string
-  on_admitted?: (admission: { run_id: string, status: string, replayed: boolean }) => void
+  on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   deps?: Partial<StartIssueReviewCommandDeps>
 }
 
@@ -39,7 +40,7 @@ interface StartedIssueReview {
   run_id: string
 }
 
-export async function startIssueReviewCommand ({
+export async function startIssueReviewCommand({
   octokit,
   issue,
   event_type,
@@ -54,11 +55,15 @@ export async function startIssueReviewCommand ({
     store = reviewRunStore,
     create_run_id = createRunId
   } = deps
-  const admission = await admitReviewRun(store, {
-    workflow: 'issue-review',
-    ingress_kind: 'github_webhook',
-    ingress_key: delivery_id
-  }, create_run_id)
+  const admission = await admitReviewRun(
+    store,
+    {
+      workflow: 'issue-review',
+      ingress_kind: 'github_webhook',
+      ingress_key: delivery_id
+    },
+    create_run_id
+  )
   on_admitted?.({
     run_id: admission.run_id,
     status: admission.status,
@@ -69,17 +74,22 @@ export async function startIssueReviewCommand ({
   }
   const run_id = admission.run_id
   const preparationToken = admission.preparation_token
-  if (!preparationToken) throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
+  if (!preparationToken)
+    throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
 
   let submitted: SubmittedIssueReviewRun
   try {
     submitted = await start_review({
-      octokit, issue, run_id, event_type,
+      octokit,
+      issue,
+      run_id,
+      event_type,
       review_objective: event_type === 'opened' ? 'audit' : review_objective,
       repair_mode: event_type === 'opened' ? null : repair_mode,
       on_prepared: async (prepared, input) => {
         await store.submit_prepared_run(
-          run_id, preparationToken,
+          run_id,
+          preparationToken,
           issueReviewPublishContext(prepared),
           input
         )

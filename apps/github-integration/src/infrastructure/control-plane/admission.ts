@@ -2,8 +2,18 @@ import { randomUUID } from 'node:crypto'
 
 import type { WorkflowName as ControlPlaneWorkflow } from '../runner/client.js'
 
-interface ReviewRunAdmissionRequest { workflow: ControlPlaneWorkflow, ingress_kind: 'github_webhook' | 'github_actions_dispatch', ingress_key: string }
-interface AdmittedReviewRun { run_id: string, workflow: ControlPlaneWorkflow, status: string, created: boolean, preparation_token: string | null }
+interface ReviewRunAdmissionRequest {
+  workflow: ControlPlaneWorkflow
+  ingress_kind: 'github_webhook' | 'github_actions_dispatch'
+  ingress_key: string
+}
+interface AdmittedReviewRun {
+  run_id: string
+  workflow: ControlPlaneWorkflow
+  status: string
+  created: boolean
+  preparation_token: string | null
+}
 
 interface StoredAdmission {
   record: {
@@ -29,7 +39,7 @@ export interface ReviewRunAdmissionStore {
  * Assigns identity before input preparation so every post-admission failure is
  * queryable. The store resolves ingress replays to the original run identity.
  */
-export async function admitReviewRun (
+export async function admitReviewRun(
   store: ReviewRunAdmissionStore,
   request: ReviewRunAdmissionRequest,
   createRunId: () => string = randomUUID

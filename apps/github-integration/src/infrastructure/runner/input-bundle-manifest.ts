@@ -5,7 +5,7 @@ import { WORKSPACE_SNAPSHOT_TAR_NAME } from './git-workspace.js'
 
 export const INPUT_BUNDLE_MANIFEST_NAME = 'manifest.json'
 
-export async function writeInputBundleManifest ({
+export async function writeInputBundleManifest({
   input_bundle_root,
   include_incremental_window
 }: {

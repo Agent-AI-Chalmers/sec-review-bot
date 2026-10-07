@@ -16,9 +16,9 @@ export type FileChange =
       mode?: FileMode
     }
 
-export function fileChangePaths (file_changes: unknown): string[] {
+export function fileChangePaths(file_changes: unknown): string[] {
   const paths = asList(file_changes)
-    .map((item) => isRecord(item) ? nonEmptyText(item.path) : '')
+    .map((item) => (isRecord(item) ? nonEmptyText(item.path) : ''))
     .filter((item) => item.length > 0)
 
   return [...new Set(paths)]

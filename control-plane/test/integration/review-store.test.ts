@@ -4,7 +4,7 @@ import test from 'node:test'
 
 import { ReviewRunStore } from '../../src/index.js'
 
-function databaseUrl () {
+function databaseUrl() {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
   if (!value) throw new Error('TEST_DATABASE_URL or DATABASE_URL is required.')
   return value
@@ -43,8 +43,14 @@ test('Control Plane store initializes its schema and deduplicates ingress', asyn
 
 test('Control Plane store fences reads by connector', async () => {
   const runId = `run-${randomUUID()}`
-  const first = new ReviewRunStore({ connectionString: databaseUrl(), connectorId: `first:${randomUUID()}` })
-  const second = new ReviewRunStore({ connectionString: databaseUrl(), connectorId: `second:${randomUUID()}` })
+  const first = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `first:${randomUUID()}`
+  })
+  const second = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `second:${randomUUID()}`
+  })
   await Promise.all([first.initialize(), second.initialize()])
   try {
     await first.create_preparing_review_run({
@@ -65,19 +71,30 @@ test('run queries survive a fresh store connection and preserve stable paginatio
   const runIds = [`run-${randomUUID()}`, `run-${randomUUID()}`]
   try {
     for (const run_id of runIds) {
-      await first.create_preparing_review_run({ run_id, workflow: 'issue-review', publish_context: { private: true }, runner_input: { secret: true } })
+      await first.create_preparing_review_run({
+        run_id,
+        workflow: 'issue-review',
+        publish_context: { private: true },
+        runner_input: { secret: true }
+      })
     }
-  } finally { await first.close() }
+  } finally {
+    await first.close()
+  }
 
   const restarted = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
   await restarted.initialize()
   try {
     const firstPage = await restarted.listRuns({ limit: 1 })
     assert.equal(firstPage.length, 1)
-    const cursor = Buffer.from(`${firstPage[0]?.created_at}|${firstPage[0]?.run_id}`).toString('base64url')
+    const cursor = Buffer.from(`${firstPage[0]?.created_at}|${firstPage[0]?.run_id}`).toString(
+      'base64url'
+    )
     const secondPage = await restarted.listRuns({ limit: 1, cursor })
     assert.equal(secondPage.length, 1)
     assert.notEqual(secondPage[0]?.run_id, firstPage[0]?.run_id)
     assert.equal((await restarted.getRun(runIds[0] ?? ''))?.runner_input?.secret, true)
-  } finally { await restarted.close() }
+  } finally {
+    await restarted.close()
+  }
 })

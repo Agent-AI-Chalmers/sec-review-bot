@@ -12,4 +12,4 @@ export const RUNNER_PUBLISH_ERROR_CODES = {
 } as const
 
 export type RunnerPublishErrorCode =
-  typeof RUNNER_PUBLISH_ERROR_CODES[keyof typeof RUNNER_PUBLISH_ERROR_CODES]
+  (typeof RUNNER_PUBLISH_ERROR_CODES)[keyof typeof RUNNER_PUBLISH_ERROR_CODES]

@@ -12,9 +12,7 @@ import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import type { PullRequestReviewInput } from '../../infrastructure/runner/input.js'
 import type { RepairMode } from '../../infrastructure/runner/input.js'
 import { getInstallationAccessToken } from '../../infrastructure/github/installation-auth.js'
-import {
-  materializeWorkspaceWithCommitHistory
-} from '../../infrastructure/runner/git-workspace.js'
+import { materializeWorkspaceWithCommitHistory } from '../../infrastructure/runner/git-workspace.js'
 import {
   archiveInputBundle,
   buildGitRemoteUrl,
@@ -66,7 +64,7 @@ interface PullRequestCommitsGraphQLResponse {
   }
 }
 
-function buildPrMetadata (pr: PullRequestContext): Record<string, unknown> {
+function buildPrMetadata(pr: PullRequestContext): Record<string, unknown> {
   return {
     action: pr.action,
     owner: pr.owner_login,
@@ -86,7 +84,7 @@ function buildPrMetadata (pr: PullRequestContext): Record<string, unknown> {
   }
 }
 
-function normalizeFiles (files: PullRequestFile[]): NormalizedPullRequestFile[] {
+function normalizeFiles(files: PullRequestFile[]): NormalizedPullRequestFile[] {
   return summarizePullRequestFiles(files).map((file: PullRequestFileSummary) => ({
     path: file.filename,
     status: file.status,
@@ -97,7 +95,7 @@ function normalizeFiles (files: PullRequestFile[]): NormalizedPullRequestFile[] 
   }))
 }
 
-function buildIncrementalPatchText (files: NormalizedPullRequestFile[]): string {
+function buildIncrementalPatchText(files: NormalizedPullRequestFile[]): string {
   const chunks: string[] = []
 
   for (const file of files) {
@@ -116,7 +114,7 @@ function buildIncrementalPatchText (files: NormalizedPullRequestFile[]): string 
   return chunks.join('\n')
 }
 
-async function listCommitChainRefsForPullRequest ({
+async function listCommitChainRefsForPullRequest({
   octokit,
   pr
 }: {
@@ -147,14 +145,16 @@ async function listCommitChainRefsForPullRequest ({
   let cursor: string | null = null
 
   while (true) {
-    const response: PullRequestCommitsGraphQLResponse = await octokit.graphql<PullRequestCommitsGraphQLResponse>(query, {
-      owner: pr.owner_login,
-      repo: pr.repo_name,
-      number: pr.pr_number,
-      cursor
-    })
+    const response: PullRequestCommitsGraphQLResponse =
+      await octokit.graphql<PullRequestCommitsGraphQLResponse>(query, {
+        owner: pr.owner_login,
+        repo: pr.repo_name,
+        number: pr.pr_number,
+        cursor
+      })
 
-    const commits: PullRequestCommitsConnection | undefined = response?.repository?.pullRequest?.commits
+    const commits: PullRequestCommitsConnection | undefined =
+      response?.repository?.pullRequest?.commits
     const nodes = Array.isArray(commits?.nodes) ? commits.nodes : []
     for (const node of nodes) {
       const sha = String(node?.commit?.oid ?? '').trim()
@@ -181,7 +181,7 @@ async function listCommitChainRefsForPullRequest ({
   return uniqueRefs
 }
 
-async function materializeWorkspaceHistory ({
+async function materializeWorkspaceHistory({
   octokit,
   pr,
   workspace_path,
@@ -202,7 +202,7 @@ async function materializeWorkspaceHistory ({
   })
 }
 
-async function materializeIncrementalWindowArtifacts (
+async function materializeIncrementalWindowArtifacts(
   files: NormalizedPullRequestFile[],
   incremental_window_path: string
 ): Promise<void> {
@@ -216,7 +216,11 @@ async function materializeIncrementalWindowArtifacts (
   }))
 
   await Promise.all([
-    fs.writeFile(path.join(incremental_window_path, 'incremental.patch'), buildIncrementalPatchText(files), 'utf8'),
+    fs.writeFile(
+      path.join(incremental_window_path, 'incremental.patch'),
+      buildIncrementalPatchText(files),
+      'utf8'
+    ),
     fs.writeFile(
       path.join(incremental_window_path, 'changed-files.json'),
       JSON.stringify(
@@ -232,7 +236,7 @@ async function materializeIncrementalWindowArtifacts (
   ])
 }
 
-async function materializeHistoryArtifacts ({
+async function materializeHistoryArtifacts({
   octokit,
   pr,
   history_path
@@ -255,18 +259,22 @@ async function materializeHistoryArtifacts ({
 
   await fs.writeFile(
     path.join(history_path, 'linked-context.json'),
-    JSON.stringify({
-      generated_at: new Date().toISOString(),
-      relation_type: 'cross-referenced',
-      source: 'timeline',
-      sources_checked: ['timeline'],
-      issues: linkedIssues.issues.map((issue) => ({
-        ...issue,
+    JSON.stringify(
+      {
+        generated_at: new Date().toISOString(),
         relation_type: 'cross-referenced',
-        source: 'timeline'
-      })),
-      prs: []
-    }, null, 2),
+        source: 'timeline',
+        sources_checked: ['timeline'],
+        issues: linkedIssues.issues.map((issue) => ({
+          ...issue,
+          relation_type: 'cross-referenced',
+          source: 'timeline'
+        })),
+        prs: []
+      },
+      null,
+      2
+    ),
     'utf8'
   )
 
@@ -276,7 +284,7 @@ async function materializeHistoryArtifacts ({
   }
 }
 
-export async function preparePullRequestReviewInput ({
+export async function preparePullRequestReviewInput({
   run_id: provided_run_id,
   octokit,
   pr,

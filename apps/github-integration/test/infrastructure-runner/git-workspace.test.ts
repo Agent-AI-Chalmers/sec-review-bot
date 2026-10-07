@@ -15,7 +15,7 @@ import {
 
 const execFileAsync = promisify(execFile)
 
-async function git (cwd: string, args: string[]): Promise<string> {
+async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('git', args, { cwd })
   return stdout.trim()
 }
@@ -31,7 +31,7 @@ test('retryGitFetch retries with exponential delays and then succeeds', async ()
         throw new Error('temporary fetch failure')
       }
     },
-    async delay_ms => {
+    async (delay_ms) => {
       delays.push(delay_ms)
     }
   )
@@ -52,7 +52,7 @@ test('retryGitFetch preserves the final fetch error', async () => {
       },
       async () => {}
     ),
-    error => error === failure
+    (error) => error === failure
   )
 
   assert.equal(attempts, 3)
@@ -74,17 +74,14 @@ test('withConfiguredGitFetchProxy adds a fetch-only Git proxy', () => {
     env: { GIT_TERMINAL_PROMPT: '0' }
   }
 
-  assert.deepEqual(
-    withConfiguredGitFetchProxy(options, ' http://host.docker.internal:7897 '),
-    {
-      config: ['credential.helper='],
-      env: {
-        GIT_TERMINAL_PROMPT: '0',
-        http_proxy: 'http://host.docker.internal:7897',
-        https_proxy: 'http://host.docker.internal:7897'
-      }
+  assert.deepEqual(withConfiguredGitFetchProxy(options, ' http://host.docker.internal:7897 '), {
+    config: ['credential.helper='],
+    env: {
+      GIT_TERMINAL_PROMPT: '0',
+      http_proxy: 'http://host.docker.internal:7897',
+      https_proxy: 'http://host.docker.internal:7897'
     }
-  )
+  })
 })
 
 test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch metadata', async () => {
@@ -111,7 +108,10 @@ test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch me
     })
 
     assert.equal(await git(workspace, ['rev-parse', 'HEAD']), head_sha)
-    assert.equal(await git(workspace, ['diff', '--name-only', `${base_sha}..${head_sha}`]), 'README.md')
+    assert.equal(
+      await git(workspace, ['diff', '--name-only', `${base_sha}..${head_sha}`]),
+      'README.md'
+    )
     assert.equal(await git(workspace, ['remote']), '')
     await assert.rejects(fs.stat(path.join(workspace, '.git', 'FETCH_HEAD')))
     await assert.rejects(fs.stat(path.join(workspace, '.git', 'logs')))
@@ -217,12 +217,7 @@ test('createWorkspaceSnapshotTar restores a self-consistent git workspace from t
     })
 
     await fs.mkdir(restoredParent, { recursive: true })
-    await execFileAsync('tar', [
-      '-xf',
-      tar_path,
-      '-C',
-      restoredParent
-    ])
+    await execFileAsync('tar', ['-xf', tar_path, '-C', restoredParent])
 
     await git(restoredWorkspace, ['fsck', '--strict'])
     assert.equal(await git(restoredWorkspace, ['rev-parse', 'HEAD']), head_sha)

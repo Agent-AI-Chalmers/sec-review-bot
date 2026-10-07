@@ -13,8 +13,8 @@ import {
 test('extractIssueContext rejects payloads missing required identity fields', () => {
   assert.throws(
     () => extractIssueContext({}),
-    (error: unknown) => error instanceof IssueContextExtractionError &&
-      /repository\.name/.test(error.message)
+    (error: unknown) =>
+      error instanceof IssueContextExtractionError && /repository\.name/.test(error.message)
   )
 })
 
@@ -49,8 +49,8 @@ test('extractIssueContext returns normalized issue context', () => {
 test('extractPullRequestContext rejects payloads missing required identity fields', () => {
   assert.throws(
     () => extractPullRequestContext({}),
-    (error: unknown) => error instanceof PullRequestContextExtractionError &&
-      /repository\.name/.test(error.message)
+    (error: unknown) =>
+      error instanceof PullRequestContextExtractionError && /repository\.name/.test(error.message)
   )
 })
 

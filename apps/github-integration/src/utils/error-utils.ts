@@ -1,10 +1,12 @@
 interface GitHubErrorResponse {
   status: number | undefined
   headers: Record<string, unknown> | undefined
-  data: {
-    message: string | undefined
-    errors: unknown
-  } | undefined
+  data:
+    | {
+        message: string | undefined
+        errors: unknown
+      }
+    | undefined
 }
 
 interface ErrorWithResponse {
@@ -14,11 +16,11 @@ interface ErrorWithResponse {
   response: GitHubErrorResponse | undefined
 }
 
-function isRecord (value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function toGitHubErrorResponse (value: unknown): GitHubErrorResponse | undefined {
+function toGitHubErrorResponse(value: unknown): GitHubErrorResponse | undefined {
   if (!isRecord(value)) {
     return undefined
   }
@@ -37,16 +39,17 @@ function toGitHubErrorResponse (value: unknown): GitHubErrorResponse | undefined
   }
 }
 
-export function asErrorWithResponse (error: unknown): ErrorWithResponse {
+export function asErrorWithResponse(error: unknown): ErrorWithResponse {
   if (error instanceof Error) {
-    const withMaybeGitHubFields = error as Error & { response?: unknown, status?: unknown }
+    const withMaybeGitHubFields = error as Error & { response?: unknown; status?: unknown }
     const response = toGitHubErrorResponse(withMaybeGitHubFields.response)
     return {
       message: error.message,
       name: error.name,
-      status: typeof withMaybeGitHubFields.status === 'number'
-        ? withMaybeGitHubFields.status
-        : response?.status,
+      status:
+        typeof withMaybeGitHubFields.status === 'number'
+          ? withMaybeGitHubFields.status
+          : response?.status,
       response
     }
   }

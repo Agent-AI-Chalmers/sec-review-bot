@@ -3,9 +3,15 @@ import { assertV5ReviewRecord } from '../infrastructure/runner/contract-schema.j
 
 type AnyRecord = Record<string, unknown>
 
-type AnalysisVerdict = 'no-actionable-finding' | 'inconclusive' | 'plausible-risk' | 'confirmed-defect' | 'confirmed-vulnerability'
+type AnalysisVerdict =
+  | 'no-actionable-finding'
+  | 'inconclusive'
+  | 'plausible-risk'
+  | 'confirmed-defect'
+  | 'confirmed-vulnerability'
 type ValidationLevel = 'static' | 'logic-simulated' | 'runtime-partial' | 'runtime-endpoint'
-type PatchCoverage = 'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | 'no-patch' | 'not-applicable'
+type PatchCoverage =
+  'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | 'no-patch' | 'not-applicable'
 type RegressionStatus = 'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved'
 type ResolutionNextStep = 'none' | 'retry-ai' | 'manual-review'
 type CvssOutcome = 'scored' | 'not-scored' | 'skipped'
@@ -44,7 +50,7 @@ export interface ReviewRecord {
   } | null
 }
 
-export function parseReviewRecord (value: unknown): ReviewRecord {
+export function parseReviewRecord(value: unknown): ReviewRecord {
   assertV5ReviewRecord(value)
   return value as ReviewRecord
 }

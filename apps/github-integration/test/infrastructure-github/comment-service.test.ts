@@ -13,12 +13,14 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
     rest: {
       issues: {
         listComments: async () => ({
-          data: [{
-            id: 123,
-            body: '<!-- sec-review-bot:repository-summary-run:run-1 -->\nold body',
-            html_url: 'https://example.test/comment/123',
-            user: { type: 'Bot' }
-          }]
+          data: [
+            {
+              id: 123,
+              body: '<!-- sec-review-bot:repository-summary-run:run-1 -->\nold body',
+              html_url: 'https://example.test/comment/123',
+              user: { type: 'Bot' }
+            }
+          ]
         }),
         createComment: async () => {
           createCalls += 1
@@ -87,13 +89,15 @@ test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', asy
     rest: {
       pulls: {
         listReviews: async () => ({
-          data: [{
-            id: 123,
-            body: `${marker}\nold body`,
-            html_url: 'https://example.test/review/123',
-            state: 'CHANGES_REQUESTED',
-            user: { type: 'Bot' }
-          }]
+          data: [
+            {
+              id: 123,
+              body: `${marker}\nold body`,
+              html_url: 'https://example.test/review/123',
+              state: 'CHANGES_REQUESTED',
+              user: { type: 'Bot' }
+            }
+          ]
         }),
         createReview: async () => {
           createCalls += 1

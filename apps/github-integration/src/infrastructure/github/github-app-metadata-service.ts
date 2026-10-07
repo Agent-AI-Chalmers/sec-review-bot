@@ -12,17 +12,17 @@ let github_app_metadata: GitHubAppMetadata = {
   bot_login: null
 }
 
-export function setGitHubAppMetadata (metadata: {
-  id?: unknown
-  slug?: unknown
-  name?: unknown
-} = {}): void {
-  const slug = typeof metadata.slug === 'string' && metadata.slug.trim() !== ''
-    ? metadata.slug.trim()
-    : null
-  const name = typeof metadata.name === 'string' && metadata.name.trim() !== ''
-    ? metadata.name.trim()
-    : null
+export function setGitHubAppMetadata(
+  metadata: {
+    id?: unknown
+    slug?: unknown
+    name?: unknown
+  } = {}
+): void {
+  const slug =
+    typeof metadata.slug === 'string' && metadata.slug.trim() !== '' ? metadata.slug.trim() : null
+  const name =
+    typeof metadata.name === 'string' && metadata.name.trim() !== '' ? metadata.name.trim() : null
   const id = typeof metadata.id === 'number' && Number.isInteger(metadata.id) ? metadata.id : null
 
   github_app_metadata = {
@@ -33,6 +33,6 @@ export function setGitHubAppMetadata (metadata: {
   }
 }
 
-export function getGitHubAppMetadata (): GitHubAppMetadata {
+export function getGitHubAppMetadata(): GitHubAppMetadata {
   return { ...github_app_metadata }
 }

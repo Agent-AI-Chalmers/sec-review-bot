@@ -12,14 +12,14 @@ type LogLevel = keyof typeof ANSI_LEVEL_COLORS
 
 type LogFields = Record<string, unknown>
 
-function timestamp (): string {
+function timestamp(): string {
   const iso = new Date().toISOString()
   // Match Python-like readability with 6-digit fractional seconds.
   // JavaScript Date only provides milliseconds, so we pad to microsecond style.
   return iso.replace(/\.(\d{3})Z$/, '.$1000Z')
 }
 
-function formatScalar (value: unknown): string {
+function formatScalar(value: unknown): string {
   if (value == null) return 'null'
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
 
@@ -27,7 +27,7 @@ function formatScalar (value: unknown): string {
   return /\s/.test(text) ? JSON.stringify(text) : text
 }
 
-function formatValue (value: unknown): string {
+function formatValue(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map((item) => formatScalar(item)).join(',')}]`
   }
@@ -39,20 +39,22 @@ function formatValue (value: unknown): string {
   return formatScalar(value)
 }
 
-function formatFields (fields: LogFields): string {
+function formatFields(fields: LogFields): string {
   return Object.entries(fields)
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}=${formatValue(value)}`)
     .join(' ')
 }
 
-function shouldColorize (level: LogLevel): boolean {
+function shouldColorize(level: LogLevel): boolean {
   const noColor = typeof process.env.NO_COLOR === 'string' && process.env.NO_COLOR !== ''
   if (noColor) {
     return false
   }
 
-  const configured = String(process.env.LOG_COLOR ?? '').trim().toLowerCase()
+  const configured = String(process.env.LOG_COLOR ?? '')
+    .trim()
+    .toLowerCase()
   if (['0', 'false', 'off', 'no'].includes(configured)) {
     return false
   }
@@ -67,7 +69,7 @@ function shouldColorize (level: LogLevel): boolean {
   return Boolean(process.stdout.isTTY)
 }
 
-function formatLevelLabel (level: LogLevel): string {
+function formatLevelLabel(level: LogLevel): string {
   const padded = level.padEnd(LEVEL_WIDTH)
 
   if (!shouldColorize(level)) {
@@ -78,11 +80,9 @@ function formatLevelLabel (level: LogLevel): string {
   return `[${color}${padded}${ANSI_RESET}]`
 }
 
-export function logEvent (level: LogLevel, event: string, fields: LogFields = {}): void {
+export function logEvent(level: LogLevel, event: string, fields: LogFields = {}): void {
   const levelLabel = formatLevelLabel(level)
-  const eventLabel = event.length >= EVENT_WIDTH
-    ? `${event} `
-    : `${event.padEnd(EVENT_WIDTH)} `
+  const eventLabel = event.length >= EVENT_WIDTH ? `${event} ` : `${event.padEnd(EVENT_WIDTH)} `
   const renderedFields = formatFields(fields)
   const line = `${timestamp()} ${levelLabel} ${eventLabel}${renderedFields}`.trimEnd()
 
@@ -94,14 +94,14 @@ export function logEvent (level: LogLevel, event: string, fields: LogFields = {}
   console.log(line)
 }
 
-export function logInfo (event: string, fields: LogFields = {}): void {
+export function logInfo(event: string, fields: LogFields = {}): void {
   logEvent('info', event, fields)
 }
 
-export function logWarn (event: string, fields: LogFields = {}): void {
+export function logWarn(event: string, fields: LogFields = {}): void {
   logEvent('warn', event, fields)
 }
 
-export function logError (event: string, fields: LogFields = {}): void {
+export function logError(event: string, fields: LogFields = {}): void {
   logEvent('error', event, fields)
 }

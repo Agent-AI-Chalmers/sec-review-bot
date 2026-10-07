@@ -23,7 +23,7 @@ export interface AuthorizedRepositoryReviewOidcClaims extends GitHubActionsOidcC
 export type GitHubActionsOidcVerifier = (token: string) => Promise<GitHubActionsOidcClaims>
 
 export class RepositoryReviewOidcError extends Error {
-  constructor (
+  constructor(
     message: string,
     readonly status_code: 401 | 403 = 403
   ) {
@@ -32,7 +32,9 @@ export class RepositoryReviewOidcError extends Error {
   }
 }
 
-export async function verifyGitHubActionsOidcToken (token: string): Promise<GitHubActionsOidcClaims> {
+export async function verifyGitHubActionsOidcToken(
+  token: string
+): Promise<GitHubActionsOidcClaims> {
   const { payload } = await jwtVerify(token, githubActionsJwks, {
     issuer: GITHUB_ACTIONS_OIDC_ISSUER,
     audience: REPOSITORY_REVIEW_OIDC_AUDIENCE
@@ -41,7 +43,7 @@ export async function verifyGitHubActionsOidcToken (token: string): Promise<GitH
   return payload as GitHubActionsOidcClaims
 }
 
-function normalizeHeaderValue (value: string | string[] | undefined): string | null {
+function normalizeHeaderValue(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) {
     return null
   }
@@ -49,7 +51,7 @@ function normalizeHeaderValue (value: string | string[] | undefined): string | n
   return normalized || null
 }
 
-function branchNameFromRef (ref: unknown): string | null {
+function branchNameFromRef(ref: unknown): string | null {
   const value = typeof ref === 'string' ? ref.trim() : ''
   if (!value.startsWith('refs/heads/')) {
     return null
@@ -57,17 +59,24 @@ function branchNameFromRef (ref: unknown): string | null {
   return value.slice('refs/heads/'.length)
 }
 
-function workflowRefMatchesRepositoryReviewWorkflow (value: unknown, repo_full_name: string, target_branch: string): boolean {
+function workflowRefMatchesRepositoryReviewWorkflow(
+  value: unknown,
+  repo_full_name: string,
+  target_branch: string
+): boolean {
   const text = typeof value === 'string' ? value.trim() : ''
   const suffix = `/${REPOSITORY_REVIEW_WORKFLOW_PATH}@refs/heads/${target_branch}`
-  return text.endsWith(suffix) && text.slice(0, -suffix.length).toLowerCase() === repo_full_name.toLowerCase()
+  return (
+    text.endsWith(suffix) &&
+    text.slice(0, -suffix.length).toLowerCase() === repo_full_name.toLowerCase()
+  )
 }
 
-function canonicalRepository (value: unknown): string {
+function canonicalRepository(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
 }
 
-export async function authorizeRepositoryReviewDispatchOidc ({
+export async function authorizeRepositoryReviewDispatchOidc({
   headers,
   payload_repo_full_name,
   payload_target_branch,
@@ -108,8 +117,16 @@ export async function authorizeRepositoryReviewDispatchOidc ({
     throw new RepositoryReviewOidcError('OIDC ref does not match target_branch.')
   }
 
-  if (!workflowRefMatchesRepositoryReviewWorkflow(claims.workflow_ref, verified_repository, payload_target_branch)) {
-    throw new RepositoryReviewOidcError('OIDC workflow is not allowed for repository review dispatch.')
+  if (
+    !workflowRefMatchesRepositoryReviewWorkflow(
+      claims.workflow_ref,
+      verified_repository,
+      payload_target_branch
+    )
+  ) {
+    throw new RepositoryReviewOidcError(
+      'OIDC workflow is not allowed for repository review dispatch.'
+    )
   }
 
   return { ...claims, repository: verified_repository }

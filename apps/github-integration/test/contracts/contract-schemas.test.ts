@@ -16,19 +16,19 @@ interface FixtureManifest {
   invalid_schema_fixtures: Record<string, string>
 }
 
-function invalidFixtureSchemas (): Array<[string, string]> {
+function invalidFixtureSchemas(): Array<[string, string]> {
   const manifest = contractFixtureManifest('v5') as FixtureManifest
   assert.equal(typeof manifest.invalid_schema_fixtures, 'object')
   return Object.entries(manifest.invalid_schema_fixtures)
 }
 
-function fixtureSchemas (): Array<[string, string]> {
+function fixtureSchemas(): Array<[string, string]> {
   const manifest = contractFixtureManifest('v5') as FixtureManifest
   assert.equal(typeof manifest.schema_fixtures, 'object')
   return Object.entries(manifest.schema_fixtures)
 }
 
-function contractAjv (): Ajv2020 {
+function contractAjv(): Ajv2020 {
   const ajv = new Ajv2020({ allErrors: true })
   const commonSchema = contractSchema('v5', 'common.schema.json') as AnySchemaObject
 
@@ -38,7 +38,7 @@ function contractAjv (): Ajv2020 {
   return ajv
 }
 
-function contractValidator (schemaName: string): ReturnType<Ajv2020['compile']> {
+function contractValidator(schemaName: string): ReturnType<Ajv2020['compile']> {
   const ajv = contractAjv()
   return ajv.compile(contractSchema('v5', schemaName) as AnySchemaObject)
 }
@@ -71,8 +71,9 @@ test('shared v5 contract fixture manifest covers fixture and schema files', () =
 
   assert.deepEqual([...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort(), fixtureNames)
   assert.ok(
-    [...schemaFixtures.values(), ...invalidSchemaFixtures.values()]
-      .every((schemaName) => schemaNames.has(schemaName))
+    [...schemaFixtures.values(), ...invalidSchemaFixtures.values()].every((schemaName) =>
+      schemaNames.has(schemaName)
+    )
   )
 })
 
@@ -137,7 +138,9 @@ test('v5 repository incremental schema rejects missing window fields', () => {
   const validate = contractValidator('repository-review-input.schema.json')
 
   for (const scanTargetPatch of [{ base_sha: null }, { commit_shas: [] }]) {
-    const payload = structuredClone(contractFixture('v5', 'repository-review-input-incremental.json')) as {
+    const payload = structuredClone(
+      contractFixture('v5', 'repository-review-input-incremental.json')
+    ) as {
       scan_target: {
         base_sha: string | null
         commit_shas: string[]
@@ -151,7 +154,9 @@ test('v5 repository incremental schema rejects missing window fields', () => {
 
 test('v5 repository incremental schema allows empty changed file scope', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = structuredClone(contractFixture('v5', 'repository-review-input-incremental.json')) as {
+  const payload = structuredClone(
+    contractFixture('v5', 'repository-review-input-incremental.json')
+  ) as {
     scan_scope: {
       incremental_changed_files: Array<Record<string, unknown>>
     }

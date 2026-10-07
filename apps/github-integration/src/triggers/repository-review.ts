@@ -2,7 +2,10 @@ import type { App } from 'octokit'
 import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
 
 import type { GitHubAppOctokit } from '../infrastructure/github/octokit.js'
-import { getRepositoryRefSha, splitRepoFullName } from '../infrastructure/github/repository-service.js'
+import {
+  getRepositoryRefSha,
+  splitRepoFullName
+} from '../infrastructure/github/repository-service.js'
 import {
   startRepositoryReviewRun,
   type SubmittedRepositoryReviewRun
@@ -49,14 +52,16 @@ interface ValidatedRepositoryReviewDispatch {
   head_sha: string | null
 }
 
-export function normalizeRepositoryReviewDispatchPayload (raw: unknown): RepositoryReviewDispatchPayload {
+export function normalizeRepositoryReviewDispatchPayload(
+  raw: unknown
+): RepositoryReviewDispatchPayload {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     return {}
   }
   return raw as RepositoryReviewDispatchPayload
 }
 
-export function validateRepositoryReviewDispatchContract (
+export function validateRepositoryReviewDispatchContract(
   payload: RepositoryReviewDispatchPayload
 ): ValidatedRepositoryReviewDispatch {
   const repo_full_name = requiredString(payload.repo_full_name, 'repo_full_name')
@@ -77,10 +82,19 @@ export function validateRepositoryReviewDispatchContract (
   if (base_sha !== null && head_sha !== null && base_sha === head_sha) {
     throw new Error('incremental scan requires base_sha != head_sha.')
   }
-  return { repo_full_name, target_branch, scan_mode, event_type, repair_mode, correlation_id, base_sha, head_sha }
+  return {
+    repo_full_name,
+    target_branch,
+    scan_mode,
+    event_type,
+    repair_mode,
+    correlation_id,
+    base_sha,
+    head_sha
+  }
 }
 
-export async function resolveRepositoryReviewDispatch ({
+export async function resolveRepositoryReviewDispatch({
   octokit,
   payload
 }: {
@@ -88,7 +102,8 @@ export async function resolveRepositoryReviewDispatch ({
   payload: RepositoryReviewDispatchPayload
 }): Promise<ResolvedRepositoryReviewDispatch> {
   const validated = validateRepositoryReviewDispatchContract(payload)
-  const { repo_full_name, target_branch, event_type, scan_mode, repair_mode, correlation_id } = validated
+  const { repo_full_name, target_branch, event_type, scan_mode, repair_mode, correlation_id } =
+    validated
   const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
 
   if (scan_mode !== 'incremental') {
@@ -111,20 +126,21 @@ export async function resolveRepositoryReviewDispatch ({
     target_branch,
     head_sha: validated.head_sha
   })
-  const base_sha = event_type === 'scheduled'
-    ? await resolveScheduledBaseSha({
-      octokit,
-      owner_login,
-      repo_name,
-      head_sha,
-      schedule: payload.schedule
-    })
-    : await resolveManualBaseSha({
-      octokit,
-      owner_login,
-      repo_name,
-      base_sha: validated.base_sha
-    })
+  const base_sha =
+    event_type === 'scheduled'
+      ? await resolveScheduledBaseSha({
+          octokit,
+          owner_login,
+          repo_name,
+          head_sha,
+          schedule: payload.schedule
+        })
+      : await resolveManualBaseSha({
+          octokit,
+          owner_login,
+          repo_name,
+          base_sha: validated.base_sha
+        })
 
   if (base_sha === head_sha) {
     throw new Error('incremental scan requires base_sha != head_sha.')
@@ -143,7 +159,7 @@ export async function resolveRepositoryReviewDispatch ({
 }
 
 export class RepositoryReviewDispatchValidationError extends Error {
-  constructor (message: string) {
+  constructor(message: string) {
     super(message)
     this.name = 'RepositoryReviewDispatchValidationError'
   }
@@ -153,7 +169,7 @@ export interface DispatchRepositoryReviewCommandArgs {
   app: App
   payload: RepositoryReviewDispatchPayload
   verified_repository: string
-  on_admitted?: (admission: { run_id: string, status: string, replayed: boolean }) => void
+  on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   deps?: Partial<DispatchRepositoryReviewCommandDeps>
 }
 
@@ -167,30 +183,37 @@ interface DispatchRepositoryReviewCommandDeps {
   resolve_dispatch: typeof resolveRepositoryReviewDispatch
   submit_run: typeof startRepositoryReviewRun
   store: {
-    admit_review_run: (...args: Parameters<typeof reviewRunStore.admit_review_run>) => Awaited<ReturnType<typeof reviewRunStore.admit_review_run>> | ReturnType<typeof reviewRunStore.admit_review_run>
+    admit_review_run: (
+      ...args: Parameters<typeof reviewRunStore.admit_review_run>
+    ) =>
+      | Awaited<ReturnType<typeof reviewRunStore.admit_review_run>>
+      | ReturnType<typeof reviewRunStore.admit_review_run>
     failPreparation: (...args: Parameters<typeof reviewRunStore.failPreparation>) => unknown
     submit_prepared_run: (...args: Parameters<typeof reviewRunStore.submit_prepared_run>) => unknown
   }
   create_run_id: typeof createRunId
 }
 
-function asErrorMessage (error: unknown): string {
+function asErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
   return String(error)
 }
 
-async function getRepositoryInstallationOctokit (app: App, repo_full_name: string): Promise<GitHubAppOctokit> {
+async function getRepositoryInstallationOctokit(
+  app: App,
+  repo_full_name: string
+): Promise<GitHubAppOctokit> {
   const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
   const installation = await app.octokit.rest.apps.getRepoInstallation({
     owner: owner_login,
     repo: repo_name
   })
-  return await app.getInstallationOctokit(installation.data.id) as unknown as GitHubAppOctokit
+  return (await app.getInstallationOctokit(installation.data.id)) as unknown as GitHubAppOctokit
 }
 
-export async function dispatchRepositoryReview ({
+export async function dispatchRepositoryReview({
   app,
   payload,
   verified_repository,
@@ -198,7 +221,8 @@ export async function dispatchRepositoryReview ({
   deps = {}
 }: DispatchRepositoryReviewCommandArgs): Promise<DispatchedRepositoryReview> {
   const {
-    getInstallationOctokit = async (repo_full_name) => getRepositoryInstallationOctokit(app, repo_full_name),
+    getInstallationOctokit = async (repo_full_name) =>
+      getRepositoryInstallationOctokit(app, repo_full_name),
     resolve_dispatch = resolveRepositoryReviewDispatch,
     submit_run = startRepositoryReviewRun,
     store = reviewRunStore,
@@ -211,11 +235,15 @@ export async function dispatchRepositoryReview ({
     throw new RepositoryReviewDispatchValidationError(asErrorMessage(error))
   }
   const { repo_full_name, correlation_id } = validated
-  const admission = await admitReviewRun(store, {
-    workflow: 'repository-review',
-    ingress_kind: 'github_actions_dispatch',
-    ingress_key: `${verified_repository}:${correlation_id}`
-  }, create_run_id)
+  const admission = await admitReviewRun(
+    store,
+    {
+      workflow: 'repository-review',
+      ingress_kind: 'github_actions_dispatch',
+      ingress_key: `${verified_repository}:${correlation_id}`
+    },
+    create_run_id
+  )
   on_admitted?.({
     run_id: admission.run_id,
     status: admission.status,
@@ -229,7 +257,8 @@ export async function dispatchRepositoryReview ({
   }
   const run_id = admission.run_id
   const preparationToken = admission.preparation_token
-  if (!preparationToken) throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
+  if (!preparationToken)
+    throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
 
   let octokit: GitHubAppOctokit
   let resolved: Awaited<ReturnType<typeof resolveRepositoryReviewDispatch>>
@@ -254,7 +283,8 @@ export async function dispatchRepositoryReview ({
       ...resolved,
       on_prepared: async (prepared, input) => {
         await store.submit_prepared_run(
-          run_id, preparationToken,
+          run_id,
+          preparationToken,
           repositoryReviewPublishContext(prepared),
           input
         )
@@ -285,7 +315,7 @@ export async function dispatchRepositoryReview ({
   return { run_id: submitted.run_id, replayed: false }
 }
 
-function requiredString (value: unknown, label: string): string {
+function requiredString(value: unknown, label: string): string {
   const text = typeof value === 'string' ? value.trim() : ''
   if (!text) {
     throw new Error(`${label} is required.`)
@@ -293,12 +323,15 @@ function requiredString (value: unknown, label: string): string {
   return text
 }
 
-function optionalString (value: unknown): string | null {
+function optionalString(value: unknown): string | null {
   const text = typeof value === 'string' ? value.trim() : ''
   return text || null
 }
 
-function normalizeScanMode (value: unknown, event_type: 'manual' | 'scheduled'): 'full' | 'incremental' {
+function normalizeScanMode(
+  value: unknown,
+  event_type: 'manual' | 'scheduled'
+): 'full' | 'incremental' {
   const raw = typeof value === 'string' ? value.trim().toLowerCase() : ''
   if (raw === '') {
     return event_type === 'scheduled' ? 'incremental' : 'full'
@@ -309,7 +342,7 @@ function normalizeScanMode (value: unknown, event_type: 'manual' | 'scheduled'):
   throw new Error(`Unsupported repository scan_mode: ${String(value)}`)
 }
 
-function normalizeRepositoryEventType (value: unknown): 'manual' | 'scheduled' {
+function normalizeRepositoryEventType(value: unknown): 'manual' | 'scheduled' {
   const raw = typeof value === 'string' ? value.trim().toLowerCase() : ''
   if (raw === '' || raw === 'manual') {
     return 'manual'
@@ -320,7 +353,7 @@ function normalizeRepositoryEventType (value: unknown): 'manual' | 'scheduled' {
   throw new Error(`Unsupported repository event_type: ${String(value)}`)
 }
 
-function normalizeRepairMode (value: unknown): RepairMode | null {
+function normalizeRepairMode(value: unknown): RepairMode | null {
   const raw = typeof value === 'string' ? value.trim() : ''
   if (raw === '') {
     return null
@@ -331,7 +364,7 @@ function normalizeRepairMode (value: unknown): RepairMode | null {
   throw new Error(`Unsupported repository repair_mode: ${String(value)}`)
 }
 
-function normalizeOptionalSha (value: unknown, label: string): string | null {
+function normalizeOptionalSha(value: unknown, label: string): string | null {
   const raw = optionalString(value)
   if (raw === null) {
     return null
@@ -339,14 +372,14 @@ function normalizeOptionalSha (value: unknown, label: string): string | null {
   return ensureLikelyGitSha(raw, label)
 }
 
-function ensureLikelyGitSha (value: string, label: string): string {
+function ensureLikelyGitSha(value: string, label: string): string {
   if (!/^[a-f0-9]{7,40}$/i.test(value)) {
     throw new Error(`${label} must be a valid commit SHA (7-40 hex chars).`)
   }
   return value
 }
 
-async function resolveHeadSha ({
+async function resolveHeadSha({
   octokit,
   owner_login,
   repo_name,
@@ -374,7 +407,7 @@ async function resolveHeadSha ({
   })
 }
 
-async function resolveManualBaseSha ({
+async function resolveManualBaseSha({
   octokit,
   owner_login,
   repo_name,
@@ -396,7 +429,7 @@ async function resolveManualBaseSha ({
   })
 }
 
-async function resolveScheduledBaseSha ({
+async function resolveScheduledBaseSha({
   octokit,
   owner_login,
   repo_name,
@@ -426,8 +459,11 @@ async function resolveScheduledBaseSha ({
   return candidate
 }
 
-function inferRollbackDaysFromCron (expr: string | null): number {
-  const parts = (expr || '').trim().split(/\s+/).filter((item) => item !== '')
+function inferRollbackDaysFromCron(expr: string | null): number {
+  const parts = (expr || '')
+    .trim()
+    .split(/\s+/)
+    .filter((item) => item !== '')
   if (parts.length !== 5) {
     return 7
   }
@@ -450,7 +486,7 @@ function inferRollbackDaysFromCron (expr: string | null): number {
   return 1
 }
 
-function step (token: string | undefined): number | null {
+function step(token: string | undefined): number | null {
   const match = String(token || '').match(/^\*\/([0-9]+)$/)
   if (!match) {
     return null

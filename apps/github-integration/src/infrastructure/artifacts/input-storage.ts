@@ -10,32 +10,32 @@ import {
 } from '../../config.js'
 import type { InputBundleArtifactRef } from '../runner/input.js'
 
-function inputObjectKey (runId: string): string {
+function inputObjectKey(runId: string): string {
   return `runs/${runId}/input/input-bundle.v1.tar.zst`
 }
 
-function configuredClient (): S3Client {
+function configuredClient(): S3Client {
   return new S3Client({
     region: artifact_s3_region,
-    ...(artifact_s3_endpoint
-      ? { endpoint: artifact_s3_endpoint, forcePathStyle: true }
-      : {})
+    ...(artifact_s3_endpoint ? { endpoint: artifact_s3_endpoint, forcePathStyle: true } : {})
   })
 }
 
-function matchesReference (
+function matchesReference(
   response: {
     ContentLength?: number | undefined
     Metadata?: Record<string, string> | undefined
   },
   reference: InputBundleArtifactRef
 ): boolean {
-  return response.ContentLength === reference.size_bytes &&
+  return (
+    response.ContentLength === reference.size_bytes &&
     response.Metadata?.['sha256'] === reference.digest.replace(/^sha256:/, '') &&
     response.Metadata?.['media-type'] === reference.media_type
+  )
 }
 
-async function existingObjectMatches (
+async function existingObjectMatches(
   client: S3Client,
   bucket: string,
   key: string,
@@ -45,15 +45,16 @@ async function existingObjectMatches (
     const response = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
     return matchesReference(response, reference)
   } catch (error) {
-    const status = typeof error === 'object' && error !== null && '$metadata' in error
-      ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
-      : undefined
+    const status =
+      typeof error === 'object' && error !== null && '$metadata' in error
+        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+        : undefined
     if (status === 404) return undefined
     throw error
   }
 }
 
-export async function publishInputBundle (
+export async function publishInputBundle(
   reference: InputBundleArtifactRef,
   runId: string
 ): Promise<InputBundleArtifactRef> {
@@ -77,23 +78,29 @@ export async function publishInputBundle (
   }
 
   try {
-    await client.send(new PutObjectCommand({
-      Bucket: artifact_s3_bucket,
-      Key: key,
-      Body: createReadStream(fileURLToPath(source)),
-      ContentLength: reference.size_bytes,
-      ContentType: reference.media_type,
-      IfNoneMatch: '*',
-      Metadata: {
-        sha256: reference.digest.replace(/^sha256:/, ''),
-        'media-type': reference.media_type
-      }
-    }))
+    await client.send(
+      new PutObjectCommand({
+        Bucket: artifact_s3_bucket,
+        Key: key,
+        Body: createReadStream(fileURLToPath(source)),
+        ContentLength: reference.size_bytes,
+        ContentType: reference.media_type,
+        IfNoneMatch: '*',
+        Metadata: {
+          sha256: reference.digest.replace(/^sha256:/, ''),
+          'media-type': reference.media_type
+        }
+      })
+    )
   } catch (error) {
-    const status = typeof error === 'object' && error !== null && '$metadata' in error
-      ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
-      : undefined
-    if (status !== 412 || await existingObjectMatches(client, artifact_s3_bucket, key, reference) !== true) {
+    const status =
+      typeof error === 'object' && error !== null && '$metadata' in error
+        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+        : undefined
+    if (
+      status !== 412 ||
+      (await existingObjectMatches(client, artifact_s3_bucket, key, reference)) !== true
+    ) {
       throw error
     }
   }

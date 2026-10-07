@@ -7,7 +7,7 @@ import {
 } from '../../src/infrastructure/github/manual-command-authorization.js'
 import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
 
-function octokitWithPermission (permission: string): GitHubAppOctokit {
+function octokitWithPermission(permission: string): GitHubAppOctokit {
   return {
     rest: {
       repos: {

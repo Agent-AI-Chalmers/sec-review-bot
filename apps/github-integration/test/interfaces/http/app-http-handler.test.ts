@@ -6,14 +6,21 @@ import type { App } from 'octokit'
 
 import { createAppHttpHandler } from '../../../src/interfaces/http/app-http-handler.js'
 
-function requestFor (url: string, headers: Record<string, string> = { host: 'example.test' }): IncomingMessage {
+function requestFor(
+  url: string,
+  headers: Record<string, string> = { host: 'example.test' }
+): IncomingMessage {
   const request = Readable.from([]) as IncomingMessage
   request.url = url
   request.headers = headers
   return request
 }
 
-function captureResponse (): ServerResponse & { statusCodeValue?: number, body?: string, headers: Record<string, string> } {
+function captureResponse(): ServerResponse & {
+  statusCodeValue?: number
+  body?: string
+  headers: Record<string, string>
+} {
   const response: {
     statusCode: number
     statusCodeValue?: number
@@ -24,17 +31,21 @@ function captureResponse (): ServerResponse & { statusCodeValue?: number, body?:
   } = {
     statusCode: 200,
     headers: {},
-    setHeader (name: string, value: string) {
+    setHeader(name: string, value: string) {
       this.headers[name.toLowerCase()] = value
       return this
     },
-    end (body: string) {
+    end(body: string) {
       this.statusCodeValue = this.statusCode
       this.body = body
       return this
     }
   }
-  return response as ServerResponse & { statusCodeValue?: number, body?: string, headers: Record<string, string> }
+  return response as ServerResponse & {
+    statusCodeValue?: number
+    body?: string
+    headers: Record<string, string>
+  }
 }
 
 test('app HTTP handler routes repository dispatch requests before webhook middleware', async () => {

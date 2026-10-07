@@ -5,7 +5,7 @@ import { handlePullRequestOpenedWithDeps } from '../../../../src/interfaces/gith
 import { setGitHubAppMetadata } from '../../../../src/infrastructure/github/github-app-metadata-service.js'
 import { RepositoryTriggerConfigError } from '../../../../src/infrastructure/github/repo-config-service.js'
 
-function automaticConfig () {
+function automaticConfig() {
   return {
     trigger_mode: 'automatic' as const,
     paths_ignore: [],
@@ -15,7 +15,7 @@ function automaticConfig () {
   }
 }
 
-function manualOnlyConfig () {
+function manualOnlyConfig() {
   return {
     trigger_mode: 'manual_only' as const,
     paths_ignore: [],
@@ -25,7 +25,7 @@ function manualOnlyConfig () {
   }
 }
 
-function createPullRequestOpenedPayload ({ draft = false } = {}) {
+function createPullRequestOpenedPayload({ draft = false } = {}) {
   return {
     action: 'opened',
     before: null,
@@ -102,8 +102,8 @@ test('pull-request-opened skips self-originated payload before pull request extr
     let configFetched = false
 
     await handlePullRequestOpenedWithDeps(
-    {
-      id: 'delivery-test',
+      {
+        id: 'delivery-test',
         octokit: {},
         payload: {
           sender: {
@@ -167,7 +167,8 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
         fetchRepositoryTriggerConfigFn: async () => {
           throw configError
         },
-        isRepositoryTriggerConfigErrorFn: (error): error is RepositoryTriggerConfigError => Boolean(error)
+        isRepositoryTriggerConfigErrorFn: (error): error is RepositoryTriggerConfigError =>
+          Boolean(error)
       }
     ),
     configError

@@ -9,9 +9,7 @@ import {
 import { getInstallationAccessToken } from '../../infrastructure/github/installation-auth.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
 import type { IssueReviewInput } from '../../infrastructure/runner/input.js'
-import {
-  materializeWorkspaceWithCommitHistory
-} from '../../infrastructure/runner/git-workspace.js'
+import { materializeWorkspaceWithCommitHistory } from '../../infrastructure/runner/git-workspace.js'
 import {
   archiveInputBundle,
   buildGitRemoteUrl,
@@ -21,7 +19,7 @@ import {
   finalizeInputBundleWorkspace
 } from '../shared/input-bundle.js'
 
-async function materializeWorkspace (
+async function materializeWorkspace(
   octokit: GitHubAppOctokit,
   issue: IssueContext,
   workspace_path: string,
@@ -36,11 +34,11 @@ async function materializeWorkspace (
   })
 }
 
-async function writeJsonArtifact (artifact_path: string, value: unknown): Promise<void> {
+async function writeJsonArtifact(artifact_path: string, value: unknown): Promise<void> {
   await fs.writeFile(artifact_path, JSON.stringify(value, null, 2), 'utf8')
 }
 
-async function materializeHistoryArtifacts ({
+async function materializeHistoryArtifacts({
   octokit,
   issue,
   history_path,
@@ -89,7 +87,7 @@ async function materializeHistoryArtifacts ({
   }
 }
 
-export async function prepareIssueReviewInput ({
+export async function prepareIssueReviewInput({
   run_id: provided_run_id,
   octokit,
   issue,

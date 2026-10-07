@@ -1,7 +1,10 @@
 import { createIssueCommentUnlessMarkerExists } from '../../infrastructure/github/comment-service.js'
 import { findRepositorySecuritySummaryIssue } from '../../infrastructure/github/repository-service.js'
 import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import { completedRunnerRunResult, type RunnerRunStatus } from '../../infrastructure/runner/client.js'
+import {
+  completedRunnerRunResult,
+  type RunnerRunStatus
+} from '../../infrastructure/runner/client.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
 import type { ReviewRunStore } from '../../infrastructure/runner/review-store.js'
 import { classifyPublicationFailure } from '../../infrastructure/runner/publication-failure.js'
@@ -24,13 +27,7 @@ import {
 } from './result.js'
 import type { RepositoryContext } from './submit.js'
 import type { PersistedRepositoryScanTarget } from '../../infrastructure/runner/publish-context.js'
-import {
-  asList,
-  isRecord,
-  nonEmptyText,
-  optionalNumber,
-  type AnyRecord
-} from '../view-utils.js'
+import { asList, isRecord, nonEmptyText, optionalNumber, type AnyRecord } from '../view-utils.js'
 
 interface PublishedDeliveryEntry {
   // Publish-time view for the summary renderer. It is not an agent result:
@@ -58,18 +55,18 @@ type CompletedRunnerRun = {
   publish_context: Record<string, unknown>
 }
 
-function repositorySummaryRunMarker (run_id: string): string {
+function repositorySummaryRunMarker(run_id: string): string {
   return `<!-- sec-review-bot:repository-summary-run:${run_id} -->`
 }
 
-function asErrorMessage (error: unknown): string {
+function asErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
   return String(error)
 }
 
-function repositoryResultFromRunStatus (status: RunnerRunStatus): RepositoryWorkflowResult | null {
+function repositoryResultFromRunStatus(status: RunnerRunStatus): RepositoryWorkflowResult | null {
   const completed = completedRunnerRunResult(status)
   if (completed === null) {
     return null
@@ -87,14 +84,23 @@ function repositoryResultFromRunStatus (status: RunnerRunStatus): RepositoryWork
   }
 }
 
-function deliveryCvssFieldsFromCases (delivery: RepositoryDelivery, case_results: RepositoryCaseResult[]): {
+function deliveryCvssFieldsFromCases(
+  delivery: RepositoryDelivery,
+  case_results: RepositoryCaseResult[]
+): {
   case_count: number
   cvss_outcome: string | null
   cvss_base_score: number | null
   cvss_severity: string | null
 } {
-  const case_ids = new Set(asList(delivery.case_ids).map(nonEmptyText).filter((item) => item.length > 0))
-  const matchedCases = asList<AnyRecord>(case_results).filter((item) => case_ids.has(nonEmptyText(item.case_id)))
+  const case_ids = new Set(
+    asList(delivery.case_ids)
+      .map(nonEmptyText)
+      .filter((item) => item.length > 0)
+  )
+  const matchedCases = asList<AnyRecord>(case_results).filter((item) =>
+    case_ids.has(nonEmptyText(item.case_id))
+  )
   const case_count = optionalNumber(delivery.case_count) ?? case_ids.size
   let best_score: number | null = null
   let best_severity: string | null = null
@@ -138,15 +144,14 @@ function deliveryCvssFieldsFromCases (delivery: RepositoryDelivery, case_results
 
   return {
     case_count,
-    cvss_outcome: cvssCount > 0 && notScoredCount === cvssCount
-      ? 'not-scored'
-      : first_non_scored_outcome,
+    cvss_outcome:
+      cvssCount > 0 && notScoredCount === cvssCount ? 'not-scored' : first_non_scored_outcome,
     cvss_base_score: null,
     cvss_severity: null
   }
 }
 
-export async function publishDeliveryDraftPrs ({
+export async function publishDeliveryDraftPrs({
   octokit,
   repo,
   run_id,
@@ -154,8 +159,8 @@ export async function publishDeliveryDraftPrs ({
   scan_target,
   deliveries,
   case_results,
-  event_type
-  , store,
+  event_type,
+  store,
   claim_token,
   create_delivery_draft_pr = createRepositoryDeliveryDraftPr
 }: {
@@ -174,10 +179,12 @@ export async function publishDeliveryDraftPrs ({
   const published_delivery_entries: PublishedDeliveryEntry[] = []
   const resolvedWorkspaceRef = String(workspace_ref ?? '').trim()
   if (!resolvedWorkspaceRef) {
-    throw new Error('Repository publish context is missing workspace_ref before delivery branch creation.')
+    throw new Error(
+      'Repository publish context is missing workspace_ref before delivery branch creation.'
+    )
   }
   const persistedSteps = new Map(
-    (await store.listPublicationSteps(run_id)).map(step => [step.step_key, step])
+    (await store.listPublicationSteps(run_id)).map((step) => [step.step_key, step])
   )
 
   for (const delivery of deliveries) {
@@ -190,7 +197,11 @@ export async function publishDeliveryDraftPrs ({
       // publication retries still need to reach the summary and other deliveries.
       if (persisted?.status === 'terminal_failed') continue
       let draftPullRequest: DraftPullRequestSummary
-      if (persisted?.status === 'succeeded' && persisted.remote_object_id && persisted.remote_object_url) {
+      if (
+        persisted?.status === 'succeeded' &&
+        persisted.remote_object_id &&
+        persisted.remote_object_url
+      ) {
         draftPullRequest = {
           title: String(buildDeliveryDraftPrTitle(delivery)),
           html_url: persisted.remote_object_url,
@@ -199,18 +210,25 @@ export async function publishDeliveryDraftPrs ({
         }
       } else {
         await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
-        draftPullRequest = await create_delivery_draft_pr({
+        draftPullRequest = (await create_delivery_draft_pr({
           octokit,
           repo,
           run_id,
           input: {
             workspace_ref: resolvedWorkspaceRef,
-            ...(scan_target?.target_branch ? { scan_target: { target_branch: scan_target.target_branch } } : {})
+            ...(scan_target?.target_branch
+              ? { scan_target: { target_branch: scan_target.target_branch } }
+              : {})
           },
           delivery,
           case_results
-        }) as DraftPullRequestSummary
-        if (!await store.completePublicationStep(run_id, claim_token, stepKey, { id: draftPullRequest.number, url: draftPullRequest.html_url })) {
+        })) as DraftPullRequestSummary
+        if (
+          !(await store.completePublicationStep(run_id, claim_token, stepKey, {
+            id: draftPullRequest.number,
+            url: draftPullRequest.html_url
+          }))
+        ) {
           throw new Error(`Publication claim was lost after completing ${stepKey}.`)
         }
       }
@@ -235,10 +253,16 @@ export async function publishDeliveryDraftPrs ({
     } catch (error) {
       const errorMessage = asErrorMessage(error)
       const failure = classifyPublicationFailure(error)
-      await store.failPublicationStep(run_id, claim_token, stepKey, {
-        code: failure.code,
-        message: errorMessage
-      }, { retry: failure.retry })
+      await store.failPublicationStep(
+        run_id,
+        claim_token,
+        stepKey,
+        {
+          code: failure.code,
+          message: errorMessage
+        },
+        { retry: failure.retry }
+      )
       logError('delivery_draft_pr_failed', {
         delivery_id: delivery?.delivery_id ?? '(unknown)',
         error,
@@ -258,7 +282,7 @@ export async function publishDeliveryDraftPrs ({
   return published_delivery_entries
 }
 
-async function ensureSummaryIssueNumber (
+async function ensureSummaryIssueNumber(
   octokit: GitHubAppOctokit,
   repo: RepositoryContext
 ): Promise<number> {
@@ -282,15 +306,15 @@ async function ensureSummaryIssueNumber (
   return created.data.number
 }
 
-async function publishRepositoryReviewResult ({
+async function publishRepositoryReviewResult({
   octokit,
   repo,
   run_id,
   workspace_ref,
   scan_target,
   workflow_result,
-  event_type
-  , store,
+  event_type,
+  store,
   claim_token
 }: {
   octokit: unknown
@@ -304,7 +328,9 @@ async function publishRepositoryReviewResult ({
   claim_token: string
 }): Promise<void> {
   const github = octokit as GitHubAppOctokit
-  const deliveryStepKeys = (workflow_result.deliveries ?? []).map(delivery => `repository:delivery:${String(delivery.delivery_id ?? '')}`)
+  const deliveryStepKeys = (workflow_result.deliveries ?? []).map(
+    (delivery) => `repository:delivery:${String(delivery.delivery_id ?? '')}`
+  )
   await store.initializePublicationSteps(run_id, claim_token, [
     ...deliveryStepKeys,
     'repository:summary-issue',
@@ -324,7 +350,7 @@ async function publishRepositoryReviewResult ({
   })
 
   const steps = await store.listPublicationSteps(run_id)
-  const summaryIssueStep = steps.find(step => step.step_key === 'repository:summary-issue')
+  const summaryIssueStep = steps.find((step) => step.step_key === 'repository:summary-issue')
   let summaryIssueNumber: number
   if (summaryIssueStep?.status === 'succeeded' && summaryIssueStep.remote_object_id) {
     summaryIssueNumber = Number(summaryIssueStep.remote_object_id)
@@ -332,13 +358,24 @@ async function publishRepositoryReviewResult ({
     await store.requirePublicationStepClaim(run_id, claim_token, 'repository:summary-issue')
     try {
       summaryIssueNumber = await ensureSummaryIssueNumber(github, repo)
-      if (!await store.completePublicationStep(run_id, claim_token, 'repository:summary-issue', { id: summaryIssueNumber })) throw new Error('Publication claim was lost after resolving the summary issue.')
+      if (
+        !(await store.completePublicationStep(run_id, claim_token, 'repository:summary-issue', {
+          id: summaryIssueNumber
+        }))
+      )
+        throw new Error('Publication claim was lost after resolving the summary issue.')
     } catch (error) {
       const failure = classifyPublicationFailure(error)
-      await store.failPublicationStep(run_id, claim_token, 'repository:summary-issue', {
-        code: failure.code,
-        message: asErrorMessage(error)
-      }, { retry: failure.retry })
+      await store.failPublicationStep(
+        run_id,
+        claim_token,
+        'repository:summary-issue',
+        {
+          code: failure.code,
+          message: asErrorMessage(error)
+        },
+        { retry: failure.retry }
+      )
       throw error
     }
   }
@@ -346,16 +383,18 @@ async function publishRepositoryReviewResult ({
   const commentBody = [
     marker,
     renderRepositorySecuritySummaryComment({
-    workflow_result: buildRepositorySummaryWorkflowView(workflow_result, {
-      run_id
-    }),
-    published_delivery_entries,
-    event_type,
-    target_branch: scan_target?.target_branch ?? repo.default_branch,
-    ...(scan_target ? { scan_target } : {})
+      workflow_result: buildRepositorySummaryWorkflowView(workflow_result, {
+        run_id
+      }),
+      published_delivery_entries,
+      event_type,
+      target_branch: scan_target?.target_branch ?? repo.default_branch,
+      ...(scan_target ? { scan_target } : {})
     })
   ].join('\n\n')
-  const summaryCommentStep = (await store.listPublicationSteps(run_id)).find(step => step.step_key === 'repository:summary-comment')
+  const summaryCommentStep = (await store.listPublicationSteps(run_id)).find(
+    (step) => step.step_key === 'repository:summary-comment'
+  )
   if (summaryCommentStep?.status === 'succeeded') return
   await store.requirePublicationStepClaim(run_id, claim_token, 'repository:summary-comment')
   let comment
@@ -367,13 +406,25 @@ async function publishRepositoryReviewResult ({
       body: commentBody,
       marker
     })
-    if (!await store.completePublicationStep(run_id, claim_token, 'repository:summary-comment', { id: comment.id, url: comment.html_url })) throw new Error('Publication claim was lost after publishing the summary comment.')
+    if (
+      !(await store.completePublicationStep(run_id, claim_token, 'repository:summary-comment', {
+        id: comment.id,
+        url: comment.html_url
+      }))
+    )
+      throw new Error('Publication claim was lost after publishing the summary comment.')
   } catch (error) {
     const failure = classifyPublicationFailure(error)
-    await store.failPublicationStep(run_id, claim_token, 'repository:summary-comment', {
-      code: failure.code,
-      message: asErrorMessage(error)
-    }, { retry: failure.retry })
+    await store.failPublicationStep(
+      run_id,
+      claim_token,
+      'repository:summary-comment',
+      {
+        code: failure.code,
+        message: asErrorMessage(error)
+      },
+      { retry: failure.retry }
+    )
     throw error
   }
   logInfo('repository_summary_comment_publish_completed', {
@@ -384,10 +435,9 @@ async function publishRepositoryReviewResult ({
     repo: repo.repo_full_name,
     reused: comment.reused
   })
-
 }
 
-export async function handleRepositoryReviewRun ({
+export async function handleRepositoryReviewRun({
   run,
   status,
   store,

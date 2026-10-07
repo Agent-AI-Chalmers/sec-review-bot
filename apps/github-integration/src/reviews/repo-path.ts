@@ -1,17 +1,13 @@
-const SENSITIVE_EXACT_PATHS = new Set([
-  'CODEOWNERS',
-  '.github/CODEOWNERS',
-  'docs/CODEOWNERS'
-])
+const SENSITIVE_EXACT_PATHS = new Set(['CODEOWNERS', '.github/CODEOWNERS', 'docs/CODEOWNERS'])
 
-function isSensitivePath (path: string): boolean {
+function isSensitivePath(path: string): boolean {
   if (SENSITIVE_EXACT_PATHS.has(path)) {
     return true
   }
   return path === '.github/workflows' || path.startsWith('.github/workflows/')
 }
 
-export function validateRepoRelativePathShape (value: string): string {
+export function validateRepoRelativePathShape(value: string): string {
   // Structural contract check only; publishing policy such as sensitive paths is enforced by publishing validators.
   const normalized = value
   const parts = normalized.split('/')
@@ -35,7 +31,7 @@ export function validateRepoRelativePathShape (value: string): string {
   return normalized
 }
 
-export function validateRepoRelativePath (value: string): string {
+export function validateRepoRelativePath(value: string): string {
   const normalized = validateRepoRelativePathShape(value.trim().replace(/\\/g, '/'))
 
   // Model-authored PRs must not silently change repository security controls.
@@ -46,7 +42,7 @@ export function validateRepoRelativePath (value: string): string {
   return normalized
 }
 
-export function validateContractPublishableRepoRelativePath (value: string): string {
+export function validateContractPublishableRepoRelativePath(value: string): string {
   const normalized = validateRepoRelativePathShape(value)
 
   if (isSensitivePath(normalized)) {

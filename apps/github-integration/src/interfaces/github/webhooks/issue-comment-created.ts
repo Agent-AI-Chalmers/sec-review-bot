@@ -3,9 +3,7 @@ import type { EmitterWebhookEvent } from '@octokit/webhooks'
 import { startIssueReviewCommand } from '../../../triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../../triggers/pull-request-review.js'
 import { extractCommentCommand } from '../../../infrastructure/github/comment-command-service.js'
-import {
-  authorizeManualCommentCommand
-} from '../../../infrastructure/github/manual-command-authorization.js'
+import { authorizeManualCommentCommand } from '../../../infrastructure/github/manual-command-authorization.js'
 import { extractIssueContext } from '../../../infrastructure/github/issue-service.js'
 import { getPullRequestContext } from '../../../infrastructure/github/pull-request-service.js'
 import type { GitHubAppOctokit } from '../../../infrastructure/github/octokit.js'
@@ -17,7 +15,10 @@ import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { reviewExecutionTracker } from '../../../infrastructure/review-execution-tracker.js'
 
-type IssueCommentCreatedWebhookEvent = Pick<EmitterWebhookEvent<'issue_comment.created'>, 'id' | 'payload'> & {
+type IssueCommentCreatedWebhookEvent = Pick<
+  EmitterWebhookEvent<'issue_comment.created'>,
+  'id' | 'payload'
+> & {
   octokit: unknown
 }
 
@@ -34,11 +35,15 @@ interface HandlerDeps {
   startPullRequestReviewCommandFn?: typeof startPullRequestReviewCommand
 }
 
-export async function handleIssueCommentCreated ({ id, octokit, payload }: IssueCommentCreatedWebhookEvent): Promise<void> {
+export async function handleIssueCommentCreated({
+  id,
+  octokit,
+  payload
+}: IssueCommentCreatedWebhookEvent): Promise<void> {
   await handleIssueCommentCreatedWithDeps({ id, octokit, payload })
 }
 
-export async function handleIssueCommentCreatedWithDeps (
+export async function handleIssueCommentCreatedWithDeps(
   { id, octokit, payload }: WebhookHandlerArgs,
   {
     authorizeManualCommentCommandFn = authorizeManualCommentCommand,
@@ -71,9 +76,10 @@ export async function handleIssueCommentCreatedWithDeps (
       octokit: octokit as GitHubAppOctokit,
       owner_login: issue.owner_login,
       repo_name: issue.repo_name,
-      sender_login: typeof payload === 'object' && payload !== null && !Array.isArray(payload)
-        ? (payload as { sender?: { login?: string } }).sender?.login
-        : undefined
+      sender_login:
+        typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+          ? (payload as { sender?: { login?: string } }).sender?.login
+          : undefined
     })
 
     if (!authorization.allowed) {
@@ -96,7 +102,9 @@ export async function handleIssueCommentCreatedWithDeps (
       }
 
       let resolveAdmission: (() => void) | undefined
-      const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+      const admitted = new Promise<void>((resolve) => {
+        resolveAdmission = resolve
+      })
       const execution = startPullRequestReviewCommandFn({
         octokit,
         event_type: 'manual_review',
@@ -104,12 +112,15 @@ export async function handleIssueCommentCreatedWithDeps (
         repair_mode: command.repair_mode,
         // issue_comment only has issue-shaped PR identity. Resolve full refs and
         // SHAs after the delivery has a durable run record.
-        resolve_pr: async () => await getPullRequestContextFn(octokit as GitHubAppOctokit, {
-          owner_login: issue.owner_login,
-          repo_name: issue.repo_name,
-          pr_number: issue.issue_number
-        }),
-        on_admitted: () => { resolveAdmission?.() }
+        resolve_pr: async () =>
+          await getPullRequestContextFn(octokit as GitHubAppOctokit, {
+            owner_login: issue.owner_login,
+            repo_name: issue.repo_name,
+            pr_number: issue.issue_number
+          }),
+        on_admitted: () => {
+          resolveAdmission?.()
+        }
       })
       reviewExecutionTracker.start(execution, {
         ingress: 'issue_comment.created',
@@ -127,7 +138,9 @@ export async function handleIssueCommentCreatedWithDeps (
     }
 
     let resolveAdmission: (() => void) | undefined
-    const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+    const admitted = new Promise<void>((resolve) => {
+      resolveAdmission = resolve
+    })
     const execution = startIssueReviewCommandFn({
       octokit,
       issue,
@@ -135,7 +148,9 @@ export async function handleIssueCommentCreatedWithDeps (
       delivery_id: id,
       review_objective: command.issue_review_objective,
       repair_mode: command.repair_mode,
-      on_admitted: () => { resolveAdmission?.() }
+      on_admitted: () => {
+        resolveAdmission?.()
+      }
     })
     reviewExecutionTracker.start(execution, {
       ingress: 'issue_comment.created',

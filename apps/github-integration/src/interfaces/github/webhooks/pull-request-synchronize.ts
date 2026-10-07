@@ -17,11 +17,18 @@ import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { reviewExecutionTracker } from '../../../infrastructure/review-execution-tracker.js'
 
-type PullRequestSynchronizeWebhookEvent = Pick<EmitterWebhookEvent<'pull_request.synchronize'>, 'id' | 'payload'> & {
+type PullRequestSynchronizeWebhookEvent = Pick<
+  EmitterWebhookEvent<'pull_request.synchronize'>,
+  'id' | 'payload'
+> & {
   octokit: unknown
 }
 
-export async function handlePullRequestSynchronize ({ id, octokit, payload }: PullRequestSynchronizeWebhookEvent): Promise<void> {
+export async function handlePullRequestSynchronize({
+  id,
+  octokit,
+  payload
+}: PullRequestSynchronizeWebhookEvent): Promise<void> {
   const pr = extractPullRequestContext(payload)
 
   logPullRequestPayload(payload)
@@ -74,13 +81,17 @@ export async function handlePullRequestSynchronize ({ id, octokit, payload }: Pu
 
   try {
     let resolveAdmission: (() => void) | undefined
-    const admitted = new Promise<void>((resolve) => { resolveAdmission = resolve })
+    const admitted = new Promise<void>((resolve) => {
+      resolveAdmission = resolve
+    })
     const execution = startPullRequestReviewCommand({
       octokit,
       pr,
       event_type: 'synchronize',
       delivery_id: id,
-      on_admitted: () => { resolveAdmission?.() }
+      on_admitted: () => {
+        resolveAdmission?.()
+      }
     })
     reviewExecutionTracker.start(execution, {
       ingress: 'pull_request.synchronize',
