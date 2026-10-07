@@ -110,6 +110,7 @@ services:
     environment:
       CONTROL_PLANE_PORT: "8090"
       CONTROL_PLANE_SERVICE_TOKEN: "${CONTROL_PLANE_SERVICE_TOKEN:?CONTROL_PLANE_SERVICE_TOKEN is required}"
+      CONTROL_PLANE_READ_TOKEN: "${CONTROL_PLANE_READ_TOKEN:?CONTROL_PLANE_READ_TOKEN is required}"
       CONNECTOR_ID: "${CONNECTOR_ID:-github-app:default}"
       DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sec_review_bot}"
       AGENT_RUNNER_SERVICE_URL: "http://runner-service:8000"
@@ -127,6 +128,29 @@ services:
         condition: service_healthy
       runner-service:
         condition: service_started
+
+  control-plane-ui:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/control-plane-ui/Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+    environment:
+      CONTROL_PLANE_UI_PORT: "8091"
+      CONTROL_PLANE_URL: "http://control-plane:8090"
+      CONTROL_PLANE_READ_TOKEN: "${CONTROL_PLANE_READ_TOKEN:?CONTROL_PLANE_READ_TOKEN is required}"
+      CONTROL_PLANE_UI_ACCESS_TOKEN: "${CONTROL_PLANE_UI_ACCESS_TOKEN:?CONTROL_PLANE_UI_ACCESS_TOKEN is required}"
+    ports:
+      - "127.0.0.1:${CONTROL_PLANE_UI_HOST_PORT:-8091}:8091"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8091/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      control-plane:
+        condition: service_healthy
 
   github-integration:
     profiles: ["app"]

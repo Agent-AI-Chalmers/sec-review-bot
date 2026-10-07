@@ -60,6 +60,7 @@ function isRpcRequest (value: unknown): value is { operation: Operation, args: u
 
 export async function startControlPlaneServer (): Promise<{ close: () => Promise<void> }> {
   const token = requiredEnv('CONTROL_PLANE_SERVICE_TOKEN')
+  const readToken = requiredEnv('CONTROL_PLANE_READ_TOKEN')
   const store = new ReviewRunStore({
     connectionString: requiredEnv('DATABASE_URL'),
     connectorId: process.env.CONNECTOR_ID?.trim() || 'github-app:default'
@@ -101,7 +102,8 @@ export async function startControlPlaneServer (): Promise<{ close: () => Promise
         sendJson(response, 404, { error: 'not_found' })
         return
       }
-      if (request.headers.authorization !== `Bearer ${token}`) {
+      const expectedToken = runQuery !== null || stepsQuery !== null || listQuery ? readToken : token
+      if (request.headers.authorization !== `Bearer ${expectedToken}`) {
         sendJson(response, 401, { error: 'unauthorized' })
         return
       }

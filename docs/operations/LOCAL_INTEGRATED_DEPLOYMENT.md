@@ -38,6 +38,8 @@ Runner Service is the HTTP API between Control Plane and Temporal. It authentica
 
 Object Storage holds two kinds of run data: the input bundle prepared before execution and the result artifact produced after execution. GitHub integration writes the input bundle. The result publication path writes the terminal artifact. The worker and Runner Service read these objects when needed. The worker does not hold credentials for publishing result artifacts.
 
+Control Plane UI is a separately deployed, read-only console. Its same-origin server authenticates the browser and calls Control Plane with a dedicated read token; neither the read token nor the mutation service token is exposed to browser code.
+
 Without a worker, submitted tasks remain in Temporal waiting for execution.
 
 Default local endpoints:
@@ -46,6 +48,7 @@ Default local endpoints:
 | --- | --- |
 | GitHub integration | `http://127.0.0.1:30000` |
 | Review Control Plane | `http://127.0.0.1:8090` |
+| Control Plane UI | `http://127.0.0.1:8091` |
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |

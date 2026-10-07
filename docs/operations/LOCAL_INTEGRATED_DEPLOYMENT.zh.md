@@ -40,6 +40,8 @@ Runner Service 是 Control Plane 与 Temporal 之间的 HTTP API。它负责鉴�
 
 对象存储保存两类运行数据：执行前准备的 input bundle，以及执行结束后生成的 result artifact。GitHub integration 写入 input bundle，结果发布流程写入终态 artifact；worker 和 Runner Service 在需要时从对象存储读取。worker 不持有发布 result artifact 的凭据。
 
+Control Plane UI 是独立部署的只读控制台。它的同源服务端验证浏览器访问，并使用专用 read token 调用 Control Plane；read token 和 mutation service token 都不会进入浏览器代码。
+
 没有 worker 时，提交的任务会停留在 Temporal 中等待执行。
 
 默认本地端口：
@@ -48,6 +50,7 @@ Runner Service 是 Control Plane 与 Temporal 之间的 HTTP API。它负责鉴�
 | --- | --- |
 | GitHub integration | `http://127.0.0.1:30000` |
 | Review Control Plane | `http://127.0.0.1:8090` |
+| Control Plane UI | `http://127.0.0.1:8091` |
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |

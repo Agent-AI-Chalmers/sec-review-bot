@@ -43,6 +43,7 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
 This repository is a monorepo with three main subsystems:
 
 - [`apps/github-integration/`](apps/github-integration/): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
+- [`apps/control-plane-ui/`](apps/control-plane-ui/): independently deployed, read-only web console for inspecting Control Plane runs
 - [`control-plane/`](control-plane/): independently deployed TypeScript service for review-run admission and durable coordination
 - [`agents/src/sec_review_agents`](agents/src/sec_review_agents/): Python multi-agent runner and review logic
 
@@ -120,7 +121,7 @@ curl -sS http://127.0.0.1:8000/healthz \
   -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
 ```
 
-In Compose, Temporal Web UI is exposed at `127.0.0.1:8233`, the runner service at `127.0.0.1:8000`, Review Control Plane at `127.0.0.1:8090`, and GitHub integration at `127.0.0.1:30000`.
+In Compose, Control Plane UI is exposed at `127.0.0.1:8091`, Temporal Web UI at `127.0.0.1:8233`, the runner service at `127.0.0.1:8000`, Review Control Plane at `127.0.0.1:8090`, and GitHub integration at `127.0.0.1:30000`.
 
 ## Where To Start
 
