@@ -57,3 +57,27 @@ test('Control Plane store fences reads by connector', async () => {
     await Promise.all([first.close(), second.close()])
   }
 })
+
+test('run queries survive a fresh store connection and preserve stable pagination', async () => {
+  const connectorId = `query-restart:${randomUUID()}`
+  const first = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
+  await first.initialize()
+  const runIds = [`run-${randomUUID()}`, `run-${randomUUID()}`]
+  try {
+    for (const run_id of runIds) {
+      await first.create_preparing_review_run({ run_id, workflow: 'issue-review', publish_context: { private: true }, runner_input: { secret: true } })
+    }
+  } finally { await first.close() }
+
+  const restarted = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
+  await restarted.initialize()
+  try {
+    const firstPage = await restarted.listRuns({ limit: 1 })
+    assert.equal(firstPage.length, 1)
+    const cursor = Buffer.from(`${firstPage[0]?.created_at}|${firstPage[0]?.run_id}`).toString('base64url')
+    const secondPage = await restarted.listRuns({ limit: 1, cursor })
+    assert.equal(secondPage.length, 1)
+    assert.notEqual(secondPage[0]?.run_id, firstPage[0]?.run_id)
+    assert.equal((await restarted.getRun(runIds[0] ?? ''))?.runner_input?.secret, true)
+  } finally { await restarted.close() }
+})
