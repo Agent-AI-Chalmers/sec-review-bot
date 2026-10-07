@@ -50,6 +50,12 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       body: JSON.stringify({ token: 'x'.repeat(1024 * 1024) })
     })
     assert.equal(oversizedLogin.status, 413)
+    const unicodeLogin = await fetch(`${base}/api/session`, {
+      method: 'POST',
+      body: JSON.stringify({ token: '\u00e9'.repeat('login-secret'.length) })
+    })
+    assert.equal(unicodeLogin.status, 401)
+    assert.equal((await fetch(`${base}/healthz`)).status, 200)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),

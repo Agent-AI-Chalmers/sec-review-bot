@@ -24,4 +24,6 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /prod ./
 
+USER node
+
 CMD ["node", "dist/server.js"]

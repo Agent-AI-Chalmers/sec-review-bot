@@ -65,9 +65,11 @@ export function createControlPlaneUiServer({
           return ''
         }
       })()
+      const suppliedBytes = Buffer.from(supplied)
+      const accessTokenBytes = Buffer.from(accessToken)
       const valid =
-        supplied.length === accessToken.length &&
-        crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(accessToken))
+        suppliedBytes.byteLength === accessTokenBytes.byteLength &&
+        crypto.timingSafeEqual(suppliedBytes, accessTokenBytes)
       if (!valid) {
         response.writeHead(401, { 'content-type': 'application/json' })
         response.end('{"error":"unauthorized"}')

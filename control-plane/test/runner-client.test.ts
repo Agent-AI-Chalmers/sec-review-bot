@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   getRunnerRunStatus,
+  isTerminalRunnerPollingError,
   RunnerSubmissionUncertainError,
   submitRunnerRun
 } from '../src/runner-client.js'
@@ -71,7 +72,33 @@ test('status response cannot substitute another run or workflow', async () => {
       { status: 200 }
     )
 
-  await assert.rejects(getRunnerRunStatus('run-1'), /unexpected run_id/)
+  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+    assert.match((error as Error).message, /unexpected run_id/)
+    assert.equal(isTerminalRunnerPollingError(error), true)
+    return true
+  })
+})
+
+test('malformed successful status response is a terminal protocol failure', async () => {
+  configureRunner()
+  globalThis.fetch = async () => new Response('{invalid', { status: 200 })
+
+  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+    assert.equal((error as { code?: string }).code, 'RUNNER_INVALID_JSON')
+    assert.equal(isTerminalRunnerPollingError(error), true)
+    return true
+  })
+})
+
+test('malformed transient error response remains retryable', async () => {
+  configureRunner()
+  globalThis.fetch = async () => new Response('{invalid', { status: 500 })
+
+  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+    assert.equal((error as { name?: string }).name, 'AgentRunnerServiceError')
+    assert.equal(isTerminalRunnerPollingError(error), false)
+    return true
+  })
 })
 
 test('status response must match the persisted workflow', async () => {

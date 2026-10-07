@@ -16,4 +16,5 @@ FROM node:24-bookworm-slim
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist-server ./dist-server
+USER node
 CMD ["node", "dist-server/server/index.js"]

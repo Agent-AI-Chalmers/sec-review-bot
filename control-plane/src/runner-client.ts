@@ -34,6 +34,29 @@ export interface AgentRunnerServiceError extends Error {
   retryable: boolean
 }
 
+export class RunnerProtocolError extends Error {
+  readonly code: string
+  readonly retryable = false
+
+  constructor(code: string, message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'RunnerProtocolError'
+    this.code = code
+  }
+}
+
+export function isTerminalRunnerPollingError(error: unknown): boolean {
+  return (
+    error instanceof RunnerProtocolError ||
+    (typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      error.name === 'AgentRunnerServiceError' &&
+      (('retryable' in error && error.retryable === false) ||
+        ('code' in error && error.code === RUNNER_RUN_NOT_FOUND)))
+  )
+}
+
 export class RunnerSubmissionUncertainError extends Error {
   readonly code = 'SUBMISSION_STATE_UNCERTAIN'
 
@@ -111,7 +134,7 @@ function isTransientTransportError(error: unknown): boolean {
 async function request(
   path: string,
   init: RequestInit
-): Promise<{ response: Response; body: unknown }> {
+): Promise<{ response: Response; body: unknown; bodyParseError?: SyntaxError }> {
   const base = serviceUrl()
   const retries = integerEnv('AGENT_RUNNER_SERVICE_REQUEST_RETRIES', 2, true)
   const timeout = integerEnv('AGENT_RUNNER_SERVICE_REQUEST_TIMEOUT_MS', 30_000)
@@ -129,8 +152,18 @@ async function request(
         signal: controller.signal
       })
       const text = await response.text()
-      const body: unknown = text.trim() ? JSON.parse(text) : null
-      if (!isRetryableStatus(response.status) || attempt === retries) return { response, body }
+      let body: unknown = null
+      let bodyParseError: SyntaxError | undefined
+      if (text.trim()) {
+        try {
+          body = JSON.parse(text)
+        } catch (error) {
+          if (!(error instanceof SyntaxError)) throw error
+          bodyParseError = error
+        }
+      }
+      if (!isRetryableStatus(response.status) || attempt === retries)
+        return { response, body, ...(bodyParseError ? { bodyParseError } : {}) }
     } catch (error) {
       lastError = error
       if (!isTransientTransportError(error) || attempt === retries) throw error
@@ -148,21 +181,29 @@ function parseResponse(
   expectedWorkflow?: ControlPlaneWorkflow
 ): RunnerResponse {
   if (!isRecord(body) || typeof body.status !== 'string')
-    throw new Error('Runner returned an invalid run response.')
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_RESPONSE',
+      'Runner returned an invalid run response.'
+    )
   if (!RUNNER_STATUSES.has(body.status)) {
-    throw Object.assign(new Error(`Runner returned an unknown status: ${body.status}.`), {
-      name: 'AgentRunnerServiceError' as const,
-      code: 'RUNNER_INVALID_STATUS',
-      retryable: false
-    })
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_STATUS',
+      `Runner returned an unknown status: ${body.status}.`
+    )
   }
   if (body.run_id !== expectedRunId)
-    throw new Error(`Runner returned an unexpected run_id for ${expectedRunId}.`)
+    throw new RunnerProtocolError(
+      'RUNNER_IDENTITY_MISMATCH',
+      `Runner returned an unexpected run_id for ${expectedRunId}.`
+    )
   if (
     !isWorkflow(body.workflow) ||
     (expectedWorkflow !== undefined && body.workflow !== expectedWorkflow)
   ) {
-    throw new Error(`Runner returned an unexpected workflow for ${expectedRunId}.`)
+    throw new RunnerProtocolError(
+      'RUNNER_WORKFLOW_MISMATCH',
+      `Runner returned an unexpected workflow for ${expectedRunId}.`
+    )
   }
   return body as unknown as RunnerResponse
 }
@@ -176,7 +217,7 @@ export async function submitRunnerRun({
   run_id: string
   input: JsonObject
 }): Promise<void> {
-  let result: { response: Response; body: unknown }
+  let result: { response: Response; body: unknown; bodyParseError?: SyntaxError }
   try {
     result = await request(`/v1/workflows/${encodeURIComponent(workflow)}/runs`, {
       method: 'POST',
@@ -197,6 +238,7 @@ export async function submitRunnerRun({
     throw runnerError(result.body, result.response.status)
   }
   try {
+    if (result.bodyParseError) throw result.bodyParseError
     parseResponse(result.body, run_id, workflow)
   } catch (error) {
     throw new RunnerSubmissionUncertainError(
@@ -210,10 +252,18 @@ export async function getRunnerRunStatus(
   runId: string,
   workflow?: ControlPlaneWorkflow
 ): Promise<RunnerRunStatus> {
-  const { response, body } = await request(`/v1/runs/${encodeURIComponent(runId)}`, {
-    method: 'GET'
-  })
+  const { response, body, bodyParseError } = await request(
+    `/v1/runs/${encodeURIComponent(runId)}`,
+    { method: 'GET' }
+  )
   if (!response.ok) throw runnerError(body, response.status)
+  if (bodyParseError) {
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_JSON',
+      `Runner returned invalid JSON for ${runId}.`,
+      { cause: bodyParseError }
+    )
+  }
   const parsed = parseResponse(body, runId, workflow)
   return {
     run_id: runId,

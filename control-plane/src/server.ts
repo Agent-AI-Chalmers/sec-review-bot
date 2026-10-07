@@ -8,7 +8,7 @@ import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from './coord
 import { observeRunnerRun } from './terminal-coordination.js'
 import {
   getRunnerRunStatus,
-  RUNNER_RUN_NOT_FOUND,
+  isTerminalRunnerPollingError,
   RunnerSubmissionUncertainError,
   submitRunnerRun
 } from './runner-client.js'
@@ -201,13 +201,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
             store,
             run,
             getRunnerRunStatus,
-            (error) =>
-              typeof error === 'object' &&
-              error !== null &&
-              'name' in error &&
-              error.name === 'AgentRunnerServiceError' &&
-              (('retryable' in error && error.retryable === false) ||
-                ('code' in error && error.code === RUNNER_RUN_NOT_FOUND)),
+            isTerminalRunnerPollingError,
             (event) => {
               console.info(
                 JSON.stringify({ event: event.kind, connector_id: store.connector_id, ...event })
