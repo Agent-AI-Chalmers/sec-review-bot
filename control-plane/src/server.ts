@@ -83,6 +83,17 @@ function invalidQuery(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 400, code: 'INVALID_QUERY' })
 }
 
+export function decodeRunId(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    throw Object.assign(new Error('run_id must use valid percent-encoding.'), {
+      statusCode: 400,
+      code: 'INVALID_PATH_PARAMETER'
+    })
+  }
+}
+
 function parseListQuery(url: URL): ListQueryOptions {
   const rawLimit = url.searchParams.get('limit')
   const limit = rawLimit === null ? 50 : Number(rawLimit)
@@ -238,7 +249,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       if (runQuery !== null) {
         const requestedRunId = runQuery[1]
         if (requestedRunId === undefined) throw new Error('Run query did not include a run id.')
-        const run = await store.getRun(decodeURIComponent(requestedRunId))
+        const run = await store.getRun(decodeRunId(requestedRunId))
         if (run === null) {
           sendJson(response, 404, { error: 'run_not_found' })
           return
@@ -250,7 +261,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
         const requestedRunId = stepsQuery[1]
         if (requestedRunId === undefined)
           throw new Error('Publication step query did not include a run id.')
-        const run = await store.getRun(decodeURIComponent(requestedRunId))
+        const run = await store.getRun(decodeRunId(requestedRunId))
         if (run === null) {
           sendJson(response, 404, { error: 'run_not_found' })
           return

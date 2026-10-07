@@ -203,9 +203,7 @@ function Detail(): React.JSX.Element {
               {run.failure_code && (
                 <>
                   <dt>Failure</dt>
-                  <dd>
-                    {run.failure_code}: {run.failure_message ?? 'No failure details.'}
-                  </dd>
+                  <dd>{run.failure_code}</dd>
                 </>
               )}
             </dl>

@@ -11,7 +11,6 @@
     "updated_at",
     "published_at",
     "failure_code",
-    "failure_message",
     "artifact_publication"
   ],
   "properties": {
@@ -33,7 +32,6 @@
     "updated_at": { "type": "string", "format": "date-time" },
     "published_at": { "type": ["string", "null"], "format": "date-time" },
     "failure_code": { "type": ["string", "null"] },
-    "failure_message": { "type": ["string", "null"] },
     "artifact_publication": { "type": ["object", "null"] },
     "publication_steps": { "type": "array" }
   }

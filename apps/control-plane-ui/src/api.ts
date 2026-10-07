@@ -6,7 +6,6 @@ export interface Run {
   updated_at: string
   published_at: string | null
   failure_code: string | null
-  failure_message: string | null
   artifact_publication: unknown
 }
 export class ApiError extends Error {

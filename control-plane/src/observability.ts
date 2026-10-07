@@ -9,7 +9,6 @@ export interface ObservedRun {
   updated_at: string
   published_at: string | null
   failure_code: string | null
-  failure_message: string | null
   artifact_publication: ReviewRunRecord['artifact_publication']
   publication_steps?: readonly PublicationStepSummary[]
 }
@@ -30,7 +29,6 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
     updated_at: run.updated_at,
     published_at: run.published_at,
     failure_code: run.failure_code,
-    failure_message: run.failure_message,
     artifact_publication: run.artifact_publication
   }
 }
