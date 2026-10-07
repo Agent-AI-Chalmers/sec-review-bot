@@ -232,7 +232,9 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
         request.method === 'GET'
           ? /^\/v1\/runs\/([^/]+)\/publication-steps$/.exec(request.url ?? '')
           : null
-      const listQuery = request.method === 'GET' && request.url?.startsWith('/v1/runs?')
+      const listQuery =
+        request.method === 'GET' &&
+        (request.url === '/v1/runs' || request.url?.startsWith('/v1/runs?'))
       if (
         (request.method !== 'POST' || request.url !== '/v1/store') &&
         runQuery === null &&

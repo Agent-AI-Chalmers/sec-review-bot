@@ -33,6 +33,9 @@ test('authenticated run queries are redacted, paginated, and survive a server re
   try {
     const unauthorized = await fetch(`${base}/v1/runs?limit=1`)
     assert.equal(unauthorized.status, 401)
+    const unfiltered = await fetch(`${base}/v1/runs`, { headers: readAuth })
+    assert.equal(unfiltered.status, 200)
+    assert.deepEqual(await unfiltered.json(), { runs: [], next_cursor: null })
     const invalidStatus = await fetch(`${base}/v1/runs?status=typo`, { headers: readAuth })
     assert.equal(invalidStatus.status, 400)
     assert.deepEqual(await invalidStatus.json(), {

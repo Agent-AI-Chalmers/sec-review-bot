@@ -6,8 +6,10 @@ import { createControlPlaneUiServer } from '../server/index.js'
 
 test('BFF authenticates sessions and proxies only read queries', async () => {
   let authorization = ''
+  let upstreamPath = ''
   const upstream = createServer((request, response) => {
     authorization = request.headers.authorization ?? ''
+    upstreamPath = request.url ?? ''
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end('{"runs":[]}')
   })
@@ -37,6 +39,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     const query = await fetch(`${base}/api/runs`, { headers: { cookie } })
     assert.equal(query.status, 200)
     assert.equal(authorization, 'Bearer read-secret')
+    assert.equal(upstreamPath, '/v1/runs')
     assert.equal(
       (await fetch(`${base}/api/runs`, { method: 'POST', headers: { cookie } })).status,
       404
