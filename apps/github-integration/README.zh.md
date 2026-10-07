@@ -44,7 +44,7 @@ pnpm run test:integration
 
 完整 review 还需要 runner service 和 worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub integration service。
 
-非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET` 和 `AGENT_RUNNER_SERVICE_URL`。任何非 loopback runner service URL，或 runner service 要求 token 时，都需要设置 `AGENT_RUNNER_SERVICE_TOKEN`。
+非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET`、`CONTROL_PLANE_SERVICE_URL` 和 `CONTROL_PLANE_SERVICE_TOKEN`。
 
 ```bash
 pnpm run server

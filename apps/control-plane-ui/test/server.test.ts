@@ -42,6 +42,11 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       404
     )
     assert.equal((await fetch(`${base}/api/store`, { headers: { cookie } })).status, 404)
+    const oversizedLogin = await fetch(`${base}/api/session`, {
+      method: 'POST',
+      body: JSON.stringify({ token: 'x'.repeat(1024 * 1024) })
+    })
+    assert.equal(oversizedLogin.status, 413)
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),

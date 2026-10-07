@@ -5,6 +5,8 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 
+const MAX_SESSION_BODY_BYTES = 1024 * 1024
+
 function securityHeaders(response: ServerResponse): void {
   response.setHeader(
     'content-security-policy',
@@ -42,7 +44,17 @@ export function createControlPlaneUiServer({
     }
     if (request.url === '/api/session' && request.method === 'POST') {
       const chunks: Buffer[] = []
-      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      let size = 0
+      for await (const chunk of request) {
+        const buffer = Buffer.from(chunk)
+        size += buffer.byteLength
+        if (size > MAX_SESSION_BODY_BYTES) {
+          response.writeHead(413, { 'content-type': 'application/json' })
+          response.end('{"error":"request_too_large"}')
+          return
+        }
+        chunks.push(buffer)
+      }
       const supplied = ((): string => {
         try {
           return (

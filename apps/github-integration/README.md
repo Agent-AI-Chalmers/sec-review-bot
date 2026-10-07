@@ -43,7 +43,7 @@ pnpm run test:integration
 
 A complete review also needs the runner service and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub integration service.
 
-For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, and `AGENT_RUNNER_SERVICE_URL`. Set `AGENT_RUNNER_SERVICE_TOKEN` for any non-loopback runner service URL, or when the runner service requires a token.
+For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `CONTROL_PLANE_SERVICE_URL`, and `CONTROL_PLANE_SERVICE_TOKEN`.
 
 ```bash
 pnpm run server

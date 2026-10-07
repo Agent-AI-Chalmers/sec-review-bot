@@ -98,3 +98,40 @@ test('run queries survive a fresh store connection and preserve stable paginatio
     await restarted.close()
   }
 })
+
+test('run queries apply status filters before pagination limits', async () => {
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `query-status:${randomUUID()}`
+  })
+  await store.initialize()
+  try {
+    const failedRunId = `run-${randomUUID()}`
+    const failed = await store.create_preparing_review_run({
+      run_id: failedRunId,
+      workflow: 'issue-review',
+      publish_context: {}
+    })
+    assert.ok(failed.preparation_token)
+    await store.failPreparation(failedRunId, failed.preparation_token, {
+      code: 'PREPARATION_FAILED',
+      message: 'failed before newer runs were admitted'
+    })
+
+    for (let index = 0; index < 2; index += 1) {
+      await store.create_preparing_review_run({
+        run_id: `run-${randomUUID()}`,
+        workflow: 'issue-review',
+        publish_context: {}
+      })
+    }
+
+    const failedRuns = await store.listRuns({ status: 'failed', limit: 1 })
+    assert.deepEqual(
+      failedRuns.map((run) => run.run_id),
+      [failedRunId]
+    )
+  } finally {
+    await store.close()
+  }
+})

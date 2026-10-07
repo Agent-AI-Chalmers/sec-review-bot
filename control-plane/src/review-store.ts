@@ -380,6 +380,19 @@ export class ReviewRunStore {
       return `$${values.length}`
     }
     if (options.workflow !== undefined) clauses.push(`r.workflow=${add(options.workflow)}`)
+    if (options.status !== undefined) {
+      if (options.status === 'publishing' || options.status === 'published') {
+        clauses.push(`p.status=${add(options.status)}`)
+      } else if (options.status === 'failed') {
+        clauses.push(
+          "(p.status='failed' OR (p.status IN ('pending','not_required') AND r.runner_status='failed'))"
+        )
+      } else {
+        clauses.push(
+          `(p.status IN ('pending','not_required') AND r.runner_status=${add(options.status)})`
+        )
+      }
+    }
     if (options.from !== undefined) clauses.push(`r.created_at>=${add(options.from)}`)
     if (options.to !== undefined) clauses.push(`r.created_at<${add(options.to)}`)
     if (options.cursor !== undefined) {
@@ -394,10 +407,7 @@ export class ReviewRunStore {
       WHERE ${clauses.join(' AND ')} ORDER BY r.created_at DESC, r.run_id DESC LIMIT ${add(boundedLimit)}`,
       values
     )
-    const records = result.rows.map(rowToRecord)
-    return options.status === undefined
-      ? records
-      : records.filter((record) => record.status === options.status)
+    return result.rows.map(rowToRecord)
   }
   async expireStalePreparations(): Promise<number> {
     return await transaction(this.pool, async (client) => {
