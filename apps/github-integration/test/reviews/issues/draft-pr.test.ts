@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createDraftPullRequestFromIssueReviewRecord } from '../../../reviews/issues/draft-pr.js'
-import type { ReviewRecord } from '../../../reviews/review-record.js'
-import type { FileMode } from '../../../reviews/file-change.js'
+import { createDraftPullRequestFromIssueReviewRecord } from '../../../src/reviews/issues/draft-pr.js'
+import type { ReviewRecord } from '../../../src/reviews/review-record.js'
+import type { FileMode } from '../../../src/reviews/file-change.js'
 
 type CreateDraftPrParams = Parameters<typeof createDraftPullRequestFromIssueReviewRecord>[0]
 type CreateDraftPrOctokit = CreateDraftPrParams['octokit']

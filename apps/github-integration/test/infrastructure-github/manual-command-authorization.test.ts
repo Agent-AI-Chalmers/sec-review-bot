@@ -4,8 +4,8 @@ import test from 'node:test'
 import {
   authorizeManualCommentCommand,
   normalizeRepositoryPermission
-} from '../../infrastructure/github/manual-command-authorization.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+} from '../../src/infrastructure/github/manual-command-authorization.js'
+import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
 
 function octokitWithPermission (permission: string): GitHubAppOctokit {
   return {

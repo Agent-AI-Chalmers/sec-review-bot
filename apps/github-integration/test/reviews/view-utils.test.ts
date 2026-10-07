@@ -5,7 +5,7 @@ import {
   inlineCode,
   renderChangedFilesLines,
   renderVerificationSummaryLines
-} from '../../reviews/view-utils.js'
+} from '../../src/reviews/view-utils.js'
 
 test('view utils render missing inline code values with explicit fallback', () => {
   assert.equal(inlineCode(null), '`unknown`')

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { handlePullRequestReviewRun } from '../../../reviews/pull-requests/publish.js'
-import { setGitHubAppMetadata } from '../../../infrastructure/github/github-app-metadata-service.js'
+import { handlePullRequestReviewRun } from '../../../src/reviews/pull-requests/publish.js'
+import { setGitHubAppMetadata } from '../../../src/infrastructure/github/github-app-metadata-service.js'
 
 const stepStore = {
   initializePublicationSteps: async () => {},

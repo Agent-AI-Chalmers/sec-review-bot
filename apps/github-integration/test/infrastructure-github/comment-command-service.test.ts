@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { extractCommentCommand } from '../../infrastructure/github/comment-command-service.js'
-import { setGitHubAppMetadata } from '../../infrastructure/github/github-app-metadata-service.js'
+import { extractCommentCommand } from '../../src/infrastructure/github/comment-command-service.js'
+import { setGitHubAppMetadata } from '../../src/infrastructure/github/github-app-metadata-service.js'
 
 test('extractCommentCommand parses review audit intent', () => {
   setGitHubAppMetadata({

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { contractFixture } from '../contract-fixtures.js'
-import { parseRepositoryWorkflowResult } from '../../reviews/repositories/result.js'
+import { parseRepositoryWorkflowResult } from '../../src/reviews/repositories/result.js'
 
 interface RepositoryDeliveryFixture {
   delivery_id: string

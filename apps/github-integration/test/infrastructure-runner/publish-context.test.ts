@@ -4,8 +4,8 @@ import test from 'node:test'
 import {
   parseIssueReviewPublishContext,
   parsePublishContextForWorkflow
-} from '../../infrastructure/runner/publish-context.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../infrastructure/runner/publish-error-code.js'
+} from '../../src/infrastructure/runner/publish-context.js'
+import { RUNNER_PUBLISH_ERROR_CODES } from '../../src/infrastructure/runner/publish-error-code.js'
 import { publishContextForWorkflow } from '../publish-context-fixtures.js'
 
 function assertInvalidPublishContext (operation: () => unknown): void {

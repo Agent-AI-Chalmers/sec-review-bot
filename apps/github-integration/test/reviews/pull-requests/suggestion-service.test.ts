@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { generateSuggestionCandidatesFromReviewRecord } from '../../../reviews/pull-requests/suggestion-service.js'
-import type { ReviewRecord } from '../../../reviews/review-record.js'
+import { generateSuggestionCandidatesFromReviewRecord } from '../../../src/reviews/pull-requests/suggestion-service.js'
+import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 
 function reviewRecordWithPatchDiff (patch_diff: string): ReviewRecord {
   return {

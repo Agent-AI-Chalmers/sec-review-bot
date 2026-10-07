@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ReviewExecutionTracker } from '../../infrastructure/review-execution-tracker.js'
+import { ReviewExecutionTracker } from '../../src/infrastructure/review-execution-tracker.js'
 
 test('ReviewExecutionTracker waits for admitted preparation work during shutdown', async () => {
   const tracker = new ReviewExecutionTracker()

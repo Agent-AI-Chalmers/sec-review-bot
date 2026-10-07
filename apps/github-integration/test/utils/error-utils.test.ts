@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { asErrorWithResponse } from '../../utils/error-utils.js'
+import { asErrorWithResponse } from '../../src/utils/error-utils.js'
 
 test('asErrorWithResponse reads an Octokit top-level status', () => {
   const error = Object.assign(new Error('Not Found'), { status: 404 })

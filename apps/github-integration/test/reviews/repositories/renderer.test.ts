@@ -5,7 +5,7 @@ import {
   buildRepositorySummaryWorkflowView,
   buildDeliveryDraftPrBody,
   renderRepositorySecuritySummaryComment
-} from '../../../reviews/repositories/renderer.js'
+} from '../../../src/reviews/repositories/renderer.js'
 
 test('repository renderer derives blocked confirmed case cards from case results', () => {
   const body = renderRepositorySecuritySummaryComment({

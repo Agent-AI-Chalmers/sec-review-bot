@@ -7,10 +7,10 @@ import {
   dispatchRepositoryReview,
   resolveRepositoryReviewDispatch,
   RepositoryReviewDispatchValidationError
-} from '../../triggers/repository-review.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
-import { RunnerSubmissionUncertainError } from '../../infrastructure/runner/client.js'
-import type { SubmittedRepositoryReviewRun } from '../../reviews/repositories/submit.js'
+} from '../../src/triggers/repository-review.js'
+import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
+import { RunnerSubmissionUncertainError } from '../../src/infrastructure/runner/client.js'
+import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
 
 function fakeApp (): App {
   return appWithInstallationOctokit({

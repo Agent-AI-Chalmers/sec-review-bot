@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { publishDeliveryDraftPrs } from '../../../reviews/repositories/publish.js'
-import type { ReviewRunStore, PublicationStepRecord } from '../../../infrastructure/runner/review-store.js'
-import type { RepositoryDelivery } from '../../../reviews/repositories/result.js'
+import { publishDeliveryDraftPrs } from '../../../src/reviews/repositories/publish.js'
+import type { ReviewRunStore, PublicationStepRecord } from '../../../src/infrastructure/runner/review-store.js'
+import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
 
 function delivery (delivery_id: string): RepositoryDelivery {
   return {

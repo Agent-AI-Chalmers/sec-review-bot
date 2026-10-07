@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildDeliveryDraftPrTitle } from '../../../reviews/repositories/delivery-title.js'
+import { buildDeliveryDraftPrTitle } from '../../../src/reviews/repositories/delivery-title.js'
 
 test('repository draft PR title uses the primary changed code file and case id', () => {
   const title = buildDeliveryDraftPrTitle({

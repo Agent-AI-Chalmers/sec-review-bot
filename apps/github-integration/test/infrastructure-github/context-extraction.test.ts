@@ -4,11 +4,11 @@ import test from 'node:test'
 import {
   extractIssueContext,
   IssueContextExtractionError
-} from '../../infrastructure/github/issue-service.js'
+} from '../../src/infrastructure/github/issue-service.js'
 import {
   extractPullRequestContext,
   PullRequestContextExtractionError
-} from '../../infrastructure/github/pull-request-service.js'
+} from '../../src/infrastructure/github/pull-request-service.js'
 
 test('extractIssueContext rejects payloads missing required identity fields', () => {
   assert.throws(

@@ -4,8 +4,8 @@ import test from 'node:test'
 import {
   buildRepositoryDeliveryBranchName,
   createRepositoryDeliveryDraftPr
-} from '../../../reviews/repositories/delivery-draft-pr.js'
-import type { RepositoryDelivery } from '../../../reviews/repositories/result.js'
+} from '../../../src/reviews/repositories/delivery-draft-pr.js'
+import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
 
 test('repository delivery branch identity includes both run and delivery', () => {
   const delivery = { delivery_id: 'case/shared' } as RepositoryDelivery
@@ -15,7 +15,7 @@ test('repository delivery branch identity includes both run and delivery', () =>
   assert.notEqual(first, second)
   assert.match(first, /^sec-review-bot\/repo-scan\/run-one-[a-f0-9]{12}\/case-shared-[a-f0-9]{12}$/)
 })
-import type { FileMode } from '../../../reviews/file-change.js'
+import type { FileMode } from '../../../src/reviews/file-change.js'
 
 type CreateRepositoryDeliveryDraftPrParams = Parameters<typeof createRepositoryDeliveryDraftPr>[0]
 type CreateRepositoryDeliveryDraftPrOctokit = CreateRepositoryDeliveryDraftPrParams['octokit']

@@ -4,8 +4,8 @@ import test from 'node:test'
 import {
   createIssueCommentUnlessMarkerExists,
   createPullRequestReviewUnlessMarkerExists
-} from '../../infrastructure/github/comment-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+} from '../../src/infrastructure/github/comment-service.js'
+import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
 
 test('createIssueCommentUnlessMarkerExists skips creation when marker already exists', async () => {
   let createCalls = 0

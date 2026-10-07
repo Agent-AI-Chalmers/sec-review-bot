@@ -8,10 +8,10 @@ import test from 'node:test'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
-import type { GitHubAppOctokit } from '../../../infrastructure/github/octokit.js'
-import type { IssueContext } from '../../../infrastructure/github/issue-service.js'
-import type { PullRequestContext } from '../../../infrastructure/github/pull-request-service.js'
-import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../infrastructure/runner/git-workspace.js'
+import type { GitHubAppOctokit } from '../../../src/infrastructure/github/octokit.js'
+import type { IssueContext } from '../../../src/infrastructure/github/issue-service.js'
+import type { PullRequestContext } from '../../../src/infrastructure/github/pull-request-service.js'
+import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/infrastructure/runner/git-workspace.js'
 
 const execFileAsync = promisify(execFile)
 const PRIVATE_RUNNER_INPUT_KEYS = new Set([
@@ -147,7 +147,7 @@ test('issue input preparer keeps materialized git workspace files in snapshot', 
   const previousGitHubServerUrl = process.env['GITHUB_SERVER_URL']
   process.env['GITHUB_SERVER_URL'] = `file://${tempRoot}`
   try {
-    const { prepareIssueReviewInput } = await import('../../../reviews/issues/prepare-input.js')
+    const { prepareIssueReviewInput } = await import('../../../src/reviews/issues/prepare-input.js')
     const gitServerRoot = path.join(tempRoot, 'octo')
     const remoteRepoPath = path.join(gitServerRoot, 'demo.git')
     const source_repo_path = path.join(tempRoot, 'source-repo')
@@ -258,7 +258,7 @@ test('pull request input preparer writes a canonical runner bundle', { concurren
   process.env['GITHUB_SERVER_URL'] = `file://${tempRoot}`
   try {
     const refs = await createGitFixture(tempRoot)
-    const { preparePullRequestReviewInput } = await import('../../../reviews/pull-requests/prepare-input.js')
+    const { preparePullRequestReviewInput } = await import('../../../src/reviews/pull-requests/prepare-input.js')
     const pr: PullRequestContext = {
       action: 'opened', previous_head_sha: null, repo_name: 'demo', repo_full_name: 'octo/demo', owner_login: 'octo', sender_login: 'alice',
       pr_number: 7, pr_title: 'Update app', pr_body: 'body', pr_author: 'alice', is_draft: false,
@@ -299,7 +299,7 @@ test('repository input preparer writes full and incremental runner bundles', { c
   process.env['GITHUB_SERVER_URL'] = `file://${tempRoot}`
   try {
     const refs = await createGitFixture(tempRoot)
-    const { prepareRepositoryReviewInput } = await import('../../../reviews/repositories/prepare-input.js')
+    const { prepareRepositoryReviewInput } = await import('../../../src/reviews/repositories/prepare-input.js')
     const octokit = repositoryOctokit(refs)
     const full = await prepareRepositoryReviewInput({ run_id: 'run-repo-full', octokit, repo_full_name: 'octo/demo', scan_mode: 'full' })
     await assertRunnerInputArtifact({

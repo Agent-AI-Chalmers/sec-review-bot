@@ -6,8 +6,8 @@ import {
   isAutomaticTriggerModeEnabled,
   isRepositoryTriggerConfigError,
   RepositoryTriggerConfigError
-} from '../../infrastructure/github/repo-config-service.js'
-import type { GitHubAppOctokit } from '../../infrastructure/github/octokit.js'
+} from '../../src/infrastructure/github/repo-config-service.js'
+import type { GitHubAppOctokit } from '../../src/infrastructure/github/octokit.js'
 
 interface TestErrorWithStatus extends Error {
   status?: number

@@ -11,7 +11,7 @@ import {
   materializeWorkspaceWithCommitHistory,
   retryGitFetch,
   withConfiguredGitFetchProxy
-} from '../../infrastructure/runner/git-workspace.js'
+} from '../../src/infrastructure/runner/git-workspace.js'
 
 const execFileAsync = promisify(execFile)
 

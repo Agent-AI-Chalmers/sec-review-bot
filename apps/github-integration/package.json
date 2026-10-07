@@ -10,10 +10,10 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "copy:schema": "mkdir -p dist/infrastructure/runner/database && cp -R infrastructure/runner/database/schema-versions dist/infrastructure/runner/database/",
-    "build": "pnpm run clean && tsc -p tsconfig.json && pnpm run copy:schema",
+    "copy:schema": "mkdir -p dist/infrastructure/runner/database && cp -R src/infrastructure/runner/database/schema-versions dist/infrastructure/runner/database/",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:schema",
     "server": "pnpm run build && node dist/app.js",
-    "dev": "pnpm run build && sh -c 'tsc -w -p tsconfig.json & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT INT TERM; nodemon --watch dist --watch infrastructure/runner/database/schema-versions --ignore dist/infrastructure/runner/database/schema-versions --ext js,json,sql --delay 200ms --exec \"pnpm run copy:schema && node dist/app.js\"'",
+    "dev": "pnpm run build && sh -c 'tsc -w -p tsconfig.build.json & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT INT TERM; nodemon --watch dist --watch src/infrastructure/runner/database/schema-versions --ignore dist/infrastructure/runner/database/schema-versions --ext js,json,sql --delay 200ms --exec \"pnpm run copy:schema && node dist/app.js\"'",
     "test": "rm -rf dist && node scripts/test-runner.mjs unit",
     "test:integration": "node scripts/test-runner.mjs integration",
     "typecheck": "tsc --noEmit -p tsconfig.json",

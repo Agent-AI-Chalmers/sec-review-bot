@@ -10,7 +10,7 @@ import {
   getRunnerRunStatus,
   RUNNER_RUN_NOT_FOUND,
   RunnerSubmissionUncertainError
-} from '../../infrastructure/runner/client.js'
+} from '../../src/infrastructure/runner/client.js'
 
 const ORIGINAL_ENV = { ...process.env }
 const ORIGINAL_FETCH = globalThis.fetch

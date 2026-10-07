@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { startIssueReviewCommand } from '../../triggers/issue-review.js'
-import { startPullRequestReviewCommand } from '../../triggers/pull-request-review.js'
-import type { IssueContext } from '../../infrastructure/github/issue-service.js'
-import type { PullRequestContext } from '../../infrastructure/github/pull-request-service.js'
-import { RunnerSubmissionUncertainError } from '../../infrastructure/runner/client.js'
+import { startIssueReviewCommand } from '../../src/triggers/issue-review.js'
+import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-review.js'
+import type { IssueContext } from '../../src/infrastructure/github/issue-service.js'
+import type { PullRequestContext } from '../../src/infrastructure/github/pull-request-service.js'
+import { RunnerSubmissionUncertainError } from '../../src/infrastructure/runner/client.js'
 
 function issueContext (): IssueContext {
   return {

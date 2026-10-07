@@ -27,7 +27,8 @@
     "useUnknownInCatchVariables": true
   },
   "include": [
-    "./**/*.ts"
+    "src/**/*.ts",
+    "test/**/*.ts"
   ],
   "exclude": [
     "dist",

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { handleIssueOpenedWithDeps } from '../../../../interfaces/github/webhooks/issue-opened.js'
-import { setGitHubAppMetadata } from '../../../../infrastructure/github/github-app-metadata-service.js'
-import { RepositoryTriggerConfigError } from '../../../../infrastructure/github/repo-config-service.js'
+import { handleIssueOpenedWithDeps } from '../../../../src/interfaces/github/webhooks/issue-opened.js'
+import { setGitHubAppMetadata } from '../../../../src/infrastructure/github/github-app-metadata-service.js'
+import { RepositoryTriggerConfigError } from '../../../../src/infrastructure/github/repo-config-service.js'
 
 function automaticConfig () {
   return {

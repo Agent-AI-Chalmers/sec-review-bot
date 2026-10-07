@@ -4,7 +4,7 @@ import { Readable } from 'node:stream'
 import test from 'node:test'
 import type { App } from 'octokit'
 
-import { createAppHttpHandler } from '../../../interfaces/http/app-http-handler.js'
+import { createAppHttpHandler } from '../../../src/interfaces/http/app-http-handler.js'
 
 function requestFor (url: string, headers: Record<string, string> = { host: 'example.test' }): IncomingMessage {
   const request = Readable.from([]) as IncomingMessage

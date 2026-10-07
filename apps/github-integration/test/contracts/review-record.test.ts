@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { contractFixture, contractFixtureManifest } from '../contract-fixtures.js'
-import { parseReviewRecord } from '../../reviews/review-record.js'
+import { parseReviewRecord } from '../../src/reviews/review-record.js'
 
 interface FixtureManifest {
   schema_fixtures: Record<string, string>

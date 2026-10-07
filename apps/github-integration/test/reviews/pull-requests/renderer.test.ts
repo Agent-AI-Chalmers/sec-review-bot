@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { renderAnalysisSummaryCommentFromReviewRecord } from '../../../reviews/pull-requests/renderer.js'
+import { renderAnalysisSummaryCommentFromReviewRecord } from '../../../src/reviews/pull-requests/renderer.js'
 
 test('pull request renderer preserves inline code in review prose', () => {
   const body = renderAnalysisSummaryCommentFromReviewRecord({

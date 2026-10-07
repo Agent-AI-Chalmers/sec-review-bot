@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { setGitHubAppMetadata } from '../../../../infrastructure/github/github-app-metadata-service.js'
-import type { ManualCommandAuthorizationDecision } from '../../../../infrastructure/github/manual-command-authorization.js'
-import type { IssueContext } from '../../../../infrastructure/github/issue-service.js'
-import type { PullRequestContext } from '../../../../infrastructure/github/pull-request-service.js'
-import type { SubmittedIssueReviewRun } from '../../../../reviews/issues/submit.js'
-import type { SubmittedPullRequestReviewRun } from '../../../../reviews/pull-requests/submit.js'
-import { handleIssueCommentCreatedWithDeps } from '../../../../interfaces/github/webhooks/issue-comment-created.js'
+import { setGitHubAppMetadata } from '../../../../src/infrastructure/github/github-app-metadata-service.js'
+import type { ManualCommandAuthorizationDecision } from '../../../../src/infrastructure/github/manual-command-authorization.js'
+import type { IssueContext } from '../../../../src/infrastructure/github/issue-service.js'
+import type { PullRequestContext } from '../../../../src/infrastructure/github/pull-request-service.js'
+import type { SubmittedIssueReviewRun } from '../../../../src/reviews/issues/submit.js'
+import type { SubmittedPullRequestReviewRun } from '../../../../src/reviews/pull-requests/submit.js'
+import { handleIssueCommentCreatedWithDeps } from '../../../../src/interfaces/github/webhooks/issue-comment-created.js'
 
 setGitHubAppMetadata({
   id: 1,

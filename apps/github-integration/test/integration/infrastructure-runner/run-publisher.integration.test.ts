@@ -5,19 +5,19 @@ import type { App } from 'octokit'
 
 import { contractFixture } from '../../contract-fixtures.js'
 import { appWithInstallationOctokit } from '../../github-app-stubs.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../../infrastructure/runner/publish-error-code.js'
-import { DeterministicRunnerPublishError } from '../../../infrastructure/runner/publish-error.js'
-import { publishReviewRunsOnce, startRunnerRunPublisher } from '../../../infrastructure/runner/run-publisher.js'
-import { classifyPublicationFailure } from '../../../infrastructure/runner/publication-failure.js'
-import { ReviewRunStore } from '../../../infrastructure/runner/review-store.js'
-import { parsePublishContextForWorkflow } from '../../../infrastructure/runner/publish-context.js'
+import { RUNNER_PUBLISH_ERROR_CODES } from '../../../src/infrastructure/runner/publish-error-code.js'
+import { DeterministicRunnerPublishError } from '../../../src/infrastructure/runner/publish-error.js'
+import { publishReviewRunsOnce, startRunnerRunPublisher } from '../../../src/infrastructure/runner/run-publisher.js'
+import { classifyPublicationFailure } from '../../../src/infrastructure/runner/publication-failure.js'
+import { ReviewRunStore } from '../../../src/infrastructure/runner/review-store.js'
+import { parsePublishContextForWorkflow } from '../../../src/infrastructure/runner/publish-context.js'
 import { publishContextForWorkflow } from '../../publish-context-fixtures.js'
 import {
   RUNNER_RUN_NOT_FOUND,
   RunnerSubmissionUncertainError,
   type RunnerRunStatus,
   type WorkflowName
-} from '../../../infrastructure/runner/client.js'
+} from '../../../src/infrastructure/runner/client.js'
 
 async function createStore (options: { connectorId?: string, claimTimeoutMs?: number } = {}): Promise<ReviewRunStore> {
   const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL

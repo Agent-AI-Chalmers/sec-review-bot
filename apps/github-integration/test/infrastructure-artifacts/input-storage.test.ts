@@ -33,7 +33,7 @@ async function reference () {
 test('uploads an immutable input bundle to its deterministic run key', async () => {
   s3.on(HeadObjectCommand).rejects(Object.assign(new Error('not found'), { $metadata: { httpStatusCode: 404 } }))
   s3.on(PutObjectCommand).resolves({})
-  const { publishInputBundle } = await import('../../infrastructure/artifacts/input-storage.js')
+  const { publishInputBundle } = await import('../../src/infrastructure/artifacts/input-storage.js')
 
   const published = await publishInputBundle(await reference(), 'run-123')
 
@@ -51,7 +51,7 @@ test('reuses an existing object only when immutable metadata matches', async () 
       'media-type': input.media_type
     }
   })
-  const { publishInputBundle } = await import('../../infrastructure/artifacts/input-storage.js')
+  const { publishInputBundle } = await import('../../src/infrastructure/artifacts/input-storage.js')
 
   const published = await publishInputBundle(input, 'run-123')
 
@@ -61,7 +61,7 @@ test('reuses an existing object only when immutable metadata matches', async () 
 
 test('rejects conflicting content at the immutable run key', async () => {
   s3.on(HeadObjectCommand).resolves({ ContentLength: 99, Metadata: {} })
-  const { publishInputBundle } = await import('../../infrastructure/artifacts/input-storage.js')
+  const { publishInputBundle } = await import('../../src/infrastructure/artifacts/input-storage.js')
 
   await assert.rejects(
     publishInputBundle(await reference(), 'run-123'),

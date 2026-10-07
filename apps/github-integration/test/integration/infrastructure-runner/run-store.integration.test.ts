@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
 
-import { ReviewRunStore } from '../../../infrastructure/runner/review-store.js'
+import { ReviewRunStore } from '../../../src/infrastructure/runner/review-store.js'
 import { publishContextForWorkflow } from '../../publish-context-fixtures.js'
 
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
