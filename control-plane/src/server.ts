@@ -2,11 +2,14 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto'
 
 import { ReviewRunStore } from './review-store.js'
+import type { ReviewRunStatus } from './review-store.js'
+import type { ControlPlaneWorkflow } from './contracts.js'
 import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from './coordinator.js'
 import { observeRunnerRun } from './terminal-coordination.js'
 import { getRunnerRunStatus, RUNNER_RUN_NOT_FOUND, RunnerSubmissionUncertainError, submitRunnerRun } from './runner-client.js'
 import { recoverReviewRunSubmission } from './submission-recovery.js'
 import { submitPreparedRun } from './prepared-submission.js'
+import { observeRun, type PublicationStepSummary } from './observability.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
 const operations = [
@@ -43,6 +46,12 @@ function sendJson (response: ServerResponse, status: number, value: unknown): vo
   response.end(JSON.stringify(value))
 }
 
+function logEvent (event: string, fields: Record<string, unknown> = {}): void {
+  // Keep operational logs structured, but never serialize request arguments:
+  // they may contain runner input, publish context, or claim credentials.
+  console.info(JSON.stringify({ event, ...fields }))
+}
+
 function isRpcRequest (value: unknown): value is { operation: Operation, args: unknown[] } {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Record<string, unknown>
@@ -60,17 +69,22 @@ export async function startControlPlaneServer (): Promise<{ close: () => Promise
   const coordinator = startReviewRunCoordinatorLoop({
     intervalMs: Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : 15_000,
     runOnce: async () => await coordinateReviewRunsOnce(store, {
-      recoverSubmission: async run => { await recoverReviewRunSubmission(store, run, {
+      recoverSubmission: async run => {
+        logEvent('runner_submission_recovery_started', { connector_id: store.connector_id, run_id: run.run_id, workflow: run.workflow })
+        await recoverReviewRunSubmission(store, run, {
         submit: submitRunnerRun,
         classifyError: error => ({
           uncertain: error instanceof RunnerSubmissionUncertainError,
           code: error instanceof RunnerSubmissionUncertainError ? 'SUBMISSION_STATE_UNCERTAIN' : error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : 'REVIEW_START_FAILED',
           message: error instanceof Error ? error.message : String(error)
         })
-      }) },
+        })
+        logEvent('runner_submission_recovery_completed', { connector_id: store.connector_id, run_id: run.run_id, workflow: run.workflow })
+      },
       observeActiveRun: async run => { await observeRunnerRun(store, run, getRunnerRunStatus, error =>
         typeof error === 'object' && error !== null && 'name' in error && error.name === 'AgentRunnerServiceError' &&
-        (('retryable' in error && error.retryable === false) || ('code' in error && error.code === RUNNER_RUN_NOT_FOUND))) }
+        (('retryable' in error && error.retryable === false) || ('code' in error && error.code === RUNNER_RUN_NOT_FOUND)),
+      event => { console.info(JSON.stringify({ event: event.kind, connector_id: store.connector_id, ...event })) }) }
     }),
     onError: error => { console.error('control_plane_runner_coordination_failed', error) }
   })
@@ -80,12 +94,56 @@ export async function startControlPlaneServer (): Promise<{ close: () => Promise
         sendJson(response, 200, { status: 'ok' })
         return
       }
-      if (request.method !== 'POST' || request.url !== '/v1/store') {
+      const runQuery = request.method === 'GET' ? /^\/v1\/runs\/([^/?]+)$/.exec(request.url ?? '') : null
+      const stepsQuery = request.method === 'GET' ? /^\/v1\/runs\/([^/]+)\/publication-steps$/.exec(request.url ?? '') : null
+      const listQuery = request.method === 'GET' && request.url?.startsWith('/v1/runs?')
+      if ((request.method !== 'POST' || request.url !== '/v1/store') && runQuery === null && stepsQuery === null && !listQuery) {
         sendJson(response, 404, { error: 'not_found' })
         return
       }
       if (request.headers.authorization !== `Bearer ${token}`) {
         sendJson(response, 401, { error: 'unauthorized' })
+        return
+      }
+      if (runQuery !== null) {
+        const requestedRunId = runQuery[1]
+        if (requestedRunId === undefined) throw new Error('Run query did not include a run id.')
+        const run = await store.getRun(decodeURIComponent(requestedRunId))
+        if (run === null) {
+          sendJson(response, 404, { error: 'run_not_found' })
+          return
+        }
+        sendJson(response, 200, { run: observeRun(run) })
+        return
+      }
+      if (stepsQuery !== null) {
+        const requestedRunId = stepsQuery[1]
+        if (requestedRunId === undefined) throw new Error('Publication step query did not include a run id.')
+        const run = await store.getRun(decodeURIComponent(requestedRunId))
+        if (run === null) { sendJson(response, 404, { error: 'run_not_found' }); return }
+        const steps = await store.listPublicationSteps(run.run_id)
+        const summary: PublicationStepSummary[] = steps.map(step => ({
+          step_key: step.step_key, status: step.status, attempts: step.attempts, failure_code: step.failure_code
+        }))
+        sendJson(response, 200, { run_id: run.run_id, publication_steps: summary })
+        return
+      }
+      if (listQuery) {
+        const url = new URL(request.url ?? '/', 'http://control-plane.local')
+        const limit = Number.parseInt(url.searchParams.get('limit') ?? '50', 10)
+        const listOptions: Parameters<ReviewRunStore['listRuns']>[0] = { limit: Number.isFinite(limit) ? limit : 50 }
+        const cursor = url.searchParams.get('cursor'); if (cursor !== null) listOptions.cursor = cursor
+        const status = url.searchParams.get('status') as ReviewRunStatus | null; if (status !== null) listOptions.status = status
+        const workflow = url.searchParams.get('workflow') as ControlPlaneWorkflow | null; if (workflow !== null) listOptions.workflow = workflow
+        const from = url.searchParams.get('from'); if (from !== null) listOptions.from = from
+        const to = url.searchParams.get('to'); if (to !== null) listOptions.to = to
+        const runs = await store.listRuns(listOptions)
+        const observed = runs.map(observeRun)
+        const last = runs.at(-1)
+        const next_cursor = last === undefined || runs.length < Math.min(Math.max(Number.isFinite(limit) ? limit : 50, 1), 100)
+          ? null
+          : Buffer.from(`${last.created_at}|${last.run_id}`).toString('base64url')
+        sendJson(response, 200, { runs: observed, next_cursor })
         return
       }
       const body = await readJson(request)
@@ -96,13 +154,27 @@ export async function startControlPlaneServer (): Promise<{ close: () => Promise
       const args = body.operation === 'admit_review_run' && typeof body.args[0] === 'object' && body.args[0] !== null
         ? [{ ...(body.args[0] as Record<string, unknown>), run_id: randomUUID() }]
         : body.args
+      const runId = typeof body.args[0] === 'string' ? body.args[0] : undefined
+      logEvent('control_plane_operation_started', {
+        operation: body.operation,
+        ...(runId === undefined ? {} : { run_id: runId }),
+        connector_id: store.connector_id
+      })
       if (body.operation === 'submit_prepared_run') {
         const [runId, preparationToken, publishContext, input] = args as [string, string, Record<string, unknown>, Record<string, unknown>]
-        sendJson(response, 200, { result: await submitPreparedRun(store, { runId, preparationToken, publishContext, input }, submitRunnerRun) })
+        const result = await submitPreparedRun(store, { runId, preparationToken, publishContext, input }, submitRunnerRun)
+        logEvent('control_plane_operation_completed', { operation: body.operation, run_id: runId, connector_id: store.connector_id })
+        sendJson(response, 200, { result })
         return
       }
       const method = store[body.operation] as (...operationArgs: unknown[]) => Promise<unknown>
-      sendJson(response, 200, { result: await method.apply(store, args) })
+      const result = await method.apply(store, args)
+      logEvent('control_plane_operation_completed', {
+        operation: body.operation,
+        ...(runId === undefined ? {} : { run_id: runId }),
+        connector_id: store.connector_id
+      })
+      sendJson(response, 200, { result })
     } catch (error) {
       const status = typeof error === 'object' && error !== null && 'statusCode' in error && typeof error.statusCode === 'number'
         ? error.statusCode

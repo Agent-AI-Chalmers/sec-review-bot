@@ -248,6 +248,27 @@ export class ReviewRunStore {
     [runId, this.connectorId])
     return result.rows[0] === undefined ? null : rowToRecord(result.rows[0])
   }
+
+  async listRuns (options: { limit?: number, cursor?: string, status?: ReviewRunStatus, workflow?: WorkflowName, from?: string, to?: string } = {}): Promise<ReviewRunRecord[]> {
+    this.ready()
+    const boundedLimit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 100)
+    const values: unknown[] = [this.connectorId]
+    const clauses = ['r.connector_id=$1']
+    const add = (value: unknown): string => { values.push(value); return `$${values.length}` }
+    if (options.workflow !== undefined) clauses.push(`r.workflow=${add(options.workflow)}`)
+    if (options.from !== undefined) clauses.push(`r.created_at>=${add(options.from)}`)
+    if (options.to !== undefined) clauses.push(`r.created_at<${add(options.to)}`)
+    if (options.cursor !== undefined) {
+      const [createdAt, runId] = Buffer.from(options.cursor, 'base64url').toString('utf8').split('|')
+      if (!createdAt || !runId) throw new Error('Invalid run list cursor.')
+      clauses.push(`(r.created_at, r.run_id)<(${add(createdAt)}, ${add(runId)})`)
+    }
+    const result = await this.pool.query<ReviewRunRow>(`${RUN_SELECT}
+      WHERE ${clauses.join(' AND ')} ORDER BY r.created_at DESC, r.run_id DESC LIMIT ${add(boundedLimit)}`,
+    values)
+    const records = result.rows.map(rowToRecord)
+    return options.status === undefined ? records : records.filter(record => record.status === options.status)
+  }
   async expireStalePreparations (): Promise<number> {
     return await transaction(this.pool, async client => {
       const expired = await client.query<{ run_id: string }>(`
