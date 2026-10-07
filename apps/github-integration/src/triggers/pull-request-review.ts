@@ -1,3 +1,5 @@
+import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
+
 import type { PullRequestContext } from '../infrastructure/github/pull-request-service.js'
 import { pullRequestReviewPublishContext } from '../infrastructure/runner/publish-context.js'
 import { reviewRunStore } from '../infrastructure/runner/review-store.js'
@@ -54,31 +56,28 @@ export async function startPullRequestReviewCommand ({
     store = reviewRunStore,
     create_run_id = createRunId
   } = deps
-  const candidate_run_id = create_run_id()
-  const run = {
+  const admission = await admitReviewRun(store, {
     workflow: 'pull-request-review',
-    run_id: candidate_run_id,
-    publish_context: {}
-  } as const
-  const admission = await store.admit_review_run({
-    ...run,
     ingress_kind: 'github_webhook',
     ingress_key: delivery_id
-  })
+  }, create_run_id)
   on_admitted?.({
-    run_id: admission.record.run_id,
-    status: admission.record.status,
+    run_id: admission.run_id,
+    status: admission.status,
     replayed: !admission.created
   })
   if (!admission.created) {
-    return { run_id: admission.record.run_id }
+    return { run_id: admission.run_id }
   }
-  const run_id = admission.record.run_id
+  const run_id = admission.run_id
   const preparationToken = admission.preparation_token
   if (!preparationToken) throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
 
   let submitted: SubmittedPullRequestReviewRun
   try {
+    // Admission happens before PR lookup, input preparation, and Runner
+    // submission. Any failure below therefore remains attached to this run_id
+    // instead of becoming an untracked pre-run error.
     const resolvedPr = pr ?? await resolve_pr?.()
     if (resolvedPr === undefined) {
       throw new Error('Pull request context is missing after admission.')

@@ -4,7 +4,7 @@
 
 本文是 [LOCAL_INTEGRATED_DEPLOYMENT.md](LOCAL_INTEGRATED_DEPLOYMENT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是 GitHub integration / 运行服务 / Temporal 控制平面、对象存储与宿主机执行 worker 的本地部署说明。
+这是 GitHub integration、Review Control Plane、运行服务、Temporal、对象存储与宿主机执行 worker 的本地部署说明。
 
 如果你要在本地跑完整集成链路，读本文。不经过 HTTP 运行服务、直接在本地运行 agent，或使用 `run-local-* --temporal` 调试时，见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -16,7 +16,9 @@ flowchart LR
     dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
 
     subgraph compose["Docker Compose"]
-        integration["github-integration"] --> runner["Runner Service<br/>提交和查询 review 任务"]
+        integration["github-integration"] --> control["Review Control Plane<br/>接纳和持久化状态"]
+        integration --> runner["Runner Service<br/>提交和查询 review 任务"]
+        control --> postgres[(PostgreSQL)]
         runner --> temporal["Temporal<br/>workflow 状态和 task queue"]
         integration -->|写入 input bundle| storage["Object Storage<br/>不可变 input 和 result artifact"]
         runner -->|写入终态 result artifact| storage
@@ -45,6 +47,7 @@ Runner Service 是 GitHub integration 与 Temporal 之间的 HTTP API。它负�
 | Service | URL |
 | --- | --- |
 | GitHub integration | `http://127.0.0.1:30000` |
+| Review Control Plane | `http://127.0.0.1:8090` |
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
@@ -139,7 +142,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose 会注入容器内私钥路径、Runner Service 地址和 token、PostgreSQL 连接以及 RustFS input storage 配置；这些值不需要在 `apps/github-integration/.env` 中重复配置。
+Compose 会注入容器内私钥路径、Runner Service 地址和 token、Control Plane 地址和 token，以及 RustFS input storage 配置。PostgreSQL 凭据只注入 Control Plane；这些值不需要在 `apps/github-integration/.env` 中重复配置。
 
 ### 3. 模型配置
 

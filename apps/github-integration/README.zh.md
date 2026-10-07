@@ -10,11 +10,12 @@
 
 ## 安装
 
-在 `apps/github-integration/` 目录运行：
+本地开发时，在仓库根目录安装 Control Plane 服务和 integration 的依赖：
 
 ```bash
 corepack enable pnpm
-pnpm install
+pnpm --dir control-plane install
+pnpm --dir apps/github-integration install
 ```
 
 请使用 Node 24.x。
@@ -31,11 +32,10 @@ pnpm run build
 pnpm test
 ```
 
-`pnpm test` 运行不依赖外部服务的测试。依赖 PostgreSQL 的 runner 测试单独放在集成测试套件中：
+`pnpm test` 运行不依赖外部服务的测试。集成测试使用 Control Plane 测试数据库验证 publisher 边界：
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
-DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
 pnpm run test:integration
 ```
 
@@ -230,7 +230,7 @@ GitHub integration 负责完整的 `review_runs` 生命周期。Python 和 Tempo
 
 ### 数据库 schema 版本
 
-PostgreSQL schema 变更位于 `infrastructure/runner/database/schema-versions`。已执行版本及其 SHA-256 checksum 记录在 `schema_versions`。不要修改已经执行过的版本文件；应新增下一个编号的 SQL 文件，并在 `schema-version-runner.ts` 中注册。应用启动时使用 PostgreSQL advisory lock 串行执行 schema 变更；如果文件 checksum 与数据库账本不一致，应用会拒绝启动。
+PostgreSQL 协调 schema 由 `control-plane/src/database/schema-versions` 所有。已执行版本及其 SHA-256 checksum 记录在 `schema_versions`。不要修改已经执行过的版本文件；应新增下一个编号的 SQL 文件，并在 `control-plane/src/database/schema-version-runner.ts` 中注册。Control Plane 启动时使用 PostgreSQL advisory lock 串行执行 schema 变更，如果文件 checksum 与数据库账本不一致则拒绝启动。
 
 ### 接纳与重放身份
 

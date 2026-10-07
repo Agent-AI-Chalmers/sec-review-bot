@@ -8,11 +8,12 @@ It does not execute agent workflows directly. It prepares inputs, submits runner
 
 ## Setup
 
-From `apps/github-integration/`:
+For local development, install the Control Plane service and integration dependencies from the repository root:
 
 ```bash
 corepack enable pnpm
-pnpm install
+pnpm --dir control-plane install
+pnpm --dir apps/github-integration install
 ```
 
 Use Node 24.x.
@@ -29,12 +30,11 @@ pnpm run build
 pnpm test
 ```
 
-`pnpm test` runs tests that do not require external services. PostgreSQL-backed
-runner tests are kept as an explicit integration suite:
+`pnpm test` runs tests that do not require external services. The integration
+suite uses the Control Plane test database for publisher boundary tests:
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
-DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
 pnpm run test:integration
 ```
 
@@ -229,7 +229,7 @@ The integration owns the complete `review_runs` lifecycle. Python and Temporal o
 
 ### Database Schema Versions
 
-PostgreSQL schema changes live in `infrastructure/runner/database/schema-versions`. Applied versions are recorded with a SHA-256 checksum in `schema_versions`. Never edit an applied version file; add the next numbered SQL file and register it in `schema-version-runner.ts`. Startup serializes schema changes with a PostgreSQL advisory lock and refuses files whose checksum no longer matches the database ledger.
+PostgreSQL coordination schema changes are owned by `control-plane/src/database/schema-versions`. Applied versions are recorded with a SHA-256 checksum in `schema_versions`. Never edit an applied version file; add the next numbered SQL file and register it in `control-plane/src/database/schema-version-runner.ts`. Control Plane startup serializes schema changes with a PostgreSQL advisory lock and refuses files whose checksum no longer matches the database ledger.
 
 ### Admission And Replay Identity
 

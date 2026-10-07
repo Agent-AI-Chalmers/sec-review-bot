@@ -100,6 +100,29 @@ services:
       temporal:
         condition: service_started
 
+  control-plane:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: control-plane/Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+    environment:
+      CONTROL_PLANE_PORT: "8090"
+      CONTROL_PLANE_SERVICE_TOKEN: "${CONTROL_PLANE_SERVICE_TOKEN:?CONTROL_PLANE_SERVICE_TOKEN is required}"
+      CONNECTOR_ID: "${CONNECTOR_ID:-github-app:default}"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sec_review_bot}"
+    ports:
+      - "127.0.0.1:${CONTROL_PLANE_HOST_PORT:-8090}:8090"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8090/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   github-integration:
     profiles: ["app"]
     build:
@@ -116,14 +139,8 @@ services:
       AGENT_RUNNER_SERVICE_URL: "http://runner-service:8000"
       AGENT_RUNNER_SERVICE_TOKEN: "${RUNNER_SERVICE_TOKEN:?RUNNER_SERVICE_TOKEN is required}"
       AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS:-15000}"
-      # The env_file DATABASE_URL targets PostgreSQL through a host port for
-      # local Node.js runs. Inside Compose, service discovery must own routing.
-      DATABASE_URL: ""
-      PGHOST: "postgres"
-      PGPORT: "5432"
-      PGDATABASE: "${POSTGRES_DB:-sec_review_bot}"
-      PGUSER: "${POSTGRES_USER:-sec_review_bot}"
-      PGPASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      CONTROL_PLANE_SERVICE_URL: "http://control-plane:8090"
+      CONTROL_PLANE_SERVICE_TOKEN: "${CONTROL_PLANE_SERVICE_TOKEN:?CONTROL_PLANE_SERVICE_TOKEN is required}"
       GITHUB_INTEGRATION_GIT_HTTP_PROXY: "${GITHUB_INTEGRATION_GIT_HTTP_PROXY:-}"
       SEC_REVIEW_ARTIFACT_STORE: "s3"
       SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"
@@ -141,7 +158,7 @@ services:
     depends_on:
       rustfs-init:
         condition: service_completed_successfully
-      postgres:
+      control-plane:
         condition: service_healthy
       runner-service:
         condition: service_started

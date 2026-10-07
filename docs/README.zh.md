@@ -74,6 +74,9 @@ App 侧和 agent 侧之间的契约，看这里：
 - [CVSSV4.md](workflows/repository-review/CVSSV4.md) / [中文](workflows/repository-review/CVSSV4.zh.md)：CVSS v4 scoring。
 - [CONCURRENCY_AND_FAILURES.md](workflows/repository-review/CONCURRENCY_AND_FAILURES.md) / [中文](workflows/repository-review/CONCURRENCY_AND_FAILURES.zh.md)：Repository review 并发与失败边界。
 
+### architecture/
+
+
 ### operations/
 
 本地运行系统或配置 GitHub webhook 时，看这里：
@@ -85,3 +88,4 @@ App 侧和 agent 侧之间的契约，看这里：
 ### roadmap/
 
 - [FUTURE_WORK.md](roadmap/FUTURE_WORK.md) / [中文](roadmap/FUTURE_WORK.zh.md)：将来工作。
+- [REVIEW_CONTROL_PLANE_IMPLEMENTATION.zh.md](roadmap/REVIEW_CONTROL_PLANE_IMPLEMENTATION.zh.md)：Review Control Plane 的临时实施记录和分阶段计划。

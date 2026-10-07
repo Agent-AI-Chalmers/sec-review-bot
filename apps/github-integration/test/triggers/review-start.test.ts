@@ -180,6 +180,8 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
 })
 
 test('startPullRequestReviewCommand records a failed run when preparation or submission fails', async () => {
+  // The run is deliberately admitted before preparation fails: operators must
+  // be able to find the failed attempt and its delivery identity afterwards.
   const transitions: unknown[] = []
 
   await assert.rejects(

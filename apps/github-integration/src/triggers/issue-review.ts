@@ -1,3 +1,5 @@
+import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
+
 import type { IssueContext } from '../infrastructure/github/issue-service.js'
 import { issueReviewPublishContext } from '../infrastructure/runner/publish-context.js'
 import {
@@ -53,22 +55,20 @@ export async function startIssueReviewCommand ({
     store = reviewRunStore,
     create_run_id = createRunId
   } = deps
-  const candidate_run_id = create_run_id()
-  const run = { workflow: 'issue-review' as const, run_id: candidate_run_id, publish_context: {} }
-  const admission = await store.admit_review_run({
-    ...run,
+  const admission = await admitReviewRun(store, {
+    workflow: 'issue-review',
     ingress_kind: 'github_webhook',
     ingress_key: delivery_id
-  })
+  }, create_run_id)
   on_admitted?.({
-    run_id: admission.record.run_id,
-    status: admission.record.status,
+    run_id: admission.run_id,
+    status: admission.status,
     replayed: !admission.created
   })
   if (!admission.created) {
-    return { run_id: admission.record.run_id }
+    return { run_id: admission.run_id }
   }
-  const run_id = admission.record.run_id
+  const run_id = admission.run_id
   const preparationToken = admission.preparation_token
   if (!preparationToken) throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
 

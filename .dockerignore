@@ -6,6 +6,8 @@ deploy/systemd/deployment.env
 node_modules
 apps/*/node_modules
 apps/*/dist
+control-plane/node_modules
+control-plane/dist
 __pycache__
 *.pyc
 .pytest_cache

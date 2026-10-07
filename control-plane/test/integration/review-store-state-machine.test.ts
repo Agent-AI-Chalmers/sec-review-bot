@@ -3,8 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
 
-import { ReviewRunStore } from '../../../src/infrastructure/runner/review-store.js'
-import { publishContextForWorkflow } from '../../publish-context-fixtures.js'
+import { ReviewRunStore } from '../../src/index.js'
 
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
@@ -26,12 +25,37 @@ async function createStore (options: { connectorId?: string, claimTimeoutMs?: nu
 }
 
 async function createQueuedRun (store: ReviewRunStore, runId = `run-${randomUUID()}`): Promise<string> {
-  const context = publishContextForWorkflow('issue-review')
+  const context = {}
   const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: context })
   assert.ok(admission.preparation_token)
   await store.mark_queued(runId, admission.preparation_token, context)
   return runId
 }
+
+test('ReviewRunStore prevents cross-connector access to a globally unique run identity', async () => {
+  const connectorA = connectorId()
+  const connectorB = connectorId()
+  const runId = `run-shared-${randomUUID()}`
+  const first = await createStore({ connectorId: connectorA })
+  const second = await createStore({ connectorId: connectorB })
+  try {
+    await createQueuedRun(first, runId)
+
+    assert.equal((await first.getRun(runId))?.run_id, runId)
+    // run_id is currently a global primary key, while connector_id fences
+    // reads and claims. A second connector must not create or see the first
+    // connector's run under that identity.
+    await assert.rejects(createQueuedRun(second, runId), /duplicate key value violates unique constraint/)
+    assert.equal(await second.getRun(runId), null)
+    assert.equal((await first.listActiveRuns()).length, 1)
+    assert.equal((await second.listActiveRuns()).length, 0)
+    assert.notEqual(await first.claimPublication(runId), null)
+    assert.equal(await second.claimPublication(runId), null)
+  } finally {
+    await first.close()
+    await second.close()
+  }
+})
 
 test('ReviewRunStore persists queued runs and keeps preparing runs out of polling', async () => {
   const store = await createStore()
@@ -71,6 +95,48 @@ test('ReviewRunStore terminates preparation after its claim expires', async () =
   } finally { await store.close() }
 })
 
+test('ReviewRunStore keeps an admitted run queryable after preparation fails', async () => {
+  const store = await createStore()
+  const runId = `run-preparation-failed-${randomUUID()}`
+  const ingressKey = `delivery-${randomUUID()}`
+  try {
+    const admission = await store.admit_review_run({
+      workflow: 'pull-request-review',
+      run_id: runId,
+      publish_context: {},
+      ingress_kind: 'github_webhook',
+      ingress_key: ingressKey
+    })
+    assert.ok(admission.preparation_token)
+
+    // Input preparation happens after durable admission. Its failure must keep
+    // the original run and ingress identity available for diagnosis/replay.
+    await store.failPreparation(runId, admission.preparation_token, {
+      code: 'REVIEW_START_FAILED',
+      message: 'input bundle upload failed'
+    })
+
+    const failed = await store.getRun(runId)
+    assert.equal(failed?.status, 'failed')
+    assert.equal(failed?.ingress_kind, 'github_webhook')
+    assert.equal(failed?.ingress_key, ingressKey)
+    assert.equal(failed?.failure_code, 'REVIEW_START_FAILED')
+    assert.equal(failed?.failure_message, 'input bundle upload failed')
+    assert.deepEqual(await store.listActiveRuns(), [])
+    assert.equal(await store.claimPublication(runId), null)
+
+    const replay = await store.admit_review_run({
+      workflow: 'pull-request-review',
+      run_id: `run-replay-${randomUUID()}`,
+      publish_context: {},
+      ingress_kind: 'github_webhook',
+      ingress_key: ingressKey
+    })
+    assert.equal(replay.created, false)
+    assert.equal(replay.record.run_id, runId)
+  } finally { await store.close() }
+})
+
 test('ReviewRunStore records one immutable schema version across concurrent initialization', async () => {
   const first = new ReviewRunStore({ connectionString: requireTestDatabase(), connectorId: connectorId() })
   const second = new ReviewRunStore({ connectionString: requireTestDatabase(), connectorId: connectorId() })
@@ -82,8 +148,7 @@ test('ReviewRunStore records one immutable schema version across concurrent init
     )).rows
     await observer.end()
     assert.deepEqual(versions.map(item => [item.version, item.name]), [
-      [1, 'initial_coordination_schema'],
-      [2, 'runner_artifact_publication']
+      [1, 'initial_coordination_schema']
     ])
     for (const version of versions) assert.match(version.checksum, /^[a-f0-9]{64}$/)
   } finally { await Promise.all([first.close(), second.close()]) }
@@ -143,18 +208,18 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
     assert.notEqual(takeover.preparation_token, first.preparation_token)
 
     await assert.rejects(
-      ownerA.save_prepared_submission(first.record.run_id, first.preparation_token, publishContextForWorkflow('issue-review'), {}),
+      ownerA.save_prepared_submission(first.record.run_id, first.preparation_token, {}, {}),
       /cannot save prepared submission/
     )
     await assert.rejects(
-      ownerA.mark_queued(first.record.run_id, first.preparation_token, publishContextForWorkflow('issue-review')),
+      ownerA.mark_queued(first.record.run_id, first.preparation_token, {}),
       /cannot transition/
     )
     await assert.rejects(
       ownerA.failPreparation(first.record.run_id, first.preparation_token, { message: 'late failure' }),
       /claim was lost/
     )
-    await ownerB.mark_queued(takeover.record.run_id, takeover.preparation_token, publishContextForWorkflow('issue-review'))
+    await ownerB.mark_queued(takeover.record.run_id, takeover.preparation_token, {})
     assert.equal((await ownerA.getRun(first.record.run_id))?.status, 'queued')
   } finally { await Promise.all([ownerA.close(), ownerB.close()]) }
 })
@@ -165,7 +230,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
   try {
     const admission = await store.create_preparing_review_run({ workflow: 'issue-review', run_id: runId, publish_context: {} })
     assert.ok(admission.preparation_token)
-    await store.save_prepared_submission(runId, admission.preparation_token, publishContextForWorkflow('issue-review'), { contract_version: 'v5' })
+    await store.save_prepared_submission(runId, admission.preparation_token, {}, { contract_version: 'v5' })
     await store.failPreparation(runId, admission.preparation_token, { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' })
     const staleToken = await store.claimSubmissionRecovery(runId)
     const currentToken = await store.claimSubmissionRecovery(runId)

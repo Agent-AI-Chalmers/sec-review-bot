@@ -49,17 +49,6 @@ const artifact_store = configured_artifact_store as 'file' | 's3'
 const artifact_s3_bucket = process.env['SEC_REVIEW_ARTIFACT_S3_BUCKET']?.trim()
 const artifact_s3_endpoint = process.env['SEC_REVIEW_ARTIFACT_S3_ENDPOINT']?.trim()
 const artifact_s3_region = process.env['AWS_REGION']?.trim() || 'us-east-1'
-const database_url = process.env['DATABASE_URL']?.trim() || undefined
-const database_pg_options = {
-  host: process.env['PGHOST'],
-  port: process.env['PGPORT'] ? Number.parseInt(process.env['PGPORT'], 10) : undefined,
-  database: process.env['PGDATABASE'],
-  user: process.env['PGUSER'],
-  password: process.env['PGPASSWORD']
-}
-if (!database_url && Object.values(database_pg_options).every(value => value === undefined)) {
-  throw new Error('DATABASE_URL or PGHOST/PGDATABASE/PGUSER/PGPASSWORD is required for the GitHub integration coordination store.')
-}
 
 export {
   app_id,
@@ -76,7 +65,5 @@ export {
   artifact_store,
   artifact_s3_bucket,
   artifact_s3_endpoint,
-  artifact_s3_region,
-  database_url,
-  database_pg_options
+  artifact_s3_region
 }

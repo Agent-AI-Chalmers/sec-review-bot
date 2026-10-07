@@ -13,12 +13,10 @@ import { handlePullRequestReadyForReview } from './interfaces/github/webhooks/pu
 import { handlePullRequestSynchronize } from './interfaces/github/webhooks/pull-request-synchronize.js'
 import { verifyGitWorkspaceRuntime } from './infrastructure/runner/git-workspace.js'
 import { startRunnerRunPublisher } from './infrastructure/runner/run-publisher.js'
-import { reviewRunStore } from './infrastructure/runner/review-store.js'
 import { reviewExecutionTracker } from './infrastructure/review-execution-tracker.js'
 import { logError, logInfo } from './utils/logger.js'
 
 await verifyGitWorkspaceRuntime()
-await reviewRunStore.initialize()
 
 const app = createGitHubApp()
 
@@ -98,14 +96,9 @@ async function shutdown (signal: ShutdownSignal): Promise<void> {
     ...serverResult,
     ...await Promise.allSettled([publisher.stop(), reviewExecutionTracker.stop()])
   ]
-  let shutdownError = results.find(
+  const shutdownError = results.find(
     (result): result is PromiseRejectedResult => result.status === 'rejected'
   )?.reason
-  try {
-    await reviewRunStore.close()
-  } catch (error) {
-    shutdownError ??= error
-  }
   if (shutdownError !== undefined) {
     process.exitCode = 1
     logError('server_shutdown_failed', { error: shutdownError, signal })

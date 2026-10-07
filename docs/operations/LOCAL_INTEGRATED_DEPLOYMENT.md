@@ -2,7 +2,7 @@
 
 Language: English | [中文](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
-This guide covers local deployment of the GitHub integration / Runner Service / Temporal control plane, object storage, and a host execution worker.
+This guide covers local deployment of the GitHub integration, Review Control Plane, Runner Service, Temporal, object storage, and a host execution worker.
 
 Use it to run the complete integrated path locally. For running agents directly without the HTTP Runner Service, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
@@ -14,7 +14,9 @@ flowchart LR
     dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
 
     subgraph compose["Docker Compose"]
-        integration["github-integration"] --> runner["Runner Service<br/>submit and query review tasks"]
+        integration["github-integration"] --> control["Review Control Plane<br/>admission and durable state"]
+        integration --> runner["Runner Service<br/>submit and query review tasks"]
+        control --> postgres[(PostgreSQL)]
         runner --> temporal["Temporal<br/>workflow state and task queue"]
         integration -->|write input bundles| storage["Object Storage<br/>immutable input and result artifacts"]
         runner -->|write terminal result artifacts| storage
@@ -43,6 +45,7 @@ Default local endpoints:
 | Service | URL |
 | --- | --- |
 | GitHub integration | `http://127.0.0.1:30000` |
+| Review Control Plane | `http://127.0.0.1:8090` |
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
@@ -137,7 +140,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose injects the container private-key path, Runner Service address and token, PostgreSQL connection, and RustFS input storage configuration. These values do not need to be repeated in `apps/github-integration/.env`.
+Compose injects the container private-key path, Runner Service address and token, Control Plane address and token, and RustFS input storage configuration. PostgreSQL credentials are injected only into Control Plane. These values do not need to be repeated in `apps/github-integration/.env`.
 
 ### 3. Model Configuration
 

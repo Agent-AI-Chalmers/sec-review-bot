@@ -42,7 +42,17 @@ test('S3 input upload is immutable and idempotent', async (t) => {
       /conflicts with existing content/
     )
   } finally {
-    const client = new S3Client({ endpoint, region: process.env['AWS_REGION'] || 'us-east-1', forcePathStyle: true })
-    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+    const cleanupAccessKeyId = process.env['SEC_REVIEW_TEST_S3_CLEANUP_ACCESS_KEY_ID']
+    const cleanupSecretAccessKey = process.env['SEC_REVIEW_TEST_S3_CLEANUP_SECRET_ACCESS_KEY']
+    if (cleanupAccessKeyId && cleanupSecretAccessKey) {
+      // Production integration credentials intentionally cannot delete artifacts.
+      const client = new S3Client({
+        endpoint,
+        region: process.env['AWS_REGION'] || 'us-east-1',
+        forcePathStyle: true,
+        credentials: { accessKeyId: cleanupAccessKeyId, secretAccessKey: cleanupSecretAccessKey }
+      })
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+    }
   }
 })

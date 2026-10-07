@@ -43,6 +43,7 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 这个仓库是一个 monorepo，主要有两个子系统：
 
 - [`apps/github-integration/`](apps/github-integration/)：TS 编写，GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
+- [`control-plane/`](control-plane/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
 - [`agents/src/sec_review_agents`](agents/src/sec_review_agents/)：Python 编写，multi-agent runner 和审查逻辑
 
 `github-integration` 不直接调用 agents 代码，而是通过 HTTP 运行服务提交 run；运行服务再通过 Temporal 把任务交给 worker 执行。
@@ -118,7 +119,7 @@ curl -sS http://127.0.0.1:8000/healthz \
   -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
 ```
 
-Compose 里的 Temporal Web UI 默认暴露在 `127.0.0.1:8233`；运行服务默认暴露在 `127.0.0.1:8000`，GitHub integration service 默认暴露在 `127.0.0.1:30000`。
+Compose 里的 Temporal Web UI 默认暴露在 `127.0.0.1:8233`；运行服务默认暴露在 `127.0.0.1:8000`，Review Control Plane 默认暴露在 `127.0.0.1:8090`，GitHub integration 默认暴露在 `127.0.0.1:30000`。
 
 ## 从哪里开始
 

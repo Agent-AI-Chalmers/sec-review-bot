@@ -9,7 +9,7 @@ import { RUNNER_PUBLISH_ERROR_CODES } from '../../../src/infrastructure/runner/p
 import { DeterministicRunnerPublishError } from '../../../src/infrastructure/runner/publish-error.js'
 import { publishReviewRunsOnce, startRunnerRunPublisher } from '../../../src/infrastructure/runner/run-publisher.js'
 import { classifyPublicationFailure } from '../../../src/infrastructure/runner/publication-failure.js'
-import { ReviewRunStore } from '../../../src/infrastructure/runner/review-store.js'
+import { ReviewRunStore } from '../../../../../control-plane/src/index.js'
 import { parsePublishContextForWorkflow } from '../../../src/infrastructure/runner/publish-context.js'
 import { publishContextForWorkflow } from '../../publish-context-fixtures.js'
 import {
@@ -102,6 +102,44 @@ test('publisher replays the persisted idempotent submission directly', async () 
   }])
   assert.equal((await store.getRun(runId))?.status, 'queued')
   await store.close()
+})
+
+test('a restarted publisher resumes an active run from PostgreSQL', async () => {
+  const connectorId = `publisher-restart:${randomUUID()}`
+  const runId = `run-publisher-restart-${randomUUID()}`
+  const firstProcess = await createStore({ connectorId })
+  await createQueuedRun(firstProcess, {
+    workflow: 'issue-review',
+    run_id: runId,
+    publish_context: publishContextForWorkflow('issue-review')
+  })
+  await firstProcess.close()
+
+  // A fresh store instance models integration/publisher process restart. No
+  // in-memory run handle from the admitting process is available here.
+  const restartedProcess = await createStore({ connectorId })
+  try {
+    await publishReviewRunsOnce({
+      app: appWithInstallationOctokit({ installation_octokit: {
+        rest: {
+          issues: {
+            listComments: async () => ({ data: [] }),
+            createComment: async () => ({ data: { id: 1, html_url: 'https://example.test/comment/1' } })
+          }
+        }
+      } }),
+      store: restartedProcess,
+      get_runner_run_status: async () => succeededStatus(
+        runId,
+        'issue-review',
+        contractFixture('v5', 'issue-review-result.json')
+      )
+    })
+
+    assert.equal((await restartedProcess.getRun(runId))?.status, 'published')
+  } finally {
+    await restartedProcess.close()
+  }
 })
 
 test('stopping the runner publisher waits for its active publish pass', async () => {

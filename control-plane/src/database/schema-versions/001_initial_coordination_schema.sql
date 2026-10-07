@@ -7,6 +7,7 @@ CREATE TABLE review_runs (
   runner_status text NOT NULL CHECK (runner_status IN ('preparing', 'recovering', 'queued', 'running', 'failed')),
   runner_failure_code text,
   runner_failure_message text,
+  artifact_publication jsonb,
   preparation_claim_token uuid,
   preparation_claimed_at timestamptz,
   recovery_claim_token uuid,

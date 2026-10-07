@@ -1,4 +1,5 @@
 import type { App } from 'octokit'
+import { admitReviewRun } from '../infrastructure/control-plane/admission.js'
 
 import type { GitHubAppOctokit } from '../infrastructure/github/octokit.js'
 import { getRepositoryRefSha, splitRepoFullName } from '../infrastructure/github/repository-service.js'
@@ -211,26 +212,23 @@ export async function dispatchRepositoryReview ({
     throw new RepositoryReviewDispatchValidationError(asErrorMessage(error))
   }
   const { repo_full_name, correlation_id } = validated
-  const candidate_run_id = create_run_id()
-  const admission = await store.admit_review_run({
+  const admission = await admitReviewRun(store, {
     workflow: 'repository-review',
-    run_id: candidate_run_id,
-    publish_context: {},
     ingress_kind: 'github_actions_dispatch',
     ingress_key: `${verified_repository}:${correlation_id}`
-  })
+  }, create_run_id)
   on_admitted?.({
-    run_id: admission.record.run_id,
-    status: admission.record.status,
+    run_id: admission.run_id,
+    status: admission.status,
     replayed: !admission.created
   })
   if (!admission.created) {
     return {
-      run_id: admission.record.run_id,
+      run_id: admission.run_id,
       replayed: true
     }
   }
-  const run_id = admission.record.run_id
+  const run_id = admission.run_id
   const preparationToken = admission.preparation_token
   if (!preparationToken) throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
 
