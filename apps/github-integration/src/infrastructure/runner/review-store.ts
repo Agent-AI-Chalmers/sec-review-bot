@@ -96,13 +96,6 @@ class ControlPlaneReviewRunStoreClient {
     return body.result as T
   }
 
-  private validateRun(run: ReviewRunRecord): ReviewRunRecord {
-    return {
-      ...run,
-      publish_context: parsePublishContextForWorkflow(run.workflow, run.publish_context)
-    }
-  }
-
   private async validateContext(runId: string, context: PublishContext): Promise<PublishContext> {
     const run = await this.getRun(runId)
     if (run === null) throw new Error(`Control Plane run does not exist: ${runId}`)
@@ -113,12 +106,12 @@ class ControlPlaneReviewRunStoreClient {
 
   async close(): Promise<void> {}
 
+  // Admission deliberately persists an empty context: run identity exists
+  // before input preparation discovers the workflow-specific publish target.
   async admit_review_run(
     run: CreateReviewRunArgs & Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
   ): Promise<ReviewRunAdmission> {
-    parsePublishContextForWorkflow(run.workflow, run.publish_context)
-    const admission = await this.call<ReviewRunAdmission>('admit_review_run', run)
-    return { ...admission, record: this.validateRun(admission.record) }
+    return await this.call<ReviewRunAdmission>('admit_review_run', run)
   }
 
   async save_prepared_submission(
@@ -161,9 +154,10 @@ class ControlPlaneReviewRunStoreClient {
     }
   }
 
+  // Status queries must expose preparing runs whose publish context is not ready.
+  // Publication claims below remain the strict persisted-context boundary.
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
-    const run = await this.call<ReviewRunRecord | null>('getRun', runId)
-    return run === null ? null : this.validateRun(run)
+    return await this.call<ReviewRunRecord | null>('getRun', runId)
   }
 
   async claimNextPublication(): Promise<PublicationWork | null> {
