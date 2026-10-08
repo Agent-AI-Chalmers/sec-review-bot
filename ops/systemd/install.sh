@@ -4,13 +4,13 @@ set -eu
 # Installation writes to /etc and normalizes repository state ownership. The
 # service itself still runs as the unprivileged user passed by the operator.
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Run this installer as root: sudo deploy/systemd/install.sh <service-user>" >&2
+    echo "Run this installer as root: sudo ops/systemd/install.sh <service-user>" >&2
     exit 1
 fi
 
 service_user=${1:-}
 if [ -z "$service_user" ]; then
-    echo "Usage: sudo deploy/systemd/install.sh <service-user>" >&2
+    echo "Usage: sudo ops/systemd/install.sh <service-user>" >&2
     exit 1
 fi
 if ! id "$service_user" >/dev/null 2>&1; then
@@ -60,6 +60,14 @@ install -d -m 0755 "$config_dir"
 # Re-running the installer also restores these default directories to the
 # selected service user after an earlier root-owned deployment.
 install -d -m 0755 -o "$service_uid" -g "$service_gid" \
+    "$repository_root/.agent-temporal-state" \
+    "$repository_root/.agent-rustfs-state" \
+    "$repository_root/.agent-postgres-state" \
+    "$repository_root/.agent-artifacts" \
+    "$repository_root/.agent-run-inputs"
+# GNU install preserves the owner of directories that already exist. Correct
+# the bind-mount roots explicitly without traversing potentially large state.
+chown "$service_uid:$service_gid" \
     "$repository_root/.agent-temporal-state" \
     "$repository_root/.agent-rustfs-state" \
     "$repository_root/.agent-postgres-state" \

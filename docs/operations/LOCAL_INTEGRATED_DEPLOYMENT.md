@@ -106,7 +106,7 @@ The integrated deployment uses four source configuration files. Compose `.env` a
 - repository-root `.env`: Compose control plane;
 - `apps/github-integration/.env`: GitHub integration;
 - `agents/config/model-providers.toml`: model deployments;
-- `deploy/systemd/deployment.env`: systemd deployment configuration before installation.
+- `ops/systemd/deployment.env`: systemd deployment configuration before installation.
 
 The installer combines these settings with checkout-derived paths and writes the systemd services' effective configuration to `/etc/sec-review-bot/deployment.env`.
 
@@ -116,11 +116,11 @@ Create the configuration files from the repository root:
 cp compose.env.sample .env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
-cp deploy/systemd/deployment.env.sample deploy/systemd/deployment.env
+cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
 chmod 600 .env \
   agents/config/model-providers.toml \
   apps/github-integration/.env \
-  deploy/systemd/deployment.env
+  ops/systemd/deployment.env
 ```
 
 The samples contain both usable defaults and empty or placeholder values that must be replaced. At minimum, configure the Runner Service token, GitHub App credentials, and model deployment credentials. The systemd installer combines the deployment settings with repository paths and writes the result to `/etc` as described below.
@@ -173,15 +173,15 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd Integrated Service Configuration
 
-`deploy/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the control-plane service and host worker read the installed file.
+`ops/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the control-plane service and host worker read the installed file.
 
 The installer owns `SEC_REVIEW_BOT_DIR` and `SEC_REVIEW_AGENTS_DIR`. Do not add them to the editable source file. The installer removes stale values and regenerates them from its own repository location. Input archives are exchanged through RustFS, so the integration container and host worker no longer share `.agent-input-bundles`.
 
 The installer also generates the internal `SEC_REVIEW_SERVICE_UID` and `SEC_REVIEW_SERVICE_GID` values. Before Compose starts, it creates the repository-local state directories for that service user. This prevents Docker from creating unwritable root-owned bind-mount sources and lets the Temporal container write its SQLite database as the same user.
 
-Materialized run inputs and generated artifacts default to `.agent-run-inputs` and `.agent-artifacts`. Model configuration defaults to `agents/config/model-providers.toml` in the current checkout. Most installations should keep these defaults. To move them, set an absolute `SEC_REVIEW_AGENT_RUN_INPUT_ROOT`, `SEC_REVIEW_AGENT_ARTIFACT_ROOT`, or `MODEL_PROVIDERS_CONFIG_TOML` in `deploy/systemd/deployment.env`; the installer preserves non-empty overrides for these independent worker paths.
+Materialized run inputs and generated artifacts default to `.agent-run-inputs` and `.agent-artifacts`. Model configuration defaults to `agents/config/model-providers.toml` in the current checkout. Most installations should keep these defaults. To move them, set an absolute `SEC_REVIEW_AGENT_RUN_INPUT_ROOT`, `SEC_REVIEW_AGENT_ARTIFACT_ROOT`, or `MODEL_PROVIDERS_CONFIG_TOML` in `ops/systemd/deployment.env`; the installer preserves non-empty overrides for these independent worker paths.
 
-If [`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) gains new options, add the relevant options to `deploy/systemd/deployment.env` manually.
+If [`ops/systemd/deployment.env.sample`](../../ops/systemd/deployment.env.sample) gains new options, add the relevant options to `ops/systemd/deployment.env` manually.
 
 Core fields:
 
@@ -201,7 +201,7 @@ Add or change the following variables as needed.
 
 #### Langfuse Tracing
 
-[Langfuse](https://langfuse.com/docs) is an optional external observability service. It is not part of this repository's Compose control plane. Use [Langfuse Cloud](https://cloud.langfuse.com) or run a separate [self-hosted Langfuse deployment](https://langfuse.com/self-hosting), create a project and API keys there, then set all three variables together in `deploy/systemd/deployment.env` and rerun the installer:
+[Langfuse](https://langfuse.com/docs) is an optional external observability service. It is not part of this repository's Compose control plane. Use [Langfuse Cloud](https://cloud.langfuse.com) or run a separate [self-hosted Langfuse deployment](https://langfuse.com/self-hosting), create a project and API keys there, then set all three variables together in `ops/systemd/deployment.env` and rerun the installer:
 
 ```bash
 LANGFUSE_PUBLIC_KEY=your_public_key
@@ -276,10 +276,10 @@ docker info
 docker compose --profile app build
 ```
 
-Review `deploy/systemd/deployment.env`, then install the systemd units. The argument identifies the regular host user that runs Compose and the worker:
+Review `ops/systemd/deployment.env`, then install the systemd units. The argument identifies the regular host user that runs Compose and the worker:
 
 ```bash
-sudo deploy/systemd/install.sh "$USER"
+sudo ops/systemd/install.sh "$USER"
 ```
 
 Start the complete integrated service and enable it at boot:
@@ -327,7 +327,7 @@ docker compose --profile app build
 sudo systemctl restart sec-review-bot.target
 ```
 
-After changing installation files under `deploy/systemd`, run the installer again before restarting the service.
+After changing installation files under `ops/systemd`, run the installer again before restarting the service.
 
 Check Runner Service:
 
@@ -369,13 +369,13 @@ Temporal distributes tasks among instances that share a task queue. Tune one pro
 
 ## Cleanup
 
-GitHub integration uses the container's default root user for local staging files. Durable input archives live in RustFS, and the host worker writes runtime artifacts as its own user.
-
-To repair ownership:
+The installer creates the repository-local bind-mount roots and assigns them to the configured service user. Run the installer after changing the service user or deployment checkout:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-run-inputs .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
+sudo ops/systemd/install.sh "$USER"
 ```
+
+Files inside the PostgreSQL, Temporal, and RustFS state directories retain the service-specific ownership required by their containers.
 
 The PostgreSQL coordination store and Temporal state describe the same active runs. Do not delete `.agent-temporal-state` while retaining PostgreSQL records that still need polling or publication. To reset run execution and publication state, stop the complete service and remove both state directories together:
 
@@ -442,5 +442,5 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 - Repository dispatch authentication fails: confirm that the workflow has `id-token: write`, requests the `sec-review-bot` OIDC audience, and uses the `.github/workflows/sec-review-bot.yml` workflow path.
 - Tasks remain queued: confirm that at least one host worker is running and uses the same `TEMPORAL_TASK_QUEUE` as Runner Service.
 - The worker cannot read an input bundle: check the RustFS endpoint and ensure the installed worker credential matches the read-only credential initialized by Compose.
-- The worker writes artifacts elsewhere: check the optional `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override in `deploy/systemd/deployment.env`, then rerun `sudo deploy/systemd/install.sh "$USER"`.
+- The worker writes artifacts elsewhere: check the optional `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override in `ops/systemd/deployment.env`, then rerun `sudo ops/systemd/install.sh "$USER"`.
 - LLM calls fail before workflow progress: from `agents/`, run `uv run sec-review-agents-check-llm-deployments --fail-fast`.

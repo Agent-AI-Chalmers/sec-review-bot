@@ -1,3 +1,23 @@
+"""Converge a fresh RustFS instance to the storage boundary used by this project.
+
+This module runs once as the Compose ``rustfs-init`` service. It creates the
+fixed ``sec-review`` bucket, upserts three runtime identities, installs their
+least-privilege policies from ``/policies``, and attaches one policy to each
+identity. It is intentionally deployment code rather than an application
+storage client: normal services never receive the root credentials used here.
+
+The resulting ownership model is:
+
+* GitHub integration can read and write immutable input bundles.
+* The execution worker can only read input bundles.
+* Runner Service can read and write terminal result artifacts.
+
+All provisioning operations are safe to repeat. Rerunning the container also
+rotates configured user secrets and replaces policy documents with the checked-in
+versions. RustFS exposes IAM management through its native admin API, so those
+requests are signed explicitly below; ordinary bucket creation uses the S3 API.
+"""
+
 import json
 import os
 import time
@@ -15,8 +35,9 @@ from botocore.credentials import Credentials
 from botocore.exceptions import ClientError
 
 ENDPOINT = os.environ.get("RUSTFS_ENDPOINT", "http://rustfs:9000").rstrip("/")
+ADMIN_API_PREFIX = "/rustfs/admin/v3"
 REGION = os.environ.get("AWS_REGION", "us-east-1")
-BUCKET = os.environ.get("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+BUCKET = "sec-review"
 
 
 def required_env(name: str) -> str:
@@ -31,8 +52,9 @@ ROOT_SECRET_KEY = required_env("RUSTFS_ROOT_PASSWORD")
 ROOT_CREDENTIALS = Credentials(ROOT_ACCESS_KEY, ROOT_SECRET_KEY)
 
 
-def admin_request(method: str, path: str, body: bytes = b"") -> None:
+def admin_request(method: str, route: str, body: bytes = b"") -> None:
     """Call RustFS's native admin namespace with the SigV4 scheme it requires."""
+    path = f"{ADMIN_API_PREFIX}/{route.lstrip('/')}"
     url = f"{ENDPOINT}{path}"
     # RustFS admin authentication requires the payload digest to be signed even
     # for an empty body; generic botocore AWSRequest does not add it for us.
@@ -58,6 +80,7 @@ def admin_request(method: str, path: str, body: bytes = b"") -> None:
 
 
 def ensure_bucket() -> None:
+    """Create the fixed project bucket if RustFS reports that it is absent."""
     client = boto3.client(
         "s3",
         endpoint_url=ENDPOINT,
@@ -77,26 +100,27 @@ def ensure_bucket() -> None:
 
 
 def put_user(access_key: str, secret_key: str) -> None:
-    # RustFS add-user is an upsert, so reruns also apply credential rotation.
+    """Upsert an enabled RustFS identity, applying secret rotation on reruns."""
     query = urllib.parse.urlencode({"accessKey": access_key})
     body = json.dumps({"secretKey": secret_key, "status": "enabled"}).encode()
-    admin_request("PUT", f"/rustfs/admin/v3/add-user?{query}", body)
+    admin_request("PUT", f"add-user?{query}", body)
 
 
 def put_policy(name: str, path: Path) -> None:
-    # Replacing the named policy keeps the deployed least-privilege document authoritative.
+    """Replace a named RustFS policy with its checked-in JSON document."""
     query = urllib.parse.urlencode({"name": name})
-    admin_request(
-        "PUT", f"/rustfs/admin/v3/add-canned-policy?{query}", path.read_bytes()
-    )
+    admin_request("PUT", f"add-canned-policy?{query}", path.read_bytes())
 
 
 def attach_policy(name: str, access_key: str) -> None:
+    """Make one named policy authoritative for a provisioned identity."""
     body = json.dumps({"policies": [name], "user": access_key}).encode()
-    admin_request("POST", "/rustfs/admin/v3/idp/builtin/policy/attach", body)
+    admin_request("POST", "idp/builtin/policy/attach", body)
 
 
 def wait_for_rustfs() -> None:
+    """Wait up to one minute for the S3 plane and ensure the bucket exists."""
+
     # Compose only guarantees process start; IAM initialization must wait for the S3 plane.
     deadline = time.monotonic() + 60
     while True:
@@ -110,6 +134,8 @@ def wait_for_rustfs() -> None:
 
 
 def main() -> None:
+    """Provision the three runtime identities and their disjoint object prefixes."""
+
     integration_access_key = os.environ.get(
         "SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY", "sec-review-integration"
     )
@@ -118,7 +144,10 @@ def main() -> None:
     )
     integration_secret_key = required_env("SEC_REVIEW_INTEGRATION_S3_SECRET_KEY")
     runner_secret_key = required_env("SEC_REVIEW_RUNNER_S3_SECRET_KEY")
-    publisher_access_key = os.environ.get("SEC_REVIEW_ARTIFACT_PUBLISHER_S3_ACCESS_KEY", "sec-review-artifact-publisher")
+    publisher_access_key = os.environ.get(
+        "SEC_REVIEW_ARTIFACT_PUBLISHER_S3_ACCESS_KEY",
+        "sec-review-artifact-publisher",
+    )
     publisher_secret_key = required_env("SEC_REVIEW_ARTIFACT_PUBLISHER_S3_SECRET_KEY")
     policy_root = Path("/policies")
 

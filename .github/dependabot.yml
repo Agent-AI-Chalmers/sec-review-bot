@@ -47,6 +47,13 @@ updates:
           - "temporalio"
           - "opentelemetry-*"
 
+  - package-ecosystem: "pip"
+    directory: "/ops/rustfs-init"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "Asia/Shanghai"
+
   - package-ecosystem: "npm"
     directory: "/control-plane"
     schedule:

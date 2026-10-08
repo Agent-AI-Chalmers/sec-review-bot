@@ -28,7 +28,7 @@ dist-ssr
 .env
 *.pem
 agents/config/model-providers.toml
-deploy/systemd/deployment.env
+ops/systemd/deployment.env
 
 # workdir
 .agent-workspace

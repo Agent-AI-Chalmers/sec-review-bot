@@ -1,7 +1,7 @@
 .git
 .env
 *.pem
-deploy/systemd/deployment.env
+ops/systemd/deployment.env
 .venv
 node_modules
 apps/*/node_modules

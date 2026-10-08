@@ -114,9 +114,9 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 cp compose.env.sample .env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
-cp deploy/systemd/deployment.env.sample deploy/systemd/deployment.env
+cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
 # 填好 .env、agents/config/model-providers.toml、apps/github-integration/.env 和
-# deploy/systemd/deployment.env，并把私钥放到 apps/github-integration/private-key.pem
+# ops/systemd/deployment.env，并把私钥放到 apps/github-integration/private-key.pem
 ```
 
 构建控制平面镜像并安装集成服务：
@@ -126,7 +126,7 @@ cd agents
 uv sync --frozen --no-dev
 cd ..
 docker compose --profile app build
-sudo deploy/systemd/install.sh "$USER"
+sudo ops/systemd/install.sh "$USER"
 sudo systemctl enable --now sec-review-bot.target
 ```
 
