@@ -7,6 +7,7 @@
   --border: #dfe1e5;
   --muted: #5f6368;
   --link: #0759b8;
+  --text: #202124;
 }
 [data-theme='dark'] {
   color: #e8eaed;
@@ -16,6 +17,7 @@
   --border: #4a4d52;
   --muted: #bdc1c6;
   --link: #8ab4f8;
+  --text: #e8eaed;
 }
 /* Color-vision mode supplements status colors with a distinguishable palette;
    status labels remain visible so color is never the only signal. */
@@ -40,6 +42,31 @@
 body {
   margin: 0;
 }
+.app-bar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(10px);
+}
+.app-bar-inner {
+  display: flex;
+  min-height: 58px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.brand {
+  color: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+}
 main {
   max-width: 1100px;
   margin: 0 auto;
@@ -56,14 +83,18 @@ header {
   gap: 16px;
   margin-bottom: 24px;
 }
-.header-actions {
-  display: flex;
-  align-items: end;
-  gap: 10px;
-}
 .preferences {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+.preferences label {
+  grid-template-columns: auto minmax(88px, auto);
+  align-items: center;
+  gap: 6px;
+}
+.preferences select {
+  min-height: 34px;
 }
 .eyebrow {
   color: var(--muted);
@@ -125,6 +156,7 @@ a {
 }
 .status {
   display: inline-block;
+  align-self: flex-start;
   border: 1px solid #b8bdc5;
   border-radius: 4px;
   padding: 3px 7px;
@@ -182,14 +214,37 @@ pre {
   main {
     padding: 20px 16px;
   }
+  .app-bar-inner {
+    min-height: auto;
+    padding: 10px 16px;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .brand {
+    font-size: 14px;
+  }
   header,
   .filters {
     align-items: stretch;
     flex-direction: column;
   }
-  .header-actions,
   .preferences {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .preferences label {
+    display: block;
+    color: transparent;
+    font-size: 0;
+  }
+  .preferences select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    color: var(--text);
+    font-size: 13px;
   }
   h1 {
     font-size: 20px;

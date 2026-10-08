@@ -75,10 +75,7 @@ function Runs(): React.JSX.Element {
           <p className="eyebrow">Review Control Plane</p>
           <h1>{t('runs')}</h1>
         </div>
-        <div className="header-actions">
-          <PreferenceControls />
-          <button onClick={refresh}>{t('refresh')}</button>
-        </div>
+        <button onClick={refresh}>{t('refresh')}</button>
       </header>
       <section className="filters" aria-label="Run filters">
         <label>
@@ -286,13 +283,23 @@ function ErrorFallback(): React.JSX.Element {
 }
 function App(): React.JSX.Element {
   return (
-    <ErrorBoundary>
-      <Routes>
-        <Route path="/runs" element={<Runs />} />
-        <Route path="/runs/:runId" element={<Detail />} />
-        <Route path="*" element={<Runs />} />
-      </Routes>
-    </ErrorBoundary>
+    <>
+      <div className="app-bar">
+        <div className="app-bar-inner">
+          <Link className="brand" to="/runs">
+            Review Control Plane
+          </Link>
+          <PreferenceControls />
+        </div>
+      </div>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/runs" element={<Runs />} />
+          <Route path="/runs/:runId" element={<Detail />} />
+          <Route path="*" element={<Runs />} />
+        </Routes>
+      </ErrorBoundary>
+    </>
   )
 }
 createRoot(document.getElementById('root')!).render(
