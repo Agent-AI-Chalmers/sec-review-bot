@@ -33,6 +33,21 @@
     "published_at": { "type": ["string", "null"], "format": "date-time" },
     "failure_code": { "type": ["string", "null"] },
     "artifact_publication": { "type": ["object", "null"] },
-    "publication_steps": { "type": "array" }
+    "publication_steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step_key", "status", "failure_count", "failure_code"],
+        "properties": {
+          "step_key": { "type": "string", "minLength": 1 },
+          "status": {
+            "enum": ["pending", "running", "succeeded", "failed", "terminal_failed"]
+          },
+          "failure_count": { "type": "integer", "minimum": 0 },
+          "failure_code": { "type": ["string", "null"] }
+        }
+      }
+    }
   }
 }

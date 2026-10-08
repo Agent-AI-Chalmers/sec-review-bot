@@ -68,7 +68,7 @@ flowchart LR
     steppending[pending] --> runningstep[running] --> succeeded
     runningstep --> stepfailed[failed]
     stepfailed --> runningstep
-    stepfailed -->|重试耗尽| terminalfailed[terminal_failed]
+    stepfailed -->|达到失败次数上限| terminalfailed[terminal_failed]
   end
 
   runnersucceeded -.->|result 变为可领取| pending
@@ -76,6 +76,8 @@ flowchart LR
 ```
 
 `ReviewRunStatus` 是读取投影，不是数据库字段。Publication 为 `pending` 或 `not_required` 时，它显示 Runner 状态；之后显示 `publishing`、`published` 或 publication `failed`。Publication step 状态需要单独查询。
+
+`publication_steps.failure_count` 只记录失败的执行。成功执行不会增加该值；失败步骤达到配置的失败次数上限后进入 `terminal_failed`。
 
 ## Claim 和恢复
 

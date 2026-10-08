@@ -107,7 +107,7 @@ CREATE TABLE publication_steps (
   run_id text NOT NULL REFERENCES review_runs(run_id) ON DELETE CASCADE,
   step_key text NOT NULL,
   status text NOT NULL CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'terminal_failed')),
-  attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  failure_count integer NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
   remote_object_id text,
   remote_object_url text,
   failure_code text,
@@ -127,7 +127,7 @@ COMMENT ON COLUMN publication_steps.step_key IS
   'Stable connector-defined identity of one publication side effect within the run.';
 COMMENT ON COLUMN publication_steps.status IS
   'Step lifecycle; terminal_failed means the retry budget was exhausted or retry was explicitly forbidden.';
-COMMENT ON COLUMN publication_steps.attempts IS
+COMMENT ON COLUMN publication_steps.failure_count IS
   'Number of failed executions recorded for this step; successful claims do not increment it.';
 COMMENT ON COLUMN publication_steps.remote_object_id IS
   'Stable identifier returned by the external system after the side effect succeeds, used for reconciliation.';

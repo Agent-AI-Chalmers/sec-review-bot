@@ -189,7 +189,7 @@ function Runs(): React.JSX.Element {
 interface Step {
   step_key: string
   status: string
-  attempts: number
+  failure_count: number
   failure_code: string | null
 }
 function Detail(): React.JSX.Element {
@@ -295,7 +295,7 @@ function Detail(): React.JSX.Element {
                           <Table.Th w="36%">{t('step')}</Table.Th>
                           <Table.Th w="24%">{t('status')}</Table.Th>
                           <Table.Th w="16%" ta="right">
-                            {t('attempts')}
+                            {t('failureCount')}
                           </Table.Th>
                           <Table.Th w="24%">{t('failure')}</Table.Th>
                         </Table.Tr>
@@ -313,7 +313,7 @@ function Detail(): React.JSX.Element {
                               </Badge>
                             </Table.Td>
                             <Table.Td ta="right" ff="monospace">
-                              {step.attempts}
+                              {step.failure_count}
                             </Table.Td>
                             <Table.Td>{step.failure_code ?? '—'}</Table.Td>
                           </Table.Tr>

@@ -34,7 +34,7 @@ function step(
   return {
     step_key,
     status: 'pending',
-    attempts: 0,
+    failure_count: 0,
     remote_object_id: null,
     remote_object_url: null,
     failure_code: null,
@@ -50,7 +50,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
       remote_object_id: '11',
       remote_object_url: 'https://example.test/pull/11'
     }),
-    step('repository:delivery:delivery-b', { status: 'failed', attempts: 1 })
+    step('repository:delivery:delivery-b', { status: 'failed', failure_count: 1 })
   ]
   const claimed: string[] = []
   const completed: string[] = []
@@ -166,7 +166,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
   const steps = [
     step('repository:delivery:delivery-a', {
       status: 'terminal_failed',
-      attempts: 1,
+      failure_count: 1,
       failure_code: 'GITHUB_VALIDATION_REJECTED'
     }),
     step('repository:delivery:delivery-b')

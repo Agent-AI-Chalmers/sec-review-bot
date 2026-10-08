@@ -395,6 +395,8 @@ test('ReviewRunStore does not publish while a required step is incomplete', asyn
     const token = await store.claimPublication(runId)
     assert.ok(token)
     await store.initializePublicationSteps(runId, token, ['issue:summary-comment'])
+    const [step] = await store.listPublicationSteps(runId)
+    assert.equal(step?.failure_count, 0)
     assert.equal(await store.completePublication(runId, token), false)
     assert.equal((await store.getRun(runId))?.status, 'publishing')
   } finally {
@@ -467,6 +469,7 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
         }),
         true
       )
+      assert.equal((await store.listPublicationSteps(runId))[0]?.failure_count, attempt + 1)
       assert.equal(
         await store.failPublication(
           runId,
@@ -487,7 +490,9 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
         'code' in error &&
         error.code === 'PUBLICATION_STEP_RETRY_EXHAUSTED'
     )
-    assert.equal((await store.listPublicationSteps(runId))[0]?.status, 'terminal_failed')
+    const [step] = await store.listPublicationSteps(runId)
+    assert.equal(step?.status, 'terminal_failed')
+    assert.equal(step?.failure_count, 3)
   } finally {
     await store.close()
   }
