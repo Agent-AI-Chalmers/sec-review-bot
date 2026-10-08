@@ -388,6 +388,20 @@ test('ReviewRunStore fences a stale publisher after another connection takes ove
   }
 })
 
+test('ReviewRunStore does not publish while a required step is incomplete', async () => {
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await store.initializePublicationSteps(runId, token, ['issue:summary-comment'])
+    assert.equal(await store.completePublication(runId, token), false)
+    assert.equal((await store.getRun(runId))?.status, 'publishing')
+  } finally {
+    await store.close()
+  }
+})
+
 test('ReviewRunStore spends retry budget only for the current publication owner', async () => {
   const store = await createStore()
   const runId = await createSuccessfulRun(store)

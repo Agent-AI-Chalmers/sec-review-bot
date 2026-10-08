@@ -600,17 +600,25 @@ export class ReviewRunStore {
   }
   async failRunnerExecution(
     runId: string,
-    error: { code?: string | null; message: string }
+    error: { code?: string | null; message: string },
+    publication?: RunnerArtifactPublication
   ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const run = await client.query(
         `
         UPDATE review_runs
         SET runner_status='failed', runner_failure_code=$3,
-            runner_failure_message=$4, updated_at=clock_timestamp()
+            runner_failure_message=$4, artifact_publication=$5::jsonb,
+            updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
       `,
-        [runId, this.connectorId, error.code ?? null, error.message]
+        [
+          runId,
+          this.connectorId,
+          error.code ?? null,
+          error.message,
+          publication === undefined ? null : JSON.stringify(publication)
+        ]
       )
       if (run.rowCount !== 1) return false
       // A terminal Runner failure has no result to publish. Keep the publication
@@ -696,6 +704,10 @@ export class ReviewRunStore {
       SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2
         AND status='publishing' AND claim_token=$3
+        AND NOT EXISTS (
+          SELECT 1 FROM publication_steps
+          WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded'
+        )
     `,
       [runId, this.connectorId, token]
     )

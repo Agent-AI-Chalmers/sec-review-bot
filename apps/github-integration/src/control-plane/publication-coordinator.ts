@@ -149,8 +149,32 @@ export async function publishReviewRunsOnce({
       work,
       async (assertOwned) => await publishWork(app, store, work, assertOwned)
     )
-    if (!ownsClaim || !(await store.completePublication(work.run_id, work.claim_token))) {
+    if (!ownsClaim) {
       logWarn('review_publication_claim_lost', { run_id: work.run_id, workflow: work.workflow })
+      return
+    }
+    if (!(await store.completePublication(work.run_id, work.claim_token))) {
+      const committed = await store.failPublication(
+        work.run_id,
+        work.claim_token,
+        {
+          code: 'PUBLICATION_STEPS_INCOMPLETE',
+          message: 'Publication completed without all required steps succeeding.'
+        },
+        { retry: false }
+      )
+      if (!committed)
+        logWarn('review_publication_claim_lost', {
+          run_id: work.run_id,
+          workflow: work.workflow
+        })
+      else
+        logError('review_publication_failed', {
+          run_id: work.run_id,
+          workflow: work.workflow,
+          retry: false,
+          claim_committed: true
+        })
       return
     }
     logInfo('review_publication_completed', { run_id: work.run_id, workflow: work.workflow })

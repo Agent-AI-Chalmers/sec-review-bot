@@ -24,11 +24,8 @@ function store(events: unknown[][]): Parameters<typeof observeRunnerRun>[0] {
       events.push(['succeeded', id, result, artifact])
       return true
     },
-    async recordArtifactPublication(id, artifact) {
-      events.push(['artifact', id, artifact])
-    },
-    async failRunnerExecution(id, failure) {
-      events.push(['failed', id, failure])
+    async failRunnerExecution(id, failure, artifact) {
+      events.push(['failed', id, failure, artifact])
       return true
     }
   }
@@ -100,6 +97,29 @@ test('terminal polling failure fails the run without publication', async () => {
     'failed'
   )
   assert.deepEqual(events, [
-    ['failed', 'run-1', { code: 'RUNNER_RUN_NOT_FOUND', message: 'missing' }]
+    ['failed', 'run-1', { code: 'RUNNER_RUN_NOT_FOUND', message: 'missing' }, undefined]
+  ])
+})
+
+test('Runner failure records its artifact atomically with the terminal failure', async () => {
+  const events: unknown[][] = []
+  const artifact = { status: 'failed' as const, error: 'upload failed' }
+  assert.equal(
+    await observeRunnerRun(
+      store(events),
+      run,
+      async () => ({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'failed',
+        artifact_publication: artifact,
+        error: { code: 'RUNNER_FAILED', message: 'failed' }
+      }),
+      () => false
+    ),
+    'failed'
+  )
+  assert.deepEqual(events, [
+    ['failed', 'run-1', { code: 'RUNNER_FAILED', message: 'failed' }, artifact]
   ])
 })

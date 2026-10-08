@@ -3,7 +3,7 @@ import type { RunnerRunStatus } from './runner-client.js'
 
 type ObservationStore = Pick<
   ReviewRunStore,
-  'markRunning' | 'recordRunnerSuccess' | 'recordArtifactPublication' | 'failRunnerExecution'
+  'markRunning' | 'recordRunnerSuccess' | 'failRunnerExecution'
 >
 export type RunnerObservationResult = 'active' | 'succeeded' | 'failed' | 'poll_retry'
 export interface RunnerObservationEvent {
@@ -69,8 +69,7 @@ export async function observeRunnerRun(
   }
   if (status.status !== 'succeeded' && status.status !== 'failed') return 'active'
   if (status.status === 'failed') {
-    await store.recordArtifactPublication(run.run_id, status.artifact_publication)
-    await store.failRunnerExecution(
+    const recorded = await store.failRunnerExecution(
       run.run_id,
       status.error === undefined
         ? {
@@ -80,8 +79,10 @@ export async function observeRunnerRun(
         : {
             code: status.error.code ?? 'RUNNER_EXECUTION_FAILED',
             message: status.error.message ?? 'Runner execution failed.'
-          }
+          },
+      status.artifact_publication
     )
+    if (!recorded) return 'failed'
     onEvent({
       kind: 'runner_terminal_recorded',
       run_id: run.run_id,
