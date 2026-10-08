@@ -4,13 +4,13 @@ set -eu
 # Installation writes to /etc and normalizes repository state ownership. The
 # service itself still runs as the unprivileged user passed by the operator.
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Run this installer as root: sudo deploy/systemd/install.sh <service-user>" >&2
+    echo "Run this installer as root: sudo ops/systemd/install.sh <service-user>" >&2
     exit 1
 fi
 
 service_user=${1:-}
 if [ -z "$service_user" ]; then
-    echo "Usage: sudo deploy/systemd/install.sh <service-user>" >&2
+    echo "Usage: sudo ops/systemd/install.sh <service-user>" >&2
     exit 1
 fi
 if ! id "$service_user" >/dev/null 2>&1; then

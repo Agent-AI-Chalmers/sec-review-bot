@@ -108,7 +108,7 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 - 根目录 `.env`：Compose 控制平面；
 - `apps/github-integration/.env`：GitHub integration；
 - `agents/config/model-providers.toml`：模型 deployment；
-- `deploy/systemd/deployment.env`：安装前的 systemd 部署配置。
+- `ops/systemd/deployment.env`：安装前的 systemd 部署配置。
 
 安装脚本会将这些设置与当前 checkout 推导出的路径合并，并把 systemd service 实际使用的配置写入 `/etc/sec-review-bot/deployment.env`。
 
@@ -118,11 +118,11 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 cp compose.env.sample .env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
-cp deploy/systemd/deployment.env.sample deploy/systemd/deployment.env
+cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
 chmod 600 .env \
   agents/config/model-providers.toml \
   apps/github-integration/.env \
-  deploy/systemd/deployment.env
+  ops/systemd/deployment.env
 ```
 
 Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据和模型 deployment 凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
@@ -175,15 +175,15 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd 集成服务配置
 
-`deploy/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取安装后的文件。
+`ops/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取安装后的文件。
 
 `SEC_REVIEW_BOT_DIR` 和 `SEC_REVIEW_AGENTS_DIR` 由安装脚本负责，不要把它们加入可编辑的源文件。安装脚本会删除旧值，并根据自身所在的仓库重新生成。Input archive 改由 RustFS 交换，因此 integration 容器和宿主 worker 不再共享 `.agent-input-bundles`。
 
 安装脚本还会生成内部使用的 `SEC_REVIEW_SERVICE_UID` 和 `SEC_REVIEW_SERVICE_GID`。在 Compose 启动前，它会为该 service user 创建仓库内的状态目录。这样可以避免 Docker 自动创建无法由非 root 容器写入的 root-owned bind mount 源目录，并让 Temporal 容器以同一用户写入 SQLite 数据库。
 
-运行时解包的输入和生成的 artifact 默认分别写入当前 checkout 的 `.agent-run-inputs` 与 `.agent-artifacts`，模型配置默认读取 `agents/config/model-providers.toml`。大多数部署应保留这些默认值。如果需要移动这些目录或从其他位置读取模型配置，可以在 `deploy/systemd/deployment.env` 中填写绝对路径 `SEC_REVIEW_AGENT_RUN_INPUT_ROOT`、`SEC_REVIEW_AGENT_ARTIFACT_ROOT` 或 `MODEL_PROVIDERS_CONFIG_TOML`；安装脚本会保留这些独立 worker 路径的非空 override。
+运行时解包的输入和生成的 artifact 默认分别写入当前 checkout 的 `.agent-run-inputs` 与 `.agent-artifacts`，模型配置默认读取 `agents/config/model-providers.toml`。大多数部署应保留这些默认值。如果需要移动这些目录或从其他位置读取模型配置，可以在 `ops/systemd/deployment.env` 中填写绝对路径 `SEC_REVIEW_AGENT_RUN_INPUT_ROOT`、`SEC_REVIEW_AGENT_ARTIFACT_ROOT` 或 `MODEL_PROVIDERS_CONFIG_TOML`；安装脚本会保留这些独立 worker 路径的非空 override。
 
-如果 [`deploy/systemd/deployment.env.sample`](../../deploy/systemd/deployment.env.sample) 新增了选项，需要手动把相关选项加入 `deploy/systemd/deployment.env`。
+如果 [`ops/systemd/deployment.env.sample`](../../ops/systemd/deployment.env.sample) 新增了选项，需要手动把相关选项加入 `ops/systemd/deployment.env`。
 
 核心字段：
 
@@ -203,7 +203,7 @@ Runner service 通过 Compose 使用独立的 artifact-publisher 凭据，只能
 
 #### Langfuse tracing
 
-[Langfuse](https://langfuse.com/docs) 是可选的外部可观测性服务，不属于本仓库的 Compose 控制平面。可以使用 [Langfuse Cloud](https://cloud.langfuse.com)，也可以单独运行[自托管 Langfuse](https://langfuse.com/self-hosting)。在 Langfuse 中创建 project 和 API keys 后，把下面三项一起写入 `deploy/systemd/deployment.env`，再重新运行安装脚本：
+[Langfuse](https://langfuse.com/docs) 是可选的外部可观测性服务，不属于本仓库的 Compose 控制平面。可以使用 [Langfuse Cloud](https://cloud.langfuse.com)，也可以单独运行[自托管 Langfuse](https://langfuse.com/self-hosting)。在 Langfuse 中创建 project 和 API keys 后，把下面三项一起写入 `ops/systemd/deployment.env`，再重新运行安装脚本：
 
 ```bash
 LANGFUSE_PUBLIC_KEY=your_public_key
@@ -278,10 +278,10 @@ docker info
 docker compose --profile app build
 ```
 
-检查 `deploy/systemd/deployment.env` 后，安装 systemd units。参数指定实际运行 Compose 和 worker 的普通宿主机用户：
+检查 `ops/systemd/deployment.env` 后，安装 systemd units。参数指定实际运行 Compose 和 worker 的普通宿主机用户：
 
 ```bash
-sudo deploy/systemd/install.sh "$USER"
+sudo ops/systemd/install.sh "$USER"
 ```
 
 启动完整集成服务，并配置为随系统启动：
@@ -329,7 +329,7 @@ docker compose --profile app build
 sudo systemctl restart sec-review-bot.target
 ```
 
-修改 `deploy/systemd` 下的安装文件后，先重新运行安装脚本，再重启服务。
+修改 `ops/systemd` 下的安装文件后，先重新运行安装脚本，再重启服务。
 
 验证 Runner Service：
 
@@ -444,5 +444,5 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 - Repository dispatch 鉴权失败：确认 workflow 配置了 `id-token: write`，请求了 `sec-review-bot` OIDC audience，并且 workflow 路径是 `.github/workflows/sec-review-bot.yml`。
 - Run 一直处于 queued：确认至少有一个宿主机 worker 正在运行，并与 Runner Service 使用相同的 `TEMPORAL_TASK_QUEUE`。
 - Worker 读不到 input bundle：检查 RustFS endpoint，并确认安装后的 worker 凭据与 Compose 初始化的只读凭据一致。
-- Worker 把 artifact 写到其他位置：检查 `deploy/systemd/deployment.env` 中可选的 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override，再重新运行 `sudo deploy/systemd/install.sh "$USER"`。
+- Worker 把 artifact 写到其他位置：检查 `ops/systemd/deployment.env` 中可选的 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override，再重新运行 `sudo ops/systemd/install.sh "$USER"`。
 - LLM 调用在 workflow 推进前失败：进入 `agents/` 后运行 `uv run sec-review-agents-check-llm-deployments --fail-fast`。

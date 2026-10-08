@@ -114,9 +114,9 @@ Create the integrated deployment configuration:
 cp compose.env.sample .env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 cp apps/github-integration/.env.sample apps/github-integration/.env
-cp deploy/systemd/deployment.env.sample deploy/systemd/deployment.env
+cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
 # Fill .env, agents/config/model-providers.toml, apps/github-integration/.env,
-# and deploy/systemd/deployment.env, then place the private key at
+# and ops/systemd/deployment.env, then place the private key at
 # apps/github-integration/private-key.pem.
 ```
 
@@ -127,7 +127,7 @@ cd agents
 uv sync --frozen --no-dev
 cd ..
 docker compose --profile app build
-sudo deploy/systemd/install.sh "$USER"
+sudo ops/systemd/install.sh "$USER"
 sudo systemctl enable --now sec-review-bot.target
 ```
 
