@@ -4,11 +4,7 @@ import tsPlugin from '@typescript-eslint/eslint-plugin'
 
 export default [
   {
-    ignores: [
-      'dist/**',
-      'node_modules/**',
-      '.agent-input-bundles/**'
-    ]
+    ignores: ['dist/**', 'node_modules/**', '.agent-input-bundles/**']
   },
   js.configs.recommended,
   {
@@ -44,9 +40,9 @@ export default [
       ...tsPlugin.configs.recommended.rules,
       '@typescript-eslint/ban-ts-comment': 'off',
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
-      'quotes': ['error', 'single', { 'avoidEscape': true }],
-      'semi': ['error', 'never'],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      quotes: ['error', 'single', { avoidEscape: true }],
+      semi: ['error', 'never'],
       'comma-dangle': ['error', 'never'],
       'eol-last': ['error', 'always']
     }

@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       github-integration: ${{ steps.filter.outputs.github-integration }}
+      control-plane-ui: ${{ steps.filter.outputs.control-plane-ui }}
       agents: ${{ steps.filter.outputs.agents }}
       scripts: ${{ steps.filter.outputs.scripts }}
       documentation: ${{ steps.filter.outputs.documentation }}
@@ -41,6 +42,10 @@ jobs:
           filters: |
             github-integration:
               - 'apps/github-integration/**'
+              - 'control-plane/**'
+              - '.github/workflows/ci.yml'
+            control-plane-ui:
+              - 'apps/control-plane-ui/**'
               - '.github/workflows/ci.yml'
             agents:
               - 'agents/**'
@@ -122,28 +127,78 @@ jobs:
           node-version-file: apps/github-integration/package.json
           check-latest: true
           cache: pnpm
-          cache-dependency-path: apps/github-integration/pnpm-lock.yaml
+          cache-dependency-path: |
+            apps/github-integration/pnpm-lock.yaml
+            control-plane/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm --dir ../../control-plane install --frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm run lint
+        run: |
+          pnpm run format:check
+          pnpm run lint
+
+      - name: Check Control Plane
+        run: |
+          pnpm --dir ../../control-plane run format:check
+          pnpm --dir ../../control-plane run lint
+          pnpm --dir ../../control-plane run typecheck
+          pnpm --dir ../../control-plane test
 
       - name: Typecheck
         run: pnpm run typecheck
 
       - name: Test
-        env:
-          TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
-          DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
         run: pnpm test
 
       - name: Integration test
         env:
           TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
-          DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
-        run: pnpm run test:integration
+        run: |
+          pnpm --dir ../../control-plane run test:integration
+          pnpm run test:integration
+
+  control-plane-ui:
+    name: Control Plane UI
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.control-plane-ui == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/control-plane-ui
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: apps/control-plane-ui/package.json
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: apps/control-plane-ui/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: apps/control-plane-ui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
+          pnpm run build
 
   agents:
     name: Agents
@@ -285,6 +340,7 @@ jobs:
       - changes
       - automation-config
       - github-integration
+      - control-plane-ui
       - agents
       - scripts
       - documentation
@@ -296,6 +352,7 @@ jobs:
         env:
           AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
+          CONTROL_PLANE_UI_RESULT: ${{ needs.control-plane-ui.result }}
           AGENTS_RESULT: ${{ needs.agents.result }}
           SCRIPTS_RESULT: ${{ needs.scripts.result }}
           DOCUMENTATION_RESULT: ${{ needs.documentation.result }}
@@ -304,6 +361,7 @@ jobs:
           for result in \
             "$AUTOMATION_CONFIG_RESULT" \
             "$GITHUB_INTEGRATION_RESULT" \
+            "$CONTROL_PLANE_UI_RESULT" \
             "$AGENTS_RESULT" \
             "$SCRIPTS_RESULT" \
             "$DOCUMENTATION_RESULT"; do

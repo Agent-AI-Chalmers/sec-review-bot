@@ -74,6 +74,10 @@ The main public workflow IDs are `issue-review`, `pull-request-review`, and `rep
 - [CVSSV4.md](workflows/repository-review/CVSSV4.md): CVSS v4 scoring.
 - [CONCURRENCY_AND_FAILURES.md](workflows/repository-review/CONCURRENCY_AND_FAILURES.md): Repository review concurrency and failure boundaries.
 
+### architecture/
+
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Runtime entities, end-to-end data flow, cross-service contracts, sources of truth, and credential ownership.
+
 ### operations/
 
 Use these docs when running the system locally or wiring GitHub webhooks:

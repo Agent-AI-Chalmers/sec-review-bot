@@ -7,7 +7,7 @@ interface InstallationAppStubOptions {
   expected_repo?: string
 }
 
-export function appWithInstallationOctokit ({
+export function appWithInstallationOctokit({
   installation_octokit,
   installation_id = 123,
   expected_owner,
@@ -17,7 +17,7 @@ export function appWithInstallationOctokit ({
     octokit: {
       rest: {
         apps: {
-          getRepoInstallation: async ({ owner, repo }: { owner: string, repo: string }) => {
+          getRepoInstallation: async ({ owner, repo }: { owner: string; repo: string }) => {
             if (expected_owner !== undefined && owner !== expected_owner) {
               throw new Error(`Unexpected installation owner: ${owner}`)
             }

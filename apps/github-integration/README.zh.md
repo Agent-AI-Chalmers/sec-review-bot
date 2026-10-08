@@ -6,45 +6,47 @@
 
 这个 package 是项目里的 GitHub integration service。
 
-它不直接执行 agent workflow；它负责准备输入、提交 runner run、轮询结果，并把结果发布回 GitHub。
+它不直接执行 agent workflow；它负责准备输入，通过 Control Plane 提交和观察 review run，并把终态结果发布回 GitHub。
 
 ## 安装
 
-在 `apps/github-integration/` 目录运行：
+本地开发时，在仓库根目录安装 Control Plane 服务和 integration 的依赖：
 
 ```bash
 corepack enable pnpm
-pnpm install
+pnpm --dir control-plane install
+pnpm --dir apps/github-integration install
 ```
 
 请使用 Node 24.x。
 
-> *Node 24 是当前 package 的 LTS 基线。[Node.js release schedule](https://github.com/nodejs/Release#release-schedule) 当前把 Node 26 的 Active LTS start 列为 2026-10-28；到那之后，可以评估把默认 runtime 切到 Node 26。*
+> _Node 24 是当前 package 的 LTS 基线。[Node.js release schedule](https://github.com/nodejs/Release#release-schedule) 当前把 Node 26 的 Active LTS start 列为 2026-10-28；到那之后，可以评估把默认 runtime 切到 Node 26。_
 
 ## 命令
 
 ```bash
 pnpm run dev
 pnpm run server
+pnpm run format:check
 pnpm run lint
 pnpm run build
 pnpm test
 ```
 
-`pnpm test` 运行不依赖外部服务的测试。依赖 PostgreSQL 的 runner 测试单独放在集成测试套件中：
+`pnpm test` 运行不依赖外部服务的测试。集成测试使用 Control Plane 测试数据库验证 publisher 边界：
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
-DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
 pnpm run test:integration
 ```
-
 
 ## 本地接收端
 
 完整 review 还需要 runner service 和 worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub integration service。
 
-非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET` 和 `AGENT_RUNNER_SERVICE_URL`。任何非 loopback runner service URL，或 runner service 要求 token 时，都需要设置 `AGENT_RUNNER_SERVICE_TOKEN`。
+非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET`、`CONTROL_PLANE_SERVICE_URL` 和 `CONTROL_PLANE_SERVICE_TOKEN`。
+
+`CONTROL_PLANE_REQUEST_TIMEOUT_MS` 限制每次 Control Plane RPC 的最长等待时间，默认 30 秒。publication lease 续租失败或超时会被视为 ownership 已丢失：publisher 不再启动新的 GitHub mutation，而是等待 lease takeover 恢复。
 
 ```bash
 pnpm run server
@@ -90,7 +92,7 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
 - 准备 issue / pull request review input
 - 准备 repository review input
 
-- 调用 HTTP Agent Runner Service
+- 向 Control Plane 提交已准备的输入并领取发布任务
 - 把结构化结果发布回 GitHub
 
 ## 目录
@@ -99,10 +101,12 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
   - `reviews/issues/` - issue review
   - `reviews/pull-requests/` - PR review、建议评论
   - `reviews/repositories/` - repository review、摘要 issue 与修复 draft PR
-- `infrastructure/runner/` - HTTP runner client、runner input 类型、input bundle manifest / workspace helper、PostgreSQL 协调状态、后台 publisher
-- `infrastructure/github/` - GitHub API 薄封装和 webhook 辅助函数
-- `interfaces/` - HTTP、GitHub Actions 和 GitHub webhook adapter
-- `triggers/` - 把 webhook / Actions / comment 请求转换为 runner review run
+- `github/` - GitHub API 薄封装和 webhook 辅助函数
+- `control-plane/` - Control Plane client、claim 处理与发布协调
+- `runner/` - 此 connector 消费的 Runner input、result 与错误契约
+- `artifacts/` - input bundle 存储与 Git workspace 准备
+- `ingress/` - HTTP、GitHub Actions 和 GitHub webhook 的入站处理
+- `triggers/` - 把 webhook / Actions / comment 请求转换为提交给 Control Plane 的 review 请求
 - `utils/` - 轻量日志与辅助函数
 
 ## 触发
@@ -138,7 +142,7 @@ sec_review_bot:
 
 说明：
 
-- [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) 仅用于 GitHub Actions 调度，不再承载 bot 的运行配置。
+- [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) 只包含 GitHub Actions 调度；bot 运行配置属于 `.sec-review-bot.yml`。
 - 如果 [`.github/sec-review-bot.yml`](../../.github/sec-review-bot.yml) 文件不存在，默认行为是 `trigger_mode: manual_only`。
 - 如果配置文件存在但 YAML 非法、缺少 `sec_review_bot.trigger_mode` 或值不在允许集合内，自动 webhook 会严格报错并失败（不会静默降级）。
 - `paths_ignore` 仅影响 repository-review 的 discovery 文件扫描；不影响 PR/Issue webhook 触发判定本身。
@@ -203,80 +207,8 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 
 补充说明：
 
-- comment 手动命令目前只支持普通 issue comment 和 pull request 页面 Conversation 标签下的 comment
-- 暂不支持：Files changed 页面里的评论和 Submit review 时提交的 review 评论。
-
-## Review 生命周期
-
-Webhook 或 Actions dispatch 只等待 integration 完成校验并持久化接纳请求。Workspace 准备、agent 执行和 GitHub 发布都在入口请求路径之外继续进行。
-
-```mermaid
-flowchart LR
-  ingress[GitHub webhook 事件或 Actions HTTP 请求]
-  subgraph integration[GitHub integration]
-    admission[校验并持久化接纳]
-    preparation[准备 workspace 和 runner input]
-    publication[轮询、校验并发布结果]
-    admission --> preparation
-  end
-  ingress --> admission
-  admission -.-> acknowledgement[Webhook 成功响应<br/>或 Actions 202 Accepted]
-  preparation --> runner[Python Runner 和 Temporal<br/>执行 agent workflow]
-  runner --> publication
-  publication --> output[GitHub issue、comment、review 或 pull request]
-```
-
-GitHub integration 负责完整的 `review_runs` 生命周期。Python 和 Temporal 负责执行 agent workflow，但不负责 GitHub 发布状态。
-
-### 数据库 schema 版本
-
-PostgreSQL schema 变更位于 `infrastructure/runner/database/schema-versions`。已执行版本及其 SHA-256 checksum 记录在 `schema_versions`。不要修改已经执行过的版本文件；应新增下一个编号的 SQL 文件，并在 `schema-version-runner.ts` 中注册。应用启动时使用 PostgreSQL advisory lock 串行执行 schema 变更；如果文件 checksum 与数据库账本不一致，应用会拒绝启动。
-
-### 接纳与重放身份
-
-Webhook 使用 GitHub Delivery ID；Actions dispatch 使用 OIDC 验证的 repository 和 `correlation_id`（当前为 `GITHUB_RUN_ID`）。入口身份写入 `review_runs`，并映射到唯一 `run_id`。
-
-对于 Actions dispatch，HTTP `202 Accepted` 只表示 integration 已经校验并持久化请求；它不表示 agent workflow 或 GitHub 发布已经完成。Webhook 的成功响应也只表示同一件事。
-
-状态分别记录在以下三张表中：
-
-| 表 | 记录内容 | 状态 |
-| --- | --- | --- |
-| `review_runs` | Runner 观察 | `preparing`、`recovering`、`queued`、`running`、`failed` |
-| `publications` | 发布占用 | `pending`、`publishing`、`published`、`failed`、`not_required` |
-| `publication_steps` | 单个 GitHub 副作用 | `pending`、`running`、`succeeded`、`failed`、`terminal_failed` |
-
-`ReviewRunStatus` 是 store 的合并投影：publication 开始前显示 Runner 状态，之后显示 publication 状态。它不是数据库字段；step 状态不并入其中。
-
-```mermaid
-flowchart LR
-  preparing --> queued --> running --> publishing --> published
-  preparing --> failed
-  failed -->|提交状态不确定| recovering
-  recovering --> queued
-  queued --> failed
-  running --> failed
-  publishing -->|确定性失败| failed
-  publishing -->|可重试的步骤失败| queued
-```
-
-`preparing` 从请求被持久化接纳时开始，早于 workspace 或 input 准备。`recovering` 表示 publisher 已独占领取一次状态不确定的 Runner submission。Publication ownership 和每个 step 的 attempts 与 Runner observation 分开存储。Runner 确定性失败会把 publication 标为 `not_required`，不会进入 GitHub 发布。
-
-| 持久化 run 状态 | 含义 | Publisher 行为 |
-| --- | --- | --- |
-| `preparing` | 请求已经接纳，但 workspace 和 runner input 仍在准备。 | 不会进入 runner 轮询。 |
-| `recovering` | Publisher 正在安全地重放一次响应丢失的 Runner 请求。 | 同一时间只有一个 publisher 持有 recovery claim；过期 claim 可以被重新领取。 |
-| `queued` | Runner run 已提交，但尚未观察到运行中状态。 | 继续轮询 runner service。 |
-| `running` | Runner service 报告 run 仍在执行。 | 继续轮询。 |
-| `publishing` | 某个 publisher 已领取完成的 run，准备执行 GitHub side effects。 | 除非领取已过期，否则其他 publisher 不应再次领取。 |
-| `published` | GitHub 发布完成。 | 终态。 |
-| `failed` | preparation、submission、Runner execution 或确定性的结果处理失败。 | 通常是终态；`failure_code` 为 `SUBMISSION_STATE_UNCERTAIN` 时由后台自动恢复。 |
-
-可重试的 publication 失败会把 publication 归还 pending。只有失败的 step 消耗自己的 attempt；Runner 轮询失败不消耗 publication attempt。
-
-Repository 发布中，确定性失败只终止当前 delivery；瞬时失败在下一轮从未完成的 step 继续。所有 delivery step 结束后才发布 summary，summary 只链接成功的 delivery。
-
-> 当前重试策略很简单：后台 publisher 启动时会立刻轮询一次，之后按 `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` 间隔轮询，默认 15 秒。这里还没有指数退避调度。
+- 手动命令接受普通 issue comment 和 pull request 页面 Conversation 标签下的 comment。
+- Files changed 页面里的评论和通过 Submit review 提交的 review 评论不属于受支持的命令入口。
 
 ## GitHub REST API 版本
 

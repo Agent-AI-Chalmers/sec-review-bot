@@ -18,11 +18,11 @@ Sec Review Bot 支持使用 AI Agent 执行代码库安全审计，覆盖 issue�
 
 ## 能力
 
-| 能力 | 行为 |
-| --- | --- |
-| Issue review | 审计 issue 报告，并在需要修复时产出经过复核的补丁或 draft PR。 |
-| Pull request review | 审查 PR 变更，并可发布 review suggestions。 |
-| Repository review | 对仓库执行全仓或增量扫描，并进行问题发现、筛选、逐项处理和交付规划。 |
+| 能力                | 行为                                                                 |
+| ------------------- | -------------------------------------------------------------------- |
+| Issue review        | 审计 issue 报告，并在需要修复时产出经过复核的补丁或 draft PR。       |
+| Pull request review | 审查 PR 变更，并可发布 review suggestions。                          |
+| Repository review   | 对仓库执行全仓或增量扫描，并进行问题发现、筛选、逐项处理和交付规划。 |
 
 ## 运行结果示例
 
@@ -40,12 +40,34 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 
 ## 架构
 
-这个仓库是一个 monorepo，主要有两个子系统：
+这个仓库包含四个运行实体：GitHub integration、Review Control Plane、Control Plane UI 和 Agent Runner。它们通过受认证的 HTTP、`ArtifactRef` 和持久化 PostgreSQL 状态协作，同时保持各自独立的职责、配置和部署边界。
 
 - [`apps/github-integration/`](apps/github-integration/)：TS 编写，GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
+- [`control-plane/`](control-plane/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
+- [`apps/control-plane-ui/`](apps/control-plane-ui/)：独立部署、只读的 Control Plane 运维界面
 - [`agents/src/sec_review_agents`](agents/src/sec_review_agents/)：Python 编写，multi-agent runner 和审查逻辑
 
-`github-integration` 不直接调用 agents 代码，而是通过 HTTP 运行服务提交 run；运行服务再通过 Temporal 把任务交给 worker 执行。
+`github-integration` 不直接调用 agents 代码，也不直接协调 Runner；它通过 Control Plane 提交和观察 review run，由 Control Plane 协调 HTTP Runner service 和 Temporal worker。
+
+```mermaid
+flowchart LR
+  github[GitHub]
+  integration[apps/github-integration]
+  control[control-plane]
+  ui[apps/control-plane-ui]
+  agents[agents]
+  storage[(对象存储)]
+  state[(PostgreSQL)]
+
+  github -->|webhook 或 Actions 请求| integration
+  integration -->|受认证的 review 请求| control
+  control -->|提交并观察 run| agents
+  integration -->|input ArtifactRef| storage
+  agents -->|终态 artifact| storage
+  control <-->|run 和 publication 状态| state
+  ui -->|只读查询 API| control
+  integration -->|GitHub 发布| github
+```
 
 ## 运行技术栈
 
@@ -73,12 +95,12 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 
 ## 支持的工作流
 
-| 路径 | 触发方式 | 输出 |
-| --- | --- | --- |
-| Issue audit | `issues.opened`、`@<app-slug> review audit` | issue comment |
-| Issue repair | `@<app-slug> review repair` | issue comment 或 draft PR |
-| Pull request review | PR webhook、`@<app-slug> review` | PR review / suggestions |
-| Repository review | 定时或手动触发的 GitHub Action | repository summary 和 deliveries |
+| 路径                | 触发方式                                    | 输出                             |
+| ------------------- | ------------------------------------------- | -------------------------------- |
+| Issue audit         | `issues.opened`、`@<app-slug> review audit` | issue comment                    |
+| Issue repair        | `@<app-slug> review repair`                 | issue comment 或 draft PR        |
+| Pull request review | PR webhook、`@<app-slug> review`            | PR review / suggestions          |
+| Repository review   | 定时或手动触发的 GitHub Action              | repository summary 和 deliveries |
 
 完整触发行为见 [GitHub integration 触发说明](apps/github-integration/README.zh.md#触发)。
 
@@ -118,18 +140,18 @@ curl -sS http://127.0.0.1:8000/healthz \
   -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
 ```
 
-Compose 里的 Temporal Web UI 默认暴露在 `127.0.0.1:8233`；运行服务默认暴露在 `127.0.0.1:8000`，GitHub integration service 默认暴露在 `127.0.0.1:30000`。
+Compose 里的 Temporal Web UI 默认暴露在 `127.0.0.1:8233`；运行服务默认暴露在 `127.0.0.1:8000`，Review Control Plane 默认暴露在 `127.0.0.1:8090`，GitHub integration 默认暴露在 `127.0.0.1:30000`。
 
 ## 从哪里开始
 
 各 package 的安装和开发命令放在对应 package README 里。
 
-| 目标 | 入口 |
-| --- | --- |
-| 本地启动完整链路和执行 worker | [本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) |
-| 开发 GitHub integration | [GitHub integration 说明](apps/github-integration/README.zh.md) |
-| 开发 agent 运行后端或做本地运行 | [Agents 本地运行说明](agents/README.zh.md) |
-| 把 GitHub 入站请求转发到本地 | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
+| 目标                            | 入口                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| 本地启动完整链路和执行 worker   | [本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)    |
+| 开发 GitHub integration         | [GitHub integration 说明](apps/github-integration/README.zh.md)          |
+| 开发 agent 运行后端或做本地运行 | [Agents 本地运行说明](agents/README.zh.md)                               |
+| 把 GitHub 入站请求转发到本地    | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
 
 ## 论文
 

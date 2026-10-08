@@ -2,7 +2,7 @@
 
 Language: English | [中文](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
-This guide covers local deployment of the GitHub integration / Runner Service / Temporal control plane, object storage, and a host execution worker.
+This guide covers local deployment of the GitHub integration, Review Control Plane, Runner Service, Temporal, object storage, and a host execution worker.
 
 Use it to run the complete integrated path locally. For running agents directly without the HTTP Runner Service, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
@@ -14,7 +14,9 @@ flowchart LR
     dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
 
     subgraph compose["Docker Compose"]
-        integration["github-integration"] --> runner["Runner Service<br/>submit and query review tasks"]
+        integration["github-integration"] --> control["Review Control Plane<br/>admit and coordinate review runs"]
+        control --> runner["Runner Service<br/>submit and query review tasks"]
+        control --> postgres[(PostgreSQL)]
         runner --> temporal["Temporal<br/>workflow state and task queue"]
         integration -->|write input bundles| storage["Object Storage<br/>immutable input and result artifacts"]
         runner -->|write terminal result artifacts| storage
@@ -32,9 +34,11 @@ flowchart LR
 
 Cloudflare Tunnel forwards both public endpoints to the local `github-integration` service. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for configuration.
 
-Runner Service is the HTTP API between GitHub integration and Temporal. It authenticates and validates task requests, starts Temporal workflows, and queries task status; `sec-review-agents-worker` executes the agents.
+Runner Service is the HTTP API between Control Plane and Temporal. It authenticates and validates task requests, starts Temporal workflows, and exposes task status; `sec-review-agents-worker` executes the agents.
 
 Object Storage holds two kinds of run data: the input bundle prepared before execution and the result artifact produced after execution. GitHub integration writes the input bundle. The result publication path writes the terminal artifact. The worker and Runner Service read these objects when needed. The worker does not hold credentials for publishing result artifacts.
+
+Control Plane UI is a separately deployed, read-only console. Its same-origin server authenticates the browser and calls Control Plane with a dedicated read token; neither the read token nor the mutation service token is exposed to browser code.
 
 Without a worker, submitted tasks remain in Temporal waiting for execution.
 
@@ -43,6 +47,8 @@ Default local endpoints:
 | Service | URL |
 | --- | --- |
 | GitHub integration | `http://127.0.0.1:30000` |
+| Review Control Plane | `http://127.0.0.1:8090` |
+| Control Plane UI | `http://127.0.0.1:8091` |
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
@@ -137,7 +143,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose injects the container private-key path, Runner Service address and token, PostgreSQL connection, and RustFS input storage configuration. These values do not need to be repeated in `apps/github-integration/.env`.
+Compose injects the Runner Service address and token only into Control Plane for initial submission, submission recovery, and terminal observation. It injects the container private-key path, Control Plane address and token, and RustFS input storage configuration into the integration. PostgreSQL and Runner credentials are not available to the integration. These values do not need to be repeated in `apps/github-integration/.env`.
 
 ### 3. Model Configuration
 

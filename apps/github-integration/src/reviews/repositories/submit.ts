@@ -1,0 +1,149 @@
+import { splitRepoFullName } from '../../github/repository-service.js'
+import { prepareRepositoryReviewInput } from './prepare-input.js'
+import { fetchRepositoryTriggerConfig } from '../../github/repo-config-service.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
+import { logInfo } from '../../utils/logger.js'
+import type { RepairMode, RepositoryScanTarget, RepositoryReviewInput } from '../../runner/input.js'
+
+export interface RepositoryContext {
+  owner_login: string
+  repo_name: string
+  repo_full_name: string
+  default_branch: string
+}
+
+interface RunRepositoryReviewArgs {
+  run_id?: string
+  octokit: unknown
+  repo_full_name: string
+  target_branch?: string | null
+  scan_mode: 'full' | 'incremental'
+  base_sha?: string | null
+  head_sha?: string | null
+  event_type?: 'manual' | 'scheduled'
+  repair_mode?: RepairMode | null
+  // Runs after preparation and before the Runner POST, so callers can durably
+  // retain the context needed if the submission response is lost.
+  on_prepared?: (
+    submitted: SubmittedRepositoryReviewRun,
+    input: RepositoryReviewInput & Record<string, unknown>
+  ) => void | Promise<void>
+}
+
+export interface SubmittedRepositoryReviewRun {
+  repo: RepositoryContext
+  run_id: string
+  workspace_ref: string
+  scan_target: RepositoryScanTarget
+  workflow: string
+  event_type: 'manual' | 'scheduled'
+}
+
+function assertRepositoryReviewInput(
+  input: RepositoryReviewInput
+): asserts input is RepositoryReviewInput & Record<string, unknown> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Repository review input is missing before runner invocation.')
+  }
+}
+
+async function materializeRepositoryReviewInput({
+  run_id,
+  octokit,
+  repo_full_name,
+  target_branch = null,
+  scan_mode,
+  base_sha = null,
+  head_sha = null,
+  event_type = 'manual',
+  repair_mode = null
+}: RunRepositoryReviewArgs): Promise<{
+  run_id: string
+  repo: RepositoryContext
+  workspace_ref: string
+  input: RepositoryReviewInput
+}> {
+  logInfo('repository_review_workflow_started', {
+    event_type,
+    branch: target_branch ?? '(default-branch)',
+    head_sha: head_sha ?? '(resolve-from-branch)',
+    repo: repo_full_name
+  })
+
+  const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
+  const github = octokit as GitHubAppOctokit
+  const pathConfig = await fetchRepositoryTriggerConfig(github, {
+    owner_login,
+    repo_name,
+    ...(target_branch ? { ref: target_branch } : {})
+  })
+
+  const prepared = await prepareRepositoryReviewInput({
+    ...(run_id ? { run_id } : {}),
+    octokit: github,
+    repo_full_name,
+    target_branch,
+    scan_mode,
+    base_sha,
+    head_sha,
+    event_type,
+    paths_ignore: pathConfig.paths_ignore,
+    repair_mode
+  })
+  const input = prepared.input
+  const repo = prepared.repo
+
+  return {
+    run_id: prepared.run_id,
+    input,
+    repo,
+    workspace_ref: prepared.workspace_ref
+  }
+}
+
+export async function startRepositoryReviewRun({
+  run_id: provided_run_id,
+  octokit,
+  repo_full_name,
+  target_branch = null,
+  scan_mode,
+  base_sha = null,
+  head_sha = null,
+  event_type = 'manual',
+  repair_mode = null,
+  on_prepared
+}: RunRepositoryReviewArgs): Promise<SubmittedRepositoryReviewRun> {
+  const { run_id, input, repo, workspace_ref } = await materializeRepositoryReviewInput({
+    ...(provided_run_id ? { run_id: provided_run_id } : {}),
+    octokit,
+    repo_full_name,
+    target_branch,
+    scan_mode,
+    base_sha,
+    head_sha,
+    event_type,
+    repair_mode
+  })
+
+  assertRepositoryReviewInput(input)
+  const preparedRun: SubmittedRepositoryReviewRun = {
+    repo,
+    run_id,
+    workspace_ref,
+    scan_target: input.scan_target,
+    workflow: 'repository-review',
+    event_type
+  }
+  if (on_prepared === undefined)
+    throw new Error('Repository review submission callback is required.')
+  await on_prepared(preparedRun, input)
+
+  logInfo('repository_review_runner_run_submitted', {
+    event_type,
+    repo: repo.repo_full_name,
+    run_id: run_id,
+    workflow: preparedRun.workflow
+  })
+
+  return preparedRun
+}

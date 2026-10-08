@@ -74,6 +74,10 @@ App 侧和 agent 侧之间的契约，看这里：
 - [CVSSV4.md](workflows/repository-review/CVSSV4.md) / [中文](workflows/repository-review/CVSSV4.zh.md)：CVSS v4 scoring。
 - [CONCURRENCY_AND_FAILURES.md](workflows/repository-review/CONCURRENCY_AND_FAILURES.md) / [中文](workflows/repository-review/CONCURRENCY_AND_FAILURES.zh.md)：Repository review 并发与失败边界。
 
+### architecture/
+
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体、端到端数据流、跨服务契约、事实来源和凭据所有权。
+
 ### operations/
 
 本地运行系统或配置 GitHub webhook 时，看这里：

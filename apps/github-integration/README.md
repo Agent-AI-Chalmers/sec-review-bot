@@ -4,46 +4,48 @@ Language: English | [中文](README.zh.md)
 
 This package contains the GitHub integration service for the project.
 
-It does not execute agent workflows directly. It prepares inputs, submits runner runs, polls results, and publishes results back to GitHub.
+It does not execute agent workflows directly. It prepares inputs, submits and observes review runs through Control Plane, and publishes terminal results back to GitHub.
 
 ## Setup
 
-From `apps/github-integration/`:
+For local development, install the Control Plane service and integration dependencies from the repository root:
 
 ```bash
 corepack enable pnpm
-pnpm install
+pnpm --dir control-plane install
+pnpm --dir apps/github-integration install
 ```
 
 Use Node 24.x.
 
-> *Node 24 is the current LTS baseline for this package. The [Node.js release schedule](https://github.com/nodejs/Release#release-schedule) currently lists Node 26's Active LTS start as 2026-10-28; after that, this package can evaluate moving the default runtime to Node 26.*
+> _Node 24 is the current LTS baseline for this package. The [Node.js release schedule](https://github.com/nodejs/Release#release-schedule) currently lists Node 26's Active LTS start as 2026-10-28; after that, this package can evaluate moving the default runtime to Node 26._
 
 ## Commands
 
 ```bash
 pnpm run dev
 pnpm run server
+pnpm run format:check
 pnpm run lint
 pnpm run build
 pnpm test
 ```
 
-`pnpm test` runs tests that do not require external services. PostgreSQL-backed
-runner tests are kept as an explicit integration suite:
+`pnpm test` runs tests that do not require external services. The integration
+suite uses the Control Plane test database for publisher boundary tests:
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
-DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
 pnpm run test:integration
 ```
-
 
 ## Local Receiver
 
 A complete review also needs the runner service and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub integration service.
 
-For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, and `AGENT_RUNNER_SERVICE_URL`. Set `AGENT_RUNNER_SERVICE_TOKEN` for any non-loopback runner service URL, or when the runner service requires a token.
+For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `CONTROL_PLANE_SERVICE_URL`, and `CONTROL_PLANE_SERVICE_TOKEN`.
+
+`CONTROL_PLANE_REQUEST_TIMEOUT_MS` bounds every Control Plane RPC and defaults to 30 seconds. In particular, a publication lease renewal that fails or times out is treated as lost ownership: the publisher stops before starting another GitHub mutation and leaves recovery to lease takeover.
 
 ```bash
 pnpm run server
@@ -89,7 +91,7 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
 - Prepare issue / pull request review input
 - Prepare repository review input
 
-- Call the HTTP Agent Runner Service
+- Submit prepared inputs to Control Plane and claim publication work
 - Publish structured results back to GitHub
 
 ## Layout
@@ -98,10 +100,12 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
   - `reviews/issues/` - issue review
   - `reviews/pull-requests/` - pull request review and suggestion comments
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
-- `infrastructure/runner/` - HTTP runner client, runner input types, input bundle manifest / workspace helpers, PostgreSQL coordination state, background publisher
-- `infrastructure/github/` - thin GitHub API wrappers and webhook helpers
-- `interfaces/` - HTTP, GitHub Actions, and GitHub webhook adapters
-- `triggers/` - turns webhook / Actions / comment requests into runner review runs
+- `github/` - thin GitHub API wrappers and webhook helpers
+- `control-plane/` - Control Plane client, claim handling, and publication coordination
+- `runner/` - Runner input, result, and error contracts consumed by this connector
+- `artifacts/` - input bundle storage and Git workspace preparation
+- `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling
+- `triggers/` - turns webhook / Actions / comment requests into Control Plane review submissions
 - `utils/` - lightweight logging and helpers
 
 ## Triggers
@@ -137,7 +141,7 @@ Semantics:
 
 Notes:
 
-- [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) is only for GitHub Actions scheduling and no longer carries bot runtime config.
+- [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) contains GitHub Actions scheduling only; bot runtime configuration belongs in `.sec-review-bot.yml`.
 - If [`.github/sec-review-bot.yml`](../../.github/sec-review-bot.yml) is missing, the default behavior is `trigger_mode: manual_only`.
 - If the config file exists but the YAML is invalid, `sec_review_bot.trigger_mode` is missing, or the value is not allowed, automatic webhooks fail strictly instead of silently downgrading.
 - `paths_ignore` only affects repository-review discovery file scanning. It does not affect PR/Issue webhook trigger decisions.
@@ -202,80 +206,8 @@ Manual `workflow_dispatch` supports:
 
 Additional notes:
 
-- Manual comment commands currently support normal issue comments and comments on the Pull Request page's Conversation tab.
-- Not supported yet: comments on the Files changed page and review comments submitted through Submit review.
-
-## Review Lifecycle
-
-A webhook or Actions dispatch only waits until the integration has validated and durably admitted the request. Workspace preparation, agent execution, and GitHub publication continue outside the inbound request path.
-
-```mermaid
-flowchart LR
-  ingress[GitHub webhook event or Actions HTTP request]
-  subgraph integration[GitHub integration]
-    admission[Validate and durably admit]
-    preparation[Prepare workspace and runner input]
-    publication[Poll, validate, and publish result]
-    admission --> preparation
-  end
-  ingress --> admission
-  admission -.-> acknowledgement[Webhook success response<br/>or Actions 202 Accepted]
-  preparation --> runner[Python Runner and Temporal<br/>execute agent workflow]
-  runner --> publication
-  publication --> output[GitHub issue, comment, review, or pull request]
-```
-
-The integration owns the complete `review_runs` lifecycle. Python and Temporal own agent workflow execution; they do not own GitHub publication state.
-
-### Database Schema Versions
-
-PostgreSQL schema changes live in `infrastructure/runner/database/schema-versions`. Applied versions are recorded with a SHA-256 checksum in `schema_versions`. Never edit an applied version file; add the next numbered SQL file and register it in `schema-version-runner.ts`. Startup serializes schema changes with a PostgreSQL advisory lock and refuses files whose checksum no longer matches the database ledger.
-
-### Admission And Replay Identity
-
-A webhook uses its GitHub Delivery ID to recognize a repeated delivery. An Actions dispatch uses the OIDC-verified repository together with the required `correlation_id`, currently `GITHUB_RUN_ID`. These ingress identities prevent transport retries from starting another review; after admission, each maps to the single `run_id` used through preparation, agent execution, polling, and publication.
-
-For an Actions dispatch, HTTP `202 Accepted` means the integration validated and durably recorded the request. It does not mean the agent workflow or GitHub publication has finished. A webhook success response has the same limited meaning when that event starts a review.
-
-The three tables record separate concerns:
-
-| Table | Records | Status |
-| --- | --- | --- |
-| `review_runs` | Runner observation | `preparing`, `recovering`, `queued`, `running`, `failed` |
-| `publications` | Publication ownership | `pending`, `publishing`, `published`, `failed`, `not_required` |
-| `publication_steps` | One GitHub side effect | `pending`, `running`, `succeeded`, `failed`, `terminal_failed` |
-
-`ReviewRunStatus` is only the merged store projection; it is not a database column, and step status is not merged into it.
-
-```mermaid
-flowchart LR
-  preparing --> queued --> running --> publishing --> published
-  preparing --> failed
-  failed -->|submission state uncertain| recovering
-  recovering --> queued
-  queued --> failed
-  running --> failed
-  publishing -->|deterministic failure| failed
-  publishing -->|retryable step failure| queued
-```
-
-`preparing` begins at durable admission, before workspace or input preparation. `recovering` means the publisher has exclusively claimed an uncertain Runner submission. Publication ownership and per-step attempts are stored separately from Runner observation. A terminal Runner failure marks publication `not_required`; it never enters GitHub publication.
-
-| Stored run state | Meaning | Publisher behavior |
-| --- | --- | --- |
-| `preparing` | The request was admitted, but its workspace and runner input are still being prepared. | Not visible to the runner poller. |
-| `recovering` | The publisher is safely replaying a Runner request whose response was lost. | One publisher owns the recovery claim; a stale claim can be reclaimed. |
-| `queued` | Runner run was submitted and has not been observed as running. | Poll the runner service. |
-| `running` | Runner service reports the run is still in progress. | Keep polling. |
-| `publishing` | A publisher claimed the completed run for GitHub side effects. | Do not let another publisher claim it unless the claim becomes stale. |
-| `published` | GitHub publication completed. | Terminal. |
-| `failed` | Preparation, submission, Runner execution, or deterministic result handling failed. | Terminal unless `failure_code` is `SUBMISSION_STATE_UNCERTAIN`; that case is recovered in the background. |
-
-Retryable publication failures return the publication to pending. Only the failed step spends its own attempt budget; Runner polling failures spend no publication attempts.
-
-For repository publication, a deterministic failure terminates only the current delivery. A transient failure resumes from unfinished steps on the next pass. The summary is published after all delivery steps finish and links only successful deliveries.
-
-> Current retry behavior is simple: the background publisher polls immediately on startup, then every `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` milliseconds, defaulting to 15 seconds. There is no exponential backoff scheduler yet.
+- Manual commands are accepted from normal issue comments and comments on the Pull Request page's Conversation tab.
+- Comments on the Files changed page and review comments submitted through Submit review are outside the supported command surface.
 
 ## GitHub REST API Version
 

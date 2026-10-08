@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { handlePullRequestReviewRun } from '../../../reviews/pull-requests/publish.js'
-import { setGitHubAppMetadata } from '../../../infrastructure/github/github-app-metadata-service.js'
+import { handlePullRequestReviewRun } from '../../../src/reviews/pull-requests/publish.js'
+import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 
 const stepStore = {
   initializePublicationSteps: async () => {},
@@ -12,7 +12,7 @@ const stepStore = {
   failPublicationStep: async () => true
 }
 
-function pullRequestContext (overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function pullRequestContext(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     action: 'opened',
     previous_head_sha: null,
@@ -46,7 +46,7 @@ function pullRequestContext (overrides: Record<string, unknown> = {}): Record<st
   }
 }
 
-function review_record (overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function review_record(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     analysis: {
       verdict: 'confirmed-vulnerability',
@@ -119,9 +119,11 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
         contract_version: 'v5',
         review_record: review_record()
       }
-    },store: stepStore as never,
-claim_token: 'test-claim',
-installation_octokit_for_repo: async () => octokit
+    },
+    store: stepStore as never,
+    claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
+    installation_octokit_for_repo: async () => octokit
   })
 
   assert.equal(issueComments.length, 0)
@@ -135,18 +137,21 @@ installation_octokit_for_repo: async () => octokit
     pull_number: number
     repo: string
   }
-  assert.deepEqual({
-    ...reviewArgs,
-    body: '<body>'
-  }, {
-    owner: 'octo',
-    repo: 'example',
-    pull_number: 7,
-    commit_id: 'head-sha',
-    body: '<body>',
-    event: 'COMMENT',
-    comments: []
-  })
+  assert.deepEqual(
+    {
+      ...reviewArgs,
+      body: '<body>'
+    },
+    {
+      owner: 'octo',
+      repo: 'example',
+      pull_number: 7,
+      commit_id: 'head-sha',
+      body: '<body>',
+      event: 'COMMENT',
+      comments: []
+    }
+  )
   assert.match(reviewArgs.body, /<!-- sec-review-bot:pull-request-review-run:run-1 -->/)
   assert.match(reviewArgs.body, /## PR Security Review/)
 })
@@ -208,6 +213,7 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
     },
     store: stepStore as never,
     claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
   })
 
@@ -282,9 +288,11 @@ test('pull request publish approves when analysis is not confirmed', async () =>
           }
         })
       }
-    },store: stepStore as never,
-claim_token: 'test-claim',
-installation_octokit_for_repo: async () => octokit
+    },
+    store: stepStore as never,
+    claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
+    installation_octokit_for_repo: async () => octokit
   })
 
   assert.equal(issueComments.length, 0)
@@ -337,9 +345,11 @@ test('pull request publish comments instead of approving a PR authored by the ap
             }
           })
         }
-      },store: stepStore as never,
-claim_token: 'test-claim',
-installation_octokit_for_repo: async () => octokit
+      },
+      store: stepStore as never,
+      claim_token: 'test-claim',
+      assert_publication_claim: async () => {},
+      installation_octokit_for_repo: async () => octokit
     })
   } finally {
     setGitHubAppMetadata()
@@ -406,9 +416,11 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
           }
         })
       }
-    },store: stepStore as never,
-claim_token: 'test-claim',
-installation_octokit_for_repo: async () => octokit
+    },
+    store: stepStore as never,
+    claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
+    installation_octokit_for_repo: async () => octokit
   })
 
   assert.deepEqual(
@@ -473,9 +485,11 @@ test('pull request publish falls back to comment when own PR approval error is i
           }
         })
       }
-    },store: stepStore as never,
-claim_token: 'test-claim',
-installation_octokit_for_repo: async () => octokit
+    },
+    store: stepStore as never,
+    claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
+    installation_octokit_for_repo: async () => octokit
   })
 
   assert.deepEqual(
@@ -552,9 +566,11 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
           }
         })
       }
-    },store: stepStore as never,
-claim_token: 'test-claim',
-installation_octokit_for_repo: async () => octokit
+    },
+    store: stepStore as never,
+    claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
+    installation_octokit_for_repo: async () => octokit
   })
 
   assert.equal(pullReviews.length, 1)
@@ -609,9 +625,11 @@ test('pull request publish does not create a fallback review after an uncertain 
             }
           })
         }
-      },store: stepStore as never,
-claim_token: 'test-claim',
-installation_octokit_for_repo: async () => octokit
+      },
+      store: stepStore as never,
+      claim_token: 'test-claim',
+      assert_publication_claim: async () => {},
+      installation_octokit_for_repo: async () => octokit
     }),
     /connection reset/
   )

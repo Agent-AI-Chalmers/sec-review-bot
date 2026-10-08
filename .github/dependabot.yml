@@ -47,6 +47,42 @@ updates:
           - "temporalio"
           - "opentelemetry-*"
 
+  - package-ecosystem: "npm"
+    directory: "/control-plane"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "Asia/Shanghai"
+    groups:
+      control-plane:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
+
+  - package-ecosystem: "npm"
+    directory: "/apps/control-plane-ui"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "Asia/Shanghai"
+    groups:
+      control-plane-ui:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

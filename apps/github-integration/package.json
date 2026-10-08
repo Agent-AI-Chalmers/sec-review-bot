@@ -4,21 +4,22 @@
   "version": "0.0.1",
   "license": "Apache-2.0",
   "type": "module",
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@12.9.1",
   "engines": {
     "node": ">=24 <25"
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "copy:schema": "mkdir -p dist/infrastructure/runner/database && cp -R infrastructure/runner/database/schema-versions dist/infrastructure/runner/database/",
-    "build": "pnpm run clean && tsc -p tsconfig.json && pnpm run copy:schema",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json",
     "server": "pnpm run build && node dist/app.js",
-    "dev": "pnpm run build && sh -c 'tsc -w -p tsconfig.json & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT INT TERM; nodemon --watch dist --watch infrastructure/runner/database/schema-versions --ignore dist/infrastructure/runner/database/schema-versions --ext js,json,sql --delay 200ms --exec \"pnpm run copy:schema && node dist/app.js\"'",
+    "dev": "pnpm run build && sh -c 'tsc -w -p tsconfig.json & TSC_PID=$!; trap \"kill $TSC_PID\" EXIT INT TERM; nodemon --watch dist --ext js,json --delay 200ms --exec \"node dist/app.js\"'",
     "test": "rm -rf dist && node scripts/test-runner.mjs unit",
     "test:integration": "node scripts/test-runner.mjs integration",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
@@ -27,18 +28,17 @@
     "dotenv": "^18.0.4",
     "jose": "^6.2.12",
     "octokit": "^5.0.5",
-    "pg": "^8.23.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.0",
-    "@types/pg": "^8.23.1",
     "@typescript-eslint/eslint-plugin": "^8.70.1",
     "@typescript-eslint/parser": "^8.70.1",
     "aws-sdk-client-mock": "^4.1.0",
     "eslint": "^10.11.0",
     "nodemon": "^3.1.14",
+    "prettier": "^3.9.9",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3"
   }

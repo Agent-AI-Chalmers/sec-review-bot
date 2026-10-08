@@ -8,12 +8,13 @@ if (mode !== 'unit' && mode !== 'integration') {
   throw new Error('Usage: node scripts/test-runner.mjs <unit|integration>')
 }
 
-async function collectTests (directory, excludedDirectory = null) {
+async function collectTests(directory, excludedDirectory = null) {
   const entries = await readdir(directory, { withFileTypes: true })
   const files = []
   for (const entry of entries) {
     const path = resolve(directory, entry.name)
-    if (entry.isDirectory() && path !== excludedDirectory) files.push(...await collectTests(path, excludedDirectory))
+    if (entry.isDirectory() && path !== excludedDirectory)
+      files.push(...(await collectTests(path, excludedDirectory)))
     else if (entry.isFile() && entry.name.endsWith('.test.ts')) files.push(path)
   }
   return files

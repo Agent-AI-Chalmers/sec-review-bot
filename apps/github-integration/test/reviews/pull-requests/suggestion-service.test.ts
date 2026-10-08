@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { generateSuggestionCandidatesFromReviewRecord } from '../../../reviews/pull-requests/suggestion-service.js'
-import type { ReviewRecord } from '../../../reviews/review-record.js'
+import { generateSuggestionCandidatesFromReviewRecord } from '../../../src/reviews/pull-requests/suggestion-service.js'
+import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 
-function reviewRecordWithPatchDiff (patch_diff: string): ReviewRecord {
+function reviewRecordWithPatchDiff(patch_diff: string): ReviewRecord {
   return {
     analysis: {
       verdict: null,
@@ -32,14 +32,14 @@ function reviewRecordWithPatchDiff (patch_diff: string): ReviewRecord {
   }
 }
 
-function workspacePatchSample (): string {
+function workspacePatchSample(): string {
   return [
     'diff --git a/workspace/src/server.js b/workspace/src/server.js',
     'index 726cbf4..92ccc97 100644',
     '--- a/workspace/src/server.js',
     '+++ b/workspace/src/server.js',
-    '@@ -12,7 +12,7 @@ const DOWNLOAD_ROOT = path.resolve(process.cwd(), \'downloads\')',
-    ' const PREVIEW_DEFAULT_FILE = \'README.md\'',
+    "@@ -12,7 +12,7 @@ const DOWNLOAD_ROOT = path.resolve(process.cwd(), 'downloads')",
+    " const PREVIEW_DEFAULT_FILE = 'README.md'",
     ' const PREVIEW_MAX_BYTES = 64 * 1024',
     ' const PREVIEW_MAX_LINES = 20',
     "-const DIAG_TOKEN = process.env.DIAG_TOKEN || 'internal-debug'",
@@ -47,9 +47,9 @@ function workspacePatchSample (): string {
     '',
     ' function ensurePathInRoot (rootPath, candidatePath) {',
     '   const rootWithSep = rootPath.endsWith(path.sep)',
-    '@@ -149,16 +149,12 @@ app.get(\'/preview-remote\', (request, response) => {',
-    ' app.get(\'/admin/diag/run\', (request, response) => {',
-    '   const token = String(request.query.token || \'\')',
+    "@@ -149,16 +149,12 @@ app.get('/preview-remote', (request, response) => {",
+    " app.get('/admin/diag/run', (request, response) => {",
+    "   const token = String(request.query.token || '')",
     "   const cmd = String(request.query.cmd || 'uptime')",
     "-  const bypassHeader = String(request.headers['x-internal-bypass'] || '').toLowerCase()",
     ' ',
@@ -68,14 +68,14 @@ function workspacePatchSample (): string {
   ].join('\n')
 }
 
-function workspacePatchWithInsertionSample (): string {
+function workspacePatchWithInsertionSample(): string {
   return [
     'diff --git a/workspace/src/server.js b/workspace/src/server.js',
     'index 726cbf4..b98a4f4 100644',
     '--- a/workspace/src/server.js',
     '+++ b/workspace/src/server.js',
-    '@@ -12,7 +12,7 @@ const DOWNLOAD_ROOT = path.resolve(process.cwd(), \'downloads\')',
-    ' const PREVIEW_DEFAULT_FILE = \'README.md\'',
+    "@@ -12,7 +12,7 @@ const DOWNLOAD_ROOT = path.resolve(process.cwd(), 'downloads')",
+    " const PREVIEW_DEFAULT_FILE = 'README.md'",
     ' const PREVIEW_MAX_BYTES = 64 * 1024',
     ' const PREVIEW_MAX_LINES = 20',
     "-const DIAG_TOKEN = process.env.DIAG_TOKEN || 'internal-debug'",
@@ -83,10 +83,10 @@ function workspacePatchWithInsertionSample (): string {
     ' ',
     ' function ensurePathInRoot (rootPath, candidatePath) {',
     '   const rootWithSep = rootPath.endsWith(path.sep)',
-    '@@ -147,18 +147,23 @@ app.get(\'/preview-remote\', (request, response) => {',
+    "@@ -147,18 +147,23 @@ app.get('/preview-remote', (request, response) => {",
     ' })',
     ' ',
-    ' app.get(\'/admin/diag/run\', (request, response) => {',
+    " app.get('/admin/diag/run', (request, response) => {",
     '+  if (!DIAG_TOKEN) {',
     '+    response.status(500).json({',
     '+      ok: false,',
@@ -95,7 +95,7 @@ function workspacePatchWithInsertionSample (): string {
     '+    return',
     '+  }',
     '+',
-    '   const token = String(request.query.token || \'\')',
+    "   const token = String(request.query.token || '')",
     "   const cmd = String(request.query.cmd || 'uptime')",
     "-  const bypassHeader = String(request.headers['x-internal-bypass'] || '').toLowerCase()",
     ' ',
@@ -114,7 +114,7 @@ function workspacePatchWithInsertionSample (): string {
   ].join('\n')
 }
 
-function workspacePatchWithoutWorkspacePrefixSample (): string {
+function workspacePatchWithoutWorkspacePrefixSample(): string {
   return workspacePatchSample().replaceAll('a/workspace/', 'a/').replaceAll('b/workspace/', 'b/')
 }
 
@@ -122,10 +122,7 @@ test('suggestion candidates anchor to minimal changed line ranges instead of ent
   const files = [
     {
       filename: 'src/server.js',
-      patch: [
-        '@@ -1,53 +1,53 @@',
-        '@@ -89,87 +89,87 @@'
-      ].join('\n')
+      patch: ['@@ -1,53 +1,53 @@', '@@ -89,87 +89,87 @@'].join('\n')
     }
   ]
 
@@ -136,7 +133,10 @@ test('suggestion candidates anchor to minimal changed line ranges instead of ent
 
   assert.equal(manifest.candidates.length, 4)
   assert.deepEqual(
-    manifest.candidates.map((candidate) => ({ start_line: candidate.start_line, line: candidate.line })),
+    manifest.candidates.map((candidate) => ({
+      start_line: candidate.start_line,
+      line: candidate.line
+    })),
     [
       { start_line: 15, line: 15 },
       { start_line: 152, line: 152 },
@@ -162,7 +162,10 @@ test('suggestion candidates split a hunk into minimal contiguous +/- change bloc
   })
 
   assert.deepEqual(
-    manifest.candidates.map((candidate) => ({ start_line: candidate.start_line, line: candidate.line })),
+    manifest.candidates.map((candidate) => ({
+      start_line: candidate.start_line,
+      line: candidate.line
+    })),
     [
       { start_line: 15, line: 15 },
       { start_line: 150, line: 150 },
@@ -178,10 +181,7 @@ test('suggestion candidates accept repository-relative workspace patch paths', a
     files: [
       {
         filename: 'src/server.js',
-        patch: [
-          '@@ -1,53 +1,53 @@',
-          '@@ -89,87 +89,87 @@'
-        ].join('\n')
+        patch: ['@@ -1,53 +1,53 @@', '@@ -89,87 +89,87 @@'].join('\n')
       }
     ],
     review_record: reviewRecordWithPatchDiff(workspacePatchWithoutWorkspacePrefixSample())

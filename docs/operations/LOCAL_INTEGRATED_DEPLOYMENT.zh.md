@@ -4,7 +4,7 @@
 
 本文是 [LOCAL_INTEGRATED_DEPLOYMENT.md](LOCAL_INTEGRATED_DEPLOYMENT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是 GitHub integration / 运行服务 / Temporal 控制平面、对象存储与宿主机执行 worker 的本地部署说明。
+这是 GitHub integration、Review Control Plane、运行服务、Temporal、对象存储与宿主机执行 worker 的本地部署说明。
 
 如果你要在本地跑完整集成链路，读本文。不经过 HTTP 运行服务、直接在本地运行 agent，或使用 `run-local-* --temporal` 调试时，见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -16,7 +16,9 @@ flowchart LR
     dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
 
     subgraph compose["Docker Compose"]
-        integration["github-integration"] --> runner["Runner Service<br/>提交和查询 review 任务"]
+        integration["github-integration"] --> control["Review Control Plane<br/>接纳和协调 review run"]
+        control --> runner["Runner Service<br/>提交和查询 review 任务"]
+        control --> postgres[(PostgreSQL)]
         runner --> temporal["Temporal<br/>workflow 状态和 task queue"]
         integration -->|写入 input bundle| storage["Object Storage<br/>不可变 input 和 result artifact"]
         runner -->|写入终态 result artifact| storage
@@ -34,9 +36,11 @@ flowchart LR
 
 Cloudflare Tunnel 将两个公网 endpoint 转发到本地 `github-integration`。具体配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
-Runner Service 是 GitHub integration 与 Temporal 之间的 HTTP API。它负责鉴权、校验任务请求、启动 Temporal workflow 和查询任务状态；agent 由 `sec-review-agents-worker` 执行。
+Runner Service 是 Control Plane 与 Temporal 之间的 HTTP API。它负责鉴权、校验任务请求、启动 Temporal workflow，并提供任务状态查询；agent 由 `sec-review-agents-worker` 执行。
 
 对象存储保存两类运行数据：执行前准备的 input bundle，以及执行结束后生成的 result artifact。GitHub integration 写入 input bundle，结果发布流程写入终态 artifact；worker 和 Runner Service 在需要时从对象存储读取。worker 不持有发布 result artifact 的凭据。
+
+Control Plane UI 是独立部署的只读控制台。它的同源服务端验证浏览器访问，并使用专用 read token 调用 Control Plane；read token 和 mutation service token 都不会进入浏览器代码。
 
 没有 worker 时，提交的任务会停留在 Temporal 中等待执行。
 
@@ -45,6 +49,8 @@ Runner Service 是 GitHub integration 与 Temporal 之间的 HTTP API。它负�
 | Service | URL |
 | --- | --- |
 | GitHub integration | `http://127.0.0.1:30000` |
+| Review Control Plane | `http://127.0.0.1:8090` |
+| Control Plane UI | `http://127.0.0.1:8091` |
 | Runner Service | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
@@ -139,7 +145,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose 会注入容器内私钥路径、Runner Service 地址和 token、PostgreSQL 连接以及 RustFS input storage 配置；这些值不需要在 `apps/github-integration/.env` 中重复配置。
+Compose 只把 Runner Service 地址和 token 注入 Control Plane，用于初次提交、提交恢复和终态观察。Integration 只接收容器内私钥路径、Control Plane 地址和 token，以及 RustFS input storage 配置，不持有 PostgreSQL 或 Runner 凭据。这些值不需要在 `apps/github-integration/.env` 中重复配置。
 
 ### 3. 模型配置
 
