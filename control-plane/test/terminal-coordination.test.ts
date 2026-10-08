@@ -24,7 +24,6 @@ function store(events: unknown[][]): Parameters<typeof observeRunnerRun>[0] {
     async recordRunnerSuccess(id, result, artifact) {
       events.push(['succeeded', id, result, artifact])
       return true
-      return true
     },
     async failRunnerExecution(id, failure, artifact) {
       events.push(['failed', id, failure, artifact])
