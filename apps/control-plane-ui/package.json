@@ -19,6 +19,9 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@mantine/core": "9.7.1",
+    "@mantine/hooks": "9.7.1",
+    "@tabler/icons-react": "3.49.0",
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",

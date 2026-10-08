@@ -1,18 +1,16 @@
 import React from 'react'
+import { ActionIcon, Group, MantineProvider, Menu, Tooltip } from '@mantine/core'
+import { IconLanguage, IconMoon, IconSun } from '@tabler/icons-react'
 
 export type Language = 'en' | 'zh'
 export type Theme = 'light' | 'dark'
-export type ColorVision = 'default' | 'friendly'
 
 const messages = {
   en: {
     language: 'Language',
     theme: 'Theme',
-    colors: 'Color vision',
     light: 'Light',
     dark: 'Dark',
-    default: 'Default',
-    friendly: 'Color friendly',
     signInHint: 'Sign in to inspect review runs.',
     accessToken: 'Access token',
     signIn: 'Sign in',
@@ -47,11 +45,8 @@ const messages = {
   zh: {
     language: '语言',
     theme: '主题',
-    colors: '色觉方案',
     light: '浅色',
     dark: '深色',
-    default: '默认',
-    friendly: '色觉友好',
     signInHint: '登录以查看审查运行。',
     accessToken: '访问令牌',
     signIn: '登录',
@@ -89,17 +84,13 @@ export type Message = keyof typeof messages.en
 const PreferencesContext = React.createContext<{
   language: Language
   theme: Theme
-  colorVision: ColorVision
   setLanguage: (value: Language) => void
   setTheme: (value: Theme) => void
-  setColorVision: (value: ColorVision) => void
 }>({
   language: 'en',
   theme: 'light',
-  colorVision: 'default',
   setLanguage: () => {},
-  setTheme: () => {},
-  setColorVision: () => {}
+  setTheme: () => {}
 })
 
 export function Preferences({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -115,9 +106,6 @@ export function Preferences({ children }: { children: React.ReactNode }): React.
       (localStorage.getItem('ui-theme') as Theme) ||
       (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   )
-  const [colorVision, setColorVision] = React.useState<ColorVision>(
-    () => (localStorage.getItem('ui-color-vision') as ColorVision) || 'default'
-  )
   React.useEffect(() => {
     localStorage.setItem('ui-language', language)
   }, [language])
@@ -125,15 +113,9 @@ export function Preferences({ children }: { children: React.ReactNode }): React.
     localStorage.setItem('ui-theme', theme)
     document.documentElement.dataset.theme = theme
   }, [theme])
-  React.useEffect(() => {
-    localStorage.setItem('ui-color-vision', colorVision)
-    document.documentElement.dataset.colorVision = colorVision
-  }, [colorVision])
   return (
-    <PreferencesContext.Provider
-      value={{ language, theme, colorVision, setLanguage, setTheme, setColorVision }}
-    >
-      {children}
+    <PreferencesContext.Provider value={{ language, theme, setLanguage, setTheme }}>
+      <MantineProvider forceColorScheme={theme}>{children}</MantineProvider>
     </PreferencesContext.Provider>
   )
 }
@@ -151,34 +133,42 @@ export function formatDate(value: string, language: Language): string {
   return new Date(value).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
 }
 export function PreferenceControls(): React.JSX.Element {
-  const { language, theme, colorVision, setLanguage, setTheme, setColorVision } = usePreferences()
+  const { language, theme, setLanguage, setTheme } = usePreferences()
   const t = useMessages()
   return (
-    <div className="preferences" aria-label="Preferences">
-      <label>
-        {t('language')}
-        <select value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
-          <option value="en">English</option>
-          <option value="zh">中文</option>
-        </select>
-      </label>
-      <label>
-        {t('theme')}
-        <select value={theme} onChange={(event) => setTheme(event.target.value as Theme)}>
-          <option value="light">{t('light')}</option>
-          <option value="dark">{t('dark')}</option>
-        </select>
-      </label>
-      <label>
-        {t('colors')}
-        <select
-          value={colorVision}
-          onChange={(event) => setColorVision(event.target.value as ColorVision)}
+    <Group gap={4} wrap="nowrap" aria-label="Preferences">
+      <Menu position="bottom-end" withinPortal>
+        <Menu.Target>
+          <Tooltip label={t('language')}>
+            <ActionIcon variant="subtle" color="gray" aria-label={t('language')}>
+              <IconLanguage size={19} stroke={1.8} />
+            </ActionIcon>
+          </Tooltip>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Label>{t('language')}</Menu.Label>
+          <Menu.Item onClick={() => setLanguage('en')} fw={language === 'en' ? 600 : undefined}>
+            English
+          </Menu.Item>
+          <Menu.Item onClick={() => setLanguage('zh')} fw={language === 'zh' ? 600 : undefined}>
+            中文
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+      <Tooltip label={theme === 'light' ? t('dark') : t('light')}>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          aria-label={t('theme')}
+          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
         >
-          <option value="default">{t('default')}</option>
-          <option value="friendly">{t('friendly')}</option>
-        </select>
-      </label>
-    </div>
+          {theme === 'light' ? (
+            <IconMoon size={19} stroke={1.8} />
+          ) : (
+            <IconSun size={19} stroke={1.8} />
+          )}
+        </ActionIcon>
+      </Tooltip>
+    </Group>
   )
 }

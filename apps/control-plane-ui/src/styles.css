@@ -19,46 +19,8 @@
   --link: #8ab4f8;
   --text: #e8eaed;
 }
-/* Color-vision mode supplements status colors with a distinguishable palette;
-   status labels remain visible so color is never the only signal. */
-[data-color-vision='friendly'] .status-failed {
-  border-color: #b54708;
-  color: #b54708;
-}
-[data-color-vision='friendly'] .status-published,
-[data-color-vision='friendly'] .status-succeeded {
-  border-color: #1769aa;
-  color: #1769aa;
-}
-[data-theme='dark'][data-color-vision='friendly'] .status-failed {
-  border-color: #ffb366;
-  color: #ffb366;
-}
-[data-theme='dark'][data-color-vision='friendly'] .status-published,
-[data-theme='dark'][data-color-vision='friendly'] .status-succeeded {
-  border-color: #8ab4f8;
-  color: #8ab4f8;
-}
 body {
   margin: 0;
-}
-.app-bar {
-  position: sticky;
-  z-index: 10;
-  top: 0;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(10px);
-}
-.app-bar-inner {
-  display: flex;
-  min-height: 58px;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 24px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
 }
 .brand {
   color: inherit;
@@ -67,68 +29,8 @@ body {
   text-decoration: none;
   white-space: nowrap;
 }
-main {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 32px 24px;
-}
-h1 {
-  font-size: 24px;
-  letter-spacing: 0;
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.preferences {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.preferences label {
-  grid-template-columns: auto minmax(88px, auto);
-  align-items: center;
-  gap: 6px;
-}
-.preferences select {
-  min-height: 34px;
-}
-.eyebrow {
-  color: var(--muted);
-  font-size: 12px;
-  text-transform: uppercase;
-  margin: 0 0 4px;
-}
 .run-id {
   overflow-wrap: anywhere;
-}
-.filters {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-label {
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--muted);
-}
-select,
-input,
-button {
-  min-height: 38px;
-  border: 1px solid #b8bdc5;
-  border-radius: 4px;
-  background: var(--surface);
-  color: inherit;
-  padding: 0 10px;
-  font: inherit;
-}
-button {
-  cursor: pointer;
 }
 .table-wrap {
   overflow-x: auto;
@@ -136,56 +38,8 @@ button {
 .table-wrap table {
   min-width: 680px;
 }
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--surface);
-}
-th,
-td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-th {
-  color: var(--muted);
-  font-size: 13px;
-}
 a {
   color: var(--link);
-}
-.status {
-  display: inline-block;
-  align-self: flex-start;
-  border: 1px solid #b8bdc5;
-  border-radius: 4px;
-  padding: 3px 7px;
-  font-size: 12px;
-  background: var(--surface);
-}
-.status-failed {
-  border-color: #c9362b;
-  color: #a5271e;
-}
-.status-published,
-.status-succeeded {
-  border-color: #27833e;
-  color: #196b2d;
-}
-.empty {
-  padding: 32px 0;
-  color: var(--muted);
-}
-.next {
-  margin-top: 16px;
-}
-.back {
-  display: inline-block;
-  margin-bottom: 24px;
-}
-h2 {
-  margin-top: 32px;
-  font-size: 17px;
 }
 dt {
   margin-top: 16px;
@@ -202,51 +56,12 @@ pre {
   border: 1px solid var(--border);
   padding: 12px;
 }
-.login {
-  max-width: 420px;
-  padding-top: 15vh;
-}
-.login form {
+.mantine-Paper-root form {
   display: grid;
   gap: 16px;
 }
 @media (max-width: 600px) {
-  main {
-    padding: 20px 16px;
-  }
-  .app-bar-inner {
-    min-height: auto;
-    padding: 10px 16px;
-    align-items: stretch;
-    flex-direction: column;
-    gap: 8px;
-  }
   .brand {
-    font-size: 14px;
-  }
-  header,
-  .filters {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .preferences {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: 100%;
-  }
-  .preferences label {
-    display: block;
-    color: transparent;
-    font-size: 0;
-  }
-  .preferences select {
-    width: 100%;
-    min-width: 0;
-    max-width: none;
-    color: var(--text);
     font-size: 13px;
-  }
-  h1 {
-    font-size: 20px;
   }
 }
