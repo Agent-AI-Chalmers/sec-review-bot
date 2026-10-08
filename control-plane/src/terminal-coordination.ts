@@ -57,7 +57,7 @@ export async function observeRunnerRun(
     return 'failed'
   }
   if (status.status === 'running') {
-    await store.markRunning(run.run_id)
+    if (!(await store.markRunning(run.run_id))) return 'active'
     onEvent({
       kind: 'runner_state_changed',
       run_id: run.run_id,
@@ -108,7 +108,9 @@ export async function observeRunnerRun(
     })
     return 'failed'
   }
-  await store.recordRunnerSuccess(run.run_id, status.result, status.artifact_publication)
+  if (!(await store.recordRunnerSuccess(run.run_id, status.result, status.artifact_publication))) {
+    return 'succeeded'
+  }
   onEvent({
     kind: 'runner_terminal_recorded',
     run_id: run.run_id,

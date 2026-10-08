@@ -228,6 +228,52 @@ test('delivery-draft-pr stops before the next GitHub write after claim loss', as
   assert.equal(octokit.calls.pulls.length, 0)
 })
 
+test('delivery-draft-pr reuses a PR when the create response is lost', async () => {
+  const octokit = createOctokitMock()
+  const existing: Array<{
+    title: string
+    body: string | null
+    html_url: string
+    number: number
+  }> = []
+  let createAttempts = 0
+  octokit.rest.pulls.list = async () => ({ data: existing })
+  octokit.rest.pulls.create = async (args) => {
+    createAttempts += 1
+    existing.push({
+      title: args.title,
+      body: args.body,
+      html_url: 'https://example.test/pull/lost-response',
+      number: 42
+    })
+    throw new Error('response lost after GitHub created the pull request')
+  }
+  const args = {
+    octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+    repo: {
+      owner_login: 'octo-org',
+      repo_name: 'example-repo',
+      default_branch: 'main'
+    },
+    run_id: 'run-lost-pr-response',
+    input: { workspace_ref: 'base-sha' },
+    delivery: {
+      delivery_id: 'delivery-lost-response',
+      case_ids: ['case-1'],
+      case_count: 1,
+      file_changes: [
+        { path: 'src/app.txt', status: 'upsert', content: 'fixed\n', content_encoding: 'utf-8' }
+      ]
+    } satisfies RepositoryDelivery
+  }
+
+  await assert.rejects(createRepositoryDeliveryDraftPr(args), /response lost/)
+  const retry = await createRepositoryDeliveryDraftPr(args)
+  assert.equal(createAttempts, 1)
+  assert.equal(retry.reused, true)
+  assert.equal(retry.number, 42)
+})
+
 test('delivery-draft-pr uses scan target branch as PR base when provided', async () => {
   const octokit = createOctokitMock()
   const repo: CreateRepositoryDeliveryDraftPrRepo = {

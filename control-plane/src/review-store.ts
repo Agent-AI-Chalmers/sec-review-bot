@@ -552,8 +552,8 @@ export class ReviewRunStore {
     )
     return result.rows.map(rowToRecord)
   }
-  async markRunning(runId: string): Promise<void> {
-    await this.pool.query(
+  async markRunning(runId: string): Promise<boolean> {
+    const result = await this.pool.query(
       `
       UPDATE review_runs
       SET runner_status='running', updated_at=clock_timestamp()
@@ -561,6 +561,7 @@ export class ReviewRunStore {
     `,
       [runId, this.connectorId]
     )
+    return result.rowCount === 1
   }
   async recordArtifactPublication(
     runId: string,
@@ -704,10 +705,6 @@ export class ReviewRunStore {
       SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2
         AND status='publishing' AND claim_token=$3
-        AND NOT EXISTS (
-          SELECT 1 FROM publication_steps
-          WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded'
-        )
     `,
       [runId, this.connectorId, token]
     )
@@ -886,6 +883,10 @@ export class ReviewRunStore {
           failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2
         AND status='publishing' AND claim_token=$3
+        AND NOT EXISTS (
+          SELECT 1 FROM publication_steps
+          WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded'
+        )
     `,
       [runId, this.connectorId, token]
     )

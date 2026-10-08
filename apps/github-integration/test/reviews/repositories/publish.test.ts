@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { ensureSummaryIssueNumber } from '../../../src/reviews/repositories/publish.js'
+import { REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE } from '../../../src/reviews/repositories/renderer.js'
+
 import { publishDeliveryDraftPrs } from '../../../src/reviews/repositories/publish.js'
 import type {
   ControlPlaneClient,
@@ -209,4 +212,35 @@ test('repository delivery recovery skips terminal failures and reaches later wor
     published.map((item) => item.html_url),
     ['https://example.test/pull/12']
   )
+})
+test('summary issue lookup reuses an issue when the create response is lost', async () => {
+  let created = false
+  let createAttempts = 0
+  const octokit = {
+    rest: {
+      issues: {
+        listForRepo: async () => ({
+          data: created
+            ? [
+                {
+                  number: 17,
+                  title: REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE,
+                  pull_request: undefined
+                }
+              ]
+            : []
+        }),
+        create: async () => {
+          createAttempts += 1
+          created = true
+          throw new Error('response lost after issue creation')
+        }
+      }
+    }
+  }
+  const repo = { owner_login: 'octo', repo_name: 'example', default_branch: 'main' }
+  const ensure = () => ensureSummaryIssueNumber(octokit as never, repo as never, async () => {})
+  await assert.rejects(ensure(), /response lost/)
+  assert.equal(await ensure(), 17)
+  assert.equal(createAttempts, 1)
 })

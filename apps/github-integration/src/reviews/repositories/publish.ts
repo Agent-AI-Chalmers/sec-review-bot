@@ -288,7 +288,7 @@ export async function publishDeliveryDraftPrs({
   return published_delivery_entries
 }
 
-async function ensureSummaryIssueNumber(
+export async function ensureSummaryIssueNumber(
   octokit: GitHubAppOctokit,
   repo: RepositoryContext,
   assertPublicationClaim: () => Promise<void>

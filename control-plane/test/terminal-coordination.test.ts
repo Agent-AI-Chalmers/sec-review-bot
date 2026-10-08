@@ -19,9 +19,11 @@ function store(events: unknown[][]): Parameters<typeof observeRunnerRun>[0] {
   return {
     async markRunning(id) {
       events.push(['running', id])
+      return true
     },
     async recordRunnerSuccess(id, result, artifact) {
       events.push(['succeeded', id, result, artifact])
+      return true
       return true
     },
     async failRunnerExecution(id, failure, artifact) {
@@ -122,4 +124,41 @@ test('Runner failure records its artifact atomically with the terminal failure',
   assert.deepEqual(events, [
     ['failed', 'run-1', { code: 'RUNNER_FAILED', message: 'failed' }, artifact]
   ])
+})
+
+test('a stale running observation does not emit a state-change event', async () => {
+  const events: unknown[] = []
+  const result = await observeRunnerRun(
+    {
+      ...store([]),
+      markRunning: async () => false
+    },
+    run,
+    async () => ({ run_id: 'run-1', workflow: 'issue-review', status: 'running' }),
+    () => false,
+    (event) => events.push(event)
+  )
+  assert.equal(result, 'active')
+  assert.deepEqual(events, [])
+})
+
+test('a stale successful observation does not emit a terminal event', async () => {
+  const events: unknown[] = []
+  const result = await observeRunnerRun(
+    {
+      ...store([]),
+      recordRunnerSuccess: async () => false
+    },
+    run,
+    async () => ({
+      run_id: 'run-1',
+      workflow: 'issue-review',
+      status: 'succeeded',
+      result: { answer: 42 }
+    }),
+    () => false,
+    (event) => events.push(event)
+  )
+  assert.equal(result, 'succeeded')
+  assert.deepEqual(events, [])
 })
