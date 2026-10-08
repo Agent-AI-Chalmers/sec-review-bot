@@ -38,6 +38,7 @@ const messages = {
     noSteps: 'No publication steps recorded.',
     step: 'Step',
     failureCount: 'Failures',
+    latestError: 'Latest error',
     unable: 'Unable to load Control Plane',
     requestFailed: 'The service could not complete this request.'
   },
@@ -73,6 +74,7 @@ const messages = {
     noSteps: '没有记录发布步骤。',
     step: '步骤',
     failureCount: '失败次数',
+    latestError: '最近错误',
     unable: '无法加载 Control Plane',
     requestFailed: '服务无法完成此请求。'
   }

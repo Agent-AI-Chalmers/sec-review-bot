@@ -297,7 +297,7 @@ function Detail(): React.JSX.Element {
                           <Table.Th w="16%" ta="right">
                             {t('failureCount')}
                           </Table.Th>
-                          <Table.Th w="24%">{t('failure')}</Table.Th>
+                          <Table.Th w="24%">{t('latestError')}</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
