@@ -266,30 +266,47 @@ function Detail(): React.JSX.Element {
               </pre>
             </Box>
             <Box component="section">
-              <Title order={2}>{t('publicationSteps')}</Title>
+              <Title order={2} mb="sm">
+                {t('publicationSteps')}
+              </Title>
               {steps.length === 0 ? (
-                <p>{t('noSteps')}</p>
+                <Text c="dimmed">{t('noSteps')}</Text>
               ) : (
-                <Table striped>
-                  <thead>
-                    <tr>
-                      <th>{t('step')}</th>
-                      <th>{t('status')}</th>
-                      <th>{t('attempts')}</th>
-                      <th>{t('failure')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {steps.map((step) => (
-                      <tr key={step.step_key}>
-                        <td>{step.step_key}</td>
-                        <td>{step.status}</td>
-                        <td>{step.attempts}</td>
-                        <td>{step.failure_code ?? t('none')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
+                <Paper withBorder radius="sm" className="table-wrap">
+                  <Table.ScrollContainer minWidth={620}>
+                    <Table striped verticalSpacing="sm">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th w="36%">{t('step')}</Table.Th>
+                          <Table.Th w="24%">{t('status')}</Table.Th>
+                          <Table.Th w="16%" ta="right">
+                            {t('attempts')}
+                          </Table.Th>
+                          <Table.Th w="24%">{t('failure')}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {steps.map((step) => (
+                          <Table.Tr key={step.step_key}>
+                            <Table.Td>{step.step_key}</Table.Td>
+                            <Table.Td>
+                              <Badge
+                                variant="light"
+                                color={step.status === 'failed' ? 'red' : 'blue'}
+                              >
+                                {step.status}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td ta="right" ff="monospace">
+                              {step.attempts}
+                            </Table.Td>
+                            <Table.Td>{step.failure_code ?? '—'}</Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                </Paper>
               )}
             </Box>
           </Stack>

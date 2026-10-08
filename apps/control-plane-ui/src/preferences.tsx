@@ -38,7 +38,6 @@ const messages = {
     noSteps: 'No publication steps recorded.',
     step: 'Step',
     attempts: 'Attempts',
-    none: 'None',
     unable: 'Unable to load Control Plane',
     requestFailed: 'The service could not complete this request.'
   },
@@ -74,7 +73,6 @@ const messages = {
     noSteps: '没有记录发布步骤。',
     step: '步骤',
     attempts: '尝试次数',
-    none: '无',
     unable: '无法加载 Control Plane',
     requestFailed: '服务无法完成此请求。'
   }
