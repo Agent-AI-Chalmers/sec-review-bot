@@ -11,6 +11,7 @@ import {
   NativeSelect,
   Paper,
   Stack,
+  Switch,
   Table,
   Text,
   Timeline,
@@ -67,21 +68,126 @@ function Login(): React.JSX.Element {
   )
 }
 
+function useRefresh(
+  load: () => Promise<void>,
+  enabled = true
+): {
+  refresh: () => void
+  refreshing: boolean
+  lastChecked: Date | undefined
+} {
+  const { autoRefresh, refreshInterval } = usePreferences()
+  const [refreshing, setRefreshing] = React.useState(false)
+  const [lastChecked, setLastChecked] = React.useState<Date>()
+  const inFlight = React.useRef(false)
+  const pending = React.useRef(false)
+  const loadRef = React.useRef(load)
+  loadRef.current = load
+  const refresh = React.useCallback(function runRefresh(): void {
+    if (inFlight.current) {
+      pending.current = true
+      return
+    }
+    inFlight.current = true
+    setRefreshing(true)
+    void loadRef.current().finally(() => {
+      inFlight.current = false
+      setRefreshing(false)
+      setLastChecked(new Date())
+      if (pending.current) {
+        pending.current = false
+        runRefresh()
+      }
+    })
+  }, [])
+  React.useEffect(() => {
+    refresh()
+  }, [refresh, load])
+  React.useEffect(() => {
+    if (!autoRefresh || !enabled) return
+    const check = (): void => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const timer = window.setInterval(check, refreshInterval)
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return (): void => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [autoRefresh, enabled, refresh, refreshInterval])
+  return { refresh, refreshing, lastChecked }
+}
+
+function RefreshControls({
+  refresh,
+  refreshing,
+  lastChecked
+}: {
+  refresh: () => void
+  refreshing: boolean
+  lastChecked: Date | undefined
+}): React.JSX.Element {
+  const { language, autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } =
+    usePreferences()
+  const t = useMessages()
+  return (
+    <Stack gap={4} align="flex-end" className="refresh-controls">
+      <Text c="dimmed" size="xs" ta="right">
+        {t('lastChecked')}:{' '}
+        {lastChecked ? formatDate(lastChecked.toISOString(), language) : t('neverChecked')}
+      </Text>
+      <Group gap="sm" wrap="nowrap">
+        <Switch
+          label={t('autoRefresh')}
+          checked={autoRefresh}
+          onChange={(event) => setAutoRefresh(event.currentTarget.checked)}
+        />
+        <NativeSelect
+          aria-label={t('refreshInterval')}
+          value={String(refreshInterval)}
+          disabled={!autoRefresh}
+          onChange={(event) =>
+            setRefreshInterval(Number(event.currentTarget.value) as 5000 | 15000 | 30000 | 60000)
+          }
+        >
+          <option value="5000">5s</option>
+          <option value="15000">15s</option>
+          <option value="30000">30s</option>
+          <option value="60000">1m</option>
+        </NativeSelect>
+        <Button
+          variant="default"
+          leftSection={<IconRefresh size={16} />}
+          loading={refreshing}
+          onClick={refresh}
+        >
+          {t('refresh')}
+        </Button>
+      </Group>
+    </Stack>
+  )
+}
+
 function Runs(): React.JSX.Element {
   const { language } = usePreferences()
   const t = useMessages()
   const [search, setSearch] = useSearchParams()
   const [data, setData] = React.useState<{ runs: Run[]; next_cursor: string | null }>()
   const [error, setError] = React.useState<unknown>()
-  const [version, refresh] = React.useReducer((value) => value + 1, 0)
-  React.useEffect(() => {
-    setData(undefined)
-    void api<{ runs: Run[]; next_cursor: string | null }>(`/runs?${search.toString()}`).then(
-      setData,
-      setError
-    )
-  }, [search, version])
-  if (error) throw error
+  const query = search.toString()
+  const load = React.useCallback(async (): Promise<void> => {
+    try {
+      setData(await api<{ runs: Run[]; next_cursor: string | null }>(`/runs?${query}`))
+      setError(undefined)
+    } catch (value) {
+      setError(value)
+    }
+  }, [query])
+  const { refresh, refreshing, lastChecked } = useRefresh(load)
+  if (error && data === undefined) throw error
   const update = (name: string, value: string): void => {
     const next = new URLSearchParams(search)
     if (value) next.set(name, value)
@@ -91,48 +197,53 @@ function Runs(): React.JSX.Element {
   }
   return (
     <Container component="main" size="lg" py="xl">
-      <Group justify="space-between" align="flex-start" mb="xl">
-        <div>
-          <Text c="dimmed" size="xs" tt="uppercase">
-            Review Control Plane
-          </Text>
-          <Title order={1}>{t('runs')}</Title>
-        </div>
-        <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={refresh}>
-          {t('refresh')}
-        </Button>
-      </Group>
-      <Group mb="lg" aria-label="Run filters">
-        <NativeSelect
-          label={t('status')}
-          value={search.get('status') ?? ''}
-          onChange={(event) => update('status', event.target.value)}
-        >
-          <option value="">{t('all')}</option>
-          {[
-            'preparing',
-            'recovering',
-            'queued',
-            'running',
-            'succeeded',
-            'publishing',
-            'published',
-            'failed'
-          ].map((value) => (
-            <option key={value}>{value}</option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          label={t('workflow')}
-          value={search.get('workflow') ?? ''}
-          onChange={(event) => update('workflow', event.target.value)}
-        >
-          <option value="">{t('all')}</option>
-          {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
-            <option key={value}>{value}</option>
-          ))}
-        </NativeSelect>
-      </Group>
+      <Box mb="lg">
+        <Text c="dimmed" size="xs" tt="uppercase">
+          Review Control Plane
+        </Text>
+        <Title order={1}>{t('runs')}</Title>
+      </Box>
+      {Boolean(error) && (
+        <Text role="alert" c="red" mb="md">
+          {t('refreshFailed')}
+        </Text>
+      )}
+      <Box className="operations-bar" mb="lg">
+        <Group justify="space-between" align="flex-end" gap="lg">
+          <Group aria-label="Run filters" align="flex-end">
+            <NativeSelect
+              label={t('status')}
+              value={search.get('status') ?? ''}
+              onChange={(event) => update('status', event.target.value)}
+            >
+              <option value="">{t('all')}</option>
+              {[
+                'preparing',
+                'recovering',
+                'queued',
+                'running',
+                'succeeded',
+                'publishing',
+                'published',
+                'failed'
+              ].map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
+              label={t('workflow')}
+              value={search.get('workflow') ?? ''}
+              onChange={(event) => update('workflow', event.target.value)}
+            >
+              <option value="">{t('all')}</option>
+              {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </NativeSelect>
+          </Group>
+          <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
+        </Group>
+      </Box>
       {data === undefined ? (
         <p>{t('loadingRuns')}</p>
       ) : data.runs.length === 0 ? (
@@ -199,16 +310,22 @@ function Detail(): React.JSX.Element {
   const [run, setRun] = React.useState<Run>()
   const [steps, setSteps] = React.useState<Step[]>([])
   const [error, setError] = React.useState<unknown>()
-  React.useEffect(() => {
-    void Promise.all([
-      api<{ run: Run }>(`/runs/${encodeURIComponent(runId)}`),
-      api<{ publication_steps: Step[] }>(`/runs/${encodeURIComponent(runId)}/publication-steps`)
-    ]).then(([runValue, stepValue]) => {
+  const load = React.useCallback(async (): Promise<void> => {
+    try {
+      const [runValue, stepValue] = await Promise.all([
+        api<{ run: Run }>(`/runs/${encodeURIComponent(runId)}`),
+        api<{ publication_steps: Step[] }>(`/runs/${encodeURIComponent(runId)}/publication-steps`)
+      ])
       setRun(runValue.run)
       setSteps(stepValue.publication_steps)
-    }, setError)
+      setError(undefined)
+    } catch (value) {
+      setError(value)
+    }
   }, [runId])
-  if (error) throw error
+  const terminal = run ? ['published', 'failed'].includes(run.status) : false
+  const { refresh, refreshing, lastChecked } = useRefresh(load, !terminal)
+  if (error && run === undefined) throw error
   return (
     <Container component="main" size="lg" py="xl">
       <Button
@@ -225,7 +342,7 @@ function Detail(): React.JSX.Element {
         <p>{t('loadingRun')}</p>
       ) : (
         <>
-          <Group justify="space-between" align="flex-start" mb="xl">
+          <Group justify="space-between" align="flex-start" mb="md">
             <div>
               <Text c="dimmed" size="xs" tt="uppercase">
                 {run.workflow}
@@ -238,7 +355,15 @@ function Detail(): React.JSX.Element {
               {run.status}
             </Badge>
           </Group>
+          <Box className="operations-bar detail-operations" mb="xl">
+            <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
+          </Box>
           <Stack gap="xl">
+            {Boolean(error) && (
+              <Text role="alert" c="red">
+                {t('refreshFailed')}
+              </Text>
+            )}
             <Paper component="section" withBorder radius="sm" p="md">
               <Group justify="space-between" align="flex-start" mb="lg">
                 <Title order={2}>{t('timeline')}</Title>

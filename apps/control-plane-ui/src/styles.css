@@ -38,6 +38,18 @@ body {
 .table-wrap table {
   min-width: 680px;
 }
+.operations-bar {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.detail-operations {
+  display: flex;
+  justify-content: flex-end;
+}
+.refresh-controls .mantine-NativeSelect-root {
+  width: 72px;
+}
 a {
   color: var(--link);
 }
@@ -63,5 +75,19 @@ pre {
 @media (max-width: 600px) {
   .brand {
     font-size: 13px;
+  }
+  .operations-bar > .mantine-Group-root {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .operations-bar [aria-label='Run filters'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .operations-bar [aria-label='Run filters'] > * {
+    min-width: 0;
+  }
+  .refresh-controls {
+    align-items: flex-end;
   }
 }
