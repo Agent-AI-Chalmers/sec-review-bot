@@ -65,6 +65,14 @@ install -d -m 0755 -o "$service_uid" -g "$service_gid" \
     "$repository_root/.agent-postgres-state" \
     "$repository_root/.agent-artifacts" \
     "$repository_root/.agent-run-inputs"
+# GNU install preserves the owner of directories that already exist. Correct
+# the bind-mount roots explicitly without traversing potentially large state.
+chown "$service_uid:$service_gid" \
+    "$repository_root/.agent-temporal-state" \
+    "$repository_root/.agent-rustfs-state" \
+    "$repository_root/.agent-postgres-state" \
+    "$repository_root/.agent-artifacts" \
+    "$repository_root/.agent-run-inputs"
 if [ ! -f "$deployment_env_source" ]; then
     echo "Missing deployment config: $deployment_env_source" >&2
     echo "Copy deployment.env.sample to deployment.env and fill in its values first." >&2
