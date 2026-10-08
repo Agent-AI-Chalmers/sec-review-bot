@@ -2,15 +2,23 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Link, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiError, login, type Run } from './api.js'
+import {
+  formatDate,
+  PreferenceControls,
+  Preferences,
+  useMessages,
+  usePreferences
+} from './preferences.js'
 import './styles.css'
 
 function Login(): React.JSX.Element {
+  const t = useMessages()
   const [token, setToken] = React.useState('')
   const [error, setError] = React.useState('')
   return (
     <main className="login">
       <h1>Control Plane</h1>
-      <p>Sign in to inspect review runs.</p>
+      <p>{t('signInHint')}</p>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -18,12 +26,12 @@ function Login(): React.JSX.Element {
             () => {
               window.location.href = '/runs'
             },
-            () => setError('Access denied.')
+            () => setError(t('denied'))
           )
         }}
       >
         <label>
-          Access token
+          {t('accessToken')}
           <input
             autoFocus
             type="password"
@@ -31,7 +39,7 @@ function Login(): React.JSX.Element {
             onChange={(event) => setToken(event.target.value)}
           />
         </label>
-        <button type="submit">Sign in</button>
+        <button type="submit">{t('signIn')}</button>
         {error && <p role="alert">{error}</p>}
       </form>
     </main>
@@ -39,6 +47,8 @@ function Login(): React.JSX.Element {
 }
 
 function Runs(): React.JSX.Element {
+  const { language } = usePreferences()
+  const t = useMessages()
   const [search, setSearch] = useSearchParams()
   const [data, setData] = React.useState<{ runs: Run[]; next_cursor: string | null }>()
   const [error, setError] = React.useState<unknown>()
@@ -63,18 +73,21 @@ function Runs(): React.JSX.Element {
       <header>
         <div>
           <p className="eyebrow">Review Control Plane</p>
-          <h1>Review runs</h1>
+          <h1>{t('runs')}</h1>
         </div>
-        <button onClick={refresh}>Refresh</button>
+        <div className="header-actions">
+          <PreferenceControls />
+          <button onClick={refresh}>{t('refresh')}</button>
+        </div>
       </header>
       <section className="filters" aria-label="Run filters">
         <label>
-          Status
+          {t('status')}
           <select
             value={search.get('status') ?? ''}
             onChange={(event) => update('status', event.target.value)}
           >
-            <option value="">All</option>
+            <option value="">{t('all')}</option>
             {[
               'preparing',
               'recovering',
@@ -90,12 +103,12 @@ function Runs(): React.JSX.Element {
           </select>
         </label>
         <label>
-          Workflow
+          {t('workflow')}
           <select
             value={search.get('workflow') ?? ''}
             onChange={(event) => update('workflow', event.target.value)}
           >
-            <option value="">All</option>
+            <option value="">{t('all')}</option>
             {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
               <option key={value}>{value}</option>
             ))}
@@ -103,19 +116,19 @@ function Runs(): React.JSX.Element {
         </label>
       </section>
       {data === undefined ? (
-        <p>Loading runs...</p>
+        <p>{t('loadingRuns')}</p>
       ) : data.runs.length === 0 ? (
-        <p className="empty">No review runs match these filters.</p>
+        <p className="empty">{t('emptyRuns')}</p>
       ) : (
         <>
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Run</th>
-                  <th>Workflow</th>
-                  <th>Status</th>
-                  <th>Updated</th>
+                  <th>{t('run')}</th>
+                  <th>{t('workflow')}</th>
+                  <th>{t('status')}</th>
+                  <th>{t('updated')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,7 +141,7 @@ function Runs(): React.JSX.Element {
                     <td>
                       <span className={`status status-${run.status}`}>{run.status}</span>
                     </td>
-                    <td>{new Date(run.updated_at).toLocaleString()}</td>
+                    <td>{formatDate(run.updated_at, language)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -143,7 +156,7 @@ function Runs(): React.JSX.Element {
                 setSearch(next)
               }}
             >
-              Next page
+              {t('nextPage')}
             </button>
           )}
         </>
@@ -159,6 +172,8 @@ interface Step {
   failure_code: string | null
 }
 function Detail(): React.JSX.Element {
+  const { language } = usePreferences()
+  const t = useMessages()
   const { runId = '' } = useParams()
   const [run, setRun] = React.useState<Run>()
   const [steps, setSteps] = React.useState<Step[]>([])
@@ -176,10 +191,10 @@ function Detail(): React.JSX.Element {
   return (
     <main>
       <Link className="back" to="/runs">
-        Back to runs
+        {t('back')}
       </Link>
       {run === undefined ? (
-        <p>Loading run...</p>
+        <p>{t('loadingRun')}</p>
       ) : (
         <>
           <header>
@@ -190,44 +205,44 @@ function Detail(): React.JSX.Element {
             <span className={`status status-${run.status}`}>{run.status}</span>
           </header>
           <section>
-            <h2>Execution</h2>
+            <h2>{t('execution')}</h2>
             <dl>
-              <dt>Created</dt>
-              <dd>{new Date(run.created_at).toLocaleString()}</dd>
-              <dt>Updated</dt>
-              <dd>{new Date(run.updated_at).toLocaleString()}</dd>
-              <dt>Published</dt>
+              <dt>{t('created')}</dt>
+              <dd>{formatDate(run.created_at, language)}</dd>
+              <dt>{t('updated')}</dt>
+              <dd>{formatDate(run.updated_at, language)}</dd>
+              <dt>{t('published')}</dt>
               <dd>
-                {run.published_at ? new Date(run.published_at).toLocaleString() : 'Not published'}
+                {run.published_at ? formatDate(run.published_at, language) : t('notPublished')}
               </dd>
               {run.failure_code && (
                 <>
-                  <dt>Failure</dt>
+                  <dt>{t('failure')}</dt>
                   <dd>{run.failure_code}</dd>
                 </>
               )}
             </dl>
           </section>
           <section>
-            <h2>Artifact</h2>
+            <h2>{t('artifact')}</h2>
             <pre>
               {run.artifact_publication === null
-                ? 'No artifact publication recorded.'
+                ? t('noArtifact')
                 : JSON.stringify(run.artifact_publication, null, 2)}
             </pre>
           </section>
           <section>
-            <h2>Publication steps</h2>
+            <h2>{t('publicationSteps')}</h2>
             {steps.length === 0 ? (
-              <p>No publication steps recorded.</p>
+              <p>{t('noSteps')}</p>
             ) : (
               <table>
                 <thead>
                   <tr>
-                    <th>Step</th>
-                    <th>Status</th>
-                    <th>Attempts</th>
-                    <th>Failure</th>
+                    <th>{t('step')}</th>
+                    <th>{t('status')}</th>
+                    <th>{t('attempts')}</th>
+                    <th>{t('failure')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -236,7 +251,7 @@ function Detail(): React.JSX.Element {
                       <td>{step.step_key}</td>
                       <td>{step.status}</td>
                       <td>{step.attempts}</td>
-                      <td>{step.failure_code ?? 'None'}</td>
+                      <td>{step.failure_code ?? t('none')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -256,15 +271,18 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
   render(): React.ReactNode {
     if (this.state.error instanceof ApiError && this.state.error.status === 401) return <Login />
-    if (this.state.error)
-      return (
-        <main>
-          <h1>Unable to load Control Plane</h1>
-          <p role="alert">The service could not complete this request.</p>
-        </main>
-      )
+    if (this.state.error) return <ErrorFallback />
     return this.props.children
   }
+}
+function ErrorFallback(): React.JSX.Element {
+  const t = useMessages()
+  return (
+    <main>
+      <h1>{t('unable')}</h1>
+      <p role="alert">{t('requestFailed')}</p>
+    </main>
+  )
 }
 function App(): React.JSX.Element {
   return (
@@ -278,7 +296,9 @@ function App(): React.JSX.Element {
   )
 }
 createRoot(document.getElementById('root')!).render(
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>
+  <Preferences>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </Preferences>
 )

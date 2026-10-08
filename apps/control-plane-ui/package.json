@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:fixtures": "CONTROL_PLANE_UI_DEV_FIXTURES=1 vite",
     "build": "vite build && tsc -p tsconfig.server.json",
     "server": "node dist-server/server/index.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
