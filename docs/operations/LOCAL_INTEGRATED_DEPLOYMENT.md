@@ -369,13 +369,13 @@ Temporal distributes tasks among instances that share a task queue. Tune one pro
 
 ## Cleanup
 
-GitHub integration uses the container's default root user for local staging files. Durable input archives live in RustFS, and the host worker writes runtime artifacts as its own user.
-
-To repair ownership:
+The installer creates the repository-local bind-mount roots and assigns them to the configured service user. Run the installer after changing the service user or deployment checkout:
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-run-inputs .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
+sudo ops/systemd/install.sh "$USER"
 ```
+
+Files inside the PostgreSQL, Temporal, and RustFS state directories retain the service-specific ownership required by their containers.
 
 The PostgreSQL coordination store and Temporal state describe the same active runs. Do not delete `.agent-temporal-state` while retaining PostgreSQL records that still need polling or publication. To reset run execution and publication state, stop the complete service and remove both state directories together:
 

@@ -371,13 +371,13 @@ Temporal 会在共用 task queue 的实例之间分配任务。应先调整单�
 
 ## 清理
 
-GitHub integration 使用容器默认 root 用户写入本地 staging 文件。持久 input archive 位于 RustFS，宿主 worker 会以自身用户身份写入 runtime artifacts。
-
-可用下面命令修复 ownership：
+安装脚本会创建仓库内的 bind-mount 根目录，并将其 ownership 设置为配置的 service user。更换 service user 或部署 checkout 后，运行安装脚本：
 
 ```bash
-sudo chown -R "$USER:$USER" .agent-run-inputs .agent-artifacts .agent-rustfs-state .agent-postgres-state .agent-temporal-state
+sudo ops/systemd/install.sh "$USER"
 ```
+
+PostgreSQL、Temporal 和 RustFS 状态目录内的文件保留各自容器所需的 ownership。
 
 PostgreSQL 协调状态与 Temporal 状态描述的是同一批活跃 run。不要在保留仍需轮询或发布的 PostgreSQL 记录时单独删除 `.agent-temporal-state`。重置 run 执行与发布状态时，应先停止完整服务，再同时删除两个状态目录：
 
