@@ -13,9 +13,10 @@ import {
   Stack,
   Table,
   Text,
+  Timeline,
   Title
 } from '@mantine/core'
-import { IconArrowLeft, IconRefresh } from '@tabler/icons-react'
+import { IconArrowLeft, IconCheck, IconClock, IconRefresh } from '@tabler/icons-react'
 import { api, ApiError, login, type Run } from './api.js'
 import {
   formatDate,
@@ -238,25 +239,39 @@ function Detail(): React.JSX.Element {
             </Badge>
           </Group>
           <Stack gap="xl">
-            <Box component="section">
-              <Title order={2}>{t('execution')}</Title>
-              <dl>
-                <dt>{t('created')}</dt>
-                <dd>{formatDate(run.created_at, language)}</dd>
-                <dt>{t('updated')}</dt>
-                <dd>{formatDate(run.updated_at, language)}</dd>
-                <dt>{t('published')}</dt>
-                <dd>
-                  {run.published_at ? formatDate(run.published_at, language) : t('notPublished')}
-                </dd>
-                {run.failure_code && (
-                  <>
-                    <dt>{t('failure')}</dt>
-                    <dd>{run.failure_code}</dd>
-                  </>
-                )}
-              </dl>
-            </Box>
+            <Paper component="section" withBorder radius="sm" p="md">
+              <Group justify="space-between" align="flex-start" mb="lg">
+                <Title order={2}>{t('timeline')}</Title>
+                <div>
+                  <Text c="dimmed" size="xs" ta="right">
+                    {t('updated')}
+                  </Text>
+                  <Text size="sm">{formatDate(run.updated_at, language)}</Text>
+                </div>
+              </Group>
+              <Timeline active={run.published_at ? 1 : 0} bulletSize={24} lineWidth={2}>
+                <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
+                  <Text c="dimmed" size="sm">
+                    {formatDate(run.created_at, language)}
+                  </Text>
+                </Timeline.Item>
+                <Timeline.Item bullet={<IconCheck size={14} />} title={t('published')}>
+                  <Text c="dimmed" size="sm">
+                    {run.published_at ? formatDate(run.published_at, language) : t('notPublished')}
+                  </Text>
+                </Timeline.Item>
+              </Timeline>
+              {run.failure_code && (
+                <Box mt="md">
+                  <Text c="dimmed" size="xs">
+                    {t('failure')}
+                  </Text>
+                  <Text c="red" mt={2}>
+                    {run.failure_code}
+                  </Text>
+                </Box>
+              )}
+            </Paper>
             <Box component="section">
               <Title order={2}>{t('artifact')}</Title>
               <pre>
