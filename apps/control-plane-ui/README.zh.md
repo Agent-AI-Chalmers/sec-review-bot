@@ -12,6 +12,8 @@ pnpm test
 pnpm run build
 ```
 
+`pnpm run dev` 连接本机 8091 端口的 UI server；`pnpm run dev:fixtures` 使用固定的开发数据预览完整界面，不需要启动后端服务。
+
 生产服务需要 `CONTROL_PLANE_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`。只读 token 只能调用 Control Plane 查询路由；访问 token 用于建立 HTTP-only 浏览器会话，不能放入 Vite 变量或浏览器代码。
 
 通过 Compose 启动时，默认本地地址为 `http://127.0.0.1:8091`。

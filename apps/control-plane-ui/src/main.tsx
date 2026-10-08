@@ -1,44 +1,75 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Link, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
+import {
+  AppShell,
+  Badge,
+  Box,
+  Button,
+  Container,
+  Group,
+  NativeSelect,
+  Paper,
+  Stack,
+  Table,
+  Text,
+  Timeline,
+  Title
+} from '@mantine/core'
+import { IconArrowLeft, IconCheck, IconClock, IconRefresh } from '@tabler/icons-react'
 import { api, ApiError, login, type Run } from './api.js'
+import {
+  formatDate,
+  PreferenceControls,
+  Preferences,
+  useMessages,
+  usePreferences
+} from './preferences.js'
 import './styles.css'
+import '@mantine/core/styles.css'
 
 function Login(): React.JSX.Element {
+  const t = useMessages()
   const [token, setToken] = React.useState('')
   const [error, setError] = React.useState('')
   return (
-    <main className="login">
-      <h1>Control Plane</h1>
-      <p>Sign in to inspect review runs.</p>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          void login(token).then(
-            () => {
-              window.location.href = '/runs'
-            },
-            () => setError('Access denied.')
-          )
-        }}
-      >
-        <label>
-          Access token
-          <input
-            autoFocus
-            type="password"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          />
-        </label>
-        <button type="submit">Sign in</button>
-        {error && <p role="alert">{error}</p>}
-      </form>
-    </main>
+    <Container component="main" size="xs" py="15vh">
+      <Paper withBorder p="xl" radius="sm">
+        <Title order={1}>Control Plane</Title>
+        <Text c="dimmed" mt="xs">
+          {t('signInHint')}
+        </Text>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            void login(token).then(
+              () => {
+                window.location.href = '/runs'
+              },
+              () => setError(t('denied'))
+            )
+          }}
+        >
+          <label>
+            {t('accessToken')}
+            <input
+              autoFocus
+              type="password"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+            />
+          </label>
+          <Button type="submit">{t('signIn')}</Button>
+          {error && <p role="alert">{error}</p>}
+        </form>
+      </Paper>
+    </Container>
   )
 }
 
 function Runs(): React.JSX.Element {
+  const { language } = usePreferences()
+  const t = useMessages()
   const [search, setSearch] = useSearchParams()
   const [data, setData] = React.useState<{ runs: Run[]; next_cursor: string | null }>()
   const [error, setError] = React.useState<unknown>()
@@ -59,83 +90,86 @@ function Runs(): React.JSX.Element {
     setSearch(next)
   }
   return (
-    <main>
-      <header>
+    <Container component="main" size="lg" py="xl">
+      <Group justify="space-between" align="flex-start" mb="xl">
         <div>
-          <p className="eyebrow">Review Control Plane</p>
-          <h1>Review runs</h1>
+          <Text c="dimmed" size="xs" tt="uppercase">
+            Review Control Plane
+          </Text>
+          <Title order={1}>{t('runs')}</Title>
         </div>
-        <button onClick={refresh}>Refresh</button>
-      </header>
-      <section className="filters" aria-label="Run filters">
-        <label>
-          Status
-          <select
-            value={search.get('status') ?? ''}
-            onChange={(event) => update('status', event.target.value)}
-          >
-            <option value="">All</option>
-            {[
-              'preparing',
-              'recovering',
-              'queued',
-              'running',
-              'succeeded',
-              'publishing',
-              'published',
-              'failed'
-            ].map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Workflow
-          <select
-            value={search.get('workflow') ?? ''}
-            onChange={(event) => update('workflow', event.target.value)}
-          >
-            <option value="">All</option>
-            {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </label>
-      </section>
+        <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={refresh}>
+          {t('refresh')}
+        </Button>
+      </Group>
+      <Group mb="lg" aria-label="Run filters">
+        <NativeSelect
+          label={t('status')}
+          value={search.get('status') ?? ''}
+          onChange={(event) => update('status', event.target.value)}
+        >
+          <option value="">{t('all')}</option>
+          {[
+            'preparing',
+            'recovering',
+            'queued',
+            'running',
+            'succeeded',
+            'publishing',
+            'published',
+            'failed'
+          ].map((value) => (
+            <option key={value}>{value}</option>
+          ))}
+        </NativeSelect>
+        <NativeSelect
+          label={t('workflow')}
+          value={search.get('workflow') ?? ''}
+          onChange={(event) => update('workflow', event.target.value)}
+        >
+          <option value="">{t('all')}</option>
+          {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
+            <option key={value}>{value}</option>
+          ))}
+        </NativeSelect>
+      </Group>
       {data === undefined ? (
-        <p>Loading runs...</p>
+        <p>{t('loadingRuns')}</p>
       ) : data.runs.length === 0 ? (
-        <p className="empty">No review runs match these filters.</p>
+        <p className="empty">{t('emptyRuns')}</p>
       ) : (
         <>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Run</th>
-                  <th>Workflow</th>
-                  <th>Status</th>
-                  <th>Updated</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Paper withBorder radius="sm" className="table-wrap">
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('run')}</Table.Th>
+                  <Table.Th>{t('workflow')}</Table.Th>
+                  <Table.Th>{t('status')}</Table.Th>
+                  <Table.Th>{t('updated')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {data.runs.map((run) => (
-                  <tr key={run.run_id}>
-                    <td>
+                  <Table.Tr key={run.run_id}>
+                    <Table.Td>
                       <Link to={`/runs/${encodeURIComponent(run.run_id)}`}>{run.run_id}</Link>
-                    </td>
-                    <td>{run.workflow}</td>
-                    <td>
-                      <span className={`status status-${run.status}`}>{run.status}</span>
-                    </td>
-                    <td>{new Date(run.updated_at).toLocaleString()}</td>
-                  </tr>
+                    </Table.Td>
+                    <Table.Td>{run.workflow}</Table.Td>
+                    <Table.Td>
+                      <Badge variant="light" color={run.status === 'failed' ? 'red' : 'blue'}>
+                        {run.status}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>{formatDate(run.updated_at, language)}</Table.Td>
+                  </Table.Tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </Table.Tbody>
+            </Table>
+          </Paper>
           {data.next_cursor && (
-            <button
+            <Button
+              variant="default"
               className="next"
               onClick={() => {
                 const next = new URLSearchParams(search)
@@ -143,12 +177,12 @@ function Runs(): React.JSX.Element {
                 setSearch(next)
               }}
             >
-              Next page
-            </button>
+              {t('nextPage')}
+            </Button>
           )}
         </>
       )}
-    </main>
+    </Container>
   )
 }
 
@@ -159,6 +193,8 @@ interface Step {
   failure_code: string | null
 }
 function Detail(): React.JSX.Element {
+  const { language } = usePreferences()
+  const t = useMessages()
   const { runId = '' } = useParams()
   const [run, setRun] = React.useState<Run>()
   const [steps, setSteps] = React.useState<Step[]>([])
@@ -174,78 +210,124 @@ function Detail(): React.JSX.Element {
   }, [runId])
   if (error) throw error
   return (
-    <main>
-      <Link className="back" to="/runs">
-        Back to runs
-      </Link>
+    <Container component="main" size="lg" py="xl">
+      <Button
+        component={Link}
+        to="/runs"
+        variant="subtle"
+        px={0}
+        leftSection={<IconArrowLeft size={16} />}
+        mb="lg"
+      >
+        {t('back')}
+      </Button>
       {run === undefined ? (
-        <p>Loading run...</p>
+        <p>{t('loadingRun')}</p>
       ) : (
         <>
-          <header>
+          <Group justify="space-between" align="flex-start" mb="xl">
             <div>
-              <p className="eyebrow">{run.workflow}</p>
-              <h1 className="run-id">{run.run_id}</h1>
+              <Text c="dimmed" size="xs" tt="uppercase">
+                {run.workflow}
+              </Text>
+              <Title order={1} className="run-id">
+                {run.run_id}
+              </Title>
             </div>
-            <span className={`status status-${run.status}`}>{run.status}</span>
-          </header>
-          <section>
-            <h2>Execution</h2>
-            <dl>
-              <dt>Created</dt>
-              <dd>{new Date(run.created_at).toLocaleString()}</dd>
-              <dt>Updated</dt>
-              <dd>{new Date(run.updated_at).toLocaleString()}</dd>
-              <dt>Published</dt>
-              <dd>
-                {run.published_at ? new Date(run.published_at).toLocaleString() : 'Not published'}
-              </dd>
+            <Badge variant="light" color={run.status === 'failed' ? 'red' : 'blue'}>
+              {run.status}
+            </Badge>
+          </Group>
+          <Stack gap="xl">
+            <Paper component="section" withBorder radius="sm" p="md">
+              <Group justify="space-between" align="flex-start" mb="lg">
+                <Title order={2}>{t('timeline')}</Title>
+                <div>
+                  <Text c="dimmed" size="xs" ta="right">
+                    {t('updated')}
+                  </Text>
+                  <Text size="sm">{formatDate(run.updated_at, language)}</Text>
+                </div>
+              </Group>
+              <Timeline active={run.published_at ? 1 : 0} bulletSize={24} lineWidth={2}>
+                <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
+                  <Text c="dimmed" size="sm">
+                    {formatDate(run.created_at, language)}
+                  </Text>
+                </Timeline.Item>
+                <Timeline.Item bullet={<IconCheck size={14} />} title={t('published')}>
+                  <Text c="dimmed" size="sm">
+                    {run.published_at ? formatDate(run.published_at, language) : t('notPublished')}
+                  </Text>
+                </Timeline.Item>
+              </Timeline>
               {run.failure_code && (
-                <>
-                  <dt>Failure</dt>
-                  <dd>{run.failure_code}</dd>
-                </>
+                <Box mt="md">
+                  <Text c="dimmed" size="xs">
+                    {t('failure')}
+                  </Text>
+                  <Text c="red" mt={2}>
+                    {run.failure_code}
+                  </Text>
+                </Box>
               )}
-            </dl>
-          </section>
-          <section>
-            <h2>Artifact</h2>
-            <pre>
-              {run.artifact_publication === null
-                ? 'No artifact publication recorded.'
-                : JSON.stringify(run.artifact_publication, null, 2)}
-            </pre>
-          </section>
-          <section>
-            <h2>Publication steps</h2>
-            {steps.length === 0 ? (
-              <p>No publication steps recorded.</p>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Step</th>
-                    <th>Status</th>
-                    <th>Attempts</th>
-                    <th>Failure</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {steps.map((step) => (
-                    <tr key={step.step_key}>
-                      <td>{step.step_key}</td>
-                      <td>{step.status}</td>
-                      <td>{step.attempts}</td>
-                      <td>{step.failure_code ?? 'None'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
+            </Paper>
+            <Box component="section">
+              <Title order={2}>{t('artifact')}</Title>
+              <pre>
+                {run.artifact_publication === null
+                  ? t('noArtifact')
+                  : JSON.stringify(run.artifact_publication, null, 2)}
+              </pre>
+            </Box>
+            <Box component="section">
+              <Title order={2} mb="sm">
+                {t('publicationSteps')}
+              </Title>
+              {steps.length === 0 ? (
+                <Text c="dimmed">{t('noSteps')}</Text>
+              ) : (
+                <Paper withBorder radius="sm" className="table-wrap">
+                  <Table.ScrollContainer minWidth={620}>
+                    <Table striped verticalSpacing="sm">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th w="36%">{t('step')}</Table.Th>
+                          <Table.Th w="24%">{t('status')}</Table.Th>
+                          <Table.Th w="16%" ta="right">
+                            {t('attempts')}
+                          </Table.Th>
+                          <Table.Th w="24%">{t('failure')}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {steps.map((step) => (
+                          <Table.Tr key={step.step_key}>
+                            <Table.Td>{step.step_key}</Table.Td>
+                            <Table.Td>
+                              <Badge
+                                variant="light"
+                                color={step.status === 'failed' ? 'red' : 'blue'}
+                              >
+                                {step.status}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td ta="right" ff="monospace">
+                              {step.attempts}
+                            </Table.Td>
+                            <Table.Td>{step.failure_code ?? '—'}</Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                </Paper>
+              )}
+            </Box>
+          </Stack>
         </>
       )}
-    </main>
+    </Container>
   )
 }
 
@@ -256,29 +338,50 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
   render(): React.ReactNode {
     if (this.state.error instanceof ApiError && this.state.error.status === 401) return <Login />
-    if (this.state.error)
-      return (
-        <main>
-          <h1>Unable to load Control Plane</h1>
-          <p role="alert">The service could not complete this request.</p>
-        </main>
-      )
+    if (this.state.error) return <ErrorFallback />
     return this.props.children
   }
 }
+function ErrorFallback(): React.JSX.Element {
+  const t = useMessages()
+  return (
+    <Container component="main" size="lg" py="xl">
+      <Title order={1}>{t('unable')}</Title>
+      <Text role="alert">{t('requestFailed')}</Text>
+    </Container>
+  )
+}
 function App(): React.JSX.Element {
   return (
-    <ErrorBoundary>
-      <Routes>
-        <Route path="/runs" element={<Runs />} />
-        <Route path="/runs/:runId" element={<Detail />} />
-        <Route path="*" element={<Runs />} />
-      </Routes>
-    </ErrorBoundary>
+    <>
+      <AppShell header={{ height: 58 }}>
+        <AppShell.Header>
+          <Container size="lg" h="100%" w="100%">
+            <Group h="100%" justify="space-between">
+              <Link className="brand" to="/runs">
+                Review Control Plane
+              </Link>
+              <PreferenceControls />
+            </Group>
+          </Container>
+        </AppShell.Header>
+        <AppShell.Main>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/runs" element={<Runs />} />
+              <Route path="/runs/:runId" element={<Detail />} />
+              <Route path="*" element={<Runs />} />
+            </Routes>
+          </ErrorBoundary>
+        </AppShell.Main>
+      </AppShell>
+    </>
   )
 }
 createRoot(document.getElementById('root')!).render(
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>
+  <Preferences>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </Preferences>
 )
