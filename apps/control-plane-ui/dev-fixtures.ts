@@ -44,7 +44,7 @@ export function devFixtures(): Plugin {
                 {
                   step_key: 'pull-request:review',
                   status: 'succeeded',
-                  attempts: 0,
+                  failure_count: 0,
                   failure_code: null
                 }
               ]

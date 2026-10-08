@@ -16,7 +16,7 @@ export interface ObservedRun {
 export interface PublicationStepSummary {
   step_key: string
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-  attempts: number
+  failure_count: number
   failure_code: string | null
 }
 

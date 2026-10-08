@@ -55,7 +55,7 @@ export interface PublicationWork extends ReviewRunRecord {
 export interface PublicationStepRecord {
   step_key: string
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-  attempts: number
+  failure_count: number
   remote_object_id: string | null
   remote_object_url: string | null
   failure_code: string | null
@@ -83,7 +83,7 @@ interface ReviewRunRow {
   ingress_key: string | null
 }
 
-const MAX_PUBLISH_ATTEMPTS = 3
+const MAX_PUBLICATION_STEP_FAILURES = 3
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
 const RUN_SELECT = `
   SELECT r.run_id, r.workflow, r.publish_context, r.runner_input, r.runner_status,
@@ -759,7 +759,7 @@ export class ReviewRunStore {
   async listPublicationSteps(runId: string): Promise<PublicationStepRecord[]> {
     const result = await this.pool.query<PublicationStepRecord>(
       `
-      SELECT step_key,status,attempts,remote_object_id,remote_object_url,
+      SELECT step_key,status,failure_count,remote_object_id,remote_object_url,
              failure_code,failure_message
       FROM publication_steps
       WHERE run_id=$1 AND connector_id=$2
@@ -783,11 +783,11 @@ export class ReviewRunStore {
       SET status='running', updated_at=clock_timestamp()
       FROM publications p
       WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
-        AND (s.status IN ('pending','running') OR (s.status='failed' AND s.attempts<$5))
+        AND (s.status IN ('pending','running') OR (s.status='failed' AND s.failure_count<$5))
         AND p.run_id=s.run_id AND p.connector_id=s.connector_id
         AND p.status='publishing' AND p.claim_token=$4
     `,
-      [runId, this.connectorId, stepKey, token, MAX_PUBLISH_ATTEMPTS]
+      [runId, this.connectorId, stepKey, token, MAX_PUBLICATION_STEP_FAILURES]
     )
     return result.rowCount === 1
   }
@@ -802,11 +802,11 @@ export class ReviewRunStore {
       SET status='terminal_failed', updated_at=clock_timestamp()
       FROM publications p
       WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
-        AND s.status='failed' AND s.attempts>=$5
+        AND s.status='failed' AND s.failure_count>=$5
         AND p.run_id=s.run_id AND p.connector_id=s.connector_id
         AND p.status='publishing' AND p.claim_token=$4
     `,
-      [runId, this.connectorId, stepKey, token, MAX_PUBLISH_ATTEMPTS]
+      [runId, this.connectorId, stepKey, token, MAX_PUBLICATION_STEP_FAILURES]
     )
     const step = (await this.listPublicationSteps(runId)).find((item) => item.step_key === stepKey)
     if (step?.status === 'terminal_failed') {
@@ -856,7 +856,7 @@ export class ReviewRunStore {
     const result = await this.pool.query(
       `
       UPDATE publication_steps s
-      SET status=$7, attempts=s.attempts+1,
+      SET status=$7, failure_count=s.failure_count+1,
           failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
       FROM publications p
       WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'

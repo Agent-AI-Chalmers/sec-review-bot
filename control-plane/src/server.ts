@@ -268,7 +268,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
         const summary: PublicationStepSummary[] = steps.map((step) => ({
           step_key: step.step_key,
           status: step.status,
-          attempts: step.attempts,
+          failure_count: step.failure_count,
           failure_code: step.failure_code
         }))
         sendJson(response, 200, { run_id: run.run_id, publication_steps: summary })

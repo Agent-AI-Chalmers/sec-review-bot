@@ -55,7 +55,7 @@ export class ControlPlaneSubmissionError extends Error {
 export interface PublicationStepRecord {
   step_key: string
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-  attempts: number
+  failure_count: number
   remote_object_id: string | null
   remote_object_url: string | null
   failure_code: string | null

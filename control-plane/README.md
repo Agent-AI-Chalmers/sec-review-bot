@@ -68,7 +68,7 @@ flowchart LR
     steppending[pending] --> runningstep[running] --> succeeded
     runningstep --> stepfailed[failed]
     stepfailed --> runningstep
-    stepfailed -->|attempts exhausted| terminalfailed[terminal_failed]
+    stepfailed -->|failure limit reached| terminalfailed[terminal_failed]
   end
 
   runnersucceeded -.->|result becomes claimable| pending
@@ -76,6 +76,8 @@ flowchart LR
 ```
 
 `ReviewRunStatus` is a read projection rather than a database column. It shows Runner status while publication is `pending` or `not_required`, then shows `publishing`, `published`, or publication `failed`. Publication-step status is queried separately.
+
+`publication_steps.failure_count` records failed executions only. A successful execution does not increment it; a failed step becomes `terminal_failed` after reaching the configured failure limit.
 
 ## Claims and recovery
 
