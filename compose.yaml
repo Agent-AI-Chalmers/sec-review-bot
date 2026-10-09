@@ -28,8 +28,10 @@ services:
       SEC_REVIEW_INTEGRATION_S3_SECRET_KEY: "${SEC_REVIEW_INTEGRATION_S3_SECRET_KEY:?SEC_REVIEW_INTEGRATION_S3_SECRET_KEY is required}"
       SEC_REVIEW_RUNNER_S3_ACCESS_KEY: "${SEC_REVIEW_RUNNER_S3_ACCESS_KEY:-sec-review-runner}"
       SEC_REVIEW_RUNNER_S3_SECRET_KEY: "${SEC_REVIEW_RUNNER_S3_SECRET_KEY:?SEC_REVIEW_RUNNER_S3_SECRET_KEY is required}"
-      SEC_REVIEW_ARTIFACT_PUBLISHER_S3_ACCESS_KEY: "${SEC_REVIEW_ARTIFACT_PUBLISHER_S3_ACCESS_KEY:-sec-review-artifact-publisher}"
-      SEC_REVIEW_ARTIFACT_PUBLISHER_S3_SECRET_KEY: "${SEC_REVIEW_ARTIFACT_PUBLISHER_S3_SECRET_KEY:?SEC_REVIEW_ARTIFACT_PUBLISHER_S3_SECRET_KEY is required}"
+      SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY: "${SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY:-sec-review-artifact-storage-writer}"
+      SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY: "${SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY:?SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY is required}"
+      SEC_REVIEW_UI_S3_ACCESS_KEY: "${SEC_REVIEW_UI_S3_ACCESS_KEY:-sec-review-ui-artifact-reader}"
+      SEC_REVIEW_UI_S3_SECRET_KEY: "${SEC_REVIEW_UI_S3_SECRET_KEY:?SEC_REVIEW_UI_S3_SECRET_KEY is required}"
     volumes:
       - "./ops/rustfs-init:/policies:ro"
   postgres:
@@ -86,10 +88,10 @@ services:
       SEC_REVIEW_ARTIFACT_S3_ENDPOINT: "http://rustfs:9000"
       SEC_REVIEW_AGENT_ARTIFACT_ROOT: "${PWD}/.agent-artifacts"
       AWS_REGION: "us-east-1"
-      AWS_ACCESS_KEY_ID: "${SEC_REVIEW_ARTIFACT_PUBLISHER_S3_ACCESS_KEY:-sec-review-artifact-publisher}"
-      AWS_SECRET_ACCESS_KEY: "${SEC_REVIEW_ARTIFACT_PUBLISHER_S3_SECRET_KEY:?SEC_REVIEW_ARTIFACT_PUBLISHER_S3_SECRET_KEY is required}"
+      AWS_ACCESS_KEY_ID: "${SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY:-sec-review-artifact-storage-writer}"
+      AWS_SECRET_ACCESS_KEY: "${SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY:?SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY is required}"
     volumes:
-      # The service reads worker output but owns the only credential that can publish it.
+      # The service reads worker output but owns the only credential that can store it.
       - "${PWD}/.agent-artifacts:${PWD}/.agent-artifacts:ro"
     ports:
       - "127.0.0.1:${RUNNER_SERVICE_PORT:-8000}:8000"
@@ -140,6 +142,11 @@ services:
       CONTROL_PLANE_URL: "http://control-plane:8090"
       CONTROL_PLANE_READ_TOKEN: "${CONTROL_PLANE_READ_TOKEN:?CONTROL_PLANE_READ_TOKEN is required}"
       CONTROL_PLANE_UI_ACCESS_TOKEN: "${CONTROL_PLANE_UI_ACCESS_TOKEN:?CONTROL_PLANE_UI_ACCESS_TOKEN is required}"
+      SEC_REVIEW_ARTIFACT_S3_ENDPOINT: "http://rustfs:9000"
+      SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"
+      AWS_REGION: "us-east-1"
+      AWS_ACCESS_KEY_ID: "${SEC_REVIEW_UI_S3_ACCESS_KEY:-sec-review-ui-artifact-reader}"
+      AWS_SECRET_ACCESS_KEY: "${SEC_REVIEW_UI_S3_SECRET_KEY:?SEC_REVIEW_UI_S3_SECRET_KEY is required}"
     ports:
       - "127.0.0.1:${CONTROL_PLANE_UI_HOST_PORT:-8091}:8091"
     healthcheck:
@@ -150,6 +157,8 @@ services:
     depends_on:
       control-plane:
         condition: service_healthy
+      rustfs-init:
+        condition: service_completed_successfully
 
   github-integration:
     profiles: ["app"]

@@ -1,6 +1,6 @@
 import { isIP } from 'node:net'
 
-import type { ControlPlaneWorkflow, RunnerArtifactPublication } from './contracts.js'
+import type { ControlPlaneWorkflow, RunnerArtifactStorage } from './contracts.js'
 
 type JsonObject = Record<string, unknown>
 interface RunnerErrorBody {
@@ -14,7 +14,7 @@ interface RunnerResponse {
   status: string
   result?: unknown
   error?: unknown
-  artifact_publication?: unknown
+  artifact_storage?: unknown
 }
 
 const RUNNER_STATUSES = new Set(['queued', 'running', 'succeeded', 'failed'])
@@ -26,7 +26,7 @@ export interface RunnerRunStatus {
   status: string
   result?: unknown
   error?: RunnerErrorBody
-  artifact_publication?: RunnerArtifactPublication
+  artifact_storage?: RunnerArtifactStorage
 }
 export interface AgentRunnerServiceError extends Error {
   name: 'AgentRunnerServiceError'
@@ -74,6 +74,62 @@ function isWorkflow(value: unknown): value is ControlPlaneWorkflow {
   return (
     value === 'issue-review' || value === 'pull-request-review' || value === 'repository-review'
   )
+}
+
+function parseArtifactStorage(value: unknown, runId: string): RunnerArtifactStorage {
+  if (!isRecord(value) || !['available', 'unavailable', 'failed'].includes(String(value.status)))
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_ARTIFACT_STORAGE',
+      `Runner returned invalid artifact storage metadata for ${runId}.`
+    )
+  const status = value.status as RunnerArtifactStorage['status']
+  if (status !== 'available') {
+    if (
+      Object.hasOwn(value, 'artifact') ||
+      Object.keys(value).some((key) => !['status', 'error_code', 'message'].includes(key)) ||
+      (value.error_code !== undefined && typeof value.error_code !== 'string') ||
+      (value.message !== undefined && typeof value.message !== 'string')
+    )
+      throw new RunnerProtocolError(
+        'RUNNER_INVALID_ARTIFACT_STORAGE',
+        `Runner returned invalid artifact storage metadata for ${runId}.`
+      )
+    return {
+      status,
+      ...(typeof value.error_code === 'string' ? { error_code: value.error_code } : {}),
+      ...(typeof value.message === 'string' ? { message: value.message } : {})
+    }
+  }
+  const artifact = value.artifact
+  const expectedUri = `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
+  if (
+    Object.keys(value).some((key) => !['status', 'artifact'].includes(key)) ||
+    !isRecord(artifact) ||
+    Object.keys(artifact).some(
+      (key) => !['kind', 'uri', 'media_type', 'digest', 'size_bytes'].includes(key)
+    ) ||
+    artifact.kind !== 'diagnostic_bundle' ||
+    artifact.uri !== expectedUri ||
+    artifact.media_type !== 'application/zstd' ||
+    typeof artifact.digest !== 'string' ||
+    !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
+    !Number.isSafeInteger(artifact.size_bytes) ||
+    (artifact.size_bytes as number) < 0
+  )
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_ARTIFACT_STORAGE',
+      `Runner returned invalid artifact storage metadata for ${runId}.`
+    )
+  return {
+    status,
+    artifact: {
+      kind: artifact.kind,
+      uri: expectedUri,
+      media_type: artifact.media_type,
+      digest: artifact.digest,
+      size_bytes: artifact.size_bytes as number
+    }
+  }
 }
 
 function serviceUrl(): string {
@@ -271,10 +327,8 @@ export async function getRunnerRunStatus(
     status: parsed.status,
     ...(Object.hasOwn(parsed, 'result') ? { result: parsed.result } : {}),
     ...(isRecord(parsed.error) ? { error: parsed.error as RunnerErrorBody } : {}),
-    ...(isRecord(parsed.artifact_publication)
-      ? {
-          artifact_publication: parsed.artifact_publication as unknown as RunnerArtifactPublication
-        }
-      : {})
+    ...(parsed.artifact_storage === undefined
+      ? {}
+      : { artifact_storage: parseArtifactStorage(parsed.artifact_storage, runId) })
   }
 }

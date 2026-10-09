@@ -29,16 +29,12 @@ flowchart LR
     tunnel --> integration
     temporal --> worker
     storage -->|read input bundles| worker
-    storage -->|read published artifacts| runner
+    storage -->|read stored artifacts| runner
 ```
 
-Cloudflare Tunnel forwards both public endpoints to the local `github-integration` service. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for configuration.
+Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, Runner Service and Temporal dispatch its work, and the host worker executes the agents in Docker sandboxes. PostgreSQL stores control state, while RustFS stores run inputs and artifacts.
 
-Runner Service is the HTTP API between Control Plane and Temporal. It authenticates and validates task requests, starts Temporal workflows, and exposes task status; `sec-review-agents-worker` executes the agents.
-
-Object Storage holds two kinds of run data: the input bundle prepared before execution and the result artifact produced after execution. GitHub integration writes the input bundle. The result publication path writes the terminal artifact. The worker and Runner Service read these objects when needed. The worker does not hold credentials for publishing result artifacts.
-
-Control Plane UI is a separately deployed, read-only console. Its same-origin server authenticates the browser and calls Control Plane with a dedicated read token; neither the read token nor the mutation service token is exposed to browser code.
+Control Plane UI is a separately deployed, read-only console. Its same-origin server reads run state from Control Plane and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
 
 Without a worker, submitted tasks remain in Temporal waiting for execution.
 
@@ -131,7 +127,9 @@ The samples contain both usable defaults and empty or placeholder values that mu
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-Set `RUNNER_SERVICE_TOKEN` and the PostgreSQL/RustFS passwords to locally generated secrets, for example with `openssl rand -hex 32`. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values. RustFS stores immutable input archives; the integration credential can write input objects and the host worker credential is read-only.
+Set `RUNNER_SERVICE_TOKEN` and the PostgreSQL/RustFS passwords to locally generated secrets, for example with `openssl rand -hex 32`. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
+
+RustFS uses a separate workload identity for each responsibility: the integration writes input objects, the host worker reads inputs, the artifact storage writer writes terminal artifacts, and the UI BFF reads stored artifacts for authenticated downloads. The corresponding secret keys in `compose.env.sample` belong to those identities and should be generated independently.
 
 ### 2. GitHub Integration `.env`
 
@@ -193,7 +191,7 @@ Core fields:
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Read-only RustFS credential matching the runner values in the repository `.env`. |
 
-The Runner service receives a separate artifact-publisher credential through Compose. It can write only `runs/*/artifacts/*`; the host worker has no object-storage credential. The service reads the worker's artifact root through a read-only bind mount when a terminal run is observed.
+The Runner service receives a separate artifact-storage-writer credential through Compose. It can write only `runs/*/artifacts/*`; the host worker has no object-storage credential. The service reads the worker's artifact root through a read-only bind mount when a terminal run is observed.
 
 Most local deployments can keep these defaults. Rerun the installer after moving the checkout.
 

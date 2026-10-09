@@ -137,6 +137,58 @@ test('status response preserves a valid terminal result', async () => {
   })
 })
 
+test('status response validates an available artifact against the run identity', async () => {
+  configureRunner()
+  const artifactStorage = {
+    status: 'available',
+    artifact: {
+      kind: 'diagnostic_bundle',
+      uri: 's3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
+      media_type: 'application/zstd',
+      digest: `sha256:${'a'.repeat(64)}`,
+      size_bytes: 42
+    }
+  }
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'succeeded',
+        artifact_storage: artifactStorage
+      })
+    )
+
+  assert.deepEqual((await getRunnerRunStatus('run-1')).artifact_storage, artifactStorage)
+})
+
+test('status response rejects an artifact reference owned by another run', async () => {
+  configureRunner()
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'succeeded',
+        artifact_storage: {
+          status: 'available',
+          artifact: {
+            kind: 'diagnostic_bundle',
+            uri: 's3://sec-review/runs/run-2/artifacts/diagnostic-tree.v1.tar.zst',
+            media_type: 'application/zstd',
+            digest: `sha256:${'a'.repeat(64)}`,
+            size_bytes: 42
+          }
+        }
+      })
+    )
+
+  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+    assert.equal((error as { code?: string }).code, 'RUNNER_INVALID_ARTIFACT_STORAGE')
+    return true
+  })
+})
+
 test('status response rejects an unknown Runner state', async () => {
   configureRunner()
   globalThis.fetch = async () =>

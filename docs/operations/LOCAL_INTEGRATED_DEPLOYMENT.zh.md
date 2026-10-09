@@ -34,13 +34,9 @@ flowchart LR
     storage -->|读取已发布 artifact| runner
 ```
 
-Cloudflare Tunnel 将两个公网 endpoint 转发到本地 `github-integration`。具体配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
+Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run，Runner Service 和 Temporal 分派任务，宿主机 worker 在 Docker sandbox 中执行 agent。PostgreSQL 保存控制状态，RustFS 保存运行输入和 artifact。
 
-Runner Service 是 Control Plane 与 Temporal 之间的 HTTP API。它负责鉴权、校验任务请求、启动 Temporal workflow，并提供任务状态查询；agent 由 `sec-review-agents-worker` 执行。
-
-对象存储保存两类运行数据：执行前准备的 input bundle，以及执行结束后生成的 result artifact。GitHub integration 写入 input bundle，结果发布流程写入终态 artifact；worker 和 Runner Service 在需要时从对象存储读取。worker 不持有发布 result artifact 的凭据。
-
-Control Plane UI 是独立部署的只读控制台。它的同源服务端验证浏览器访问，并使用专用 read token 调用 Control Plane；read token 和 mutation service token 都不会进入浏览器代码。
+Control Plane UI 是独立部署的只读控制台。它的同源服务端从 Control Plane 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 没有 worker 时，提交的任务会停留在 Temporal 中等待执行。
 
@@ -133,7 +129,9 @@ Sample 中既有可直接使用的默认值，也有必须替换的空值和占�
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-将 `RUNNER_SERVICE_TOKEN` 以及 PostgreSQL/RustFS 密码设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。RustFS 保存不可变 input archive；integration 凭据可写 input object，宿主 worker 凭据只读。
+将 `RUNNER_SERVICE_TOKEN` 以及 PostgreSQL/RustFS 密码设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
+
+RustFS 按职责为各组件分配独立身份：integration 写入 input object，宿主机 worker 读取 input，artifact storage writer 写入终态 artifact，UI BFF 为经过认证的下载读取已存储 artifact。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
 
 ### 2. GitHub integration `.env`
 
@@ -195,7 +193,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
 | `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` | 与仓库 `.env` 中 runner 配置相匹配的 RustFS 只读凭据。 |
 
-Runner service 通过 Compose 使用独立的 artifact-publisher 凭据，只能写入 `runs/*/artifacts/*`；宿主机 worker 不持有对象存储凭据。Runner service 观察到终态 run 后，通过只读 bind mount 读取 worker 的 artifact root。
+Runner service 通过 Compose 使用独立的 artifact-storage-writer 凭据，只能写入 `runs/*/artifacts/*`；宿主机 worker 不持有对象存储凭据。Runner service 观察到终态 run 后，通过只读 bind mount 读取 worker 的 artifact root。
 
 大多数本地部署可以保留这些默认值。移动 checkout 后，重新运行安装脚本。
 

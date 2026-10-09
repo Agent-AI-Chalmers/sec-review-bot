@@ -9,7 +9,7 @@ CREATE TABLE review_runs (
   runner_status text NOT NULL CHECK (runner_status IN ('preparing', 'recovering', 'queued', 'running', 'succeeded', 'failed')),
   runner_failure_code text,
   runner_failure_message text,
-  artifact_publication jsonb,
+  artifact_storage jsonb,
   workflow_result jsonb,
   preparation_claim_token uuid,
   preparation_claimed_at timestamptz,
@@ -39,8 +39,8 @@ COMMENT ON COLUMN review_runs.runner_failure_code IS
   'Machine-readable reason for a preparation, submission, polling, or Runner execution failure.';
 COMMENT ON COLUMN review_runs.runner_failure_message IS
   'Operator-readable detail associated with runner_failure_code.';
-COMMENT ON COLUMN review_runs.artifact_publication IS
-  'Runner-reported publication status and reference for the terminal result artifact, when available.';
+COMMENT ON COLUMN review_runs.artifact_storage IS
+  'Runner-reported terminal diagnostic artifact storage result and immutable object reference when available.';
 COMMENT ON COLUMN review_runs.workflow_result IS
   'Terminal successful workflow result returned by the Runner and consumed by the connector publisher.';
 COMMENT ON COLUMN review_runs.preparation_claim_token IS

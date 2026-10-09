@@ -50,7 +50,7 @@ async function createSuccessfulRun(
 ): Promise<string> {
   await createQueuedRun(store, runId)
   assert.equal(
-    await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'not_available' }),
+    await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'unavailable' }),
     true
   )
   return runId
@@ -77,7 +77,7 @@ test('ReviewRunStore prevents cross-connector access to a globally unique run id
     assert.equal((await first.listActiveRuns()).length, 1)
     assert.equal((await second.listActiveRuns()).length, 0)
     assert.equal(await first.claimPublication(runId), null)
-    await first.recordRunnerSuccess(runId, { run_id: runId }, { status: 'not_available' })
+    await first.recordRunnerSuccess(runId, { run_id: runId }, { status: 'unavailable' })
     assert.notEqual(await first.claimPublication(runId), null)
     assert.equal(await second.claimPublication(runId), null)
   } finally {
@@ -90,17 +90,17 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
   const store = await createStore()
   try {
     const queuedId = await createQueuedRun(store)
-    const artifactPublication = {
-      status: 'published' as const,
+    const artifactStorage = {
+      status: 'available' as const,
       artifact: {
         kind: 'diagnostic_bundle',
         uri: `s3://sec-review/runs/${queuedId}/artifacts/diagnostic-tree.v1.tar.zst`,
-        media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+        media_type: 'application/zstd',
         digest: `sha256:${'a'.repeat(64)}`,
         size_bytes: 123
       }
     }
-    await store.recordArtifactPublication(queuedId, artifactPublication)
+    await store.recordArtifactStorage(queuedId, artifactStorage)
     await store.create_preparing_review_run({
       workflow: 'issue-review',
       run_id: `run-${randomUUID()}`,
@@ -108,7 +108,7 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
     })
     const queued = await store.getRun(queuedId)
     assert.equal(queued?.status, 'queued')
-    assert.deepEqual(queued?.artifact_publication, artifactPublication)
+    assert.deepEqual(queued?.artifact_storage, artifactStorage)
     assert.deepEqual(
       (await store.listActiveRuns()).map((run) => run.run_id),
       [queuedId]

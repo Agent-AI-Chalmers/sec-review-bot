@@ -11,10 +11,13 @@ RUN corepack enable pnpm \
     && pnpm install --frozen-lockfile
 COPY apps/control-plane-ui/ ./
 RUN pnpm run build
+RUN pnpm deploy --filter . --prod --legacy /app/prod
 
 FROM node:24-bookworm-slim
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist-server ./dist-server
+COPY --from=builder /app/prod/node_modules ./node_modules
+COPY --from=builder /app/prod/package.json ./package.json
 USER node
 CMD ["node", "dist-server/server/index.js"]

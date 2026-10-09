@@ -1,7 +1,7 @@
 """Converge a fresh RustFS instance to the storage boundary used by this project.
 
 This module runs once as the Compose ``rustfs-init`` service. It creates the
-fixed ``sec-review`` bucket, upserts three runtime identities, installs their
+fixed ``sec-review`` bucket, upserts four runtime identities, installs their
 least-privilege policies from ``/policies``, and attaches one policy to each
 identity. It is intentionally deployment code rather than an application
 storage client: normal services never receive the root credentials used here.
@@ -11,6 +11,7 @@ The resulting ownership model is:
 * GitHub integration can read and write immutable input bundles.
 * The execution worker can only read input bundles.
 * Runner Service can read and write terminal result artifacts.
+* Control Plane UI can only read terminal result artifacts.
 
 All provisioning operations are safe to repeat. Rerunning the container also
 rotates configured user secrets and replaces policy documents with the checked-in
@@ -134,7 +135,7 @@ def wait_for_rustfs() -> None:
 
 
 def main() -> None:
-    """Provision the three runtime identities and their disjoint object prefixes."""
+    """Provision runtime identities with disjoint read and write capabilities."""
 
     integration_access_key = os.environ.get(
         "SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY", "sec-review-integration"
@@ -144,23 +145,33 @@ def main() -> None:
     )
     integration_secret_key = required_env("SEC_REVIEW_INTEGRATION_S3_SECRET_KEY")
     runner_secret_key = required_env("SEC_REVIEW_RUNNER_S3_SECRET_KEY")
-    publisher_access_key = os.environ.get(
-        "SEC_REVIEW_ARTIFACT_PUBLISHER_S3_ACCESS_KEY",
-        "sec-review-artifact-publisher",
+    storage_writer_access_key = os.environ.get(
+        "SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY",
+        "sec-review-artifact-storage-writer",
     )
-    publisher_secret_key = required_env("SEC_REVIEW_ARTIFACT_PUBLISHER_S3_SECRET_KEY")
+    storage_writer_secret_key = required_env("SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY")
+    ui_reader_access_key = os.environ.get(
+        "SEC_REVIEW_UI_S3_ACCESS_KEY", "sec-review-ui-artifact-reader"
+    )
+    ui_reader_secret_key = required_env("SEC_REVIEW_UI_S3_SECRET_KEY")
     policy_root = Path("/policies")
 
     wait_for_rustfs()
     put_user(integration_access_key, integration_secret_key)
     put_user(runner_access_key, runner_secret_key)
-    put_user(publisher_access_key, publisher_secret_key)
+    put_user(storage_writer_access_key, storage_writer_secret_key)
+    put_user(ui_reader_access_key, ui_reader_secret_key)
     put_policy("sec-review-input-writer", policy_root / "integration-policy.json")
     put_policy("sec-review-input-reader", policy_root / "runner-policy.json")
-    put_policy("sec-review-artifact-publisher", policy_root / "artifact-policy.json")
+    put_policy("sec-review-artifact-storage-writer", policy_root / "artifact-policy.json")
+    put_policy(
+        "sec-review-ui-artifact-reader",
+        policy_root / "ui-artifact-reader-policy.json",
+    )
     attach_policy("sec-review-input-writer", integration_access_key)
     attach_policy("sec-review-input-reader", runner_access_key)
-    attach_policy("sec-review-artifact-publisher", publisher_access_key)
+    attach_policy("sec-review-artifact-storage-writer", storage_writer_access_key)
+    attach_policy("sec-review-ui-artifact-reader", ui_reader_access_key)
 
 
 if __name__ == "__main__":

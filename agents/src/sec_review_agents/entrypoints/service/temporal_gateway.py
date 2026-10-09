@@ -15,7 +15,7 @@ from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 
-from sec_review_agents.artifacts.run_storage import publish_run_artifacts
+from sec_review_agents.artifacts.run_storage import store_run_artifacts
 from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_result
 from sec_review_agents.entrypoints.input_preparation import workflow_artifact_root
 from sec_review_agents.entrypoints.run_protocol import (
@@ -142,10 +142,10 @@ async def _record_from_handle(
 ) -> dict[str, Any]:
     """Project a Temporal execution handle into the public run record.
 
-    The projection combines Temporal status and memo data, publishes terminal
+    The projection combines Temporal status and memo data, stores terminal
     diagnostic artifacts when an artifact root is available, and validates a
     completed workflow's v5 result before reporting it as successful. Artifact
-    publication is deliberately recorded separately from the business result,
+    storage is deliberately recorded separately from the business result,
     so a storage failure cannot be mistaken for a successful publication.
     """
     description = await handle.describe()
@@ -164,18 +164,18 @@ async def _record_from_handle(
     artifact_root = _string_from_memo(memo, "artifact_root_path")
     if status in {"succeeded", "failed"} and artifact_root:
         try:
-            reference = publish_run_artifacts(artifact_root, handle.id)
-            record["artifact_publication"] = {
-                "status": "published" if reference else "not_available",
+            reference = store_run_artifacts(artifact_root, handle.id)
+            record["artifact_storage"] = {
+                "status": "available" if reference else "unavailable",
                 **({"artifact": reference} if reference else {}),
             }
         except Exception:
-            # Publication is diagnostic metadata, not the business result.  Keep
+            # Storage is diagnostic metadata, not the business result.  Keep
             # the public record stable and do not leak storage endpoint details.
-            record["artifact_publication"] = {
+            record["artifact_storage"] = {
                 "status": "failed",
                 "error_code": "ARTIFACT_UPLOAD_FAILED",
-                "message": "Unable to publish terminal run artifacts.",
+                "message": "Unable to store terminal run artifacts.",
             }
     if description.status is WorkflowExecutionStatus.COMPLETED:
         response = await handle.result()

@@ -1,4 +1,4 @@
-import type { RunnerArtifactPublication, WorkflowName } from '../runner/client.js'
+import type { RunnerArtifactStorage, WorkflowName } from '../runner/client.js'
 import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 
 type JsonObject = Record<string, unknown>
@@ -28,7 +28,7 @@ export interface ReviewRunRecord extends CreateReviewRunArgs {
   published_at: string | null
   failure_code: string | null
   failure_message: string | null
-  artifact_publication: RunnerArtifactPublication | null
+  artifact_storage: RunnerArtifactStorage | null
 }
 
 export interface ReviewRunAdmission {

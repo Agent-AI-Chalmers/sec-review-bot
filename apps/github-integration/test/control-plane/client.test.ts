@@ -13,7 +13,7 @@ const preparingRun: ReviewRunRecord = {
   published_at: null,
   failure_code: null,
   failure_message: null,
-  artifact_publication: null,
+  artifact_storage: null,
   ingress_kind: 'github_actions_dispatch',
   ingress_key: 'octo/example:dispatch-1'
 }

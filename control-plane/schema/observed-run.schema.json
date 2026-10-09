@@ -7,11 +7,13 @@
     "run_id",
     "workflow",
     "status",
+    "execution_status",
+    "publication_status",
     "created_at",
     "updated_at",
     "published_at",
     "failure_code",
-    "artifact_publication"
+    "artifact_storage"
   ],
   "properties": {
     "run_id": { "type": "string", "minLength": 1 },
@@ -28,24 +30,76 @@
         "failed"
       ]
     },
+    "execution_status": {
+      "enum": ["preparing", "recovering", "queued", "running", "succeeded", "failed"]
+    },
+    "publication_status": {
+      "enum": ["pending", "publishing", "published", "failed", "not_required"]
+    },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
     "published_at": { "type": ["string", "null"], "format": "date-time" },
     "failure_code": { "type": ["string", "null"] },
-    "artifact_publication": { "type": ["object", "null"] },
+    "artifact_storage": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": { "enum": ["unavailable", "failed"] },
+            "error_code": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "artifact"],
+          "properties": {
+            "status": { "const": "available" },
+            "artifact": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "uri", "media_type", "digest", "size_bytes"],
+              "properties": {
+                "kind": { "const": "diagnostic_bundle" },
+                "uri": {
+                  "type": "string",
+                  "pattern": "^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
+                },
+                "media_type": { "const": "application/zstd" },
+                "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "size_bytes": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      ]
+    },
     "publication_steps": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["step_key", "status", "failure_count", "failure_code"],
+        "required": [
+          "step_key",
+          "status",
+          "failure_count",
+          "remote_object_url",
+          "failure_code",
+          "failure_message"
+        ],
         "properties": {
           "step_key": { "type": "string", "minLength": 1 },
           "status": {
             "enum": ["pending", "running", "succeeded", "failed", "terminal_failed"]
           },
           "failure_count": { "type": "integer", "minimum": 0 },
-          "failure_code": { "type": ["string", "null"] }
+          "remote_object_url": { "type": ["string", "null"], "format": "uri" },
+          "failure_code": { "type": ["string", "null"] },
+          "failure_message": { "type": ["string", "null"] }
         }
       }
     }

@@ -78,6 +78,14 @@ function review_record(overrides: Record<string, unknown> = {}): Record<string, 
 test('pull request publish leaves confirmed risks as non-blocking comments without inline suggestions', async () => {
   const issueComments: unknown[] = []
   const pullReviews: unknown[] = []
+  const completed: unknown[] = []
+  const store = {
+    ...stepStore,
+    completePublicationStep: async (...args: unknown[]) => {
+      completed.push(args)
+      return true
+    }
+  }
   const octokit = {
     rest: {
       issues: {
@@ -120,7 +128,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
         review_record: review_record()
       }
     },
-    store: stepStore as never,
+    store: store as never,
     claim_token: 'test-claim',
     assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
@@ -154,6 +162,9 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
   )
   assert.match(reviewArgs.body, /<!-- sec-review-bot:pull-request-review-run:run-1 -->/)
   assert.match(reviewArgs.body, /## PR Security Review/)
+  assert.deepEqual(completed, [
+    ['run-1', 'test-claim', 'pull-request:review', { id: 2, url: 'https://example.test/review/2' }]
+  ])
 })
 
 test('pull request publish leaves plausible risks as non-blocking comments', async () => {

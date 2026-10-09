@@ -7,8 +7,8 @@
  */
 export type ControlPlaneWorkflow = 'issue-review' | 'pull-request-review' | 'repository-review'
 
-export interface RunnerArtifactPublication {
-  status: 'published' | 'not_available' | 'failed'
+export interface RunnerArtifactStorage {
+  status: 'available' | 'unavailable' | 'failed'
   artifact?: {
     kind: string
     uri: string

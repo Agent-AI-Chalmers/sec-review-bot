@@ -1,12 +1,25 @@
+export interface ArtifactStorage {
+  status: 'available' | 'unavailable' | 'failed'
+  artifact?: {
+    kind: 'diagnostic_bundle'
+    media_type: string
+    digest: string
+    size_bytes: number
+  }
+  error_code?: string
+  message?: string
+}
 export interface Run {
   run_id: string
   workflow: string
   status: string
+  execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+  publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
   created_at: string
   updated_at: string
   published_at: string | null
   failure_code: string | null
-  artifact_publication: unknown
+  artifact_storage: ArtifactStorage | null
 }
 export class ApiError extends Error {
   constructor(readonly status: number) {

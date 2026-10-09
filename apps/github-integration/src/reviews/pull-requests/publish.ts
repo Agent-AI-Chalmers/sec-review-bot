@@ -41,6 +41,11 @@ interface SuggestionReviewResult {
   }>
 }
 
+interface PublishedReviewRef {
+  id: number
+  url: string
+}
+
 interface SuggestionManifestLike {
   candidates: Array<unknown>
   skipped_reason?: string | null
@@ -247,7 +252,7 @@ async function publishPullRequestReviewResult({
   try {
     // Never begin a GitHub mutation on the strength of an expired heartbeat.
     await assert_publication_claim()
-    await publishPullRequestReviewSideEffect({
+    const remote = await publishPullRequestReviewSideEffect({
       octokit,
       pr,
       files: reviewFiles,
@@ -256,7 +261,7 @@ async function publishPullRequestReviewResult({
       run_id,
       assert_publication_claim
     })
-    if (!(await store.completePublicationStep(run_id, claim_token, stepKey)))
+    if (!(await store.completePublicationStep(run_id, claim_token, stepKey, remote)))
       throw new PublicationClaimLostError(run_id)
   } catch (error) {
     if (isPublicationClaimLostError(error)) throw error
@@ -291,7 +296,7 @@ async function publishPullRequestReviewSideEffect({
   workflow_result: PullRequestReviewWorkflowResult
   run_id: string
   assert_publication_claim: () => Promise<void>
-}): Promise<void> {
+}): Promise<PublishedReviewRef> {
   let review: SuggestionReviewResult | null = null
   const review_record = workflow_result.review_record
   const marker = pullRequestReviewRunMarker(run_id)
@@ -371,7 +376,7 @@ async function publishPullRequestReviewSideEffect({
       review_url: review.html_url
     })
 
-    return
+    return { id: review.review_id, url: review.html_url }
   }
 
   logInfo('analysis_review_publish_started', {
@@ -402,4 +407,5 @@ async function publishPullRequestReviewSideEffect({
     review_url: reviewComment.html_url,
     reused: reviewComment.reused
   })
+  return { id: reviewComment.id, url: reviewComment.html_url }
 }

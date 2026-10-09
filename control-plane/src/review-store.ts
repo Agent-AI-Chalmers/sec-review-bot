@@ -1,10 +1,7 @@
 import crypto from 'node:crypto'
 import { Pool, type PoolClient, type PoolConfig } from 'pg'
 
-import type {
-  ControlPlaneWorkflow as WorkflowName,
-  RunnerArtifactPublication
-} from './contracts.js'
+import type { ControlPlaneWorkflow as WorkflowName, RunnerArtifactStorage } from './contracts.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
 import { DeterministicControlPlaneError } from './errors.js'
 
@@ -23,8 +20,9 @@ export type ReviewRunStatus =
   | 'publishing'
   | 'published'
   | 'failed'
-type RunnerStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
+export type RunnerStatus =
+  'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
 
 export interface CreateReviewRunArgs {
   run_id: string
@@ -41,12 +39,14 @@ export interface ReviewRunAdmission {
 }
 export interface ReviewRunRecord extends CreateReviewRunArgs {
   status: ReviewRunStatus
+  runner_status: RunnerStatus
+  publication_status: PublicationStatus
   created_at: string
   updated_at: string
   published_at: string | null
   failure_code: string | null
   failure_message: string | null
-  artifact_publication: RunnerArtifactPublication | null
+  artifact_storage: RunnerArtifactStorage | null
 }
 export interface PublicationWork extends ReviewRunRecord {
   workflow_result: unknown
@@ -70,7 +70,7 @@ interface ReviewRunRow {
   runner_status: RunnerStatus
   runner_failure_code: string | null
   runner_failure_message: string | null
-  artifact_publication: RunnerArtifactPublication | null
+  artifact_storage: RunnerArtifactStorage | null
   workflow_result: unknown | null
   publication_status: PublicationStatus
   created_at: Date | string
@@ -87,7 +87,7 @@ const MAX_PUBLICATION_STEP_FAILURES = 3
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
 const RUN_SELECT = `
   SELECT r.run_id, r.workflow, r.publish_context, r.runner_input, r.runner_status,
-    r.runner_failure_code, r.runner_failure_message, r.artifact_publication, r.workflow_result,
+    r.runner_failure_code, r.runner_failure_message, r.artifact_storage, r.workflow_result,
     r.ingress_kind, r.ingress_key,
     r.created_at, r.updated_at AS runner_updated_at,
     p.status AS publication_status, p.updated_at AS publication_updated_at,
@@ -113,6 +113,8 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     publish_context: row.publish_context,
     ...(row.runner_input === null ? {} : { runner_input: row.runner_input }),
     status,
+    runner_status: row.runner_status,
+    publication_status: row.publication_status,
     created_at: iso(row.created_at),
     updated_at: iso(
       row.publication_status === 'pending' ? row.runner_updated_at : row.publication_updated_at
@@ -122,7 +124,7 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     failure_message: publicationFailure
       ? row.publication_failure_message
       : row.runner_failure_message,
-    artifact_publication: row.artifact_publication,
+    artifact_storage: row.artifact_storage,
     ...(row.ingress_kind ? { ingress_kind: row.ingress_kind } : {}),
     ...(row.ingress_key ? { ingress_key: row.ingress_key } : {})
   }
@@ -563,30 +565,30 @@ export class ReviewRunStore {
     )
     return result.rowCount === 1
   }
-  async recordArtifactPublication(
+  async recordArtifactStorage(
     runId: string,
-    publication: RunnerArtifactPublication | undefined
+    storage: RunnerArtifactStorage | undefined
   ): Promise<void> {
-    if (publication === undefined) return
+    if (storage === undefined) return
     await this.pool.query(
       `
       UPDATE review_runs
-      SET artifact_publication=$3::jsonb, updated_at=clock_timestamp()
+      SET artifact_storage=$3::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2
     `,
-      [runId, this.connectorId, JSON.stringify(publication)]
+      [runId, this.connectorId, JSON.stringify(storage)]
     )
   }
   async recordRunnerSuccess(
     runId: string,
     workflowResult: unknown,
-    publication: RunnerArtifactPublication | undefined
+    storage: RunnerArtifactStorage | undefined
   ): Promise<boolean> {
     const result = await this.pool.query(
       `
       UPDATE review_runs
       SET runner_status='succeeded', workflow_result=$3::jsonb,
-          artifact_publication=$4::jsonb, runner_failure_code=NULL,
+          artifact_storage=$4::jsonb, runner_failure_code=NULL,
           runner_failure_message=NULL, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
     `,
@@ -594,7 +596,7 @@ export class ReviewRunStore {
         runId,
         this.connectorId,
         JSON.stringify(workflowResult),
-        publication === undefined ? null : JSON.stringify(publication)
+        storage === undefined ? null : JSON.stringify(storage)
       ]
     )
     return result.rowCount === 1
@@ -602,14 +604,14 @@ export class ReviewRunStore {
   async failRunnerExecution(
     runId: string,
     error: { code?: string | null; message: string },
-    publication?: RunnerArtifactPublication
+    storage?: RunnerArtifactStorage
   ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const run = await client.query(
         `
         UPDATE review_runs
         SET runner_status='failed', runner_failure_code=$3,
-            runner_failure_message=$4, artifact_publication=$5::jsonb,
+            runner_failure_message=$4, artifact_storage=$5::jsonb,
             updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
       `,
@@ -618,7 +620,7 @@ export class ReviewRunStore {
           this.connectorId,
           error.code ?? null,
           error.message,
-          publication === undefined ? null : JSON.stringify(publication)
+          storage === undefined ? null : JSON.stringify(storage)
         ]
       )
       if (run.rowCount !== 1) return false

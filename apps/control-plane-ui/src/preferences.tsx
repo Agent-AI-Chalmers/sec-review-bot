@@ -4,6 +4,7 @@ import { IconLanguage, IconMoon, IconSun } from '@tabler/icons-react'
 
 export type Language = 'en' | 'zh'
 export type Theme = 'light' | 'dark'
+export type RefreshInterval = 5000 | 15000 | 30000 | 60000
 
 const messages = {
   en: {
@@ -17,7 +18,26 @@ const messages = {
     denied: 'Access denied.',
     runs: 'Review runs',
     refresh: 'Refresh',
+    autoRefresh: 'Auto refresh',
+    refreshInterval: 'Refresh interval',
+    lastChecked: 'Last checked',
+    neverChecked: 'Not checked yet',
+    refreshFailed: 'Refresh failed. Showing the last available data.',
+    download: 'Download',
+    artifactAvailable: 'Available',
+    notAvailable: 'Not available',
+    sha256: 'SHA-256',
+    copyDigest: 'Copy digest',
+    digestCopied: 'Digest copied',
     status: 'Status',
+    statusPreparing: 'Preparing',
+    statusRecovering: 'Recovering',
+    statusQueued: 'Queued',
+    statusRunning: 'Running',
+    statusSucceeded: 'Succeeded',
+    statusPublishing: 'Publishing',
+    statusPublished: 'Published',
+    statusFailed: 'Failed',
     workflow: 'Workflow',
     all: 'All',
     loadingRuns: 'Loading runs...',
@@ -27,17 +47,20 @@ const messages = {
     nextPage: 'Next page',
     back: 'Back to runs',
     loadingRun: 'Loading run...',
-    timeline: 'Timeline',
+    runProgress: 'Run progress',
     created: 'Created',
-    published: 'Published',
-    notPublished: 'Not published',
-    failure: 'Failure',
+    execution: 'Execution',
+    publicationPending: 'Pending',
+    publicationNotRequired: 'Not required',
     artifact: 'Artifact',
-    noArtifact: 'No artifact publication recorded.',
-    publicationSteps: 'Publication steps',
-    noSteps: 'No publication steps recorded.',
-    step: 'Step',
-    failureCount: 'Failures',
+    publication: 'Publication',
+    openExternalLink: 'View publication result',
+    waiting: 'Waiting',
+    publishingStatus: 'Publishing',
+    retryPending: 'Retry pending',
+    failedStatus: 'Failed',
+    failedAttempts: 'Failed attempts',
+    latestError: 'Latest error',
     unable: 'Unable to load Control Plane',
     requestFailed: 'The service could not complete this request.'
   },
@@ -52,7 +75,26 @@ const messages = {
     denied: '访问被拒绝。',
     runs: '审查运行',
     refresh: '刷新',
+    autoRefresh: '自动刷新',
+    refreshInterval: '刷新频率',
+    lastChecked: '上次检查',
+    neverChecked: '尚未检查',
+    refreshFailed: '刷新失败，当前显示上次成功获取的数据。',
+    download: '下载',
+    artifactAvailable: '可用',
+    notAvailable: '不可用',
+    sha256: 'SHA-256',
+    copyDigest: '复制摘要',
+    digestCopied: '摘要已复制',
     status: '状态',
+    statusPreparing: '准备中',
+    statusRecovering: '恢复中',
+    statusQueued: '排队中',
+    statusRunning: '运行中',
+    statusSucceeded: '执行成功',
+    statusPublishing: '发布中',
+    statusPublished: '已发布',
+    statusFailed: '失败',
     workflow: '工作流',
     all: '全部',
     loadingRuns: '正在加载运行...',
@@ -62,17 +104,20 @@ const messages = {
     nextPage: '下一页',
     back: '返回运行列表',
     loadingRun: '正在加载运行...',
-    timeline: '时间轴',
+    runProgress: '运行进度',
     created: '创建',
-    published: '发布',
-    notPublished: '尚未发布',
-    failure: '失败',
-    artifact: 'Artifact',
-    noArtifact: '没有记录 artifact 发布信息。',
-    publicationSteps: '发布步骤',
-    noSteps: '没有记录发布步骤。',
-    step: '步骤',
-    failureCount: '失败次数',
+    execution: '执行',
+    publicationPending: '等待中',
+    publicationNotRequired: '无需发布',
+    artifact: '产物',
+    publication: '发布',
+    openExternalLink: '查看发布结果',
+    waiting: '等待中',
+    publishingStatus: '发布中',
+    retryPending: '等待重试',
+    failedStatus: '失败',
+    failedAttempts: '失败次数',
+    latestError: '最近错误',
     unable: '无法加载 Control Plane',
     requestFailed: '服务无法完成此请求。'
   }
@@ -82,14 +127,24 @@ export type Message = keyof typeof messages.en
 const PreferencesContext = React.createContext<{
   language: Language
   theme: Theme
+  autoRefresh: boolean
+  refreshInterval: RefreshInterval
   setLanguage: (value: Language) => void
   setTheme: (value: Theme) => void
+  setAutoRefresh: (value: boolean) => void
+  setRefreshInterval: (value: RefreshInterval) => void
 }>({
   language: 'en',
   theme: 'light',
+  autoRefresh: true,
+  refreshInterval: 15000,
   setLanguage: () => {},
-  setTheme: () => {}
+  setTheme: () => {},
+  setAutoRefresh: () => {},
+  setRefreshInterval: () => {}
 })
+
+const refreshIntervals: RefreshInterval[] = [5000, 15000, 30000, 60000]
 
 export function Preferences({ children }: { children: React.ReactNode }): React.JSX.Element {
   // Keep browser preferences local to this console; they are presentation state,
@@ -104,6 +159,15 @@ export function Preferences({ children }: { children: React.ReactNode }): React.
       (localStorage.getItem('ui-theme') as Theme) ||
       (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   )
+  const [autoRefresh, setAutoRefresh] = React.useState(
+    () => localStorage.getItem('ui-auto-refresh') !== 'false'
+  )
+  const [refreshInterval, setRefreshInterval] = React.useState<RefreshInterval>(() => {
+    const stored = Number(localStorage.getItem('ui-refresh-interval'))
+    return refreshIntervals.includes(stored as RefreshInterval)
+      ? (stored as RefreshInterval)
+      : 15000
+  })
   React.useEffect(() => {
     localStorage.setItem('ui-language', language)
   }, [language])
@@ -111,8 +175,25 @@ export function Preferences({ children }: { children: React.ReactNode }): React.
     localStorage.setItem('ui-theme', theme)
     document.documentElement.dataset.theme = theme
   }, [theme])
+  React.useEffect(() => {
+    localStorage.setItem('ui-auto-refresh', String(autoRefresh))
+  }, [autoRefresh])
+  React.useEffect(() => {
+    localStorage.setItem('ui-refresh-interval', String(refreshInterval))
+  }, [refreshInterval])
   return (
-    <PreferencesContext.Provider value={{ language, theme, setLanguage, setTheme }}>
+    <PreferencesContext.Provider
+      value={{
+        language,
+        theme,
+        autoRefresh,
+        refreshInterval,
+        setLanguage,
+        setTheme,
+        setAutoRefresh,
+        setRefreshInterval
+      }}
+    >
       <MantineProvider forceColorScheme={theme}>{children}</MantineProvider>
     </PreferencesContext.Provider>
   )

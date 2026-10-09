@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
-from sec_review_agents.artifacts.run_storage import publish_run_artifacts
+from sec_review_agents.artifacts.run_storage import store_run_artifacts
 
 
-def test_publish_run_artifacts_builds_immutable_reference(
+def test_store_run_artifacts_builds_immutable_reference(
     tmp_path: Path, monkeypatch
 ) -> None:
     root = tmp_path / "run"
@@ -25,7 +25,7 @@ def test_publish_run_artifacts_builds_immutable_reference(
     with patch(
         "sec_review_agents.artifacts.run_storage.boto3.client", return_value=client
     ):
-        reference = publish_run_artifacts(root, "run-1")
+        reference = store_run_artifacts(root, "run-1")
 
     assert reference is not None
     assert (
@@ -38,7 +38,7 @@ def test_publish_run_artifacts_builds_immutable_reference(
     assert request["Metadata"]["size-bytes"].isdigit()
 
 
-def test_publish_run_artifacts_uses_writable_system_temp_directory(
+def test_store_run_artifacts_uses_writable_system_temp_directory(
     tmp_path: Path, monkeypatch
 ) -> None:
     """The Runner source tree is mounted read-only in the service container."""
@@ -69,14 +69,14 @@ def test_publish_run_artifacts_uses_writable_system_temp_directory(
             side_effect=create_temp_file,
         ),
     ):
-        publish_run_artifacts(root, "run-read-only-source")
+        store_run_artifacts(root, "run-read-only-source")
 
 
-def test_publish_run_artifacts_skips_missing_terminal_tree(tmp_path: Path) -> None:
-    assert publish_run_artifacts(tmp_path / "missing", "run-missing") is None
+def test_store_run_artifacts_skips_missing_terminal_tree(tmp_path: Path) -> None:
+    assert store_run_artifacts(tmp_path / "missing", "run-missing") is None
 
 
-def test_publish_run_artifacts_does_not_hide_upload_failure(
+def test_store_run_artifacts_does_not_hide_upload_failure(
     tmp_path: Path, monkeypatch
 ) -> None:
     root = tmp_path / "run"
@@ -96,14 +96,14 @@ def test_publish_run_artifacts_does_not_hide_upload_failure(
         "sec_review_agents.artifacts.run_storage.boto3.client", return_value=client
     ):
         try:
-            publish_run_artifacts(root, "run-failed")
+            store_run_artifacts(root, "run-failed")
         except RuntimeError as error:
             assert str(error) == "storage unavailable"
         else:
             raise AssertionError("publication failure must be raised")
 
 
-def test_publish_run_artifacts_reuses_existing_immutable_object(
+def test_store_run_artifacts_reuses_existing_immutable_object(
     tmp_path: Path, monkeypatch
 ) -> None:
     root = tmp_path / "run"
@@ -114,18 +114,18 @@ def test_publish_run_artifacts_reuses_existing_immutable_object(
     client = MagicMock()
     client.head_object.return_value = {
         "ContentLength": 42,
-        "ContentType": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+        "ContentType": "application/zstd",
         "Metadata": {"sha256": "a" * 64, "size-bytes": "42"},
     }
     with patch(
         "sec_review_agents.artifacts.run_storage.boto3.client", return_value=client
     ):
-        reference = publish_run_artifacts(root, "run-existing")
+        reference = store_run_artifacts(root, "run-existing")
 
     assert reference == {
         "kind": "diagnostic_bundle",
         "uri": "s3://sec-review/runs/run-existing/artifacts/diagnostic-tree.v1.tar.zst",
-        "media_type": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+        "media_type": "application/zstd",
         "digest": f"sha256:{'a' * 64}",
         "size_bytes": 42,
     }
