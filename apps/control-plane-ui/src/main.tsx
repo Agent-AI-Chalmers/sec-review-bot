@@ -533,7 +533,7 @@ function Artifact({
         )}
       </div>
       <div className="artifact-technical-details">
-        <Text c="dimmed" size="xs">
+        <Text c="dimmed" size="xs" ff="monospace">
           {artifact.media_type}
         </Text>
         <div className="artifact-digest-row">
