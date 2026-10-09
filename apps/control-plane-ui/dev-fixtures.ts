@@ -69,7 +69,7 @@ const runs: FixtureRun[] = [
     created_at: '2026-10-08T08:11:46.832Z',
     updated_at: '2026-10-08T08:29:10.118Z',
     published_at: null,
-    failure_code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
+    failure_code: 'GITHUB_VALIDATION_REJECTED',
     artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000004')
   },
   {
@@ -148,7 +148,7 @@ const stepsByRun = new Map<string, FixtureStep[]>([
       {
         step_key: 'repository:delivery:delivery-a',
         status: 'terminal_failed',
-        failure_count: 3,
+        failure_count: 1,
         remote_object_url: null,
         failure_code: 'GITHUB_VALIDATION_REJECTED',
         failure_message: 'Validation failed.'
