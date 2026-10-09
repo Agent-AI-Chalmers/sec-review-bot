@@ -138,11 +138,13 @@ function useRefresh(
 function RefreshControls({
   refresh,
   refreshing,
-  lastChecked
+  lastChecked,
+  autoRefreshEnabled = true
 }: {
   refresh: () => void
   refreshing: boolean
   lastChecked: Date | undefined
+  autoRefreshEnabled?: boolean
 }): React.JSX.Element {
   const { language, autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } =
     usePreferences()
@@ -156,13 +158,14 @@ function RefreshControls({
       <Group gap="sm" wrap="nowrap">
         <Switch
           label={t('autoRefresh')}
-          checked={autoRefresh}
+          checked={autoRefresh && autoRefreshEnabled}
+          disabled={!autoRefreshEnabled}
           onChange={(event) => setAutoRefresh(event.currentTarget.checked)}
         />
         <NativeSelect
           aria-label={t('refreshInterval')}
           value={String(refreshInterval)}
-          disabled={!autoRefresh}
+          disabled={!autoRefresh || !autoRefreshEnabled}
           onChange={(event) =>
             setRefreshInterval(Number(event.currentTarget.value) as 5000 | 15000 | 30000 | 60000)
           }
@@ -610,6 +613,7 @@ function Detail(): React.JSX.Element {
                 refresh={refresh}
                 refreshing={refreshing}
                 lastChecked={lastChecked}
+                autoRefreshEnabled={!terminal}
               />
             </Group>
           </div>
