@@ -248,12 +248,9 @@ function Runs(): React.JSX.Element {
   }
   return (
     <Container component="main" size="lg" py="xl">
-      <Box mb="lg">
-        <Text c="dimmed" size="xs" tt="uppercase">
-          Review Control Plane
-        </Text>
-        <Title order={1}>{t('runs')}</Title>
-      </Box>
+      <Title order={1} mb="lg">
+        {t('runs')}
+      </Title>
       {Boolean(error) && (
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}
