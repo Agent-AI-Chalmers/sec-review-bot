@@ -7,7 +7,6 @@ import {
   Badge,
   Box,
   Button,
-  Collapse,
   Container,
   Group,
   NativeSelect,
@@ -25,8 +24,6 @@ import {
   IconAlertTriangle,
   IconArrowLeft,
   IconCheck,
-  IconChevronDown,
-  IconChevronUp,
   IconClock,
   IconCopy,
   IconDownload,
@@ -396,19 +393,18 @@ function Artifact({
   runId: string
 }): React.JSX.Element {
   const t = useMessages()
-  const [detailsOpen, setDetailsOpen] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
   const artifact = publication.artifact
   if (artifact === undefined) {
     return (
-      <Paper withBorder radius="sm" p="md">
+      <div className="artifact-state">
         <Group gap="sm">
           <Badge variant="light" color={publication.status === 'failed' ? 'red' : 'gray'}>
             {publication.status}
           </Badge>
           {publication.error_code && <Text>{publication.error_code}</Text>}
         </Group>
-      </Paper>
+      </div>
     )
   }
   const copyDigest = async (): Promise<void> => {
@@ -417,69 +413,54 @@ function Artifact({
     window.setTimeout(() => setCopied(false), 2000)
   }
   return (
-    <Paper withBorder radius="sm" className="artifact-panel">
+    <div className="artifact-panel">
       <div className="artifact-summary">
-        <Group gap="sm" wrap="nowrap" className="artifact-identity">
-          <IconArchive size={20} aria-hidden="true" />
-          <div>
-            <Text fw={600}>{t('diagnosticBundle')}</Text>
-            <Text c="dimmed" size="sm" className="artifact-meta">
-              {t('artifactPublished')} <span aria-hidden="true">·</span>{' '}
-              {formatBytes(artifact.size_bytes)}
-            </Text>
-          </div>
-        </Group>
-        <Group gap="xs" wrap="nowrap" justify="space-between" className="artifact-actions">
-          {isDownloadableArtifact(publication) && (
-            <Button
+        <Text c="dimmed" size="sm" className="artifact-meta">
+          {t('artifactPublished')} <span aria-hidden="true">·</span>{' '}
+          {formatBytes(artifact.size_bytes)}
+        </Text>
+        {isDownloadableArtifact(publication) && (
+          <Tooltip label={t('download')}>
+            <ActionIcon
               component="a"
               href={`/api/runs/${encodeURIComponent(runId)}/artifact`}
               download
-              variant="default"
-              leftSection={<IconDownload size={16} />}
+              variant="subtle"
+              color="gray"
+              size="sm"
+              aria-label={t('download')}
             >
-              {t('download')}
-            </Button>
-          )}
-          <Button
-            variant="subtle"
-            rightSection={detailsOpen ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
-            aria-expanded={detailsOpen}
-            aria-controls="artifact-technical-details"
-            onClick={() => setDetailsOpen((open) => !open)}
-          >
-            {detailsOpen ? t('hideDetails') : t('details')}
-          </Button>
-        </Group>
+              <IconDownload size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
       </div>
-      <Collapse expanded={detailsOpen}>
-        <dl id="artifact-technical-details" className="artifact-technical-details">
-          <div>
-            <dt>{t('artifactMediaType')}</dt>
-            <dd>{artifact.media_type}</dd>
-          </div>
-          <div>
-            <dt>{t('sha256')}</dt>
-            <dd className="artifact-digest-row">
-              <code>{artifact.digest.replace(/^sha256:/, '')}</code>
-              <Tooltip label={copied ? t('digestCopied') : t('copyDigest')}>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label={copied ? t('digestCopied') : t('copyDigest')}
-                  onClick={() => void copyDigest()}
-                >
-                  {copied ? <IconCheck size={17} /> : <IconCopy size={17} />}
-                </ActionIcon>
-              </Tooltip>
-              <span className="visually-hidden" aria-live="polite">
-                {copied ? t('digestCopied') : ''}
-              </span>
-            </dd>
-          </div>
-        </dl>
-      </Collapse>
-    </Paper>
+      <div className="artifact-technical-details">
+        <Text c="dimmed" size="xs">
+          {artifact.media_type}
+        </Text>
+        <div className="artifact-digest-row">
+          <Text c="dimmed" size="xs">
+            {t('sha256')}
+          </Text>
+          <code>{artifact.digest.replace(/^sha256:/, '')}</code>
+          <Tooltip label={copied ? t('digestCopied') : t('copyDigest')}>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              aria-label={copied ? t('digestCopied') : t('copyDigest')}
+              onClick={() => void copyDigest()}
+            >
+              {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
+            </ActionIcon>
+          </Tooltip>
+          <span className="visually-hidden" aria-live="polite">
+            {copied ? t('digestCopied') : ''}
+          </span>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -509,6 +490,11 @@ function Detail(): React.JSX.Element {
   const publicationOutcomes = steps.filter(
     (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
   )
+  const progressItemCount =
+    1 +
+    (run?.artifact_publication === null ? 0 : 1) +
+    (publicationOutcomes.length > 0 ? 1 : 0) +
+    (run?.published_at || run?.status === 'failed' ? 1 : 0)
   return (
     <Container component="main" size="lg" py="xl">
       <Button
@@ -547,7 +533,7 @@ function Detail(): React.JSX.Element {
             )}
             <Paper component="section" withBorder radius="sm" p="md">
               <Group justify="space-between" align="flex-start" mb="lg">
-                <Title order={2}>{t('timeline')}</Title>
+                <Title order={2}>{t('runProgress')}</Title>
                 <div>
                   <Text c="dimmed" size="xs" ta="right">
                     {t('updated')}
@@ -555,16 +541,83 @@ function Detail(): React.JSX.Element {
                   <Text size="sm">{formatDate(run.updated_at, language)}</Text>
                 </div>
               </Group>
-              <Timeline
-                active={run.published_at || run.status === 'failed' ? 1 : 0}
-                bulletSize={24}
-                lineWidth={2}
-              >
+              <Timeline active={progressItemCount - 1} bulletSize={24} lineWidth={2}>
                 <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
                   <Text c="dimmed" size="sm">
                     {formatDate(run.created_at, language)}
                   </Text>
                 </Timeline.Item>
+                {run.artifact_publication !== null && (
+                  <Timeline.Item bullet={<IconArchive size={14} />} title={t('artifact')}>
+                    <Artifact publication={run.artifact_publication} runId={run.run_id} />
+                  </Timeline.Item>
+                )}
+                {publicationOutcomes.length > 0 && (
+                  <Timeline.Item
+                    bullet={<IconExternalLink size={14} />}
+                    title={t('publicationResults')}
+                  >
+                    <div className="delivery-list">
+                      {publicationOutcomes.map((step) => {
+                        const externalUrl = safeExternalUrl(step.remote_object_url)
+                        const succeeded = step.status === 'succeeded'
+                        return (
+                          <div className="delivery-item" key={step.step_key}>
+                            <div className="delivery-main">
+                              <Badge
+                                variant="light"
+                                color={
+                                  step.status === 'terminal_failed'
+                                    ? 'red'
+                                    : succeeded
+                                      ? 'green'
+                                      : 'yellow'
+                                }
+                              >
+                                {publicationStatusLabel(step.status, t)}
+                              </Badge>
+                            </div>
+                            {externalUrl && (
+                              <Button
+                                component="a"
+                                href={externalUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                variant="subtle"
+                                rightSection={<IconExternalLink size={16} />}
+                              >
+                                {t('openExternalLink')}
+                              </Button>
+                            )}
+                            {!succeeded &&
+                              (step.failure_message ||
+                                step.failure_code ||
+                                step.failure_count > 0) && (
+                                <div className="delivery-error">
+                                  {step.failure_message && (
+                                    <Text size="sm">{step.failure_message}</Text>
+                                  )}
+                                  <Group gap="sm">
+                                    {step.failure_code && (
+                                      <Text c="dimmed" size="xs" ff="monospace">
+                                        {step.failure_code}
+                                      </Text>
+                                    )}
+                                    {step.failure_count > 0 && (
+                                      <Text c="dimmed" size="xs">
+                                        {t('failedAttempts')}: {step.failure_count}
+                                      </Text>
+                                    )}
+                                  </Group>
+                                </div>
+                              )}
+                            <code className="delivery-step-key">{step.step_key}</code>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </Timeline.Item>
+                )}
                 {run.published_at && (
                   <Timeline.Item bullet={<IconCheck size={14} />} title={t('publicationCompleted')}>
                     <Text c="dimmed" size="sm">
@@ -590,80 +643,6 @@ function Detail(): React.JSX.Element {
                 )}
               </Timeline>
             </Paper>
-            <Box component="section">
-              <Title order={2} mb="sm">
-                {t('artifact')}
-              </Title>
-              {run.artifact_publication === null ? (
-                <Text c="dimmed">{t('noArtifact')}</Text>
-              ) : (
-                <Artifact publication={run.artifact_publication} runId={run.run_id} />
-              )}
-            </Box>
-            {publicationOutcomes.length > 0 && (
-              <Box component="section">
-                <Title order={2} mb="sm">
-                  {t('publicationResults')}
-                </Title>
-                <Paper withBorder radius="sm" className="delivery-list">
-                  {publicationOutcomes.map((step) => {
-                    const externalUrl = safeExternalUrl(step.remote_object_url)
-                    const succeeded = step.status === 'succeeded'
-                    return (
-                      <div className="delivery-item" key={step.step_key}>
-                        <div className="delivery-main">
-                          <Badge
-                            variant="light"
-                            color={
-                              step.status === 'terminal_failed'
-                                ? 'red'
-                                : succeeded
-                                  ? 'green'
-                                  : 'yellow'
-                            }
-                          >
-                            {publicationStatusLabel(step.status, t)}
-                          </Badge>
-                        </div>
-                        {externalUrl && (
-                          <Button
-                            component="a"
-                            href={externalUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            variant="subtle"
-                            rightSection={<IconExternalLink size={16} />}
-                          >
-                            {t('openExternalLink')}
-                          </Button>
-                        )}
-                        {!succeeded &&
-                          (step.failure_message || step.failure_code || step.failure_count > 0) && (
-                            <div className="delivery-error">
-                              {step.failure_message && (
-                                <Text size="sm">{step.failure_message}</Text>
-                              )}
-                              <Group gap="sm">
-                                {step.failure_code && (
-                                  <Text c="dimmed" size="xs" ff="monospace">
-                                    {step.failure_code}
-                                  </Text>
-                                )}
-                                {step.failure_count > 0 && (
-                                  <Text c="dimmed" size="xs">
-                                    {t('failedAttempts')}: {step.failure_count}
-                                  </Text>
-                                )}
-                              </Group>
-                            </div>
-                          )}
-                        <code className="delivery-step-key">{step.step_key}</code>
-                      </div>
-                    )
-                  })}
-                </Paper>
-              </Box>
-            )}
           </Stack>
         </>
       )}
