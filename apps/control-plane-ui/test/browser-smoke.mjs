@@ -13,7 +13,7 @@ try {
     await page.getByLabel('Access token').fill(token)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await page.waitForURL('**/runs')
-    await page.getByRole('heading', { name: 'Review runs' }).waitFor()
+    await page.getByRole('heading', { name: 'Runs' }).waitFor()
     await page.screenshot({ path: `/tmp/control-plane-ui-${name}.png`, fullPage: true })
     const body = await page.locator('body').boundingBox()
     if (body === null || body.width > viewport.width + 1)
