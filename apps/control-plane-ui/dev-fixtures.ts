@@ -185,7 +185,15 @@ export function devFixtures(): Plugin {
           return
         }
         if (request.url.startsWith('/api/runs?')) {
-          response.end(JSON.stringify({ runs, next_cursor: null }))
+          const url = new URL(request.url, 'http://fixture.local')
+          const status = url.searchParams.get('status')
+          const workflow = url.searchParams.get('workflow')
+          const filtered = runs.filter(
+            (run) =>
+              (status === null || run.status === status) &&
+              (workflow === null || run.workflow === workflow)
+          )
+          response.end(JSON.stringify({ runs: filtered, next_cursor: null }))
           return
         }
         const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(request.url)
