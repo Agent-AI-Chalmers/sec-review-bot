@@ -36,13 +36,8 @@ import {
   IconRefresh
 } from '@tabler/icons-react'
 import { api, ApiError, login, type ArtifactStorage, type Run } from './api.js'
-import {
-  formatDate,
-  PreferenceControls,
-  Preferences,
-  useMessages,
-  usePreferences
-} from './preferences.js'
+import { formatDate, LanguageProvider, useLanguage, useMessages } from './i18n.js'
+import { PreferenceControls, Preferences, usePreferences } from './preferences.js'
 import './styles.css'
 import '@mantine/core/styles.css'
 
@@ -149,8 +144,8 @@ function RefreshControls({
   lastChecked: Date | undefined
   autoRefreshEnabled?: boolean
 }): React.JSX.Element {
-  const { language, autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } =
-    usePreferences()
+  const { language } = useLanguage()
+  const { autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } = usePreferences()
   const t = useMessages()
   return (
     <Stack gap={4} align="flex-end" className="refresh-controls">
@@ -228,7 +223,7 @@ function RunStatusBadge({ status }: { status: string }): React.JSX.Element {
 }
 
 function Runs(): React.JSX.Element {
-  const { language } = usePreferences()
+  const { language } = useLanguage()
   const t = useMessages()
   const [search, setSearch] = useSearchParams()
   const [data, setData] = React.useState<{ runs: Run[]; next_cursor: string | null }>()
@@ -557,7 +552,7 @@ function Artifact({
 }
 
 function Detail(): React.JSX.Element {
-  const { language } = usePreferences()
+  const { language } = useLanguage()
   const t = useMessages()
   const { runId = '' } = useParams()
   const [run, setRun] = React.useState<Run>()
@@ -864,9 +859,11 @@ function App(): React.JSX.Element {
   )
 }
 createRoot(document.getElementById('root')!).render(
-  <Preferences>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </Preferences>
+  <LanguageProvider>
+    <Preferences>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </Preferences>
+  </LanguageProvider>
 )
