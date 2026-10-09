@@ -3,9 +3,11 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Link, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
 import {
   AppShell,
+  ActionIcon,
   Badge,
   Box,
   Button,
+  Collapse,
   Container,
   Group,
   NativeSelect,
@@ -15,9 +17,20 @@ import {
   Table,
   Text,
   Timeline,
+  Tooltip,
   Title
 } from '@mantine/core'
-import { IconArrowLeft, IconCheck, IconClock, IconDownload, IconRefresh } from '@tabler/icons-react'
+import {
+  IconArchive,
+  IconArrowLeft,
+  IconCheck,
+  IconChevronDown,
+  IconChevronUp,
+  IconClock,
+  IconCopy,
+  IconDownload,
+  IconRefresh
+} from '@tabler/icons-react'
 import { api, ApiError, login, type ArtifactPublication, type Run } from './api.js'
 import {
   formatDate,
@@ -317,6 +330,101 @@ function isDownloadableArtifact(value: ArtifactPublication | null): value is Art
   return value?.status === 'published' && value.artifact !== undefined
 }
 
+function Artifact({
+  publication,
+  runId
+}: {
+  publication: ArtifactPublication
+  runId: string
+}): React.JSX.Element {
+  const t = useMessages()
+  const [detailsOpen, setDetailsOpen] = React.useState(false)
+  const [copied, setCopied] = React.useState(false)
+  const artifact = publication.artifact
+  if (artifact === undefined) {
+    return (
+      <Paper withBorder radius="sm" p="md">
+        <Group gap="sm">
+          <Badge variant="light" color={publication.status === 'failed' ? 'red' : 'gray'}>
+            {publication.status}
+          </Badge>
+          {publication.error_code && <Text>{publication.error_code}</Text>}
+        </Group>
+      </Paper>
+    )
+  }
+  const copyDigest = async (): Promise<void> => {
+    await navigator.clipboard.writeText(artifact.digest)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <Paper withBorder radius="sm" className="artifact-panel">
+      <div className="artifact-summary">
+        <Group gap="sm" wrap="nowrap" className="artifact-identity">
+          <IconArchive size={20} aria-hidden="true" />
+          <div>
+            <Text fw={600}>{t('diagnosticBundle')}</Text>
+            <Text c="dimmed" size="sm" className="artifact-meta">
+              {t('artifactPublished')} <span aria-hidden="true">·</span>{' '}
+              {formatBytes(artifact.size_bytes)}
+            </Text>
+          </div>
+        </Group>
+        <Group gap="xs" wrap="nowrap" justify="space-between" className="artifact-actions">
+          {isDownloadableArtifact(publication) && (
+            <Button
+              component="a"
+              href={`/api/runs/${encodeURIComponent(runId)}/artifact`}
+              download
+              variant="default"
+              leftSection={<IconDownload size={16} />}
+            >
+              {t('download')}
+            </Button>
+          )}
+          <Button
+            variant="subtle"
+            rightSection={detailsOpen ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
+            aria-expanded={detailsOpen}
+            aria-controls="artifact-technical-details"
+            onClick={() => setDetailsOpen((open) => !open)}
+          >
+            {detailsOpen ? t('hideDetails') : t('details')}
+          </Button>
+        </Group>
+      </div>
+      <Collapse expanded={detailsOpen}>
+        <dl id="artifact-technical-details" className="artifact-technical-details">
+          <div>
+            <dt>{t('artifactMediaType')}</dt>
+            <dd>{artifact.media_type}</dd>
+          </div>
+          <div>
+            <dt>{t('sha256')}</dt>
+            <dd className="artifact-digest-row">
+              <code>{artifact.digest.replace(/^sha256:/, '')}</code>
+              <Tooltip label={copied ? t('digestCopied') : t('copyDigest')}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label={copied ? t('digestCopied') : t('copyDigest')}
+                  onClick={() => void copyDigest()}
+                >
+                  {copied ? <IconCheck size={17} /> : <IconCopy size={17} />}
+                </ActionIcon>
+              </Tooltip>
+              <span className="visually-hidden" aria-live="polite">
+                {copied ? t('digestCopied') : ''}
+              </span>
+            </dd>
+          </div>
+        </dl>
+      </Collapse>
+    </Paper>
+  )
+}
+
 function Detail(): React.JSX.Element {
   const { language } = usePreferences()
   const t = useMessages()
@@ -412,59 +520,13 @@ function Detail(): React.JSX.Element {
               )}
             </Paper>
             <Box component="section">
-              <Group justify="space-between" align="center" mb="sm">
-                <Title order={2}>{t('artifact')}</Title>
-                {isDownloadableArtifact(run.artifact_publication) && (
-                  <Button
-                    component="a"
-                    href={`/api/runs/${encodeURIComponent(run.run_id)}/artifact`}
-                    download
-                    variant="default"
-                    leftSection={<IconDownload size={16} />}
-                  >
-                    {t('download')}
-                  </Button>
-                )}
-              </Group>
+              <Title order={2} mb="sm">
+                {t('artifact')}
+              </Title>
               {run.artifact_publication === null ? (
                 <Text c="dimmed">{t('noArtifact')}</Text>
               ) : (
-                <Paper withBorder radius="sm" p="md">
-                  <dl className="artifact-details">
-                    <div>
-                      <dt>{t('artifactStatus')}</dt>
-                      <dd>{run.artifact_publication.status}</dd>
-                    </div>
-                    {run.artifact_publication.artifact && (
-                      <>
-                        <div>
-                          <dt>{t('artifactType')}</dt>
-                          <dd>{run.artifact_publication.artifact.kind}</dd>
-                        </div>
-                        <div>
-                          <dt>{t('artifactSize')}</dt>
-                          <dd>{formatBytes(run.artifact_publication.artifact.size_bytes)}</dd>
-                        </div>
-                        <div>
-                          <dt>{t('artifactMediaType')}</dt>
-                          <dd>{run.artifact_publication.artifact.media_type}</dd>
-                        </div>
-                        <div>
-                          <dt>{t('artifactDigest')}</dt>
-                          <dd className="artifact-digest">
-                            {run.artifact_publication.artifact.digest}
-                          </dd>
-                        </div>
-                      </>
-                    )}
-                    {run.artifact_publication.error_code && (
-                      <div>
-                        <dt>{t('latestError')}</dt>
-                        <dd>{run.artifact_publication.error_code}</dd>
-                      </div>
-                    )}
-                  </dl>
-                </Paper>
+                <Artifact publication={run.artifact_publication} runId={run.run_id} />
               )}
             </Box>
             <Box component="section">
