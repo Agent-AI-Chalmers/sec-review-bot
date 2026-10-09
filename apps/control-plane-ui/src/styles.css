@@ -45,6 +45,12 @@ body {
 .run-id {
   overflow-wrap: anywhere;
 }
+.run-heading {
+  margin-bottom: 16px;
+}
+.run-state-summary {
+  overflow-wrap: anywhere;
+}
 .table-wrap {
   overflow-x: auto;
 }

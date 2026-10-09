@@ -494,7 +494,7 @@ function Detail(): React.JSX.Element {
     1 +
     (run?.artifact_publication === null ? 0 : 1) +
     (publicationOutcomes.length > 0 ? 1 : 0) +
-    (run?.published_at || run?.status === 'failed' ? 1 : 0)
+    (run?.published_at ? 1 : 0)
   return (
     <Container component="main" size="lg" py="xl">
       <Button
@@ -511,17 +511,27 @@ function Detail(): React.JSX.Element {
         <p>{t('loadingRun')}</p>
       ) : (
         <>
-          <Group justify="space-between" align="flex-start" mb="md">
-            <div>
-              <Text c="dimmed" size="xs" tt="uppercase">
-                {run.workflow}
-              </Text>
-              <Title order={1} className="run-id">
-                {run.run_id}
-              </Title>
-            </div>
-            <RunStatusBadge status={run.status} />
-          </Group>
+          <div className="run-heading">
+            <Text c="dimmed" size="xs" tt="uppercase">
+              {run.workflow}
+            </Text>
+            <Title order={1} className="run-id">
+              {run.run_id}
+            </Title>
+            <Group gap="sm" mt="xs" align="center" className="run-state-summary">
+              <RunStatusBadge status={run.status} />
+              {run.failure_code && (
+                <Group gap={6} wrap="wrap">
+                  <Text c="dimmed" size="xs">
+                    {t('latestError')}:
+                  </Text>
+                  <Text c="red" size="xs" ff="monospace">
+                    {run.failure_code}
+                  </Text>
+                </Group>
+              )}
+            </Group>
+          </div>
           <Box className="operations-bar detail-operations" mb="xl">
             <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
           </Box>
@@ -623,22 +633,6 @@ function Detail(): React.JSX.Element {
                     <Text c="dimmed" size="sm">
                       {formatDate(run.published_at, language)}
                     </Text>
-                  </Timeline.Item>
-                )}
-                {run.status === 'failed' && (
-                  <Timeline.Item
-                    bullet={<IconAlertTriangle size={14} />}
-                    color="red"
-                    title={t('failedStatus')}
-                  >
-                    <Text c="dimmed" size="sm">
-                      {formatDate(run.updated_at, language)}
-                    </Text>
-                    {run.failure_code && (
-                      <Text c="red" size="sm" ff="monospace" mt={2}>
-                        {run.failure_code}
-                      </Text>
-                    )}
                   </Timeline.Item>
                 )}
               </Timeline>
