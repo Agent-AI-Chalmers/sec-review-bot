@@ -340,7 +340,7 @@ function Runs(): React.JSX.Element {
                   <Table.Th>{t('workflow')}</Table.Th>
                   <Table.Th>{t('execution')}</Table.Th>
                   <Table.Th>{t('publication')}</Table.Th>
-                  <Table.Th>{t('updated')}</Table.Th>
+                  <Table.Th>{t('lastActivity')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -585,7 +585,7 @@ function Detail(): React.JSX.Element {
     }
   }, [runId])
   const terminal = run ? isRunTerminal(run) : false
-  const { refresh, refreshing, lastChecked } = useRefresh(load, !terminal)
+  useRefresh(load, !terminal)
   const titleRunId = run?.run_id
   React.useEffect(() => {
     if (titleRunId === undefined) return
@@ -625,9 +625,6 @@ function Detail(): React.JSX.Element {
       ) : (
         <>
           <div className="run-heading">
-            <Text c="dimmed" size="xs" tt="uppercase">
-              {workflowLabel(run.workflow, t)}
-            </Text>
             <Title order={1} className="run-id">
               {run.run_id}
             </Title>
@@ -639,6 +636,9 @@ function Detail(): React.JSX.Element {
               className="run-heading-footer"
             >
               <Group gap="lg" align="center" className="run-state-summary">
+                <Text c="dimmed" size="xs" tt="uppercase">
+                  {workflowLabel(run.workflow, t)}
+                </Text>
                 <Group gap={6} align="center">
                   <Text c="dimmed" size="xs">
                     {t('execution')}
@@ -662,12 +662,9 @@ function Detail(): React.JSX.Element {
                   </Group>
                 )}
               </Group>
-              <RefreshControls
-                refresh={refresh}
-                refreshing={refreshing}
-                lastChecked={lastChecked}
-                autoRefreshEnabled={!terminal}
-              />
+              <Text c="dimmed" size="xs">
+                {t('lastActivity')}: {formatDate(run.updated_at, language)}
+              </Text>
             </Group>
           </div>
           <Stack gap="xl">
@@ -677,15 +674,9 @@ function Detail(): React.JSX.Element {
               </Text>
             )}
             <Paper component="section" withBorder radius="sm" p="md">
-              <Group justify="space-between" align="flex-start" mb="lg">
-                <Title order={2}>{t('runProgress')}</Title>
-                <div>
-                  <Text c="dimmed" size="xs" ta="right">
-                    {t('updated')}
-                  </Text>
-                  <Text size="sm">{formatDate(run.updated_at, language)}</Text>
-                </div>
-              </Group>
+              <Title order={2} mb="lg">
+                {t('runProgress')}
+              </Title>
               <Timeline active={timelineActive} bulletSize={24} lineWidth={2}>
                 <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
                   <Text c="dimmed" size="sm">
