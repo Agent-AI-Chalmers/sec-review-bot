@@ -399,25 +399,41 @@ function isDownloadableArtifact(value: ArtifactPublication | null): value is Art
   return value?.status === 'published' && value.artifact !== undefined
 }
 
+function artifactStatusLabel(
+  status: ArtifactPublication['status'],
+  t: ReturnType<typeof useMessages>
+): string {
+  if (status === 'published') return t('artifactPublished')
+  if (status === 'not_available') return t('notAvailable')
+  return t('failedStatus')
+}
+
+function artifactStatusColor(status: ArtifactPublication['status']): string {
+  if (status === 'published') return 'green'
+  if (status === 'failed') return 'red'
+  return 'gray'
+}
+
 function Artifact({
   publication,
   runId
 }: {
   publication: ArtifactPublication
   runId: string
-}): React.JSX.Element {
+}): React.ReactNode {
   const t = useMessages()
   const [copied, setCopied] = React.useState(false)
   const artifact = publication.artifact
   if (artifact === undefined) {
+    if (!publication.message && !publication.error_code) return null
     return (
       <div className="artifact-state">
-        <Group gap="sm">
-          <Badge variant="light" color={publication.status === 'failed' ? 'red' : 'gray'}>
-            {publication.status}
-          </Badge>
-          {publication.error_code && <Text>{publication.error_code}</Text>}
-        </Group>
+        {publication.message && <Text size="sm">{publication.message}</Text>}
+        {publication.error_code && (
+          <Text c={publication.status === 'failed' ? 'red' : 'dimmed'} size="xs" ff="monospace">
+            {publication.error_code}
+          </Text>
+        )}
       </div>
     )
   }
@@ -430,7 +446,6 @@ function Artifact({
     <div className="artifact-panel">
       <div className="artifact-summary">
         <Text c="dimmed" size="sm" className="artifact-meta">
-          {t('artifactPublished')} <span aria-hidden="true">·</span>{' '}
           {formatBytes(artifact.size_bytes)}
         </Text>
         {isDownloadableArtifact(publication) && (
@@ -581,7 +596,21 @@ function Detail(): React.JSX.Element {
                   </Text>
                 </Timeline.Item>
                 {run.artifact_publication !== null && (
-                  <Timeline.Item bullet={<IconArchive size={14} />} title={t('artifact')}>
+                  <Timeline.Item
+                    bullet={<IconArchive size={14} />}
+                    color={artifactStatusColor(run.artifact_publication.status)}
+                    title={
+                      <Group gap="xs" align="center">
+                        <Text fw={500}>{t('artifact')}</Text>
+                        <Badge
+                          variant="light"
+                          color={artifactStatusColor(run.artifact_publication.status)}
+                        >
+                          {artifactStatusLabel(run.artifact_publication.status, t)}
+                        </Badge>
+                      </Group>
+                    }
+                  >
                     <Artifact publication={run.artifact_publication} runId={run.run_id} />
                   </Timeline.Item>
                 )}

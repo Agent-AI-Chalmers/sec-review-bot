@@ -96,9 +96,6 @@ pre {
   min-height: 36px;
   padding: 2px 0 4px;
 }
-.artifact-meta span {
-  margin: 0 4px;
-}
 .artifact-technical-details {
   display: grid;
   gap: 4px;
