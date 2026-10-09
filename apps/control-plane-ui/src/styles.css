@@ -22,18 +22,44 @@
 body {
   margin: 0;
 }
-@keyframes status-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.status-spinner {
-  animation: status-spin 1.2s linear infinite;
-}
 @media (prefers-reduced-motion: reduce) {
-  .status-spinner {
+  .status-dot-active {
     animation: none;
   }
+}
+.status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mantine-color-gray-4);
+}
+.status-dot-waiting {
+  background: var(--mantine-color-gray-5);
+}
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+.status-dot-active {
+  background: var(--mantine-color-blue-6);
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+.status-dot-complete {
+  background: var(--mantine-color-green-6);
+}
+.status-dot-failed {
+  background: var(--mantine-color-red-6);
 }
 .brand {
   color: inherit;
@@ -51,6 +77,9 @@ body {
 .run-state-summary {
   overflow-wrap: anywhere;
 }
+.run-state-summary .status-text {
+  font-size: var(--mantine-font-size-sm);
+}
 .table-wrap {
   overflow-x: auto;
 }
@@ -67,6 +96,11 @@ body {
 }
 a {
   color: var(--link);
+}
+.artifact-section {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
 }
 .artifact-panel {
   overflow: hidden;

@@ -22,7 +22,6 @@ import {
   Title
 } from '@mantine/core'
 import {
-  IconArchive,
   IconAlertTriangle,
   IconArrowLeft,
   IconCheck,
@@ -33,7 +32,7 @@ import {
   IconChevronUp,
   IconExternalLink,
   IconInbox,
-  IconLoader2,
+  IconMinus,
   IconPlayerPlay,
   IconRefresh
 } from '@tabler/icons-react'
@@ -201,21 +200,12 @@ function statusToneColor(tone: StatusTone): string {
   return 'gray'
 }
 
-function StatusBadge({ label, tone }: { label: string; tone: StatusTone }): React.JSX.Element {
-  const icon =
-    tone === 'active' ? (
-      <IconLoader2 size={12} className="status-spinner" />
-    ) : tone === 'complete' ? (
-      <IconCheck size={12} />
-    ) : tone === 'failed' ? (
-      <IconAlertTriangle size={12} />
-    ) : tone === 'waiting' ? (
-      <IconClock size={12} />
-    ) : undefined
+function StatusText({ label, tone }: { label: string; tone: StatusTone }): React.JSX.Element {
   return (
-    <Badge variant="light" color={statusToneColor(tone)} leftSection={icon}>
+    <span className="status-text">
+      <span className={`status-dot status-dot-${tone}`} aria-hidden="true" />
       {label}
-    </Badge>
+    </span>
   )
 }
 
@@ -234,14 +224,22 @@ function publicationTone(status: Run['publication_status']): StatusTone {
   return 'neutral'
 }
 
-function ExecutionBadge({ status }: { status: Run['execution_status'] }): React.JSX.Element {
+function ExecutionStatus({ status }: { status: Run['execution_status'] }): React.JSX.Element {
   const t = useMessages()
-  return <StatusBadge label={executionStatusLabel(status, t)} tone={executionTone(status)} />
+  return <StatusText label={executionStatusLabel(status, t)} tone={executionTone(status)} />
 }
 
-function PublicationBadge({ status }: { status: Run['publication_status'] }): React.JSX.Element {
+function PublicationStatus({ status }: { status: Run['publication_status'] }): React.JSX.Element {
   const t = useMessages()
-  return <StatusBadge label={runPublicationStatusLabel(status, t)} tone={publicationTone(status)} />
+  return <StatusText label={runPublicationStatusLabel(status, t)} tone={publicationTone(status)} />
+}
+
+function statusBullet(tone: StatusTone): React.ReactNode {
+  if (tone === 'active') return <IconPlayerPlay size={14} />
+  if (tone === 'complete') return <IconCheck size={14} />
+  if (tone === 'failed') return <IconAlertTriangle size={14} />
+  if (tone === 'neutral') return <IconMinus size={14} />
+  return <IconClock size={14} />
 }
 
 function Runs(): React.JSX.Element {
@@ -282,6 +280,18 @@ function Runs(): React.JSX.Element {
         <Group justify="space-between" align="flex-end" gap="lg">
           <Group aria-label="Run filters" align="flex-end">
             <NativeSelect
+              label={t('workflow')}
+              value={search.get('workflow') ?? ''}
+              onChange={(event) => update('workflow', event.target.value)}
+            >
+              <option value="">{t('all')}</option>
+              {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
+                <option key={value} value={value}>
+                  {workflowLabel(value, t)}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
               label={t('execution')}
               value={search.get('execution_status') ?? ''}
               onChange={(event) => update('execution_status', event.target.value)}
@@ -308,18 +318,6 @@ function Runs(): React.JSX.Element {
                   </option>
                 )
               )}
-            </NativeSelect>
-            <NativeSelect
-              label={t('workflow')}
-              value={search.get('workflow') ?? ''}
-              onChange={(event) => update('workflow', event.target.value)}
-            >
-              <option value="">{t('all')}</option>
-              {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
-                <option key={value} value={value}>
-                  {workflowLabel(value, t)}
-                </option>
-              ))}
             </NativeSelect>
           </Group>
           <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
@@ -357,10 +355,10 @@ function Runs(): React.JSX.Element {
                     </Table.Td>
                     <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
                     <Table.Td>
-                      <ExecutionBadge status={run.execution_status} />
+                      <ExecutionStatus status={run.execution_status} />
                     </Table.Td>
                     <Table.Td>
-                      <PublicationBadge status={run.publication_status} />
+                      <PublicationStatus status={run.publication_status} />
                     </Table.Td>
                     <Table.Td>{formatDate(run.updated_at, language)}</Table.Td>
                   </Table.Tr>
@@ -474,21 +472,6 @@ function isDownloadableArtifact(value: ArtifactStorage | null): value is Artifac
   artifact: NonNullable<ArtifactStorage['artifact']>
 } {
   return value?.status === 'available' && value.artifact !== undefined
-}
-
-function artifactStatusLabel(
-  status: ArtifactStorage['status'],
-  t: ReturnType<typeof useMessages>
-): string {
-  if (status === 'available') return t('artifactAvailable')
-  if (status === 'unavailable') return t('notAvailable')
-  return t('failedStatus')
-}
-
-function artifactStatusColor(status: ArtifactStorage['status']): string {
-  if (status === 'available') return 'green'
-  if (status === 'failed') return 'red'
-  return 'gray'
 }
 
 function Artifact({
@@ -655,9 +638,19 @@ function Detail(): React.JSX.Element {
               mt="md"
               className="run-heading-footer"
             >
-              <Group gap="sm" align="center" className="run-state-summary">
-                <ExecutionBadge status={run.execution_status} />
-                <PublicationBadge status={run.publication_status} />
+              <Group gap="lg" align="center" className="run-state-summary">
+                <Group gap={6} align="center">
+                  <Text c="dimmed" size="xs">
+                    {t('execution')}
+                  </Text>
+                  <ExecutionStatus status={run.execution_status} />
+                </Group>
+                <Group gap={6} align="center">
+                  <Text c="dimmed" size="xs">
+                    {t('publication')}
+                  </Text>
+                  <PublicationStatus status={run.publication_status} />
+                </Group>
                 {run.failure_code && (
                   <Group gap={6} wrap="wrap">
                     <Text c="dimmed" size="xs">
@@ -700,55 +693,20 @@ function Detail(): React.JSX.Element {
                   </Text>
                 </Timeline.Item>
                 <Timeline.Item
-                  bullet={
-                    run.execution_status === 'running' ? (
-                      <IconLoader2 size={14} className="status-spinner" />
-                    ) : (
-                      <IconPlayerPlay size={14} />
-                    )
-                  }
+                  bullet={statusBullet(executionTone(run.execution_status))}
                   color={statusToneColor(executionTone(run.execution_status))}
-                  title={
-                    <Group gap="xs" align="center">
-                      <Text fw={500}>{t('execution')}</Text>
-                      <ExecutionBadge status={run.execution_status} />
-                    </Group>
-                  }
-                />
-                {run.artifact_storage !== null && (
-                  <Timeline.Item
-                    bullet={<IconArchive size={14} />}
-                    color={artifactStatusColor(run.artifact_storage.status)}
-                    title={
-                      <Group gap="xs" align="center">
-                        <Text fw={500}>{t('artifact')}</Text>
-                        <Badge
-                          variant="light"
-                          color={artifactStatusColor(run.artifact_storage.status)}
-                        >
-                          {artifactStatusLabel(run.artifact_storage.status, t)}
-                        </Badge>
-                      </Group>
-                    }
-                  >
-                    <Artifact storage={run.artifact_storage} runId={run.run_id} />
-                  </Timeline.Item>
-                )}
+                  title={<Text fw={500}>{t('execution')}</Text>}
+                >
+                  {run.artifact_storage !== null && (
+                    <div className="artifact-section">
+                      <Artifact storage={run.artifact_storage} runId={run.run_id} />
+                    </div>
+                  )}
+                </Timeline.Item>
                 <Timeline.Item
-                  bullet={
-                    run.publication_status === 'publishing' ? (
-                      <IconLoader2 size={14} className="status-spinner" />
-                    ) : (
-                      <IconExternalLink size={14} />
-                    )
-                  }
+                  bullet={statusBullet(publicationTone(run.publication_status))}
                   color={statusToneColor(publicationTone(run.publication_status))}
-                  title={
-                    <Group gap="xs" align="center">
-                      <Text fw={500}>{t('publication')}</Text>
-                      <PublicationBadge status={run.publication_status} />
-                    </Group>
-                  }
+                  title={<Text fw={500}>{t('publication')}</Text>}
                 >
                   {(run.published_at || singlePublicationUrl) && (
                     <Group gap="xs" className="publication-summary">
