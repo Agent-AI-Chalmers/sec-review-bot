@@ -185,18 +185,6 @@ function RefreshControls({
   )
 }
 
-function runStatusLabel(status: string, t: ReturnType<typeof useMessages>): string {
-  if (status === 'preparing') return t('statusPreparing')
-  if (status === 'recovering') return t('statusRecovering')
-  if (status === 'queued') return t('statusQueued')
-  if (status === 'running') return t('statusRunning')
-  if (status === 'succeeded') return t('statusSucceeded')
-  if (status === 'publishing') return t('statusPublishing')
-  if (status === 'published') return t('statusPublished')
-  if (status === 'failed') return t('statusFailed')
-  return status
-}
-
 function workflowLabel(workflow: string, t: ReturnType<typeof useMessages>): string {
   if (workflow === 'issue-review') return t('workflowIssueReview')
   if (workflow === 'pull-request-review') return t('workflowPullRequestReview')
@@ -204,30 +192,56 @@ function workflowLabel(workflow: string, t: ReturnType<typeof useMessages>): str
   return workflow
 }
 
-function RunStatusBadge({ status }: { status: string }): React.JSX.Element {
-  const t = useMessages()
-  const waiting = ['preparing', 'recovering', 'queued'].includes(status)
-  const active = ['running', 'publishing'].includes(status)
-  const complete = ['succeeded', 'published'].includes(status)
-  const label = runStatusLabel(status, t)
-  const icon = waiting ? (
-    <IconClock size={12} />
-  ) : active ? (
-    <IconLoader2 size={12} className="status-spinner" />
-  ) : complete ? (
-    <IconCheck size={12} />
-  ) : (
-    <IconAlertTriangle size={12} />
-  )
+type StatusTone = 'waiting' | 'active' | 'complete' | 'failed' | 'neutral'
+
+function statusToneColor(tone: StatusTone): string {
+  if (tone === 'active') return 'blue'
+  if (tone === 'complete') return 'green'
+  if (tone === 'failed') return 'red'
+  return 'gray'
+}
+
+function StatusBadge({ label, tone }: { label: string; tone: StatusTone }): React.JSX.Element {
+  const icon =
+    tone === 'active' ? (
+      <IconLoader2 size={12} className="status-spinner" />
+    ) : tone === 'complete' ? (
+      <IconCheck size={12} />
+    ) : tone === 'failed' ? (
+      <IconAlertTriangle size={12} />
+    ) : tone === 'waiting' ? (
+      <IconClock size={12} />
+    ) : undefined
   return (
-    <Badge
-      variant="light"
-      color={waiting ? 'gray' : active ? 'blue' : complete ? 'green' : 'red'}
-      leftSection={icon}
-    >
+    <Badge variant="light" color={statusToneColor(tone)} leftSection={icon}>
       {label}
     </Badge>
   )
+}
+
+function executionTone(status: Run['execution_status']): StatusTone {
+  if (status === 'running') return 'active'
+  if (status === 'succeeded') return 'complete'
+  if (status === 'failed') return 'failed'
+  return 'waiting'
+}
+
+function publicationTone(status: Run['publication_status']): StatusTone {
+  if (status === 'publishing') return 'active'
+  if (status === 'published') return 'complete'
+  if (status === 'failed') return 'failed'
+  if (status === 'pending') return 'waiting'
+  return 'neutral'
+}
+
+function ExecutionBadge({ status }: { status: Run['execution_status'] }): React.JSX.Element {
+  const t = useMessages()
+  return <StatusBadge label={executionStatusLabel(status, t)} tone={executionTone(status)} />
+}
+
+function PublicationBadge({ status }: { status: Run['publication_status'] }): React.JSX.Element {
+  const t = useMessages()
+  return <StatusBadge label={runPublicationStatusLabel(status, t)} tone={publicationTone(status)} />
 }
 
 function Runs(): React.JSX.Element {
@@ -268,25 +282,32 @@ function Runs(): React.JSX.Element {
         <Group justify="space-between" align="flex-end" gap="lg">
           <Group aria-label="Run filters" align="flex-end">
             <NativeSelect
-              label={t('status')}
-              value={search.get('status') ?? ''}
-              onChange={(event) => update('status', event.target.value)}
+              label={t('execution')}
+              value={search.get('execution_status') ?? ''}
+              onChange={(event) => update('execution_status', event.target.value)}
             >
               <option value="">{t('all')}</option>
-              {[
-                'preparing',
-                'recovering',
-                'queued',
-                'running',
-                'succeeded',
-                'publishing',
-                'published',
-                'failed'
-              ].map((value) => (
+              {(
+                ['preparing', 'recovering', 'queued', 'running', 'succeeded', 'failed'] as const
+              ).map((value) => (
                 <option key={value} value={value}>
-                  {runStatusLabel(value, t)}
+                  {executionStatusLabel(value, t)}
                 </option>
               ))}
+            </NativeSelect>
+            <NativeSelect
+              label={t('publication')}
+              value={search.get('publication_status') ?? ''}
+              onChange={(event) => update('publication_status', event.target.value)}
+            >
+              <option value="">{t('all')}</option>
+              {(['pending', 'publishing', 'published', 'failed', 'not_required'] as const).map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {runPublicationStatusLabel(value, t)}
+                  </option>
+                )
+              )}
             </NativeSelect>
             <NativeSelect
               label={t('workflow')}
@@ -319,7 +340,8 @@ function Runs(): React.JSX.Element {
                 <Table.Tr>
                   <Table.Th>{t('run')}</Table.Th>
                   <Table.Th>{t('workflow')}</Table.Th>
-                  <Table.Th>{t('status')}</Table.Th>
+                  <Table.Th>{t('execution')}</Table.Th>
+                  <Table.Th>{t('publication')}</Table.Th>
                   <Table.Th>{t('updated')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
@@ -335,7 +357,10 @@ function Runs(): React.JSX.Element {
                     </Table.Td>
                     <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
                     <Table.Td>
-                      <RunStatusBadge status={run.status} />
+                      <ExecutionBadge status={run.execution_status} />
+                    </Table.Td>
+                    <Table.Td>
+                      <PublicationBadge status={run.publication_status} />
                     </Table.Td>
                     <Table.Td>{formatDate(run.updated_at, language)}</Table.Td>
                   </Table.Tr>
@@ -382,7 +407,7 @@ function safeExternalUrl(value: string | null): string | undefined {
 }
 
 function publicationStatusLabel(status: string, t: ReturnType<typeof useMessages>): string {
-  if (status === 'pending') return t('waiting')
+  if (status === 'pending') return t('publicationPending')
   if (status === 'running') return t('publishingStatus')
   if (status === 'succeeded') return t('statusSucceeded')
   if (status === 'failed') return t('retryPending')
@@ -411,13 +436,6 @@ function executionStatusLabel(
   return t('statusFailed')
 }
 
-function executionStatusColor(status: Run['execution_status']): string {
-  if (status === 'failed') return 'red'
-  if (status === 'succeeded') return 'green'
-  if (status === 'running') return 'blue'
-  return 'gray'
-}
-
 function runPublicationStatusLabel(
   status: Run['publication_status'],
   t: ReturnType<typeof useMessages>
@@ -427,13 +445,6 @@ function runPublicationStatusLabel(
   if (status === 'published') return t('statusPublished')
   if (status === 'failed') return t('failedStatus')
   return t('publicationNotRequired')
-}
-
-function runPublicationStatusColor(status: Run['publication_status']): string {
-  if (status === 'failed') return 'red'
-  if (status === 'published') return 'green'
-  if (status === 'publishing') return 'blue'
-  return 'gray'
 }
 
 function isRunTerminal(run: Run): boolean {
@@ -645,7 +656,8 @@ function Detail(): React.JSX.Element {
               className="run-heading-footer"
             >
               <Group gap="sm" align="center" className="run-state-summary">
-                <RunStatusBadge status={run.status} />
+                <ExecutionBadge status={run.execution_status} />
+                <PublicationBadge status={run.publication_status} />
                 {run.failure_code && (
                   <Group gap={6} wrap="wrap">
                     <Text c="dimmed" size="xs">
@@ -695,13 +707,11 @@ function Detail(): React.JSX.Element {
                       <IconPlayerPlay size={14} />
                     )
                   }
-                  color={executionStatusColor(run.execution_status)}
+                  color={statusToneColor(executionTone(run.execution_status))}
                   title={
                     <Group gap="xs" align="center">
                       <Text fw={500}>{t('execution')}</Text>
-                      <Badge variant="light" color={executionStatusColor(run.execution_status)}>
-                        {executionStatusLabel(run.execution_status, t)}
-                      </Badge>
+                      <ExecutionBadge status={run.execution_status} />
                     </Group>
                   }
                 />
@@ -732,16 +742,11 @@ function Detail(): React.JSX.Element {
                       <IconExternalLink size={14} />
                     )
                   }
-                  color={runPublicationStatusColor(run.publication_status)}
+                  color={statusToneColor(publicationTone(run.publication_status))}
                   title={
                     <Group gap="xs" align="center">
                       <Text fw={500}>{t('publication')}</Text>
-                      <Badge
-                        variant="light"
-                        color={runPublicationStatusColor(run.publication_status)}
-                      >
-                        {runPublicationStatusLabel(run.publication_status, t)}
-                      </Badge>
+                      <PublicationBadge status={run.publication_status} />
                     </Group>
                   }
                 >

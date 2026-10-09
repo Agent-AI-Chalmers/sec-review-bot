@@ -186,11 +186,13 @@ export function devFixtures(): Plugin {
         }
         if (request.url.startsWith('/api/runs?')) {
           const url = new URL(request.url, 'http://fixture.local')
-          const status = url.searchParams.get('status')
+          const executionStatus = url.searchParams.get('execution_status')
+          const publicationStatus = url.searchParams.get('publication_status')
           const workflow = url.searchParams.get('workflow')
           const filtered = runs.filter(
             (run) =>
-              (status === null || run.status === status) &&
+              (executionStatus === null || run.execution_status === executionStatus) &&
+              (publicationStatus === null || run.publication_status === publicationStatus) &&
               (workflow === null || run.workflow === workflow)
           )
           response.end(JSON.stringify({ runs: filtered, next_cursor: null }))

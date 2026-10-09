@@ -126,7 +126,7 @@ test('run queries apply status filters before pagination limits', async () => {
       })
     }
 
-    const failedRuns = await store.listRuns({ status: 'failed', limit: 1 })
+    const failedRuns = await store.listRuns({ execution_status: 'failed', limit: 1 })
     assert.deepEqual(
       failedRuns.map((run) => run.run_id),
       [failedRunId]

@@ -36,10 +36,20 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const unfiltered = await fetch(`${base}/v1/runs`, { headers: readAuth })
     assert.equal(unfiltered.status, 200)
     assert.deepEqual(await unfiltered.json(), { runs: [], next_cursor: null })
-    const invalidStatus = await fetch(`${base}/v1/runs?status=typo`, { headers: readAuth })
-    assert.equal(invalidStatus.status, 400)
-    assert.deepEqual(await invalidStatus.json(), {
-      error: 'status is invalid.',
+    const invalidExecutionStatus = await fetch(`${base}/v1/runs?execution_status=typo`, {
+      headers: readAuth
+    })
+    assert.equal(invalidExecutionStatus.status, 400)
+    assert.deepEqual(await invalidExecutionStatus.json(), {
+      error: 'execution_status is invalid.',
+      code: 'INVALID_QUERY'
+    })
+    const invalidPublicationStatus = await fetch(`${base}/v1/runs?publication_status=typo`, {
+      headers: readAuth
+    })
+    assert.equal(invalidPublicationStatus.status, 400)
+    assert.deepEqual(await invalidPublicationStatus.json(), {
+      error: 'publication_status is invalid.',
       code: 'INVALID_QUERY'
     })
     const invalidLimit = await fetch(`${base}/v1/runs?limit=10junk`, { headers: readAuth })

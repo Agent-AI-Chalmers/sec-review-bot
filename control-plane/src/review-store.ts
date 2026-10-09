@@ -387,7 +387,8 @@ export class ReviewRunStore {
     options: {
       limit?: number
       cursor?: string
-      status?: ReviewRunStatus
+      execution_status?: RunnerStatus
+      publication_status?: PublicationStatus
       workflow?: WorkflowName
       from?: string
       to?: string
@@ -402,18 +403,11 @@ export class ReviewRunStore {
       return `$${values.length}`
     }
     if (options.workflow !== undefined) clauses.push(`r.workflow=${add(options.workflow)}`)
-    if (options.status !== undefined) {
-      if (options.status === 'publishing' || options.status === 'published') {
-        clauses.push(`p.status=${add(options.status)}`)
-      } else if (options.status === 'failed') {
-        clauses.push(
-          "(p.status='failed' OR (p.status IN ('pending','not_required') AND r.runner_status='failed'))"
-        )
-      } else {
-        clauses.push(
-          `(p.status IN ('pending','not_required') AND r.runner_status=${add(options.status)})`
-        )
-      }
+    if (options.execution_status !== undefined) {
+      clauses.push(`r.runner_status=${add(options.execution_status)}`)
+    }
+    if (options.publication_status !== undefined) {
+      clauses.push(`p.status=${add(options.publication_status)}`)
     }
     if (options.from !== undefined) clauses.push(`r.created_at>=${add(options.from)}`)
     if (options.to !== undefined) clauses.push(`r.created_at<${add(options.to)}`)
