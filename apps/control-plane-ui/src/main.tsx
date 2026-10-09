@@ -28,6 +28,8 @@ import {
   IconClock,
   IconCopy,
   IconDownload,
+  IconChevronDown,
+  IconChevronUp,
   IconExternalLink,
   IconLoader2,
   IconPlayerPlay,
@@ -437,6 +439,11 @@ function formatBytes(value: number): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`
 }
 
+function abbreviateDigest(digest: string): string {
+  const hex = digest.replace(/^sha256:/, '')
+  return `${hex.slice(0, 12)}…${hex.slice(-12)}`
+}
+
 function isDownloadableArtifact(value: ArtifactStorage | null): value is ArtifactStorage & {
   status: 'available'
   artifact: NonNullable<ArtifactStorage['artifact']>
@@ -468,6 +475,7 @@ function Artifact({
 }): React.ReactNode {
   const t = useMessages()
   const [copied, setCopied] = React.useState(false)
+  const [expanded, setExpanded] = React.useState(false)
   const artifact = storage.artifact
   if (artifact === undefined) {
     if (!storage.message && !storage.error_code) return null
@@ -482,6 +490,7 @@ function Artifact({
       </div>
     )
   }
+  const hex = artifact.digest.replace(/^sha256:/, '')
   const copyDigest = async (): Promise<void> => {
     await navigator.clipboard.writeText(artifact.digest)
     setCopied(true)
@@ -517,7 +526,16 @@ function Artifact({
           <Text c="dimmed" size="xs">
             {t('sha256')}
           </Text>
-          <code>{artifact.digest.replace(/^sha256:/, '')}</code>
+          <button
+            type="button"
+            className="artifact-digest-toggle"
+            aria-expanded={expanded}
+            aria-label={expanded ? t('collapseDigest') : t('expandDigest')}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            <code>{expanded ? hex : abbreviateDigest(hex)}</code>
+            {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+          </button>
           <Tooltip label={copied ? t('digestCopied') : t('copyDigest')}>
             <ActionIcon
               variant="subtle"

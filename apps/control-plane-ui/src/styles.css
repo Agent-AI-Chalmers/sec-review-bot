@@ -113,6 +113,22 @@ pre {
   overflow-wrap: anywhere;
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
+.artifact-digest-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.artifact-digest-toggle:hover code {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .delivery-list {
   overflow: hidden;
 }
