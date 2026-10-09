@@ -4,6 +4,7 @@ import { BrowserRouter, Link, Route, Routes, useParams, useSearchParams } from '
 import {
   AppShell,
   ActionIcon,
+  Anchor,
   Badge,
   Box,
   Button,
@@ -563,6 +564,13 @@ function Detail(): React.JSX.Element {
   const publicationOutcomes = steps.filter(
     (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
   )
+  const singlePublicationUrl =
+    publicationOutcomes.length === 1
+      ? safeExternalUrl(publicationOutcomes[0]?.remote_object_url ?? null)
+      : undefined
+  const showPublicationDetails =
+    publicationOutcomes.length > 1 ||
+    (publicationOutcomes.length === 1 && publicationOutcomes[0]?.status !== 'succeeded')
   const publicationIndex = 2 + (run?.artifact_storage === null ? 0 : 1)
   const timelineActive =
     run?.publication_status === 'pending' ? publicationIndex - 1 : publicationIndex
@@ -697,12 +705,33 @@ function Detail(): React.JSX.Element {
                     </Group>
                   }
                 >
-                  {run.published_at && (
-                    <Text c="dimmed" size="sm" mb={publicationOutcomes.length > 0 ? 6 : 0}>
-                      {formatDate(run.published_at, language)}
-                    </Text>
+                  {(run.published_at || singlePublicationUrl) && (
+                    <Group gap="xs" className="publication-summary">
+                      {run.published_at && (
+                        <Text c="dimmed" size="sm">
+                          {formatDate(run.published_at, language)}
+                        </Text>
+                      )}
+                      {run.published_at && singlePublicationUrl && (
+                        <Text c="dimmed" size="sm" aria-hidden="true">
+                          ·
+                        </Text>
+                      )}
+                      {singlePublicationUrl && (
+                        <Anchor
+                          href={singlePublicationUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          size="sm"
+                          className="delivery-link"
+                        >
+                          {t('openExternalLink')}
+                          <IconExternalLink size={14} aria-hidden="true" />
+                        </Anchor>
+                      )}
+                    </Group>
                   )}
-                  {publicationOutcomes.length > 0 && (
+                  {showPublicationDetails && (
                     <div className="delivery-list">
                       {publicationOutcomes.map((step) => {
                         const externalUrl = safeExternalUrl(step.remote_object_url)
@@ -716,17 +745,18 @@ function Detail(): React.JSX.Element {
                                 </Badge>
                               </div>
                             )}
-                            {externalUrl && (
-                              <Button
+                            {externalUrl && singlePublicationUrl === undefined && (
+                              <Anchor
                                 component="a"
                                 href={externalUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                variant="subtle"
-                                rightSection={<IconExternalLink size={16} />}
+                                size="sm"
+                                className="delivery-link"
                               >
                                 {t('openExternalLink')}
-                              </Button>
+                                <IconExternalLink size={14} aria-hidden="true" />
+                              </Anchor>
                             )}
                             {!succeeded &&
                               (step.failure_message ||
@@ -750,7 +780,9 @@ function Detail(): React.JSX.Element {
                                   </Group>
                                 </div>
                               )}
-                            <code className="delivery-step-key">{step.step_key}</code>
+                            {(publicationOutcomes.length > 1 || !succeeded) && (
+                              <code className="delivery-step-key">{step.step_key}</code>
+                            )}
                           </div>
                         )
                       })}

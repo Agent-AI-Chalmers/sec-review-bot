@@ -116,7 +116,7 @@ const stepsByRun = new Map<string, FixtureStep[]>([
         step_key: 'pull-request:review',
         status: 'succeeded',
         failure_count: 0,
-        remote_object_url: null,
+        remote_object_url: 'https://github.com/octo/example/pull/42#pullrequestreview-1001',
         failure_code: null,
         failure_message: null
       }

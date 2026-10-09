@@ -116,6 +116,9 @@ pre {
 .delivery-list {
   overflow: hidden;
 }
+.publication-summary {
+  min-height: 24px;
+}
 .delivery-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -132,6 +135,12 @@ pre {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+.delivery-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
 }
 .delivery-error {
   grid-column: 1 / -1;
@@ -192,9 +201,5 @@ pre {
     align-items: flex-start;
     flex-direction: column;
     gap: 6px;
-  }
-  .delivery-item > .mantine-Button-root {
-    justify-self: start;
-    padding-left: 0;
   }
 }
