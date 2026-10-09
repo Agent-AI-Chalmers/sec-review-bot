@@ -68,6 +68,19 @@ pre {
   border: 1px solid var(--border);
   padding: 12px;
 }
+.artifact-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 28px;
+  margin: 0;
+}
+.artifact-details dt {
+  margin-top: 0;
+}
+.artifact-digest {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
 .mantine-Paper-root form {
   display: grid;
   gap: 16px;
@@ -89,5 +102,8 @@ pre {
   }
   .refresh-controls {
     align-items: flex-end;
+  }
+  .artifact-details {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

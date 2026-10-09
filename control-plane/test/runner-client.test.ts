@@ -137,6 +137,58 @@ test('status response preserves a valid terminal result', async () => {
   })
 })
 
+test('status response validates a published artifact against the run identity', async () => {
+  configureRunner()
+  const artifactPublication = {
+    status: 'published',
+    artifact: {
+      kind: 'diagnostic_bundle',
+      uri: 's3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
+      media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+      digest: `sha256:${'a'.repeat(64)}`,
+      size_bytes: 42
+    }
+  }
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'succeeded',
+        artifact_publication: artifactPublication
+      })
+    )
+
+  assert.deepEqual((await getRunnerRunStatus('run-1')).artifact_publication, artifactPublication)
+})
+
+test('status response rejects an artifact reference owned by another run', async () => {
+  configureRunner()
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'succeeded',
+        artifact_publication: {
+          status: 'published',
+          artifact: {
+            kind: 'diagnostic_bundle',
+            uri: 's3://sec-review/runs/run-2/artifacts/diagnostic-tree.v1.tar.zst',
+            media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+            digest: `sha256:${'a'.repeat(64)}`,
+            size_bytes: 42
+          }
+        }
+      })
+    )
+
+  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+    assert.equal((error as { code?: string }).code, 'RUNNER_INVALID_ARTIFACT_PUBLICATION')
+    return true
+  })
+})
+
 test('status response rejects an unknown Runner state', async () => {
   configureRunner()
   globalThis.fetch = async () =>

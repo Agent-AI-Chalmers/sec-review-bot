@@ -1,3 +1,14 @@
+export interface ArtifactPublication {
+  status: 'published' | 'not_available' | 'failed'
+  artifact?: {
+    kind: 'diagnostic_bundle'
+    media_type: string
+    digest: string
+    size_bytes: number
+  }
+  error_code?: string
+  message?: string
+}
 export interface Run {
   run_id: string
   workflow: string
@@ -6,7 +17,7 @@ export interface Run {
   updated_at: string
   published_at: string | null
   failure_code: string | null
-  artifact_publication: unknown
+  artifact_publication: ArtifactPublication | null
 }
 export class ApiError extends Error {
   constructor(readonly status: number) {

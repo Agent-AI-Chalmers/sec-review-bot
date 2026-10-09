@@ -32,7 +32,44 @@
     "updated_at": { "type": "string", "format": "date-time" },
     "published_at": { "type": ["string", "null"], "format": "date-time" },
     "failure_code": { "type": ["string", "null"] },
-    "artifact_publication": { "type": ["object", "null"] },
+    "artifact_publication": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": { "enum": ["not_available", "failed"] },
+            "error_code": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "artifact"],
+          "properties": {
+            "status": { "const": "published" },
+            "artifact": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "uri", "media_type", "digest", "size_bytes"],
+              "properties": {
+                "kind": { "const": "diagnostic_bundle" },
+                "uri": {
+                  "type": "string",
+                  "pattern": "^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
+                },
+                "media_type": { "const": "application/vnd.sec-review.diagnostic.v1+tar+zstd" },
+                "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "size_bytes": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      ]
+    },
     "publication_steps": {
       "type": "array",
       "items": {

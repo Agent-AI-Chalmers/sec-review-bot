@@ -76,6 +76,62 @@ function isWorkflow(value: unknown): value is ControlPlaneWorkflow {
   )
 }
 
+function parseArtifactPublication(value: unknown, runId: string): RunnerArtifactPublication {
+  if (!isRecord(value) || !['published', 'not_available', 'failed'].includes(String(value.status)))
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_ARTIFACT_PUBLICATION',
+      `Runner returned invalid artifact publication metadata for ${runId}.`
+    )
+  const status = value.status as RunnerArtifactPublication['status']
+  if (status !== 'published') {
+    if (
+      Object.hasOwn(value, 'artifact') ||
+      Object.keys(value).some((key) => !['status', 'error_code', 'message'].includes(key)) ||
+      (value.error_code !== undefined && typeof value.error_code !== 'string') ||
+      (value.message !== undefined && typeof value.message !== 'string')
+    )
+      throw new RunnerProtocolError(
+        'RUNNER_INVALID_ARTIFACT_PUBLICATION',
+        `Runner returned invalid artifact publication metadata for ${runId}.`
+      )
+    return {
+      status,
+      ...(typeof value.error_code === 'string' ? { error_code: value.error_code } : {}),
+      ...(typeof value.message === 'string' ? { message: value.message } : {})
+    }
+  }
+  const artifact = value.artifact
+  const expectedUri = `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
+  if (
+    Object.keys(value).some((key) => !['status', 'artifact'].includes(key)) ||
+    !isRecord(artifact) ||
+    Object.keys(artifact).some(
+      (key) => !['kind', 'uri', 'media_type', 'digest', 'size_bytes'].includes(key)
+    ) ||
+    artifact.kind !== 'diagnostic_bundle' ||
+    artifact.uri !== expectedUri ||
+    artifact.media_type !== 'application/vnd.sec-review.diagnostic.v1+tar+zstd' ||
+    typeof artifact.digest !== 'string' ||
+    !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
+    !Number.isSafeInteger(artifact.size_bytes) ||
+    (artifact.size_bytes as number) < 0
+  )
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_ARTIFACT_PUBLICATION',
+      `Runner returned invalid artifact publication metadata for ${runId}.`
+    )
+  return {
+    status,
+    artifact: {
+      kind: artifact.kind,
+      uri: expectedUri,
+      media_type: artifact.media_type,
+      digest: artifact.digest,
+      size_bytes: artifact.size_bytes as number
+    }
+  }
+}
+
 function serviceUrl(): string {
   const value = process.env.AGENT_RUNNER_SERVICE_URL?.trim()
   if (!value)
@@ -271,10 +327,8 @@ export async function getRunnerRunStatus(
     status: parsed.status,
     ...(Object.hasOwn(parsed, 'result') ? { result: parsed.result } : {}),
     ...(isRecord(parsed.error) ? { error: parsed.error as RunnerErrorBody } : {}),
-    ...(isRecord(parsed.artifact_publication)
-      ? {
-          artifact_publication: parsed.artifact_publication as unknown as RunnerArtifactPublication
-        }
-      : {})
+    ...(parsed.artifact_publication === undefined
+      ? {}
+      : { artifact_publication: parseArtifactPublication(parsed.artifact_publication, runId) })
   }
 }
