@@ -22,6 +22,7 @@ import {
 } from '@mantine/core'
 import {
   IconArchive,
+  IconAlertTriangle,
   IconArrowLeft,
   IconCheck,
   IconChevronDown,
@@ -29,6 +30,8 @@ import {
   IconClock,
   IconCopy,
   IconDownload,
+  IconExternalLink,
+  IconLoader2,
   IconRefresh
 } from '@tabler/icons-react'
 import { api, ApiError, login, type ArtifactPublication, type Run } from './api.js'
@@ -184,6 +187,42 @@ function RefreshControls({
   )
 }
 
+function RunStatusBadge({ status }: { status: string }): React.JSX.Element {
+  const t = useMessages()
+  const waiting = ['preparing', 'recovering', 'queued'].includes(status)
+  const active = ['running', 'publishing'].includes(status)
+  const complete = ['succeeded', 'published'].includes(status)
+  const label = ((): string => {
+    if (status === 'preparing') return t('statusPreparing')
+    if (status === 'recovering') return t('statusRecovering')
+    if (status === 'queued') return t('statusQueued')
+    if (status === 'running') return t('statusRunning')
+    if (status === 'succeeded') return t('statusSucceeded')
+    if (status === 'publishing') return t('statusPublishing')
+    if (status === 'published') return t('statusPublished')
+    if (status === 'failed') return t('statusFailed')
+    return status
+  })()
+  const icon = waiting ? (
+    <IconClock size={12} />
+  ) : active ? (
+    <IconLoader2 size={12} className="status-spinner" />
+  ) : complete ? (
+    <IconCheck size={12} />
+  ) : (
+    <IconAlertTriangle size={12} />
+  )
+  return (
+    <Badge
+      variant="light"
+      color={waiting ? 'gray' : active ? 'blue' : complete ? 'green' : 'red'}
+      leftSection={icon}
+    >
+      {label}
+    </Badge>
+  )
+}
+
 function Runs(): React.JSX.Element {
   const { language } = usePreferences()
   const t = useMessages()
@@ -281,9 +320,7 @@ function Runs(): React.JSX.Element {
                     </Table.Td>
                     <Table.Td>{run.workflow}</Table.Td>
                     <Table.Td>
-                      <Badge variant="light" color={run.status === 'failed' ? 'red' : 'blue'}>
-                        {run.status}
-                      </Badge>
+                      <RunStatusBadge status={run.status} />
                     </Table.Td>
                     <Table.Td>{formatDate(run.updated_at, language)}</Table.Td>
                   </Table.Tr>
@@ -314,7 +351,40 @@ interface Step {
   step_key: string
   status: string
   failure_count: number
+  remote_object_url: string | null
   failure_code: string | null
+  failure_message: string | null
+}
+
+function publicationStepLabel(stepKey: string, t: ReturnType<typeof useMessages>): string {
+  if (stepKey === 'pull-request:review') return t('pullRequestReview')
+  if (stepKey === 'issue:draft-pr') return t('draftPullRequest')
+  if (stepKey === 'issue:summary-comment') return t('issueSummaryComment')
+  if (stepKey === 'repository:summary-issue') return t('repositorySummaryIssue')
+  if (stepKey === 'repository:summary-comment') return t('repositorySummaryComment')
+  if (stepKey.startsWith('repository:delivery:')) return t('fixPullRequest')
+  return stepKey
+}
+
+function safeExternalUrl(value: string | null): string | undefined {
+  if (value === null) return undefined
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' &&
+      (url.hostname === 'github.com' || url.hostname.endsWith('.github.com'))
+      ? url.toString()
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function publicationStatusLabel(status: string, t: ReturnType<typeof useMessages>): string {
+  if (status === 'pending') return t('waiting')
+  if (status === 'running') return t('publishingStatus')
+  if (status === 'failed') return t('retryPending')
+  if (status === 'terminal_failed') return t('failedStatus')
+  return status
 }
 
 function formatBytes(value: number): string {
@@ -448,6 +518,9 @@ function Detail(): React.JSX.Element {
   const terminal = run ? ['published', 'failed'].includes(run.status) : false
   const { refresh, refreshing, lastChecked } = useRefresh(load, !terminal)
   if (error && run === undefined) throw error
+  const publicationOutcomes = steps.filter(
+    (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
+  )
   return (
     <Container component="main" size="lg" py="xl">
       <Button
@@ -473,9 +546,7 @@ function Detail(): React.JSX.Element {
                 {run.run_id}
               </Title>
             </div>
-            <Badge variant="light" color={run.status === 'failed' ? 'red' : 'blue'}>
-              {run.status}
-            </Badge>
+            <RunStatusBadge status={run.status} />
           </Group>
           <Box className="operations-bar detail-operations" mb="xl">
             <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
@@ -502,11 +573,13 @@ function Detail(): React.JSX.Element {
                     {formatDate(run.created_at, language)}
                   </Text>
                 </Timeline.Item>
-                <Timeline.Item bullet={<IconCheck size={14} />} title={t('published')}>
-                  <Text c="dimmed" size="sm">
-                    {run.published_at ? formatDate(run.published_at, language) : t('notPublished')}
-                  </Text>
-                </Timeline.Item>
+                {run.published_at && (
+                  <Timeline.Item bullet={<IconCheck size={14} />} title={t('publicationCompleted')}>
+                    <Text c="dimmed" size="sm">
+                      {formatDate(run.published_at, language)}
+                    </Text>
+                  </Timeline.Item>
+                )}
               </Timeline>
               {run.failure_code && (
                 <Box mt="md">
@@ -529,50 +602,63 @@ function Detail(): React.JSX.Element {
                 <Artifact publication={run.artifact_publication} runId={run.run_id} />
               )}
             </Box>
-            <Box component="section">
-              <Title order={2} mb="sm">
-                {t('publicationSteps')}
-              </Title>
-              {steps.length === 0 ? (
-                <Text c="dimmed">{t('noSteps')}</Text>
-              ) : (
-                <Paper withBorder radius="sm" className="table-wrap">
-                  <Table.ScrollContainer minWidth={620}>
-                    <Table striped verticalSpacing="sm">
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th w="36%">{t('step')}</Table.Th>
-                          <Table.Th w="24%">{t('status')}</Table.Th>
-                          <Table.Th w="16%" ta="right">
-                            {t('failureCount')}
-                          </Table.Th>
-                          <Table.Th w="24%">{t('latestError')}</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {steps.map((step) => (
-                          <Table.Tr key={step.step_key}>
-                            <Table.Td>{step.step_key}</Table.Td>
-                            <Table.Td>
-                              <Badge
-                                variant="light"
-                                color={step.status === 'failed' ? 'red' : 'blue'}
-                              >
-                                {step.status}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td ta="right" ff="monospace">
-                              {step.failure_count}
-                            </Table.Td>
-                            <Table.Td>{step.failure_code ?? '—'}</Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  </Table.ScrollContainer>
+            {publicationOutcomes.length > 0 && (
+              <Box component="section">
+                <Title order={2} mb="sm">
+                  {t('publicationResults')}
+                </Title>
+                <Paper withBorder radius="sm" className="delivery-list">
+                  {publicationOutcomes.map((step) => {
+                    const externalUrl = safeExternalUrl(step.remote_object_url)
+                    const succeeded = step.status === 'succeeded'
+                    return (
+                      <div className="delivery-item" key={step.step_key}>
+                        <div className="delivery-main">
+                          <Text fw={600}>{publicationStepLabel(step.step_key, t)}</Text>
+                          {!succeeded && (
+                            <Badge
+                              variant="light"
+                              color={step.status === 'terminal_failed' ? 'red' : 'yellow'}
+                            >
+                              {publicationStatusLabel(step.status, t)}
+                            </Badge>
+                          )}
+                        </div>
+                        {externalUrl && (
+                          <Button
+                            component="a"
+                            href={externalUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            variant="subtle"
+                            rightSection={<IconExternalLink size={16} />}
+                          >
+                            {t('openOnGitHub')}
+                          </Button>
+                        )}
+                        {!succeeded && (step.failure_message || step.failure_code) && (
+                          <div className="delivery-error">
+                            {step.failure_message && <Text size="sm">{step.failure_message}</Text>}
+                            <Group gap="sm">
+                              {step.failure_code && (
+                                <Text c="dimmed" size="xs" ff="monospace">
+                                  {step.failure_code}
+                                </Text>
+                              )}
+                              {step.failure_count > 0 && (
+                                <Text c="dimmed" size="xs">
+                                  {t('failedAttempts')}: {step.failure_count}
+                                </Text>
+                              )}
+                            </Group>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </Paper>
-              )}
-            </Box>
+              </Box>
+            )}
           </Stack>
         </>
       )}

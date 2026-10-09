@@ -75,14 +75,23 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["step_key", "status", "failure_count", "failure_code"],
+        "required": [
+          "step_key",
+          "status",
+          "failure_count",
+          "remote_object_url",
+          "failure_code",
+          "failure_message"
+        ],
         "properties": {
           "step_key": { "type": "string", "minLength": 1 },
           "status": {
             "enum": ["pending", "running", "succeeded", "failed", "terminal_failed"]
           },
           "failure_count": { "type": "integer", "minimum": 0 },
-          "failure_code": { "type": ["string", "null"] }
+          "remote_object_url": { "type": ["string", "null"], "format": "uri" },
+          "failure_code": { "type": ["string", "null"] },
+          "failure_message": { "type": ["string", "null"] }
         }
       }
     }

@@ -11,7 +11,7 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies fixed run data and does not require Control Plane, PostgreSQL, or RustFS. Artifact metadata is visible, but there is no stored object to download.
+Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative successful, active, retrying, and failed runs without requiring Control Plane, PostgreSQL, or RustFS. Artifact metadata is visible, but there are no stored objects to download.
 
 To develop against a running Control Plane, build and start the BFF in one terminal:
 

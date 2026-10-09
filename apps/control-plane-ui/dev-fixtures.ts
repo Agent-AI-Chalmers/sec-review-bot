@@ -1,26 +1,177 @@
 import type { Plugin } from 'vite'
 
-const run = {
-  run_id: '018f6b7c-2d41-7a30-9000-000000000001',
-  workflow: 'pull-request-review',
-  status: 'published',
-  created_at: '2026-10-08T14:17:15.571Z',
-  updated_at: '2026-10-08T14:19:43.909Z',
-  published_at: '2026-10-08T14:19:43.909Z',
-  failure_code: null,
-  artifact_publication: {
-    status: 'published',
-    artifact: {
-      uri: 's3://sec-review/runs/018f6b7c-2d41-7a30-9000-000000000001/artifacts/diagnostic-tree.v1.tar.zst',
-      kind: 'diagnostic_bundle',
-      digest: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
-      media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
-      size_bytes: 51200
-    }
-  }
+interface FixtureRun {
+  run_id: string
+  workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+  status: string
+  created_at: string
+  updated_at: string
+  published_at: string | null
+  failure_code: string | null
+  artifact_publication: object | null
 }
 
-/** Serve a complete read-only UI preview without a Control Plane or BFF. */
+interface FixtureStep {
+  step_key: string
+  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+  failure_count: number
+  remote_object_url: string | null
+  failure_code: string | null
+  failure_message: string | null
+}
+
+const artifact = (runId: string, sizeBytes: number): object => ({
+  status: 'published',
+  artifact: {
+    uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
+    kind: 'diagnostic_bundle',
+    digest: `sha256:${runId.replaceAll('-', '').padEnd(64, '0').slice(0, 64)}`,
+    media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+    size_bytes: sizeBytes
+  }
+})
+
+const runs: FixtureRun[] = [
+  {
+    run_id: '018f6b7c-2d41-7a30-9000-000000000001',
+    workflow: 'pull-request-review',
+    status: 'published',
+    created_at: '2026-10-08T14:17:15.571Z',
+    updated_at: '2026-10-08T14:19:43.909Z',
+    published_at: '2026-10-08T14:19:43.909Z',
+    failure_code: null,
+    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000001', 83_251)
+  },
+  {
+    run_id: '018f6b7c-2d41-7a30-9000-000000000002',
+    workflow: 'issue-review',
+    status: 'published',
+    created_at: '2026-10-08T12:02:11.104Z',
+    updated_at: '2026-10-08T12:07:54.601Z',
+    published_at: '2026-10-08T12:07:54.601Z',
+    failure_code: null,
+    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000002', 164_918)
+  },
+  {
+    run_id: '018f6b7c-2d41-7a30-9000-000000000003',
+    workflow: 'repository-review',
+    status: 'publishing',
+    created_at: '2026-10-08T09:40:03.214Z',
+    updated_at: '2026-10-08T09:58:19.772Z',
+    published_at: null,
+    failure_code: null,
+    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000003', 2_746_310)
+  },
+  {
+    run_id: '018f6b7c-2d41-7a30-9000-000000000004',
+    workflow: 'repository-review',
+    status: 'failed',
+    created_at: '2026-10-08T08:11:46.832Z',
+    updated_at: '2026-10-08T08:29:10.118Z',
+    published_at: null,
+    failure_code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
+    artifact_publication: {
+      status: 'failed',
+      error_code: 'ARTIFACT_UPLOAD_FAILED',
+      message: 'RustFS did not accept the diagnostic bundle after repeated attempts.'
+    }
+  },
+  {
+    run_id: '018f6b7c-2d41-7a30-9000-000000000005',
+    workflow: 'issue-review',
+    status: 'failed',
+    created_at: '2026-10-08T07:03:28.002Z',
+    updated_at: '2026-10-08T07:04:01.447Z',
+    published_at: null,
+    failure_code: 'RUNNER_EXECUTION_FAILED',
+    artifact_publication: { status: 'not_available' }
+  },
+  {
+    run_id: '018f6b7c-2d41-7a30-9000-000000000006',
+    workflow: 'pull-request-review',
+    status: 'running',
+    created_at: '2026-10-08T06:42:17.510Z',
+    updated_at: '2026-10-08T06:43:32.090Z',
+    published_at: null,
+    failure_code: null,
+    artifact_publication: null
+  }
+]
+
+const stepsByRun = new Map<string, FixtureStep[]>([
+  [
+    runs[0]!.run_id,
+    [
+      {
+        step_key: 'pull-request:review',
+        status: 'succeeded',
+        failure_count: 0,
+        remote_object_url: null,
+        failure_code: null,
+        failure_message: null
+      }
+    ]
+  ],
+  [
+    runs[1]!.run_id,
+    [
+      {
+        step_key: 'issue:draft-pr',
+        status: 'succeeded',
+        failure_count: 0,
+        remote_object_url: 'https://github.com/Agent-AI-Chalmers/sec-review-bot/pull/142',
+        failure_code: null,
+        failure_message: null
+      },
+      {
+        step_key: 'issue:summary-comment',
+        status: 'succeeded',
+        failure_count: 0,
+        remote_object_url:
+          'https://github.com/Agent-AI-Chalmers/sec-review-bot/issues/137#issuecomment-3214567890',
+        failure_code: null,
+        failure_message: null
+      }
+    ]
+  ],
+  [
+    runs[2]!.run_id,
+    [
+      {
+        step_key: 'repository:delivery:auth-boundary',
+        status: 'succeeded',
+        failure_count: 0,
+        remote_object_url: 'https://github.com/Agent-AI-Chalmers/sec-review-bot/pull/143',
+        failure_code: null,
+        failure_message: null
+      },
+      {
+        step_key: 'repository:summary-comment',
+        status: 'failed',
+        failure_count: 2,
+        remote_object_url: null,
+        failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
+        failure_message: 'GitHub temporarily limited comment creation; publication will retry.'
+      }
+    ]
+  ],
+  [
+    runs[3]!.run_id,
+    [
+      {
+        step_key: 'repository:delivery:unsafe-deserialization',
+        status: 'terminal_failed',
+        failure_count: 3,
+        remote_object_url: null,
+        failure_code: 'GITHUB_VALIDATION_REJECTED',
+        failure_message:
+          'GitHub rejected the pull request because the proposed changes were invalid.'
+      }
+    ]
+  ]
+])
+
+/** Serve representative read-only states without a Control Plane or BFF. */
 export function devFixtures(): Plugin {
   return {
     name: 'control-plane-ui-dev-fixtures',
@@ -34,27 +185,25 @@ export function devFixtures(): Plugin {
           return
         }
         if (request.url.startsWith('/api/runs?')) {
-          response.end(JSON.stringify({ runs: [run], next_cursor: null }))
+          response.end(JSON.stringify({ runs, next_cursor: null }))
           return
         }
-        if (request.url.endsWith('/publication-steps')) {
+        const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(request.url)
+        if (stepsMatch) {
+          const runId = decodeURIComponent(stepsMatch[1] ?? '')
           response.end(
-            JSON.stringify({
-              publication_steps: [
-                {
-                  step_key: 'pull-request:review',
-                  status: 'succeeded',
-                  failure_count: 0,
-                  failure_code: null
-                }
-              ]
-            })
+            JSON.stringify({ run_id: runId, publication_steps: stepsByRun.get(runId) ?? [] })
           )
           return
         }
-        if (request.url.startsWith('/api/runs/')) {
-          response.end(JSON.stringify({ run }))
-          return
+        const runMatch = /^\/api\/runs\/([^/?]+)$/.exec(request.url)
+        if (runMatch) {
+          const runId = decodeURIComponent(runMatch[1] ?? '')
+          const run = runs.find((item) => item.run_id === runId)
+          if (run) {
+            response.end(JSON.stringify({ run }))
+            return
+          }
         }
         response.statusCode = 404
         response.end(JSON.stringify({ error: 'not_found' }))

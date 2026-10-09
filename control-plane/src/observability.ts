@@ -1,4 +1,4 @@
-import type { ReviewRunRecord } from './review-store.js'
+import type { PublicationStepRecord, ReviewRunRecord } from './review-store.js'
 
 /** Stable, connector-neutral fields intended for operators and future query clients. */
 export interface ObservedRun {
@@ -17,7 +17,9 @@ export interface PublicationStepSummary {
   step_key: string
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
   failure_count: number
+  remote_object_url: string | null
   failure_code: string | null
+  failure_message: string | null
 }
 
 export function observeRun(run: ReviewRunRecord): ObservedRun {
@@ -30,5 +32,16 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
     published_at: run.published_at,
     failure_code: run.failure_code,
     artifact_publication: run.artifact_publication
+  }
+}
+
+export function observePublicationStep(step: PublicationStepRecord): PublicationStepSummary {
+  return {
+    step_key: step.step_key,
+    status: step.status,
+    failure_count: step.failure_count,
+    remote_object_url: step.remote_object_url,
+    failure_code: step.failure_code,
+    failure_message: step.failure_message
   }
 }

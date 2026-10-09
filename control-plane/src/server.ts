@@ -14,7 +14,7 @@ import {
 } from './runner-client.js'
 import { recoverReviewRunSubmission } from './submission-recovery.js'
 import { submitPreparedRun } from './prepared-submission.js'
-import { observeRun, type PublicationStepSummary } from './observability.js'
+import { observePublicationStep, observeRun } from './observability.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
 const operations = [
@@ -265,12 +265,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
           return
         }
         const steps = await store.listPublicationSteps(run.run_id)
-        const summary: PublicationStepSummary[] = steps.map((step) => ({
-          step_key: step.step_key,
-          status: step.status,
-          failure_count: step.failure_count,
-          failure_code: step.failure_code
-        }))
+        const summary = steps.map(observePublicationStep)
         sendJson(response, 200, { run_id: run.run_id, publication_steps: summary })
         return
       }

@@ -11,7 +11,7 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式使用固定的 run 数据，不需要启动 Control Plane、PostgreSQL 或 RustFS；界面会显示 artifact 元数据，但没有可供下载的真实存储对象。
+打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的成功、运行中、等待重试和失败 run，不需要启动 Control Plane、PostgreSQL 或 RustFS；界面会显示 artifact 元数据，但没有可供下载的真实存储对象。
 
 如需连接正在运行的 Control Plane，先在一个终端中构建并启动 BFF：
 
