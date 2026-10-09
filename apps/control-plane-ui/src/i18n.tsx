@@ -37,6 +37,9 @@ const messages = {
     statusPublished: 'Published',
     statusFailed: 'Failed',
     workflow: 'Workflow',
+    workflowIssueReview: 'Issue review',
+    workflowPullRequestReview: 'Pull request review',
+    workflowRepositoryReview: 'Repository review',
     all: 'All',
     loadingRuns: 'Loading runs...',
     emptyRuns: 'No review runs match these filters.',
@@ -96,6 +99,9 @@ const messages = {
     statusPublished: '已发布',
     statusFailed: '失败',
     workflow: '工作流',
+    workflowIssueReview: '议题审查',
+    workflowPullRequestReview: '拉取请求审查',
+    workflowRepositoryReview: '仓库审查',
     all: '全部',
     loadingRuns: '正在加载运行...',
     emptyRuns: '没有符合筛选条件的运行。',
@@ -142,6 +148,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }): R
   )
   React.useEffect(() => {
     localStorage.setItem('ui-language', language)
+    document.documentElement.lang = language
   }, [language])
   return (
     <LanguageContext.Provider value={{ language, setLanguage }}>

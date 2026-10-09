@@ -68,21 +68,6 @@ body {
 a {
   color: var(--link);
 }
-dt {
-  margin-top: 16px;
-  color: var(--muted);
-  font-size: 13px;
-}
-dd {
-  margin: 4px 0 0;
-}
-pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 12px;
-}
 .artifact-panel {
   overflow: hidden;
 }

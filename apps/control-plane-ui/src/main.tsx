@@ -12,6 +12,7 @@ import {
   Group,
   NativeSelect,
   Paper,
+  PasswordInput,
   Stack,
   Switch,
   Table,
@@ -48,7 +49,7 @@ function Login(): React.JSX.Element {
   return (
     <Container component="main" size="xs" py="15vh">
       <Paper withBorder p="xl" radius="sm">
-        <Title order={1}>Control Plane</Title>
+        <Title order={1}>Review Control Plane</Title>
         <Text c="dimmed" mt="xs">
           {t('signInHint')}
         </Text>
@@ -63,15 +64,12 @@ function Login(): React.JSX.Element {
             )
           }}
         >
-          <label>
-            {t('accessToken')}
-            <input
-              autoFocus
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-            />
-          </label>
+          <PasswordInput
+            label={t('accessToken')}
+            autoFocus
+            value={token}
+            onChange={(event) => setToken(event.currentTarget.value)}
+          />
           <Button type="submit">{t('signIn')}</Button>
           {error && <p role="alert">{error}</p>}
         </form>
@@ -186,22 +184,31 @@ function RefreshControls({
   )
 }
 
+function runStatusLabel(status: string, t: ReturnType<typeof useMessages>): string {
+  if (status === 'preparing') return t('statusPreparing')
+  if (status === 'recovering') return t('statusRecovering')
+  if (status === 'queued') return t('statusQueued')
+  if (status === 'running') return t('statusRunning')
+  if (status === 'succeeded') return t('statusSucceeded')
+  if (status === 'publishing') return t('statusPublishing')
+  if (status === 'published') return t('statusPublished')
+  if (status === 'failed') return t('statusFailed')
+  return status
+}
+
+function workflowLabel(workflow: string, t: ReturnType<typeof useMessages>): string {
+  if (workflow === 'issue-review') return t('workflowIssueReview')
+  if (workflow === 'pull-request-review') return t('workflowPullRequestReview')
+  if (workflow === 'repository-review') return t('workflowRepositoryReview')
+  return workflow
+}
+
 function RunStatusBadge({ status }: { status: string }): React.JSX.Element {
   const t = useMessages()
   const waiting = ['preparing', 'recovering', 'queued'].includes(status)
   const active = ['running', 'publishing'].includes(status)
   const complete = ['succeeded', 'published'].includes(status)
-  const label = ((): string => {
-    if (status === 'preparing') return t('statusPreparing')
-    if (status === 'recovering') return t('statusRecovering')
-    if (status === 'queued') return t('statusQueued')
-    if (status === 'running') return t('statusRunning')
-    if (status === 'succeeded') return t('statusSucceeded')
-    if (status === 'publishing') return t('statusPublishing')
-    if (status === 'published') return t('statusPublished')
-    if (status === 'failed') return t('statusFailed')
-    return status
-  })()
+  const label = runStatusLabel(status, t)
   const icon = waiting ? (
     <IconClock size={12} />
   ) : active ? (
@@ -275,7 +282,9 @@ function Runs(): React.JSX.Element {
                 'published',
                 'failed'
               ].map((value) => (
-                <option key={value}>{value}</option>
+                <option key={value} value={value}>
+                  {runStatusLabel(value, t)}
+                </option>
               ))}
             </NativeSelect>
             <NativeSelect
@@ -285,7 +294,9 @@ function Runs(): React.JSX.Element {
             >
               <option value="">{t('all')}</option>
               {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
-                <option key={value}>{value}</option>
+                <option key={value} value={value}>
+                  {workflowLabel(value, t)}
+                </option>
               ))}
             </NativeSelect>
           </Group>
@@ -295,7 +306,7 @@ function Runs(): React.JSX.Element {
       {data === undefined ? (
         <p>{t('loadingRuns')}</p>
       ) : data.runs.length === 0 ? (
-        <p className="empty">{t('emptyRuns')}</p>
+        <p>{t('emptyRuns')}</p>
       ) : (
         <>
           <Paper withBorder radius="sm" className="table-wrap">
@@ -314,7 +325,7 @@ function Runs(): React.JSX.Element {
                     <Table.Td>
                       <Link to={`/runs/${encodeURIComponent(run.run_id)}`}>{run.run_id}</Link>
                     </Table.Td>
-                    <Table.Td>{run.workflow}</Table.Td>
+                    <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
                     <Table.Td>
                       <RunStatusBadge status={run.status} />
                     </Table.Td>
@@ -602,7 +613,7 @@ function Detail(): React.JSX.Element {
         <>
           <div className="run-heading">
             <Text c="dimmed" size="xs" tt="uppercase">
-              {run.workflow}
+              {workflowLabel(run.workflow, t)}
             </Text>
             <Title order={1} className="run-id">
               {run.run_id}
