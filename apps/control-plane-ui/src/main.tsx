@@ -531,23 +531,33 @@ function Detail(): React.JSX.Element {
             <Title order={1} className="run-id">
               {run.run_id}
             </Title>
-            <Group gap="sm" mt="xs" align="center" className="run-state-summary">
-              <RunStatusBadge status={run.status} />
-              {run.failure_code && (
-                <Group gap={6} wrap="wrap">
-                  <Text c="dimmed" size="xs">
-                    {t('latestError')}:
-                  </Text>
-                  <Text c="red" size="xs" ff="monospace">
-                    {run.failure_code}
-                  </Text>
-                </Group>
-              )}
+            <Group
+              justify="space-between"
+              align="flex-end"
+              gap="lg"
+              mt="md"
+              className="run-heading-footer"
+            >
+              <Group gap="sm" align="center" className="run-state-summary">
+                <RunStatusBadge status={run.status} />
+                {run.failure_code && (
+                  <Group gap={6} wrap="wrap">
+                    <Text c="dimmed" size="xs">
+                      {t('latestError')}:
+                    </Text>
+                    <Text c="red" size="xs" ff="monospace">
+                      {run.failure_code}
+                    </Text>
+                  </Group>
+                )}
+              </Group>
+              <RefreshControls
+                refresh={refresh}
+                refreshing={refreshing}
+                lastChecked={lastChecked}
+              />
             </Group>
           </div>
-          <Box className="operations-bar detail-operations" mb="xl">
-            <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
-          </Box>
           <Stack gap="xl">
             {Boolean(error) && (
               <Text role="alert" c="red">

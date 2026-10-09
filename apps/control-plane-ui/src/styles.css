@@ -46,7 +46,7 @@ body {
   overflow-wrap: anywhere;
 }
 .run-heading {
-  margin-bottom: 16px;
+  margin-bottom: 32px;
 }
 .run-state-summary {
   overflow-wrap: anywhere;
@@ -61,10 +61,6 @@ body {
   padding: 14px 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-}
-.detail-operations {
-  display: flex;
-  justify-content: flex-end;
 }
 .refresh-controls .mantine-NativeSelect-root {
   width: 72px;
@@ -181,6 +177,13 @@ pre {
   }
   .refresh-controls {
     align-items: flex-end;
+  }
+  .run-heading-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .run-heading-footer .refresh-controls {
+    align-items: flex-start;
   }
   .artifact-summary {
     padding: 2px 0 4px;
