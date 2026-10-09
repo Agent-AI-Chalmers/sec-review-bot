@@ -32,6 +32,7 @@ import {
   IconChevronDown,
   IconChevronUp,
   IconExternalLink,
+  IconInbox,
   IconLoader2,
   IconPlayerPlay,
   IconRefresh
@@ -306,7 +307,10 @@ function Runs(): React.JSX.Element {
       {data === undefined ? (
         <p>{t('loadingRuns')}</p>
       ) : data.runs.length === 0 ? (
-        <p>{t('emptyRuns')}</p>
+        <Stack align="center" gap="xs" py="xl">
+          <IconInbox size={40} stroke={1.2} style={{ color: 'var(--mantine-color-dimmed)' }} />
+          <Text c="dimmed">{t('emptyRuns')}</Text>
+        </Stack>
       ) : (
         <>
           <Paper withBorder radius="sm" className="table-wrap">
@@ -323,7 +327,11 @@ function Runs(): React.JSX.Element {
                 {data.runs.map((run) => (
                   <Table.Tr key={run.run_id}>
                     <Table.Td>
-                      <Link to={`/runs/${encodeURIComponent(run.run_id)}`}>{run.run_id}</Link>
+                      <Tooltip label={run.run_id}>
+                        <Link to={`/runs/${encodeURIComponent(run.run_id)}`}>
+                          {abbreviate(run.run_id, 8, 4)}
+                        </Link>
+                      </Tooltip>
                     </Table.Td>
                     <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
                     <Table.Td>
@@ -442,9 +450,12 @@ function formatBytes(value: number): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`
 }
 
+function abbreviate(value: string, head: number, tail: number): string {
+  return `${value.slice(0, head)}…${value.slice(-tail)}`
+}
+
 function abbreviateDigest(digest: string): string {
-  const hex = digest.replace(/^sha256:/, '')
-  return `${hex.slice(0, 12)}…${hex.slice(-12)}`
+  return abbreviate(digest.replace(/^sha256:/, ''), 12, 12)
 }
 
 function isDownloadableArtifact(value: ArtifactStorage | null): value is ArtifactStorage & {
@@ -581,6 +592,14 @@ function Detail(): React.JSX.Element {
   }, [runId])
   const terminal = run ? isRunTerminal(run) : false
   const { refresh, refreshing, lastChecked } = useRefresh(load, !terminal)
+  const titleRunId = run?.run_id
+  React.useEffect(() => {
+    if (titleRunId === undefined) return
+    document.title = `${titleRunId} · Review Control Plane`
+    return (): void => {
+      document.title = 'Review Control Plane'
+    }
+  }, [titleRunId])
   if (error && run === undefined) throw error
   const publicationOutcomes = steps.filter(
     (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
