@@ -131,7 +131,7 @@ Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个�
 
 将 `RUNNER_SERVICE_TOKEN` 以及 PostgreSQL/RustFS 密码设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
 
-RustFS 按职责为各组件分配独立身份：integration 写入 input object，宿主机 worker 读取 input，artifact publisher 写入终态 artifact，UI BFF 为经过认证的下载读取已发布 artifact。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
+RustFS 按职责为各组件分配独立身份：integration 写入 input object，宿主机 worker 读取 input，artifact storage writer 写入终态 artifact，UI BFF 为经过认证的下载读取已存储 artifact。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
 
 ### 2. GitHub integration `.env`
 
@@ -193,7 +193,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
 | `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` | 与仓库 `.env` 中 runner 配置相匹配的 RustFS 只读凭据。 |
 
-Runner service 通过 Compose 使用独立的 artifact-publisher 凭据，只能写入 `runs/*/artifacts/*`；宿主机 worker 不持有对象存储凭据。Runner service 观察到终态 run 后，通过只读 bind mount 读取 worker 的 artifact root。
+Runner service 通过 Compose 使用独立的 artifact-storage-writer 凭据，只能写入 `runs/*/artifacts/*`；宿主机 worker 不持有对象存储凭据。Runner service 观察到终态 run 后，通过只读 bind mount 读取 worker 的 artifact root。
 
 大多数本地部署可以保留这些默认值。移动 checkout 后，重新运行安装脚本。
 

@@ -5,11 +5,13 @@ export interface ObservedRun {
   run_id: string
   workflow: ReviewRunRecord['workflow']
   status: ReviewRunRecord['status']
+  execution_status: ReviewRunRecord['runner_status']
+  publication_status: ReviewRunRecord['publication_status']
   created_at: string
   updated_at: string
   published_at: string | null
   failure_code: string | null
-  artifact_publication: ReviewRunRecord['artifact_publication']
+  artifact_storage: ReviewRunRecord['artifact_storage']
   publication_steps?: readonly PublicationStepSummary[]
 }
 
@@ -27,11 +29,13 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
     run_id: run.run_id,
     workflow: run.workflow,
     status: run.status,
+    execution_status: run.runner_status,
+    publication_status: run.publication_status,
     created_at: run.created_at,
     updated_at: run.updated_at,
     published_at: run.published_at,
     failure_code: run.failure_code,
-    artifact_publication: run.artifact_publication
+    artifact_storage: run.artifact_storage
   }
 }
 

@@ -10,12 +10,14 @@ function run(input: Record<string, unknown> | null = { contract_version: 'v5' })
     publish_context: {},
     ...(input === null ? {} : { runner_input: input }),
     status: 'recovering',
+    runner_status: 'recovering',
+    publication_status: 'pending',
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     published_at: null,
     failure_code: null,
     failure_message: null,
-    artifact_publication: null
+    artifact_storage: null
   }
 }
 

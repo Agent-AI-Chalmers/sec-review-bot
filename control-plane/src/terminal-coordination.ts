@@ -80,7 +80,7 @@ export async function observeRunnerRun(
             code: status.error.code ?? 'RUNNER_EXECUTION_FAILED',
             message: status.error.message ?? 'Runner execution failed.'
           },
-      status.artifact_publication
+      status.artifact_storage
     )
     if (!recorded) return 'failed'
     onEvent({
@@ -108,7 +108,7 @@ export async function observeRunnerRun(
     })
     return 'failed'
   }
-  if (!(await store.recordRunnerSuccess(run.run_id, status.result, status.artifact_publication))) {
+  if (!(await store.recordRunnerSuccess(run.run_id, status.result, status.artifact_storage))) {
     return 'succeeded'
   }
   onEvent({

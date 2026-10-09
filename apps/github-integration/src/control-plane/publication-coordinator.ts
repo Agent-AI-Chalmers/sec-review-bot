@@ -60,9 +60,7 @@ async function publishWork(
     workflow: work.workflow,
     status: 'succeeded',
     result: work.workflow_result,
-    ...(work.artifact_publication === null
-      ? {}
-      : { artifact_publication: work.artifact_publication })
+    ...(work.artifact_storage === null ? {} : { artifact_storage: work.artifact_storage })
   }
   const common = {
     run: work,

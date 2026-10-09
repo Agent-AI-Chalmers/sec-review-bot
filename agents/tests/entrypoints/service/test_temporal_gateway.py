@@ -684,7 +684,7 @@ async def test_temporal_backend_starts_and_reads_runner_workflow(
         "run_id": "run-1",
         "workflow": workflow,
         "status": "succeeded",
-        "artifact_publication": {"status": "not_available"},
+        "artifact_storage": {"status": "unavailable"},
         "result": _valid_workflow_result(workflow),
     }
     assert replayed == fetched
@@ -702,7 +702,7 @@ async def test_temporal_backend_maps_completed_error_envelope_to_failed_run() ->
         "run_id": "run-error",
         "workflow": "issue-review",
         "status": "failed",
-        "artifact_publication": {"status": "not_available"},
+        "artifact_storage": {"status": "unavailable"},
         "error": {
             "category": "input",
             "code": "RUNNER_REQUEST_INVALID",

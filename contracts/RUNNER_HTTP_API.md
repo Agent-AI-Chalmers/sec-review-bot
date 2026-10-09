@@ -101,8 +101,8 @@ The Runner reports `succeeded` only after the workflow completes and its result 
   "workflow": "issue-review",
   "status": "succeeded",
   "result": {},
-  "artifact_publication": {
-    "status": "published",
+  "artifact_storage": {
+    "status": "available",
     "artifact": {
       "kind": "diagnostic_bundle",
       "uri": "s3://sec-review/runs/run-001/artifacts/diagnostic-tree.v1.tar.zst",
@@ -114,7 +114,7 @@ The Runner reports `succeeded` only after the workflow completes and its result 
 }
 ```
 
-`artifact_publication` is separate from the workflow result. Its status is `published`, `not_available`, or `failed`; publication failure does not change the workflow's business result.
+`artifact_storage` is separate from the workflow result. Its status is `available`, `unavailable`, or `failed`; storage failure does not change the workflow's business result.
 
 ### Failed Response
 

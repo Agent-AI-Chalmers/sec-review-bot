@@ -137,10 +137,10 @@ test('status response preserves a valid terminal result', async () => {
   })
 })
 
-test('status response validates a published artifact against the run identity', async () => {
+test('status response validates an available artifact against the run identity', async () => {
   configureRunner()
-  const artifactPublication = {
-    status: 'published',
+  const artifactStorage = {
+    status: 'available',
     artifact: {
       kind: 'diagnostic_bundle',
       uri: 's3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
@@ -155,11 +155,11 @@ test('status response validates a published artifact against the run identity', 
         run_id: 'run-1',
         workflow: 'issue-review',
         status: 'succeeded',
-        artifact_publication: artifactPublication
+        artifact_storage: artifactStorage
       })
     )
 
-  assert.deepEqual((await getRunnerRunStatus('run-1')).artifact_publication, artifactPublication)
+  assert.deepEqual((await getRunnerRunStatus('run-1')).artifact_storage, artifactStorage)
 })
 
 test('status response rejects an artifact reference owned by another run', async () => {
@@ -170,8 +170,8 @@ test('status response rejects an artifact reference owned by another run', async
         run_id: 'run-1',
         workflow: 'issue-review',
         status: 'succeeded',
-        artifact_publication: {
-          status: 'published',
+        artifact_storage: {
+          status: 'available',
           artifact: {
             kind: 'diagnostic_bundle',
             uri: 's3://sec-review/runs/run-2/artifacts/diagnostic-tree.v1.tar.zst',
@@ -184,7 +184,7 @@ test('status response rejects an artifact reference owned by another run', async
     )
 
   await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
-    assert.equal((error as { code?: string }).code, 'RUNNER_INVALID_ARTIFACT_PUBLICATION')
+    assert.equal((error as { code?: string }).code, 'RUNNER_INVALID_ARTIFACT_STORAGE')
     return true
   })
 })

@@ -7,11 +7,13 @@
     "run_id",
     "workflow",
     "status",
+    "execution_status",
+    "publication_status",
     "created_at",
     "updated_at",
     "published_at",
     "failure_code",
-    "artifact_publication"
+    "artifact_storage"
   ],
   "properties": {
     "run_id": { "type": "string", "minLength": 1 },
@@ -28,11 +30,17 @@
         "failed"
       ]
     },
+    "execution_status": {
+      "enum": ["preparing", "recovering", "queued", "running", "succeeded", "failed"]
+    },
+    "publication_status": {
+      "enum": ["pending", "publishing", "published", "failed", "not_required"]
+    },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
     "published_at": { "type": ["string", "null"], "format": "date-time" },
     "failure_code": { "type": ["string", "null"] },
-    "artifact_publication": {
+    "artifact_storage": {
       "oneOf": [
         { "type": "null" },
         {
@@ -40,7 +48,7 @@
           "additionalProperties": false,
           "required": ["status"],
           "properties": {
-            "status": { "enum": ["not_available", "failed"] },
+            "status": { "enum": ["unavailable", "failed"] },
             "error_code": { "type": "string" },
             "message": { "type": "string" }
           }
@@ -50,7 +58,7 @@
           "additionalProperties": false,
           "required": ["status", "artifact"],
           "properties": {
-            "status": { "const": "published" },
+            "status": { "const": "available" },
             "artifact": {
               "type": "object",
               "additionalProperties": false,

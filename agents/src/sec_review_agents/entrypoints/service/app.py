@@ -98,8 +98,8 @@ def _run_response(run: dict[str, Any]) -> dict[str, Any]:
         response["result"] = run["result"]
     if run.get("error") is not None:
         response["error"] = run["error"]
-    if run.get("artifact_publication") is not None:
-        response["artifact_publication"] = run["artifact_publication"]
+    if run.get("artifact_storage") is not None:
+        response["artifact_storage"] = run["artifact_storage"]
     return response
 
 

@@ -145,11 +145,11 @@ def main() -> None:
     )
     integration_secret_key = required_env("SEC_REVIEW_INTEGRATION_S3_SECRET_KEY")
     runner_secret_key = required_env("SEC_REVIEW_RUNNER_S3_SECRET_KEY")
-    publisher_access_key = os.environ.get(
-        "SEC_REVIEW_ARTIFACT_PUBLISHER_S3_ACCESS_KEY",
-        "sec-review-artifact-publisher",
+    storage_writer_access_key = os.environ.get(
+        "SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY",
+        "sec-review-artifact-storage-writer",
     )
-    publisher_secret_key = required_env("SEC_REVIEW_ARTIFACT_PUBLISHER_S3_SECRET_KEY")
+    storage_writer_secret_key = required_env("SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY")
     ui_reader_access_key = os.environ.get(
         "SEC_REVIEW_UI_S3_ACCESS_KEY", "sec-review-ui-artifact-reader"
     )
@@ -159,18 +159,18 @@ def main() -> None:
     wait_for_rustfs()
     put_user(integration_access_key, integration_secret_key)
     put_user(runner_access_key, runner_secret_key)
-    put_user(publisher_access_key, publisher_secret_key)
+    put_user(storage_writer_access_key, storage_writer_secret_key)
     put_user(ui_reader_access_key, ui_reader_secret_key)
     put_policy("sec-review-input-writer", policy_root / "integration-policy.json")
     put_policy("sec-review-input-reader", policy_root / "runner-policy.json")
-    put_policy("sec-review-artifact-publisher", policy_root / "artifact-policy.json")
+    put_policy("sec-review-artifact-storage-writer", policy_root / "artifact-policy.json")
     put_policy(
         "sec-review-ui-artifact-reader",
         policy_root / "ui-artifact-reader-policy.json",
     )
     attach_policy("sec-review-input-writer", integration_access_key)
     attach_policy("sec-review-input-reader", runner_access_key)
-    attach_policy("sec-review-artifact-publisher", publisher_access_key)
+    attach_policy("sec-review-artifact-storage-writer", storage_writer_access_key)
     attach_policy("sec-review-ui-artifact-reader", ui_reader_access_key)
 
 

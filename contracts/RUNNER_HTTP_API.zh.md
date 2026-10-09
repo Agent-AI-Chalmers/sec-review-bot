@@ -97,8 +97,8 @@ GET /v1/runs/{run_id}
   "workflow": "issue-review",
   "status": "succeeded",
   "result": {},
-  "artifact_publication": {
-    "status": "published",
+  "artifact_storage": {
+    "status": "available",
     "artifact": {
       "kind": "diagnostic_bundle",
       "uri": "s3://sec-review/runs/run-001/artifacts/diagnostic-tree.v1.tar.zst",
@@ -110,7 +110,7 @@ GET /v1/runs/{run_id}
 }
 ```
 
-`artifact_publication` 与 workflow 业务结果相互独立。其状态为 `published`、`not_available` 或 `failed`；诊断材料发布失败不会改变 workflow 的业务结果。
+`artifact_storage` 与 workflow 业务结果相互独立。其状态为 `available`、`unavailable` 或 `failed`；诊断材料存储失败不会改变 workflow 的业务结果。
 
 ### 失败响应
 

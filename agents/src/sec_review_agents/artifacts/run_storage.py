@@ -1,4 +1,4 @@
-"""Publish immutable, diagnostic-only artifacts for terminal Runner runs."""
+"""Store immutable, diagnostic-only artifacts for terminal Runner runs."""
 
 import hashlib
 import tarfile
@@ -12,28 +12,28 @@ from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
 from sec_review_agents.utils.env import env_value
 
-PUBLISHER_BUCKET_ENV = "SEC_REVIEW_ARTIFACT_S3_BUCKET"
-PUBLISHER_ENDPOINT_ENV = "SEC_REVIEW_ARTIFACT_S3_ENDPOINT"
-PUBLISHER_ACCESS_KEY_ENV = "AWS_ACCESS_KEY_ID"
-PUBLISHER_SECRET_KEY_ENV = "AWS_SECRET_ACCESS_KEY"
+STORAGE_BUCKET_ENV = "SEC_REVIEW_ARTIFACT_S3_BUCKET"
+STORAGE_ENDPOINT_ENV = "SEC_REVIEW_ARTIFACT_S3_ENDPOINT"
+STORAGE_ACCESS_KEY_ENV = "AWS_ACCESS_KEY_ID"
+STORAGE_SECRET_KEY_ENV = "AWS_SECRET_ACCESS_KEY"
 
 
-def publish_run_artifacts(root: str | Path, run_id: str) -> dict[str, Any] | None:
-    """Freeze one run directory and publish it without exposing storage to workers."""
+def store_run_artifacts(root: str | Path, run_id: str) -> dict[str, Any] | None:
+    """Freeze and store one run directory without exposing storage to workers."""
     source = Path(root).expanduser().resolve()
     if not source.is_dir():
         return None
-    bucket = env_value(PUBLISHER_BUCKET_ENV)
-    access_key = env_value(PUBLISHER_ACCESS_KEY_ENV)
-    secret_key = env_value(PUBLISHER_SECRET_KEY_ENV)
+    bucket = env_value(STORAGE_BUCKET_ENV)
+    access_key = env_value(STORAGE_ACCESS_KEY_ENV)
+    secret_key = env_value(STORAGE_SECRET_KEY_ENV)
     if not bucket or not access_key or not secret_key:
-        raise RuntimeError("artifact publisher storage configuration is incomplete")
+        raise RuntimeError("artifact storage configuration is incomplete")
 
     key = f"runs/{run_id}/artifacts/diagnostic-tree.v1.tar.zst"
     media_type = "application/zstd"
     client = boto3.client(
         "s3",
-        endpoint_url=env_value(PUBLISHER_ENDPOINT_ENV),
+        endpoint_url=env_value(STORAGE_ENDPOINT_ENV),
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
         config=Config(s3={"addressing_style": "path"}),

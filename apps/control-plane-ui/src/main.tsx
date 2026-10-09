@@ -29,9 +29,10 @@ import {
   IconDownload,
   IconExternalLink,
   IconLoader2,
+  IconPlayerPlay,
   IconRefresh
 } from '@tabler/icons-react'
-import { api, ApiError, login, type ArtifactPublication, type Run } from './api.js'
+import { api, ApiError, login, type ArtifactStorage, type Run } from './api.js'
 import {
   formatDate,
   PreferenceControls,
@@ -381,9 +382,49 @@ function publicationStatusColor(status: string): string {
   return 'gray'
 }
 
-function publicationStatus(steps: Step[]): string {
-  const priority = ['terminal_failed', 'failed', 'running', 'pending', 'succeeded']
-  return priority.find((status) => steps.some((step) => step.status === status)) ?? ''
+function executionStatusLabel(
+  status: Run['execution_status'],
+  t: ReturnType<typeof useMessages>
+): string {
+  if (status === 'preparing') return t('statusPreparing')
+  if (status === 'recovering') return t('statusRecovering')
+  if (status === 'queued') return t('statusQueued')
+  if (status === 'running') return t('statusRunning')
+  if (status === 'succeeded') return t('statusSucceeded')
+  return t('statusFailed')
+}
+
+function executionStatusColor(status: Run['execution_status']): string {
+  if (status === 'failed') return 'red'
+  if (status === 'succeeded') return 'green'
+  if (status === 'running') return 'blue'
+  return 'gray'
+}
+
+function runPublicationStatusLabel(
+  status: Run['publication_status'],
+  t: ReturnType<typeof useMessages>
+): string {
+  if (status === 'pending') return t('publicationPending')
+  if (status === 'publishing') return t('publishingStatus')
+  if (status === 'published') return t('statusPublished')
+  if (status === 'failed') return t('failedStatus')
+  return t('publicationNotRequired')
+}
+
+function runPublicationStatusColor(status: Run['publication_status']): string {
+  if (status === 'failed') return 'red'
+  if (status === 'published') return 'green'
+  if (status === 'publishing') return 'blue'
+  return 'gray'
+}
+
+function isRunTerminal(run: Run): boolean {
+  if (run.execution_status === 'failed') return true
+  return (
+    run.execution_status === 'succeeded' &&
+    ['published', 'failed', 'not_required'].includes(run.publication_status)
+  )
 }
 
 function formatBytes(value: number): string {
@@ -392,46 +433,46 @@ function formatBytes(value: number): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`
 }
 
-function isDownloadableArtifact(value: ArtifactPublication | null): value is ArtifactPublication & {
-  status: 'published'
-  artifact: NonNullable<ArtifactPublication['artifact']>
+function isDownloadableArtifact(value: ArtifactStorage | null): value is ArtifactStorage & {
+  status: 'available'
+  artifact: NonNullable<ArtifactStorage['artifact']>
 } {
-  return value?.status === 'published' && value.artifact !== undefined
+  return value?.status === 'available' && value.artifact !== undefined
 }
 
 function artifactStatusLabel(
-  status: ArtifactPublication['status'],
+  status: ArtifactStorage['status'],
   t: ReturnType<typeof useMessages>
 ): string {
-  if (status === 'published') return t('artifactPublished')
-  if (status === 'not_available') return t('notAvailable')
+  if (status === 'available') return t('artifactAvailable')
+  if (status === 'unavailable') return t('notAvailable')
   return t('failedStatus')
 }
 
-function artifactStatusColor(status: ArtifactPublication['status']): string {
-  if (status === 'published') return 'green'
+function artifactStatusColor(status: ArtifactStorage['status']): string {
+  if (status === 'available') return 'green'
   if (status === 'failed') return 'red'
   return 'gray'
 }
 
 function Artifact({
-  publication,
+  storage,
   runId
 }: {
-  publication: ArtifactPublication
+  storage: ArtifactStorage
   runId: string
 }): React.ReactNode {
   const t = useMessages()
   const [copied, setCopied] = React.useState(false)
-  const artifact = publication.artifact
+  const artifact = storage.artifact
   if (artifact === undefined) {
-    if (!publication.message && !publication.error_code) return null
+    if (!storage.message && !storage.error_code) return null
     return (
       <div className="artifact-state">
-        {publication.message && <Text size="sm">{publication.message}</Text>}
-        {publication.error_code && (
-          <Text c={publication.status === 'failed' ? 'red' : 'dimmed'} size="xs" ff="monospace">
-            {publication.error_code}
+        {storage.message && <Text size="sm">{storage.message}</Text>}
+        {storage.error_code && (
+          <Text c={storage.status === 'failed' ? 'red' : 'dimmed'} size="xs" ff="monospace">
+            {storage.error_code}
           </Text>
         )}
       </div>
@@ -448,7 +489,7 @@ function Artifact({
         <Text c="dimmed" size="sm" className="artifact-meta">
           {formatBytes(artifact.size_bytes)}
         </Text>
-        {isDownloadableArtifact(publication) && (
+        {isDownloadableArtifact(storage) && (
           <Tooltip label={t('download')}>
             <ActionIcon
               component="a"
@@ -513,16 +554,15 @@ function Detail(): React.JSX.Element {
       setError(value)
     }
   }, [runId])
-  const terminal = run ? ['published', 'failed'].includes(run.status) : false
+  const terminal = run ? isRunTerminal(run) : false
   const { refresh, refreshing, lastChecked } = useRefresh(load, !terminal)
   if (error && run === undefined) throw error
   const publicationOutcomes = steps.filter(
     (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
   )
-  const hasPublication = steps.length > 0 || run?.published_at != null
-  const publicationNodeStatus = run?.published_at ? 'succeeded' : publicationStatus(steps)
-  const progressItemCount =
-    1 + (run?.artifact_publication === null ? 0 : 1) + (hasPublication ? 1 : 0)
+  const publicationIndex = 2 + (run?.artifact_storage === null ? 0 : 1)
+  const timelineActive =
+    run?.publication_status === 'pending' ? publicationIndex - 1 : publicationIndex
   return (
     <Container component="main" size="lg" py="xl">
       <Button
@@ -589,111 +629,130 @@ function Detail(): React.JSX.Element {
                   <Text size="sm">{formatDate(run.updated_at, language)}</Text>
                 </div>
               </Group>
-              <Timeline active={progressItemCount - 1} bulletSize={24} lineWidth={2}>
+              <Timeline active={timelineActive} bulletSize={24} lineWidth={2}>
                 <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
                   <Text c="dimmed" size="sm">
                     {formatDate(run.created_at, language)}
                   </Text>
                 </Timeline.Item>
-                {run.artifact_publication !== null && (
+                <Timeline.Item
+                  bullet={
+                    run.execution_status === 'running' ? (
+                      <IconLoader2 size={14} className="status-spinner" />
+                    ) : (
+                      <IconPlayerPlay size={14} />
+                    )
+                  }
+                  color={executionStatusColor(run.execution_status)}
+                  title={
+                    <Group gap="xs" align="center">
+                      <Text fw={500}>{t('execution')}</Text>
+                      <Badge variant="light" color={executionStatusColor(run.execution_status)}>
+                        {executionStatusLabel(run.execution_status, t)}
+                      </Badge>
+                    </Group>
+                  }
+                />
+                {run.artifact_storage !== null && (
                   <Timeline.Item
                     bullet={<IconArchive size={14} />}
-                    color={artifactStatusColor(run.artifact_publication.status)}
+                    color={artifactStatusColor(run.artifact_storage.status)}
                     title={
                       <Group gap="xs" align="center">
                         <Text fw={500}>{t('artifact')}</Text>
                         <Badge
                           variant="light"
-                          color={artifactStatusColor(run.artifact_publication.status)}
+                          color={artifactStatusColor(run.artifact_storage.status)}
                         >
-                          {artifactStatusLabel(run.artifact_publication.status, t)}
+                          {artifactStatusLabel(run.artifact_storage.status, t)}
                         </Badge>
                       </Group>
                     }
                   >
-                    <Artifact publication={run.artifact_publication} runId={run.run_id} />
+                    <Artifact storage={run.artifact_storage} runId={run.run_id} />
                   </Timeline.Item>
                 )}
-                {hasPublication && (
-                  <Timeline.Item
-                    bullet={<IconExternalLink size={14} />}
-                    color={publicationStatusColor(publicationNodeStatus)}
-                    title={
-                      <Group gap="xs" align="center">
-                        <Text fw={500}>{t('publication')}</Text>
-                        <Badge
-                          variant="light"
-                          color={publicationStatusColor(publicationNodeStatus)}
-                        >
-                          {publicationStatusLabel(publicationNodeStatus, t)}
-                        </Badge>
-                      </Group>
-                    }
-                  >
-                    {run.published_at && (
-                      <Text c="dimmed" size="sm" mb={publicationOutcomes.length > 0 ? 6 : 0}>
-                        {formatDate(run.published_at, language)}
-                      </Text>
-                    )}
-                    {publicationOutcomes.length > 0 && (
-                      <div className="delivery-list">
-                        {publicationOutcomes.map((step) => {
-                          const externalUrl = safeExternalUrl(step.remote_object_url)
-                          const succeeded = step.status === 'succeeded'
-                          return (
-                            <div className="delivery-item" key={step.step_key}>
-                              {publicationOutcomes.length > 1 && (
-                                <div className="delivery-main">
-                                  <Badge
-                                    variant="light"
-                                    color={publicationStatusColor(step.status)}
-                                  >
-                                    {publicationStatusLabel(step.status, t)}
-                                  </Badge>
+                <Timeline.Item
+                  bullet={
+                    run.publication_status === 'publishing' ? (
+                      <IconLoader2 size={14} className="status-spinner" />
+                    ) : (
+                      <IconExternalLink size={14} />
+                    )
+                  }
+                  color={runPublicationStatusColor(run.publication_status)}
+                  title={
+                    <Group gap="xs" align="center">
+                      <Text fw={500}>{t('publication')}</Text>
+                      <Badge
+                        variant="light"
+                        color={runPublicationStatusColor(run.publication_status)}
+                      >
+                        {runPublicationStatusLabel(run.publication_status, t)}
+                      </Badge>
+                    </Group>
+                  }
+                >
+                  {run.published_at && (
+                    <Text c="dimmed" size="sm" mb={publicationOutcomes.length > 0 ? 6 : 0}>
+                      {formatDate(run.published_at, language)}
+                    </Text>
+                  )}
+                  {publicationOutcomes.length > 0 && (
+                    <div className="delivery-list">
+                      {publicationOutcomes.map((step) => {
+                        const externalUrl = safeExternalUrl(step.remote_object_url)
+                        const succeeded = step.status === 'succeeded'
+                        return (
+                          <div className="delivery-item" key={step.step_key}>
+                            {publicationOutcomes.length > 1 && (
+                              <div className="delivery-main">
+                                <Badge variant="light" color={publicationStatusColor(step.status)}>
+                                  {publicationStatusLabel(step.status, t)}
+                                </Badge>
+                              </div>
+                            )}
+                            {externalUrl && (
+                              <Button
+                                component="a"
+                                href={externalUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                variant="subtle"
+                                rightSection={<IconExternalLink size={16} />}
+                              >
+                                {t('openExternalLink')}
+                              </Button>
+                            )}
+                            {!succeeded &&
+                              (step.failure_message ||
+                                step.failure_code ||
+                                step.failure_count > 0) && (
+                                <div className="delivery-error">
+                                  {step.failure_message && (
+                                    <Text size="sm">{step.failure_message}</Text>
+                                  )}
+                                  <Group gap="sm">
+                                    {step.failure_code && (
+                                      <Text c="dimmed" size="xs" ff="monospace">
+                                        {step.failure_code}
+                                      </Text>
+                                    )}
+                                    {step.failure_count > 0 && (
+                                      <Text c="dimmed" size="xs">
+                                        {t('failedAttempts')}: {step.failure_count}
+                                      </Text>
+                                    )}
+                                  </Group>
                                 </div>
                               )}
-                              {externalUrl && (
-                                <Button
-                                  component="a"
-                                  href={externalUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  variant="subtle"
-                                  rightSection={<IconExternalLink size={16} />}
-                                >
-                                  {t('openExternalLink')}
-                                </Button>
-                              )}
-                              {!succeeded &&
-                                (step.failure_message ||
-                                  step.failure_code ||
-                                  step.failure_count > 0) && (
-                                  <div className="delivery-error">
-                                    {step.failure_message && (
-                                      <Text size="sm">{step.failure_message}</Text>
-                                    )}
-                                    <Group gap="sm">
-                                      {step.failure_code && (
-                                        <Text c="dimmed" size="xs" ff="monospace">
-                                          {step.failure_code}
-                                        </Text>
-                                      )}
-                                      {step.failure_count > 0 && (
-                                        <Text c="dimmed" size="xs">
-                                          {t('failedAttempts')}: {step.failure_count}
-                                        </Text>
-                                      )}
-                                    </Group>
-                                  </div>
-                                )}
-                              <code className="delivery-step-key">{step.step_key}</code>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </Timeline.Item>
-                )}
+                            <code className="delivery-step-key">{step.step_key}</code>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </Timeline.Item>
               </Timeline>
             </Paper>
           </Stack>

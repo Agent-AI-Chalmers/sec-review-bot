@@ -101,8 +101,8 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
       JSON.stringify({
         run: {
           run_id: runId,
-          artifact_publication: {
-            status: 'published',
+          artifact_storage: {
+            status: 'available',
             artifact: {
               kind: 'diagnostic_bundle',
               uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
@@ -170,8 +170,8 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
       JSON.stringify({
         run: {
           run_id: 'run-1',
-          artifact_publication: {
-            status: 'published',
+          artifact_storage: {
+            status: 'available',
             artifact: {
               kind: 'diagnostic_bundle',
               uri: 's3://sec-review/runs/run-2/artifacts/diagnostic-tree.v1.tar.zst',
@@ -221,7 +221,7 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
   }
 })
 
-test('BFF rejects an object whose size does not match the published artifact', async () => {
+test('BFF rejects an object whose size does not match the available artifact', async () => {
   const runId = 'run-1'
   const upstream = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
@@ -229,8 +229,8 @@ test('BFF rejects an object whose size does not match the published artifact', a
       JSON.stringify({
         run: {
           run_id: runId,
-          artifact_publication: {
-            status: 'published',
+          artifact_storage: {
+            status: 'available',
             artifact: {
               kind: 'diagnostic_bundle',
               uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
@@ -278,7 +278,7 @@ test('BFF rejects an object whose size does not match the published artifact', a
   }
 })
 
-test('BFF rejects same-size artifact content that does not match the published digest', async () => {
+test('BFF rejects same-size artifact content that does not match the stored digest', async () => {
   const runId = 'run-1'
   const upstream = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
@@ -286,8 +286,8 @@ test('BFF rejects same-size artifact content that does not match the published d
       JSON.stringify({
         run: {
           run_id: runId,
-          artifact_publication: {
-            status: 'published',
+          artifact_storage: {
+            status: 'available',
             artifact: {
               kind: 'diagnostic_bundle',
               uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
@@ -343,8 +343,8 @@ test('BFF times out a stalled artifact download', async () => {
       JSON.stringify({
         run: {
           run_id: runId,
-          artifact_publication: {
-            status: 'published',
+          artifact_storage: {
+            status: 'available',
             artifact: {
               kind: 'diagnostic_bundle',
               uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,

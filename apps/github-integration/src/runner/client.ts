@@ -7,8 +7,8 @@ interface RunnerServiceErrorBody {
   retryable?: boolean
   details?: JsonObject
 }
-export interface RunnerArtifactPublication {
-  status: 'published' | 'not_available' | 'failed'
+export interface RunnerArtifactStorage {
+  status: 'available' | 'unavailable' | 'failed'
   artifact?: { kind: string; uri: string; media_type: string; digest: string; size_bytes: number }
   error_code?: string
   message?: string
@@ -19,7 +19,7 @@ export interface RunnerRunStatus {
   status: string
   result?: unknown
   error?: RunnerServiceErrorBody
-  artifact_publication?: RunnerArtifactPublication
+  artifact_storage?: RunnerArtifactStorage
 }
 export interface RunnerWorkflowResponse {
   run_id: string

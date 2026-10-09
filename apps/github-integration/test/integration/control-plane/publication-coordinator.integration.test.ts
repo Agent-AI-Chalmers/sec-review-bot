@@ -28,7 +28,7 @@ async function successfulRun(value: ReviewRunStore): Promise<string> {
   await value.recordRunnerSuccess(
     runId,
     { run_id: runId, review_record: { analysis: { verdict: 'no-findings' } } },
-    { status: 'not_available' }
+    { status: 'unavailable' }
   )
   return runId
 }
@@ -60,7 +60,7 @@ test('publication claim returns the persisted opaque result, context, and artifa
     const work = await value.claimNextPublication()
     assert.equal(work?.run_id, runId)
     assert.equal(work?.claim_token.length, 36)
-    assert.deepEqual(work?.artifact_publication, { status: 'not_available' })
+    assert.deepEqual(work?.artifact_storage, { status: 'unavailable' })
     assert.equal((work?.workflow_result as { run_id?: string }).run_id, runId)
     assert.deepEqual(work?.publish_context, publishContextForWorkflow('issue-review'))
   } finally {

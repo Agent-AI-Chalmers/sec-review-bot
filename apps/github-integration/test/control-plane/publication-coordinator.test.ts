@@ -21,7 +21,7 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
     published_at: null,
     failure_code: null,
     failure_message: null,
-    artifact_publication: null,
+    artifact_storage: null,
     workflow_result: {},
     claim_token: 'claim-1'
   } satisfies PublicationWork
@@ -76,7 +76,7 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
     published_at: null,
     failure_code: null,
     failure_message: null,
-    artifact_publication: null,
+    artifact_storage: null,
     workflow_result: {},
     claim_token: 'claim-1'
   } satisfies PublicationWork

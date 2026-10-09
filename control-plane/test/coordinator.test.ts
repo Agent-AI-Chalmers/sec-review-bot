@@ -8,12 +8,14 @@ const run = {
   workflow: 'issue-review' as const,
   publish_context: {},
   status: 'queued' as const,
+  runner_status: 'queued' as const,
+  publication_status: 'pending' as const,
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
   published_at: null,
   failure_code: null,
   failure_message: null,
-  artifact_publication: null
+  artifact_storage: null
 }
 
 test('coordination expires preparations before recovery and active observation', async () => {

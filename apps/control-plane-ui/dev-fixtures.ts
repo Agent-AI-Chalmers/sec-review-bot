@@ -4,11 +4,13 @@ interface FixtureRun {
   run_id: string
   workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
   status: string
+  execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+  publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
   created_at: string
   updated_at: string
   published_at: string | null
   failure_code: string | null
-  artifact_publication: object | null
+  artifact_storage: object | null
 }
 
 interface FixtureStep {
@@ -21,7 +23,7 @@ interface FixtureStep {
 }
 
 const artifact = (runId: string): object => ({
-  status: 'published',
+  status: 'available',
   artifact: {
     uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
     kind: 'diagnostic_bundle',
@@ -36,61 +38,73 @@ const runs: FixtureRun[] = [
     run_id: '018f6b7c-2d41-7a30-9000-000000000001',
     workflow: 'pull-request-review',
     status: 'published',
+    execution_status: 'succeeded',
+    publication_status: 'published',
     created_at: '2026-10-08T14:17:15.571Z',
     updated_at: '2026-10-08T14:19:43.909Z',
     published_at: '2026-10-08T14:19:43.909Z',
     failure_code: null,
-    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000001')
+    artifact_storage: artifact('018f6b7c-2d41-7a30-9000-000000000001')
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000002',
     workflow: 'issue-review',
     status: 'publishing',
+    execution_status: 'succeeded',
+    publication_status: 'publishing',
     created_at: '2026-10-08T12:02:11.104Z',
     updated_at: '2026-10-08T12:07:54.601Z',
     published_at: null,
     failure_code: null,
-    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000002')
+    artifact_storage: artifact('018f6b7c-2d41-7a30-9000-000000000002')
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000003',
     workflow: 'repository-review',
     status: 'publishing',
+    execution_status: 'succeeded',
+    publication_status: 'publishing',
     created_at: '2026-10-08T09:40:03.214Z',
     updated_at: '2026-10-08T09:58:19.772Z',
     published_at: null,
     failure_code: null,
-    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000003')
+    artifact_storage: artifact('018f6b7c-2d41-7a30-9000-000000000003')
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000004',
     workflow: 'repository-review',
     status: 'failed',
+    execution_status: 'succeeded',
+    publication_status: 'failed',
     created_at: '2026-10-08T08:11:46.832Z',
     updated_at: '2026-10-08T08:29:10.118Z',
     published_at: null,
     failure_code: 'GITHUB_VALIDATION_REJECTED',
-    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000004')
+    artifact_storage: artifact('018f6b7c-2d41-7a30-9000-000000000004')
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000005',
     workflow: 'issue-review',
     status: 'failed',
+    execution_status: 'failed',
+    publication_status: 'pending',
     created_at: '2026-10-08T07:03:28.002Z',
     updated_at: '2026-10-08T07:04:01.447Z',
     published_at: null,
     failure_code: 'RUNNER_EXECUTION_FAILED',
-    artifact_publication: { status: 'not_available' }
+    artifact_storage: { status: 'unavailable' }
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000006',
     workflow: 'pull-request-review',
     status: 'running',
+    execution_status: 'running',
+    publication_status: 'pending',
     created_at: '2026-10-08T06:42:17.510Z',
     updated_at: '2026-10-08T06:43:32.090Z',
     published_at: null,
     failure_code: null,
-    artifact_publication: null
+    artifact_storage: null
   }
 ]
 

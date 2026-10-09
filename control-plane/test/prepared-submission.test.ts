@@ -9,12 +9,14 @@ const run: ReviewRunRecord = {
   workflow: 'issue-review',
   publish_context: {},
   status: 'preparing',
+  runner_status: 'preparing',
+  publication_status: 'pending',
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
   published_at: null,
   failure_code: null,
   failure_message: null,
-  artifact_publication: null
+  artifact_storage: null
 }
 
 test('prepared submission persists input before crossing the Runner boundary', async () => {

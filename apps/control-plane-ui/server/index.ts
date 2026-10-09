@@ -23,7 +23,7 @@ export interface ArtifactStore {
   getObject(key: string, signal: AbortSignal): Promise<ArtifactObject>
 }
 
-interface PublishedArtifact {
+interface AvailableArtifact {
   digest: string
   key: string
   sizeBytes: number
@@ -45,21 +45,21 @@ function sendJson(response: ServerResponse, status: number, body: object): void 
   response.end(JSON.stringify(body))
 }
 
-function publishedArtifact(
+function availableArtifact(
   value: unknown,
   runId: string,
   bucket: string
-): PublishedArtifact | null {
+): AvailableArtifact | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
-  const publication = value as Record<string, unknown>
-  if (publication.status !== 'published') return null
+  const storage = value as Record<string, unknown>
+  if (storage.status !== 'available') return null
   if (
-    typeof publication.artifact !== 'object' ||
-    publication.artifact === null ||
-    Array.isArray(publication.artifact)
+    typeof storage.artifact !== 'object' ||
+    storage.artifact === null ||
+    Array.isArray(storage.artifact)
   )
     return null
-  const artifact = publication.artifact as Record<string, unknown>
+  const artifact = storage.artifact as Record<string, unknown>
   const expectedUri = `s3://${bucket}/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
   if (
     artifact.kind !== 'diagnostic_bundle' ||
@@ -239,15 +239,15 @@ export function createControlPlaneUiServer({
             return
           }
           const body = (await upstream.json()) as {
-            run?: { run_id?: unknown; artifact_publication?: unknown }
+            run?: { run_id?: unknown; artifact_storage?: unknown }
           }
           clearTimeout(metadataTimeout)
           const artifact =
             body.run?.run_id === runId
-              ? publishedArtifact(body.run.artifact_publication, runId, ARTIFACT_BUCKET)
+              ? availableArtifact(body.run.artifact_storage, runId, ARTIFACT_BUCKET)
               : null
           if (artifact === null) {
-            sendJson(response, 409, { error: 'artifact_not_available' })
+            sendJson(response, 409, { error: 'artifact_unavailable' })
             return
           }
           resetDownloadIdleTimeout()

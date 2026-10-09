@@ -29,7 +29,7 @@ flowchart LR
     tunnel --> integration
     temporal --> worker
     storage -->|read input bundles| worker
-    storage -->|read published artifacts| runner
+    storage -->|read stored artifacts| runner
 ```
 
 Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, Runner Service and Temporal dispatch its work, and the host worker executes the agents in Docker sandboxes. PostgreSQL stores control state, while RustFS stores run inputs and artifacts.
@@ -129,7 +129,7 @@ Compose-level defaults are documented in [compose.env.sample](../../compose.env.
 
 Set `RUNNER_SERVICE_TOKEN` and the PostgreSQL/RustFS passwords to locally generated secrets, for example with `openssl rand -hex 32`. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
 
-RustFS uses a separate workload identity for each responsibility: the integration writes input objects, the host worker reads inputs, the artifact publisher writes terminal artifacts, and the UI BFF reads published artifacts for authenticated downloads. The corresponding secret keys in `compose.env.sample` belong to those identities and should be generated independently.
+RustFS uses a separate workload identity for each responsibility: the integration writes input objects, the host worker reads inputs, the artifact storage writer writes terminal artifacts, and the UI BFF reads stored artifacts for authenticated downloads. The corresponding secret keys in `compose.env.sample` belong to those identities and should be generated independently.
 
 ### 2. GitHub Integration `.env`
 
@@ -191,7 +191,7 @@ Core fields:
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Read-only RustFS credential matching the runner values in the repository `.env`. |
 
-The Runner service receives a separate artifact-publisher credential through Compose. It can write only `runs/*/artifacts/*`; the host worker has no object-storage credential. The service reads the worker's artifact root through a read-only bind mount when a terminal run is observed.
+The Runner service receives a separate artifact-storage-writer credential through Compose. It can write only `runs/*/artifacts/*`; the host worker has no object-storage credential. The service reads the worker's artifact root through a read-only bind mount when a terminal run is observed.
 
 Most local deployments can keep these defaults. Rerun the installer after moving the checkout.
 

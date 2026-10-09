@@ -2,7 +2,7 @@ export type {
   AdmittedReviewRun,
   ControlPlaneWorkflow,
   InputArtifactRef,
-  RunnerArtifactPublication,
+  RunnerArtifactStorage,
   ReviewRunAdmissionRequest,
   ReviewRunCoordinator
 } from './contracts.js'

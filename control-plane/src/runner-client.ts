@@ -1,6 +1,6 @@
 import { isIP } from 'node:net'
 
-import type { ControlPlaneWorkflow, RunnerArtifactPublication } from './contracts.js'
+import type { ControlPlaneWorkflow, RunnerArtifactStorage } from './contracts.js'
 
 type JsonObject = Record<string, unknown>
 interface RunnerErrorBody {
@@ -14,7 +14,7 @@ interface RunnerResponse {
   status: string
   result?: unknown
   error?: unknown
-  artifact_publication?: unknown
+  artifact_storage?: unknown
 }
 
 const RUNNER_STATUSES = new Set(['queued', 'running', 'succeeded', 'failed'])
@@ -26,7 +26,7 @@ export interface RunnerRunStatus {
   status: string
   result?: unknown
   error?: RunnerErrorBody
-  artifact_publication?: RunnerArtifactPublication
+  artifact_storage?: RunnerArtifactStorage
 }
 export interface AgentRunnerServiceError extends Error {
   name: 'AgentRunnerServiceError'
@@ -76,14 +76,14 @@ function isWorkflow(value: unknown): value is ControlPlaneWorkflow {
   )
 }
 
-function parseArtifactPublication(value: unknown, runId: string): RunnerArtifactPublication {
-  if (!isRecord(value) || !['published', 'not_available', 'failed'].includes(String(value.status)))
+function parseArtifactStorage(value: unknown, runId: string): RunnerArtifactStorage {
+  if (!isRecord(value) || !['available', 'unavailable', 'failed'].includes(String(value.status)))
     throw new RunnerProtocolError(
-      'RUNNER_INVALID_ARTIFACT_PUBLICATION',
-      `Runner returned invalid artifact publication metadata for ${runId}.`
+      'RUNNER_INVALID_ARTIFACT_STORAGE',
+      `Runner returned invalid artifact storage metadata for ${runId}.`
     )
-  const status = value.status as RunnerArtifactPublication['status']
-  if (status !== 'published') {
+  const status = value.status as RunnerArtifactStorage['status']
+  if (status !== 'available') {
     if (
       Object.hasOwn(value, 'artifact') ||
       Object.keys(value).some((key) => !['status', 'error_code', 'message'].includes(key)) ||
@@ -91,8 +91,8 @@ function parseArtifactPublication(value: unknown, runId: string): RunnerArtifact
       (value.message !== undefined && typeof value.message !== 'string')
     )
       throw new RunnerProtocolError(
-        'RUNNER_INVALID_ARTIFACT_PUBLICATION',
-        `Runner returned invalid artifact publication metadata for ${runId}.`
+        'RUNNER_INVALID_ARTIFACT_STORAGE',
+        `Runner returned invalid artifact storage metadata for ${runId}.`
       )
     return {
       status,
@@ -117,8 +117,8 @@ function parseArtifactPublication(value: unknown, runId: string): RunnerArtifact
     (artifact.size_bytes as number) < 0
   )
     throw new RunnerProtocolError(
-      'RUNNER_INVALID_ARTIFACT_PUBLICATION',
-      `Runner returned invalid artifact publication metadata for ${runId}.`
+      'RUNNER_INVALID_ARTIFACT_STORAGE',
+      `Runner returned invalid artifact storage metadata for ${runId}.`
     )
   return {
     status,
@@ -327,8 +327,8 @@ export async function getRunnerRunStatus(
     status: parsed.status,
     ...(Object.hasOwn(parsed, 'result') ? { result: parsed.result } : {}),
     ...(isRecord(parsed.error) ? { error: parsed.error as RunnerErrorBody } : {}),
-    ...(parsed.artifact_publication === undefined
+    ...(parsed.artifact_storage === undefined
       ? {}
-      : { artifact_publication: parseArtifactPublication(parsed.artifact_publication, runId) })
+      : { artifact_storage: parseArtifactStorage(parsed.artifact_storage, runId) })
   }
 }
