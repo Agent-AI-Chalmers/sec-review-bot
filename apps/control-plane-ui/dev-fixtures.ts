@@ -20,14 +20,14 @@ interface FixtureStep {
   failure_message: string | null
 }
 
-const artifact = (runId: string, sizeBytes: number): object => ({
+const artifact = (runId: string): object => ({
   status: 'published',
   artifact: {
     uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
     kind: 'diagnostic_bundle',
-    digest: `sha256:${runId.replaceAll('-', '').padEnd(64, '0').slice(0, 64)}`,
-    media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
-    size_bytes: sizeBytes
+    digest: `sha256:${'0'.repeat(64)}`,
+    media_type: 'application/zstd',
+    size_bytes: 12_345
   }
 })
 
@@ -40,17 +40,17 @@ const runs: FixtureRun[] = [
     updated_at: '2026-10-08T14:19:43.909Z',
     published_at: '2026-10-08T14:19:43.909Z',
     failure_code: null,
-    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000001', 83_251)
+    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000001')
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000002',
     workflow: 'issue-review',
-    status: 'published',
+    status: 'publishing',
     created_at: '2026-10-08T12:02:11.104Z',
     updated_at: '2026-10-08T12:07:54.601Z',
-    published_at: '2026-10-08T12:07:54.601Z',
+    published_at: null,
     failure_code: null,
-    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000002', 164_918)
+    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000002')
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000003',
@@ -60,7 +60,7 @@ const runs: FixtureRun[] = [
     updated_at: '2026-10-08T09:58:19.772Z',
     published_at: null,
     failure_code: null,
-    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000003', 2_746_310)
+    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000003')
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000004',
@@ -70,11 +70,7 @@ const runs: FixtureRun[] = [
     updated_at: '2026-10-08T08:29:10.118Z',
     published_at: null,
     failure_code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
-    artifact_publication: {
-      status: 'failed',
-      error_code: 'ARTIFACT_UPLOAD_FAILED',
-      message: 'RustFS did not accept the diagnostic bundle after repeated attempts.'
-    }
+    artifact_publication: artifact('018f6b7c-2d41-7a30-9000-000000000004')
   },
   {
     run_id: '018f6b7c-2d41-7a30-9000-000000000005',
@@ -117,20 +113,11 @@ const stepsByRun = new Map<string, FixtureStep[]>([
     [
       {
         step_key: 'issue:draft-pr',
-        status: 'succeeded',
-        failure_count: 0,
-        remote_object_url: 'https://github.com/Agent-AI-Chalmers/sec-review-bot/pull/142',
-        failure_code: null,
-        failure_message: null
-      },
-      {
-        step_key: 'issue:summary-comment',
-        status: 'succeeded',
-        failure_count: 0,
-        remote_object_url:
-          'https://github.com/Agent-AI-Chalmers/sec-review-bot/issues/137#issuecomment-3214567890',
-        failure_code: null,
-        failure_message: null
+        status: 'failed',
+        failure_count: 2,
+        remote_object_url: null,
+        failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
+        failure_message: 'GitHub temporarily limited publication.'
       }
     ]
   ],
@@ -138,20 +125,20 @@ const stepsByRun = new Map<string, FixtureStep[]>([
     runs[2]!.run_id,
     [
       {
-        step_key: 'repository:delivery:auth-boundary',
+        step_key: 'repository:delivery:delivery-a',
         status: 'succeeded',
         failure_count: 0,
-        remote_object_url: 'https://github.com/Agent-AI-Chalmers/sec-review-bot/pull/143',
+        remote_object_url: null,
         failure_code: null,
         failure_message: null
       },
       {
         step_key: 'repository:summary-comment',
         status: 'failed',
-        failure_count: 2,
+        failure_count: 1,
         remote_object_url: null,
-        failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
-        failure_message: 'GitHub temporarily limited comment creation; publication will retry.'
+        failure_code: null,
+        failure_message: null
       }
     ]
   ],
@@ -159,13 +146,12 @@ const stepsByRun = new Map<string, FixtureStep[]>([
     runs[3]!.run_id,
     [
       {
-        step_key: 'repository:delivery:unsafe-deserialization',
+        step_key: 'repository:delivery:delivery-a',
         status: 'terminal_failed',
         failure_count: 3,
         remote_object_url: null,
         failure_code: 'GITHUB_VALIDATION_REJECTED',
-        failure_message:
-          'GitHub rejected the pull request because the proposed changes were invalid.'
+        failure_message: 'Validation failed.'
       }
     ]
   ]

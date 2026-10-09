@@ -144,7 +144,7 @@ test('status response validates a published artifact against the run identity', 
     artifact: {
       kind: 'diagnostic_bundle',
       uri: 's3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
-      media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+      media_type: 'application/zstd',
       digest: `sha256:${'a'.repeat(64)}`,
       size_bytes: 42
     }
@@ -175,7 +175,7 @@ test('status response rejects an artifact reference owned by another run', async
           artifact: {
             kind: 'diagnostic_bundle',
             uri: 's3://sec-review/runs/run-2/artifacts/diagnostic-tree.v1.tar.zst',
-            media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+            media_type: 'application/zstd',
             digest: `sha256:${'a'.repeat(64)}`,
             size_bytes: 42
           }

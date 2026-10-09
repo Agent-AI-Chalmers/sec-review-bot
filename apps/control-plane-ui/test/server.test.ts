@@ -106,7 +106,7 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
             artifact: {
               kind: 'diagnostic_bundle',
               uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
-              media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+              media_type: 'application/zstd',
               digest: `sha256:${crypto.createHash('sha256').update(artifactBody).digest('hex')}`,
               size_bytes: 8
             }
@@ -175,7 +175,7 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
             artifact: {
               kind: 'diagnostic_bundle',
               uri: 's3://sec-review/runs/run-2/artifacts/diagnostic-tree.v1.tar.zst',
-              media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+              media_type: 'application/zstd',
               digest: `sha256:${'a'.repeat(64)}`,
               size_bytes: 8
             }
@@ -234,7 +234,7 @@ test('BFF rejects an object whose size does not match the published artifact', a
             artifact: {
               kind: 'diagnostic_bundle',
               uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
-              media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+              media_type: 'application/zstd',
               digest: `sha256:${'a'.repeat(64)}`,
               size_bytes: 8
             }
@@ -291,7 +291,7 @@ test('BFF rejects same-size artifact content that does not match the published d
             artifact: {
               kind: 'diagnostic_bundle',
               uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
-              media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+              media_type: 'application/zstd',
               digest: `sha256:${crypto.createHash('sha256').update('expected').digest('hex')}`,
               size_bytes: 8
             }
@@ -348,7 +348,7 @@ test('BFF times out a stalled artifact download', async () => {
             artifact: {
               kind: 'diagnostic_bundle',
               uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
-              media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+              media_type: 'application/zstd',
               digest: `sha256:${'a'.repeat(64)}`,
               size_bytes: 8
             }

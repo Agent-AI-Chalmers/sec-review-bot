@@ -30,7 +30,7 @@ def publish_run_artifacts(root: str | Path, run_id: str) -> dict[str, Any] | Non
         raise RuntimeError("artifact publisher storage configuration is incomplete")
 
     key = f"runs/{run_id}/artifacts/diagnostic-tree.v1.tar.zst"
-    media_type = "application/vnd.sec-review.diagnostic.v1+tar+zstd"
+    media_type = "application/zstd"
     client = boto3.client(
         "s3",
         endpoint_url=env_value(PUBLISHER_ENDPOINT_ENV),

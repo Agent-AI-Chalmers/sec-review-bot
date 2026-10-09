@@ -64,7 +64,7 @@ function publishedArtifact(
   if (
     artifact.kind !== 'diagnostic_bundle' ||
     artifact.uri !== expectedUri ||
-    artifact.media_type !== 'application/vnd.sec-review.diagnostic.v1+tar+zstd' ||
+    artifact.media_type !== 'application/zstd' ||
     typeof artifact.digest !== 'string' ||
     !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
     !Number.isSafeInteger(artifact.size_bytes) ||

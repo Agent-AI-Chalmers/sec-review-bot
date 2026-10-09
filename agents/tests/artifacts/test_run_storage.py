@@ -114,7 +114,7 @@ def test_publish_run_artifacts_reuses_existing_immutable_object(
     client = MagicMock()
     client.head_object.return_value = {
         "ContentLength": 42,
-        "ContentType": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+        "ContentType": "application/zstd",
         "Metadata": {"sha256": "a" * 64, "size-bytes": "42"},
     }
     with patch(
@@ -125,7 +125,7 @@ def test_publish_run_artifacts_reuses_existing_immutable_object(
     assert reference == {
         "kind": "diagnostic_bundle",
         "uri": "s3://sec-review/runs/run-existing/artifacts/diagnostic-tree.v1.tar.zst",
-        "media_type": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+        "media_type": "application/zstd",
         "digest": f"sha256:{'a' * 64}",
         "size_bytes": 42,
     }

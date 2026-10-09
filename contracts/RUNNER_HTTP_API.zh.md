@@ -102,7 +102,7 @@ GET /v1/runs/{run_id}
     "artifact": {
       "kind": "diagnostic_bundle",
       "uri": "s3://sec-review/runs/run-001/artifacts/diagnostic-tree.v1.tar.zst",
-      "media_type": "application/vnd.sec-review.diagnostic.v1+tar+zstd",
+      "media_type": "application/zstd",
       "digest": "sha256:0123456789abcdef...",
       "size_bytes": 12345
     }

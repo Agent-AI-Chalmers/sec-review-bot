@@ -356,24 +356,11 @@ interface Step {
   failure_message: string | null
 }
 
-function publicationStepLabel(stepKey: string, t: ReturnType<typeof useMessages>): string {
-  if (stepKey === 'pull-request:review') return t('pullRequestReview')
-  if (stepKey === 'issue:draft-pr') return t('draftPullRequest')
-  if (stepKey === 'issue:summary-comment') return t('issueSummaryComment')
-  if (stepKey === 'repository:summary-issue') return t('repositorySummaryIssue')
-  if (stepKey === 'repository:summary-comment') return t('repositorySummaryComment')
-  if (stepKey.startsWith('repository:delivery:')) return t('fixPullRequest')
-  return stepKey
-}
-
 function safeExternalUrl(value: string | null): string | undefined {
   if (value === null) return undefined
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' &&
-      (url.hostname === 'github.com' || url.hostname.endsWith('.github.com'))
-      ? url.toString()
-      : undefined
+    return url.protocol === 'https:' ? url.toString() : undefined
   } catch {
     return undefined
   }
@@ -382,6 +369,7 @@ function safeExternalUrl(value: string | null): string | undefined {
 function publicationStatusLabel(status: string, t: ReturnType<typeof useMessages>): string {
   if (status === 'pending') return t('waiting')
   if (status === 'running') return t('publishingStatus')
+  if (status === 'succeeded') return t('statusSucceeded')
   if (status === 'failed') return t('retryPending')
   if (status === 'terminal_failed') return t('failedStatus')
   return status
@@ -567,7 +555,11 @@ function Detail(): React.JSX.Element {
                   <Text size="sm">{formatDate(run.updated_at, language)}</Text>
                 </div>
               </Group>
-              <Timeline active={run.published_at ? 1 : 0} bulletSize={24} lineWidth={2}>
+              <Timeline
+                active={run.published_at || run.status === 'failed' ? 1 : 0}
+                bulletSize={24}
+                lineWidth={2}
+              >
                 <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
                   <Text c="dimmed" size="sm">
                     {formatDate(run.created_at, language)}
@@ -580,17 +572,23 @@ function Detail(): React.JSX.Element {
                     </Text>
                   </Timeline.Item>
                 )}
+                {run.status === 'failed' && (
+                  <Timeline.Item
+                    bullet={<IconAlertTriangle size={14} />}
+                    color="red"
+                    title={t('failedStatus')}
+                  >
+                    <Text c="dimmed" size="sm">
+                      {formatDate(run.updated_at, language)}
+                    </Text>
+                    {run.failure_code && (
+                      <Text c="red" size="sm" ff="monospace" mt={2}>
+                        {run.failure_code}
+                      </Text>
+                    )}
+                  </Timeline.Item>
+                )}
               </Timeline>
-              {run.failure_code && (
-                <Box mt="md">
-                  <Text c="dimmed" size="xs">
-                    {t('failure')}
-                  </Text>
-                  <Text c="red" mt={2}>
-                    {run.failure_code}
-                  </Text>
-                </Box>
-              )}
             </Paper>
             <Box component="section">
               <Title order={2} mb="sm">
@@ -614,15 +612,18 @@ function Detail(): React.JSX.Element {
                     return (
                       <div className="delivery-item" key={step.step_key}>
                         <div className="delivery-main">
-                          <Text fw={600}>{publicationStepLabel(step.step_key, t)}</Text>
-                          {!succeeded && (
-                            <Badge
-                              variant="light"
-                              color={step.status === 'terminal_failed' ? 'red' : 'yellow'}
-                            >
-                              {publicationStatusLabel(step.status, t)}
-                            </Badge>
-                          )}
+                          <Badge
+                            variant="light"
+                            color={
+                              step.status === 'terminal_failed'
+                                ? 'red'
+                                : succeeded
+                                  ? 'green'
+                                  : 'yellow'
+                            }
+                          >
+                            {publicationStatusLabel(step.status, t)}
+                          </Badge>
                         </div>
                         {externalUrl && (
                           <Button
@@ -633,26 +634,30 @@ function Detail(): React.JSX.Element {
                             variant="subtle"
                             rightSection={<IconExternalLink size={16} />}
                           >
-                            {t('openOnGitHub')}
+                            {t('openExternalLink')}
                           </Button>
                         )}
-                        {!succeeded && (step.failure_message || step.failure_code) && (
-                          <div className="delivery-error">
-                            {step.failure_message && <Text size="sm">{step.failure_message}</Text>}
-                            <Group gap="sm">
-                              {step.failure_code && (
-                                <Text c="dimmed" size="xs" ff="monospace">
-                                  {step.failure_code}
-                                </Text>
+                        {!succeeded &&
+                          (step.failure_message || step.failure_code || step.failure_count > 0) && (
+                            <div className="delivery-error">
+                              {step.failure_message && (
+                                <Text size="sm">{step.failure_message}</Text>
                               )}
-                              {step.failure_count > 0 && (
-                                <Text c="dimmed" size="xs">
-                                  {t('failedAttempts')}: {step.failure_count}
-                                </Text>
-                              )}
-                            </Group>
-                          </div>
-                        )}
+                              <Group gap="sm">
+                                {step.failure_code && (
+                                  <Text c="dimmed" size="xs" ff="monospace">
+                                    {step.failure_code}
+                                  </Text>
+                                )}
+                                {step.failure_count > 0 && (
+                                  <Text c="dimmed" size="xs">
+                                    {t('failedAttempts')}: {step.failure_count}
+                                  </Text>
+                                )}
+                              </Group>
+                            </div>
+                          )}
+                        <code className="delivery-step-key">{step.step_key}</code>
                       </div>
                     )
                   })}

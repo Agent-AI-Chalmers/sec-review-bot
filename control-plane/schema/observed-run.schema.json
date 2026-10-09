@@ -61,7 +61,7 @@
                   "type": "string",
                   "pattern": "^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
                 },
-                "media_type": { "const": "application/vnd.sec-review.diagnostic.v1+tar+zstd" },
+                "media_type": { "const": "application/zstd" },
                 "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                 "size_bytes": { "type": "integer", "minimum": 0 }
               }

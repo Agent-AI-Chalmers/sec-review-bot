@@ -142,6 +142,12 @@ pre {
 .delivery-error {
   grid-column: 1 / -1;
 }
+.delivery-step-key {
+  grid-column: 1 / -1;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  overflow-wrap: anywhere;
+}
 .visually-hidden {
   position: absolute;
   width: 1px;

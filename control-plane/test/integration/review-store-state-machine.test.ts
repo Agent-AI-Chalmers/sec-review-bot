@@ -95,7 +95,7 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
       artifact: {
         kind: 'diagnostic_bundle',
         uri: `s3://sec-review/runs/${queuedId}/artifacts/diagnostic-tree.v1.tar.zst`,
-        media_type: 'application/vnd.sec-review.diagnostic.v1+tar+zstd',
+        media_type: 'application/zstd',
         digest: `sha256:${'a'.repeat(64)}`,
         size_bytes: 123
       }
