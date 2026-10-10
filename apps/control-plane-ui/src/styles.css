@@ -80,6 +80,12 @@ body {
 .run-state-summary .status-text {
   font-size: var(--mantine-font-size-sm);
 }
+/* The rail is a neutral order cue: the bullets already carry each step's status,
+   so the rail must not repeat the status colour. */
+.run-progress-timeline .mantine-Timeline-item::before {
+  border-left-color: var(--mantine-color-gray-4);
+  border-left-style: dashed;
+}
 .table-wrap {
   overflow-x: auto;
 }

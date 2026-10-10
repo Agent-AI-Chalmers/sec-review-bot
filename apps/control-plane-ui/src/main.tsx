@@ -680,7 +680,12 @@ function Detail(): React.JSX.Element {
               <Title order={2} mb="lg">
                 {t('runProgress')}
               </Title>
-              <Timeline active={timelineActive} bulletSize={24} lineWidth={2}>
+              <Timeline
+                active={timelineActive}
+                bulletSize={24}
+                lineWidth={2}
+                className="run-progress-timeline"
+              >
                 <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
                   <Text c="dimmed" size="sm">
                     {formatDate(run.created_at, language)}
