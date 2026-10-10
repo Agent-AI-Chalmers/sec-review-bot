@@ -59,7 +59,7 @@ function Login(): React.JSX.Element {
   const [token, setToken] = React.useState('')
   const [error, setError] = React.useState('')
   return (
-    <Container component="main" size="xs" py="15vh">
+    <Container size="xs" py="15vh">
       <Paper withBorder p="xl" radius="sm">
         <Title order={1}>Review Control Plane</Title>
         <Text c="dimmed" mt="xs">
@@ -349,7 +349,7 @@ function Runs(): React.JSX.Element {
   }, [cursorParents, cursor])
   const totalPages = data?.next_cursor != null ? page + 1 : page
   return (
-    <Container component="main" size="lg" py="xl">
+    <Container size="lg" py="xl">
       <Title order={1} mb="lg">
         {t('runs')}
       </Title>
@@ -835,7 +835,7 @@ function Detail(): React.JSX.Element {
     // misreport it as one — including for a hand-edited or stale link.
     if (error instanceof ApiError && error.status === 404) {
       return (
-        <Container component="main" size="lg" py="xl">
+        <Container size="lg" py="xl">
           <Title order={1} mb="xs">
             {t('runNotFound')}
           </Title>
@@ -872,7 +872,7 @@ function Detail(): React.JSX.Element {
   const publicationStarted =
     run !== undefined && ['publishing', 'published', 'failed'].includes(run.publication_status)
   return (
-    <Container component="main" size="lg" py="xl">
+    <Container size="lg" py="xl">
       <Button
         component={Link}
         to={backTo}
@@ -1061,7 +1061,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
 function ErrorFallback({ error }: { error: unknown }): React.JSX.Element {
   const t = useMessages()
   return (
-    <Container component="main" size="lg" py="xl">
+    <Container size="lg" py="xl">
       <Title order={1}>{t('unable')}</Title>
       <Text role="alert" mb="md">
         {t('requestFailed')}
