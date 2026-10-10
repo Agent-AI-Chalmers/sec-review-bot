@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto'
 
 import { ReviewRunStore } from './review-store.js'
-import type { ReviewRunStatus } from './review-store.js'
+import type { PublicationStatus, RunnerStatus } from './review-store.js'
 import type { ControlPlaneWorkflow } from './contracts.js'
 import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from './coordinator.js'
 import { observeRunnerRun } from './terminal-coordination.js'
@@ -36,15 +36,20 @@ const operations = [
 ] as const
 type Operation = (typeof operations)[number]
 const allowedOperations = new Set<string>(operations)
-const reviewStatuses = new Set<ReviewRunStatus>([
+const runnerStatuses = new Set<RunnerStatus>([
   'preparing',
   'recovering',
   'queued',
   'running',
   'succeeded',
+  'failed'
+])
+const publicationStatuses = new Set<PublicationStatus>([
+  'pending',
   'publishing',
   'published',
-  'failed'
+  'failed',
+  'skipped'
 ])
 const workflows = new Set<ControlPlaneWorkflow>([
   'issue-review',
@@ -119,10 +124,19 @@ function parseListQuery(url: URL): ListQueryOptions {
     }
     options.cursor = cursor
   }
-  const status = url.searchParams.get('status')
-  if (status !== null) {
-    if (!reviewStatuses.has(status as ReviewRunStatus)) throw invalidQuery('status is invalid.')
-    options.status = status as ReviewRunStatus
+  const executionStatus = url.searchParams.get('execution_status')
+  if (executionStatus !== null) {
+    if (!runnerStatuses.has(executionStatus as RunnerStatus)) {
+      throw invalidQuery('execution_status is invalid.')
+    }
+    options.execution_status = executionStatus as RunnerStatus
+  }
+  const publicationStatus = url.searchParams.get('publication_status')
+  if (publicationStatus !== null) {
+    if (!publicationStatuses.has(publicationStatus as PublicationStatus)) {
+      throw invalidQuery('publication_status is invalid.')
+    }
+    options.publication_status = publicationStatus as PublicationStatus
   }
   const workflow = url.searchParams.get('workflow')
   if (workflow !== null) {

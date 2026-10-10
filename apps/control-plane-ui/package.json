@@ -14,6 +14,7 @@
     "server": "node dist-server/server/index.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
     "test": "node --import tsx --test test/*.test.ts",
+    "test:smoke": "node test/browser-smoke.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

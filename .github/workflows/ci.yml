@@ -253,6 +253,9 @@ jobs:
           pnpm test
           pnpm run build
 
+      - name: Smoke test
+        run: pnpm run test:smoke
+
   agents:
     name: Agents
     needs: changes

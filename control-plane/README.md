@@ -35,7 +35,7 @@ A run begins in `preparing` immediately after admission. GitHub integration prep
 
 Control Plane polls `queued` and `running` runs. A successful Runner result is stored as `succeeded` and becomes eligible for publication. The integration claims that work, performs the GitHub side effects, and records either `published`, a retryable publication failure, or a terminal publication failure.
 
-If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `not_required`.
+If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `skipped`.
 
 ## Persistence model
 
@@ -44,7 +44,7 @@ Execution and publication are separate state machines:
 | Table               | Responsibility                                            | Status                                                                |
 | ------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
 | `review_runs`       | Admission, Runner observation, and terminal workflow data | `preparing`, `recovering`, `queued`, `running`, `succeeded`, `failed` |
-| `publications`      | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `not_required`        |
+| `publications`      | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `skipped`             |
 | `publication_steps` | Recoverable individual connector side effects             | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`        |
 
 ```mermaid
@@ -61,7 +61,7 @@ flowchart LR
     pending --> publishing --> published
     publishing -->|retryable failure| pending
     publishing -->|terminal failure| pubfailed[failed]
-    pending -->|execution failed| notrequired[not_required]
+    pending -->|execution failed| skipped
   end
 
   subgraph steps[publication_steps.status]
@@ -75,7 +75,7 @@ flowchart LR
   publishing -.->|initializes side effects| steppending
 ```
 
-`ReviewRunStatus` is a read projection rather than a database column. It shows Runner status while publication is `pending` or `not_required`, then shows `publishing`, `published`, or publication `failed`. Publication-step status is queried separately.
+`ReviewRunStatus` is a read projection rather than a database column. It shows Runner status while publication is `pending` or `skipped`, then shows `publishing`, `published`, or publication `failed`. Publication-step status is queried separately.
 
 `publication_steps.failure_count` records failed executions only. A successful execution does not increment it; a failed step becomes `terminal_failed` after reaching the configured failure limit.
 
@@ -98,6 +98,8 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 | `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`    | Publication-step summary                                             |
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
+
+Read responses report the two status axes (`execution_status`, `publication_status`) rather than the flattened `ReviewRunStatus`, and filter on the same names; `schema/observed-run.schema.json` is their contract. The flattened status appears only on the records exchanged over `POST /v1/store`.
 
 ## Configuration
 

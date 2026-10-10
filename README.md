@@ -120,7 +120,7 @@ cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
 # apps/github-integration/private-key.pem.
 ```
 
-Build the control-plane images and install the integrated service:
+Build all required images and install the integrated service:
 
 ```bash
 cd agents

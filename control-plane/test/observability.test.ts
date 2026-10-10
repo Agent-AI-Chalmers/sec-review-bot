@@ -11,7 +11,8 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
     runner_status: 'succeeded',
     publication_status: 'pending',
     created_at: '2026-01-01T00:00:00.000Z',
-    updated_at: '2026-01-01T00:01:00.000Z',
+    execution_updated_at: '2026-01-01T00:01:00.000Z',
+    publication_updated_at: '2026-01-01T00:01:00.000Z',
     published_at: null,
     failure_code: null,
     failure_message: 'request failed for https://secret@example.test/private',
@@ -22,11 +23,11 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
   assert.deepEqual(observed, {
     run_id: 'run-1',
     workflow: 'issue-review',
-    status: 'succeeded',
     execution_status: 'succeeded',
     publication_status: 'pending',
     created_at: '2026-01-01T00:00:00.000Z',
-    updated_at: '2026-01-01T00:01:00.000Z',
+    execution_updated_at: '2026-01-01T00:01:00.000Z',
+    publication_updated_at: '2026-01-01T00:01:00.000Z',
     published_at: null,
     failure_code: null,
     artifact_storage: null

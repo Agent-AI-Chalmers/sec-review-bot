@@ -1,6 +1,15 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Link, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Link,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams
+} from 'react-router-dom'
 import {
   AppShell,
   ActionIcon,
@@ -11,36 +20,37 @@ import {
   Container,
   Group,
   NativeSelect,
+  Pagination,
   Paper,
+  PasswordInput,
   Stack,
   Switch,
   Table,
   Text,
+  TextInput,
   Timeline,
   Tooltip,
   Title
 } from '@mantine/core'
 import {
-  IconArchive,
   IconAlertTriangle,
   IconArrowLeft,
+  IconArrowRight,
   IconCheck,
   IconClock,
   IconCopy,
   IconDownload,
-  IconExternalLink,
-  IconLoader2,
+  IconChevronDown,
+  IconChevronUp,
+  IconArrowUpRight,
+  IconInbox,
+  IconMinus,
   IconPlayerPlay,
   IconRefresh
 } from '@tabler/icons-react'
 import { api, ApiError, login, type ArtifactStorage, type Run } from './api.js'
-import {
-  formatDate,
-  PreferenceControls,
-  Preferences,
-  useMessages,
-  usePreferences
-} from './preferences.js'
+import { formatDate, LanguageProvider, useLanguage, useMessages } from './i18n.js'
+import { PreferenceControls, Preferences, usePreferences } from './preferences.js'
 import './styles.css'
 import '@mantine/core/styles.css'
 
@@ -49,9 +59,9 @@ function Login(): React.JSX.Element {
   const [token, setToken] = React.useState('')
   const [error, setError] = React.useState('')
   return (
-    <Container component="main" size="xs" py="15vh">
+    <Container size="xs" py="15vh">
       <Paper withBorder p="xl" radius="sm">
-        <Title order={1}>Control Plane</Title>
+        <Title order={1}>Review Control Plane</Title>
         <Text c="dimmed" mt="xs">
           {t('signInHint')}
         </Text>
@@ -66,15 +76,12 @@ function Login(): React.JSX.Element {
             )
           }}
         >
-          <label>
-            {t('accessToken')}
-            <input
-              autoFocus
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-            />
-          </label>
+          <PasswordInput
+            label={t('accessToken')}
+            autoFocus
+            value={token}
+            onChange={(event) => setToken(event.currentTarget.value)}
+          />
           <Button type="submit">{t('signIn')}</Button>
           {error && <p role="alert">{error}</p>}
         </form>
@@ -147,8 +154,8 @@ function RefreshControls({
   lastChecked: Date | undefined
   autoRefreshEnabled?: boolean
 }): React.JSX.Element {
-  const { language, autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } =
-    usePreferences()
+  const { language } = useLanguage()
+  const { autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } = usePreferences()
   const t = useMessages()
   return (
     <Stack gap={4} align="flex-end" className="refresh-controls">
@@ -189,49 +196,106 @@ function RefreshControls({
   )
 }
 
-function RunStatusBadge({ status }: { status: string }): React.JSX.Element {
-  const t = useMessages()
-  const waiting = ['preparing', 'recovering', 'queued'].includes(status)
-  const active = ['running', 'publishing'].includes(status)
-  const complete = ['succeeded', 'published'].includes(status)
-  const label = ((): string => {
-    if (status === 'preparing') return t('statusPreparing')
-    if (status === 'recovering') return t('statusRecovering')
-    if (status === 'queued') return t('statusQueued')
-    if (status === 'running') return t('statusRunning')
-    if (status === 'succeeded') return t('statusSucceeded')
-    if (status === 'publishing') return t('statusPublishing')
-    if (status === 'published') return t('statusPublished')
-    if (status === 'failed') return t('statusFailed')
-    return status
-  })()
-  const icon = waiting ? (
-    <IconClock size={12} />
-  ) : active ? (
-    <IconLoader2 size={12} className="status-spinner" />
-  ) : complete ? (
-    <IconCheck size={12} />
-  ) : (
-    <IconAlertTriangle size={12} />
-  )
+function workflowLabel(workflow: string, t: ReturnType<typeof useMessages>): string {
+  if (workflow === 'issue-review') return t('workflowIssueReview')
+  if (workflow === 'pull-request-review') return t('workflowPullRequestReview')
+  if (workflow === 'repository-review') return t('workflowRepositoryReview')
+  return workflow
+}
+
+type StatusTone = 'waiting' | 'active' | 'complete' | 'failed' | 'neutral'
+
+function statusToneColor(tone: StatusTone): string {
+  if (tone === 'active') return 'blue'
+  if (tone === 'complete') return 'green'
+  if (tone === 'failed') return 'red'
+  return 'gray'
+}
+
+function StatusText({ label, tone }: { label: string; tone: StatusTone }): React.JSX.Element {
   return (
-    <Badge
-      variant="light"
-      color={waiting ? 'gray' : active ? 'blue' : complete ? 'green' : 'red'}
-      leftSection={icon}
-    >
+    <span className="status-text">
+      <span className={`status-dot status-dot-${tone}`} aria-hidden="true" />
       {label}
-    </Badge>
+    </span>
   )
 }
 
+function executionTone(status: Run['execution_status']): StatusTone {
+  if (status === 'running') return 'active'
+  if (status === 'succeeded') return 'complete'
+  if (status === 'failed') return 'failed'
+  return 'waiting'
+}
+
+function publicationTone(status: Run['publication_status']): StatusTone {
+  if (status === 'publishing') return 'active'
+  if (status === 'published') return 'complete'
+  if (status === 'failed') return 'failed'
+  if (status === 'pending') return 'waiting'
+  return 'neutral'
+}
+
+function ExecutionStatus({ status }: { status: Run['execution_status'] }): React.JSX.Element {
+  const t = useMessages()
+  return <StatusText label={executionStatusLabel(status, t)} tone={executionTone(status)} />
+}
+
+function PublicationStatus({ status }: { status: Run['publication_status'] }): React.JSX.Element {
+  const t = useMessages()
+  return <StatusText label={runPublicationStatusLabel(status, t)} tone={publicationTone(status)} />
+}
+
+function statusBullet(tone: StatusTone): React.ReactNode {
+  if (tone === 'active') return <IconPlayerPlay size={14} />
+  if (tone === 'complete') return <IconCheck size={14} />
+  if (tone === 'failed') return <IconAlertTriangle size={14} />
+  if (tone === 'neutral') return <IconMinus size={14} />
+  return <IconClock size={14} />
+}
+
+const RANGE_MINUTES: Record<string, number> = { '1h': 60, '24h': 1_440, '7d': 10_080 }
+const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
+/** Mirrors the Control Plane's own default, so an unadorned `/runs` asks for what
+ * the server would have returned anyway. */
+const DEFAULT_PAGE_SIZE = 50
+
 function Runs(): React.JSX.Element {
-  const { language } = usePreferences()
+  const { language } = useLanguage()
   const t = useMessages()
   const [search, setSearch] = useSearchParams()
+  // The Control Plane walks pages forward by cursor only, so remember which cursor
+  // each page was opened from in order to offer a previous page. Keyed by cursor
+  // rather than by position, so the browser back button cannot desynchronise it.
+  const [cursorParents, setCursorParents] = React.useState<Record<string, string>>({})
   const [data, setData] = React.useState<{ runs: Run[]; next_cursor: string | null }>()
   const [error, setError] = React.useState<unknown>()
-  const query = search.toString()
+  const cursor = search.get('cursor') ?? ''
+  const previousCursor = cursorParents[cursor]
+  const requestedPageSize = Number(search.get('limit') ?? DEFAULT_PAGE_SIZE)
+  const pageSize =
+    Number.isSafeInteger(requestedPageSize) && requestedPageSize >= 1 && requestedPageSize <= 100
+      ? requestedPageSize
+      : DEFAULT_PAGE_SIZE
+  // State the page size on every request, so the console never depends on the
+  // server's own default changing underneath a bookmarked or shared link. A size
+  // that the console does not offer is still honoured as an extra option.
+  const pageQuery = new URLSearchParams(search)
+  pageQuery.set('limit', String(pageSize))
+  const rangeMinutes = RANGE_MINUTES[search.get('range') ?? '']
+  if (rangeMinutes !== undefined) {
+    // The API takes an absolute instant, but the URL keeps the preset so a shared
+    // link keeps sliding. Quantise to the minute so the request string stays
+    // stable between renders instead of retriggering the loader on every one.
+    const from = new Date(
+      Math.floor(Date.now() / 60_000) * 60_000 - rangeMinutes * 60_000
+    ).toISOString()
+    pageQuery.set('from', from)
+  }
+  const query = pageQuery.toString()
+  const pageSizeOptions = PAGE_SIZES.includes(pageSize)
+    ? PAGE_SIZES
+    : [...PAGE_SIZES, pageSize].sort((left, right) => left - right)
   const load = React.useCallback(async (): Promise<void> => {
     try {
       setData(await api<{ runs: Run[]; next_cursor: string | null }>(`/runs?${query}`))
@@ -241,49 +305,63 @@ function Runs(): React.JSX.Element {
     }
   }, [query])
   const { refresh, refreshing, lastChecked } = useRefresh(load)
+  // An expired session must reach the sign-in form even when the console still has data
+  // to show: nothing will update until it is handled, and the refresh banner cannot say so.
+  if (error instanceof ApiError && error.status === 401) throw error
   if (error && data === undefined) throw error
   const update = (name: string, value: string): void => {
     const next = new URLSearchParams(search)
     if (value) next.set(name, value)
     else next.delete(name)
     next.delete('cursor')
+    setCursorParents({})
     setSearch(next)
   }
+  const openCursor = (target: string): void => {
+    const next = new URLSearchParams(search)
+    if (target) next.set('cursor', target)
+    else next.delete('cursor')
+    setSearch(next)
+  }
+  const openNextPage = (): void => {
+    const target = data?.next_cursor
+    if (target === undefined || target === null) return
+    setCursorParents((parents) => ({ ...parents, [target]: cursor }))
+    openCursor(target)
+  }
+  const openPreviousPage = (): void => {
+    if (previousCursor === undefined) return
+    openCursor(previousCursor)
+  }
+  // Mantine's pager is numbered, but the read API only walks forward and never
+  // reports a total. Use the visited trail for the current position and treat
+  // "there is another page" as exactly one page beyond it: `active === total` is
+  // what disables the next control, and `active === 1` disables the previous one.
+  const page = React.useMemo(() => {
+    let number = 1
+    let node = cursorParents[cursor]
+    while (node !== undefined) {
+      number += 1
+      if (node === '') break
+      node = cursorParents[node]
+    }
+    return number
+  }, [cursorParents, cursor])
+  const totalPages = data?.next_cursor != null ? page + 1 : page
   return (
-    <Container component="main" size="lg" py="xl">
-      <Box mb="lg">
-        <Text c="dimmed" size="xs" tt="uppercase">
-          Review Control Plane
-        </Text>
-        <Title order={1}>{t('runs')}</Title>
-      </Box>
+    <Container size="lg" py="xl">
+      <Title order={1} mb="lg">
+        {t('runs')}
+      </Title>
       {Boolean(error) && (
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}
+          {failureReason(error, t) && ` ${failureReason(error, t)}`}
         </Text>
       )}
       <Box className="operations-bar" mb="lg">
         <Group justify="space-between" align="flex-end" gap="lg">
-          <Group aria-label="Run filters" align="flex-end">
-            <NativeSelect
-              label={t('status')}
-              value={search.get('status') ?? ''}
-              onChange={(event) => update('status', event.target.value)}
-            >
-              <option value="">{t('all')}</option>
-              {[
-                'preparing',
-                'recovering',
-                'queued',
-                'running',
-                'succeeded',
-                'publishing',
-                'published',
-                'failed'
-              ].map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </NativeSelect>
+          <Group aria-label="Run list controls" align="flex-end">
             <NativeSelect
               label={t('workflow')}
               value={search.get('workflow') ?? ''}
@@ -291,7 +369,65 @@ function Runs(): React.JSX.Element {
             >
               <option value="">{t('all')}</option>
               {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
-                <option key={value}>{value}</option>
+                <option key={value} value={value}>
+                  {workflowLabel(value, t)}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
+              label={t('execution')}
+              value={search.get('execution_status') ?? ''}
+              onChange={(event) => update('execution_status', event.target.value)}
+            >
+              <option value="">{t('all')}</option>
+              {(
+                ['preparing', 'recovering', 'queued', 'running', 'succeeded', 'failed'] as const
+              ).map((value) => (
+                <option key={value} value={value}>
+                  {executionStatusLabel(value, t)}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
+              label={t('publication')}
+              value={search.get('publication_status') ?? ''}
+              onChange={(event) => update('publication_status', event.target.value)}
+            >
+              <option value="">{t('all')}</option>
+              {(['pending', 'publishing', 'published', 'failed', 'skipped'] as const).map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {runPublicationStatusLabel(value, t)}
+                  </option>
+                )
+              )}
+            </NativeSelect>
+            <NativeSelect
+              label={t('timeRange')}
+              value={search.get('range') ?? ''}
+              onChange={(event) => update('range', event.target.value)}
+            >
+              <option value="">{t('all')}</option>
+              <option value="1h">{t('lastHour')}</option>
+              <option value="24h">{t('lastDay')}</option>
+              <option value="7d">{t('lastWeek')}</option>
+            </NativeSelect>
+            <NativeSelect
+              label={t('perPage')}
+              value={String(pageSize)}
+              onChange={(event) =>
+                // Reuse the filter path: changing how much a page holds invalidates
+                // the cursor and the visited-page trail.
+                update(
+                  'limit',
+                  event.target.value === String(DEFAULT_PAGE_SIZE) ? '' : event.target.value
+                )
+              }
+            >
+              {pageSizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
               ))}
             </NativeSelect>
           </Group>
@@ -301,7 +437,10 @@ function Runs(): React.JSX.Element {
       {data === undefined ? (
         <p>{t('loadingRuns')}</p>
       ) : data.runs.length === 0 ? (
-        <p className="empty">{t('emptyRuns')}</p>
+        <Stack align="center" gap="xs" py="xl">
+          <IconInbox size={40} stroke={1.2} style={{ color: 'var(--mantine-color-dimmed)' }} />
+          <Text c="dimmed">{t('emptyRuns')}</Text>
+        </Stack>
       ) : (
         <>
           <Paper withBorder radius="sm" className="table-wrap">
@@ -310,38 +449,73 @@ function Runs(): React.JSX.Element {
                 <Table.Tr>
                   <Table.Th>{t('run')}</Table.Th>
                   <Table.Th>{t('workflow')}</Table.Th>
-                  <Table.Th>{t('status')}</Table.Th>
-                  <Table.Th>{t('updated')}</Table.Th>
+                  <Table.Th>{t('execution')}</Table.Th>
+                  <Table.Th>{t('publication')}</Table.Th>
+                  <Table.Th>{t('lastActivity')}</Table.Th>
+                  <Table.Th>{t('failureCode')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {data.runs.map((run) => (
                   <Table.Tr key={run.run_id}>
                     <Table.Td>
-                      <Link to={`/runs/${encodeURIComponent(run.run_id)}`}>{run.run_id}</Link>
+                      <Group gap={4} align="center" wrap="nowrap">
+                        <Tooltip label={run.run_id}>
+                          <Link
+                            to={`/runs/${encodeURIComponent(run.run_id)}`}
+                            state={{ listSearch: search.toString() }}
+                          >
+                            {abbreviate(run.run_id, 8, 4)}
+                          </Link>
+                        </Tooltip>
+                        <span className="row-action">
+                          <CopyAction
+                            value={run.run_id}
+                            name={t('copyRunId')}
+                            copiedName={t('runIdCopied')}
+                          />
+                        </span>
+                      </Group>
                     </Table.Td>
-                    <Table.Td>{run.workflow}</Table.Td>
+                    <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
                     <Table.Td>
-                      <RunStatusBadge status={run.status} />
+                      <ExecutionStatus status={run.execution_status} />
                     </Table.Td>
-                    <Table.Td>{formatDate(run.updated_at, language)}</Table.Td>
+                    <Table.Td>
+                      <PublicationStatus status={run.publication_status} />
+                    </Table.Td>
+                    <Table.Td>
+                      <Tooltip label={formatDate(lastActivity(run), language)}>
+                        <span>
+                          {formatDuration(Date.now() - Date.parse(lastActivity(run)), t)} {t('ago')}
+                        </span>
+                      </Tooltip>
+                    </Table.Td>
+                    <Table.Td>
+                      {run.failure_code && (
+                        <Text c="red" size="xs" ff="monospace">
+                          {run.failure_code}
+                        </Text>
+                      )}
+                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
             </Table>
           </Paper>
-          {data.next_cursor && (
-            <Button
-              variant="default"
-              className="next"
-              onClick={() => {
-                const next = new URLSearchParams(search)
-                next.set('cursor', data.next_cursor ?? '')
-                setSearch(next)
-              }}
+          {totalPages > 1 && (
+            <Pagination.Root
+              total={totalPages}
+              value={page}
+              onPreviousPage={openPreviousPage}
+              onNextPage={openNextPage}
+              mt="md"
             >
-              {t('nextPage')}
-            </Button>
+              <Group gap="xs" justify="center">
+                <Pagination.Previous aria-label={t('previousPage')} />
+                <Pagination.Next aria-label={t('nextPage')} />
+              </Group>
+            </Pagination.Root>
           )}
         </>
       )}
@@ -369,9 +543,9 @@ function safeExternalUrl(value: string | null): string | undefined {
 }
 
 function publicationStatusLabel(status: string, t: ReturnType<typeof useMessages>): string {
-  if (status === 'pending') return t('waiting')
+  if (status === 'pending') return t('publicationPending')
   if (status === 'running') return t('publishingStatus')
-  if (status === 'succeeded') return t('statusSucceeded')
+  if (status === 'succeeded') return t('publicationStepSucceeded')
   if (status === 'failed') return t('retryPending')
   if (status === 'terminal_failed') return t('failedStatus')
   return status
@@ -398,13 +572,6 @@ function executionStatusLabel(
   return t('statusFailed')
 }
 
-function executionStatusColor(status: Run['execution_status']): string {
-  if (status === 'failed') return 'red'
-  if (status === 'succeeded') return 'green'
-  if (status === 'running') return 'blue'
-  return 'gray'
-}
-
 function runPublicationStatusLabel(
   status: Run['publication_status'],
   t: ReturnType<typeof useMessages>
@@ -413,21 +580,14 @@ function runPublicationStatusLabel(
   if (status === 'publishing') return t('publishingStatus')
   if (status === 'published') return t('statusPublished')
   if (status === 'failed') return t('failedStatus')
-  return t('publicationNotRequired')
-}
-
-function runPublicationStatusColor(status: Run['publication_status']): string {
-  if (status === 'failed') return 'red'
-  if (status === 'published') return 'green'
-  if (status === 'publishing') return 'blue'
-  return 'gray'
+  return t('publicationSkipped')
 }
 
 function isRunTerminal(run: Run): boolean {
   if (run.execution_status === 'failed') return true
   return (
     run.execution_status === 'succeeded' &&
-    ['published', 'failed', 'not_required'].includes(run.publication_status)
+    ['published', 'failed', 'skipped'].includes(run.publication_status)
   )
 }
 
@@ -437,11 +597,18 @@ function formatBytes(value: number): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`
 }
 
-function isDownloadableArtifact(value: ArtifactStorage | null): value is ArtifactStorage & {
-  status: 'available'
-  artifact: NonNullable<ArtifactStorage['artifact']>
-} {
-  return value?.status === 'available' && value.artifact !== undefined
+function abbreviate(value: string, head: number, tail: number): string {
+  return `${value.slice(0, head)}…${value.slice(-tail)}`
+}
+
+function lastActivity(run: Run): string {
+  return Date.parse(run.publication_updated_at) > Date.parse(run.execution_updated_at)
+    ? run.publication_updated_at
+    : run.execution_updated_at
+}
+
+function abbreviateDigest(digest: string): string {
+  return abbreviate(digest.replace(/^sha256:/, ''), 12, 12)
 }
 
 function artifactStatusLabel(
@@ -449,14 +616,96 @@ function artifactStatusLabel(
   t: ReturnType<typeof useMessages>
 ): string {
   if (status === 'available') return t('artifactAvailable')
-  if (status === 'unavailable') return t('notAvailable')
-  return t('failedStatus')
+  if (status === 'unavailable') return t('artifactUnavailable')
+  return t('statusFailed')
 }
 
 function artifactStatusColor(status: ArtifactStorage['status']): string {
   if (status === 'available') return 'green'
-  if (status === 'failed') return 'red'
-  return 'gray'
+  if (status === 'unavailable') return 'yellow'
+  return 'red'
+}
+
+function isDownloadableArtifact(value: ArtifactStorage | null): value is ArtifactStorage & {
+  status: 'available'
+  artifact: NonNullable<ArtifactStorage['artifact']>
+} {
+  return value?.status === 'available' && value.artifact !== undefined
+}
+
+/** Copies a value and confirms it briefly; used for the run id and the artifact digest. */
+/** Names the failure when the backend distinguished it, instead of reporting every
+ * failure as one generic sentence. */
+function failureReason(error: unknown, t: ReturnType<typeof useMessages>): string | undefined {
+  if (!(error instanceof ApiError)) return undefined
+  if (error.code === 'control_plane_timeout') return t('errorTimeout')
+  if (error.code === 'control_plane_unavailable') return t('errorUnreachable')
+  return error.status >= 500 ? `${t('errorUpstream')} (${error.status})` : undefined
+}
+
+/** A finished phase reports how long it took; an in-flight one reports how long it has
+ * been in that state — a fact about the clock, not about the stored timestamps. */
+function phaseElapsed(
+  updatedAt: string,
+  createdAt: string,
+  finished: boolean,
+  t: ReturnType<typeof useMessages>
+): string {
+  return finished
+    ? `${t('took')} ${formatDuration(Date.parse(updatedAt) - Date.parse(createdAt), t)}`
+    : `${t('soFar')} ${formatDuration(Date.now() - Date.parse(updatedAt), t)}`
+}
+
+/** Compact elapsed time, e.g. `2m 33s` or `1h 4m`. */
+function formatDuration(milliseconds: number, t: ReturnType<typeof useMessages>): string {
+  const totalSeconds = Math.max(0, Math.round(milliseconds / 1000))
+  const days = Math.floor(totalSeconds / 86_400)
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600)
+  const minutes = Math.floor((totalSeconds % 3_600) / 60)
+  const seconds = totalSeconds % 60
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days}${t('durationDays')}`)
+  if (hours > 0) parts.push(`${hours}${t('durationHours')}`)
+  if (minutes > 0) parts.push(`${minutes}${t('durationMinutes')}`)
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}${t('durationSeconds')}`)
+  return parts.slice(0, 2).join(' ')
+}
+
+function CopyAction({
+  value,
+  name,
+  copiedName
+}: {
+  value: string
+  name: string
+  copiedName: string
+}): React.JSX.Element {
+  const t = useMessages()
+  const [copied, setCopied] = React.useState(false)
+  const copy = async (): Promise<void> => {
+    await navigator.clipboard.writeText(value)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2000)
+  }
+  const text = copied ? copiedName : name
+  return (
+    <>
+      <Tooltip label={copied ? t('copied') : t('copy')}>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="sm"
+          aria-label={text}
+          onClick={() => void copy()}
+        >
+          {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
+        </ActionIcon>
+      </Tooltip>
+      <span className="visually-hidden" aria-live="polite">
+        {copied ? copiedName : ''}
+      </span>
+    </>
+  )
 }
 
 function Artifact({
@@ -467,7 +716,7 @@ function Artifact({
   runId: string
 }): React.ReactNode {
   const t = useMessages()
-  const [copied, setCopied] = React.useState(false)
+  const [expanded, setExpanded] = React.useState(false)
   const artifact = storage.artifact
   if (artifact === undefined) {
     if (!storage.message && !storage.error_code) return null
@@ -482,103 +731,151 @@ function Artifact({
       </div>
     )
   }
-  const copyDigest = async (): Promise<void> => {
-    await navigator.clipboard.writeText(artifact.digest)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
-  }
+  const hex = artifact.digest.replace(/^sha256:/, '')
   return (
     <div className="artifact-panel">
-      <div className="artifact-summary">
-        <Text c="dimmed" size="sm" className="artifact-meta">
-          {formatBytes(artifact.size_bytes)}
-        </Text>
-        {isDownloadableArtifact(storage) && (
-          <Tooltip label={t('download')}>
-            <ActionIcon
-              component="a"
-              href={`/api/runs/${encodeURIComponent(runId)}/artifact`}
-              download
-              variant="subtle"
-              color="gray"
-              size="sm"
-              aria-label={t('download')}
-            >
-              <IconDownload size={16} />
-            </ActionIcon>
-          </Tooltip>
-        )}
-      </div>
-      <div className="artifact-technical-details">
-        <Text c="dimmed" size="xs">
-          {artifact.media_type}
-        </Text>
-        <div className="artifact-digest-row">
-          <Text c="dimmed" size="xs">
-            {t('sha256')}
+      <div className="artifact-row">
+        <Badge variant="light" color={artifactStatusColor(storage.status)}>
+          {artifactStatusLabel(storage.status, t)}
+        </Badge>
+        <div className="artifact-facts">
+          <Text c="dimmed" size="sm">
+            {formatBytes(artifact.size_bytes)}
           </Text>
-          <code>{artifact.digest.replace(/^sha256:/, '')}</code>
-          <Tooltip label={copied ? t('digestCopied') : t('copyDigest')}>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              aria-label={copied ? t('digestCopied') : t('copyDigest')}
-              onClick={() => void copyDigest()}
+          <Text c="dimmed" size="xs" ff="monospace">
+            {artifact.media_type}
+          </Text>
+          <div className="artifact-digest-row">
+            <Text c="dimmed" size="xs">
+              {t('sha256')}
+            </Text>
+            <button
+              type="button"
+              className="artifact-digest-toggle"
+              aria-expanded={expanded}
+              aria-label={expanded ? t('collapseDigest') : t('expandDigest')}
+              onClick={() => setExpanded((value) => !value)}
             >
-              {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
-            </ActionIcon>
-          </Tooltip>
-          <span className="visually-hidden" aria-live="polite">
-            {copied ? t('digestCopied') : ''}
-          </span>
+              <code>{expanded ? hex : abbreviateDigest(hex)}</code>
+              {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+            </button>
+            <CopyAction
+              value={artifact.digest}
+              name={t('copyDigest')}
+              copiedName={t('digestCopied')}
+            />
+          </div>
         </div>
+        {isDownloadableArtifact(storage) && (
+          <Anchor
+            href={`/api/runs/${encodeURIComponent(runId)}/artifact`}
+            download
+            size="sm"
+            className="artifact-download"
+          >
+            {t('download')}
+            <IconDownload size={14} aria-hidden="true" />
+          </Anchor>
+        )}
       </div>
     </div>
   )
 }
 
 function Detail(): React.JSX.Element {
-  const { language } = usePreferences()
+  const { language } = useLanguage()
   const t = useMessages()
   const { runId = '' } = useParams()
-  const [run, setRun] = React.useState<Run>()
-  const [steps, setSteps] = React.useState<Step[]>([])
-  const [error, setError] = React.useState<unknown>()
+  const location = useLocation()
+  // Restore the list's filters and cursor when the reader came from it. A reload or
+  // a deep link has no such state, so fall back to an unfiltered first page.
+  const listSearch = (location.state as { listSearch?: string } | null)?.listSearch
+  const backTo = listSearch ? `/runs?${listSearch}` : '/runs'
+  // Both are keyed by run id. React Router keeps this component mounted when only the
+  // id changes, so unkeyed state would keep rendering the previous run — and a 404 for
+  // the new id would then be reported as a failed refresh of the old one.
+  const [loaded, setLoaded] = React.useState<{ runId: string; run: Run; steps: Step[] }>()
+  const [failure, setFailure] = React.useState<{ runId: string; error: unknown }>()
+  const run = loaded?.runId === runId ? loaded.run : undefined
+  const steps = loaded?.runId === runId ? loaded.steps : []
+  const error = failure?.runId === runId ? failure.error : undefined
   const load = React.useCallback(async (): Promise<void> => {
     try {
       const [runValue, stepValue] = await Promise.all([
         api<{ run: Run }>(`/runs/${encodeURIComponent(runId)}`),
         api<{ publication_steps: Step[] }>(`/runs/${encodeURIComponent(runId)}/publication-steps`)
       ])
-      setRun(runValue.run)
-      setSteps(stepValue.publication_steps)
-      setError(undefined)
+      setLoaded({ runId, run: runValue.run, steps: stepValue.publication_steps })
+      setFailure(undefined)
     } catch (value) {
-      setError(value)
+      setFailure({ runId, error: value })
     }
   }, [runId])
   const terminal = run ? isRunTerminal(run) : false
-  const { refresh, refreshing, lastChecked } = useRefresh(load, !terminal)
-  if (error && run === undefined) throw error
+  // Polls while the run is active. The detail page renders no refresh chrome, so
+  // the hook's display state (refreshing / lastChecked) is intentionally unused.
+  useRefresh(load, !terminal)
+  const [, setClockTick] = React.useState(0)
+  React.useEffect(() => {
+    if (terminal) return
+    const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 10_000)
+    return (): void => window.clearInterval(timer)
+  }, [terminal])
+  const titleRunId = run?.run_id
+  React.useEffect(() => {
+    if (titleRunId === undefined) return
+    document.title = `${titleRunId} · Review Control Plane`
+    return (): void => {
+      document.title = 'Review Control Plane'
+    }
+  }, [titleRunId])
+  if (error instanceof ApiError && error.status === 401) throw error
+  if (error !== undefined && run === undefined) {
+    // A missing run is not a service failure, and the generic error page would
+    // misreport it as one — including for a hand-edited or stale link.
+    if (error instanceof ApiError && error.status === 404) {
+      return (
+        <Container size="lg" py="xl">
+          <Title order={1} mb="xs">
+            {t('runNotFound')}
+          </Title>
+          <Text c="dimmed" mb="md">
+            {t('runNotFoundHint')}
+          </Text>
+          <Text ff="monospace" mb="lg">
+            {runId}
+          </Text>
+          <Button
+            component={Link}
+            to={backTo}
+            variant="subtle"
+            px={0}
+            leftSection={<IconArrowLeft size={16} />}
+          >
+            {t('back')}
+          </Button>
+        </Container>
+      )
+    }
+    throw error
+  }
   const publicationOutcomes = steps.filter(
     (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
   )
-  const singlePublicationUrl =
-    publicationOutcomes.length === 1
-      ? safeExternalUrl(publicationOutcomes[0]?.remote_object_url ?? null)
-      : undefined
-  const showPublicationDetails =
-    publicationOutcomes.length > 1 ||
-    (publicationOutcomes.length === 1 && publicationOutcomes[0]?.status !== 'succeeded')
   const publicationIndex = 2 + (run?.artifact_storage === null ? 0 : 1)
   const timelineActive =
     run?.publication_status === 'pending' ? publicationIndex - 1 : publicationIndex
+  // `publication_updated_at` is the publication row's `updated_at`, and that row is
+  // written when the run is admitted. It only means "the publication happened" once
+  // the publication has actually started, so never present it before then — a run
+  // that is still `pending`, or whose publication was ruled out, has no such moment.
+  const publicationStarted =
+    run !== undefined && ['publishing', 'published', 'failed'].includes(run.publication_status)
   return (
-    <Container component="main" size="lg" py="xl">
+    <Container size="lg" py="xl">
       <Button
         component={Link}
-        to="/runs"
+        to={backTo}
         variant="subtle"
         px={0}
         leftSection={<IconArrowLeft size={16} />}
@@ -591,161 +888,116 @@ function Detail(): React.JSX.Element {
       ) : (
         <>
           <div className="run-heading">
-            <Text c="dimmed" size="xs" tt="uppercase">
-              {run.workflow}
-            </Text>
-            <Title order={1} className="run-id">
-              {run.run_id}
-            </Title>
-            <Group
-              justify="space-between"
-              align="flex-end"
-              gap="lg"
-              mt="md"
-              className="run-heading-footer"
-            >
-              <Group gap="sm" align="center" className="run-state-summary">
-                <RunStatusBadge status={run.status} />
-                {run.failure_code && (
-                  <Group gap={6} wrap="wrap">
-                    <Text c="dimmed" size="xs">
-                      {t('latestError')}:
-                    </Text>
-                    <Text c="red" size="xs" ff="monospace">
-                      {run.failure_code}
-                    </Text>
-                  </Group>
-                )}
+            <Group gap="xs" align="center" wrap="nowrap">
+              <Title order={1} className="run-id">
+                {run.run_id}
+              </Title>
+              <CopyAction value={run.run_id} name={t('copyRunId')} copiedName={t('runIdCopied')} />
+            </Group>
+            <Group gap="lg" align="center" mt="md" className="run-state-summary">
+              <Text c="dimmed" size="xs" tt="uppercase">
+                {workflowLabel(run.workflow, t)}
+              </Text>
+              <Group gap={6} align="center">
+                <Text c="dimmed" size="xs">
+                  {t('execution')}
+                </Text>
+                <ExecutionStatus status={run.execution_status} />
               </Group>
-              <RefreshControls
-                refresh={refresh}
-                refreshing={refreshing}
-                lastChecked={lastChecked}
-                autoRefreshEnabled={!terminal}
-              />
+              <Group gap={6} align="center">
+                <Text c="dimmed" size="xs">
+                  {t('publication')}
+                </Text>
+                <PublicationStatus status={run.publication_status} />
+              </Group>
+              {run.failure_code && (
+                <Group gap={6} wrap="wrap">
+                  <Text c="dimmed" size="xs">
+                    {t('failureCode')}:
+                  </Text>
+                  <Text c="red" size="xs" ff="monospace">
+                    {run.failure_code}
+                  </Text>
+                </Group>
+              )}
             </Group>
           </div>
           <Stack gap="xl">
             {Boolean(error) && (
               <Text role="alert" c="red">
                 {t('refreshFailed')}
+                {failureReason(error, t) && ` ${failureReason(error, t)}`}
               </Text>
             )}
             <Paper component="section" withBorder radius="sm" p="md">
-              <Group justify="space-between" align="flex-start" mb="lg">
-                <Title order={2}>{t('runProgress')}</Title>
-                <div>
-                  <Text c="dimmed" size="xs" ta="right">
-                    {t('updated')}
-                  </Text>
-                  <Text size="sm">{formatDate(run.updated_at, language)}</Text>
-                </div>
-              </Group>
-              <Timeline active={timelineActive} bulletSize={24} lineWidth={2}>
+              <Title order={2} mb="lg">
+                {t('runProgress')}
+              </Title>
+              <Timeline
+                active={timelineActive}
+                bulletSize={24}
+                lineWidth={2}
+                className="run-progress-timeline"
+              >
                 <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
                   <Text c="dimmed" size="sm">
                     {formatDate(run.created_at, language)}
                   </Text>
                 </Timeline.Item>
                 <Timeline.Item
-                  bullet={
-                    run.execution_status === 'running' ? (
-                      <IconLoader2 size={14} className="status-spinner" />
-                    ) : (
-                      <IconPlayerPlay size={14} />
-                    )
-                  }
-                  color={executionStatusColor(run.execution_status)}
-                  title={
-                    <Group gap="xs" align="center">
-                      <Text fw={500}>{t('execution')}</Text>
-                      <Badge variant="light" color={executionStatusColor(run.execution_status)}>
-                        {executionStatusLabel(run.execution_status, t)}
-                      </Badge>
-                    </Group>
-                  }
-                />
-                {run.artifact_storage !== null && (
-                  <Timeline.Item
-                    bullet={<IconArchive size={14} />}
-                    color={artifactStatusColor(run.artifact_storage.status)}
-                    title={
-                      <Group gap="xs" align="center">
-                        <Text fw={500}>{t('artifact')}</Text>
-                        <Badge
-                          variant="light"
-                          color={artifactStatusColor(run.artifact_storage.status)}
-                        >
-                          {artifactStatusLabel(run.artifact_storage.status, t)}
-                        </Badge>
-                      </Group>
-                    }
-                  >
-                    <Artifact storage={run.artifact_storage} runId={run.run_id} />
-                  </Timeline.Item>
-                )}
-                <Timeline.Item
-                  bullet={
-                    run.publication_status === 'publishing' ? (
-                      <IconLoader2 size={14} className="status-spinner" />
-                    ) : (
-                      <IconExternalLink size={14} />
-                    )
-                  }
-                  color={runPublicationStatusColor(run.publication_status)}
-                  title={
-                    <Group gap="xs" align="center">
-                      <Text fw={500}>{t('publication')}</Text>
-                      <Badge
-                        variant="light"
-                        color={runPublicationStatusColor(run.publication_status)}
-                      >
-                        {runPublicationStatusLabel(run.publication_status, t)}
-                      </Badge>
-                    </Group>
-                  }
+                  bullet={statusBullet(executionTone(run.execution_status))}
+                  color={statusToneColor(executionTone(run.execution_status))}
+                  title={<Text fw={500}>{t('execution')}</Text>}
                 >
-                  {(run.published_at || singlePublicationUrl) && (
-                    <Group gap="xs" className="publication-summary">
-                      {run.published_at && (
-                        <Text c="dimmed" size="sm">
-                          {formatDate(run.published_at, language)}
-                        </Text>
-                      )}
-                      {run.published_at && singlePublicationUrl && (
-                        <Text c="dimmed" size="sm" aria-hidden="true">
-                          ·
-                        </Text>
-                      )}
-                      {singlePublicationUrl && (
-                        <Anchor
-                          href={singlePublicationUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          size="sm"
-                          className="delivery-link"
-                        >
-                          {t('openExternalLink')}
-                          <IconExternalLink size={14} aria-hidden="true" />
-                        </Anchor>
-                      )}
-                    </Group>
+                  <Text c="dimmed" size="sm">
+                    {formatDate(run.execution_updated_at, language)} ·{' '}
+                    {phaseElapsed(
+                      run.execution_updated_at,
+                      run.created_at,
+                      ['succeeded', 'failed'].includes(run.execution_status),
+                      t
+                    )}
+                  </Text>
+                  {run.artifact_storage !== null && (
+                    <div className="artifact-section">
+                      <Artifact storage={run.artifact_storage} runId={run.run_id} />
+                    </div>
                   )}
-                  {showPublicationDetails && (
+                </Timeline.Item>
+                <Timeline.Item
+                  bullet={statusBullet(publicationTone(run.publication_status))}
+                  color={statusToneColor(publicationTone(run.publication_status))}
+                  title={<Text fw={500}>{t('publication')}</Text>}
+                >
+                  <div className="publication-summary">
+                    {publicationStarted && (
+                      <Text c="dimmed" size="sm">
+                        {formatDate(run.published_at ?? run.publication_updated_at, language)} ·{' '}
+                        {phaseElapsed(
+                          run.published_at ?? run.publication_updated_at,
+                          run.created_at,
+                          ['published', 'failed'].includes(run.publication_status),
+                          t
+                        )}
+                      </Text>
+                    )}
+                  </div>
+                  {publicationOutcomes.length > 0 && (
                     <div className="delivery-list">
                       {publicationOutcomes.map((step) => {
                         const externalUrl = safeExternalUrl(step.remote_object_url)
                         const succeeded = step.status === 'succeeded'
                         return (
                           <div className="delivery-item" key={step.step_key}>
-                            {publicationOutcomes.length > 1 && (
-                              <div className="delivery-main">
-                                <Badge variant="light" color={publicationStatusColor(step.status)}>
-                                  {publicationStatusLabel(step.status, t)}
-                                </Badge>
-                              </div>
-                            )}
-                            {externalUrl && singlePublicationUrl === undefined && (
+                            {/* Identity on one line: the step's own key belongs beside its
+                                status, not stranded on a line of its own. */}
+                            <div className="delivery-main">
+                              <Badge variant="light" color={publicationStatusColor(step.status)}>
+                                {publicationStatusLabel(step.status, t)}
+                              </Badge>
+                              <code className="delivery-step-key">{step.step_key}</code>
+                            </div>
+                            {externalUrl && (
                               <Anchor
                                 component="a"
                                 href={externalUrl}
@@ -755,7 +1007,7 @@ function Detail(): React.JSX.Element {
                                 className="delivery-link"
                               >
                                 {t('openExternalLink')}
-                                <IconExternalLink size={14} aria-hidden="true" />
+                                <IconArrowUpRight size={14} aria-hidden="true" />
                               </Anchor>
                             )}
                             {!succeeded &&
@@ -780,9 +1032,6 @@ function Detail(): React.JSX.Element {
                                   </Group>
                                 </div>
                               )}
-                            {(publicationOutcomes.length > 1 || !succeeded) && (
-                              <code className="delivery-step-key">{step.step_key}</code>
-                            )}
                           </div>
                         )
                       })}
@@ -805,29 +1054,58 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
   render(): React.ReactNode {
     if (this.state.error instanceof ApiError && this.state.error.status === 401) return <Login />
-    if (this.state.error) return <ErrorFallback />
+    if (this.state.error) return <ErrorFallback error={this.state.error} />
     return this.props.children
   }
 }
-function ErrorFallback(): React.JSX.Element {
+function ErrorFallback({ error }: { error: unknown }): React.JSX.Element {
   const t = useMessages()
   return (
-    <Container component="main" size="lg" py="xl">
+    <Container size="lg" py="xl">
       <Title order={1}>{t('unable')}</Title>
-      <Text role="alert">{t('requestFailed')}</Text>
+      <Text role="alert" mb="md">
+        {t('requestFailed')}
+        {failureReason(error, t) && ` ${failureReason(error, t)}`}
+      </Text>
+      <Button onClick={() => window.location.reload()}>{t('retry')}</Button>
     </Container>
   )
 }
 function App(): React.JSX.Element {
+  const t = useMessages()
+  const navigate = useNavigate()
+  const [runIdInput, setRunIdInput] = React.useState('')
   return (
     <>
       <AppShell header={{ height: 58 }}>
         <AppShell.Header>
           <Container size="lg" h="100%" w="100%">
-            <Group h="100%" justify="space-between">
+            <Group h="100%" justify="space-between" wrap="nowrap" gap="md">
               <Link className="brand" to="/runs">
                 Review Control Plane
               </Link>
+              <form
+                className="open-run"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const requestedRunId = runIdInput.trim()
+                  if (requestedRunId) navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
+                }}
+              >
+                <Group gap={6} align="center" wrap="nowrap">
+                  <TextInput
+                    aria-label={t('goToRunId')}
+                    placeholder={t('runIdPlaceholder')}
+                    value={runIdInput}
+                    size="sm"
+                    ff="monospace"
+                    onChange={(event) => setRunIdInput(event.currentTarget.value)}
+                  />
+                  <ActionIcon type="submit" aria-label={t('goToRun')} variant="filled" size={36}>
+                    <IconArrowRight size={16} />
+                  </ActionIcon>
+                </Group>
+              </form>
               <PreferenceControls />
             </Group>
           </Container>
@@ -846,9 +1124,11 @@ function App(): React.JSX.Element {
   )
 }
 createRoot(document.getElementById('root')!).render(
-  <Preferences>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </Preferences>
+  <LanguageProvider>
+    <Preferences>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </Preferences>
+  </LanguageProvider>
 )

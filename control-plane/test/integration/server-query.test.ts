@@ -36,10 +36,20 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const unfiltered = await fetch(`${base}/v1/runs`, { headers: readAuth })
     assert.equal(unfiltered.status, 200)
     assert.deepEqual(await unfiltered.json(), { runs: [], next_cursor: null })
-    const invalidStatus = await fetch(`${base}/v1/runs?status=typo`, { headers: readAuth })
-    assert.equal(invalidStatus.status, 400)
-    assert.deepEqual(await invalidStatus.json(), {
-      error: 'status is invalid.',
+    const invalidExecutionStatus = await fetch(`${base}/v1/runs?execution_status=typo`, {
+      headers: readAuth
+    })
+    assert.equal(invalidExecutionStatus.status, 400)
+    assert.deepEqual(await invalidExecutionStatus.json(), {
+      error: 'execution_status is invalid.',
+      code: 'INVALID_QUERY'
+    })
+    const invalidPublicationStatus = await fetch(`${base}/v1/runs?publication_status=typo`, {
+      headers: readAuth
+    })
+    assert.equal(invalidPublicationStatus.status, 400)
+    assert.deepEqual(await invalidPublicationStatus.json(), {
+      error: 'publication_status is invalid.',
       code: 'INVALID_QUERY'
     })
     const invalidLimit = await fetch(`${base}/v1/runs?limit=10junk`, { headers: readAuth })
@@ -87,6 +97,23 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const secondBody = (await secondPage.json()) as { runs: Array<{ run_id: string }> }
     assert.equal(secondBody.runs.length, 1)
     assert.notEqual(secondBody.runs[0]?.run_id, firstBody.runs[0]?.run_id)
+
+    // The created-at range was accepted by the API but never covered, so a broken
+    // bound would have filtered silently.
+    const past = encodeURIComponent('2000-01-01T00:00:00.000Z')
+    const future = encodeURIComponent('2100-01-01T00:00:00.000Z')
+    const boundedAbove = await fetch(`${base}/v1/runs?from=${past}`, { headers: readAuth })
+    assert.equal(((await boundedAbove.json()) as { runs: unknown[] }).runs.length, 2)
+    const notYet = await fetch(`${base}/v1/runs?from=${future}`, { headers: readAuth })
+    assert.deepEqual(await notYet.json(), { runs: [], next_cursor: null })
+    const beforeEverything = await fetch(`${base}/v1/runs?to=${past}`, { headers: readAuth })
+    assert.deepEqual(await beforeEverything.json(), { runs: [], next_cursor: null })
+    const invalidFrom = await fetch(`${base}/v1/runs?from=not-a-date`, { headers: readAuth })
+    assert.equal(invalidFrom.status, 400)
+    assert.deepEqual(await invalidFrom.json(), {
+      error: 'from must be a valid date.',
+      code: 'INVALID_QUERY'
+    })
 
     await server.close()
     server = await startControlPlaneServer()

@@ -22,16 +22,46 @@
 body {
   margin: 0;
 }
-@keyframes status-spin {
-  to {
-    transform: rotate(360deg);
+.status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-dot-waiting {
+  background: var(--mantine-color-gray-5);
+}
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
   }
 }
-.status-spinner {
-  animation: status-spin 1.2s linear infinite;
+.status-dot-active {
+  background: var(--mantine-color-blue-6);
+  animation: status-pulse 1.4s ease-in-out infinite;
 }
+.status-dot-complete {
+  background: var(--mantine-color-green-6);
+}
+.status-dot-failed {
+  background: var(--mantine-color-red-6);
+}
+.status-dot-neutral {
+  background: var(--mantine-color-gray-4);
+}
+/* Must stay after the .status-dot-* rules above: same specificity, so the
+   later declaration wins. */
 @media (prefers-reduced-motion: reduce) {
-  .status-spinner {
+  .status-dot-active {
     animation: none;
   }
 }
@@ -51,6 +81,17 @@ body {
 .run-state-summary {
   overflow-wrap: anywhere;
 }
+.run-state-summary .status-text {
+  font-size: var(--mantine-font-size-sm);
+}
+/* Neutral rail cue. Mantine paints the rail from the Timeline.Item `::before`
+   pseudo-element and couples it to the bullet colour, so this override is the
+   only way to decouple them. If Mantine changes that element, the rail silently
+   reverts to the status colour. */
+.run-progress-timeline .mantine-Timeline-item::before {
+  border-left-color: var(--mantine-color-gray-4);
+  border-left-style: dashed;
+}
 .table-wrap {
   overflow-x: auto;
 }
@@ -68,20 +109,12 @@ body {
 a {
   color: var(--link);
 }
-dt {
-  margin-top: 16px;
-  color: var(--muted);
-  font-size: 13px;
-}
-dd {
-  margin: 4px 0 0;
-}
-pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 12px;
+.artifact-section {
+  display: grid;
+  gap: 6px;
+  /* The execution timestamp and the artifact row were touching; space them like the
+     publication summary and its rows. */
+  padding-top: 10px;
 }
 .artifact-panel {
   overflow: hidden;
@@ -89,17 +122,19 @@ pre {
 .artifact-state {
   padding: 8px 0;
 }
-.artifact-summary {
+/* The artifact reads as one row: its facts together, the download trailing. */
+.artifact-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+}
+.artifact-facts {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 2px 0 4px;
-}
-.artifact-technical-details {
-  display: grid;
-  gap: 4px;
-  padding-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
 }
 .artifact-digest-row {
   display: flex;
@@ -113,11 +148,29 @@ pre {
   overflow-wrap: anywhere;
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
+.artifact-digest-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.artifact-digest-toggle:hover code {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .delivery-list {
+  margin-top: 10px;
   overflow: hidden;
 }
 .publication-summary {
-  min-height: 24px;
+  display: grid;
+  gap: 4px;
 }
 .delivery-item {
   display: grid;
@@ -136,17 +189,18 @@ pre {
   gap: 10px;
   min-width: 0;
 }
-.delivery-link {
+.delivery-link,
+.artifact-download {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  justify-self: start;
+  gap: 6px;
+  justify-self: end;
 }
 .delivery-error {
   grid-column: 1 / -1;
 }
 .delivery-step-key {
-  grid-column: 1 / -1;
+  min-width: 0;
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   overflow-wrap: anywhere;
@@ -174,25 +228,15 @@ pre {
     align-items: stretch;
     flex-direction: column;
   }
-  .operations-bar [aria-label='Run filters'] {
+  .operations-bar [aria-label='Run list controls'] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .operations-bar [aria-label='Run filters'] > * {
+  .operations-bar [aria-label='Run list controls'] > * {
     min-width: 0;
   }
   .refresh-controls {
     align-items: flex-end;
-  }
-  .run-heading-footer {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .run-heading-footer .refresh-controls {
-    align-items: flex-start;
-  }
-  .artifact-summary {
-    padding: 2px 0 4px;
   }
   .delivery-item {
     grid-template-columns: minmax(0, 1fr);
@@ -201,5 +245,31 @@ pre {
     align-items: flex-start;
     flex-direction: column;
     gap: 6px;
+  }
+}
+
+.open-run {
+  flex: 0 1 320px;
+  min-width: 0;
+}
+.open-run .mantine-TextInput-root {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Row actions appear on demand: the table exists to be scanned, and a permanent icon on
+   every row is noise for an action that is used rarely. */
+tbody tr .row-action {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+tbody tr:hover .row-action,
+tbody tr:focus-within .row-action {
+  opacity: 1;
+}
+/* A touch device never hovers, so the action has to stay visible there or it is lost. */
+@media (hover: none) {
+  tbody tr .row-action {
+    opacity: 1;
   }
 }

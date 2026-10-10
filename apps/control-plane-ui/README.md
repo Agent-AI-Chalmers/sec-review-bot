@@ -1,6 +1,6 @@
 # Control Plane UI
 
-Internal, read-only web console for Review Control Plane runs. The browser talks only to this application's same-origin server; the server holds the Control Plane read credential and proxies an explicit GET-only query allowlist.
+Internal, read-only web console for Review Control Plane runs. The browser talks only to this application's same-origin server; the server holds the Control Plane read credential and proxies an explicit allowlist of GET paths, forwarding the query string unchanged.
 
 ## Local development
 
@@ -11,7 +11,9 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative successful, active, retrying, and failed runs without requiring Control Plane, PostgreSQL, or RustFS. Artifact metadata is visible, but there are no stored objects to download.
+Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative successful, active, recovering, publishing, and failed runs without requiring Control Plane, PostgreSQL, or RustFS. Artifact metadata is visible, but there are no stored objects to download.
+
+The fixtures serve a few dozen runs at the Control Plane's default page size and implement its cursor contract, so paging, the status filters, and the detail timeline are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails the module import instead of appearing as plausible-looking demo data.
 
 To develop against a running Control Plane, build and start the BFF in one terminal:
 
