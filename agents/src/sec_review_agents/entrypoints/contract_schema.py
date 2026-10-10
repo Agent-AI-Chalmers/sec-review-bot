@@ -31,7 +31,7 @@ def _schema_root() -> Traversable:
     # A source checkout reads the same canonical files before a wheel has
     # copied them into package data.
     for parent in Path(__file__).resolve().parents:
-        candidate = parent / "contracts" / "schemas" / "v5"
+        candidate = parent / "contracts" / "integration-contract" / "v5" / "schemas"
         if (candidate / "common.schema.json").is_file():
             return candidate
     raise RuntimeError("Could not locate contract v5 schemas for Runner validation.")

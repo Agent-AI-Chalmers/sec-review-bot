@@ -4,108 +4,48 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-本目录是项目自有契约的工作区级根目录。
+本目录是项目自有契约的工作区级根目录。它同时保存契约的人类可读规范，以及执行该规范的可执行资产。
 
-它同时包含人类可读的契约文档，以及跨包共享的可执行契约资产。
+## 布局
 
-## 从这里开始
+每个契约族占一个目录，每个受支持的版本占一个子目录，内含该版本的规范、schema 和 fixture：
 
-受支持的公开集成入口分成两层：
+```text
+contracts/
+  <family>/
+    <version>/
+      <SPEC>.md        该版本的书面契约
+      schemas/*.json   可机器校验的形状
+      fixtures/*.json  可执行示例，以及配对它们的 manifest
+```
 
-1. 生产传输层：HTTP Agent Runner Service。
-2. 数据契约：runner 输入、workflow 结果、`ReviewRecord` 和 repository `deliveries[]`。
+一个族也可以存放适用于所有版本的文档，例如传输层参考。
 
-从这些文档开始：
+## 契约族
 
-- [RUNNER_HTTP_API.zh.md](RUNNER_HTTP_API.zh.md)：调用方如何创建和轮询 workflow run。
-- [CONTRACT_V5.zh.md](CONTRACT_V5.zh.md)：workflow 输入和结果结构。
-- [schemas/v5](schemas/v5)：用于机器校验的 JSON Schema。
-- [fixtures/v5](fixtures/v5)：Python 和 TypeScript 测试共享的可执行 JSON 示例。
+- [integration-contract](integration-contract/README.zh.md)：Runner 与其调用方之间的公开集成点。当前版本：[v5](integration-contract/v5/CONTRACT.zh.md)。
 
-HTTP API 和 workflow 契约是稳定的公开接口。
+## 适用于每个族的规则
 
-## 公开边界
+规范、schema、fixture 和 fixture manifest 一起变更。
 
-调用方可以依赖：
+Schema 负责结构形状：必填字段、JSON 类型、枚举、带标签的变体，以及多余字段策略。Schema 不替代领域代码。跨字段规则留在做出该决策的 workflow 中；安全路径、平台权限、发布资格和重试行为等副作用策略留在消费者一侧。
 
-- runner HTTP API；
-- HTTP API 接受的公开 workflow 名称；
-- 当前 `contract_version` 的 runner 输入和公开 workflow 结果结构；
-- 结构化 runner 成功和错误响应。
+Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受哪些有效 fixture、必须拒绝哪些无效 fixture，因此每个实现执行同一条结构边界。
 
-以下内容不是稳定的公开 API：
+测试通过各包自己的助手读取 fixture，而不是把路径写死在单个测试里：
 
-- `agents` 下的内部 Python 模块路径；
-- Temporal workflow 名称或 workflow/stage 实现细节；
-- 诊断用 stage 产物结构，除非明确文档化为契约字段；
-- GitHub integration 内部编排细节；
-- 仅发布策略或本地工具使用的非契约字段。
+- Python：`tests.contract_fixtures`
+- TypeScript：`test/contract-fixtures.ts`
 
-## 职责
-
-调用方负责：
-
-- 准备 input bundle；
-- 通过 HTTP 传输层调用 workflow；
-- 消费结构化结果和错误响应；
-- 决定如何渲染或发布结果；
-- 处理平台特有发布规则，例如 GitHub PR 去重。
-
-Agents 负责：
-
-- 执行 issue、pull request 和 repository workflow 的结构化流程；
-- 产出以 `review_record` 和 repository `deliveries[]` 为中心的结构化 workflow 结果；
-- 保存 stage 产物。
-
-GitHub integration 是调用方侧的一种实现：它把 GitHub event 和发布规则转成 runner 输入，并负责结果发布。
-
-这条职责划分同时也是安全边界。GitHub 身份、权限、API 调用、发布、重试和审计行为都留在调用方侧。Agents 在 runner 契约内工作，不直接控制 GitHub 平台能力。
-
-## 规范、Schemas 和 Fixtures
-
-Markdown 规范定义字段语义、兼容规则和集成指导。
-
-Schema 文件是该规范的可执行结构化形式。契约 v5 schemas 使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python Runner 使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 执行 input 和 result schemas，TypeScript integration 则使用 [Ajv](https://ajv.js.org/) 独立执行这两类 schemas；两个包的测试也会执行共享 fixtures。
-
-Agents wheel 会在构建时把这些 canonical schemas 作为 package data 收入包中。因此安装后的 Python 工具不依赖仓库级 `contracts/` 路径。
-
-Schemas 是结构性契约检查，不是所有运行时规则或发布规则的完整权威。
-
-> 可移植 JSON Schema 无法表达的跨字段不变量，例如 repository incremental 的 `base_sha != head_sha`，由运行时输入校验处理。平台发布策略，例如某个符合 schema 的文件路径是否允许发布到 GitHub 敏感位置，则留给调用方处理。
-
-运行时 parser 也可能强制 schema 有意保持结构化的规范形式，例如枚举规范化、禁止未支持的公开字段，以及可发布仓库路径策略。这些 parser 检查属于各消费方的运行时边界，不替代 schema 定义。
-
-Fixture 文件提供测试可执行的具体 JSON 示例，因此也属于契约校验范围。
-
-[`fixtures/v5/manifest.json`](fixtures/v5/manifest.json) 记录每个 schema 必须接受哪些有效 fixtures、拒绝哪些无效 fixtures，因此 Python 和 TypeScript 会执行同一条结构边界。
-
-当契约字段变化时，应同时更新本目录中的相关书面规范、[schema](schemas/v5)、[fixture](fixtures/v5) 和 [manifest](fixtures/v5/manifest.json) 条目。
-
-## Fixture 使用规则
-
-`fixtures/v5/` 下的 fixtures 是当前项目自有契约的可执行示例。
-
-它们会被 Python agents 包和 GitHub integration 包共同消费，确保两个实现验证同一组 JSON 结构。
-
-包内测试应通过本包的 contract fixture helper 读取这些 fixtures，而不是在单个测试里硬编码路径：
-
-- Python: `tests.contract_fixtures`
-- TypeScript: `test/contract-fixtures.ts`
-
-Schema 校验测试应读取 `manifest.json`，不要维护包内各自的 fixture 映射。
-
-## 产物边界
-
-除非某个字段明确提升进公开 workflow 结果，否则 stage 产物属于运行时诊断。公开结果包括 `review_record`、repository `case_results[]`、repository `deliveries[]`，以及 [CONTRACT_V5.zh.md](CONTRACT_V5.zh.md) 中记录的其他字段。
-
-调用方应从 workflow result 发布结果，而不是读取整包 stage 产物。如果调用方行为必须依赖某个 stage 产物，要么把所需字段提升进本契约，要么把依赖限制在本地调试工具内。
+每个族的 README 记录该边界两侧的归属，以及调用方可以依赖什么。
 
 ## 变更清单
 
-任何契约变更都应：
+任何契约变更都需要：
 
-- 更新相关 Markdown 规范；
-- 更新 [schemas/v5](schemas/v5) 下的 JSON Schema；
-- 更新或新增 [fixtures/v5](fixtures/v5) 下的 fixtures；
-- 让 Python 和 TypeScript 测试校验同一组 fixtures 和 schemas。
-- 让 [scripts/check_contracts.sh](../scripts/check_contracts.sh) 随契约校验范围保持同步，并在发布变更前运行它。
+- 更新受影响版本的规范；
+- 更新它的 schema；
+- 更新或新增它的 fixture 与 manifest 条目；
+- 让 Python 和 TypeScript 测试校验同一批文件；
+- 保持 [scripts/check_contracts.sh](../scripts/check_contracts.sh) 与校验面一致，并在发布该变更前运行它。

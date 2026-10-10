@@ -1,10 +1,10 @@
 # Integration Contract v5
 
-Language: English | [中文](CONTRACT_V5.zh.md)
+Language: English | [中文](CONTRACT.zh.md)
 
-This document defines the workflow `input` submitted through the runner HTTP API and the `result` returned after a run completes. For the HTTP transport itself, see [RUNNER_HTTP_API.md](RUNNER_HTTP_API.md).
+This document defines the workflow `input` submitted through the runner HTTP API and the `result` returned after a run completes. For the HTTP transport itself, see [RUNNER_HTTP_API.md](../RUNNER_HTTP_API.md).
 
-Representative JSON fixtures live under [`fixtures/v5`](fixtures/v5). Python and TypeScript contract tests both read these fixtures.
+Representative JSON fixtures live under [`fixtures`](fixtures). Python and TypeScript contract tests both read these fixtures.
 
 The v5 public result exposes final results for each workflow instead of internal stage execution details:
 
@@ -13,7 +13,7 @@ The v5 public result exposes final results for each workflow instead of internal
 
 ## 1. Workflow Inputs
 
-This section defines the workflow `input` object inside the HTTP create-run request body. HTTP envelope fields such as `run_id` and `runtime` are defined in [RUNNER_HTTP_API.md](RUNNER_HTTP_API.md).
+This section defines the workflow `input` object inside the HTTP create-run request body. HTTP envelope fields such as `run_id` and `runtime` are defined in [RUNNER_HTTP_API.md](../RUNNER_HTTP_API.md).
 
 Every workflow input includes:
 

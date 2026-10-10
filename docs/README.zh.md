@@ -41,9 +41,10 @@ flowchart LR
 
 App 侧和 agent 侧之间的契约，看这里：
 
-- [Contracts README](../contracts/README.md) / [中文](../contracts/README.zh.md)：公开集成接口和契约入口。
-- [RUNNER_HTTP_API.md](../contracts/RUNNER_HTTP_API.md) / [中文](../contracts/RUNNER_HTTP_API.zh.md)：Agent Runner HTTP API。
-- [CONTRACT_V5.md](../contracts/CONTRACT_V5.md) / [中文](../contracts/CONTRACT_V5.zh.md)：workflow 输入和结果契约。
+- [Contracts README](../contracts/README.md) / [中文](../contracts/README.zh.md)：契约目录索引、它的布局规则，以及每个族都要遵守的规则。
+- [integration-contract/README.md](../contracts/integration-contract/README.md) / [中文](../contracts/integration-contract/README.zh.md)：面向 Runner 的集成点、它的公开边界与归属。
+- [RUNNER_HTTP_API.md](../contracts/integration-contract/RUNNER_HTTP_API.md) / [中文](../contracts/integration-contract/RUNNER_HTTP_API.zh.md)：Agent Runner HTTP API。
+- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md) / [中文](../contracts/integration-contract/v5/CONTRACT.zh.md)：workflow 输入和结果契约。
 
 ### workflows/
 

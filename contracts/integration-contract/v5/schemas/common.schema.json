@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sec-review-bot.local/contracts/schemas/v5/common.schema.json",
+  "$id": "https://sec-review-bot.local/contracts/integration-contract/v5/schemas/common.schema.json",
   "title": "Contract v5 common definitions",
   "$defs": {
     "nonBlankString": {
