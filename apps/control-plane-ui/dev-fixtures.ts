@@ -68,15 +68,40 @@ const BASE_TIME = Date.now() - 20 * 60 * 1000
 const RUN_SPACING_MS = 3 * 60 * 60 * 1000
 
 const WORKFLOWS: readonly Workflow[] = ['pull-request-review', 'issue-review', 'repository-review']
-const STEP_KEYS: Record<Workflow, string> = {
-  'issue-review': 'issue:draft-pr',
-  'pull-request-review': 'pull-request:review',
-  'repository-review': 'repository:delivery:delivery-a'
+/**
+ * The steps each workflow actually initializes, in publication order:
+ * pull-request reviews publish one review, issue reviews always publish a summary
+ * comment plus a draft PR when there is a patch, and repository reviews publish one
+ * step per delivery plus two summaries.
+ */
+function stepKeysFor(workflow: Workflow, index: number): string[] {
+  if (workflow === 'pull-request-review') return ['pull-request:review']
+  if (workflow === 'issue-review') {
+    return index % 3 === 0 ? ['issue:draft-pr', 'issue:summary-comment'] : ['issue:summary-comment']
+  }
+  const deliveries = 1 + (index % 2)
+  return [
+    ...Array.from(
+      { length: deliveries },
+      (_, position) => `repository:delivery:combined-${digest(index, position)}`
+    ),
+    'repository:summary-issue',
+    'repository:summary-comment'
+  ]
 }
-const STEP_URLS: Record<Workflow, string> = {
-  'issue-review': 'https://github.com/octo/example/pull/142',
-  'pull-request-review': 'https://github.com/octo/example/pull/42#pullrequestreview-1001',
-  'repository-review': 'https://github.com/octo/example/pull/311'
+
+const REMOTE_ROOT = 'https://github.com/octo/example'
+
+function remoteUrlFor(stepKey: string, index: number): string {
+  if (stepKey.startsWith('issue:draft-pr')) return `${REMOTE_ROOT}/pull/${200 + index}`
+  if (stepKey === 'issue:summary-comment') {
+    return `${REMOTE_ROOT}/issues/${100 + index}#issuecomment-${900 + index}`
+  }
+  if (stepKey === 'pull-request:review') {
+    return `${REMOTE_ROOT}/pull/42#pullrequestreview-${1000 + index}`
+  }
+  if (stepKey.startsWith('repository:delivery')) return `${REMOTE_ROOT}/pull/${300 + index}`
+  return `${REMOTE_ROOT}/issues/${50 + index}#issuecomment-${800 + index}`
 }
 
 // Ordered by lifecycle, then repeated with rotating workflows so the list shows
@@ -171,8 +196,33 @@ const SCENARIOS: readonly Scenario[] = [
 ]
 
 const iso = (milliseconds: number): string => new Date(milliseconds).toISOString()
-const runId = (index: number): string =>
-  `018f6b7c-2d41-7a30-9000-${String(index + 1).padStart(12, '0')}`
+/**
+ * Deterministic pseudo-random ids in the shape the Control Plane actually assigns
+ * (`crypto.randomUUID()`, a v4 UUID). A time-ordered id would misrepresent what the
+ * console receives and would falsely suggest that a prefix means something.
+ */
+function runId(index: number): string {
+  let state = (index + 1) * 2654435761
+  const next = (): number => {
+    state = (state * 1664525 + 1013904223) >>> 0
+    return state
+  }
+  const block = (length: number): string => next().toString(16).padStart(8, '0').slice(0, length)
+  return `${block(8)}-${block(4)}-4${block(3)}-${'89ab'.charAt(next() % 4)}${block(3)}-${block(8)}${block(4)}`
+}
+
+/** Ten mixed hex characters, the shape the delivery planner derives from its cases. */
+function digest(index: number, position: number): string {
+  let state = (index + 1) * 40503 + position * 2654435761
+  const next = (): number => {
+    state = (state * 1664525 + 1013904223) >>> 0
+    return state
+  }
+  return `${next().toString(16).padStart(8, '0')}${next().toString(16).padStart(8, '0')}`.slice(
+    0,
+    10
+  )
+}
 
 function artifactFor(run_id: string, kind: ArtifactStatus | null): FixtureArtifact | null {
   if (kind === null) return null
@@ -194,19 +244,28 @@ function artifactFor(run_id: string, kind: ArtifactStatus | null): FixtureArtifa
   return { status: 'unavailable', message: 'The runner reported no diagnostic bundle.' }
 }
 
-function stepsFor(scenario: Scenario, workflow: Workflow): FixtureStep[] {
-  if (scenario.step === null) return []
-  const failedStep = scenario.step === 'terminal_failed'
-  return [
-    {
-      step_key: STEP_KEYS[workflow],
-      status: scenario.step,
-      failure_count: failedStep ? 1 : 0,
-      remote_object_url: scenario.step === 'succeeded' ? STEP_URLS[workflow] : null,
-      failure_code: failedStep ? scenario.failure_code : null,
-      failure_message: failedStep ? 'GitHub rejected the publication payload.' : null
+/**
+ * Steps advance in order, so everything before the publication's current position has
+ * already succeeded and only the last one can still be running or have failed.
+ */
+function stepsFor(scenario: Scenario, workflow: Workflow, index: number): FixtureStep[] {
+  const step = scenario.step
+  if (step === null) return []
+  const keys = stepKeysFor(workflow, index)
+  const lastPosition = keys.length - 1
+  return keys.map((step_key, position) => {
+    const status: StepStatus =
+      position < lastPosition ? 'succeeded' : step === 'running' ? 'running' : step
+    const failed = status === 'terminal_failed'
+    return {
+      step_key,
+      status,
+      failure_count: failed ? 1 : 0,
+      remote_object_url: status === 'succeeded' ? remoteUrlFor(step_key, index) : null,
+      failure_code: failed ? scenario.failure_code : null,
+      failure_message: failed ? 'GitHub rejected the publication payload.' : null
     }
-  ]
+  })
 }
 
 /**
@@ -216,7 +275,7 @@ function stepsFor(scenario: Scenario, workflow: Workflow): FixtureStep[] {
  * `not_required` in the same transaction, and the diagnostic artifact is
  * reported only when the execution is terminal.
  */
-function validateRun(run: FixtureRun): void {
+function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   const fail = (reason: string): never => {
     throw new Error(`dev fixture ${run.run_id} describes an unreachable run: ${reason}`)
   }
@@ -262,6 +321,28 @@ function validateRun(run: FixtureRun): void {
   if (run.published_at !== null && run.published_at !== run.publication_updated_at) {
     fail('published_at is the completion time of the publication')
   }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(run.run_id)) {
+    fail('run ids are UUID v4, as the Control Plane assigns them')
+  }
+
+  if (steps.length > 0 && !startedPublication) {
+    fail('publication steps only exist once the publication has started')
+  }
+  if (startedPublication && steps.length === 0) {
+    fail('a started publication always has steps')
+  }
+  if (publication === 'published' && steps.some((step) => step.status !== 'succeeded')) {
+    fail('a published run has only succeeded steps')
+  }
+  if (publication === 'publishing' && steps.every((step) => step.status === 'succeeded')) {
+    fail('a publishing run still has work outstanding')
+  }
+  if (
+    publication === 'failed' &&
+    steps.filter((step) => step.status === 'terminal_failed').length !== 1
+  ) {
+    fail('a failed publication has exactly one terminal step')
+  }
 }
 
 const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
@@ -287,14 +368,17 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
   }
 })
 
-for (const run of runs) validateRun(run)
-
 const stepsByRun = new Map<string, FixtureStep[]>(
   runs.map((run, index) => [
     run.run_id,
-    stepsFor(SCENARIOS[index % SCENARIOS.length]!, run.workflow)
+    stepsFor(SCENARIOS[index % SCENARIOS.length]!, run.workflow, index)
   ])
 )
+
+for (const run of runs) validateRun(run, stepsByRun.get(run.run_id) ?? [])
+if (new Set(runs.map((run) => run.run_id)).size !== runs.length) {
+  throw new Error('dev fixtures must not reuse a run id.')
+}
 
 interface Cursor {
   createdAt: string
