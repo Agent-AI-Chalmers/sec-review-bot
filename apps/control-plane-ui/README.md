@@ -11,7 +11,9 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative successful, active, retrying, and failed runs without requiring Control Plane, PostgreSQL, or RustFS. Artifact metadata is visible, but there are no stored objects to download.
+Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative successful, active, recovering, publishing, and failed runs without requiring Control Plane, PostgreSQL, or RustFS. Artifact metadata is visible, but there are no stored objects to download.
+
+The fixtures serve a few dozen runs ten at a time and implement the Control Plane's cursor contract, so paging, the status filters, and the detail timeline are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails the module import instead of appearing as plausible-looking demo data.
 
 To develop against a running Control Plane, build and start the BFF in one terminal:
 
