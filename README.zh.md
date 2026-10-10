@@ -44,7 +44,7 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 
 - [`apps/github-integration/`](apps/github-integration/README.zh.md)：TypeScript 编写的 GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
 - [`control-plane/`](control-plane/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
-- [`apps/control-plane-ui/`](apps/control-plane-ui/README.zh.md)：独立部署、只读的 Control Plane 运维界面
+- [`apps/control-plane-ui/`](apps/control-plane-ui/README.zh.md)：独立部署的 Control Plane 运维界面
 - [`agents/`](agents/README.zh.md)：Python 编写的 multi-agent runner 和审查逻辑
 
 ```mermaid
@@ -63,14 +63,14 @@ flowchart LR
   integration -->|input bundle| storage
   agents -->|终态 artifact| storage
   control <-->|run 和 publication 状态| state
-  ui -->|只读查询 API| control
+  ui -->|查询 API| control
   integration -->|GitHub 发布| github
 ```
 
 ## 运行技术栈
 
 - **语言**：[TypeScript](https://www.typescriptlang.org/)（[Node.js](https://nodejs.org/)）用于集成、Control Plane 和 UI 服务端；[Python](https://www.python.org/) 3.14 用于 agent 后端。
-- **Web 与 UI**：[FastAPI](https://fastapi.tiangolo.com/) 提供 agent 执行服务（Runner）的 HTTP API；[Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) 构成只读控制台。
+- **Web 与 UI**：[FastAPI](https://fastapi.tiangolo.com/) 提供 agent 执行服务（Runner）的 HTTP API；[Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) 构成控制台。
 - **Agent 运行时**：[LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/)（[deepagents](https://github.com/langchain-ai/deepagents)），负责模型适配、结构化输出和工具调用。
 - **持久执行**：[Temporal](https://temporal.io/) 负责 workflow/activity 调度、worker 分发、重试、超时和失败状态。
 - **状态与存储**：[PostgreSQL](https://www.postgresql.org/) 存协调状态；S3 兼容对象存储（本地为 [RustFS](https://github.com/rustfs/rustfs)）存输入材料包和诊断产物。

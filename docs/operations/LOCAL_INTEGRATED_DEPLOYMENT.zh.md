@@ -36,7 +36,7 @@ flowchart LR
 
 Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run，Runner Service 和 Temporal 分派任务，宿主机 worker 在 Docker sandbox 中执行 agent。PostgreSQL 保存控制状态，RustFS 保存运行输入和 artifact。
 
-Control Plane UI 是独立部署的只读控制台。它的同源服务端从 Control Plane 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
+Control Plane UI 是独立部署的控制台。它的同源服务端从 Control Plane 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 没有 worker 时，提交的任务会停留在 Temporal 中等待执行。
 

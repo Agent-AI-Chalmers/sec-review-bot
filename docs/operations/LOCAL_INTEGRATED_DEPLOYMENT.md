@@ -34,7 +34,7 @@ flowchart LR
 
 Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, Runner Service and Temporal dispatch its work, and the host worker executes the agents in Docker sandboxes. PostgreSQL stores control state, while RustFS stores run inputs and artifacts.
 
-Control Plane UI is a separately deployed, read-only console. Its same-origin server reads run state from Control Plane and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
+Control Plane UI is a separately deployed console. Its same-origin server reads run state from Control Plane and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
 
 Without a worker, submitted tasks remain in Temporal waiting for execution.
 

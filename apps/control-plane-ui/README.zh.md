@@ -4,7 +4,7 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是用于查看 Review Control Plane run 的内部只读控制台。浏览器只访问该应用的同源服务端；服务端持有 Control Plane 只读凭据，仅代理明确白名单内的 GET 路径，并原样转发查询串。
+这是用于查看 Review Control Plane run 的内部控制台。浏览器只访问该应用的同源服务端；服务端持有 Control Plane 读取凭据，仅代理明确白名单内的 GET 路径，并原样转发查询串。
 
 ## 本地运行
 
@@ -48,6 +48,6 @@ pnpm test
 pnpm run build
 ```
 
-生产服务需要 `CONTROL_PLANE_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`。只读 token 只能调用 Control Plane 查询路由；访问 token 用于建立 HTTP-only 浏览器会话，不能放入 Vite 变量或浏览器代码。
+生产服务需要 `CONTROL_PLANE_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`。read token 只能调用 Control Plane 查询路由；访问 token 用于建立 HTTP-only 浏览器会话，不能放入 Vite 变量或浏览器代码。
 
 BFF 还负责代理下载私有 RustFS 中的终态 artifact。它使用单独的 `s3:GetObject` 凭据，该凭据仅可读取 `sec-review/runs/*/artifacts/*`；浏览器只提交 run ID，不会收到存储凭据或对象 URI。BFF 会先将对象写入临时文件，并根据 Control Plane 元数据校验大小和 SHA-256 摘要，再向浏览器返回下载。下载使用同一个 HTTP-only session 鉴权，固定作为附件返回，并受存储空闲超时限制。

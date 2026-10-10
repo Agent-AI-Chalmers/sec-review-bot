@@ -9,7 +9,7 @@ flowchart TD
   cp[control-plane/\nadmit, submit, observe, persist state]
   storage[(Object Storage\ninput bundle + terminal artifact)]
   runner[agents/\nRunner and workflow execution]
-  ui[apps/control-plane-ui\nread-only operations console]
+  ui[apps/control-plane-ui\noperations console]
   state[(PostgreSQL\nrun + publication state)]
 
   github -->|1. webhook or Actions request| app
@@ -28,7 +28,7 @@ flowchart TD
   app -->|14. claim publication work| cp
   app -->|15. publish review, comment, issue, or PR| github
   app -->|16. record publication outcome| cp
-  ui -->|read-only run queries| cp
+  ui -->|run queries| cp
 ```
 
 ## Normal flow

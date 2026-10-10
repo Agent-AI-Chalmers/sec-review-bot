@@ -13,7 +13,7 @@ flowchart TD
   cp[control-plane/\n接纳、提交、观察与持久化状态]
   storage[(对象存储\ninput bundle + 终态 artifact)]
   runner[agents/\nRunner 与 workflow 执行]
-  ui[apps/control-plane-ui\n只读运维界面]
+  ui[apps/control-plane-ui\n运维界面]
   state[(PostgreSQL\nrun + publication 状态)]
 
   github -->|1. webhook 或 Actions 请求| app
@@ -32,7 +32,7 @@ flowchart TD
   app -->|14. 领取 publication 工作| cp
   app -->|15. 发布 review、comment、issue 或 PR| github
   app -->|16. 记录发布结果| cp
-  ui -->|只读 run 查询| cp
+  ui -->|run 查询| cp
 ```
 
 ## 正常流程
