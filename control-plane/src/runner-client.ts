@@ -352,6 +352,16 @@ export interface RunnerRunStatusBatch {
 export type RunnerRunStatusToken = components['schemas']['RunStatusToken']
 
 /**
+ * How many run IDs one status request carries.
+ *
+ * The runner rejects a longer batch, so a caller tracking more runs than this has its
+ * request split rather than failing. The number is the contract's `maxItems` for
+ * `RunStatusQuery.run_ids`, and a test asserts the two agree: a client-side copy of a
+ * contract limit is exactly the kind of value that otherwise drifts.
+ */
+export const RUNNER_STATUS_QUERY_LIMIT = 200
+
+/**
  * Read many run statuses in one request.
  *
  * A caller that tracks N runs otherwise issues N requests per interval, so its check
@@ -362,15 +372,6 @@ export type RunnerRunStatusToken = components['schemas']['RunStatusToken']
  * means re-reading every listed workflow on a timer, which costs far more reads than the
  * polling it replaced. A wait belongs where the state lives, not in this layer.
  */
-/**
- * How many run IDs one status request carries.
- *
- * The runner rejects a longer batch, so a caller tracking more runs than this has its
- * request split rather than failing. The number is the contract's `maxItems` for
- * `RunStatusQuery.run_ids`, and a test asserts the two agree: a client-side copy of a
- * contract limit is exactly the kind of value that otherwise drifts.
- */
-export const RUNNER_STATUS_QUERY_LIMIT = 200
 
 export async function getRunnerRunStatuses(
   runIds: readonly string[]

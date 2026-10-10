@@ -7,11 +7,12 @@
 // Only containment is asserted, and the direction depends on what each pair promises.
 // `ReviewRunRecord` is deliberately narrower here — the integration never reads
 // `runner_status`, `publication_status`, or the per-axis `updated_at` fields — and
-// `PublicationWork` inherits that narrower view. The rest are meant to accept exactly the
-// same values, so they are compared by value: a key-set comparison would not notice a
-// widened union or a relaxed literal, which is how `kind: string` went unnoticed here. A
-// field the client adds must exist on the Control Plane side in every case; that is the
-// direction that breaks at runtime.
+// `PublicationWork` inherits that narrower view. The rest are meant to name the same keys
+// and accept the same values, so they are compared both ways: a key-set comparison would
+// not notice a widened union or a relaxed literal — which is how `kind: string` went
+// unnoticed here — while a value comparison would not notice an optional field added on
+// one side only. A field the client adds must exist on the Control Plane side in every
+// case; that is the direction that breaks at runtime.
 //
 // Four calls also pass object shapes inline — the failure envelope, the retry option, and
 // the remote object. Those have no name to compare, so their whole call signature is
@@ -54,16 +55,18 @@ type KeysWithin<A, B> = [keyof A] extends [keyof B] ? true : false
 type SameKeys<A, B> = KeysWithin<A, B> extends true ? KeysWithin<B, A> : false
 /** `A` and `B` accept exactly the same values. Used for unions, which have no keys. */
 type SameValues<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
+/** `A` and `B` name the same keys and accept the same values. */
+type SameShape<A, B> = SameKeys<A, B> extends true ? SameValues<A, B> : false
 type Expect<T extends true> = T
 
 export type StatusUnionMatches = Expect<SameValues<ClientStatus, ControlPlaneStatus>>
 
 /**
- * By value, not by key set: `workflow` is a union, and a name added on one side only would
- * leave every key in place.
+ * Both dimensions: `workflow` is a union, so value equality is needed, and
+ * `runner_input`/`ingress_*` are optional, so key equality is needed too.
  */
 export type CreateArgsMatchTheContract = Expect<
-  SameValues<ClientCreateArgs, ControlPlaneCreateArgs>
+  SameShape<ClientCreateArgs, ControlPlaneCreateArgs>
 >
 
 export type ClientRecordIsWithinControlPlaneRecord = Expect<
@@ -75,17 +78,18 @@ export type AdmissionKeysMatch = Expect<SameKeys<ClientAdmission, ControlPlaneAd
 export type PublicationWorkKeysMatch = Expect<KeysWithin<ClientWork, ControlPlaneWork>>
 
 /**
- * By value as well: `status` is a union here too, and the same blind spot applies.
+ * By value as well as by key set: `status` is a union, so value equality is needed on top
+ * of the key comparison.
  */
-export type PublicationStepMatchTheContract = Expect<SameValues<ClientStep, ControlPlaneStep>>
+export type PublicationStepMatchTheContract = Expect<SameShape<ClientStep, ControlPlaneStep>>
 
 /**
- * Compared by value rather than by key set: this shape's fields are literals
- * (`kind` is a constant) and nullable, so a key comparison would miss a widened field.
- * It did: the integration declared `kind: string` while the contract fixes one value.
+ * Both dimensions: `kind` and `status` are literals, so value equality is needed — the
+ * integration once declared `kind: string` while the contract fixes one value — and
+ * `artifact`, `error_code`, and `message` are optional, so key equality is needed too.
  */
 export type ArtifactStorageMatchesTheContract = Expect<
-  SameValues<ClientArtifactStorage, ControlPlaneArtifactStorage>
+  SameShape<ClientArtifactStorage, ControlPlaneArtifactStorage>
 >
 
 /** One whole call signature: its argument tuple and its return type. */
