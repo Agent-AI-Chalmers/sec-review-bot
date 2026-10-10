@@ -34,6 +34,7 @@ export default tseslint.config(
         document: 'readonly',
         fetch: 'readonly',
         getComputedStyle: 'readonly',
+        localStorage: 'readonly',
         navigator: 'readonly'
       }
     }

@@ -27,6 +27,46 @@ if (CHROME_PATH === undefined) {
   )
 }
 
+/** Relative luminance contrast, so the theme can be checked without pixel baselines. */
+const CONTRAST = `(() => {
+  const parse = (value) => {
+    const match = value.match(/rgba?\\(([^)]+)\\)/)
+    if (!match) return null
+    const parts = match[1].split(',').map((part) => Number.parseFloat(part))
+    return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 }
+  }
+  const luminance = ({ r, g, b }) => {
+    const channel = (c) => {
+      const s = c / 255
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+  }
+  const background = (element) => {
+    let node = element
+    while (node) {
+      const colour = parse(getComputedStyle(node).backgroundColor)
+      if (colour && colour.a > 0.9) return colour
+      node = node.parentElement
+    }
+    return { r: 255, g: 255, b: 255, a: 1 }
+  }
+  const ratio = (selector) => {
+    const element = document.querySelector(selector)
+    if (!element) return null
+    const foreground = parse(getComputedStyle(element).color)
+    if (!foreground) return null
+    const a = luminance(foreground)
+    const b = luminance(background(element))
+    return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100
+  }
+  return {
+    background: background(document.body),
+    title: ratio('h1'),
+    cell: ratio('tbody td span')
+  }
+})()`
+
 const EXPECTED_HEADERS = [
   'Run',
   'Workflow',
@@ -99,6 +139,40 @@ try {
       await context.close()
       continue
     }
+
+    // The header is a fixed height and must not grow over the page: expanding content
+    // once pushed the "Open" control on top of the content and swallowed its clicks.
+    const headerBox = await page.locator('header').boundingBox()
+    const titleBox = await page.getByRole('heading', { name: 'Runs' }).boundingBox()
+    assert.ok(
+      headerBox !== null && headerBox.height <= 58,
+      `${name} the header must keep its height (saw ${headerBox?.height})`
+    )
+    assert.ok(
+      headerBox !== null && titleBox !== null && titleBox.y >= headerBox.y + headerBox.height - 1,
+      `${name} the header must not overlap the page content`
+    )
+
+    // Row actions stay out of the way until the row is used, but they must be reachable
+    // without a mouse as well — hiding an action behind hover alone loses it for keyboards.
+    const rowAction = page.locator('tbody tr:first-child .row-action')
+    const rowActionOpacity = () =>
+      rowAction.evaluate((element) => getComputedStyle(element).opacity)
+    assert.equal(await rowActionOpacity(), '0', `${name} a row action must rest hidden`)
+    await page.locator('tbody tr:first-child').hover()
+    await page.waitForTimeout(250)
+    assert.equal(await rowActionOpacity(), '1', `${name} hovering a row must reveal its action`)
+    await page.mouse.move(2, 2)
+    await page.locator('tbody tr:first-child td a').first().focus()
+    await page.waitForTimeout(250)
+    assert.equal(await rowActionOpacity(), '1', `${name} focusing a row must reveal its action too`)
+
+    // The recency column leads with how long ago, so the feed can be scanned by eye.
+    assert.match(
+      (await page.locator('tbody tr:first-child td').nth(4).textContent()) ?? '',
+      /\d+[dhms]\s+ago/,
+      `${name} last activity must read as elapsed time`
+    )
 
     // The list separates the two status axes into their own columns, and each
     // status is dot+text rather than a badge.
@@ -380,6 +454,63 @@ try {
       `${name} a 401 must return the reader to the sign-in form`
     )
     await page.unroute('**/api/runs*')
+
+    // A specific backend failure must not collapse into the generic sentence.
+    await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await page.getByRole('heading', { name: 'Runs' }).waitFor()
+    await page.route('**/api/runs*', (route) =>
+      route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: '{"error":"control_plane_unavailable"}'
+      })
+    )
+    await page.getByRole('button', { name: 'Refresh' }).click()
+    await page.waitForTimeout(900)
+    assert.match(
+      (await page.locator('[role="alert"]').first().textContent()) ?? '',
+      /unreachable/,
+      `${name} an unreachable Control Plane must say so`
+    )
+    await page.unroute('**/api/runs*')
+
+    // A touch device never hovers, so the action has to remain visible there.
+    const touchContext = await browser.newContext({ viewport, locale: 'en-US', hasTouch: true })
+    const touchPage = await touchContext.newPage()
+    await touchPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await touchPage.getByRole('heading', { name: 'Runs' }).waitFor()
+    await touchPage.waitForTimeout(400)
+    assert.equal(
+      await touchPage
+        .locator('tbody tr:first-child .row-action')
+        .evaluate((element) => getComputedStyle(element).opacity),
+      '1',
+      `${name} a touch device must see the row action without hovering`
+    )
+    await touchContext.close()
+
+    // Both colour schemes must stay readable. Contrast is an invariant; exact pixels
+    // are not, so this is the part of the visual layer worth asserting.
+    for (const theme of ['light', 'dark']) {
+      const themeContext = await browser.newContext({ viewport, locale: 'en-US' })
+      const themePage = await themeContext.newPage()
+      await themePage.addInitScript((value) => localStorage.setItem('ui-theme', value), theme)
+      await themePage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+      await themePage.getByRole('heading', { name: 'Runs' }).waitFor()
+      await themePage.waitForTimeout(500)
+      const contrast = await themePage.evaluate(CONTRAST)
+      const dark = theme === 'dark'
+      assert.equal(
+        contrast.background.r < 128,
+        dark,
+        `${name} the ${theme} theme must render its own background`
+      )
+      assert.ok(
+        contrast.title >= 4.5 && contrast.cell >= 4.5,
+        `${name} ${theme} theme contrast is too low (title ${contrast.title}, cell ${contrast.cell})`
+      )
+      await themeContext.close()
+    }
 
     console.log(`browser-smoke ${name}: ok (${base})`)
     await context.close()

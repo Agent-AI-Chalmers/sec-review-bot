@@ -459,14 +459,23 @@ function Runs(): React.JSX.Element {
                 {data.runs.map((run) => (
                   <Table.Tr key={run.run_id}>
                     <Table.Td>
-                      <Tooltip label={run.run_id}>
-                        <Link
-                          to={`/runs/${encodeURIComponent(run.run_id)}`}
-                          state={{ listSearch: search.toString() }}
-                        >
-                          {abbreviate(run.run_id, 8, 4)}
-                        </Link>
-                      </Tooltip>
+                      <Group gap={4} align="center" wrap="nowrap">
+                        <Tooltip label={run.run_id}>
+                          <Link
+                            to={`/runs/${encodeURIComponent(run.run_id)}`}
+                            state={{ listSearch: search.toString() }}
+                          >
+                            {abbreviate(run.run_id, 8, 4)}
+                          </Link>
+                        </Tooltip>
+                        <span className="row-action">
+                          <CopyAction
+                            value={run.run_id}
+                            name={t('copyRunId')}
+                            copiedName={t('runIdCopied')}
+                          />
+                        </span>
+                      </Group>
                     </Table.Td>
                     <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
                     <Table.Td>
@@ -475,7 +484,13 @@ function Runs(): React.JSX.Element {
                     <Table.Td>
                       <PublicationStatus status={run.publication_status} />
                     </Table.Td>
-                    <Table.Td>{formatDate(lastActivity(run), language)}</Table.Td>
+                    <Table.Td>
+                      <Tooltip label={formatDate(lastActivity(run), language)}>
+                        <span>
+                          {formatDuration(Date.now() - Date.parse(lastActivity(run)), t)} {t('ago')}
+                        </span>
+                      </Tooltip>
+                    </Table.Td>
                     <Table.Td>
                       {run.failure_code && (
                         <Text c="red" size="xs" ff="monospace">
@@ -630,23 +645,24 @@ function formatDuration(milliseconds: number, t: ReturnType<typeof useMessages>)
 
 function CopyAction({
   value,
-  label,
-  copiedLabel
+  name,
+  copiedName
 }: {
   value: string
-  label: string
-  copiedLabel: string
+  name: string
+  copiedName: string
 }): React.JSX.Element {
+  const t = useMessages()
   const [copied, setCopied] = React.useState(false)
   const copy = async (): Promise<void> => {
     await navigator.clipboard.writeText(value)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 2000)
   }
-  const text = copied ? copiedLabel : label
+  const text = copied ? copiedName : name
   return (
     <>
-      <Tooltip label={text}>
+      <Tooltip label={copied ? t('copied') : t('copy')}>
         <ActionIcon
           variant="subtle"
           color="gray"
@@ -658,7 +674,7 @@ function CopyAction({
         </ActionIcon>
       </Tooltip>
       <span className="visually-hidden" aria-live="polite">
-        {copied ? copiedLabel : ''}
+        {copied ? copiedName : ''}
       </span>
     </>
   )
@@ -730,8 +746,8 @@ function Artifact({
           </button>
           <CopyAction
             value={artifact.digest}
-            label={t('copyDigest')}
-            copiedLabel={t('digestCopied')}
+            name={t('copyDigest')}
+            copiedName={t('digestCopied')}
           />
         </div>
       </div>
@@ -850,11 +866,7 @@ function Detail(): React.JSX.Element {
               <Title order={1} className="run-id">
                 {run.run_id}
               </Title>
-              <CopyAction
-                value={run.run_id}
-                label={t('copyRunId')}
-                copiedLabel={t('runIdCopied')}
-              />
+              <CopyAction value={run.run_id} name={t('copyRunId')} copiedName={t('runIdCopied')} />
             </Group>
             <Group gap="lg" align="center" mt="md" className="run-state-summary">
               <Text c="dimmed" size="xs" tt="uppercase">
