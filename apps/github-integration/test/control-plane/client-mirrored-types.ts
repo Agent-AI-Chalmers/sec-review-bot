@@ -11,8 +11,15 @@
 // same keys. A field the client adds must exist on the Control Plane side in every case;
 // that is the direction that breaks at runtime.
 //
+// Four calls also pass object shapes inline — the failure envelope, the retry option, and
+// the remote object. Those have no name to compare, so their whole call signature is
+// compared instead: the argument tuple and the return type, via `Parameters` and
+// `ReturnType`. That covers argument order and count too, which a shape comparison misses.
+//
 // The control-plane package cannot import this file back, so its own definitions are
 // checked against the shared schemas instead.
+import type { ReviewRunStore } from '../../../../control-plane/src/index.js'
+
 import type {
   CreateReviewRunArgs as ControlPlaneCreateArgs,
   ReviewRunAdmission as ControlPlaneAdmission,
@@ -25,6 +32,7 @@ import type {
 import type { RunnerArtifactStorage as ControlPlaneArtifactStorage } from '../../../../control-plane/src/index.js'
 
 import type {
+  ControlPlaneClient,
   CreateReviewRunArgs as ClientCreateArgs,
   PublicationStepRecord as ClientStep,
   PublicationWork as ClientWork,
@@ -58,4 +66,29 @@ export type PublicationStepKeysMatch = Expect<SameKeys<ClientStep, ControlPlaneS
 
 export type ArtifactStorageKeysMatch = Expect<
   SameKeys<ClientArtifactStorage, ControlPlaneArtifactStorage>
+>
+
+/** One whole call signature: its argument tuple and its return type. */
+type SameCall<
+  Client extends (...args: never[]) => unknown,
+  Server extends (...args: never[]) => unknown
+> =
+  SameValues<Parameters<Client>, Parameters<Server>> extends true
+    ? SameValues<ReturnType<Client>, ReturnType<Server>>
+    : false
+
+export type CompletePublicationStepCallMatches = Expect<
+  SameCall<ControlPlaneClient['completePublicationStep'], ReviewRunStore['completePublicationStep']>
+>
+
+export type FailPublicationStepCallMatches = Expect<
+  SameCall<ControlPlaneClient['failPublicationStep'], ReviewRunStore['failPublicationStep']>
+>
+
+export type FailPublicationCallMatches = Expect<
+  SameCall<ControlPlaneClient['failPublication'], ReviewRunStore['failPublication']>
+>
+
+export type FailPreparationCallMatches = Expect<
+  SameCall<ControlPlaneClient['failPreparation'], ReviewRunStore['failPreparation']>
 >
