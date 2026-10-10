@@ -249,7 +249,7 @@ async def _maintain_memory_with_result_locked(
             path_views=[
                 writable_memory_view(host_path=worktree_root),
             ],
-            use_docker_sandbox=False,
+            backend_kind="local",
         )
         model = create_chat_model(
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,

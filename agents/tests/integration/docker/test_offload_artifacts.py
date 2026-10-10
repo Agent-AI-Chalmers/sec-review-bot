@@ -41,7 +41,7 @@ def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
     backend = create_backend_with_path_views(
         container_name_prefix="offload-human-test",
         path_views=[],
-        use_docker_sandbox=True,
+        backend_kind="docker",
     )
     assert isinstance(backend, DockerSandboxBackend)
     try:
@@ -90,7 +90,7 @@ def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
     backend = create_backend_with_path_views(
         container_name_prefix="offload-tool-test",
         path_views=[],
-        use_docker_sandbox=True,
+        backend_kind="docker",
     )
     assert isinstance(backend, DockerSandboxBackend)
     try:

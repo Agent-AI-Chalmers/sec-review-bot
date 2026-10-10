@@ -41,15 +41,10 @@ def create_backend_with_path_views(
     path_views: list[PathView] | None = None,
     working_directory: str = "/workspace",
     image: str | None = None,
-    use_docker_sandbox: bool | None = None,
     backend_kind: str | None = None,
 ):
     if backend_kind is None:
-        backend_kind = (
-            backend_selection.selected_sandbox_backend_kind()
-            if use_docker_sandbox is None
-            else ("docker" if use_docker_sandbox else "local")
-        )
+        backend_kind = backend_selection.selected_sandbox_backend_kind()
     backend_kind = backend_kind.strip().lower()
     path_views = list(path_views or [])
     if backend_kind == "docker":

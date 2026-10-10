@@ -19,5 +19,5 @@ def create_repository_triage_backend():
     return create_backend_with_path_views(
         container_name_prefix="repository-triage",
         path_views=path_views,
-        use_docker_sandbox=False,
+        backend_kind="local",
     )

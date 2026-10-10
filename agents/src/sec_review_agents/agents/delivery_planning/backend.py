@@ -18,5 +18,5 @@ def create_repository_delivery_planning_backend(*, patch_root: Path):
             read_only_path_view(agent_path="/patches", host_path=patch_root),
             tmp_view_for_backend("local"),
         ],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )

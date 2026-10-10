@@ -51,7 +51,7 @@ def create_repository_cvss_backend(
             workspace_view(host_path=workspace_root_path, writable=True),
             tmp_view_for_backend("local"),
         ],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )
 
 
