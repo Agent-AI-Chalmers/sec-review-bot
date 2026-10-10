@@ -1,13 +1,8 @@
 export { controlPlaneOperations, type ControlPlaneOperation } from './contracts.js'
 export type {
-  AdmittedReviewRun,
   ControlPlaneWorkflow,
-  InputArtifactRef,
-  RunnerArtifactStorage,
-  ReviewRunAdmissionRequest,
-  ReviewRunCoordinator
+  RunnerArtifactStorage
 } from './contracts.js'
-export { admitReviewRun, type ReviewRunAdmissionStore } from './admission.js'
 export { submitPreparedRun } from './prepared-submission.js'
 export {
   coordinateReviewRunsOnce,

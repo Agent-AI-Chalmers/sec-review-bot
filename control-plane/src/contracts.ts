@@ -55,28 +55,3 @@ export type ControlPlaneOperation = (typeof controlPlaneOperations)[number]
  * imports it, but the definition has one home rather than three.
  */
 export type RunnerArtifactStorage = components['schemas']['RunnerArtifactStorage']
-
-export interface InputArtifactRef {
-  uri: string
-  media_type: string
-  size_bytes: number
-  digest: `sha256:${string}`
-}
-
-export interface AdmittedReviewRun {
-  run_id: string
-  workflow: ControlPlaneWorkflow
-  status: string
-  created: boolean
-  preparation_token: string | null
-}
-
-export interface ReviewRunAdmissionRequest {
-  workflow: ControlPlaneWorkflow
-  ingress_kind: 'github_webhook' | 'github_actions_dispatch'
-  ingress_key: string
-}
-
-export interface ReviewRunCoordinator {
-  admit(request: ReviewRunAdmissionRequest): Promise<AdmittedReviewRun>
-}
