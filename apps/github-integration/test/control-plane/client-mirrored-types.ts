@@ -19,12 +19,10 @@
 // compared instead: the argument tuple and the return type, via `Parameters` and
 // `ReturnType`. That covers argument order and count too, which a shape comparison misses.
 //
-// The control-plane package cannot import this file back, and this package has no generated
-// view of the contract to alias, so its copies stay written here and are compared against the
-// control-plane's own (contract-derived) types.
-//
-// The control-plane package cannot import this file back, so its own definitions are
-// checked against the shared schemas instead.
+// Neither side imports the other: this package has no generated view of the contract to
+// alias, so its copies stay written here and are compared against the control plane's
+// contract-derived types, while the control plane cannot import this file back and checks
+// its own definitions against the shared schemas instead.
 import type { ReviewRunStore } from '../../../../control-plane/src/index.js'
 
 import type {
