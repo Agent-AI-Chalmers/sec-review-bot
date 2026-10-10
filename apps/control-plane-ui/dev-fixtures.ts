@@ -7,7 +7,8 @@ interface FixtureRun {
   execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
   publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
   created_at: string
-  updated_at: string
+  execution_updated_at: string
+  publication_updated_at: string
   published_at: string | null
   failure_code: string | null
   artifact_storage: object | null
@@ -41,7 +42,8 @@ const runs: FixtureRun[] = [
     execution_status: 'succeeded',
     publication_status: 'published',
     created_at: '2026-10-08T14:17:15.571Z',
-    updated_at: '2026-10-08T14:19:43.909Z',
+    execution_updated_at: '2026-10-08T14:18:52.100Z',
+    publication_updated_at: '2026-10-08T14:19:43.909Z',
     published_at: '2026-10-08T14:19:43.909Z',
     failure_code: null,
     artifact_storage: artifact('018f6b7c-2d41-7a30-9000-000000000001')
@@ -53,7 +55,8 @@ const runs: FixtureRun[] = [
     execution_status: 'succeeded',
     publication_status: 'publishing',
     created_at: '2026-10-08T12:02:11.104Z',
-    updated_at: '2026-10-08T12:07:54.601Z',
+    execution_updated_at: '2026-10-08T12:04:30.000Z',
+    publication_updated_at: '2026-10-08T12:07:54.601Z',
     published_at: null,
     failure_code: null,
     artifact_storage: artifact('018f6b7c-2d41-7a30-9000-000000000002')
@@ -65,7 +68,8 @@ const runs: FixtureRun[] = [
     execution_status: 'succeeded',
     publication_status: 'publishing',
     created_at: '2026-10-08T09:40:03.214Z',
-    updated_at: '2026-10-08T09:58:19.772Z',
+    execution_updated_at: '2026-10-08T09:52:00.000Z',
+    publication_updated_at: '2026-10-08T09:58:19.772Z',
     published_at: null,
     failure_code: null,
     artifact_storage: artifact('018f6b7c-2d41-7a30-9000-000000000003')
@@ -77,7 +81,8 @@ const runs: FixtureRun[] = [
     execution_status: 'succeeded',
     publication_status: 'failed',
     created_at: '2026-10-08T08:11:46.832Z',
-    updated_at: '2026-10-08T08:29:10.118Z',
+    execution_updated_at: '2026-10-08T08:20:00.000Z',
+    publication_updated_at: '2026-10-08T08:29:10.118Z',
     published_at: null,
     failure_code: 'GITHUB_VALIDATION_REJECTED',
     artifact_storage: artifact('018f6b7c-2d41-7a30-9000-000000000004')
@@ -89,7 +94,8 @@ const runs: FixtureRun[] = [
     execution_status: 'failed',
     publication_status: 'pending',
     created_at: '2026-10-08T07:03:28.002Z',
-    updated_at: '2026-10-08T07:04:01.447Z',
+    execution_updated_at: '2026-10-08T07:04:01.447Z',
+    publication_updated_at: '2026-10-08T07:04:01.447Z',
     published_at: null,
     failure_code: 'RUNNER_EXECUTION_FAILED',
     artifact_storage: { status: 'unavailable' }
@@ -101,7 +107,8 @@ const runs: FixtureRun[] = [
     execution_status: 'running',
     publication_status: 'pending',
     created_at: '2026-10-08T06:42:17.510Z',
-    updated_at: '2026-10-08T06:43:32.090Z',
+    execution_updated_at: '2026-10-08T06:43:32.090Z',
+    publication_updated_at: '2026-10-08T06:42:17.510Z',
     published_at: null,
     failure_code: null,
     artifact_storage: null

@@ -16,7 +16,8 @@ export interface Run {
   execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
   publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
   created_at: string
-  updated_at: string
+  execution_updated_at: string
+  publication_updated_at: string
   published_at: string | null
   failure_code: string | null
   artifact_storage: ArtifactStorage | null

@@ -24,7 +24,6 @@ export interface CreateReviewRunArgs {
 export interface ReviewRunRecord extends CreateReviewRunArgs {
   status: ReviewRunStatus
   created_at: string
-  updated_at: string
   published_at: string | null
   failure_code: string | null
   failure_message: string | null

@@ -42,7 +42,8 @@ export interface ReviewRunRecord extends CreateReviewRunArgs {
   runner_status: RunnerStatus
   publication_status: PublicationStatus
   created_at: string
-  updated_at: string
+  execution_updated_at: string
+  publication_updated_at: string
   published_at: string | null
   failure_code: string | null
   failure_message: string | null
@@ -116,9 +117,8 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     runner_status: row.runner_status,
     publication_status: row.publication_status,
     created_at: iso(row.created_at),
-    updated_at: iso(
-      row.publication_status === 'pending' ? row.runner_updated_at : row.publication_updated_at
-    ),
+    execution_updated_at: iso(row.runner_updated_at),
+    publication_updated_at: iso(row.publication_updated_at),
     published_at: row.published_at === null ? null : iso(row.published_at),
     failure_code: publicationFailure ? row.publication_failure_code : row.runner_failure_code,
     failure_message: publicationFailure

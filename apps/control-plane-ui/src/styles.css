@@ -152,7 +152,9 @@ a {
   overflow: hidden;
 }
 .publication-summary {
-  min-height: 24px;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
 }
 .delivery-item {
   display: grid;

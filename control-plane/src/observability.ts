@@ -8,7 +8,8 @@ export interface ObservedRun {
   execution_status: ReviewRunRecord['runner_status']
   publication_status: ReviewRunRecord['publication_status']
   created_at: string
-  updated_at: string
+  execution_updated_at: string
+  publication_updated_at: string
   published_at: string | null
   failure_code: string | null
   artifact_storage: ReviewRunRecord['artifact_storage']
@@ -32,7 +33,8 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
     execution_status: run.runner_status,
     publication_status: run.publication_status,
     created_at: run.created_at,
-    updated_at: run.updated_at,
+    execution_updated_at: run.execution_updated_at,
+    publication_updated_at: run.publication_updated_at,
     published_at: run.published_at,
     failure_code: run.failure_code,
     artifact_storage: run.artifact_storage

@@ -360,7 +360,7 @@ function Runs(): React.JSX.Element {
                     <Table.Td>
                       <PublicationStatus status={run.publication_status} />
                     </Table.Td>
-                    <Table.Td>{formatDate(run.updated_at, language)}</Table.Td>
+                    <Table.Td>{formatDate(lastActivity(run), language)}</Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -461,6 +461,12 @@ function formatBytes(value: number): string {
 
 function abbreviate(value: string, head: number, tail: number): string {
   return `${value.slice(0, head)}…${value.slice(-tail)}`
+}
+
+function lastActivity(run: Run): string {
+  return Date.parse(run.publication_updated_at) > Date.parse(run.execution_updated_at)
+    ? run.publication_updated_at
+    : run.execution_updated_at
 }
 
 function abbreviateDigest(digest: string): string {
@@ -662,9 +668,6 @@ function Detail(): React.JSX.Element {
                   </Group>
                 )}
               </Group>
-              <Text c="dimmed" size="xs">
-                {t('lastActivity')}: {formatDate(run.updated_at, language)}
-              </Text>
             </Group>
           </div>
           <Stack gap="xl">
@@ -688,6 +691,9 @@ function Detail(): React.JSX.Element {
                   color={statusToneColor(executionTone(run.execution_status))}
                   title={<Text fw={500}>{t('execution')}</Text>}
                 >
+                  <Text c="dimmed" size="sm">
+                    {formatDate(run.execution_updated_at, language)}
+                  </Text>
                   {run.artifact_storage !== null && (
                     <div className="artifact-section">
                       <Artifact storage={run.artifact_storage} runId={run.run_id} />
@@ -699,32 +705,23 @@ function Detail(): React.JSX.Element {
                   color={statusToneColor(publicationTone(run.publication_status))}
                   title={<Text fw={500}>{t('publication')}</Text>}
                 >
-                  {(run.published_at || singlePublicationUrl) && (
-                    <Group gap="xs" className="publication-summary">
-                      {run.published_at && (
-                        <Text c="dimmed" size="sm">
-                          {formatDate(run.published_at, language)}
-                        </Text>
-                      )}
-                      {run.published_at && singlePublicationUrl && (
-                        <Text c="dimmed" size="sm" aria-hidden="true">
-                          ·
-                        </Text>
-                      )}
-                      {singlePublicationUrl && (
-                        <Anchor
-                          href={singlePublicationUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          size="sm"
-                          className="delivery-link"
-                        >
-                          {t('openExternalLink')}
-                          <IconExternalLink size={14} aria-hidden="true" />
-                        </Anchor>
-                      )}
-                    </Group>
-                  )}
+                  <div className="publication-summary">
+                    <Text c="dimmed" size="sm">
+                      {formatDate(run.published_at ?? run.publication_updated_at, language)}
+                    </Text>
+                    {singlePublicationUrl && (
+                      <Anchor
+                        href={singlePublicationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        size="sm"
+                        className="delivery-link"
+                      >
+                        {t('openExternalLink')}
+                        <IconExternalLink size={14} aria-hidden="true" />
+                      </Anchor>
+                    )}
+                  </div>
                   {showPublicationDetails && (
                     <div className="delivery-list">
                       {publicationOutcomes.map((step) => {
