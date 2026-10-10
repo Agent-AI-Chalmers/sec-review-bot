@@ -2,7 +2,7 @@
 
 Language: English | [中文](RUNNER_HTTP_API.zh.md)
 
-This is the HTTP API for the production runner service. Workflow input and result fields are defined in [CONTRACT_V5.md](CONTRACT_V5.md).
+This is the HTTP API for the production runner service. Workflow input and result fields are defined in [integration-contract/v5/CONTRACT.md](v5/CONTRACT.md).
 
 ## Authentication
 

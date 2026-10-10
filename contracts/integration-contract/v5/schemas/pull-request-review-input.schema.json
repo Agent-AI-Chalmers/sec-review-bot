@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sec-review-bot.local/contracts/schemas/v5/pull-request-review-input.schema.json",
+  "$id": "https://sec-review-bot.local/contracts/integration-contract/v5/schemas/pull-request-review-input.schema.json",
   "title": "Contract v5 pull-request-review input",
   "type": "object",
   "additionalProperties": false,

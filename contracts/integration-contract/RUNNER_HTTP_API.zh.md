@@ -4,7 +4,7 @@
 
 本文是 [RUNNER_HTTP_API.md](RUNNER_HTTP_API.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是生产 runner service 的 HTTP API。workflow 的输入和结果字段见 [契约 v5](CONTRACT_V5.zh.md)。
+这是生产 runner service 的 HTTP API。workflow 的输入和结果字段见 [契约 v5](v5/CONTRACT.zh.md)。
 
 ## 认证
 

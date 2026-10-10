@@ -22,9 +22,11 @@ let validators: Map<string, ValidateFunction> | null = null
 function contractSchemasRoot(): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
   const candidates = [
-    ...(configuredRoot ? [path.resolve(configuredRoot, 'schemas', 'v5')] : []),
-    path.resolve(process.cwd(), 'contracts', 'schemas', 'v5'),
-    path.resolve(process.cwd(), '..', '..', 'contracts', 'schemas', 'v5')
+    ...(configuredRoot
+      ? [path.resolve(configuredRoot, 'integration-contract', 'v5', 'schemas')]
+      : []),
+    path.resolve(process.cwd(), 'contracts', 'integration-contract', 'v5', 'schemas'),
+    path.resolve(process.cwd(), '..', '..', 'contracts', 'integration-contract', 'v5', 'schemas')
   ]
   const root = candidates.find((candidate) =>
     existsSync(path.join(candidate, 'common.schema.json'))

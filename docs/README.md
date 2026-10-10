@@ -41,9 +41,10 @@ flowchart LR
 
 Use these docs for the contracts between the App side and agent side:
 
-- [Contracts README](../contracts/README.md): Public integration interface and contract entry point.
-- [RUNNER_HTTP_API.md](../contracts/RUNNER_HTTP_API.md): The Agent Runner HTTP API.
-- [CONTRACT_V5.md](../contracts/CONTRACT_V5.md): Workflow result contract.
+- [Contracts README](../contracts/README.md): the contract directory index, its layout rule, and the rules every family follows.
+- [integration-contract/README.md](../contracts/integration-contract/README.md): the Runner-facing integration point, its public boundary, and ownership.
+- [RUNNER_HTTP_API.md](../contracts/integration-contract/RUNNER_HTTP_API.md): The Agent Runner HTTP API.
+- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md): Workflow result contract.
 
 ### workflows/
 
