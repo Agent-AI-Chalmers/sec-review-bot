@@ -64,7 +64,9 @@ const messages = {
     failureCode: 'Failure code',
     unable: 'Unable to load Control Plane',
     requestFailed: 'The service could not complete this request.',
-    retry: 'Retry'
+    retry: 'Retry',
+    runNotFound: 'Run not found',
+    runNotFoundHint: 'No run with this ID is stored here.'
   },
   zh: {
     language: '语言',
@@ -127,7 +129,9 @@ const messages = {
     failureCode: '失败码',
     unable: '无法加载 Control Plane',
     requestFailed: '服务无法完成此请求。',
-    retry: '重试'
+    retry: '重试',
+    runNotFound: '找不到该 run',
+    runNotFoundHint: '此处没有存储这个 ID 的 run。'
   }
 } as const
 export type Message = keyof typeof messages.en

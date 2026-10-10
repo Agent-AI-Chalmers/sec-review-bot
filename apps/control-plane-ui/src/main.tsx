@@ -695,20 +695,24 @@ function Detail(): React.JSX.Element {
   // a deep link has no such state, so fall back to an unfiltered first page.
   const listSearch = (location.state as { listSearch?: string } | null)?.listSearch
   const backTo = listSearch ? `/runs?${listSearch}` : '/runs'
-  const [run, setRun] = React.useState<Run>()
-  const [steps, setSteps] = React.useState<Step[]>([])
-  const [error, setError] = React.useState<unknown>()
+  // Both are keyed by run id. React Router keeps this component mounted when only the
+  // id changes, so unkeyed state would keep rendering the previous run — and a 404 for
+  // the new id would then be reported as a failed refresh of the old one.
+  const [loaded, setLoaded] = React.useState<{ runId: string; run: Run; steps: Step[] }>()
+  const [failure, setFailure] = React.useState<{ runId: string; error: unknown }>()
+  const run = loaded?.runId === runId ? loaded.run : undefined
+  const steps = loaded?.runId === runId ? loaded.steps : []
+  const error = failure?.runId === runId ? failure.error : undefined
   const load = React.useCallback(async (): Promise<void> => {
     try {
       const [runValue, stepValue] = await Promise.all([
         api<{ run: Run }>(`/runs/${encodeURIComponent(runId)}`),
         api<{ publication_steps: Step[] }>(`/runs/${encodeURIComponent(runId)}/publication-steps`)
       ])
-      setRun(runValue.run)
-      setSteps(stepValue.publication_steps)
-      setError(undefined)
+      setLoaded({ runId, run: runValue.run, steps: stepValue.publication_steps })
+      setFailure(undefined)
     } catch (value) {
-      setError(value)
+      setFailure({ runId, error: value })
     }
   }, [runId])
   const terminal = run ? isRunTerminal(run) : false
@@ -723,7 +727,35 @@ function Detail(): React.JSX.Element {
       document.title = 'Review Control Plane'
     }
   }, [titleRunId])
-  if (error && run === undefined) throw error
+  if (error !== undefined && run === undefined) {
+    // A missing run is not a service failure, and the generic error page would
+    // misreport it as one — including for a hand-edited or stale link.
+    if (error instanceof ApiError && error.status === 404) {
+      return (
+        <Container component="main" size="lg" py="xl">
+          <Title order={1} mb="xs">
+            {t('runNotFound')}
+          </Title>
+          <Text c="dimmed" mb="md">
+            {t('runNotFoundHint')}
+          </Text>
+          <Text ff="monospace" mb="lg">
+            {runId}
+          </Text>
+          <Button
+            component={Link}
+            to={backTo}
+            variant="subtle"
+            px={0}
+            leftSection={<IconArrowLeft size={16} />}
+          >
+            {t('back')}
+          </Button>
+        </Container>
+      )
+    }
+    throw error
+  }
   const publicationOutcomes = steps.filter(
     (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
   )
