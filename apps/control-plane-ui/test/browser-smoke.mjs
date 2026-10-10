@@ -339,6 +339,28 @@ try {
       `${name} a ruled-out publication must show no timestamp`
     )
 
+    // An expired session is not a refresh blip: it must reach the sign-in form even when
+    // the console already has data, otherwise nothing can update and nothing says why.
+    await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await page.getByRole('heading', { name: 'Runs' }).waitFor()
+    await page.route('**/api/runs*', (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: '{"error":"unauthorized"}'
+      })
+    )
+    await page.getByRole('button', { name: 'Refresh' }).click()
+    await page.waitForTimeout(900)
+    assert.ok(
+      await page
+        .getByLabel('Access token')
+        .isVisible()
+        .catch(() => false),
+      `${name} a 401 must return the reader to the sign-in form`
+    )
+    await page.unroute('**/api/runs*')
+
     console.log(`browser-smoke ${name}: ok (${base})`)
     await context.close()
   }

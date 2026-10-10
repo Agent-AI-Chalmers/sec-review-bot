@@ -305,6 +305,9 @@ function Runs(): React.JSX.Element {
     }
   }, [query])
   const { refresh, refreshing, lastChecked } = useRefresh(load)
+  // An expired session must reach the sign-in form even when the console still has data
+  // to show: nothing will update until it is handled, and the refresh banner cannot say so.
+  if (error instanceof ApiError && error.status === 401) throw error
   if (error && data === undefined) throw error
   const update = (name: string, value: string): void => {
     const next = new URLSearchParams(search)
@@ -730,6 +733,7 @@ function Detail(): React.JSX.Element {
       document.title = 'Review Control Plane'
     }
   }, [titleRunId])
+  if (error instanceof ApiError && error.status === 401) throw error
   if (error !== undefined && run === undefined) {
     // A missing run is not a service failure, and the generic error page would
     // misreport it as one — including for a hand-edited or stale link.
