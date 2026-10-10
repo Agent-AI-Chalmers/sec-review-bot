@@ -1,5 +1,9 @@
 # 将来工作
 
+语言：[English](FUTURE_WORK.md) | 中文
+
+本文是 [FUTURE_WORK.md](FUTURE_WORK.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 这里记录以后值得探索的方向。
 
 ## 平台适配

@@ -1,5 +1,9 @@
 # Control Plane UI
 
+语言：[English](README.md) | 中文
+
+本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 这是用于查看 Review Control Plane run 的内部只读控制台。浏览器只访问该应用的同源服务端；服务端持有 Control Plane 只读凭据，仅代理明确白名单内的 GET 路径，并原样转发查询串。
 
 ## 本地运行
