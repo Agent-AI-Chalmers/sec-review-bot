@@ -34,7 +34,7 @@ The following are not part of this contract:
 
 Three payloads have no schema: the admission envelope, the publication claim result, and the publication step record. Each is tied to Control Plane's own type at compile time instead, by `apps/github-integration/test/control-plane/client-mirrored-types.ts`.
 
-A schema for them would be a second description nobody validates at runtime: the integration parses each response and casts it, so a schema needs a validator at that call site before it enforces anything. Until someone decides that cost is worth paying, the compile-time tie is the enforcement, and adding schema files without it would only make the boundary look covered.
+A schema for them would be a second description nobody validates at runtime: the integration parses each response and casts it, so a schema needs a validator at that call site before it enforces anything. Until that validator exists, the compile-time tie is what enforces them; adding schema files without one would change nothing.
 
 ## Enforcement
 

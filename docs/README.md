@@ -21,30 +21,21 @@ Use these docs when you need agent boundaries, capabilities, or framework decisi
 
 ### contracts/
 
-```mermaid
-flowchart LR
-  subgraph app[Caller / Integration side]
-    caller[Caller / Integration]
-  end
-  subgraph agent[Agent side]
-    create["POST /v1/workflows/workflow/runs"]
-    status["GET /v1/runs/run_id"]
-    workflow[Agent workflow execution]
-    state["Run state and result (Temporal workflow state)"]
-  end
-  caller --> create
-  caller --> status
-  create --> workflow
-  workflow --> state
-  status --> state
-```
+`contracts/` holds the interfaces between components that cannot see each other's types: the App side, the Control Plane, and the Agent side. Each family keeps a specification, JSON Schemas, fixtures, and the tests that fail on both sides when a shape changes. A family that enforces less than that writes down what it does not cover.
 
-Use these docs for the contracts between the App side and agent side:
+One family covers one boundary:
 
-- [Contracts README](../contracts/README.md): the contract directory index, its layout rule, and the rules every family follows.
-- [integration-contract/README.md](../contracts/integration-contract/README.md): the Runner-facing integration point, its public boundary, and ownership.
-- [RUNNER_HTTP_API.md](../contracts/integration-contract/RUNNER_HTTP_API.md): The Agent Runner HTTP API.
-- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md): Workflow result contract.
+| Family | Boundary | Sides |
+| --- | --- | --- |
+| [integration-contract](../contracts/integration-contract/README.md) | the Runner's HTTP surface and the workflow `input` / `result` data | Runner and its callers |
+| [control-plane-api](../contracts/control-plane-api/README.md) | the run shapes the console reads, and the coordination record the integration exchanges over `POST /v1/store` | Control Plane and its callers |
+
+Read [Contracts README](../contracts/README.md) first: it defines the family layout, the naming rule, what a schema owns, and how fixtures take part in validation. Each family README then states what a consumer may rely on, who owns which side, and what is deliberately not schematized.
+
+- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md): the workflow data contract.
+- [integration-contract/openapi.json](../contracts/integration-contract/openapi.json): the Agent Runner HTTP API, generated from the service.
+- [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json): the redacted run a console read returns.
+- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json): the record exchanged over `POST /v1/store`.
 
 ### workflows/
 

@@ -1,4 +1,4 @@
-import type { RunnerArtifactStorage, WorkflowName } from '../runner/client.js'
+import type { RunnerArtifactStorage, WorkflowName } from '../runner/shapes.js'
 import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 
 type JsonObject = Record<string, unknown>

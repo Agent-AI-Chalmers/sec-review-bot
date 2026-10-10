@@ -3,24 +3,34 @@
 import os
 from hmac import compare_digest
 from ipaddress import ip_address
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import WithJsonSchema
 
 from sec_review_agents.artifacts.input_storage import ARTIFACT_S3_BUCKET_ENV
 from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_input
 from sec_review_agents.entrypoints.input_preparation import INPUT_BUNDLE_ROOT_ENV
 from sec_review_agents.entrypoints.run_protocol import (
+    RUN_ID_PATTERN,
     RUNNER_REQUEST_INVALID,
     RUNNER_RUN_CONFLICT,
     RUNNER_RUN_NOT_FOUND,
     RUNNER_WORKFLOW_UNSUPPORTED,
+    SUPPORTED_RUNNER_WORKFLOWS,
     build_runner_error,
     is_supported_workflow,
-    parse_status_query_body,
-    validate_run_id,
-    validate_run_request_body,
+)
+from sec_review_agents.entrypoints.service.api_models import (
+    CreateRunRequest,
+    HealthResponse,
+    RunnerErrorResponse,
+    RunResponse,
+    RunStatusQuery,
+    RunStatusResponse,
+    RunStatusToken,
 )
 from sec_review_agents.entrypoints.service.gateway import (
     RunnerRunConflictError,
@@ -33,6 +43,23 @@ from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.utils.env import env_value
 
 HOST_ENV = "RUNNER_SERVICE_HOST"
+
+# Declared so the published contract carries the credential it expects. `auto_error=False`
+# keeps the rejection in this module, where a missing or wrong token is a 401 rather than
+# the 403 the scheme would raise on its own.
+_bearer_scheme = HTTPBearer(
+    auto_error=False,
+    description="Bearer token configured through RUNNER_SERVICE_TOKEN.",
+)
+
+# Which workflows exist is owned by the v5 input schemas, one per workflow. The path
+# parameter stays a string because an unknown workflow is a semantic failure with its own
+# error code, not a malformed request; this only publishes the set the runner accepts.
+_WorkflowPath = Annotated[
+    str,
+    Path(),
+    WithJsonSchema({"type": "string", "enum": sorted(SUPPORTED_RUNNER_WORKFLOWS)}),
+]
 
 
 def _service_token() -> str | None:
@@ -70,15 +97,19 @@ def _require_safe_auth_configuration() -> None:
 
 
 def _require_bearer_token(
-    authorization: str | None = Header(default=None),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)
+    ] = None,
 ) -> None:
     token = _service_token()
     if token is None:
         return
+    # Compared as bytes: a configured token outside ASCII must fail closed rather than
+    # raise out of the credential comparison.
     try:
         authorized = compare_digest(
-            (authorization or "").encode("utf-8"),
-            f"Bearer {token}".encode(),
+            (credentials.credentials if credentials else "").encode("utf-8"),
+            token.encode("utf-8"),
         )
     except UnicodeError:
         authorized = False
@@ -89,19 +120,17 @@ def _require_bearer_token(
         )
 
 
-def _run_response(run: dict[str, Any]) -> dict[str, Any]:
-    response = {
-        "run_id": run.get("run_id"),
-        "workflow": run.get("workflow"),
-        "status": run["status"],
-    }
-    if run.get("result") is not None:
-        response["result"] = run["result"]
-    if run.get("error") is not None:
-        response["error"] = run["error"]
-    if run.get("artifact_storage") is not None:
-        response["artifact_storage"] = run["artifact_storage"]
-    return response
+def _run_response(run: dict[str, Any]) -> RunResponse:
+    # The route serializes with `exclude_none`, so fields the gateway has not produced yet
+    # are omitted rather than sent as null — the shape callers already receive.
+    return RunResponse(
+        run_id=run.get("run_id"),
+        workflow=run.get("workflow"),
+        status=run["status"],
+        result=run.get("result"),
+        error=run.get("error"),
+        artifact_storage=run.get("artifact_storage"),
+    )
 
 
 def _runner_gateway(request: Request) -> RunnerWorkflowGateway:
@@ -117,32 +146,28 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
     )
 
     @app.get("/healthz", dependencies=[Depends(_require_bearer_token)])
-    def healthz() -> dict[str, str]:
-        return {"status": "ok"}
+    def healthz() -> HealthResponse:
+        return HealthResponse(status="ok")
 
     @app.post(
         "/v1/workflows/{workflow}/runs",
         dependencies=[Depends(_require_bearer_token)],
+        status_code=status.HTTP_202_ACCEPTED,
+        response_model=RunResponse,
+        response_model_exclude_none=True,
+        responses={
+            status.HTTP_400_BAD_REQUEST: {"model": RunnerErrorResponse},
+            status.HTTP_409_CONFLICT: {"model": RunnerErrorResponse},
+        },
     )
     async def create_run(
-        workflow: str,
-        request: Any = Body(...),
+        workflow: _WorkflowPath,
+        request: CreateRunRequest,
         runner_gateway: RunnerWorkflowGateway = Depends(_runner_gateway),
-    ) -> JSONResponse:
-        validation_error = validate_run_request_body(request)
-        if validation_error:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "error": build_runner_error(
-                        code=RUNNER_REQUEST_INVALID,
-                        category="input",
-                        message=validation_error,
-                    )
-                },
-            )
-
-        run_id = request["run_id"]
+    ) -> RunResponse | JSONResponse:
+        # The body shape is FastAPI's to reject now, with 422 and its own error body. The
+        # checks below are semantic: a well-formed request for work this runner cannot do.
+        run_id = request.run_id
         if not is_supported_workflow(workflow):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -158,7 +183,7 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
             )
 
         try:
-            validate_v5_workflow_input(request["input"], workflow)
+            validate_v5_workflow_input(request.input, workflow)
         except ValueError as error:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -177,8 +202,8 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
             run = await runner_gateway.start(
                 workflow=workflow,
                 run_id=run_id,
-                input_data=request["input"],
-                runtime=request.get("runtime"),
+                input_data=request.input,
+                runtime=request.runtime,
             )
         except RunnerRunConflictError as error:
             return JSONResponse(
@@ -196,30 +221,21 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
                     ),
                 },
             )
-        return JSONResponse(
-            status_code=status.HTTP_202_ACCEPTED,
-            content=_run_response(run),
-        )
+        return _run_response(run)
 
-    @app.get("/v1/runs/{run_id}", dependencies=[Depends(_require_bearer_token)])
+    @app.get(
+        "/v1/runs/{run_id}",
+        dependencies=[Depends(_require_bearer_token)],
+        response_model=RunResponse,
+        response_model_exclude_none=True,
+        responses={status.HTTP_404_NOT_FOUND: {"model": RunnerErrorResponse}},
+    )
     async def get_run(
-        run_id: str,
+        # The path parameter carries the run ID rule, so a malformed one is rejected before
+        # this handler runs rather than inside it.
+        run_id: Annotated[str, Path(pattern=RUN_ID_PATTERN.pattern)],
         runner_gateway: RunnerWorkflowGateway = Depends(_runner_gateway),
-    ) -> JSONResponse:
-        try:
-            validate_run_id(run_id)
-        except ValueError as error:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "run_id": run_id,
-                    "error": build_runner_error(
-                        code=RUNNER_REQUEST_INVALID,
-                        category="input",
-                        message=str(error),
-                    ),
-                },
-            )
+    ) -> RunResponse | JSONResponse:
         run = await runner_gateway.get(run_id)
         if run is None:
             return JSONResponse(
@@ -233,35 +249,31 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
                     ),
                 },
             )
-        return JSONResponse(content=_run_response(run))
+        return _run_response(run)
 
     # A status query answers "did anything change?" for the runs a caller already tracks,
     # which is the question a polling caller asks far more often than it needs results.
     # It therefore returns status tokens only: the full run record is fetched once per
     # terminal run through GET /v1/runs/{run_id}, and returning it here would move every
     # review result on every poll instead of once.
-    @app.post("/v1/runs/status", dependencies=[Depends(_require_bearer_token)])
+    @app.post(
+        "/v1/runs/status",
+        dependencies=[Depends(_require_bearer_token)],
+        response_model=RunStatusResponse,
+        responses={status.HTTP_400_BAD_REQUEST: {"model": RunnerErrorResponse}},
+    )
     async def get_run_statuses(
-        request: Any = Body(...),
+        request: RunStatusQuery,
         runner_gateway: RunnerWorkflowGateway = Depends(_runner_gateway),
-    ) -> JSONResponse:
-        query = parse_status_query_body(request)
-        if isinstance(query, str):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "error": build_runner_error(
-                        code=RUNNER_REQUEST_INVALID,
-                        category="input",
-                        message=query,
-                    )
-                },
-            )
+    ) -> RunStatusResponse:
+        # A repeated ID would make the caller read the response positionally for no gain,
+        # and deduplicating here keeps the first-seen order the caller asked in.
+        run_ids = list(dict.fromkeys(request.run_ids))
 
         async def read_statuses() -> tuple[dict[str, str], list[str]]:
             statuses: dict[str, str] = {}
             missing: list[str] = []
-            for run_id in query.run_ids:
+            for run_id in run_ids:
                 run = await runner_gateway.get(run_id)
                 if run is None:
                     missing.append(run_id)
@@ -270,18 +282,15 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
             return statuses, missing
 
         statuses, missing = await read_statuses()
-        return JSONResponse(
-            content={
-                "runs": [
-                    {"run_id": run_id, "status": run_status}
-                    for run_id, run_status in statuses.items()
-                ],
-                # A run the Runner has no record for is reported separately rather than
-                # dropped: the caller must be able to tell "never accepted" from "the
-                # Runner skipped it", and it must not have to diff the response to find
-                # out.
-                "missing": missing,
-            }
+        return RunStatusResponse(
+            runs=[
+                RunStatusToken(run_id=run_id, status=run_status)
+                for run_id, run_status in statuses.items()
+            ],
+            # A run the Runner has no record for is reported separately rather than
+            # dropped: the caller must be able to tell "never accepted" from "the Runner
+            # skipped it", and it must not have to diff the response to find out.
+            missing=missing,
         )
 
     return app

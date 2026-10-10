@@ -5,6 +5,8 @@
  * execute the run. Control Plane only admits a validated request, persists its
  * coordination identity, and coordinates execution by reference.
  */
+import type { components } from './runner-api-schema.js'
+
 export type ControlPlaneWorkflow = 'issue-review' | 'pull-request-review' | 'repository-review'
 
 /**
@@ -37,18 +39,14 @@ export const controlPlaneOperations = [
 
 export type ControlPlaneOperation = (typeof controlPlaneOperations)[number]
 
-export interface RunnerArtifactStorage {
-  status: 'available' | 'unavailable' | 'failed'
-  artifact?: {
-    kind: string
-    uri: string
-    media_type: string
-    digest: string
-    size_bytes: number
-  }
-  error_code?: string
-  message?: string
-}
+/**
+ * Where a terminal run's diagnostics went.
+ *
+ * The runner owns this shape and publishes it in its OpenAPI document, which
+ * `runner-api-schema.ts` projects here. This name is kept because the rest of the package
+ * imports it, but the definition has one home rather than three.
+ */
+export type RunnerArtifactStorage = components['schemas']['RunnerArtifactStorage']
 
 export interface InputArtifactRef {
   uri: string

@@ -1,31 +1,64 @@
 import { isIP } from 'node:net'
 
 import type { ControlPlaneWorkflow, RunnerArtifactStorage } from './contracts.js'
+import type { components } from './runner-api-schema.js'
 
 type JsonObject = Record<string, unknown>
-interface RunnerErrorBody {
-  message?: string
-  code?: string
-  retryable?: boolean
-}
-interface RunnerResponse {
-  run_id?: unknown
-  workflow?: unknown
-  status: string
-  result?: unknown
-  error?: unknown
-  artifact_storage?: unknown
-}
 
-const RUNNER_STATUSES = new Set(['queued', 'running', 'succeeded', 'failed'])
+/** One run as the published contract reports it. */
+type ContractRunResponse = components['schemas']['RunResponse']
 
-export const RUNNER_RUN_NOT_FOUND = 'RUNNER_RUN_NOT_FOUND'
-export interface RunnerRunStatus {
+/**
+ * A response as parsed, before any field has been checked.
+ *
+ * The keys come from the contract, so a renamed or dropped field stops compiling here,
+ * while the values stay unknown because JSON off the wire is unverified until the checks
+ * below run.
+ */
+type UnvalidatedRunResponse = { [K in keyof ContractRunResponse]?: unknown }
+
+/**
+ * A response whose identity and status have been checked.
+ *
+ * `parseResponse` establishes these, so its return type says so instead of leaving callers
+ * to re-assert what has already been verified.
+ */
+type ValidatedRunResponse = UnvalidatedRunResponse & {
   run_id: string
   workflow: ControlPlaneWorkflow
   status: string
-  result?: unknown
-  error?: RunnerErrorBody
+}
+
+/** The error envelope as parsed. Every field is read defensively. */
+type UnvalidatedRunnerError = Partial<components['schemas']['RunnerError']>
+
+/**
+ * The statuses the runner may report.
+ *
+ * The values are listed once, as data, because the client checks them at runtime; the
+ * assertion below ties that list to the contract so the two cannot drift.
+ */
+const RUNNER_STATUS_VALUES = ['queued', 'running', 'succeeded', 'failed'] as const
+const RUNNER_STATUSES: ReadonlySet<string> = new Set(RUNNER_STATUS_VALUES)
+
+type SameValues<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
+type Expect<T extends true> = T
+/** Fails to compile if the runtime status list and the contract disagree either way. */
+export type StatusesMatchTheContract = Expect<
+  SameValues<(typeof RUNNER_STATUS_VALUES)[number], ContractRunResponse['status']>
+>
+
+export const RUNNER_RUN_NOT_FOUND = 'RUNNER_RUN_NOT_FOUND'
+
+export interface RunnerRunStatus extends Omit<
+  ContractRunResponse,
+  'run_id' | 'workflow' | 'status' | 'error' | 'artifact_storage'
+> {
+  run_id: string
+  workflow: ControlPlaneWorkflow
+  status: string
+  error?: UnvalidatedRunnerError
+  /** Present only once `parseArtifactStorage` has accepted it. */
   artifact_storage?: RunnerArtifactStorage
 }
 export interface AgentRunnerServiceError extends Error {
@@ -123,7 +156,8 @@ function parseArtifactStorage(value: unknown, runId: string): RunnerArtifactStor
   return {
     status,
     artifact: {
-      kind: artifact.kind,
+      // The literal that was just checked, not the unvalidated field it came from.
+      kind: 'diagnostic_bundle',
       uri: expectedUri,
       media_type: artifact.media_type,
       digest: artifact.digest,
@@ -171,7 +205,8 @@ function serviceHeaders(url: string): Record<string, string> {
 }
 
 function runnerError(body: unknown, status: number): AgentRunnerServiceError {
-  const source = isRecord(body) && isRecord(body.error) ? (body.error as RunnerErrorBody) : {}
+  const source =
+    isRecord(body) && isRecord(body.error) ? (body.error as UnvalidatedRunnerError) : {}
   return Object.assign(new Error(source.message ?? `Runner returned HTTP ${status}.`), {
     name: 'AgentRunnerServiceError' as const,
     code: source.code ?? 'RUNNER_SERVICE_ERROR',
@@ -235,7 +270,7 @@ function parseResponse(
   body: unknown,
   expectedRunId: string,
   expectedWorkflow?: ControlPlaneWorkflow
-): RunnerResponse {
+): ValidatedRunResponse {
   if (!isRecord(body) || typeof body.status !== 'string')
     throw new RunnerProtocolError(
       'RUNNER_INVALID_RESPONSE',
@@ -261,7 +296,7 @@ function parseResponse(
       `Runner returned an unexpected workflow for ${expectedRunId}.`
     )
   }
-  return body as unknown as RunnerResponse
+  return body as unknown as ValidatedRunResponse
 }
 
 export async function submitRunnerRun({
@@ -313,10 +348,8 @@ export interface RunnerRunStatusBatch {
   readonly byRunId: ReadonlyMap<string, string>
 }
 
-export interface RunnerRunStatusToken {
-  readonly run_id: string
-  readonly status: string
-}
+/** One run's status token, as the contract defines it. */
+export type RunnerRunStatusToken = components['schemas']['RunStatusToken']
 
 /**
  * Read many run statuses in one request.
@@ -395,7 +428,7 @@ export async function getRunnerRunStatus(
     workflow: parsed.workflow as ControlPlaneWorkflow,
     status: parsed.status,
     ...(Object.hasOwn(parsed, 'result') ? { result: parsed.result } : {}),
-    ...(isRecord(parsed.error) ? { error: parsed.error as RunnerErrorBody } : {}),
+    ...(isRecord(parsed.error) ? { error: parsed.error as UnvalidatedRunnerError } : {}),
     ...(parsed.artifact_storage === undefined
       ? {}
       : { artifact_storage: parseArtifactStorage(parsed.artifact_storage, runId) })

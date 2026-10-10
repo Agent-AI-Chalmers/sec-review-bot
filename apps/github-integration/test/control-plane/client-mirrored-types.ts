@@ -40,7 +40,7 @@ import type {
   ReviewRunRecord as ClientRecord,
   ReviewRunStatus as ClientStatus
 } from '../../src/control-plane/client.js'
-import type { RunnerArtifactStorage as ClientArtifactStorage } from '../../src/runner/client.js'
+import type { RunnerArtifactStorage as ClientArtifactStorage } from '../../src/runner/shapes.js'
 
 /** Every key of `A` is also a key of `B`. */
 type KeysWithin<A, B> = [keyof A] extends [keyof B] ? true : false

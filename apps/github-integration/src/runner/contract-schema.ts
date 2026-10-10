@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
 
-import type { WorkflowName } from './client.js'
+import type { WorkflowName } from './shapes.js'
 
 const RESULT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
   'issue-review': 'issue-review-result.schema.json',

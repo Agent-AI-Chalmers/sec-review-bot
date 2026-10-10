@@ -3,7 +3,6 @@ import {
   type PullRequestReviewEvent
 } from '../../github/comment-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
-import { completedRunnerRunResult, type RunnerRunStatus } from '../../runner/client.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
 import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 import {
@@ -78,16 +77,12 @@ function asErrorMessage(error: unknown): string {
   return String(error)
 }
 
-function pullRequestReviewResultFromRunStatus(
-  status: RunnerRunStatus
+function pullRequestReviewResultFromWorkflowResult(
+  result: unknown
 ): PullRequestReviewWorkflowResult | null {
-  const completed = completedRunnerRunResult(status)
-  if (completed === null) {
-    return null
-  }
   try {
-    assertV5WorkflowResult('pull-request-review', completed.result)
-    const rawResult = completed.result as { contract_version: 'v5'; review_record: unknown }
+    assertV5WorkflowResult('pull-request-review', result)
+    const rawResult = result as { contract_version: 'v5'; review_record: unknown }
     return {
       contract_version: 'v5',
       review_record: parseReviewRecord(rawResult.review_record)
@@ -105,21 +100,21 @@ function pullRequestReviewResultFromRunStatus(
 
 export async function handlePullRequestReviewRun({
   run,
-  status,
+  result,
   store,
   claim_token,
   assert_publication_claim,
   installation_octokit_for_repo
 }: {
   run: CompletedRunnerRun
-  status: RunnerRunStatus
+  result: unknown
   store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo
 }): Promise<void> {
   const context = parsePullRequestReviewPublishContext(run.publish_context)
-  const workflow_result = pullRequestReviewResultFromRunStatus(status)
+  const workflow_result = pullRequestReviewResultFromWorkflowResult(result)
   if (workflow_result === null) {
     throw new Error(`Pull request review run ${run.run_id} is not ready to publish.`)
   }

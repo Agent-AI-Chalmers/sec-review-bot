@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import type { WorkflowName as ControlPlaneWorkflow } from '../runner/client.js'
+import type { WorkflowName as ControlPlaneWorkflow } from '../runner/shapes.js'
 
 interface ReviewRunAdmissionRequest {
   workflow: ControlPlaneWorkflow

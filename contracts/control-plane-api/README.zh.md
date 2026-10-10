@@ -36,7 +36,7 @@ Control Plane 通过 `observeRun()` 产出每个 observed run，通过 `rowToRec
 
 有三个载荷没有 schema：admission 信封、publication claim 结果、以及 publication step 记录。它们改由 `apps/github-integration/test/control-plane/client-mirrored-types.ts` 在编译期与 Control Plane 自己的类型绑定。
 
-为它们写 schema，只会得到第二份**运行时没人校验**的描述：集成侧解析响应后直接做类型断言，所以 schema 要先在那个调用点接上校验器才谈得上执行。在有人决定这笔开销值得付之前，编译期的绑定就是执行方式；只补 schema 文件而不接校验，只会让这条边界**看起来**被覆盖了。
+为它们写 schema，只会得到第二份**运行时没人校验**的描述：集成侧解析响应后直接做类型断言，所以 schema 要先在那个调用点接上校验器才谈得上执行。在接上校验器之前，编译期的绑定就是它们的执行方式；只补 schema 文件不接校验，等于什么都没变。
 
 ## 执行方式
 

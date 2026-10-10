@@ -82,11 +82,14 @@ def test_create_run_rejects_invalid_request(monkeypatch) -> None:
         service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
     )
 
+    # A malformed body is FastAPI's to reject now, so it answers 422 with its own
+    # validation body instead of the runner's error envelope. The wording is Pydantic's and
+    # is deliberately not asserted: the contract fixes the status and the body's structure,
+    # not the message.
     response = client.post("/v1/workflows/issue-review/runs", json={})
 
-    assert response.status_code == 400
-    body = response.json()
-    assert body["error"]["code"] == "RUNNER_REQUEST_INVALID"
+    assert response.status_code == 422
+    assert isinstance(response.json()["detail"], list)
 
 
 def test_create_run_rejects_invalid_run_id_before_start(monkeypatch) -> None:
@@ -103,10 +106,8 @@ def test_create_run_rejects_invalid_run_id_before_start(monkeypatch) -> None:
         },
     )
 
-    assert response.status_code == 400
-    body = response.json()
-    assert body["error"]["code"] == "RUNNER_REQUEST_INVALID"
-    assert "run_id must match" in body["error"]["message"]
+    assert response.status_code == 422
+    assert isinstance(response.json()["detail"], list)
     assert gateway.runs == {}
 
 
@@ -260,11 +261,10 @@ def test_get_run_rejects_invalid_run_id_before_backend_lookup(monkeypatch) -> No
 
     fetched = client.get("/v1/runs/run%20service")
 
-    assert fetched.status_code == 400
-    body = fetched.json()
-    assert body["run_id"] == "run service"
-    assert body["error"]["code"] == "RUNNER_REQUEST_INVALID"
-    assert "run_id must match" in body["error"]["message"]
+    # The seeded run is reachable, so a 422 rather than 200 is what shows the path
+    # parameter was rejected before the gateway was consulted.
+    assert fetched.status_code == 422
+    assert isinstance(fetched.json()["detail"], list)
 
 
 def test_bearer_token_is_required_when_configured(monkeypatch) -> None:
@@ -345,8 +345,8 @@ def test_status_query_rejects_an_oversized_batch(monkeypatch) -> None:
         json={"run_ids": [f"run-{index}" for index in range(201)]},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == "RUNNER_REQUEST_INVALID"
+    assert response.status_code == 422
+    assert isinstance(response.json()["detail"], list)
 
 
 def test_status_query_rejects_an_empty_run_id_list(monkeypatch) -> None:
@@ -358,4 +358,5 @@ def test_status_query_rejects_an_empty_run_id_list(monkeypatch) -> None:
 
     response = client.post("/v1/runs/status", json={"run_ids": []})
 
-    assert response.status_code == 400
+    assert response.status_code == 422
+    assert isinstance(response.json()["detail"], list)

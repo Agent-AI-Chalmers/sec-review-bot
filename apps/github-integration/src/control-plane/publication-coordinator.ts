@@ -10,7 +10,6 @@ import { logError, logInfo, logWarn } from '../utils/logger.js'
 import { classifyPublicationFailure } from './publication-failure.js'
 import { isPublicationClaimLostError, PublicationClaimLostError } from './publication-claim.js'
 import { controlPlaneClient, type ControlPlaneClient, type PublicationWork } from './client.js'
-import type { RunnerRunStatus } from '../runner/client.js'
 
 export interface PublicationCoordinator {
   stop: () => Promise<void>
@@ -55,16 +54,9 @@ async function publishWork(
   work: PublicationWork,
   assertOwned: () => Promise<void>
 ): Promise<void> {
-  const status: RunnerRunStatus = {
-    run_id: work.run_id,
-    workflow: work.workflow,
-    status: 'succeeded',
-    result: work.workflow_result,
-    ...(work.artifact_storage === null ? {} : { artifact_storage: work.artifact_storage })
-  }
   const common = {
     run: work,
-    status,
+    result: work.workflow_result,
     store,
     claim_token: work.claim_token,
     assert_publication_claim: assertOwned,

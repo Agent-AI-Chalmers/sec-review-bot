@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
 
-import { ReviewRunStore } from '../../src/index.js'
+import { ReviewRunStore, type RunnerArtifactStorage } from '../../src/index.js'
 
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
@@ -90,8 +90,8 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
   const store = await createStore()
   try {
     const queuedId = await createQueuedRun(store)
-    const artifactStorage = {
-      status: 'available' as const,
+    const artifactStorage: RunnerArtifactStorage = {
+      status: 'available',
       artifact: {
         kind: 'diagnostic_bundle',
         uri: `s3://sec-review/runs/${queuedId}/artifacts/diagnostic-tree.v1.tar.zst`,

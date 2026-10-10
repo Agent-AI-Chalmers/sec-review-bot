@@ -11,7 +11,7 @@
 
 从这些文档开始：
 
-- [RUNNER_HTTP_API.zh.md](RUNNER_HTTP_API.zh.md)：调用方如何创建和轮询 workflow run。
+- [openapi.json](openapi.json)：调用方如何创建和轮询 workflow run —— 路径、状态码、请求与响应形状、以及鉴权方案。
 - [v5/CONTRACT.zh.md](v5/CONTRACT.zh.md)：workflow 输入和结果结构。
 - [v5/schemas](v5/schemas)：用于机器校验的 JSON Schema。
 - [v5/fixtures](v5/fixtures)：Python 和 TypeScript 测试共享的可执行 JSON 示例。
@@ -54,6 +54,33 @@ Agents 负责：
 GitHub integration 是调用方一侧的一种实现：它把 GitHub 事件与发布规则转成 runner 输入和结果发布。
 
 这条分界同时也是安全边界。GitHub 身份、权限、API 调用、发布、重试与审计行为都留在调用方一侧。Agents 在 runner 契约内运行，不直接控制 GitHub 平台能力。
+
+## 生成的规范
+
+[openapi.json](openapi.json) 是 runner 服务的 OpenAPI 文档，由代码生成。服务本身也在 `/openapi.json` 提供它，并在 `/docs` 提供可读版本；两者都刻意不要求 service token，因为接口说明里没有运行数据，也没有凭据。
+
+## Runner 错误码
+
+以下是调用方可以据以分支的稳定机器可读错误码。这个集合是**开放**的：服务暂时无法归类的失败会以 `RUNNER_EXECUTION_FAILED` 到达，而新增含义时会新增错误码，而不是复用旧码。
+
+- `RUNNER_REQUEST_INVALID`
+- `RUNNER_WORKFLOW_UNSUPPORTED`
+- `RUNNER_RUN_CONFLICT`
+- `RUNNER_RUN_NOT_FOUND`
+- `RUNNER_RESPONSE_INVALID`
+- `RUNNER_EXECUTION_FAILED`
+
+## 兼容性规则
+
+以下变化属于破坏性变更：
+
+- HTTP path / method 变化
+- 某个结果所对应的状态码，或它携带的响应体形状
+- request / response 必需字段变化
+- error body 必需字段变化
+- workflow 名称与 input 必需字段变化
+
+新增端点、端点选项、或可选的请求/响应字段，属于非破坏性扩展。
 
 ## 执行方式
 

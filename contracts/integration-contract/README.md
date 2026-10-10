@@ -10,7 +10,8 @@ This family is the supported public integration point between the Runner and its
 
 Use these documents:
 
-- [RUNNER_HTTP_API.md](RUNNER_HTTP_API.md): how callers create and poll workflow runs.
+- [openapi.json](openapi.json): how callers create and poll workflow runs — paths, status
+  codes, request and response shapes, and the security scheme.
 - [v5/CONTRACT.md](v5/CONTRACT.md): workflow input and result shapes.
 - [v5/schemas](v5/schemas): JSON Schemas for machine validation.
 - [v5/fixtures](v5/fixtures): executable JSON examples shared by Python and TypeScript
@@ -55,6 +56,34 @@ Agents are responsible for:
 The GitHub integration is one implementation of the caller side: it turns GitHub events and publishing rules into runner inputs and result publication.
 
 This split is also a security boundary. GitHub identity, permissions, API calls, publishing, retry, and audit behavior stay on the caller side. Agents operate inside the runner contract and do not directly control GitHub platform capabilities.
+
+## Generated Specification
+
+[openapi.json](openapi.json) is the runner service's OpenAPI document, generated from its code. The service also serves it at `/openapi.json` and a readable view at `/docs`; both are deliberately reachable without the service token, because an API description carries no run data or credentials.
+
+## Runner Error Codes
+
+These are the stable machine-readable codes a caller may branch on. The set is open: a failure the service cannot classify yet arrives as `RUNNER_EXECUTION_FAILED`, and new codes are added rather than reusing an existing one for a different meaning.
+
+- `RUNNER_REQUEST_INVALID`
+- `RUNNER_WORKFLOW_UNSUPPORTED`
+- `RUNNER_RUN_CONFLICT`
+- `RUNNER_RUN_NOT_FOUND`
+- `RUNNER_RESPONSE_INVALID`
+- `RUNNER_EXECUTION_FAILED`
+
+## Compatibility Rules
+
+The following changes are breaking changes:
+
+- HTTP path / method changes
+- the status code that carries a given outcome, or the shape of the body it carries
+- required request / response field changes
+- required error body field changes
+- workflow name or input required field changes
+
+Adding an endpoint, an endpoint option, or an optional request/response field is a
+non-breaking extension.
 
 ## Enforcement
 

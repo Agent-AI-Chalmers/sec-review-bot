@@ -21,30 +21,21 @@
 
 ### contracts/
 
-```mermaid
-flowchart LR
-  subgraph app[Caller / Integration side]
-    caller[Caller / Integration]
-  end
-  subgraph agent[Agent side]
-    create["POST /v1/workflows/workflow/runs"]
-    status["GET /v1/runs/run_id"]
-    workflow[Agent workflow execution]
-    state["Run state and result (Temporal workflow state)"]
-  end
-  caller --> create
-  caller --> status
-  create --> workflow
-  workflow --> state
-  status --> state
-```
+`contracts/` 记录的是那些**彼此看不到对方类型**的组件之间的接口：App 侧、Control Plane、Agent 侧。每个族各留一份规范、JSON Schema、fixtures，以及**形状一变就会在两侧失败**的测试。执行得比这少的族，会写明自己没覆盖什么。
 
-App 侧和 agent 侧之间的契约，看这里：
+一个族对应一条边界：
 
-- [Contracts README](../contracts/README.md) / [中文](../contracts/README.zh.md)：契约目录索引、它的布局规则，以及每个族都要遵守的规则。
-- [integration-contract/README.md](../contracts/integration-contract/README.md) / [中文](../contracts/integration-contract/README.zh.md)：面向 Runner 的集成点、它的公开边界与归属。
-- [RUNNER_HTTP_API.md](../contracts/integration-contract/RUNNER_HTTP_API.md) / [中文](../contracts/integration-contract/RUNNER_HTTP_API.zh.md)：Agent Runner HTTP API。
-- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md) / [中文](../contracts/integration-contract/v5/CONTRACT.zh.md)：workflow 输入和结果契约。
+| 族 | 边界 | 两侧 |
+| --- | --- | --- |
+| [integration-contract](../contracts/integration-contract/README.zh.md) | Runner 的 HTTP 面，以及 workflow 的 `input` / `result` 数据 | Runner 与它的调用方 |
+| [control-plane-api](../contracts/control-plane-api/README.zh.md) | 控制台读取的运行形状，以及集成方经 `POST /v1/store` 交换的协调记录 | Control Plane 与它的调用方 |
+
+先读 [Contracts README](../contracts/README.zh.md)：它定义了族目录的布局、命名规则、schema 该拥有什么，以及 fixtures 如何参与校验。各族 README 再分别说明消费者可以依赖什么、哪一侧归谁、以及哪些是刻意不做成 schema 的。
+
+- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md) / [中文](../contracts/integration-contract/v5/CONTRACT.zh.md)：workflow 数据契约。
+- [integration-contract/openapi.json](../contracts/integration-contract/openapi.json)：Agent Runner HTTP API，由服务代码生成。
+- [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json)：控制台读取返回的脱敏运行形状。
+- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json)：经 `POST /v1/store` 交换的记录。
 
 ### workflows/
 
