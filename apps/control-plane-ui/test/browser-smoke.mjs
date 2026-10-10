@@ -107,6 +107,43 @@ try {
       `${name} expected one dot+text status per axis`
     )
 
+    if (server !== undefined) {
+      // Paging is part of the server contract: the console only offers a next page
+      // when the response carries a cursor. Do not let the fixtures regress to a
+      // single page, or this whole affordance silently stops being reachable.
+      const firstCell = 'tbody tr td:first-child'
+      const rows = () => page.$$eval(firstCell, (cells) => cells.map((cell) => cell.textContent))
+      const previous = page.getByRole('button', { name: 'Previous page' })
+      const next = page.getByRole('button', { name: 'Next page' })
+
+      const firstPage = await rows()
+      assert.ok(await previous.isDisabled(), `${name} first page must disable the previous control`)
+      assert.ok(!(await next.isDisabled()), `${name} first page must offer a next page`)
+
+      await next.click()
+      await page.waitForTimeout(750)
+      const secondPage = await rows()
+      assert.ok(secondPage.length > 0, `${name} next page must return runs`)
+      assert.deepEqual(
+        secondPage.filter((runId) => firstPage.includes(runId)),
+        [],
+        `${name} next page must not repeat the first page`
+      )
+      assert.ok(
+        !(await previous.isDisabled()),
+        `${name} a later page must enable the previous control`
+      )
+
+      // The API only pages forward, so returning has to reuse the remembered
+      // cursor rather than silently sending the reader back to the first page.
+      await previous.click()
+      await page.waitForTimeout(750)
+      assert.deepEqual(await rows(), firstPage, `${name} previous page must restore the first page`)
+
+      await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+      await page.getByRole('heading', { name: 'Runs' }).waitFor()
+    }
+
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
     const steps = await page.$$eval('.run-progress-timeline .mantine-Timeline-item', (items) =>

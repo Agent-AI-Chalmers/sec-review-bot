@@ -11,6 +11,7 @@ import {
   Container,
   Group,
   NativeSelect,
+  Pagination,
   Paper,
   PasswordInput,
   Stack,
@@ -246,8 +247,14 @@ function Runs(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
   const [search, setSearch] = useSearchParams()
+  // The Control Plane walks pages forward by cursor only, so remember which cursor
+  // each page was opened from in order to offer a previous page. Keyed by cursor
+  // rather than by position, so the browser back button cannot desynchronise it.
+  const [cursorParents, setCursorParents] = React.useState<Record<string, string>>({})
   const [data, setData] = React.useState<{ runs: Run[]; next_cursor: string | null }>()
   const [error, setError] = React.useState<unknown>()
+  const cursor = search.get('cursor') ?? ''
+  const previousCursor = cursorParents[cursor]
   const query = search.toString()
   const load = React.useCallback(async (): Promise<void> => {
     try {
@@ -264,8 +271,40 @@ function Runs(): React.JSX.Element {
     if (value) next.set(name, value)
     else next.delete(name)
     next.delete('cursor')
+    setCursorParents({})
     setSearch(next)
   }
+  const openCursor = (target: string): void => {
+    const next = new URLSearchParams(search)
+    if (target) next.set('cursor', target)
+    else next.delete('cursor')
+    setSearch(next)
+  }
+  const openNextPage = (): void => {
+    const target = data?.next_cursor
+    if (target === undefined || target === null) return
+    setCursorParents((parents) => ({ ...parents, [target]: cursor }))
+    openCursor(target)
+  }
+  const openPreviousPage = (): void => {
+    if (previousCursor === undefined) return
+    openCursor(previousCursor)
+  }
+  // Mantine's pager is numbered, but the read API only walks forward and never
+  // reports a total. Use the visited trail for the current position and treat
+  // "there is another page" as exactly one page beyond it: `active === total` is
+  // what disables the next control, and `active === 1` disables the previous one.
+  const page = React.useMemo(() => {
+    let number = 1
+    let node = cursorParents[cursor]
+    while (node !== undefined) {
+      number += 1
+      if (node === '') break
+      node = cursorParents[node]
+    }
+    return number
+  }, [cursorParents, cursor])
+  const totalPages = data?.next_cursor != null ? page + 1 : page
   return (
     <Container component="main" size="lg" py="xl">
       <Title order={1} mb="lg">
@@ -366,18 +405,19 @@ function Runs(): React.JSX.Element {
               </Table.Tbody>
             </Table>
           </Paper>
-          {data.next_cursor && (
-            <Button
-              variant="default"
-              className="next"
-              onClick={() => {
-                const next = new URLSearchParams(search)
-                next.set('cursor', data.next_cursor ?? '')
-                setSearch(next)
-              }}
+          {totalPages > 1 && (
+            <Pagination.Root
+              total={totalPages}
+              value={page}
+              onPreviousPage={openPreviousPage}
+              onNextPage={openNextPage}
+              mt="md"
             >
-              {t('nextPage')}
-            </Button>
+              <Group gap="xs" justify="center">
+                <Pagination.Previous aria-label={t('previousPage')} />
+                <Pagination.Next aria-label={t('nextPage')} />
+              </Group>
+            </Pagination.Root>
           )}
         </>
       )}
