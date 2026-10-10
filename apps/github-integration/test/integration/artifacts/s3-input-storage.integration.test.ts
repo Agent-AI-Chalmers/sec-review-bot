@@ -25,7 +25,7 @@ test('S3 input upload is immutable and idempotent', async (t) => {
     uri: pathToFileURL(source).href,
     digest:
       `sha256:${crypto.createHash('sha256').update(content).digest('hex')}` as `sha256:${string}`,
-    media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd' as const,
+    media_type: 'application/tar+zstd' as const,
     size_bytes: content.byteLength
   }
   const runId = `integration-${crypto.randomBytes(8).toString('hex')}`

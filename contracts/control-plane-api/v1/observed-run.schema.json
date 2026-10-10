@@ -127,7 +127,7 @@
                   "pattern": "^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
                 },
                 "media_type": {
-                  "const": "application/zstd"
+                  "const": "application/tar+zstd"
                 },
                 "digest": {
                   "type": "string",

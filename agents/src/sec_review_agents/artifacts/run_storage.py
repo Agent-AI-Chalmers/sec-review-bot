@@ -30,7 +30,7 @@ def store_run_artifacts(root: str | Path, run_id: str) -> dict[str, Any] | None:
         raise RuntimeError("artifact storage configuration is incomplete")
 
     key = f"runs/{run_id}/artifacts/diagnostic-tree.v1.tar.zst"
-    media_type = "application/zstd"
+    media_type = "application/tar+zstd"
     client = boto3.client(
         "s3",
         endpoint_url=env_value(STORAGE_ENDPOINT_ENV),

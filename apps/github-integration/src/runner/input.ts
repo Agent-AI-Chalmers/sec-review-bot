@@ -29,7 +29,7 @@ export interface ReviewIntent {
 }
 
 export const INPUT_BUNDLE_MEDIA_TYPE =
-  'application/vnd.sec-review.input-bundle.v1+tar+zstd' as const
+  'application/tar+zstd' as const
 
 export interface InputBundleArtifactRef {
   uri: string

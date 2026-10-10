@@ -19,7 +19,7 @@ ReviewWorkflow = Literal[
 ]
 BUNDLE_MANIFEST_NAME = "manifest.json"
 LOCAL_INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_INPUT_BUNDLE_ROOT"
-INPUT_BUNDLE_MEDIA_TYPE = "application/vnd.sec-review.input-bundle.v1+tar+zstd"
+INPUT_BUNDLE_MEDIA_TYPE = "application/tar+zstd"
 
 
 def create_local_run_id() -> str:

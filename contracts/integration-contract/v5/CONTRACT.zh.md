@@ -37,7 +37,7 @@ v5 Runner 支持本地 `file:` 和持久的 `s3:` URI。Storage endpoint、regio
 interface InputBundleArtifactRef {
   uri: string // file: or s3:
   digest: `sha256:${string}`
-  media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
+  media_type: 'application/tar+zstd'
   size_bytes: number
 }
 ```

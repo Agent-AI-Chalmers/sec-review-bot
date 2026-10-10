@@ -35,7 +35,7 @@ The `tar.zst` archive must contain `manifest.json`, the workspace snapshot, hist
 interface InputBundleArtifactRef {
   uri: string // file: or s3:
   digest: `sha256:${string}`
-  media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
+  media_type: 'application/tar+zstd'
   size_bytes: number
 }
 ```

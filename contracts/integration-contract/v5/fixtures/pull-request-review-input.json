@@ -3,7 +3,7 @@
   "input_bundle": {
     "uri": "file:///tmp/sec-review-fixtures/pull-request-review.tar.zst",
     "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    "media_type": "application/vnd.sec-review.input-bundle.v1+tar+zstd",
+    "media_type": "application/tar+zstd",
     "size_bytes": 0
   },
   "review_intent": {

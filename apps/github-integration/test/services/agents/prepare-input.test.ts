@@ -97,7 +97,7 @@ async function assertRunnerInputArtifact({
   runId: string
 }): Promise<void> {
   const inputBundle = input['input_bundle'] as Record<string, unknown>
-  assert.equal(inputBundle['media_type'], 'application/vnd.sec-review.input-bundle.v1+tar+zstd')
+  assert.equal(inputBundle['media_type'], 'application/tar+zstd')
   const archivePath = fileURLToPath(String(inputBundle['uri']))
   assert.equal(archivePath, `${inputBundleRoot}.tar.zst`)
   const archive = await fs.readFile(archivePath)

@@ -25,7 +25,7 @@ async function reference() {
   return {
     uri: pathToFileURL(source).href,
     digest: `sha256:${'a'.repeat(64)}` as `sha256:${string}`,
-    media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd' as const,
+    media_type: 'application/tar+zstd' as const,
     size_bytes: 6
   }
 }
