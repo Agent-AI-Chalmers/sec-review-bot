@@ -113,10 +113,6 @@ class HttpControlPlaneClient {
     return parsePublishContextForWorkflow(run.workflow, context)
   }
 
-  async initialize(): Promise<void> {}
-
-  async close(): Promise<void> {}
-
   // Admission deliberately persists an empty context: run identity exists
   // before input preparation discovers the workflow-specific publish target.
   async admit_review_run(
