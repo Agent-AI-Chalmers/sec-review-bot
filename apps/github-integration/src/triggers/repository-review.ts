@@ -17,6 +17,7 @@ import { controlPlaneClient } from '../control-plane/client.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import { createRunId } from '../reviews/shared/input-bundle.js'
 import { logInfo } from '../utils/logger.js'
+import { asErrorMessage } from '../utils/error-utils.js'
 
 export interface RepositoryReviewDispatchPayload {
   repo_full_name?: unknown
@@ -190,22 +191,13 @@ interface DispatchRepositoryReviewCommandDeps {
       | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
       | ReturnType<typeof controlPlaneClient.admitReviewRun>
     failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
-    submitPreparedRun: (
-      ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
-    ) => unknown
+    submitPreparedRun: (...args: Parameters<typeof controlPlaneClient.submitPreparedRun>) => unknown
     renewPreparationClaim: (
       ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
     ) => Promise<boolean>
     preparationHeartbeatIntervalMs: typeof controlPlaneClient.preparationHeartbeatIntervalMs
   }
   create_run_id: typeof createRunId
-}
-
-function asErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
 }
 
 async function getRepositoryInstallationOctokit(

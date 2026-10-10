@@ -16,7 +16,7 @@ import {
   publishSuggestionReview
 } from './suggestion-service.js'
 import { logError, logInfo } from '../../utils/logger.js'
-import { asErrorWithResponse } from '../../utils/error-utils.js'
+import { asErrorWithResponse, asErrorMessage } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { getGitHubAppMetadata } from '../../github/github-app-metadata-service.js'
 import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
@@ -68,13 +68,6 @@ type InstallationOctokitForRepo = (repo_full_name: string) => Promise<unknown>
 type CompletedRunnerRun = {
   run_id: string
   publish_context: Record<string, unknown>
-}
-
-function asErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
 }
 
 function pullRequestReviewResultFromWorkflowResult(

@@ -1,4 +1,4 @@
-import { asErrorWithResponse } from '../utils/error-utils.js'
+import { asErrorWithResponse, errorCode } from '../utils/error-utils.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../runner/publish-error-code.js'
 import { isDeterministicRunnerPublishError } from '../runner/publish-error.js'
 
@@ -6,14 +6,6 @@ interface PublishFailureClassification {
   retry: boolean
   code: string | null
   reason: string
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function errorCode(error: unknown): string | null {
-  return isRecord(error) && typeof error.code === 'string' ? error.code : null
 }
 
 function isRateLimitOrAbuseLimit(error: unknown): boolean {

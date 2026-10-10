@@ -21,9 +21,7 @@ type IssueReviewControlPlaneClient = {
     | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
     | ReturnType<typeof controlPlaneClient.admitReviewRun>
   failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
-  submitPreparedRun: (
-    ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
-  ) => unknown
+  submitPreparedRun: (...args: Parameters<typeof controlPlaneClient.submitPreparedRun>) => unknown
   renewPreparationClaim: (
     ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
   ) => Promise<boolean>

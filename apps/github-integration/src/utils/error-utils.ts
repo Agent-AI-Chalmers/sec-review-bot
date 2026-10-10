@@ -16,8 +16,16 @@ interface ErrorWithResponse {
   response: GitHubErrorResponse | undefined
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function errorCode(error: unknown): string | null {
+  return isRecord(error) && typeof error.code === 'string' ? error.code : null
+}
+
+export function asErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function toGitHubErrorResponse(value: unknown): GitHubErrorResponse | undefined {

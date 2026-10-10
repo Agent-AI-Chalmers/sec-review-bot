@@ -1,6 +1,6 @@
 import { parse as parseYaml } from 'yaml'
 import type { GitHubAppOctokit } from './octokit.js'
-import { asErrorWithResponse } from '../utils/error-utils.js'
+import { asErrorWithResponse, isRecord } from '../utils/error-utils.js'
 
 const CONFIG_PATH = '.github/sec-review-bot.yml'
 
@@ -38,10 +38,6 @@ interface RepoGetContentResponse {
         content?: string
       }
     | Array<unknown>
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function parseRepositoryConfig(content: string): ParsedSecReviewBotConfig {

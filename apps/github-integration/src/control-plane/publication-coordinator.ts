@@ -7,6 +7,7 @@ import { handleIssueReviewRun } from '../reviews/issues/publish.js'
 import { handlePullRequestReviewRun } from '../reviews/pull-requests/publish.js'
 import { handleRepositoryReviewRun } from '../reviews/repositories/publish.js'
 import { logError, logInfo, logWarn } from '../utils/logger.js'
+import { asErrorMessage, errorCode } from '../utils/error-utils.js'
 import { classifyPublicationFailure } from './publication-failure.js'
 import { isPublicationClaimLostError, PublicationClaimLostError } from './publication-claim.js'
 import { controlPlaneClient, type ControlPlaneClient, type PublicationWork } from './client.js'
@@ -20,17 +21,6 @@ interface Options {
   intervalMs?: number
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-function errorCode(error: unknown): string | null {
-  return typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof error.code === 'string'
-    ? error.code
-    : null
-}
 function pollIntervalMs(): number {
   const parsed = Number.parseInt(
     process.env.CONTROL_PLANE_PUBLICATION_POLL_INTERVAL_MS || '15000',
@@ -186,7 +176,7 @@ export async function publishReviewRunsOnce({
       work.claim_token,
       {
         code: errorCode(error) ?? classification.code,
-        message: errorMessage(error)
+        message: asErrorMessage(error)
       },
       { retry: classification.retry }
     )
@@ -211,7 +201,7 @@ export function startPublicationCoordinator({
     onError: (error) => {
       logError('review_publication_loop_failed', {
         error,
-        error_message: errorMessage(error),
+        error_message: asErrorMessage(error),
         connector_id: store.connectorId
       })
     }

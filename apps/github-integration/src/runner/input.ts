@@ -28,8 +28,7 @@ export interface ReviewIntent {
   repair_mode?: RepairMode
 }
 
-export const INPUT_BUNDLE_MEDIA_TYPE =
-  'application/tar+zstd' as const
+export const INPUT_BUNDLE_MEDIA_TYPE = 'application/tar+zstd' as const
 
 export interface InputBundleArtifactRef {
   uri: string
