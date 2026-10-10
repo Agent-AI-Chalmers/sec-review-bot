@@ -316,6 +316,14 @@ try {
       await page.waitForTimeout(800)
       await page.locator('tbody tr:first-child td a').first().click()
       await page.waitForSelector('.run-progress-timeline')
+      assert.match(
+        (await page
+          .locator('.run-progress-timeline .mantine-Timeline-itemBody')
+          .nth(2)
+          .textContent()) ?? '',
+        /took/,
+        `${name} a finished phase must read as a duration`
+      )
       const deliverySteps = await page.locator('.delivery-item').count()
       assert.ok(
         deliverySteps > 1,
@@ -361,6 +369,7 @@ try {
       /\d+[dhms]/,
       `${name} the execution phase must report its elapsed time`
     )
+    assert.match(execution.body, /so far/, `${name} an in-flight phase must read as still running`)
     await page.getByRole('button', { name: 'Copy run ID' }).click()
     await page.waitForTimeout(300)
     assert.equal(
@@ -511,6 +520,69 @@ try {
       )
       await themeContext.close()
     }
+
+    const manualContext = await browser.newContext({ viewport, locale: 'en-US' })
+    const manualPage = await manualContext.newPage()
+    await manualPage.addInitScript(() => localStorage.setItem('ui-auto-refresh', 'false'))
+    await manualPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await manualPage.getByRole('heading', { name: 'Runs' }).waitFor()
+    await manualPage.locator('tbody tr:first-child td a').first().click()
+    await manualPage.waitForSelector('.run-progress-timeline')
+    await manualPage.waitForTimeout(500)
+    const readElapsed = () =>
+      manualPage.locator('.run-progress-timeline .mantine-Timeline-itemBody').nth(1).textContent()
+    const elapsedBefore = await readElapsed()
+    assert.match(
+      elapsedBefore ?? '',
+      /so far/,
+      `${name} an in-flight phase must read as still running`
+    )
+    await manualPage.waitForTimeout(13_000)
+    assert.notEqual(
+      await readElapsed(),
+      elapsedBefore,
+      `${name} an in-flight elapsed time must keep moving without a refetch`
+    )
+    await manualContext.close()
+
+    // The English pass above cannot catch wording that only went wrong in translation, and
+    // both a publication step called "executed" and a marker placed after its value did.
+    const zhContext = await browser.newContext({ viewport, locale: 'zh-CN' })
+    const zhPage = await zhContext.newPage()
+    await zhPage.addInitScript(() => localStorage.setItem('ui-language', 'zh'))
+    await zhPage.goto(`${base}/runs?workflow=repository-review&publication_status=published`, {
+      waitUntil: 'networkidle'
+    })
+    await zhPage.waitForTimeout(700)
+    await zhPage.locator('tbody tr:first-child td a').first().click()
+    await zhPage.waitForSelector('.run-progress-timeline')
+    await zhPage.waitForTimeout(500)
+    const zhBadges = await zhPage.$$eval('.delivery-item .mantine-Badge-root', (items) =>
+      items.map((item) => item.textContent?.trim())
+    )
+    assert.ok(zhBadges.length > 0, `${name} the zh run must show its publication steps`)
+    for (const badge of zhBadges) {
+      assert.equal(
+        badge,
+        '发布成功',
+        `${name} a publication step must not be described with execution wording`
+      )
+    }
+    await zhPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await zhPage.getByRole('heading', { name: 'Runs' }).waitFor()
+    await zhPage.locator('tbody tr:first-child td a').first().click()
+    await zhPage.waitForSelector('.run-progress-timeline')
+    await zhPage.waitForTimeout(500)
+    const zhExecution = await zhPage
+      .locator('.run-progress-timeline .mantine-Timeline-itemBody')
+      .nth(1)
+      .textContent()
+    assert.match(
+      zhExecution ?? '',
+      /· 已持续 /,
+      `${name} the Chinese marker must precede the elapsed value`
+    )
+    await zhContext.close()
 
     console.log(`browser-smoke ${name}: ok (${base})`)
     await context.close()

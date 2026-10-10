@@ -545,7 +545,7 @@ function safeExternalUrl(value: string | null): string | undefined {
 function publicationStatusLabel(status: string, t: ReturnType<typeof useMessages>): string {
   if (status === 'pending') return t('publicationPending')
   if (status === 'running') return t('publishingStatus')
-  if (status === 'succeeded') return t('statusSucceeded')
+  if (status === 'succeeded') return t('publicationStepSucceeded')
   if (status === 'failed') return t('retryPending')
   if (status === 'terminal_failed') return t('failedStatus')
   return status
@@ -626,6 +626,19 @@ function failureReason(error: unknown, t: ReturnType<typeof useMessages>): strin
   if (error.code === 'control_plane_timeout') return t('errorTimeout')
   if (error.code === 'control_plane_unavailable') return t('errorUnreachable')
   return error.status >= 500 ? `${t('errorUpstream')} (${error.status})` : undefined
+}
+
+/** A finished phase reports how long it took; an in-flight one reports how long it has
+ * been in that state — a fact about the clock, not about the stored timestamps. */
+function phaseElapsed(
+  updatedAt: string,
+  createdAt: string,
+  finished: boolean,
+  t: ReturnType<typeof useMessages>
+): string {
+  return finished
+    ? `${t('took')} ${formatDuration(Date.parse(updatedAt) - Date.parse(createdAt), t)}`
+    : `${t('soFar')} ${formatDuration(Date.now() - Date.parse(updatedAt), t)}`
 }
 
 /** Compact elapsed time, e.g. `2m 33s` or `1h 4m`. */
@@ -788,6 +801,12 @@ function Detail(): React.JSX.Element {
   // Polls while the run is active. The detail page renders no refresh chrome, so
   // the hook's display state (refreshing / lastChecked) is intentionally unused.
   useRefresh(load, !terminal)
+  const [, setClockTick] = React.useState(0)
+  React.useEffect(() => {
+    if (terminal) return
+    const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 10_000)
+    return (): void => window.clearInterval(timer)
+  }, [terminal])
   const titleRunId = run?.run_id
   React.useEffect(() => {
     if (titleRunId === undefined) return
@@ -925,8 +944,10 @@ function Detail(): React.JSX.Element {
                 >
                   <Text c="dimmed" size="sm">
                     {formatDate(run.execution_updated_at, language)} ·{' '}
-                    {formatDuration(
-                      Date.parse(run.execution_updated_at) - Date.parse(run.created_at),
+                    {phaseElapsed(
+                      run.execution_updated_at,
+                      run.created_at,
+                      ['succeeded', 'failed'].includes(run.execution_status),
                       t
                     )}
                   </Text>
@@ -945,9 +966,10 @@ function Detail(): React.JSX.Element {
                     {publicationStarted && (
                       <Text c="dimmed" size="sm">
                         {formatDate(run.published_at ?? run.publication_updated_at, language)} ·{' '}
-                        {formatDuration(
-                          Date.parse(run.published_at ?? run.publication_updated_at) -
-                            Date.parse(run.created_at),
+                        {phaseElapsed(
+                          run.published_at ?? run.publication_updated_at,
+                          run.created_at,
+                          ['published', 'failed'].includes(run.publication_status),
                           t
                         )}
                       </Text>
