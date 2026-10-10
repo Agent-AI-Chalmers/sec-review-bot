@@ -10,11 +10,7 @@ import { type ArtifactStorage, type Run } from './api.js'
 import { useMessages } from './i18n.js'
 
 export type PublicationStepStatus =
-  | 'pending'
-  | 'running'
-  | 'succeeded'
-  | 'failed'
-  | 'terminal_failed'
+  'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
 
 type StatusTone = 'waiting' | 'active' | 'complete' | 'failed' | 'neutral'
 
@@ -49,12 +45,20 @@ export function publicationTone(status: Run['publication_status']): StatusTone {
   return 'neutral'
 }
 
-export function ExecutionStatus({ status }: { status: Run['execution_status'] }): React.JSX.Element {
+export function ExecutionStatus({
+  status
+}: {
+  status: Run['execution_status']
+}): React.JSX.Element {
   const t = useMessages()
   return <StatusText label={executionStatusLabel(status, t)} tone={executionTone(status)} />
 }
 
-export function PublicationStatus({ status }: { status: Run['publication_status'] }): React.JSX.Element {
+export function PublicationStatus({
+  status
+}: {
+  status: Run['publication_status']
+}): React.JSX.Element {
   const t = useMessages()
   return <StatusText label={runPublicationStatusLabel(status, t)} tone={publicationTone(status)} />
 }

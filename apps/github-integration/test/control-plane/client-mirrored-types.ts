@@ -59,9 +59,7 @@ type Expect<T extends true> = T
  * Both dimensions: `workflow` is a union, so value equality is needed, and
  * `runner_input`/`ingress_*` are optional, so key equality is needed too.
  */
-export type CreateArgsMatchTheContract = Expect<
-  SameShape<ClientCreateArgs, ControlPlaneCreateArgs>
->
+export type CreateArgsMatchTheContract = Expect<SameShape<ClientCreateArgs, ControlPlaneCreateArgs>>
 
 export type ClientRecordIsWithinControlPlaneRecord = Expect<
   KeysWithin<ClientRecord, ControlPlaneRecord>
