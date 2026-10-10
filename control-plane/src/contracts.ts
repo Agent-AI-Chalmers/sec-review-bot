@@ -7,6 +7,36 @@
  */
 export type ControlPlaneWorkflow = 'issue-review' | 'pull-request-review' | 'repository-review'
 
+/**
+ * The operations `POST /v1/store` accepts.
+ *
+ * The GitHub integration sends these by name over HTTP and Control Plane dispatches them
+ * by name, so this list is the boundary's surface rather than an implementation detail:
+ * the server refuses anything absent from it, and the client must send nothing else.
+ * `apps/github-integration` asserts that its own sends stay inside this list, because the
+ * two sides are separate packages whose operation lists can drift silently — which they
+ * had: two methods kept sending names Control Plane had stopped accepting.
+ */
+export const controlPlaneOperations = [
+  'submit_prepared_run',
+  'admit_review_run',
+  'getRun',
+  'failPreparation',
+  'renewPreparationClaim',
+  'preparationHeartbeatIntervalMs',
+  'claimNextPublication',
+  'renewPublicationClaim',
+  'initializePublicationSteps',
+  'listPublicationSteps',
+  'requirePublicationStepClaim',
+  'completePublicationStep',
+  'failPublicationStep',
+  'completePublication',
+  'failPublication'
+] as const
+
+export type ControlPlaneOperation = (typeof controlPlaneOperations)[number]
+
 export interface RunnerArtifactStorage {
   status: 'available' | 'unavailable' | 'failed'
   artifact?: {

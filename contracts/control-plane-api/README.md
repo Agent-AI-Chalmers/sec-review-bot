@@ -2,16 +2,19 @@
 
 Language: English | [中文](README.zh.md)
 
-This family holds the shapes Control Plane exchanges with its callers. Today it covers the read surface, the shapes the read-only web console receives when it asks about review runs; the store operations belong here when they are contracted too.
+This family holds the shapes Control Plane exchanges with its callers. It covers two surfaces that answer to different credentials: the read surface the console consumes, and the store operations the GitHub integration calls.
 
 Use these documents:
 
-- [v1/observed-run.schema.json](v1/observed-run.schema.json): the shape of one observed run.
+- [v1/observed-run.schema.json](v1/observed-run.schema.json): the redacted shape a read response returns.
+- [v1/review-run-record.schema.json](v1/review-run-record.schema.json): the coordination record exchanged over `POST /v1/store`.
 - [v1/fixtures](v1/fixtures): executable examples, including the shapes this contract must reject.
 
 ## Boundary
 
-The Control Plane produces each observed run from `observeRun()`. The console does not import this package, so it carries its own type for the same shape; the fixture in this directory is what keeps the two in step.
+The Control Plane produces each observed run from `observeRun()` and each record from `rowToRecord()`. Neither caller imports this package, so both carry their own type for the shape they read; these schemas are what keep all three descriptions in step.
+
+The record carries `failure_message`, which the redacted read shape deliberately drops, so it only ever crosses the service-token boundary.
 
 ## Public Boundary
 
@@ -26,6 +29,12 @@ The following are not part of this contract:
 - internal store records, such as the row shape exchanged over `POST /v1/store`;
 - the flattened status, which appears only on those store records;
 - anything the console derives for display, such as relative times or phase durations.
+
+## What Is Not Schematized
+
+Three payloads have no schema: the admission envelope, the publication claim result, and the publication step record. Each is tied to Control Plane's own type at compile time instead, by `apps/github-integration/test/control-plane/client-mirrored-types.ts`.
+
+A schema for them would be a second description nobody validates at runtime: the integration parses each response and casts it, so a schema needs a validator at that call site before it enforces anything. Until someone decides that cost is worth paying, the compile-time tie is the enforcement, and adding schema files without it would only make the boundary look covered.
 
 ## Enforcement
 

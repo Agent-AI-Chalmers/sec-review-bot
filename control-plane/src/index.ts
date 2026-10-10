@@ -1,3 +1,4 @@
+export { controlPlaneOperations, type ControlPlaneOperation } from './contracts.js'
 export type {
   AdmittedReviewRun,
   ControlPlaneWorkflow,

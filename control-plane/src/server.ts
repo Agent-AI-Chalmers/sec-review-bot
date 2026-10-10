@@ -3,7 +3,11 @@ import { randomUUID } from 'node:crypto'
 
 import { ReviewRunStore } from './review-store.js'
 import type { PublicationStatus, RunnerStatus } from './review-store.js'
-import type { ControlPlaneWorkflow } from './contracts.js'
+import {
+  controlPlaneOperations,
+  type ControlPlaneOperation,
+  type ControlPlaneWorkflow
+} from './contracts.js'
 import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from './coordinator.js'
 import { observeRunnerRun } from './terminal-coordination.js'
 import {
@@ -42,25 +46,8 @@ function runnerStatusFromBatch(
     return await getRunnerRunStatus(runId, workflow)
   }
 }
-const operations = [
-  'submit_prepared_run',
-  'admit_review_run',
-  'getRun',
-  'failPreparation',
-  'renewPreparationClaim',
-  'preparationHeartbeatIntervalMs',
-  'claimNextPublication',
-  'renewPublicationClaim',
-  'initializePublicationSteps',
-  'listPublicationSteps',
-  'requirePublicationStepClaim',
-  'completePublicationStep',
-  'failPublicationStep',
-  'completePublication',
-  'failPublication'
-] as const
-type Operation = (typeof operations)[number]
-const allowedOperations = new Set<string>(operations)
+type Operation = ControlPlaneOperation
+const allowedOperations = new Set<string>(controlPlaneOperations)
 const runnerStatuses = new Set<RunnerStatus>([
   'preparing',
   'recovering',

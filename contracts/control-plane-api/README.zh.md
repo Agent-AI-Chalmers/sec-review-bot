@@ -4,16 +4,19 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-本族收录 Control Plane 与其调用方交换的形状。目前只覆盖读取面，即只读 Web 控制台查询 review run 时收到的形状；store 的那些操作在被契约化之后也归入本族。
+本族收录 Control Plane 与其调用方交换的形状。它覆盖两个凭据不同的面：控制台消费的读取面，以及 GitHub 集成调用的 store 操作。
 
 从这些文档开始：
 
-- [v1/observed-run.schema.json](v1/observed-run.schema.json)：单个 observed run 的形状。
+- [v1/observed-run.schema.json](v1/observed-run.schema.json)：读取响应返回的、已脱敏的形状。
+- [v1/review-run-record.schema.json](v1/review-run-record.schema.json)：经 `POST /v1/store` 交换的协调记录。
 - [v1/fixtures](v1/fixtures)：可执行示例，包含本契约必须拒绝的形状。
 
 ## 边界
 
-Control Plane 通过 `observeRun()` 产出每个 observed run。控制台不 import 这个包，因此它为同一形状保留了自己的类型；本目录中的 fixture 就是让两者保持一致的东西。
+Control Plane 通过 `observeRun()` 产出每个 observed run，通过 `rowToRecord()` 产出每条记录。两侧调用方都不 import 这个包，因此各自为所读的形状保留了自己的类型；这些 schema 就是让三份描述保持一致的东西。
+
+记录携带 `failure_message`，而脱敏后的读取形状刻意丢弃了它，因此它只跨越 service token 那条边界。
 
 ## 公开边界
 
@@ -28,6 +31,12 @@ Control Plane 通过 `observeRun()` 产出每个 observed run。控制台不 imp
 - 内部存储记录，例如经 `POST /v1/store` 交换的行形状；
 - 扁平状态，它只出现在那些存储记录上；
 - 控制台为展示而派生的任何内容，例如相对时间或各阶段耗时。
+
+## 没有 schema 的部分
+
+有三个载荷没有 schema：admission 信封、publication claim 结果、以及 publication step 记录。它们改由 `apps/github-integration/test/control-plane/client-mirrored-types.ts` 在编译期与 Control Plane 自己的类型绑定。
+
+为它们写 schema，只会得到第二份**运行时没人校验**的描述：集成侧解析响应后直接做类型断言，所以 schema 要先在那个调用点接上校验器才谈得上执行。在有人决定这笔开销值得付之前，编译期的绑定就是执行方式；只补 schema 文件而不接校验，只会让这条边界**看起来**被覆盖了。
 
 ## 执行方式
 

@@ -134,25 +134,6 @@ class HttpControlPlaneClient {
     return await this.call<ReviewRunAdmission>('admit_review_run', run)
   }
 
-  async save_prepared_submission(
-    runId: string,
-    token: string,
-    context: PublishContext,
-    input: JsonObject
-  ): Promise<void> {
-    await this.call(
-      'save_prepared_submission',
-      runId,
-      token,
-      await this.validateContext(runId, context),
-      input
-    )
-  }
-
-  async mark_queued(runId: string, token: string, context: PublishContext): Promise<void> {
-    await this.call('mark_queued', runId, token, await this.validateContext(runId, context))
-  }
-
   async submit_prepared_run(
     runId: string,
     token: string,
@@ -286,8 +267,6 @@ export type ControlPlaneClient = Pick<
   HttpControlPlaneClient,
   | 'connector_id'
   | 'admit_review_run'
-  | 'save_prepared_submission'
-  | 'mark_queued'
   | 'submit_prepared_run'
   | 'getRun'
   | 'renewPreparationClaim'

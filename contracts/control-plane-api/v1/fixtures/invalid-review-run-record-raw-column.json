@@ -1,0 +1,33 @@
+{
+  "run_id": "9d2b7c41-6e58-4a30-9f12-3b7c8d9e0a1b",
+  "workflow": "pull-request-review",
+  "publish_context": {
+    "repository": "octo/example",
+    "pull_request": 41
+  },
+  "runner_input": {
+    "diff": "sha256:ignored-by-the-contract"
+  },
+  "ingress_kind": "github_webhook",
+  "ingress_key": "octo/example#41",
+  "status": "published",
+  "runner_status": "succeeded",
+  "publication_status": "published",
+  "created_at": "2026-10-11T02:00:00.000Z",
+  "execution_updated_at": "2026-10-11T02:04:31.000Z",
+  "publication_updated_at": "2026-10-11T02:09:12.000Z",
+  "published_at": "2026-10-11T02:09:12.000Z",
+  "failure_code": null,
+  "failure_message": null,
+  "artifact_storage": {
+    "status": "available",
+    "artifact": {
+      "kind": "diagnostic_bundle",
+      "uri": "s3://sec-review/runs/9d2b7c41-6e58-4a30-9f12-3b7c8d9e0a1b/artifacts/diagnostic-tree.v1.tar.zst",
+      "media_type": "application/zstd",
+      "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "size_bytes": 4096
+    }
+  },
+  "runner_updated_at": "2026-10-11T02:04:31.000Z"
+}

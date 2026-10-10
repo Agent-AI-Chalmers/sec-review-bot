@@ -31,9 +31,8 @@ function workspaceRoot(): string {
 }
 
 const root = workspaceRoot()
-const schema = JSON.parse(
-  readFileSync(path.join(root, FAMILY, 'observed-run.schema.json'), 'utf8')
-) as AnySchemaObject
+// One family can hold several schemas, so each fixture is validated against the schema the
+// manifest names for it rather than against whichever schema was loaded first.
 const manifest = JSON.parse(readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')) as {
   schema_fixtures: Record<string, string>
   invalid_schema_fixtures: Record<string, string>
@@ -43,7 +42,14 @@ function fixture(name: string): unknown {
   return JSON.parse(readFileSync(path.join(root, FIXTURES, name), 'utf8'))
 }
 
-function validate(value: unknown): boolean {
+const validators = new Map<string, ValidateFunction>()
+
+function validate(schemaName: string, value: unknown): boolean {
+  const cached = validators.get(schemaName)
+  if (cached !== undefined) return cached(value)
+  const schema = JSON.parse(
+    readFileSync(path.join(root, FAMILY, schemaName), 'utf8')
+  ) as AnySchemaObject
   // `ajv-formats` supplies the implementations the schema's `date-time` and `uri`
   // annotations need. Without it ajv's strict mode refuses the schema outright rather than
   // quietly skipping those assertions, so the contract's `format` keywords are enforced.
@@ -56,17 +62,18 @@ function validate(value: unknown): boolean {
   const addFormats = ajvFormats.default as unknown as (instance: Ajv2020) => Ajv2020
   addFormats(ajv)
   const validator = ajv.compile(schema) as ValidateFunction
+  validators.set(schemaName, validator)
   return validator(value)
 }
 
 test('the shared fixtures match or violate the schema exactly as the manifest claims', () => {
   // A fixture that quietly stops matching the schema would teach the console a shape the
   // Control Plane never sends, so both directions are asserted.
-  for (const name of Object.keys(manifest.schema_fixtures)) {
-    assert.equal(validate(fixture(name)), true, `${name} must be accepted`)
+  for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
+    assert.equal(validate(schemaName, fixture(name)), true, `${name} must be accepted`)
   }
-  for (const name of Object.keys(manifest.invalid_schema_fixtures)) {
-    assert.equal(validate(fixture(name)), false, `${name} must be rejected`)
+  for (const [name, schemaName] of Object.entries(manifest.invalid_schema_fixtures)) {
+    assert.equal(validate(schemaName, fixture(name)), false, `${name} must be rejected`)
   }
 })
 
@@ -94,7 +101,7 @@ test('what observeRun returns validates against the shared schema', () => {
   // the check that would catch a status the schema's enum does not list.
   const withoutArtifact = observeRun(recordWith(null))
   assert.equal(
-    validate(withoutArtifact),
+    validate('observed-run.schema.json', withoutArtifact),
     true,
     `observeRun output must be accepted: ${JSON.stringify(withoutArtifact)}`
   )
@@ -112,7 +119,7 @@ test('what observeRun returns validates against the shared schema', () => {
     } as ReviewRunRecord['artifact_storage'])
   )
   assert.equal(
-    validate(withArtifact),
+    validate('observed-run.schema.json', withArtifact),
     true,
     `observeRun output must be accepted: ${JSON.stringify(withArtifact)}`
   )
