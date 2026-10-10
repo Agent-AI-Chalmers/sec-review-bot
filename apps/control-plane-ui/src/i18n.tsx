@@ -41,6 +41,10 @@ const messages = {
     emptyRuns: 'No results match these filters',
     run: 'Run',
     lastActivity: 'Last activity',
+    timeRange: 'Time range',
+    lastHour: 'Last hour',
+    lastDay: 'Last 24 hours',
+    lastWeek: 'Last 7 days',
     perPage: 'Per page',
     previousPage: 'Previous page',
     nextPage: 'Next page',
@@ -57,9 +61,10 @@ const messages = {
     retryPending: 'Retry pending',
     failedStatus: 'Failed',
     failedAttempts: 'Failed attempts',
-    latestError: 'Latest error',
+    failureCode: 'Failure code',
     unable: 'Unable to load Control Plane',
-    requestFailed: 'The service could not complete this request.'
+    requestFailed: 'The service could not complete this request.',
+    retry: 'Retry'
   },
   zh: {
     language: '语言',
@@ -99,6 +104,10 @@ const messages = {
     emptyRuns: '没有符合筛选条件的结果',
     run: 'Run',
     lastActivity: '最后活动',
+    timeRange: '时间范围',
+    lastHour: '最近 1 小时',
+    lastDay: '最近 24 小时',
+    lastWeek: '最近 7 天',
     perPage: '每页',
     previousPage: '上一页',
     nextPage: '下一页',
@@ -115,9 +124,10 @@ const messages = {
     retryPending: '等待重试',
     failedStatus: '失败',
     failedAttempts: '失败次数',
-    latestError: '最近错误',
+    failureCode: '失败码',
     unable: '无法加载 Control Plane',
-    requestFailed: '服务无法完成此请求。'
+    requestFailed: '服务无法完成此请求。',
+    retry: '重试'
   }
 } as const
 export type Message = keyof typeof messages.en

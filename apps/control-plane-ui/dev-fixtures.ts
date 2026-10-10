@@ -64,8 +64,8 @@ interface Scenario {
 // page so the console's paging is reachable without a backend.
 const DEV_PAGE_SIZE = 50
 const RUN_COUNT = 62
-const BASE_TIME = Date.parse('2026-10-09T09:00:00.000Z')
-const RUN_SPACING_MS = 43 * 60 * 1000
+const BASE_TIME = Date.now() - 20 * 60 * 1000
+const RUN_SPACING_MS = 3 * 60 * 60 * 1000
 
 const WORKFLOWS: readonly Workflow[] = ['pull-request-review', 'issue-review', 'repository-review']
 const STEP_KEYS: Record<Workflow, string> = {
@@ -336,6 +336,8 @@ export function devFixtures(): Plugin {
             response.end(JSON.stringify({ error: 'cursor is invalid.', code: 'INVALID_QUERY' }))
             return
           }
+          const from = url.searchParams.get('from')
+          const to = url.searchParams.get('to')
           const executionStatus = url.searchParams.get('execution_status')
           const publicationStatus = url.searchParams.get('publication_status')
           const workflow = url.searchParams.get('workflow')
@@ -343,6 +345,8 @@ export function devFixtures(): Plugin {
             (run) =>
               (executionStatus === null || run.execution_status === executionStatus) &&
               (publicationStatus === null || run.publication_status === publicationStatus) &&
+              (from === null || run.created_at >= from) &&
+              (to === null || run.created_at < to) &&
               (workflow === null || run.workflow === workflow) &&
               // Matches the store's `(created_at, run_id) < (cursor)` page walk.
               (cursor === null ||

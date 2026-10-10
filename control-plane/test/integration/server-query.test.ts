@@ -98,6 +98,23 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     assert.equal(secondBody.runs.length, 1)
     assert.notEqual(secondBody.runs[0]?.run_id, firstBody.runs[0]?.run_id)
 
+    // The created-at range was accepted by the API but never covered, so a broken
+    // bound would have filtered silently.
+    const past = encodeURIComponent('2000-01-01T00:00:00.000Z')
+    const future = encodeURIComponent('2100-01-01T00:00:00.000Z')
+    const boundedAbove = await fetch(`${base}/v1/runs?from=${past}`, { headers: readAuth })
+    assert.equal(((await boundedAbove.json()) as { runs: unknown[] }).runs.length, 2)
+    const notYet = await fetch(`${base}/v1/runs?from=${future}`, { headers: readAuth })
+    assert.deepEqual(await notYet.json(), { runs: [], next_cursor: null })
+    const beforeEverything = await fetch(`${base}/v1/runs?to=${past}`, { headers: readAuth })
+    assert.deepEqual(await beforeEverything.json(), { runs: [], next_cursor: null })
+    const invalidFrom = await fetch(`${base}/v1/runs?from=not-a-date`, { headers: readAuth })
+    assert.equal(invalidFrom.status, 400)
+    assert.deepEqual(await invalidFrom.json(), {
+      error: 'from must be a valid date.',
+      code: 'INVALID_QUERY'
+    })
+
     await server.close()
     server = await startControlPlaneServer()
     const afterRestart = await fetch(`${base}/v1/runs/${runIds[0]}`, { headers: readAuth })

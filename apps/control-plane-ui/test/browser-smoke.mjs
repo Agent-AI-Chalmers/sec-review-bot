@@ -27,7 +27,14 @@ if (CHROME_PATH === undefined) {
   )
 }
 
-const EXPECTED_HEADERS = ['Run', 'Workflow', 'Execution', 'Publication', 'Last activity']
+const EXPECTED_HEADERS = [
+  'Run',
+  'Workflow',
+  'Execution',
+  'Publication',
+  'Last activity',
+  'Failure code'
+]
 
 // Bind loopback explicitly. Vite's default host is `localhost`, which Node may
 // resolve to ::1 first, leaving 127.0.0.1 refused.
@@ -125,6 +132,29 @@ try {
       await perPage.selectOption('50')
       await page.waitForTimeout(750)
       assert.equal((await rows()).length, 50, `${name} default page size must apply`)
+
+      // The fixture spreads its runs over more than a week, so each range preset must
+      // narrow the list by a distinct amount rather than silently filtering nothing.
+      const timeRange = page.getByLabel('Time range')
+      const allRows = (await rows()).length
+      await timeRange.selectOption('1h')
+      await page.waitForTimeout(750)
+      const hourRows = (await rows()).length
+      assert.ok(hourRows < allRows, `${name} a one-hour range must narrow the list`)
+      await timeRange.selectOption('24h')
+      await page.waitForTimeout(750)
+      const dayRows = (await rows()).length
+      assert.ok(
+        dayRows > hourRows && dayRows < allRows,
+        `${name} a 24-hour range must sit between the hour and everything`
+      )
+      await timeRange.selectOption('')
+      await page.waitForTimeout(750)
+      assert.equal(
+        (await rows()).length,
+        allRows,
+        `${name} clearing the range must restore the list`
+      )
 
       const firstPage = await rows()
       assert.ok(await previous.isDisabled(), `${name} first page must disable the previous control`)
@@ -228,6 +258,11 @@ try {
     await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
     await page.getByLabel('Execution').selectOption('failed')
     await page.waitForTimeout(750)
+    assert.match(
+      (await page.locator('tbody tr:first-child td').last().textContent()) ?? '',
+      /[A-Z_]{4,}/,
+      `${name} a failed row must show its failure code in the list`
+    )
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
     const ruledOut = await page.$$eval('.run-progress-timeline .mantine-Timeline-item', (items) =>

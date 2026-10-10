@@ -1,6 +1,14 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Link, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Link,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+  useSearchParams
+} from 'react-router-dom'
 import {
   AppShell,
   ActionIcon,
@@ -243,6 +251,7 @@ function statusBullet(tone: StatusTone): React.ReactNode {
   return <IconClock size={14} />
 }
 
+const RANGE_MINUTES: Record<string, number> = { '1h': 60, '24h': 1_440, '7d': 10_080 }
 const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
 /** Mirrors the Control Plane's own default, so an unadorned `/runs` asks for what
  * the server would have returned anyway. */
@@ -270,6 +279,16 @@ function Runs(): React.JSX.Element {
   // that the console does not offer is still honoured as an extra option.
   const pageQuery = new URLSearchParams(search)
   pageQuery.set('limit', String(pageSize))
+  const rangeMinutes = RANGE_MINUTES[search.get('range') ?? '']
+  if (rangeMinutes !== undefined) {
+    // The API takes an absolute instant, but the URL keeps the preset so a shared
+    // link keeps sliding. Quantise to the minute so the request string stays
+    // stable between renders instead of retriggering the loader on every one.
+    const from = new Date(
+      Math.floor(Date.now() / 60_000) * 60_000 - rangeMinutes * 60_000
+    ).toISOString()
+    pageQuery.set('from', from)
+  }
   const query = pageQuery.toString()
   const pageSizeOptions = PAGE_SIZES.includes(pageSize)
     ? PAGE_SIZES
@@ -377,6 +396,16 @@ function Runs(): React.JSX.Element {
               )}
             </NativeSelect>
             <NativeSelect
+              label={t('timeRange')}
+              value={search.get('range') ?? ''}
+              onChange={(event) => update('range', event.target.value)}
+            >
+              <option value="">{t('all')}</option>
+              <option value="1h">{t('lastHour')}</option>
+              <option value="24h">{t('lastDay')}</option>
+              <option value="7d">{t('lastWeek')}</option>
+            </NativeSelect>
+            <NativeSelect
               label={t('perPage')}
               value={String(pageSize)}
               onChange={(event) =>
@@ -416,6 +445,7 @@ function Runs(): React.JSX.Element {
                   <Table.Th>{t('execution')}</Table.Th>
                   <Table.Th>{t('publication')}</Table.Th>
                   <Table.Th>{t('lastActivity')}</Table.Th>
+                  <Table.Th>{t('failureCode')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -423,7 +453,10 @@ function Runs(): React.JSX.Element {
                   <Table.Tr key={run.run_id}>
                     <Table.Td>
                       <Tooltip label={run.run_id}>
-                        <Link to={`/runs/${encodeURIComponent(run.run_id)}`}>
+                        <Link
+                          to={`/runs/${encodeURIComponent(run.run_id)}`}
+                          state={{ listSearch: search.toString() }}
+                        >
                           {abbreviate(run.run_id, 8, 4)}
                         </Link>
                       </Tooltip>
@@ -436,6 +469,13 @@ function Runs(): React.JSX.Element {
                       <PublicationStatus status={run.publication_status} />
                     </Table.Td>
                     <Table.Td>{formatDate(lastActivity(run), language)}</Table.Td>
+                    <Table.Td>
+                      {run.failure_code && (
+                        <Text c="red" size="xs" ff="monospace">
+                          {run.failure_code}
+                        </Text>
+                      )}
+                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -650,6 +690,11 @@ function Detail(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
   const { runId = '' } = useParams()
+  const location = useLocation()
+  // Restore the list's filters and cursor when the reader came from it. A reload or
+  // a deep link has no such state, so fall back to an unfiltered first page.
+  const listSearch = (location.state as { listSearch?: string } | null)?.listSearch
+  const backTo = listSearch ? `/runs?${listSearch}` : '/runs'
   const [run, setRun] = React.useState<Run>()
   const [steps, setSteps] = React.useState<Step[]>([])
   const [error, setError] = React.useState<unknown>()
@@ -702,7 +747,7 @@ function Detail(): React.JSX.Element {
     <Container component="main" size="lg" py="xl">
       <Button
         component={Link}
-        to="/runs"
+        to={backTo}
         variant="subtle"
         px={0}
         leftSection={<IconArrowLeft size={16} />}
@@ -737,7 +782,7 @@ function Detail(): React.JSX.Element {
               {run.failure_code && (
                 <Group gap={6} wrap="wrap">
                   <Text c="dimmed" size="xs">
-                    {t('latestError')}:
+                    {t('failureCode')}:
                   </Text>
                   <Text c="red" size="xs" ff="monospace">
                     {run.failure_code}
@@ -888,7 +933,10 @@ function ErrorFallback(): React.JSX.Element {
   return (
     <Container component="main" size="lg" py="xl">
       <Title order={1}>{t('unable')}</Title>
-      <Text role="alert">{t('requestFailed')}</Text>
+      <Text role="alert" mb="md">
+        {t('requestFailed')}
+      </Text>
+      <Button onClick={() => window.location.reload()}>{t('retry')}</Button>
     </Container>
   )
 }
