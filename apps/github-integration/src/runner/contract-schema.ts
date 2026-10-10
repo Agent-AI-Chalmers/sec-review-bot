@@ -50,7 +50,6 @@ function resultValidators(): Map<string, ValidateFunction> {
   const ajv = new Ajv2020({ allErrors: true })
   const commonSchema = readSchema(root, 'common.schema.json')
   ajv.addSchema(commonSchema)
-  ajv.addSchema(commonSchema, 'common.schema.json')
 
   validators = new Map<string, ValidateFunction>([
     ['review-record.schema.json', ajv.compile(readSchema(root, 'review-record.schema.json'))],

@@ -46,9 +46,9 @@ def _validators() -> dict[str, Draft202012Validator]:
         if resource.name.endswith(".schema.json")
     }
     resources: list[tuple[str, Resource]] = []
-    for name, schema in schemas.items():
+    for schema in schemas.values():
         resource = Resource.from_contents(schema)
-        resources.extend(((name, resource), (schema["$id"], resource)))
+        resources.append((schema["$id"], resource))
     registry = Registry().with_resources(resources)
     return {
         schema_name: Draft202012Validator(schema, registry=registry)
