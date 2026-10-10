@@ -29,9 +29,9 @@ A family may also hold documents that apply to every version, such as a transpor
 
 ## Rules For Every Family
 
-A family is named for what it covers. Name it after the component that owns every shape in it when one does, and after the point where the parties meet when none does: `control-plane-api` for the shapes one component exchanges, `integration-contract` for a point whose shapes span the Runner, its callers, and a downstream publisher.
+A family is named for what it covers. If one component owns every shape in it, name it after that component — `control-plane-api` is Control Plane's own shapes. If the shapes span several parties, name it after where they meet — `integration-contract` spans the Runner, its callers, and a downstream publisher.
 
-Do not name a family after one of its consumers, because consumers change while the provider does not. Do not reuse a word another family already uses for a different concept.
+Do not name a family after one of its consumers: consumers change, the provider does not. And do not reuse a word that another family already uses for a different meaning.
 
 The specification, its schemas, its fixtures, and the fixture manifest change together.
 

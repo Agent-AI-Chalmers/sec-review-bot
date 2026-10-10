@@ -21,7 +21,7 @@ Use these docs when you need agent boundaries, capabilities, or framework decisi
 
 ### contracts/
 
-`contracts/` holds the interfaces between components that cannot see each other's types: the App side, the Control Plane, and the Agent side. Each family keeps a specification, JSON Schemas, fixtures, and the tests that fail on both sides when a shape changes. A family that enforces less than that writes down what it does not cover.
+`contracts/` holds the interfaces between components that cannot see each other's types: the App side, the Control Plane, and the Agent side. Each family keeps a specification, JSON Schemas, and fixtures, plus tests on both sides that fail the moment a shape drifts. A family that enforces less than that writes down what it does not cover.
 
 One family covers one boundary:
 
