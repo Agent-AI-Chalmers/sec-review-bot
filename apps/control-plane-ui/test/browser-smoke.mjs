@@ -116,6 +116,16 @@ try {
       const previous = page.getByRole('button', { name: 'Previous page' })
       const next = page.getByRole('button', { name: 'Next page' })
 
+      // The console states the page size on every request rather than relying on the
+      // server default, so a selection must change what the server returns.
+      const perPage = page.getByLabel('Per page')
+      await perPage.selectOption('20')
+      await page.waitForTimeout(750)
+      assert.equal((await rows()).length, 20, `${name} selected page size must apply`)
+      await perPage.selectOption('50')
+      await page.waitForTimeout(750)
+      assert.equal((await rows()).length, 50, `${name} default page size must apply`)
+
       const firstPage = await rows()
       assert.ok(await previous.isDisabled(), `${name} first page must disable the previous control`)
       assert.ok(!(await next.isDisabled()), `${name} first page must offer a next page`)

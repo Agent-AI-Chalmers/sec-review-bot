@@ -223,11 +223,11 @@ a {
     align-items: stretch;
     flex-direction: column;
   }
-  .operations-bar [aria-label='Run filters'] {
+  .operations-bar [aria-label='Run list controls'] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .operations-bar [aria-label='Run filters'] > * {
+  .operations-bar [aria-label='Run list controls'] > * {
     min-width: 0;
   }
   .refresh-controls {

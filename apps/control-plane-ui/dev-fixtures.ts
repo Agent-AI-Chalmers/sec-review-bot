@@ -60,8 +60,10 @@ interface Scenario {
   step: StepStatus | null
 }
 
-const DEV_PAGE_SIZE = 10
-const RUN_COUNT = 32
+// Mirrors the Control Plane's own default page size, and holds more runs than one
+// page so the console's paging is reachable without a backend.
+const DEV_PAGE_SIZE = 50
+const RUN_COUNT = 62
 const BASE_TIME = Date.parse('2026-10-09T09:00:00.000Z')
 const RUN_SPACING_MS = 43 * 60 * 1000
 

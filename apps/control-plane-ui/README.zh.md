@@ -13,7 +13,7 @@ pnpm run dev:fixtures
 
 打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的成功、进行中、恢复中、发布中和失败 run，不需要启动 Control Plane、PostgreSQL 或 RustFS；界面会显示 artifact 元数据，但没有可供下载的真实存储对象。
 
-fixture 每次提供十条 run，并实现了 Control Plane 的游标契约，因此翻页、状态筛选和详情时间线都能在没有后端的情况下走通。每条生成的 run 都会对照 store 实际可能产生的状态做校验，所以不可能出现的组合会让模块导入直接失败，而不是变成看起来合理的演示数据。
+fixture 按 Control Plane 的默认页大小提供数十条 run，并实现了它的游标契约，因此翻页、状态筛选和详情时间线都能在没有后端的情况下走通。每条生成的 run 都会对照 store 实际可能产生的状态做校验，所以不可能出现的组合会让模块导入直接失败，而不是变成看起来合理的演示数据。
 
 如需连接正在运行的 Control Plane，先在一个终端中构建并启动 BFF：
 

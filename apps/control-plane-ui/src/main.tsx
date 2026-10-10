@@ -243,6 +243,11 @@ function statusBullet(tone: StatusTone): React.ReactNode {
   return <IconClock size={14} />
 }
 
+const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
+/** Mirrors the Control Plane's own default, so an unadorned `/runs` asks for what
+ * the server would have returned anyway. */
+const DEFAULT_PAGE_SIZE = 50
+
 function Runs(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
@@ -255,7 +260,20 @@ function Runs(): React.JSX.Element {
   const [error, setError] = React.useState<unknown>()
   const cursor = search.get('cursor') ?? ''
   const previousCursor = cursorParents[cursor]
-  const query = search.toString()
+  const requestedPageSize = Number(search.get('limit') ?? DEFAULT_PAGE_SIZE)
+  const pageSize =
+    Number.isSafeInteger(requestedPageSize) && requestedPageSize >= 1 && requestedPageSize <= 100
+      ? requestedPageSize
+      : DEFAULT_PAGE_SIZE
+  // State the page size on every request, so the console never depends on the
+  // server's own default changing underneath a bookmarked or shared link. A size
+  // that the console does not offer is still honoured as an extra option.
+  const pageQuery = new URLSearchParams(search)
+  pageQuery.set('limit', String(pageSize))
+  const query = pageQuery.toString()
+  const pageSizeOptions = PAGE_SIZES.includes(pageSize)
+    ? PAGE_SIZES
+    : [...PAGE_SIZES, pageSize].sort((left, right) => left - right)
   const load = React.useCallback(async (): Promise<void> => {
     try {
       setData(await api<{ runs: Run[]; next_cursor: string | null }>(`/runs?${query}`))
@@ -317,7 +335,7 @@ function Runs(): React.JSX.Element {
       )}
       <Box className="operations-bar" mb="lg">
         <Group justify="space-between" align="flex-end" gap="lg">
-          <Group aria-label="Run filters" align="flex-end">
+          <Group aria-label="Run list controls" align="flex-end">
             <NativeSelect
               label={t('workflow')}
               value={search.get('workflow') ?? ''}
@@ -357,6 +375,24 @@ function Runs(): React.JSX.Element {
                   </option>
                 )
               )}
+            </NativeSelect>
+            <NativeSelect
+              label={t('perPage')}
+              value={String(pageSize)}
+              onChange={(event) =>
+                // Reuse the filter path: changing how much a page holds invalidates
+                // the cursor and the visited-page trail.
+                update(
+                  'limit',
+                  event.target.value === String(DEFAULT_PAGE_SIZE) ? '' : event.target.value
+                )
+              }
+            >
+              {pageSizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
             </NativeSelect>
           </Group>
           <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
