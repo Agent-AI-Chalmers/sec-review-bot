@@ -324,12 +324,156 @@ try {
         /took/,
         `${name} a finished phase must read as a duration`
       )
+      // The artifact reads as one row with the download trailing. Compare centres, not
+      // tops: the facts use different font sizes, so their tops differ on the same line.
+      const artifact = await page.evaluate(() => {
+        const row = document.querySelector('.artifact-row')
+        if (row === null) return { found: false }
+        const download = row.querySelector('a[download]')
+        const facts = [...row.querySelectorAll('.artifact-facts > *')].map((element) =>
+          element.getBoundingClientRect()
+        )
+        const centres = facts.map((box) => Math.round(box.y + box.height / 2))
+        return {
+          found: true,
+          facts: facts.length,
+          sameLine: new Set(centres).size === 1,
+          downloadTrails:
+            download !== null &&
+            Math.abs(download.getBoundingClientRect().right - row.getBoundingClientRect().right) < 2
+        }
+      })
+      assert.ok(artifact.found, `${name} a stored artifact must render`)
+      assert.equal(artifact.facts, 3, `${name} the artifact must show size, type and digest`)
+      // The facts wrap on a narrow screen by design, so only the wide layout promises
+      // a single line; the trailing download is promised everywhere.
+      if (viewport.width >= 768) {
+        assert.ok(artifact.sameLine, `${name} the artifact facts must share one line`)
+      }
+      assert.ok(artifact.downloadTrails, `${name} the download must trail the artifact row`)
+      // Both blocks lead with a status badge, and the artifact's own storage state was
+      // never shown anywhere before, so losing it would be silent.
+      assert.equal(
+        await page.locator('.artifact-row > .mantine-Badge-root').count(),
+        1,
+        `${name} the artifact row must lead with its status badge`
+      )
+
+      // Content must not touch the line above it. Both the execution timestamp and the
+      // publication summary have crowded their block before, so measure the gap.
+      const breathing = await page.evaluate(() => {
+        const stamp = [...document.querySelectorAll('.mantine-Timeline-itemBody p')].find((p) =>
+          p.textContent.includes('\u00b7 took')
+        )
+        const row = document.querySelector('.artifact-row')
+        const summary = document.querySelector('.publication-summary p')
+        const firstStep = document.querySelector('.delivery-item')
+        const gap = (above, below) =>
+          above === null || below === null
+            ? null
+            : Math.round(below.getBoundingClientRect().top - above.getBoundingClientRect().bottom)
+        return {
+          artifact: gap(stamp ?? null, row),
+          publication: gap(summary ?? null, firstStep)
+        }
+      })
+      for (const [label, value] of Object.entries(breathing)) {
+        assert.ok(
+          value === null || value >= 8,
+          `${name} the ${label} block must not touch the line above it (saw ${value})`
+        )
+      }
+
+      // The digest is abbreviated until asked for; nothing covered that toggle before.
+      const digest = page.locator('.artifact-digest-toggle')
+      assert.equal(
+        await digest.getAttribute('aria-expanded'),
+        'false',
+        `${name} digest starts short`
+      )
+      const collapsed = (await digest.textContent()) ?? ''
+      await digest.click()
+      assert.equal(await digest.getAttribute('aria-expanded'), 'true', `${name} digest must expand`)
+      assert.ok(
+        ((await digest.textContent()) ?? '').length > collapsed.length,
+        `${name} expanding the digest must reveal more of it`
+      )
+
+      // A step reads as one row where there is width: its key beside its status and its exit
+      // trailing. Narrow screens deliberately stack the identity instead, so assert the
+      // shape that applies rather than assuming the wide one. The browser returns numbers
+      // only; the browser callback cannot see anything from this side.
+      const stacked = await page.$eval(
+        '.delivery-main',
+        (element) => getComputedStyle(element).flexDirection === 'column'
+      )
+      const stepLayout = await page.$$eval('.delivery-item', (items) =>
+        items.map((item) => {
+          const badge = item.querySelector('.mantine-Badge-root')?.getBoundingClientRect()
+          const key = item.querySelector('.delivery-step-key')?.getBoundingClientRect()
+          const link = item.querySelector('.delivery-link')?.getBoundingClientRect()
+          return {
+            badgeY: badge?.y ?? null,
+            keyY: key?.y ?? null,
+            keyRight: key?.right ?? null,
+            linkLeft: link?.left ?? null
+          }
+        })
+      )
+      assert.ok(stepLayout.length > 0, `${name} the published run must list its steps`)
+      for (const step of stepLayout) {
+        if (step.badgeY !== null && step.keyY !== null) {
+          if (stacked) {
+            assert.ok(step.keyY > step.badgeY, `${name} a stacked step must read status then key`)
+          } else {
+            assert.ok(
+              Math.abs(step.badgeY - step.keyY) < 6,
+              `${name} a step key must sit beside its status`
+            )
+          }
+        }
+        if (!stacked && step.linkLeft !== null && step.keyRight !== null) {
+          assert.ok(step.linkLeft > step.keyRight, `${name} a step link must trail its row`)
+        }
+      }
+
       const deliverySteps = await page.locator('.delivery-item').count()
       assert.ok(
         deliverySteps > 1,
         `${name} a published repository review must show its steps (saw ${deliverySteps})`
       )
 
+      // A run with a single result uses the same row shape as one with several: identity
+      // on the left, exit trailing. Sharing the timestamp's line was the thing to avoid.
+      // Both filters are set in one navigation: the selects drive the URL, so driving them
+      // back to back can drop one and quietly select a different run.
+      await page.goto(`${base}/runs?workflow=issue-review&publication_status=published`, {
+        waitUntil: 'networkidle'
+      })
+      await page.getByRole('heading', { name: 'Runs' }).waitFor()
+      await page.waitForTimeout(600)
+      await page.locator('tbody tr:first-child td a').first().click()
+      await page.waitForSelector('.delivery-item')
+      await page.waitForTimeout(300)
+      assert.equal(
+        await page.locator('.publication-summary .delivery-link').count(),
+        0,
+        `${name} the summary must not carry the exit link`
+      )
+      const single = await page.evaluate(() => {
+        const item = document.querySelector('.delivery-item')
+        if (item === null) return { found: false }
+        const key = item.querySelector('.delivery-step-key')?.getBoundingClientRect()
+        const link = item.querySelector('.delivery-link')?.getBoundingClientRect()
+        return {
+          found: true,
+          badge: item.querySelector('.mantine-Badge-root') !== null,
+          key: item.querySelector('.delivery-step-key') !== null,
+          trailing: link !== undefined && key !== undefined && link.left > key.right
+        }
+      })
+      assert.ok(single.found && single.badge && single.key, `${name} a single result needs its row`)
+      assert.ok(single.found && single.trailing, `${name} a single exit must trail its row`)
       await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
       await page.getByRole('heading', { name: 'Runs' }).waitFor()
     }

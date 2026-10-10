@@ -42,7 +42,7 @@ import {
   IconDownload,
   IconChevronDown,
   IconChevronUp,
-  IconExternalLink,
+  IconArrowUpRight,
   IconInbox,
   IconMinus,
   IconPlayerPlay,
@@ -611,6 +611,21 @@ function abbreviateDigest(digest: string): string {
   return abbreviate(digest.replace(/^sha256:/, ''), 12, 12)
 }
 
+function artifactStatusLabel(
+  status: ArtifactStorage['status'],
+  t: ReturnType<typeof useMessages>
+): string {
+  if (status === 'available') return t('artifactAvailable')
+  if (status === 'unavailable') return t('artifactUnavailable')
+  return t('statusFailed')
+}
+
+function artifactStatusColor(status: ArtifactStorage['status']): string {
+  if (status === 'available') return 'green'
+  if (status === 'unavailable') return 'yellow'
+  return 'red'
+}
+
 function isDownloadableArtifact(value: ArtifactStorage | null): value is ArtifactStorage & {
   status: 'available'
   artifact: NonNullable<ArtifactStorage['artifact']>
@@ -719,50 +734,49 @@ function Artifact({
   const hex = artifact.digest.replace(/^sha256:/, '')
   return (
     <div className="artifact-panel">
-      <div className="artifact-summary">
-        <Text c="dimmed" size="sm" className="artifact-meta">
-          {formatBytes(artifact.size_bytes)}
-        </Text>
-        {isDownloadableArtifact(storage) && (
-          <Tooltip label={t('download')}>
-            <ActionIcon
-              component="a"
-              href={`/api/runs/${encodeURIComponent(runId)}/artifact`}
-              download
-              variant="subtle"
-              color="gray"
-              size="sm"
-              aria-label={t('download')}
-            >
-              <IconDownload size={16} />
-            </ActionIcon>
-          </Tooltip>
-        )}
-      </div>
-      <div className="artifact-technical-details">
-        <Text c="dimmed" size="xs" ff="monospace">
-          {artifact.media_type}
-        </Text>
-        <div className="artifact-digest-row">
-          <Text c="dimmed" size="xs">
-            {t('sha256')}
+      <div className="artifact-row">
+        <Badge variant="light" color={artifactStatusColor(storage.status)}>
+          {artifactStatusLabel(storage.status, t)}
+        </Badge>
+        <div className="artifact-facts">
+          <Text c="dimmed" size="sm">
+            {formatBytes(artifact.size_bytes)}
           </Text>
-          <button
-            type="button"
-            className="artifact-digest-toggle"
-            aria-expanded={expanded}
-            aria-label={expanded ? t('collapseDigest') : t('expandDigest')}
-            onClick={() => setExpanded((value) => !value)}
-          >
-            <code>{expanded ? hex : abbreviateDigest(hex)}</code>
-            {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
-          </button>
-          <CopyAction
-            value={artifact.digest}
-            name={t('copyDigest')}
-            copiedName={t('digestCopied')}
-          />
+          <Text c="dimmed" size="xs" ff="monospace">
+            {artifact.media_type}
+          </Text>
+          <div className="artifact-digest-row">
+            <Text c="dimmed" size="xs">
+              {t('sha256')}
+            </Text>
+            <button
+              type="button"
+              className="artifact-digest-toggle"
+              aria-expanded={expanded}
+              aria-label={expanded ? t('collapseDigest') : t('expandDigest')}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              <code>{expanded ? hex : abbreviateDigest(hex)}</code>
+              {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+            </button>
+            <CopyAction
+              value={artifact.digest}
+              name={t('copyDigest')}
+              copiedName={t('digestCopied')}
+            />
+          </div>
         </div>
+        {isDownloadableArtifact(storage) && (
+          <Anchor
+            href={`/api/runs/${encodeURIComponent(runId)}/artifact`}
+            download
+            size="sm"
+            className="artifact-download"
+          >
+            {t('download')}
+            <IconDownload size={14} aria-hidden="true" />
+          </Anchor>
+        )}
       </div>
     </div>
   )
@@ -848,13 +862,6 @@ function Detail(): React.JSX.Element {
   const publicationOutcomes = steps.filter(
     (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
   )
-  const singlePublicationUrl =
-    publicationOutcomes.length === 1
-      ? safeExternalUrl(publicationOutcomes[0]?.remote_object_url ?? null)
-      : undefined
-  const showPublicationDetails =
-    publicationOutcomes.length > 1 ||
-    (publicationOutcomes.length === 1 && publicationOutcomes[0]?.status !== 'succeeded')
   const publicationIndex = 2 + (run?.artifact_storage === null ? 0 : 1)
   const timelineActive =
     run?.publication_status === 'pending' ? publicationIndex - 1 : publicationIndex
@@ -974,34 +981,23 @@ function Detail(): React.JSX.Element {
                         )}
                       </Text>
                     )}
-                    {singlePublicationUrl && (
-                      <Anchor
-                        href={singlePublicationUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        size="sm"
-                        className="delivery-link"
-                      >
-                        {t('openExternalLink')}
-                        <IconExternalLink size={14} aria-hidden="true" />
-                      </Anchor>
-                    )}
                   </div>
-                  {showPublicationDetails && (
+                  {publicationOutcomes.length > 0 && (
                     <div className="delivery-list">
                       {publicationOutcomes.map((step) => {
                         const externalUrl = safeExternalUrl(step.remote_object_url)
                         const succeeded = step.status === 'succeeded'
                         return (
                           <div className="delivery-item" key={step.step_key}>
-                            {publicationOutcomes.length > 1 && (
-                              <div className="delivery-main">
-                                <Badge variant="light" color={publicationStatusColor(step.status)}>
-                                  {publicationStatusLabel(step.status, t)}
-                                </Badge>
-                              </div>
-                            )}
-                            {externalUrl && singlePublicationUrl === undefined && (
+                            {/* Identity on one line: the step's own key belongs beside its
+                                status, not stranded on a line of its own. */}
+                            <div className="delivery-main">
+                              <Badge variant="light" color={publicationStatusColor(step.status)}>
+                                {publicationStatusLabel(step.status, t)}
+                              </Badge>
+                              <code className="delivery-step-key">{step.step_key}</code>
+                            </div>
+                            {externalUrl && (
                               <Anchor
                                 component="a"
                                 href={externalUrl}
@@ -1011,7 +1007,7 @@ function Detail(): React.JSX.Element {
                                 className="delivery-link"
                               >
                                 {t('openExternalLink')}
-                                <IconExternalLink size={14} aria-hidden="true" />
+                                <IconArrowUpRight size={14} aria-hidden="true" />
                               </Anchor>
                             )}
                             {!succeeded &&
@@ -1036,9 +1032,6 @@ function Detail(): React.JSX.Element {
                                   </Group>
                                 </div>
                               )}
-                            {(publicationOutcomes.length > 1 || !succeeded) && (
-                              <code className="delivery-step-key">{step.step_key}</code>
-                            )}
                           </div>
                         )
                       })}

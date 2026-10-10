@@ -112,7 +112,9 @@ a {
 .artifact-section {
   display: grid;
   gap: 6px;
-  padding-top: 2px;
+  /* The execution timestamp and the artifact row were touching; space them like the
+     publication summary and its rows. */
+  padding-top: 10px;
 }
 .artifact-panel {
   overflow: hidden;
@@ -120,17 +122,19 @@ a {
 .artifact-state {
   padding: 8px 0;
 }
-.artifact-summary {
+/* The artifact reads as one row: its facts together, the download trailing. */
+.artifact-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+}
+.artifact-facts {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 2px 0 4px;
-}
-.artifact-technical-details {
-  display: grid;
-  gap: 4px;
-  padding-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
 }
 .artifact-digest-row {
   display: flex;
@@ -161,12 +165,12 @@ a {
   text-underline-offset: 2px;
 }
 .delivery-list {
+  margin-top: 10px;
   overflow: hidden;
 }
 .publication-summary {
   display: grid;
   gap: 4px;
-  justify-items: start;
 }
 .delivery-item {
   display: grid;
@@ -185,17 +189,18 @@ a {
   gap: 10px;
   min-width: 0;
 }
-.delivery-link {
+.delivery-link,
+.artifact-download {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  justify-self: start;
+  justify-self: end;
 }
 .delivery-error {
   grid-column: 1 / -1;
 }
 .delivery-step-key {
-  grid-column: 1 / -1;
+  min-width: 0;
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   overflow-wrap: anywhere;
@@ -232,9 +237,6 @@ a {
   }
   .refresh-controls {
     align-items: flex-end;
-  }
-  .artifact-summary {
-    padding: 2px 0 4px;
   }
   .delivery-item {
     grid-template-columns: minmax(0, 1fr);
