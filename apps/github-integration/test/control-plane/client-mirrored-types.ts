@@ -7,14 +7,20 @@
 // Only containment is asserted, and the direction depends on what each pair promises.
 // `ReviewRunRecord` is deliberately narrower here — the integration never reads
 // `runner_status`, `publication_status`, or the per-axis `updated_at` fields — and
-// `PublicationWork` inherits that narrower view. The rest are meant to name exactly the
-// same keys. A field the client adds must exist on the Control Plane side in every case;
-// that is the direction that breaks at runtime.
+// `PublicationWork` inherits that narrower view. The rest are meant to accept exactly the
+// same values, so they are compared by value: a key-set comparison would not notice a
+// widened union or a relaxed literal, which is how `kind: string` went unnoticed here. A
+// field the client adds must exist on the Control Plane side in every case; that is the
+// direction that breaks at runtime.
 //
 // Four calls also pass object shapes inline — the failure envelope, the retry option, and
 // the remote object. Those have no name to compare, so their whole call signature is
 // compared instead: the argument tuple and the return type, via `Parameters` and
 // `ReturnType`. That covers argument order and count too, which a shape comparison misses.
+//
+// The control-plane package cannot import this file back, and this package has no generated
+// view of the contract to alias, so its copies stay written here and are compared against the
+// control-plane's own (contract-derived) types.
 //
 // The control-plane package cannot import this file back, so its own definitions are
 // checked against the shared schemas instead.
@@ -52,7 +58,13 @@ type Expect<T extends true> = T
 
 export type StatusUnionMatches = Expect<SameValues<ClientStatus, ControlPlaneStatus>>
 
-export type CreateArgsKeysMatch = Expect<SameKeys<ClientCreateArgs, ControlPlaneCreateArgs>>
+/**
+ * By value, not by key set: `workflow` is a union, and a name added on one side only would
+ * leave every key in place.
+ */
+export type CreateArgsMatchTheContract = Expect<
+  SameValues<ClientCreateArgs, ControlPlaneCreateArgs>
+>
 
 export type ClientRecordIsWithinControlPlaneRecord = Expect<
   KeysWithin<ClientRecord, ControlPlaneRecord>
@@ -62,7 +74,10 @@ export type AdmissionKeysMatch = Expect<SameKeys<ClientAdmission, ControlPlaneAd
 
 export type PublicationWorkKeysMatch = Expect<KeysWithin<ClientWork, ControlPlaneWork>>
 
-export type PublicationStepKeysMatch = Expect<SameKeys<ClientStep, ControlPlaneStep>>
+/**
+ * By value as well: `status` is a union here too, and the same blind spot applies.
+ */
+export type PublicationStepMatchTheContract = Expect<SameValues<ClientStep, ControlPlaneStep>>
 
 /**
  * Compared by value rather than by key set: this shape's fields are literals

@@ -5,9 +5,17 @@
  * execute the run. Control Plane only admits a validated request, persists its
  * coordination identity, and coordinates execution by reference.
  */
-import type { components } from './runner-api-schema.js'
+import type { components, operations } from './runner-api-schema.js'
 
-export type ControlPlaneWorkflow = 'issue-review' | 'pull-request-review' | 'repository-review'
+/**
+ * The workflows this service accepts.
+ *
+ * Taken from the published contract rather than restated: the Runner derives its set from the
+ * v5 schema map, so the OpenAPI enum is a projection of that single source. Restating the
+ * names here is how this package and the Runner came to disagree about what exists.
+ */
+export type ControlPlaneWorkflow =
+  operations['create_run_v1_workflows__workflow__runs_post']['parameters']['path']['workflow']
 
 /**
  * The operations `POST /v1/store` accepts.
