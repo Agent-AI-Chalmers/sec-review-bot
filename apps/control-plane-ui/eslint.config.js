@@ -33,7 +33,8 @@ export default tseslint.config(
         console: 'readonly',
         document: 'readonly',
         fetch: 'readonly',
-        getComputedStyle: 'readonly'
+        getComputedStyle: 'readonly',
+        navigator: 'readonly'
       }
     }
   }

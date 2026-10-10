@@ -72,7 +72,11 @@ try {
   ]) {
     // Pin the locale: the console follows the browser language, and the assertions
     // below expect English labels and en-US date formatting.
-    const context = await browser.newContext({ viewport, locale: 'en-US' })
+    const context = await browser.newContext({
+      viewport,
+      locale: 'en-US',
+      permissions: ['clipboard-read', 'clipboard-write']
+    })
     const page = await context.newPage()
     await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
     if (TOKEN !== undefined) {
@@ -250,6 +254,7 @@ try {
 
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
+    const knownRunIdForCopy = (await page.locator('.run-id').first().textContent())?.trim() ?? ''
     const steps = await page.$$eval('.run-progress-timeline .mantine-Timeline-item', (items) =>
       items.map((item) => ({
         title: item.querySelector('.mantine-Timeline-itemTitle')?.textContent?.trim() ?? '',
@@ -273,6 +278,21 @@ try {
       publication.body,
       TIMESTAMP,
       `${name} a publication that has not started must show no timestamp`
+    )
+
+    // Each phase reports how long it took, and the id is copyable without selecting it
+    // by hand — the console is the only place that knows the id.
+    assert.match(
+      execution.body,
+      /\d+[dhms]/,
+      `${name} the execution phase must report its elapsed time`
+    )
+    await page.getByRole('button', { name: 'Copy run ID' }).click()
+    await page.waitForTimeout(300)
+    assert.equal(
+      await page.evaluate(() => navigator.clipboard.readText()),
+      knownRunIdForCopy,
+      `${name} the copy button must put the full run id on the clipboard`
     )
 
     // The general form of the same bug: a timeline may not run backwards.

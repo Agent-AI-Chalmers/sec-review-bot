@@ -602,6 +602,58 @@ function isDownloadableArtifact(value: ArtifactStorage | null): value is Artifac
   return value?.status === 'available' && value.artifact !== undefined
 }
 
+/** Copies a value and confirms it briefly; used for the run id and the artifact digest. */
+/** Compact elapsed time, e.g. `2m 33s` or `1h 4m`. */
+function formatDuration(milliseconds: number, t: ReturnType<typeof useMessages>): string {
+  const totalSeconds = Math.max(0, Math.round(milliseconds / 1000))
+  const days = Math.floor(totalSeconds / 86_400)
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600)
+  const minutes = Math.floor((totalSeconds % 3_600) / 60)
+  const seconds = totalSeconds % 60
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days}${t('durationDays')}`)
+  if (hours > 0) parts.push(`${hours}${t('durationHours')}`)
+  if (minutes > 0) parts.push(`${minutes}${t('durationMinutes')}`)
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}${t('durationSeconds')}`)
+  return parts.slice(0, 2).join(' ')
+}
+
+function CopyAction({
+  value,
+  label,
+  copiedLabel
+}: {
+  value: string
+  label: string
+  copiedLabel: string
+}): React.JSX.Element {
+  const [copied, setCopied] = React.useState(false)
+  const copy = async (): Promise<void> => {
+    await navigator.clipboard.writeText(value)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2000)
+  }
+  const text = copied ? copiedLabel : label
+  return (
+    <>
+      <Tooltip label={text}>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="sm"
+          aria-label={text}
+          onClick={() => void copy()}
+        >
+          {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
+        </ActionIcon>
+      </Tooltip>
+      <span className="visually-hidden" aria-live="polite">
+        {copied ? copiedLabel : ''}
+      </span>
+    </>
+  )
+}
+
 function Artifact({
   storage,
   runId
@@ -610,7 +662,6 @@ function Artifact({
   runId: string
 }): React.ReactNode {
   const t = useMessages()
-  const [copied, setCopied] = React.useState(false)
   const [expanded, setExpanded] = React.useState(false)
   const artifact = storage.artifact
   if (artifact === undefined) {
@@ -627,11 +678,6 @@ function Artifact({
     )
   }
   const hex = artifact.digest.replace(/^sha256:/, '')
-  const copyDigest = async (): Promise<void> => {
-    await navigator.clipboard.writeText(artifact.digest)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
-  }
   return (
     <div className="artifact-panel">
       <div className="artifact-summary">
@@ -672,20 +718,11 @@ function Artifact({
             <code>{expanded ? hex : abbreviateDigest(hex)}</code>
             {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
           </button>
-          <Tooltip label={copied ? t('digestCopied') : t('copyDigest')}>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              aria-label={copied ? t('digestCopied') : t('copyDigest')}
-              onClick={() => void copyDigest()}
-            >
-              {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
-            </ActionIcon>
-          </Tooltip>
-          <span className="visually-hidden" aria-live="polite">
-            {copied ? t('digestCopied') : ''}
-          </span>
+          <CopyAction
+            value={artifact.digest}
+            label={t('copyDigest')}
+            copiedLabel={t('digestCopied')}
+          />
         </div>
       </div>
     </div>
@@ -799,9 +836,16 @@ function Detail(): React.JSX.Element {
       ) : (
         <>
           <div className="run-heading">
-            <Title order={1} className="run-id">
-              {run.run_id}
-            </Title>
+            <Group gap="xs" align="center" wrap="nowrap">
+              <Title order={1} className="run-id">
+                {run.run_id}
+              </Title>
+              <CopyAction
+                value={run.run_id}
+                label={t('copyRunId')}
+                copiedLabel={t('runIdCopied')}
+              />
+            </Group>
             <Group gap="lg" align="center" mt="md" className="run-state-summary">
               <Text c="dimmed" size="xs" tt="uppercase">
                 {workflowLabel(run.workflow, t)}
@@ -857,7 +901,11 @@ function Detail(): React.JSX.Element {
                   title={<Text fw={500}>{t('execution')}</Text>}
                 >
                   <Text c="dimmed" size="sm">
-                    {formatDate(run.execution_updated_at, language)}
+                    {formatDate(run.execution_updated_at, language)} ·{' '}
+                    {formatDuration(
+                      Date.parse(run.execution_updated_at) - Date.parse(run.created_at),
+                      t
+                    )}
                   </Text>
                   {run.artifact_storage !== null && (
                     <div className="artifact-section">
@@ -873,7 +921,12 @@ function Detail(): React.JSX.Element {
                   <div className="publication-summary">
                     {publicationStarted && (
                       <Text c="dimmed" size="sm">
-                        {formatDate(run.published_at ?? run.publication_updated_at, language)}
+                        {formatDate(run.published_at ?? run.publication_updated_at, language)} ·{' '}
+                        {formatDuration(
+                          Date.parse(run.published_at ?? run.publication_updated_at) -
+                            Date.parse(run.created_at),
+                          t
+                        )}
                       </Text>
                     )}
                     {singlePublicationUrl && (
