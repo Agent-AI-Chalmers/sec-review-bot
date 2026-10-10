@@ -34,6 +34,16 @@ export function classifyPublicationFailure(error: unknown): PublishFailureClassi
   if (isDeterministicRunnerPublishError(error)) {
     return { retry: false, code: errorCode(error), reason: 'deterministic-publish-result' }
   }
+  // A publication step that exhausted its retry budget is terminal. Retrying the
+  // whole publication re-claims the same terminal_failed step and fails the same
+  // way, so it must fail rather than loop.
+  if (errorCode(error) === RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted) {
+    return {
+      retry: false,
+      code: errorCode(error),
+      reason: 'publication-step-retry-exhausted'
+    }
+  }
 
   const responseStatus = asErrorWithResponse(error).status
   if (responseStatus === undefined)

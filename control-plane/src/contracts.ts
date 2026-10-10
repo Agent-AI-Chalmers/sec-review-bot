@@ -36,6 +36,7 @@ export const controlPlaneOperations = [
   'preparationHeartbeatIntervalMs',
   'claimNextPublication',
   'renewPublicationClaim',
+  'publicationHeartbeatIntervalMs',
   'initializePublicationSteps',
   'listPublicationSteps',
   'requirePublicationStepClaim',

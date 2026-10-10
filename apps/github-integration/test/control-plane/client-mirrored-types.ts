@@ -5,9 +5,10 @@
 // `undefined` at runtime with every check still green.
 //
 // Only containment is asserted, and the direction depends on what each pair promises.
-// `ReviewRunRecord` is deliberately narrower here — it omits `runner_status`,
-// `publication_status`, and the per-axis `updated_at` fields — and
-// `PublicationWork` inherits that narrower view. The rest are meant to name the same keys
+// `ReviewRunRecord` is deliberately narrower here — it omits `publication_status`
+// and the per-axis `updated_at` fields, and relaxes `runner_status` to a plain
+// `string` — and `PublicationWork` inherits that narrower view. The rest are meant
+// to name the same keys
 // and accept the same values, so they are compared both ways: a key-set comparison would
 // not notice a widened union or a relaxed literal — which is how `kind: string` went
 // unnoticed here — while a value comparison would not notice an optional field added on

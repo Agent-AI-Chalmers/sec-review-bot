@@ -193,8 +193,8 @@ class HttpControlPlaneClient {
     return await this.call('renewPublicationClaim', runId, token)
   }
 
-  publicationHeartbeatIntervalMs(): number {
-    return 60_000
+  async publicationHeartbeatIntervalMs(): Promise<number> {
+    return await this.call('publicationHeartbeatIntervalMs')
   }
 
   async initializePublicationSteps(runId: string, token: string, keys: string[]): Promise<void> {

@@ -104,9 +104,10 @@ export async function withPublicationHeartbeat(
   } catch {
     return false
   }
+  const intervalMs = await store.publicationHeartbeatIntervalMs()
   const timer = setInterval(() => {
     void renewSerially().catch(() => undefined)
-  }, store.publicationHeartbeatIntervalMs())
+  }, intervalMs)
   timer.unref?.()
   try {
     await operation(renewSerially)
