@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { Pool, type PoolClient, type PoolConfig } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 
 import type { ControlPlaneWorkflow as WorkflowName, RunnerArtifactStorage } from './contracts.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
@@ -7,10 +7,6 @@ import { DeterministicControlPlaneError } from './errors.js'
 
 type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject
-export type PublishContextValidator = (
-  workflow: WorkflowName,
-  context: JsonObject
-) => PublishContext
 export type RunnerStatus =
   'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
 export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
@@ -138,28 +134,22 @@ export class ReviewRunStore {
   private readonly pool: Pool
   readonly connectorId: string
   private readonly claimTimeoutMs: number
-  private readonly validatePublishContext: PublishContextValidator
   private initialized = false
 
   constructor({
     connectionString,
     connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default',
     claimTimeoutMs = DEFAULT_CLAIM_TIMEOUT_MS,
-    pool,
-    poolConfig,
-    validatePublishContext = (_workflow, context) => context
+    pool
   }: {
     connectionString?: string
     connectorId?: string
     claimTimeoutMs?: number
     pool?: Pool
-    poolConfig?: PoolConfig
-    validatePublishContext?: PublishContextValidator
   } = {}) {
-    this.pool = pool ?? new Pool(connectionString ? { connectionString } : poolConfig)
+    this.pool = pool ?? new Pool({ connectionString })
     this.connectorId = connectorId
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
-    this.validatePublishContext = validatePublishContext
   }
 
   async initialize(): Promise<void> {
@@ -290,11 +280,8 @@ export class ReviewRunStore {
     context: PublishContext,
     input: JsonObject
   ): Promise<void> {
-    // Revalidate at the persistence boundary even when the caller is typed.
-    // Tests, future adapters, and deserialized values can bypass compile-time types.
     const run = await this.getRun(runId)
     if (run === null) throw new Error(`Review run does not exist: ${runId}`)
-    const publishContext = this.validatePublishContext(run.workflow, context)
     const result = await this.pool.query(
       `
       UPDATE review_runs
@@ -306,7 +293,7 @@ export class ReviewRunStore {
       [
         runId,
         token,
-        JSON.stringify(publishContext),
+        JSON.stringify(context),
         JSON.stringify(input),
         this.connectorId,
         run.workflow
@@ -338,7 +325,6 @@ export class ReviewRunStore {
   async markQueued(runId: string, token: string, context: PublishContext): Promise<void> {
     const run = await this.getRun(runId)
     if (run === null) throw new Error(`Review run does not exist: ${runId}`)
-    const publishContext = this.validatePublishContext(run.workflow, context)
     const result = await this.pool.query(
       `
       UPDATE review_runs
@@ -350,7 +336,7 @@ export class ReviewRunStore {
         AND runner_status='preparing' AND preparation_claim_token=$2
         AND workflow=$5
     `,
-      [runId, token, JSON.stringify(publishContext), this.connectorId, run.workflow]
+      [runId, token, JSON.stringify(context), this.connectorId, run.workflow]
     )
     if (result.rowCount !== 1)
       throw new Error(`Review run ${runId} cannot transition from preparing to queued.`)
