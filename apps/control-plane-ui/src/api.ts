@@ -22,13 +22,35 @@ export interface Run {
   artifact_storage: ArtifactStorage | null
 }
 export class ApiError extends Error {
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    /** The BFF's own error code, when it sent one, so the console can say what failed. */
+    readonly code?: string
+  ) {
     super(`Request failed (${status})`)
   }
 }
+
+async function errorCode(response: Response): Promise<string | undefined> {
+  try {
+    const body: unknown = await response.json()
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      'error' in body &&
+      typeof body.error === 'string'
+    ) {
+      return body.error
+    }
+  } catch {
+    // Not every failure carries a body; the status still identifies it.
+  }
+  return undefined
+}
+
 export async function api<T>(path: string): Promise<T> {
   const response = await fetch(`/api${path}`)
-  if (!response.ok) throw new ApiError(response.status)
+  if (!response.ok) throw new ApiError(response.status, await errorCode(response))
   return (await response.json()) as T
 }
 export async function login(token: string): Promise<void> {

@@ -356,6 +356,7 @@ function Runs(): React.JSX.Element {
       {Boolean(error) && (
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}
+          {failureReason(error, t) && ` ${failureReason(error, t)}`}
         </Text>
       )}
       <Box className="operations-bar" mb="lg">
@@ -603,6 +604,15 @@ function isDownloadableArtifact(value: ArtifactStorage | null): value is Artifac
 }
 
 /** Copies a value and confirms it briefly; used for the run id and the artifact digest. */
+/** Names the failure when the backend distinguished it, instead of reporting every
+ * failure as one generic sentence. */
+function failureReason(error: unknown, t: ReturnType<typeof useMessages>): string | undefined {
+  if (!(error instanceof ApiError)) return undefined
+  if (error.code === 'control_plane_timeout') return t('errorTimeout')
+  if (error.code === 'control_plane_unavailable') return t('errorUnreachable')
+  return error.status >= 500 ? `${t('errorUpstream')} (${error.status})` : undefined
+}
+
 /** Compact elapsed time, e.g. `2m 33s` or `1h 4m`. */
 function formatDuration(milliseconds: number, t: ReturnType<typeof useMessages>): string {
   const totalSeconds = Math.max(0, Math.round(milliseconds / 1000))
@@ -878,6 +888,7 @@ function Detail(): React.JSX.Element {
             {Boolean(error) && (
               <Text role="alert" c="red">
                 {t('refreshFailed')}
+                {failureReason(error, t) && ` ${failureReason(error, t)}`}
               </Text>
             )}
             <Paper component="section" withBorder radius="sm" p="md">
@@ -1016,17 +1027,18 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
   render(): React.ReactNode {
     if (this.state.error instanceof ApiError && this.state.error.status === 401) return <Login />
-    if (this.state.error) return <ErrorFallback />
+    if (this.state.error) return <ErrorFallback error={this.state.error} />
     return this.props.children
   }
 }
-function ErrorFallback(): React.JSX.Element {
+function ErrorFallback({ error }: { error: unknown }): React.JSX.Element {
   const t = useMessages()
   return (
     <Container component="main" size="lg" py="xl">
       <Title order={1}>{t('unable')}</Title>
       <Text role="alert" mb="md">
         {t('requestFailed')}
+        {failureReason(error, t) && ` ${failureReason(error, t)}`}
       </Text>
       <Button onClick={() => window.location.reload()}>{t('retry')}</Button>
     </Container>
