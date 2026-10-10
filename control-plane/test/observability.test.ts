@@ -23,7 +23,6 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
   assert.deepEqual(observed, {
     run_id: 'run-1',
     workflow: 'issue-review',
-    status: 'succeeded',
     execution_status: 'succeeded',
     publication_status: 'pending',
     created_at: '2026-01-01T00:00:00.000Z',

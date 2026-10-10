@@ -4,7 +4,6 @@ import type { PublicationStepRecord, ReviewRunRecord } from './review-store.js'
 export interface ObservedRun {
   run_id: string
   workflow: ReviewRunRecord['workflow']
-  status: ReviewRunRecord['status']
   execution_status: ReviewRunRecord['runner_status']
   publication_status: ReviewRunRecord['publication_status']
   created_at: string
@@ -29,7 +28,6 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
   return {
     run_id: run.run_id,
     workflow: run.workflow,
-    status: run.status,
     execution_status: run.runner_status,
     publication_status: run.publication_status,
     created_at: run.created_at,

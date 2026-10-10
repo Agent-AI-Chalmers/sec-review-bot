@@ -6,11 +6,11 @@
   "required": [
     "run_id",
     "workflow",
-    "status",
     "execution_status",
     "publication_status",
     "created_at",
-    "updated_at",
+    "execution_updated_at",
+    "publication_updated_at",
     "published_at",
     "failure_code",
     "artifact_storage"
@@ -18,18 +18,6 @@
   "properties": {
     "run_id": { "type": "string", "minLength": 1 },
     "workflow": { "enum": ["issue-review", "pull-request-review", "repository-review"] },
-    "status": {
-      "enum": [
-        "preparing",
-        "recovering",
-        "queued",
-        "running",
-        "succeeded",
-        "publishing",
-        "published",
-        "failed"
-      ]
-    },
     "execution_status": {
       "enum": ["preparing", "recovering", "queued", "running", "succeeded", "failed"]
     },
@@ -37,7 +25,8 @@
       "enum": ["pending", "publishing", "published", "failed", "not_required"]
     },
     "created_at": { "type": "string", "format": "date-time" },
-    "updated_at": { "type": "string", "format": "date-time" },
+    "execution_updated_at": { "type": "string", "format": "date-time" },
+    "publication_updated_at": { "type": "string", "format": "date-time" },
     "published_at": { "type": ["string", "null"], "format": "date-time" },
     "failure_code": { "type": ["string", "null"] },
     "artifact_storage": {
