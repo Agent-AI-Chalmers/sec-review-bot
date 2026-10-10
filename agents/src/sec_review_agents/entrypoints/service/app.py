@@ -18,6 +18,7 @@ from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_WORKFLOW_UNSUPPORTED,
     build_runner_error,
     is_supported_workflow,
+    parse_status_query_body,
     validate_run_id,
     validate_run_request_body,
 )
@@ -233,6 +234,55 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
                 },
             )
         return JSONResponse(content=_run_response(run))
+
+    # A status query answers "did anything change?" for the runs a caller already tracks,
+    # which is the question a polling caller asks far more often than it needs results.
+    # It therefore returns status tokens only: the full run record is fetched once per
+    # terminal run through GET /v1/runs/{run_id}, and returning it here would move every
+    # review result on every poll instead of once.
+    @app.post("/v1/runs/status", dependencies=[Depends(_require_bearer_token)])
+    async def get_run_statuses(
+        request: Any = Body(...),
+        runner_gateway: RunnerWorkflowGateway = Depends(_runner_gateway),
+    ) -> JSONResponse:
+        query = parse_status_query_body(request)
+        if isinstance(query, str):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error": build_runner_error(
+                        code=RUNNER_REQUEST_INVALID,
+                        category="input",
+                        message=query,
+                    )
+                },
+            )
+
+        async def read_statuses() -> tuple[dict[str, str], list[str]]:
+            statuses: dict[str, str] = {}
+            missing: list[str] = []
+            for run_id in query.run_ids:
+                run = await runner_gateway.get(run_id)
+                if run is None:
+                    missing.append(run_id)
+                else:
+                    statuses[run_id] = run["status"]
+            return statuses, missing
+
+        statuses, missing = await read_statuses()
+        return JSONResponse(
+            content={
+                "runs": [
+                    {"run_id": run_id, "status": run_status}
+                    for run_id, run_status in statuses.items()
+                ],
+                # A run the Runner has no record for is reported separately rather than
+                # dropped: the caller must be able to tell "never accepted" from "the
+                # Runner skipped it", and it must not have to diff the response to find
+                # out.
+                "missing": missing,
+            }
+        )
 
     return app
 

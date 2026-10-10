@@ -330,3 +330,32 @@ def test_create_app_requires_token_unless_host_is_loopback(monkeypatch) -> None:
         assert "RUNNER_SERVICE_TOKEN is required" in str(error)
     else:
         raise AssertionError("create_app accepted unauthenticated non-loopback service")
+
+
+def test_status_query_rejects_an_oversized_batch(monkeypatch) -> None:
+    """The bound turns a caller mistake into a rejection instead of Runner load."""
+    monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
+    _use_loopback_host(monkeypatch)
+    client = TestClient(
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
+    )
+
+    response = client.post(
+        "/v1/runs/status",
+        json={"run_ids": [f"run-{index}" for index in range(201)]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "RUNNER_REQUEST_INVALID"
+
+
+def test_status_query_rejects_an_empty_run_id_list(monkeypatch) -> None:
+    monkeypatch.delenv("RUNNER_SERVICE_TOKEN", raising=False)
+    _use_loopback_host(monkeypatch)
+    client = TestClient(
+        service_app.create_app(runner_gateway=FakeRunnerWorkflowGateway())
+    )
+
+    response = client.post("/v1/runs/status", json={"run_ids": []})
+
+    assert response.status_code == 400

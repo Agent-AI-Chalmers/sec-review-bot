@@ -146,6 +146,40 @@ The Runner reports `succeeded` only after the workflow completes and its result 
 }
 ```
 
+## Get Run Statuses
+
+`POST /v1/runs/status` reads many run statuses in one request. It exists for a caller that tracks several runs: asking [Get Run](#get-run) once per run makes the request count grow with the number of runs in flight, so the busiest moments issue the most requests.
+
+The response carries status tokens only. A caller that needs what a run produced fetches that run once through [Get Run](#get-run) when it reaches a terminal status, instead of receiving every result on every interval.
+
+### Request Body
+
+```json
+{
+  "run_ids": ["6f1c8f2a-2d3e-4a5b-8c7d-9e0f1a2b3c4d"]
+}
+```
+
+- `run_ids`: required. At least one and at most 200, each matching the run ID rule.
+  A repeated ID is read once.
+
+### Status Response
+
+```json
+{
+  "runs": [
+    { "run_id": "6f1c8f2a-2d3e-4a5b-8c7d-9e0f1a2b3c4d", "status": "running" },
+    { "run_id": "0a94c1de-3f4a-4b6c-9d8e-1f2a3b4c5d6e", "status": "succeeded" }
+  ],
+  "missing": ["3b77aa10-5c6d-4e7f-8a9b-0c1d2e3f4a5b"]
+}
+```
+
+- `runs`: one entry per known run, in the order requested, each carrying the run's
+  `run_id` and `status`.
+- `missing`: requested run IDs the Runner holds no record for. They are reported instead
+  of dropped so that a caller can tell "never accepted" apart from "the Runner skipped it" without comparing the response against its own request.
+
 ## Error Responses
 
 ### Error Body
@@ -196,4 +230,4 @@ The following changes are breaking changes:
 - required error body field changes
 - workflow name or input required field changes
 
-Adding optional fields is a non-breaking extension.
+Adding an endpoint, an endpoint option, or an optional request/response field is a non-breaking extension.

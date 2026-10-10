@@ -304,6 +304,75 @@ export async function submitRunnerRun({
   }
 }
 
+export interface RunnerRunStatusBatch {
+  /** Status tokens for runs the Runner knows, in the order they were requested. */
+  readonly runs: readonly RunnerRunStatusToken[]
+  /** Runs the Runner has no record for, kept apart so a caller can tell them from a drop. */
+  readonly missing: readonly string[]
+  /** The same statuses by run id, for callers that look runs up instead of iterating. */
+  readonly byRunId: ReadonlyMap<string, string>
+}
+
+export interface RunnerRunStatusToken {
+  readonly run_id: string
+  readonly status: string
+}
+
+/**
+ * Read many run statuses in one request.
+ *
+ * A caller that tracks N runs otherwise issues N requests per interval, so its check
+ * frequency falls exactly when the most runs are in flight.
+ *
+ * There is deliberately no option to wait for a change here. Waiting was tried and made
+ * the Runner busier, not less: the state lives in Temporal, so holding a request open
+ * means re-reading every listed workflow on a timer, which costs far more reads than the
+ * polling it replaced. A wait belongs where the state lives, not in this layer.
+ */
+export async function getRunnerRunStatuses(
+  runIds: readonly string[]
+): Promise<RunnerRunStatusBatch> {
+  const { response, body, bodyParseError } = await request('/v1/runs/status', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ run_ids: [...runIds] })
+  })
+  if (!response.ok) throw runnerError(body, response.status)
+  if (bodyParseError) {
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_JSON',
+      'Runner returned invalid JSON for a status query.',
+      { cause: bodyParseError }
+    )
+  }
+  if (!isRecord(body) || !Array.isArray(body.runs) || !Array.isArray(body.missing)) {
+    throw new RunnerProtocolError(
+      'RUNNER_INVALID_RESPONSE',
+      'Runner returned an invalid status query response.'
+    )
+  }
+  const runs: RunnerRunStatusToken[] = []
+  const byRunId = new Map<string, string>()
+  for (const entry of body.runs) {
+    if (!isRecord(entry) || typeof entry.run_id !== 'string' || typeof entry.status !== 'string') {
+      throw new RunnerProtocolError(
+        'RUNNER_INVALID_RESPONSE',
+        'Runner returned an invalid status entry.'
+      )
+    }
+    if (!RUNNER_STATUSES.has(entry.status)) {
+      throw new RunnerProtocolError(
+        'RUNNER_INVALID_STATUS',
+        `Runner returned an unknown status: ${entry.status}.`
+      )
+    }
+    runs.push({ run_id: entry.run_id, status: entry.status })
+    byRunId.set(entry.run_id, entry.status)
+  }
+  const missing = body.missing.filter((value): value is string => typeof value === 'string')
+  return { runs, missing, byRunId }
+}
+
 export async function getRunnerRunStatus(
   runId: string,
   workflow?: ControlPlaneWorkflow

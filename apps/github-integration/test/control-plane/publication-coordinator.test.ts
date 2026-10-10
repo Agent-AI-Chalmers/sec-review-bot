@@ -24,8 +24,12 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
     workflow_result: {},
     claim_token: 'claim-1'
   } satisfies PublicationWork
+  const claimWaits: number[] = []
   const store = {
-    claimNextPublication: async () => work,
+    claimNextPublication: async (waitMs = 0) => {
+      claimWaits.push(waitMs)
+      return work
+    },
     renewPublicationClaim: async () => {
       throw new Error('Control Plane unavailable')
     },
@@ -54,6 +58,9 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
 
   await publishReviewRunsOnce({ app: app as never, store })
 
+  // The pass asks Control Plane to hold the claim, so a run that becomes publishable
+  // mid-interval is picked up then instead of at the next poll.
+  assert.ok((claimWaits[0] ?? 0) > 0, 'a publication pass must ask for a bounded wait')
   assert.equal(installationLookups, 0)
   assert.equal(completionAttempts, 0)
 })

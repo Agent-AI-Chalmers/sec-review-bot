@@ -139,7 +139,11 @@ export async function publishReviewRunsOnce({
   app: App
   store?: ControlPlaneClient
 }): Promise<void> {
-  const work = await store.claimNextPublication()
+  // Hold the claim briefly rather than returning immediately: a run that becomes
+  // publishable mid-interval is picked up as soon as it does, and the poll timer above
+  // stays as the backstop. The wait stays comfortably inside the client's request
+  // timeout.
+  const work = await store.claimNextPublication(Math.min(pollIntervalMs(), 10_000))
   if (work === null) return
   try {
     const ownsClaim = await withPublicationHeartbeat(

@@ -163,6 +163,7 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
     controlPlaneClient.claimNextPublication(),
     /Persisted publish context is invalid/
   )
+  assert.deepEqual(requests[0]?.args, [0])
   assert.equal(requests[1]?.operation, 'failPublication')
   assert.deepEqual(requests[1]?.args.slice(0, 2), ['run-1', 'claim-1'])
   assert.deepEqual(requests[1]?.args.at(-1), { retry: false })

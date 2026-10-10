@@ -8,15 +8,40 @@ import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from './coord
 import { observeRunnerRun } from './terminal-coordination.js'
 import {
   getRunnerRunStatus,
+  getRunnerRunStatuses,
   isTerminalRunnerPollingError,
   RunnerSubmissionUncertainError,
-  submitRunnerRun
+  submitRunnerRun,
+  type RunnerRunStatus,
+  type RunnerRunStatusBatch
 } from './runner-client.js'
 import { recoverReviewRunSubmission } from './submission-recovery.js'
 import { submitPreparedRun } from './prepared-submission.js'
 import { observePublicationStep, observeRun } from './observability.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
+// Statuses whose handling needs the run record itself, because the terminal writes
+// persist the result, the error, and the artifact reference. Every other status is
+// answered from the pass's batch, so a poll where nothing changed costs one request
+// rather than one per run.
+const STATUSES_NEEDING_RUN_RECORD = new Set(['succeeded', 'failed'])
+
+/**
+ * Answer a run's status from the batch the pass already read, and fetch the full record
+ * only when the caller is about to store something from it.
+ */
+function runnerStatusFromBatch(
+  batch: RunnerRunStatusBatch
+): (runId: string, workflow: ControlPlaneWorkflow) => Promise<RunnerRunStatus> {
+  return async (runId, workflow) => {
+    const status = batch.byRunId.get(runId)
+    if (status !== undefined && !STATUSES_NEEDING_RUN_RECORD.has(status)) {
+      return { run_id: runId, workflow, status }
+    }
+    // A terminal status, or a run this pass did not learn about, needs the record itself.
+    return await getRunnerRunStatus(runId, workflow)
+  }
+}
 const operations = [
   'submit_prepared_run',
   'admit_review_run',
@@ -177,12 +202,16 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
     connectorId: process.env.CONNECTOR_ID?.trim() || 'github-app:default'
   })
   await store.initialize()
-  const intervalMs = Number.parseInt(
+  const configuredIntervalMs = Number.parseInt(
     process.env.AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS || '15000',
     10
   )
+  const intervalMs =
+    Number.isFinite(configuredIntervalMs) && configuredIntervalMs > 0
+      ? configuredIntervalMs
+      : 15_000
   const coordinator = startReviewRunCoordinatorLoop({
-    intervalMs: Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : 15_000,
+    intervalMs,
     runOnce: async () =>
       await coordinateReviewRunsOnce(store, {
         recoverSubmission: async (run) => {
@@ -210,11 +239,12 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
             workflow: run.workflow
           })
         },
-        observeActiveRun: async (run) => {
+        readRunnerStatuses: (runs) => getRunnerRunStatuses(runs.map((run) => run.run_id)),
+        observeActiveRun: async (run, statuses) => {
           await observeRunnerRun(
             store,
             run,
-            getRunnerRunStatus,
+            runnerStatusFromBatch(statuses),
             isTerminalRunnerPollingError,
             (event) => {
               console.info(

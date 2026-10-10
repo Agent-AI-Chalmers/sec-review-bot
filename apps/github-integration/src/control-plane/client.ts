@@ -188,8 +188,13 @@ class HttpControlPlaneClient {
     return await this.call('preparationHeartbeatIntervalMs')
   }
 
-  async claimNextPublication(): Promise<PublicationWork | null> {
-    const work = await this.call<PublicationWork | null>('claimNextPublication')
+  /**
+   * Claim the next publishable run, optionally asking Control Plane to hold the request
+   * until one appears. The wait is served where the state lives, so it costs Control
+   * Plane one indexed query per tick instead of a request per poll interval.
+   */
+  async claimNextPublication(waitMs = 0): Promise<PublicationWork | null> {
+    const work = await this.call<PublicationWork | null>('claimNextPublication', waitMs)
     if (work === null) return null
     try {
       return {

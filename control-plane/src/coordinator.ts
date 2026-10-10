@@ -1,6 +1,7 @@
 import { clearImmediate, clearInterval } from 'node:timers'
 
 import type { ReviewRunRecord, ReviewRunStore } from './review-store.js'
+import type { RunnerRunStatusBatch } from './runner-client.js'
 
 type CoordinationStore = Pick<
   ReviewRunStore,
@@ -9,7 +10,9 @@ type CoordinationStore = Pick<
 
 export interface ReviewRunCoordinationHandlers {
   recoverSubmission: (run: ReviewRunRecord) => Promise<void>
-  observeActiveRun: (run: ReviewRunRecord) => Promise<void>
+  /** Read the whole pass's runner statuses in one request. */
+  readRunnerStatuses: (runs: readonly ReviewRunRecord[]) => Promise<RunnerRunStatusBatch>
+  observeActiveRun: (run: ReviewRunRecord, statuses: RunnerRunStatusBatch) => Promise<void>
 }
 
 export async function coordinateReviewRunsOnce(
@@ -22,8 +25,14 @@ export async function coordinateReviewRunsOnce(
     await handlers.recoverSubmission(run)
   }
 
-  for (const run of await store.listActiveRuns()) {
-    await handlers.observeActiveRun(run)
+  const active = await store.listActiveRuns()
+  if (active.length === 0) return
+  // One request for the whole pass rather than one per run. The per-run shape made the
+  // number of requests grow with the number of runs in flight, so the busiest moments
+  // were the ones that checked least often.
+  const statuses = await handlers.readRunnerStatuses(active)
+  for (const run of active) {
+    await handlers.observeActiveRun(run, statuses)
   }
 }
 
