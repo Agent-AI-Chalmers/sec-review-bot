@@ -692,6 +692,12 @@ function Detail(): React.JSX.Element {
   const publicationIndex = 2 + (run?.artifact_storage === null ? 0 : 1)
   const timelineActive =
     run?.publication_status === 'pending' ? publicationIndex - 1 : publicationIndex
+  // `publication_updated_at` is the publication row's `updated_at`, and that row is
+  // written when the run is admitted. It only means "the publication happened" once
+  // the publication has actually started, so never present it before then — a run
+  // that is still `pending`, or whose publication was ruled out, has no such moment.
+  const publicationStarted =
+    run !== undefined && ['publishing', 'published', 'failed'].includes(run.publication_status)
   return (
     <Container component="main" size="lg" py="xl">
       <Button
@@ -781,9 +787,11 @@ function Detail(): React.JSX.Element {
                   title={<Text fw={500}>{t('publication')}</Text>}
                 >
                   <div className="publication-summary">
-                    <Text c="dimmed" size="sm">
-                      {formatDate(run.published_at ?? run.publication_updated_at, language)}
-                    </Text>
+                    {publicationStarted && (
+                      <Text c="dimmed" size="sm">
+                        {formatDate(run.published_at ?? run.publication_updated_at, language)}
+                      </Text>
+                    )}
                     {singlePublicationUrl && (
                       <Anchor
                         href={singlePublicationUrl}

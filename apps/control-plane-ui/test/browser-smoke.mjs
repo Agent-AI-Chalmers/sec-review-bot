@@ -167,11 +167,29 @@ try {
       ['Created', 'Execution', 'Publication'],
       `${name} timeline steps changed`
     )
-    for (const step of steps) {
-      assert.match(
-        step.body,
-        /\d{1,2}\/\d{1,2}\/\d{4}/,
-        `${name} "${step.title}" must show a timestamp`
+    // Created and Execution always carry their timestamp. Publication carries one
+    // only once the publication actually started: before then the field it would
+    // read is the publication row's creation time at admission, which is how a
+    // `pending` run used to render a publication timestamp earlier than Execution.
+    const TIMESTAMP = /\d{1,2}\/\d{1,2}\/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M/
+    const [created, execution, publication] = steps
+    assert.match(created.body, TIMESTAMP, `${name} "Created" must show a timestamp`)
+    assert.match(execution.body, TIMESTAMP, `${name} "Execution" must show a timestamp`)
+    assert.doesNotMatch(
+      publication.body,
+      TIMESTAMP,
+      `${name} a publication that has not started must show no timestamp`
+    )
+
+    // The general form of the same bug: a timeline may not run backwards.
+    const instants = [created, execution, publication]
+      .map((step) => TIMESTAMP.exec(step.body)?.[0])
+      .filter((text) => text !== undefined)
+      .map((text) => Date.parse(text))
+    for (let index = 1; index < instants.length; index += 1) {
+      assert.ok(
+        instants[index] >= instants[index - 1],
+        `${name} timeline timestamps must not go backwards`
       )
     }
     assert.equal(
@@ -204,6 +222,23 @@ try {
         `${name} timeline rail must not reuse the status colour`
       )
     }
+
+    // A publication that was ruled out is not a moment either, so it must stay
+    // silent rather than repeat the execution failure time.
+    await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await page.getByLabel('Execution').selectOption('failed')
+    await page.waitForTimeout(750)
+    await page.locator('tbody tr:first-child td a').first().click()
+    await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
+    const ruledOut = await page.$$eval('.run-progress-timeline .mantine-Timeline-item', (items) =>
+      items.map((item) => item.querySelector('.mantine-Timeline-itemBody')?.textContent ?? '')
+    )
+    assert.equal(ruledOut.length, 3, `${name} ruled-out timeline changed`)
+    assert.doesNotMatch(
+      ruledOut[2],
+      TIMESTAMP,
+      `${name} a ruled-out publication must show no timestamp`
+    )
 
     console.log(`browser-smoke ${name}: ok (${base})`)
     await context.close()
