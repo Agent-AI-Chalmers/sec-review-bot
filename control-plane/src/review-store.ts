@@ -22,7 +22,7 @@ export type ReviewRunStatus =
   | 'failed'
 export type RunnerStatus =
   'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
+export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
 
 export interface CreateReviewRunArgs {
   run_id: string
@@ -101,7 +101,7 @@ function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 }
 function statusOf(row: ReviewRunRow): ReviewRunStatus {
-  return row.publication_status === 'pending' || row.publication_status === 'not_required'
+  return row.publication_status === 'pending' || row.publication_status === 'skipped'
     ? row.runner_status
     : row.publication_status
 }
@@ -273,7 +273,7 @@ export class ReviewRunStore {
             UPDATE publications
             SET status='pending', claim_token=NULL, failure_code=NULL,
                 failure_message=NULL, updated_at=clock_timestamp()
-            WHERE run_id=$1 AND connector_id=$2 AND status='not_required'
+            WHERE run_id=$1 AND connector_id=$2 AND status='skipped'
           `,
             [row.run_id, this.connectorId]
           )
@@ -445,7 +445,7 @@ export class ReviewRunStore {
       await client.query(
         `
         UPDATE publications
-        SET status='not_required', claim_token=NULL,
+        SET status='skipped', claim_token=NULL,
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE connector_id=$1 AND run_id=ANY($2::text[]) AND status='pending'
       `,
@@ -502,7 +502,7 @@ export class ReviewRunStore {
         UPDATE publications
         SET status='pending', claim_token=NULL, failure_code=NULL,
             failure_message=NULL, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2 AND status='not_required'
+        WHERE run_id=$1 AND connector_id=$2 AND status='skipped'
       `,
         [runId, this.connectorId]
       )
@@ -529,7 +529,7 @@ export class ReviewRunStore {
       await client.query(
         `
         UPDATE publications
-        SET status='not_required', claim_token=NULL,
+        SET status='skipped', claim_token=NULL,
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND status='pending'
       `,
@@ -623,7 +623,7 @@ export class ReviewRunStore {
       await client.query(
         `
         UPDATE publications
-        SET status='not_required', claim_token=NULL,
+        SET status='skipped', claim_token=NULL,
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND status='pending'
       `,
@@ -937,7 +937,7 @@ export class ReviewRunStore {
       await client.query(
         `
         UPDATE publications
-        SET status='not_required', claim_token=NULL,
+        SET status='skipped', claim_token=NULL,
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND status='pending'
       `,

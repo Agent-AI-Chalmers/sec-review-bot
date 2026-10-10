@@ -35,7 +35,7 @@ Run 在接纳后立即进入 `preparing`。GitHub integration 准备并上传 in
 
 Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Plane 将结果保存为 `succeeded`，使其可以被领取并发布。Integration 领取该工作，执行 GitHub 副作用，再记录 `published`、可重试的 publication 失败或终态 publication 失败。
 
-如果 Runner submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。Preparation 或 Runner 的终态失败会将 publication 标为 `not_required`。
+如果 Runner submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。Preparation 或 Runner 的终态失败会将 publication 标为 `skipped`。
 
 ## 持久化模型
 
@@ -44,7 +44,7 @@ Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Pla
 | 表                  | 职责                                  | 状态                                                                  |
 | ------------------- | ------------------------------------- | --------------------------------------------------------------------- |
 | `review_runs`       | 接纳、Runner 观察和终态 workflow 数据 | `preparing`、`recovering`、`queued`、`running`、`succeeded`、`failed` |
-| `publications`      | 整体发布的所有权和结果                | `pending`、`publishing`、`published`、`failed`、`not_required`        |
+| `publications`      | 整体发布的所有权和结果                | `pending`、`publishing`、`published`、`failed`、`skipped`             |
 | `publication_steps` | 可恢复的单个 connector 副作用         | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`        |
 
 ```mermaid
@@ -61,7 +61,7 @@ flowchart LR
     pending --> publishing --> published
     publishing -->|可重试失败| pending
     publishing -->|终态失败| pubfailed[failed]
-    pending -->|执行失败| notrequired[not_required]
+    pending -->|执行失败| skipped
   end
 
   subgraph steps[publication_steps.status]
@@ -75,7 +75,7 @@ flowchart LR
   publishing -.->|初始化副作用| steppending
 ```
 
-`ReviewRunStatus` 是读取投影，不是数据库字段。Publication 为 `pending` 或 `not_required` 时，它显示 Runner 状态；之后显示 `publishing`、`published` 或 publication `failed`。Publication step 状态需要单独查询。
+`ReviewRunStatus` 是读取投影，不是数据库字段。Publication 为 `pending` 或 `skipped` 时，它显示 Runner 状态；之后显示 `publishing`、`published` 或 publication `failed`。Publication step 状态需要单独查询。
 
 `publication_steps.failure_count` 只记录失败的执行。成功执行不会增加该值；失败步骤达到配置的失败次数上限后进入 `terminal_failed`。
 

@@ -66,7 +66,7 @@ CREATE INDEX review_runs_runner_status_idx
 CREATE TABLE publications (
   run_id text PRIMARY KEY REFERENCES review_runs(run_id) ON DELETE CASCADE,
   connector_id text NOT NULL,
-  status text NOT NULL CHECK (status IN ('pending', 'publishing', 'published', 'failed', 'not_required')),
+  status text NOT NULL CHECK (status IN ('pending', 'publishing', 'published', 'failed', 'skipped')),
   claim_token uuid,
   claimed_at timestamptz,
   failure_code text,

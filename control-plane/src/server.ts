@@ -49,7 +49,7 @@ const publicationStatuses = new Set<PublicationStatus>([
   'publishing',
   'published',
   'failed',
-  'not_required'
+  'skipped'
 ])
 const workflows = new Set<ControlPlaneWorkflow>([
   'issue-review',

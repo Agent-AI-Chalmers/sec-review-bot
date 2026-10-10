@@ -22,7 +22,7 @@
       "enum": ["preparing", "recovering", "queued", "running", "succeeded", "failed"]
     },
     "publication_status": {
-      "enum": ["pending", "publishing", "published", "failed", "not_required"]
+      "enum": ["pending", "publishing", "published", "failed", "skipped"]
     },
     "created_at": { "type": "string", "format": "date-time" },
     "execution_updated_at": { "type": "string", "format": "date-time" },

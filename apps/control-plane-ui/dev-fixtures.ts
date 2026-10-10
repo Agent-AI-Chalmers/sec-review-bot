@@ -2,7 +2,7 @@ import type { Plugin } from 'vite'
 
 type Workflow = 'issue-review' | 'pull-request-review' | 'repository-review'
 type ExecutionStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
+type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
 type ArtifactStatus = 'available' | 'unavailable' | 'failed'
 type StepStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
 
@@ -168,7 +168,7 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     execution_status: 'recovering',
-    publication_status: 'not_required',
+    publication_status: 'skipped',
     failure_code: 'SUBMISSION_STATE_UNCERTAIN',
     artifact: null,
     executionMs: 143_000,
@@ -177,7 +177,7 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     execution_status: 'failed',
-    publication_status: 'not_required',
+    publication_status: 'skipped',
     failure_code: 'PREPARATION_INTERRUPTED',
     artifact: null,
     executionMs: 601_000,
@@ -186,7 +186,7 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     execution_status: 'failed',
-    publication_status: 'not_required',
+    publication_status: 'skipped',
     failure_code: 'RUNNER_EXECUTION_FAILED',
     artifact: 'unavailable',
     executionMs: 74_000,
@@ -272,7 +272,7 @@ function stepsFor(scenario: Scenario, workflow: Workflow, index: number): Fixtur
  * Rejects any generated run that the Control Plane could never produce. The
  * checks mirror the store's write paths: publication only starts after a
  * succeeded execution, every terminal failure marks the publication
- * `not_required` in the same transaction, and the diagnostic artifact is
+ * `skipped` in the same transaction, and the diagnostic artifact is
  * reported only when the execution is terminal.
  */
 function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
@@ -289,10 +289,10 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   if (startedPublication && execution !== 'succeeded') {
     fail(`publication ${publication} requires a succeeded execution`)
   }
-  if (execution === 'succeeded' && publication === 'not_required') {
+  if (execution === 'succeeded' && publication === 'skipped') {
     fail('a succeeded execution always has a publication to perform')
   }
-  if (execution === 'failed' && publication !== 'not_required') {
+  if (execution === 'failed' && publication !== 'skipped') {
     fail('a terminal execution failure leaves nothing to publish')
   }
   if (run.artifact_storage !== null && !['succeeded', 'failed'].includes(execution)) {

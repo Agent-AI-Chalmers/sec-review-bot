@@ -13,7 +13,7 @@ export interface Run {
   run_id: string
   workflow: string
   execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-  publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
+  publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
   created_at: string
   execution_updated_at: string
   publication_updated_at: string

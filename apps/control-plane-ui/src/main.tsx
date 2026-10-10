@@ -393,7 +393,7 @@ function Runs(): React.JSX.Element {
               onChange={(event) => update('publication_status', event.target.value)}
             >
               <option value="">{t('all')}</option>
-              {(['pending', 'publishing', 'published', 'failed', 'not_required'] as const).map(
+              {(['pending', 'publishing', 'published', 'failed', 'skipped'] as const).map(
                 (value) => (
                   <option key={value} value={value}>
                     {runPublicationStatusLabel(value, t)}
@@ -564,14 +564,14 @@ function runPublicationStatusLabel(
   if (status === 'publishing') return t('publishingStatus')
   if (status === 'published') return t('statusPublished')
   if (status === 'failed') return t('failedStatus')
-  return t('publicationNotRequired')
+  return t('publicationSkipped')
 }
 
 function isRunTerminal(run: Run): boolean {
   if (run.execution_status === 'failed') return true
   return (
     run.execution_status === 'succeeded' &&
-    ['published', 'failed', 'not_required'].includes(run.publication_status)
+    ['published', 'failed', 'skipped'].includes(run.publication_status)
   )
 }
 
