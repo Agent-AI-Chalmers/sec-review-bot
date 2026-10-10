@@ -182,6 +182,70 @@ try {
 
       await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
       await page.getByRole('heading', { name: 'Runs' }).waitFor()
+
+      // The jump box is the only way to navigate by identity: the read API cannot
+      // filter by run id, and the list shows only an abbreviation of it.
+      await page.locator('tbody tr:first-child td a').first().click()
+      await page.waitForSelector('.run-progress-timeline')
+      const knownRunId = (await page.locator('.run-id').first().textContent())?.trim() ?? ''
+      assert.ok(knownRunId.length > 0, `${name} the detail page must show the full run id`)
+      await page.getByRole('link', { name: 'Back to runs' }).click()
+      await page.getByRole('heading', { name: 'Runs' }).waitFor()
+
+      const jump = page.getByLabel('Go to run ID')
+      await jump.fill(knownRunId)
+      await page.getByRole('button', { name: 'Go to run' }).click()
+      await page.waitForSelector('.run-progress-timeline')
+      assert.equal(
+        (await page.locator('.run-id').first().textContent())?.trim(),
+        knownRunId,
+        `${name} the jump box must open the given run`
+      )
+
+      // Jumping to an unknown id from a detail page must not keep rendering the previous
+      // run. React Router keeps this component mounted when only the id changes, so that
+      // state has to be keyed by id or the 404 reads as a failed refresh of the old run.
+      await jump.fill('00000000-0000-0000-0000-000000000000')
+      await page.getByRole('button', { name: 'Go to run' }).click()
+      await page.waitForTimeout(900)
+      assert.ok(
+        await page.getByRole('heading', { name: 'Run not found' }).isVisible(),
+        `${name} an unknown run id must say the run is missing`
+      )
+      assert.equal(
+        await page.getByText('Unable to load Control Plane').count(),
+        0,
+        `${name} an unknown run id must not show the generic error page`
+      )
+      assert.equal(
+        await page.getByText('Refresh failed').count(),
+        0,
+        `${name} an unknown run id must not read as a failed refresh`
+      )
+      assert.equal(
+        await page.locator('.run-id').count(),
+        0,
+        `${name} an unknown run id must not leave the previous run on screen`
+      )
+
+      await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+      await page.getByRole('heading', { name: 'Runs' }).waitFor()
+
+      // A repository review publishes one step per delivery plus two summaries, so a
+      // published one must render the multi-step delivery list.
+      await page.getByLabel('Workflow').selectOption('repository-review')
+      await page.getByLabel('Publication').selectOption('published')
+      await page.waitForTimeout(800)
+      await page.locator('tbody tr:first-child td a').first().click()
+      await page.waitForSelector('.run-progress-timeline')
+      const deliverySteps = await page.locator('.delivery-item').count()
+      assert.ok(
+        deliverySteps > 1,
+        `${name} a published repository review must show its steps (saw ${deliverySteps})`
+      )
+
+      await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+      await page.getByRole('heading', { name: 'Runs' }).waitFor()
     }
 
     await page.locator('tbody tr:first-child td a').first().click()

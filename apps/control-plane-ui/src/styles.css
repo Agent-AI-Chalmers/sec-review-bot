@@ -245,3 +245,12 @@ a {
     gap: 6px;
   }
 }
+
+.open-run {
+  flex: 0 1 320px;
+  min-width: 0;
+}
+.open-run .mantine-TextInput-root {
+  flex: 1;
+  min-width: 0;
+}

@@ -65,6 +65,9 @@ const messages = {
     unable: 'Unable to load Control Plane',
     requestFailed: 'The service could not complete this request.',
     retry: 'Retry',
+    goToRunId: 'Go to run ID',
+    runIdPlaceholder: 'Paste a run ID',
+    goToRun: 'Go to run',
     runNotFound: 'Run not found',
     runNotFoundHint: 'No run with this ID is stored here.'
   },
@@ -130,6 +133,9 @@ const messages = {
     unable: '无法加载 Control Plane',
     requestFailed: '服务无法完成此请求。',
     retry: '重试',
+    goToRunId: '按 ID 跳转 run',
+    runIdPlaceholder: '粘贴 run ID',
+    goToRun: '跳转',
     runNotFound: '找不到该 run',
     runNotFoundHint: '此处没有存储这个 ID 的 run。'
   }

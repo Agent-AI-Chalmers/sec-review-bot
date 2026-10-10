@@ -6,6 +6,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
   useParams,
   useSearchParams
 } from 'react-router-dom'
@@ -26,6 +27,7 @@ import {
   Switch,
   Table,
   Text,
+  TextInput,
   Timeline,
   Tooltip,
   Title
@@ -33,6 +35,7 @@ import {
 import {
   IconAlertTriangle,
   IconArrowLeft,
+  IconArrowRight,
   IconCheck,
   IconClock,
   IconCopy,
@@ -973,15 +976,40 @@ function ErrorFallback(): React.JSX.Element {
   )
 }
 function App(): React.JSX.Element {
+  const t = useMessages()
+  const navigate = useNavigate()
+  const [runIdInput, setRunIdInput] = React.useState('')
   return (
     <>
       <AppShell header={{ height: 58 }}>
         <AppShell.Header>
           <Container size="lg" h="100%" w="100%">
-            <Group h="100%" justify="space-between">
+            <Group h="100%" justify="space-between" wrap="nowrap" gap="md">
               <Link className="brand" to="/runs">
                 Review Control Plane
               </Link>
+              <form
+                className="open-run"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const requestedRunId = runIdInput.trim()
+                  if (requestedRunId) navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
+                }}
+              >
+                <Group gap={6} align="center" wrap="nowrap">
+                  <TextInput
+                    aria-label={t('goToRunId')}
+                    placeholder={t('runIdPlaceholder')}
+                    value={runIdInput}
+                    size="sm"
+                    ff="monospace"
+                    onChange={(event) => setRunIdInput(event.currentTarget.value)}
+                  />
+                  <ActionIcon type="submit" aria-label={t('goToRun')} variant="filled" size={36}>
+                    <IconArrowRight size={16} />
+                  </ActionIcon>
+                </Group>
+              </form>
               <PreferenceControls />
             </Group>
           </Container>
