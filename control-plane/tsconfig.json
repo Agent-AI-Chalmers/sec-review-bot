@@ -14,7 +14,10 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": false,
+    // The contract tests read a schema from `contracts/` as a typed module so a key-set
+    // comparison can tie this package's response type to the checked-in contract. Only
+    // test files import JSON; the build includes `src` alone.
+    "resolveJsonModule": true,
     "sourceMap": true,
     "declaration": false,
     "types": ["node"],

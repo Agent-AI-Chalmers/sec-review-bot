@@ -99,7 +99,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 只读响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
-只读响应报告两个状态轴（`execution_status`、`publication_status`），而不是扁平的 `ReviewRunStatus`，筛选参数同名；`schema/observed-run.schema.json` 是它们的契约。扁平状态只出现在通过 `POST /v1/store` 交换的记录上。
+只读响应报告两个状态轴（`execution_status`、`publication_status`），而不是扁平的 `ReviewRunStatus`，筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。扁平状态只出现在通过 `POST /v1/store` 交换的记录上。
 
 ## 配置
 

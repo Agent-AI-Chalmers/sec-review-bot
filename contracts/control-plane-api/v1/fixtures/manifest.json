@@ -1,0 +1,12 @@
+{
+  "schema_fixtures": {
+    "observed-run.json": "observed-run.schema.json",
+    "observed-run-with-steps.json": "observed-run.schema.json"
+  },
+  "invalid_schema_fixtures": {
+    "invalid-observed-run-extra-field.json": "observed-run.schema.json",
+    "invalid-observed-run-missing-publication-status.json": "observed-run.schema.json",
+    "invalid-observed-run-artifact-without-uri.json": "observed-run.schema.json",
+    "invalid-observed-run-created-at.json": "observed-run.schema.json"
+  }
+}

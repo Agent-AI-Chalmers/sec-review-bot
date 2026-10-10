@@ -99,7 +99,7 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
-Read responses report the two status axes (`execution_status`, `publication_status`) rather than the flattened `ReviewRunStatus`, and filter on the same names; `schema/observed-run.schema.json` is their contract. The flattened status appears only on the records exchanged over `POST /v1/store`.
+Read responses report the two status axes (`execution_status`, `publication_status`) rather than the flattened `ReviewRunStatus`, and filter on the same names; [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is their contract. The flattened status appears only on the records exchanged over `POST /v1/store`.
 
 ## Configuration
 

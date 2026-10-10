@@ -2,6 +2,8 @@ export interface ArtifactStorage {
   status: 'available' | 'unavailable' | 'failed'
   artifact?: {
     kind: 'diagnostic_bundle'
+    /** Where the Runner stored the bundle. The contract requires it. */
+    uri: string
     media_type: string
     digest: string
     size_bytes: number

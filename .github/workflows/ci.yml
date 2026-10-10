@@ -43,17 +43,25 @@ jobs:
           filters: |
             control-plane:
               - 'control-plane/**'
+              # Its contract test reads the checked-in observed-run schema.
+              - 'contracts/**'
               - '.github/workflows/ci.yml'
             github-integration:
               - 'apps/github-integration/**'
               # The integration suite imports the Control Plane store directly.
               - 'control-plane/**'
+              # ... and validates the shared contract fixtures.
+              - 'contracts/**'
               - '.github/workflows/ci.yml'
             control-plane-ui:
               - 'apps/control-plane-ui/**'
+              # The console pins its response type to the shared contract fixture.
+              - 'contracts/**'
               - '.github/workflows/ci.yml'
             agents:
               - 'agents/**'
+              # The wheel packages the canonical contract schemas.
+              - 'contracts/**'
               - '.github/workflows/ci.yml'
             scripts:
               - 'scripts/**'

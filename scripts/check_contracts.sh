@@ -13,6 +13,14 @@ python "$ROOT/scripts/check_markdown_wrapping.py" "$ROOT"
 )
 
 (
+  cd "$ROOT/control-plane"
+  # The observed-run contract: the key-set check runs through tsc, the value-level check
+  # through the shared fixtures.
+  pnpm run typecheck
+  node --import tsx --test test/observed-run-contract.test.ts
+)
+
+(
   cd "$ROOT/apps/github-integration"
   npm run lint
   npm run build

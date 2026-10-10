@@ -24,6 +24,7 @@ contracts/
 ## 契约族
 
 - [integration-contract](integration-contract/README.zh.md)：Runner 与其调用方之间的公开集成点。当前版本：[v5](integration-contract/v5/CONTRACT.zh.md)。
+- [control-plane-api](control-plane-api/README.zh.md)：Control Plane 与其调用方交换的形状。当前版本：[v1](control-plane-api/v1/observed-run.schema.json)。
 
 ## 适用于每个族的规则
 
