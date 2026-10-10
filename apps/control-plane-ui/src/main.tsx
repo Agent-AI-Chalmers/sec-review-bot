@@ -523,9 +523,11 @@ function Runs(): React.JSX.Element {
   )
 }
 
+type PublicationStepStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+
 interface Step {
   step_key: string
-  status: string
+  status: PublicationStepStatus
   failure_count: number
   remote_object_url: string | null
   failure_code: string | null
@@ -542,7 +544,7 @@ function safeExternalUrl(value: string | null): string | undefined {
   }
 }
 
-function publicationStatusLabel(status: string, t: ReturnType<typeof useMessages>): string {
+function publicationStatusLabel(status: PublicationStepStatus, t: ReturnType<typeof useMessages>): string {
   if (status === 'pending') return t('publicationPending')
   if (status === 'running') return t('publishingStatus')
   if (status === 'succeeded') return t('publicationStepSucceeded')
@@ -551,7 +553,7 @@ function publicationStatusLabel(status: string, t: ReturnType<typeof useMessages
   return status
 }
 
-function publicationStatusColor(status: string): string {
+function publicationStatusColor(status: PublicationStepStatus): string {
   if (status === 'terminal_failed') return 'red'
   if (status === 'failed') return 'yellow'
   if (status === 'running') return 'blue'

@@ -13,7 +13,7 @@ export interface ArtifactStorage {
 }
 export interface Run {
   run_id: string
-  workflow: string
+  workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
   execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
   publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
   created_at: string
