@@ -180,7 +180,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
         admit_review_run: (run) => {
           saved_runs.push(run)
           return {
-            record: { ...run, status: 'preparing' },
+            record: { ...run, runner_status: 'preparing' },
             created: true,
             preparation_token: 'claim'
           } as never
@@ -279,7 +279,7 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
         admit_review_run: () => ({
           created: false,
           preparation_token: null,
-          record: { run_id: 'run-original', status: 'running' } as never
+          record: { run_id: 'run-original', runner_status: 'running' } as never
         }),
         submit_prepared_run: () => assert.fail('replayed dispatch must not queue again'),
         failPreparation: () => assert.fail('replayed dispatch must not change the original run')
@@ -318,7 +318,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
           admit_review_run: (run) => {
             transitions.push(['preparing', run])
             return {
-              record: { ...run, status: 'preparing' },
+              record: { ...run, runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             } as never
@@ -402,7 +402,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           admit_review_run: (run) => {
             transitions.push(['preparing', run])
             return {
-              record: { ...run, status: 'preparing' },
+              record: { ...run, runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             } as never
@@ -494,7 +494,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           ...preparationClaim,
           admit_review_run: (run) =>
             ({
-              record: { ...run, status: 'preparing' },
+              record: { ...run, runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             }) as never,

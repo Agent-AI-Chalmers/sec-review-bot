@@ -7,7 +7,6 @@ const run = {
   run_id: 'run-1',
   workflow: 'issue-review' as const,
   publish_context: {},
-  status: 'queued' as const,
   runner_status: 'queued' as const,
   publication_status: 'pending' as const,
   created_at: '2026-01-01T00:00:00.000Z',

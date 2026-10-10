@@ -11,15 +11,6 @@ export type PublishContextValidator = (
   workflow: WorkflowName,
   context: JsonObject
 ) => PublishContext
-export type ReviewRunStatus =
-  | 'preparing'
-  | 'recovering'
-  | 'queued'
-  | 'running'
-  | 'succeeded'
-  | 'publishing'
-  | 'published'
-  | 'failed'
 export type RunnerStatus =
   'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
 export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
@@ -38,7 +29,6 @@ export interface ReviewRunAdmission {
   preparation_token: string | null
 }
 export interface ReviewRunRecord extends CreateReviewRunArgs {
-  status: ReviewRunStatus
   runner_status: RunnerStatus
   publication_status: PublicationStatus
   created_at: string
@@ -104,20 +94,13 @@ const RUN_SELECT = `
 function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 }
-function statusOf(row: ReviewRunRow): ReviewRunStatus {
-  return row.publication_status === 'pending' || row.publication_status === 'skipped'
-    ? row.runner_status
-    : row.publication_status
-}
 function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
-  const status = statusOf(row)
   const publicationFailure = row.publication_status === 'failed'
   return {
     run_id: row.run_id,
     workflow: row.workflow,
     publish_context: row.publish_context,
     ...(row.runner_input === null ? {} : { runner_input: row.runner_input }),
-    status,
     runner_status: row.runner_status,
     publication_status: row.publication_status,
     created_at: iso(row.created_at),

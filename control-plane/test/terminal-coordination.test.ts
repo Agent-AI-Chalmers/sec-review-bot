@@ -7,7 +7,6 @@ const run: ReviewRunRecord = {
   run_id: 'run-1',
   workflow: 'issue-review',
   publish_context: {},
-  status: 'queued',
   runner_status: 'queued',
   publication_status: 'pending',
   created_at: '2026-01-01T00:00:00.000Z',

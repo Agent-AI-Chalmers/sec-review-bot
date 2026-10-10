@@ -291,7 +291,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
           ...preparationClaim,
           admit_review_run: (run) =>
             ({
-              record: { ...run, status: 'preparing' },
+              record: { ...run, runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             }) as never,
@@ -340,7 +340,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
           ...preparationClaim,
           admit_review_run: (run) =>
             ({
-              record: { ...run, status: 'preparing' },
+              record: { ...run, runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             }) as never,
@@ -377,7 +377,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
           admit_review_run: (run) => {
             transitions.push(['preparing', run.run_id])
             return {
-              record: { ...run, status: 'preparing' },
+              record: { ...run, runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             } as never
@@ -419,7 +419,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
         admit_review_run: () => ({
           created: false,
           preparation_token: null,
-          record: { run_id: 'run-original', status: 'queued' } as never
+          record: { run_id: 'run-original', runner_status: 'queued' } as never
         }),
         submit_prepared_run: () => assert.fail('replayed delivery must not queue again'),
         failPreparation: () => assert.fail('replayed delivery must not change the original run')
@@ -449,7 +449,7 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
         admit_review_run: () => ({
           created: false,
           preparation_token: null,
-          record: { run_id: 'run-original', status: 'queued' } as never
+          record: { run_id: 'run-original', runner_status: 'queued' } as never
         }),
         submit_prepared_run: () => assert.fail('replayed delivery must not queue again'),
         failPreparation: () => assert.fail('replayed delivery must not change the original run')

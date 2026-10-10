@@ -2,15 +2,6 @@ import type { RunnerArtifactStorage, WorkflowName } from '../runner/shapes.js'
 import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 
 type JsonObject = Record<string, unknown>
-export type ReviewRunStatus =
-  | 'preparing'
-  | 'recovering'
-  | 'queued'
-  | 'running'
-  | 'succeeded'
-  | 'publishing'
-  | 'published'
-  | 'failed'
 
 export interface CreateReviewRunArgs {
   run_id: string
@@ -22,7 +13,7 @@ export interface CreateReviewRunArgs {
 }
 
 export interface ReviewRunRecord extends CreateReviewRunArgs {
-  status: ReviewRunStatus
+  runner_status: string
   created_at: string
   published_at: string | null
   failure_code: string | null

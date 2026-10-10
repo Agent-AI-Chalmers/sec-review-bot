@@ -10,7 +10,7 @@ interface StoredAdmission {
   record: {
     run_id: string
     workflow: ControlPlaneWorkflow
-    status: string
+    runner_status: string
   }
   created: boolean
   preparation_token: string | null
@@ -45,7 +45,7 @@ export async function admitReviewRun(
   return {
     run_id: admission.record.run_id,
     workflow: admission.record.workflow,
-    status: admission.record.status,
+    status: admission.record.runner_status,
     created: admission.created,
     preparation_token: admission.preparation_token
   }

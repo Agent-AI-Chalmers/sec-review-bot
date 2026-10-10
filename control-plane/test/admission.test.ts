@@ -10,7 +10,7 @@ test('admission assigns a run identity before preparation', async () => {
       async admit_review_run(run) {
         persisted = run
         return {
-          record: { ...run, status: 'preparing' },
+          record: { ...run, runner_status: 'preparing' },
           created: true,
           preparation_token: 'claim-1'
         }
@@ -48,7 +48,7 @@ test('an ingress replay keeps the identity returned by durable admission', async
           record: {
             run_id: 'original-run',
             workflow: 'issue-review',
-            status: 'failed'
+            runner_status: 'failed'
           },
           created: false,
           preparation_token: null

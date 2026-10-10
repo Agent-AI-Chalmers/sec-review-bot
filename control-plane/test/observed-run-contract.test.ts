@@ -81,7 +81,6 @@ function recordWith(artifactStorage: ReviewRunRecord['artifact_storage']): Revie
   return {
     run_id: 'run-contract',
     workflow: 'repository-review',
-    status: 'succeeded',
     runner_status: 'succeeded',
     publication_status: 'published',
     created_at: '2026-10-10T05:00:00.000Z',

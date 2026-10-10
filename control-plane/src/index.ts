@@ -23,8 +23,7 @@ export {
   type PublishContext,
   type PublishContextValidator,
   type ReviewRunAdmission,
-  type ReviewRunRecord,
-  type ReviewRunStatus
+  type ReviewRunRecord
 } from './review-store.js'
 export {
   recoverReviewRunSubmission,

@@ -5,8 +5,8 @@
 // `undefined` at runtime with every check still green.
 //
 // Only containment is asserted, and the direction depends on what each pair promises.
-// `ReviewRunRecord` is deliberately narrower here — the integration never reads
-// `runner_status`, `publication_status`, or the per-axis `updated_at` fields — and
+// `ReviewRunRecord` is deliberately narrower here — it omits `runner_status`,
+// `publication_status`, and the per-axis `updated_at` fields — and
 // `PublicationWork` inherits that narrower view. The rest are meant to name the same keys
 // and accept the same values, so they are compared both ways: a key-set comparison would
 // not notice a widened union or a relaxed literal — which is how `kind: string` went
@@ -30,8 +30,7 @@ import type {
   ReviewRunAdmission as ControlPlaneAdmission,
   ReviewRunRecord as ControlPlaneRecord,
   PublicationStepRecord as ControlPlaneStep,
-  PublicationWork as ControlPlaneWork,
-  ReviewRunStatus as ControlPlaneStatus
+  PublicationWork as ControlPlaneWork
 } from '../../../../control-plane/src/index.js'
 
 import type { RunnerArtifactStorage as ControlPlaneArtifactStorage } from '../../../../control-plane/src/index.js'
@@ -42,8 +41,7 @@ import type {
   PublicationStepRecord as ClientStep,
   PublicationWork as ClientWork,
   ReviewRunAdmission as ClientAdmission,
-  ReviewRunRecord as ClientRecord,
-  ReviewRunStatus as ClientStatus
+  ReviewRunRecord as ClientRecord
 } from '../../src/control-plane/client.js'
 import type { RunnerArtifactStorage as ClientArtifactStorage } from '../../src/runner/shapes.js'
 
@@ -56,8 +54,6 @@ type SameValues<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : fal
 /** `A` and `B` name the same keys and accept the same values. */
 type SameShape<A, B> = SameKeys<A, B> extends true ? SameValues<A, B> : false
 type Expect<T extends true> = T
-
-export type StatusUnionMatches = Expect<SameValues<ClientStatus, ControlPlaneStatus>>
 
 /**
  * Both dimensions: `workflow` is a union, so value equality is needed, and
