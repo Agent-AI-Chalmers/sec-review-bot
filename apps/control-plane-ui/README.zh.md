@@ -1,6 +1,6 @@
 # Control Plane UI
 
-这是用于查看 Review Control Plane run 的内部只读控制台。浏览器只访问该应用的同源服务端；服务端持有 Control Plane 只读凭据，并仅代理明确白名单内的 GET 查询。
+这是用于查看 Review Control Plane run 的内部只读控制台。浏览器只访问该应用的同源服务端；服务端持有 Control Plane 只读凭据，仅代理明确白名单内的 GET 路径，并原样转发查询串。
 
 ## 本地运行
 

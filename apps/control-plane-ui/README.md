@@ -1,6 +1,6 @@
 # Control Plane UI
 
-Internal, read-only web console for Review Control Plane runs. The browser talks only to this application's same-origin server; the server holds the Control Plane read credential and proxies an explicit GET-only query allowlist.
+Internal, read-only web console for Review Control Plane runs. The browser talks only to this application's same-origin server; the server holds the Control Plane read credential and proxies an explicit allowlist of GET paths, forwarding the query string unchanged.
 
 ## Local development
 
