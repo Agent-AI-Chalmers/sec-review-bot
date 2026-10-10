@@ -23,5 +23,18 @@ export default tseslint.config(
   {
     files: ['**/*.mjs'],
     languageOptions: { globals: { process: 'readonly' } }
+  },
+  {
+    // Playwright `page.evaluate` callbacks execute in the browser, so these scripts
+    // need browser globals on top of the Node ones declared above.
+    files: ['test/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        document: 'readonly',
+        fetch: 'readonly',
+        getComputedStyle: 'readonly'
+      }
+    }
   }
 )
