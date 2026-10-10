@@ -4,7 +4,7 @@ import { RunnerSubmissionUncertainError } from './runner-client.js'
 
 type Store = Pick<
   ReviewRunStore,
-  'getRun' | 'save_prepared_submission' | 'mark_queued' | 'failPreparation'
+  'getRun' | 'savePreparedSubmission' | 'markQueued' | 'failPreparation'
 >
 
 /** Persists the replayable request before crossing the Runner uncertainty boundary. */
@@ -29,7 +29,7 @@ export async function submitPreparedRun(
     })
   let runnerAccepted = false
   try {
-    await store.save_prepared_submission(
+    await store.savePreparedSubmission(
       args.runId,
       args.preparationToken,
       args.publishContext,
@@ -37,7 +37,7 @@ export async function submitPreparedRun(
     )
     await submit({ workflow: run.workflow, run_id: args.runId, input: args.input })
     runnerAccepted = true
-    await store.mark_queued(args.runId, args.preparationToken, args.publishContext)
+    await store.markQueued(args.runId, args.preparationToken, args.publishContext)
     return { run_id: args.runId, workflow: run.workflow, status: 'queued' }
   } catch (error) {
     await store

@@ -15,14 +15,14 @@ import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
 type IssueReviewControlPlaneClient = {
-  admit_review_run: (
-    ...args: Parameters<typeof controlPlaneClient.admit_review_run>
+  admitReviewRun: (
+    ...args: Parameters<typeof controlPlaneClient.admitReviewRun>
   ) =>
-    | Awaited<ReturnType<typeof controlPlaneClient.admit_review_run>>
-    | ReturnType<typeof controlPlaneClient.admit_review_run>
+    | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
+    | ReturnType<typeof controlPlaneClient.admitReviewRun>
   failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
-  submit_prepared_run: (
-    ...args: Parameters<typeof controlPlaneClient.submit_prepared_run>
+  submitPreparedRun: (
+    ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
   ) => unknown
   renewPreparationClaim: (
     ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
@@ -101,7 +101,7 @@ export async function startIssueReviewCommand({
         // Confirm the lease immediately before crossing the durable submission
         // boundary; the submission itself remains token-fenced by Control Plane.
         await heartbeat.assertOwned()
-        await store.submit_prepared_run(
+        await store.submitPreparedRun(
           run_id,
           preparationToken,
           issueReviewPublishContext(prepared),

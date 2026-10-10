@@ -61,7 +61,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
         method: 'POST',
         headers: mutationAuth,
         body: JSON.stringify({
-          operation: 'admit_review_run',
+          operation: 'admitReviewRun',
           args: [
             {
               workflow: 'issue-review',

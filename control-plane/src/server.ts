@@ -203,7 +203,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       await coordinateReviewRunsOnce(store, {
         recoverSubmission: async (run) => {
           logEvent('runner_submission_recovery_started', {
-            connector_id: store.connector_id,
+            connector_id: store.connectorId,
             run_id: run.run_id,
             workflow: run.workflow
           })
@@ -221,7 +221,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
             })
           })
           logEvent('runner_submission_recovery_completed', {
-            connector_id: store.connector_id,
+            connector_id: store.connectorId,
             run_id: run.run_id,
             workflow: run.workflow
           })
@@ -235,7 +235,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
             isTerminalRunnerPollingError,
             (event) => {
               console.info(
-                JSON.stringify({ event: event.kind, connector_id: store.connector_id, ...event })
+                JSON.stringify({ event: event.kind, connector_id: store.connectorId, ...event })
               )
             }
           )
@@ -319,7 +319,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
         return
       }
       const args =
-        body.operation === 'admit_review_run' &&
+        body.operation === 'admitReviewRun' &&
         typeof body.args[0] === 'object' &&
         body.args[0] !== null
           ? [{ ...(body.args[0] as Record<string, unknown>), run_id: randomUUID() }]
@@ -328,9 +328,9 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       logEvent('control_plane_operation_started', {
         operation: body.operation,
         ...(runId === undefined ? {} : { run_id: runId }),
-        connector_id: store.connector_id
+        connector_id: store.connectorId
       })
-      if (body.operation === 'submit_prepared_run') {
+      if (body.operation === 'submitPreparedRun') {
         const [runId, preparationToken, publishContext, input] = args as [
           string,
           string,
@@ -345,7 +345,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
         logEvent('control_plane_operation_completed', {
           operation: body.operation,
           run_id: runId,
-          connector_id: store.connector_id
+          connector_id: store.connectorId
         })
         sendJson(response, 200, { result })
         return
@@ -355,7 +355,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       logEvent('control_plane_operation_completed', {
         operation: body.operation,
         ...(runId === undefined ? {} : { run_id: runId }),
-        connector_id: store.connector_id
+        connector_id: store.connectorId
       })
       sendJson(response, 200, { result })
     } catch (error) {

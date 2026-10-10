@@ -18,14 +18,14 @@ test('Control Plane store initializes its schema and deduplicates ingress', asyn
   await store.initialize()
   try {
     const ingressKey = `delivery:${randomUUID()}`
-    const first = await store.admit_review_run({
+    const first = await store.admitReviewRun({
       run_id: `run-${randomUUID()}`,
       workflow: 'issue-review',
       publish_context: {},
       ingress_kind: 'github_webhook',
       ingress_key: ingressKey
     })
-    const replay = await store.admit_review_run({
+    const replay = await store.admitReviewRun({
       run_id: `discarded-${randomUUID()}`,
       workflow: 'issue-review',
       publish_context: {},
@@ -53,7 +53,7 @@ test('Control Plane store fences reads by connector', async () => {
   })
   await Promise.all([first.initialize(), second.initialize()])
   try {
-    await first.create_preparing_review_run({
+    await first.createPreparingReviewRun({
       run_id: runId,
       workflow: 'repository-review',
       publish_context: {}
@@ -71,7 +71,7 @@ test('run queries survive a fresh store connection and preserve stable paginatio
   const runIds = [`run-${randomUUID()}`, `run-${randomUUID()}`]
   try {
     for (const run_id of runIds) {
-      await first.create_preparing_review_run({
+      await first.createPreparingReviewRun({
         run_id,
         workflow: 'issue-review',
         publish_context: { private: true },
@@ -107,7 +107,7 @@ test('run queries apply status filters before pagination limits', async () => {
   await store.initialize()
   try {
     const failedRunId = `run-${randomUUID()}`
-    const failed = await store.create_preparing_review_run({
+    const failed = await store.createPreparingReviewRun({
       run_id: failedRunId,
       workflow: 'issue-review',
       publish_context: {}
@@ -119,7 +119,7 @@ test('run queries apply status filters before pagination limits', async () => {
     })
 
     for (let index = 0; index < 2; index += 1) {
-      await store.create_preparing_review_run({
+      await store.createPreparingReviewRun({
         run_id: `run-${randomUUID()}`,
         workflow: 'issue-review',
         publish_context: {}

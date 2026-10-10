@@ -212,12 +212,12 @@ export function startPublicationCoordinator({
       logError('review_publication_loop_failed', {
         error,
         error_message: errorMessage(error),
-        connector_id: store.connector_id
+        connector_id: store.connectorId
       })
     }
   })
   logInfo('review_publication_loop_started', {
-    connector_id: store.connector_id,
+    connector_id: store.connectorId,
     interval_ms: intervalMs
   })
   return loop

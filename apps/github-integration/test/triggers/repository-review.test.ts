@@ -177,7 +177,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       create_run_id: () => 'run-1',
       store: {
         ...preparationClaim,
-        admit_review_run: (run) => {
+        admitReviewRun: (run) => {
           saved_runs.push(run)
           return {
             record: { ...run, runner_status: 'preparing' },
@@ -185,7 +185,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
             preparation_token: 'claim'
           } as never
         },
-        submit_prepared_run: (run_id, _token, context, input) =>
+        submitPreparedRun: (run_id, _token, context, input) =>
           saved_runs.push({ run_id, context, input }),
         failPreparation: () => assert.fail('successful review must not be marked failed')
       }
@@ -276,12 +276,12 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
       },
       store: {
         ...preparationClaim,
-        admit_review_run: () => ({
+        admitReviewRun: () => ({
           created: false,
           preparation_token: null,
           record: { run_id: 'run-original', runner_status: 'running' } as never
         }),
-        submit_prepared_run: () => assert.fail('replayed dispatch must not queue again'),
+        submitPreparedRun: () => assert.fail('replayed dispatch must not queue again'),
         failPreparation: () => assert.fail('replayed dispatch must not change the original run')
       }
     }
@@ -315,7 +315,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
         },
         store: {
           ...preparationClaim,
-          admit_review_run: (run) => {
+          admitReviewRun: (run) => {
             transitions.push(['preparing', run])
             return {
               record: { ...run, runner_status: 'preparing' },
@@ -323,7 +323,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
               preparation_token: 'claim'
             } as never
           },
-          submit_prepared_run: () => assert.fail('invalid dispatch must not queue a run'),
+          submitPreparedRun: () => assert.fail('invalid dispatch must not queue a run'),
           failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
@@ -356,8 +356,8 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
         submit_run: async () => assert.fail('invalid contract must not submit'),
         store: {
           ...preparationClaim,
-          admit_review_run: () => assert.fail('invalid contract must not create a run'),
-          submit_prepared_run: () => assert.fail('invalid contract must not queue'),
+          admitReviewRun: () => assert.fail('invalid contract must not create a run'),
+          submitPreparedRun: () => assert.fail('invalid contract must not queue'),
           failPreparation: () => assert.fail('invalid contract has no run to fail')
         }
       }
@@ -399,7 +399,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
         },
         store: {
           ...preparationClaim,
-          admit_review_run: (run) => {
+          admitReviewRun: (run) => {
             transitions.push(['preparing', run])
             return {
               record: { ...run, runner_status: 'preparing' },
@@ -407,7 +407,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
               preparation_token: 'claim'
             } as never
           },
-          submit_prepared_run: () => assert.fail('failed review must not be queued'),
+          submitPreparedRun: () => assert.fail('failed review must not be queued'),
           failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
         }
       }
@@ -492,13 +492,13 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
         },
         store: {
           ...preparationClaim,
-          admit_review_run: (run) =>
+          admitReviewRun: (run) =>
             ({
               record: { ...run, runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             }) as never,
-          submit_prepared_run: (run_id, _token, context, input) =>
+          submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
         }

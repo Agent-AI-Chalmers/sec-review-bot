@@ -136,7 +136,7 @@ async function transaction<T>(
 
 export class ReviewRunStore {
   private readonly pool: Pool
-  private readonly connectorId: string
+  readonly connectorId: string
   private readonly claimTimeoutMs: number
   private readonly validatePublishContext: PublishContextValidator
   private initialized = false
@@ -160,11 +160,6 @@ export class ReviewRunStore {
     this.connectorId = connectorId
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
     this.validatePublishContext = validatePublishContext
-  }
-
-  /** Exposes the coordination domain for logs without making it part of the public run contract. */
-  get connector_id(): string {
-    return this.connectorId
   }
 
   async initialize(): Promise<void> {
@@ -215,11 +210,11 @@ export class ReviewRunStore {
     if (record === null) throw new Error(`Runner run was not persisted: ${run.run_id}`)
     return { record, created: true, preparation_token: preparationToken }
   }
-  async create_preparing_review_run(run: CreateReviewRunArgs): Promise<ReviewRunAdmission> {
+  async createPreparingReviewRun(run: CreateReviewRunArgs): Promise<ReviewRunAdmission> {
     this.ready()
     return await transaction(this.pool, async (client) => await this.insertWith(client, run))
   }
-  async admit_review_run(
+  async admitReviewRun(
     run: CreateReviewRunArgs & Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
   ): Promise<ReviewRunAdmission> {
     this.ready()
@@ -289,7 +284,7 @@ export class ReviewRunStore {
       return { record: rowToRecord(existing.rows[0]), created: false, preparation_token: null }
     }
   }
-  async save_prepared_submission(
+  async savePreparedSubmission(
     runId: string,
     token: string,
     context: PublishContext,
@@ -340,7 +335,7 @@ export class ReviewRunStore {
     // beyond a deployment-specific preparation timeout.
     return Math.max(1, Math.min(60_000, Math.floor(this.claimTimeoutMs / 3)))
   }
-  async mark_queued(runId: string, token: string, context: PublishContext): Promise<void> {
+  async markQueued(runId: string, token: string, context: PublishContext): Promise<void> {
     const run = await this.getRun(runId)
     if (run === null) throw new Error(`Review run does not exist: ${runId}`)
     const publishContext = this.validatePublishContext(run.workflow, context)

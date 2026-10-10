@@ -18,13 +18,13 @@ async function store(
 async function successfulRun(value: ReviewRunStore): Promise<string> {
   const runId = `run-${randomUUID()}`
   const context = publishContextForWorkflow('issue-review')
-  const admission = await value.create_preparing_review_run({
+  const admission = await value.createPreparingReviewRun({
     run_id: runId,
     workflow: 'issue-review',
     publish_context: context
   })
   assert.ok(admission.preparation_token)
-  await value.mark_queued(runId, admission.preparation_token, context)
+  await value.markQueued(runId, admission.preparation_token, context)
   await value.recordRunnerSuccess(
     runId,
     { run_id: runId, review_record: { analysis: { verdict: 'no-findings' } } },
@@ -36,13 +36,13 @@ async function successfulRun(value: ReviewRunStore): Promise<string> {
 test('publication work is unavailable until Control Plane records Runner success', async () => {
   const value = await store()
   try {
-    const admission = await value.create_preparing_review_run({
+    const admission = await value.createPreparingReviewRun({
       run_id: `run-${randomUUID()}`,
       workflow: 'issue-review',
       publish_context: publishContextForWorkflow('issue-review')
     })
     assert.ok(admission.preparation_token)
-    await value.mark_queued(
+    await value.markQueued(
       admission.record.run_id,
       admission.preparation_token,
       publishContextForWorkflow('issue-review')
