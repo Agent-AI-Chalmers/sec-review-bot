@@ -22,11 +22,6 @@
 body {
   margin: 0;
 }
-@media (prefers-reduced-motion: reduce) {
-  .status-dot-active {
-    animation: none;
-  }
-}
 .status-text {
   display: inline-flex;
   align-items: center;
@@ -37,7 +32,6 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--mantine-color-gray-4);
 }
 .status-dot-waiting {
   background: var(--mantine-color-gray-5);
@@ -61,6 +55,16 @@ body {
 .status-dot-failed {
   background: var(--mantine-color-red-6);
 }
+.status-dot-neutral {
+  background: var(--mantine-color-gray-4);
+}
+/* Must stay after the .status-dot-* rules above: same specificity, so the
+   later declaration wins. */
+@media (prefers-reduced-motion: reduce) {
+  .status-dot-active {
+    animation: none;
+  }
+}
 .brand {
   color: inherit;
   font-size: 15px;
@@ -80,8 +84,10 @@ body {
 .run-state-summary .status-text {
   font-size: var(--mantine-font-size-sm);
 }
-/* The rail is a neutral order cue: the bullets already carry each step's status,
-   so the rail must not repeat the status colour. */
+/* Neutral rail cue. Mantine paints the rail from the Timeline.Item `::before`
+   pseudo-element and couples it to the bullet colour, so this override is the
+   only way to decouple them. If Mantine changes that element, the rail silently
+   reverts to the status colour. */
 .run-progress-timeline .mantine-Timeline-item::before {
   border-left-color: var(--mantine-color-gray-4);
   border-left-style: dashed;
@@ -226,13 +232,6 @@ a {
   }
   .refresh-controls {
     align-items: flex-end;
-  }
-  .run-heading-footer {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .run-heading-footer .refresh-controls {
-    align-items: flex-start;
   }
   .artifact-summary {
     padding: 2px 0 4px;

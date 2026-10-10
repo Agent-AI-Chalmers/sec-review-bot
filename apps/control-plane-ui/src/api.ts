@@ -12,7 +12,6 @@ export interface ArtifactStorage {
 export interface Run {
   run_id: string
   workflow: string
-  status: string
   execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
   publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'not_required'
   created_at: string

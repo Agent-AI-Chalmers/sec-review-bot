@@ -591,6 +591,8 @@ function Detail(): React.JSX.Element {
     }
   }, [runId])
   const terminal = run ? isRunTerminal(run) : false
+  // Polls while the run is active. The detail page renders no refresh chrome, so
+  // the hook's display state (refreshing / lastChecked) is intentionally unused.
   useRefresh(load, !terminal)
   const titleRunId = run?.run_id
   React.useEffect(() => {
@@ -634,40 +636,32 @@ function Detail(): React.JSX.Element {
             <Title order={1} className="run-id">
               {run.run_id}
             </Title>
-            <Group
-              justify="space-between"
-              align="flex-end"
-              gap="lg"
-              mt="md"
-              className="run-heading-footer"
-            >
-              <Group gap="lg" align="center" className="run-state-summary">
-                <Text c="dimmed" size="xs" tt="uppercase">
-                  {workflowLabel(run.workflow, t)}
+            <Group gap="lg" align="center" mt="md" className="run-state-summary">
+              <Text c="dimmed" size="xs" tt="uppercase">
+                {workflowLabel(run.workflow, t)}
+              </Text>
+              <Group gap={6} align="center">
+                <Text c="dimmed" size="xs">
+                  {t('execution')}
                 </Text>
-                <Group gap={6} align="center">
-                  <Text c="dimmed" size="xs">
-                    {t('execution')}
-                  </Text>
-                  <ExecutionStatus status={run.execution_status} />
-                </Group>
-                <Group gap={6} align="center">
-                  <Text c="dimmed" size="xs">
-                    {t('publication')}
-                  </Text>
-                  <PublicationStatus status={run.publication_status} />
-                </Group>
-                {run.failure_code && (
-                  <Group gap={6} wrap="wrap">
-                    <Text c="dimmed" size="xs">
-                      {t('latestError')}:
-                    </Text>
-                    <Text c="red" size="xs" ff="monospace">
-                      {run.failure_code}
-                    </Text>
-                  </Group>
-                )}
+                <ExecutionStatus status={run.execution_status} />
               </Group>
+              <Group gap={6} align="center">
+                <Text c="dimmed" size="xs">
+                  {t('publication')}
+                </Text>
+                <PublicationStatus status={run.publication_status} />
+              </Group>
+              {run.failure_code && (
+                <Group gap={6} wrap="wrap">
+                  <Text c="dimmed" size="xs">
+                    {t('latestError')}:
+                  </Text>
+                  <Text c="red" size="xs" ff="monospace">
+                    {run.failure_code}
+                  </Text>
+                </Group>
+              )}
             </Group>
           </div>
           <Stack gap="xl">
