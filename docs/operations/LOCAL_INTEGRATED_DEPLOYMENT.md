@@ -264,7 +264,7 @@ With the sample configuration, the integrated deployment stores runtime data in 
 
 ### Integrated Service
 
-Install the agents project, build the control-plane images, and confirm that the current user can access Docker:
+Install the agents project, build all required images, and confirm that the current user can access Docker:
 
 ```bash
 cd agents

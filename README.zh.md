@@ -119,7 +119,7 @@ cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
 # ops/systemd/deployment.env，并把私钥放到 apps/github-integration/private-key.pem
 ```
 
-构建控制平面镜像并安装集成服务：
+构建所有需要的镜像并安装集成服务：
 
 ```bash
 cd agents

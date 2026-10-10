@@ -266,7 +266,7 @@ AGENT_MCP_ENABLED=true
 
 ### 集成服务
 
-先安装 agents 项目，构建控制平面镜像，并确认当前用户可以访问 Docker：
+先安装 agents 项目，构建所有需要的镜像，并确认当前用户可以访问 Docker：
 
 ```bash
 cd agents
