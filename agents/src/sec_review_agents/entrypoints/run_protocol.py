@@ -24,6 +24,11 @@ RUNNER_RESPONSE_INVALID = "RUNNER_RESPONSE_INVALID"
 # The workflow execution failed before it could return a valid result.
 RUNNER_EXECUTION_FAILED = "RUNNER_EXECUTION_FAILED"
 
+# A status query names every run the caller wants a status token for. The bound keeps one
+# request from expanding into an unbounded number of workflow reads: without it, a caller
+# mistake becomes load on the Runner rather than a rejection.
+MAX_STATUS_QUERY_RUN_IDS = 200
+
 
 def build_runner_error(
     *,
@@ -42,18 +47,6 @@ def build_runner_error(
     }
 
 
-def validate_run_request_body(body: Any) -> str | None:
-    if not isinstance(body, dict):
-        return "Runner run request body must be a JSON object."
-    try:
-        validate_run_id(body.get("run_id"))
-    except ValueError as error:
-        return str(error)
-    if not isinstance(body.get("input"), dict):
-        return "Runner run request body is missing input."
-    return None
-
-
 def validate_run_id(value: object) -> str:
     if not isinstance(value, str) or value == "":
         raise ValueError("Runner run request body is missing run_id.")
@@ -67,6 +60,7 @@ def is_supported_workflow(workflow: str) -> bool:
 
 
 __all__ = [
+    "MAX_STATUS_QUERY_RUN_IDS",
     "RUNNER_EXECUTION_FAILED",
     "RUNNER_REQUEST_INVALID",
     "RUNNER_RESPONSE_INVALID",
@@ -79,5 +73,4 @@ __all__ = [
     "build_runner_error",
     "is_supported_workflow",
     "validate_run_id",
-    "validate_run_request_body",
 ]

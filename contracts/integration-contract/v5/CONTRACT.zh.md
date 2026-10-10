@@ -6,7 +6,7 @@
 
 代表性的 JSON 测试样例位于 [`fixtures`](fixtures)。Python 和 TypeScript 契约测试都会读取这些测试样例。
 
-本文定义通过 runner HTTP API 提交任务时使用的 workflow `input`，以及任务完成后返回的 `result`。HTTP API 见 [Runner HTTP API](../RUNNER_HTTP_API.zh.md)。
+本文定义通过 runner HTTP API 提交任务时使用的 workflow `input`，以及任务完成后返回的 `result`。HTTP API 见 [runner 的 OpenAPI 文档](../openapi.json)。
 
 v5 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的运行细节：
 
@@ -15,7 +15,7 @@ v5 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的
 
 ## 1. Workflow 输入
 
-本节定义 HTTP create-run request body 中的 workflow `input` 对象。`run_id`、`runtime` 等 HTTP envelope 字段由 [Runner HTTP API](../RUNNER_HTTP_API.zh.md) 定义。
+本节定义 HTTP create-run request body 中的 workflow `input` 对象。`run_id`、`runtime` 等 HTTP envelope 字段由 [runner 的 OpenAPI 文档](../openapi.json) 定义。
 
 所有 workflow input 都包含：
 

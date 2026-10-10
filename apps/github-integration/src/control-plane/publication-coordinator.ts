@@ -10,7 +10,6 @@ import { logError, logInfo, logWarn } from '../utils/logger.js'
 import { classifyPublicationFailure } from './publication-failure.js'
 import { isPublicationClaimLostError, PublicationClaimLostError } from './publication-claim.js'
 import { controlPlaneClient, type ControlPlaneClient, type PublicationWork } from './client.js'
-import type { RunnerRunStatus } from '../runner/client.js'
 
 export interface PublicationCoordinator {
   stop: () => Promise<void>
@@ -55,16 +54,9 @@ async function publishWork(
   work: PublicationWork,
   assertOwned: () => Promise<void>
 ): Promise<void> {
-  const status: RunnerRunStatus = {
-    run_id: work.run_id,
-    workflow: work.workflow,
-    status: 'succeeded',
-    result: work.workflow_result,
-    ...(work.artifact_storage === null ? {} : { artifact_storage: work.artifact_storage })
-  }
   const common = {
     run: work,
-    status,
+    result: work.workflow_result,
     store,
     claim_token: work.claim_token,
     assert_publication_claim: assertOwned,
@@ -139,7 +131,11 @@ export async function publishReviewRunsOnce({
   app: App
   store?: ControlPlaneClient
 }): Promise<void> {
-  const work = await store.claimNextPublication()
+  // Hold the claim briefly rather than returning immediately: a run that becomes
+  // publishable mid-interval is picked up as soon as it does, and the poll timer above
+  // stays as the backstop. The wait stays comfortably inside the client's request
+  // timeout.
+  const work = await store.claimNextPublication(Math.min(pollIntervalMs(), 10_000))
   if (work === null) return
   try {
     const ownsClaim = await withPublicationHeartbeat(

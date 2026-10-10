@@ -11,15 +11,6 @@ export type PublishContextValidator = (
   workflow: WorkflowName,
   context: JsonObject
 ) => PublishContext
-export type ReviewRunStatus =
-  | 'preparing'
-  | 'recovering'
-  | 'queued'
-  | 'running'
-  | 'succeeded'
-  | 'publishing'
-  | 'published'
-  | 'failed'
 export type RunnerStatus =
   'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
 export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
@@ -38,7 +29,6 @@ export interface ReviewRunAdmission {
   preparation_token: string | null
 }
 export interface ReviewRunRecord extends CreateReviewRunArgs {
-  status: ReviewRunStatus
   runner_status: RunnerStatus
   publication_status: PublicationStatus
   created_at: string
@@ -86,6 +76,10 @@ interface ReviewRunRow {
 
 const MAX_PUBLICATION_STEP_FAILURES = 3
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
+/** How often a waiting publication claim re-checks for work. The state is a local indexed
+ * query, so this trades a cheap read against how quickly the caller starts publishing. */
+const CLAIM_WAIT_INTERVAL_MS = 250
+
 const RUN_SELECT = `
   SELECT r.run_id, r.workflow, r.publish_context, r.runner_input, r.runner_status,
     r.runner_failure_code, r.runner_failure_message, r.artifact_storage, r.workflow_result,
@@ -100,20 +94,13 @@ const RUN_SELECT = `
 function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 }
-function statusOf(row: ReviewRunRow): ReviewRunStatus {
-  return row.publication_status === 'pending' || row.publication_status === 'skipped'
-    ? row.runner_status
-    : row.publication_status
-}
 function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
-  const status = statusOf(row)
   const publicationFailure = row.publication_status === 'failed'
   return {
     run_id: row.run_id,
     workflow: row.workflow,
     publish_context: row.publish_context,
     ...(row.runner_input === null ? {} : { runner_input: row.runner_input }),
-    status,
     runner_status: row.runner_status,
     publication_status: row.publication_status,
     created_at: iso(row.created_at),
@@ -652,7 +639,28 @@ export class ReviewRunStore {
     )
     return result.rows[0]?.claim_token ?? null
   }
-  async claimNextPublication(): Promise<PublicationWork | null> {
+  /**
+   * Claim the next publishable run, optionally holding the request until one appears.
+   *
+   * The wait lives here because the state it looks for is in this database: a re-check
+   * costs one indexed query per tick for the single caller that waits. Waiting on a
+   * remote service is a different trade, since there each re-check is a round trip per
+   * watched item — which is why the Runner status query deliberately offers no such
+   * option.
+   */
+  async claimNextPublication(waitMs = 0): Promise<PublicationWork | null> {
+    // The RPC boundary passes untyped arguments, so treat anything unusable as "no wait"
+    // rather than trusting the declared type.
+    const boundedWaitMs = Number.isFinite(waitMs) && waitMs > 0 ? Math.min(waitMs, 30_000) : 0
+    const deadline = Date.now() + boundedWaitMs
+    for (;;) {
+      const work = await this.claimNextPublicationOnce()
+      if (work !== null || Date.now() >= deadline) return work
+      await new Promise((resolve) => setTimeout(resolve, CLAIM_WAIT_INTERVAL_MS))
+    }
+  }
+
+  private async claimNextPublicationOnce(): Promise<PublicationWork | null> {
     return await transaction(this.pool, async (client) => {
       const candidate = await client.query<{ run_id: string }>(
         `

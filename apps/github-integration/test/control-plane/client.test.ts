@@ -7,7 +7,7 @@ const preparingRun: ReviewRunRecord = {
   run_id: 'run-1',
   workflow: 'repository-review',
   publish_context: {},
-  status: 'preparing',
+  runner_status: 'preparing',
   created_at: '2026-10-07T00:00:00.000Z',
   published_at: null,
   failure_code: null,
@@ -71,7 +71,7 @@ test('repository preparation can replace the admitted empty publish context', as
     ingress_kind: 'github_actions_dispatch',
     ingress_key: 'octo/example:dispatch-1'
   })
-  assert.equal(admission.record.status, 'preparing')
+  assert.equal(admission.record.runner_status, 'preparing')
 
   await controlPlaneClient.submit_prepared_run(
     'run-1',
@@ -163,6 +163,7 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
     controlPlaneClient.claimNextPublication(),
     /Persisted publish context is invalid/
   )
+  assert.deepEqual(requests[0]?.args, [0])
   assert.equal(requests[1]?.operation, 'failPublication')
   assert.deepEqual(requests[1]?.args.slice(0, 2), ['run-1', 'claim-1'])
   assert.deepEqual(requests[1]?.args.at(-1), { retry: false })

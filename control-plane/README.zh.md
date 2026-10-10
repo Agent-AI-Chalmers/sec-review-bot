@@ -2,6 +2,8 @@
 
 [English](README.md) | 中文
 
+本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 Control Plane 为每个已接纳的 review 提供稳定身份和持久化协调状态。它位于 GitHub integration 与 Runner 之间，使 input 准备、Runner 提交、执行观察、故障恢复和 GitHub 发布能够跨进程重启和不确定的网络结果继续进行。
 
 ## 在系统中的位置
@@ -99,7 +101,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 只读响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
-只读响应报告两个状态轴（`execution_status`、`publication_status`），而不是扁平的 `ReviewRunStatus`，筛选参数同名；`schema/observed-run.schema.json` 是它们的契约。扁平状态只出现在通过 `POST /v1/store` 交换的记录上。
+只读响应报告两个状态轴（`execution_status`、`publication_status`），而不是扁平的 `ReviewRunStatus`，筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。扁平状态只出现在通过 `POST /v1/store` 交换的记录上。
 
 ## 配置
 

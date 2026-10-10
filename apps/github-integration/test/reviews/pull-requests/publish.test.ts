@@ -119,14 +119,9 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
         event_type: 'manual_review'
       }
     },
-    status: {
-      run_id: 'run-1',
-      workflow: 'pull-request-review',
-      status: 'succeeded',
-      result: {
-        contract_version: 'v5',
-        review_record: review_record()
-      }
+    result: {
+      contract_version: 'v5',
+      review_record: review_record()
     },
     store: store as never,
     claim_token: 'test-claim',
@@ -196,31 +191,26 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
         event_type: 'manual_review'
       }
     },
-    status: {
-      run_id: 'run-plausible',
-      workflow: 'pull-request-review',
-      status: 'succeeded',
-      result: {
-        contract_version: 'v5',
-        review_record: review_record({
-          analysis: {
-            verdict: 'plausible-risk',
-            overview: 'The trust boundary requires manual review.',
-            narratives: []
-          },
-          verification: {
-            overview: 'Exploitability is not confirmed.',
-            review_target_claim: null,
-            validation_level: 'static',
-            patch_coverage: 'no-patch',
-            regression_status: 'not-applicable',
-            resolution_next_step: 'manual-review',
-            patch_findings: [],
-            verification_findings: [],
-            residual_risks: ['Review the deployment trust boundary.']
-          }
-        })
-      }
+    result: {
+      contract_version: 'v5',
+      review_record: review_record({
+        analysis: {
+          verdict: 'plausible-risk',
+          overview: 'The trust boundary requires manual review.',
+          narratives: []
+        },
+        verification: {
+          overview: 'Exploitability is not confirmed.',
+          review_target_claim: null,
+          validation_level: 'static',
+          patch_coverage: 'no-patch',
+          regression_status: 'not-applicable',
+          resolution_next_step: 'manual-review',
+          patch_findings: [],
+          verification_findings: [],
+          residual_risks: ['Review the deployment trust boundary.']
+        }
+      })
     },
     store: stepStore as never,
     claim_token: 'test-claim',
@@ -268,37 +258,32 @@ test('pull request publish approves when analysis is not confirmed', async () =>
         event_type: 'manual_review'
       }
     },
-    status: {
-      run_id: 'run-1',
-      workflow: 'pull-request-review',
-      status: 'succeeded',
-      result: {
-        contract_version: 'v5',
-        review_record: review_record({
-          analysis: {
-            verdict: 'no-actionable-finding',
-            overview: 'No actionable security issue remains in this PR.',
-            narratives: []
-          },
-          mitigation: {
-            overview: null,
-            changed_files: [],
-            file_changes: [],
-            patch_diff: null
-          },
-          verification: {
-            overview: null,
-            review_target_claim: null,
-            validation_level: null,
-            patch_coverage: 'not-applicable',
-            regression_status: 'not-applicable',
-            resolution_next_step: null,
-            patch_findings: [],
-            verification_findings: [],
-            residual_risks: []
-          }
-        })
-      }
+    result: {
+      contract_version: 'v5',
+      review_record: review_record({
+        analysis: {
+          verdict: 'no-actionable-finding',
+          overview: 'No actionable security issue remains in this PR.',
+          narratives: []
+        },
+        mitigation: {
+          overview: null,
+          changed_files: [],
+          file_changes: [],
+          patch_diff: null
+        },
+        verification: {
+          overview: null,
+          review_target_claim: null,
+          validation_level: null,
+          patch_coverage: 'not-applicable',
+          regression_status: 'not-applicable',
+          resolution_next_step: null,
+          patch_findings: [],
+          verification_findings: [],
+          residual_risks: []
+        }
+      })
     },
     store: stepStore as never,
     claim_token: 'test-claim',
@@ -342,20 +327,15 @@ test('pull request publish comments instead of approving a PR authored by the ap
           event_type: 'manual_review'
         }
       },
-      status: {
-        run_id: 'run-1',
-        workflow: 'pull-request-review',
-        status: 'succeeded',
-        result: {
-          contract_version: 'v5',
-          review_record: review_record({
-            analysis: {
-              verdict: 'no-actionable-finding',
-              overview: 'No actionable security issue remains in this PR.',
-              narratives: []
-            }
-          })
-        }
+      result: {
+        contract_version: 'v5',
+        review_record: review_record({
+          analysis: {
+            verdict: 'no-actionable-finding',
+            overview: 'No actionable security issue remains in this PR.',
+            narratives: []
+          }
+        })
       },
       store: stepStore as never,
       claim_token: 'test-claim',
@@ -413,20 +393,15 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
         event_type: 'manual_review'
       }
     },
-    status: {
-      run_id: 'run-1',
-      workflow: 'pull-request-review',
-      status: 'succeeded',
-      result: {
-        contract_version: 'v5',
-        review_record: review_record({
-          analysis: {
-            verdict: 'no-actionable-finding',
-            overview: 'No actionable security issue remains in this PR.',
-            narratives: []
-          }
-        })
-      }
+    result: {
+      contract_version: 'v5',
+      review_record: review_record({
+        analysis: {
+          verdict: 'no-actionable-finding',
+          overview: 'No actionable security issue remains in this PR.',
+          narratives: []
+        }
+      })
     },
     store: stepStore as never,
     claim_token: 'test-claim',
@@ -482,20 +457,15 @@ test('pull request publish falls back to comment when own PR approval error is i
         event_type: 'manual_review'
       }
     },
-    status: {
-      run_id: 'run-1',
-      workflow: 'pull-request-review',
-      status: 'succeeded',
-      result: {
-        contract_version: 'v5',
-        review_record: review_record({
-          analysis: {
-            verdict: 'no-actionable-finding',
-            overview: 'No actionable security issue remains in this PR.',
-            narratives: []
-          }
-        })
-      }
+    result: {
+      contract_version: 'v5',
+      review_record: review_record({
+        analysis: {
+          verdict: 'no-actionable-finding',
+          overview: 'No actionable security issue remains in this PR.',
+          narratives: []
+        }
+      })
     },
     store: stepStore as never,
     claim_token: 'test-claim',
@@ -543,40 +513,35 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
         event_type: 'manual_review'
       }
     },
-    status: {
-      run_id: 'run-1',
-      workflow: 'pull-request-review',
-      status: 'succeeded',
-      result: {
-        contract_version: 'v5',
-        review_record: review_record({
-          mitigation: {
-            overview: 'Remove the unsafe default.',
-            changed_files: ['src/server.js'],
-            file_changes: [],
-            patch_diff: [
-              'diff --git a/src/server.js b/src/server.js',
-              'index 1111111..2222222 100644',
-              '--- a/src/server.js',
-              '+++ b/src/server.js',
-              '@@ -1 +1 @@',
-              "-const token = 'debug'",
-              '+const token = process.env.TOKEN'
-            ].join('\n')
-          },
-          verification: {
-            overview: 'The reviewed PR is safe.',
-            review_target_claim: null,
-            validation_level: 'static',
-            patch_coverage: 'full',
-            regression_status: 'not-run',
-            resolution_next_step: 'none',
-            patch_findings: [],
-            verification_findings: [],
-            residual_risks: []
-          }
-        })
-      }
+    result: {
+      contract_version: 'v5',
+      review_record: review_record({
+        mitigation: {
+          overview: 'Remove the unsafe default.',
+          changed_files: ['src/server.js'],
+          file_changes: [],
+          patch_diff: [
+            'diff --git a/src/server.js b/src/server.js',
+            'index 1111111..2222222 100644',
+            '--- a/src/server.js',
+            '+++ b/src/server.js',
+            '@@ -1 +1 @@',
+            "-const token = 'debug'",
+            '+const token = process.env.TOKEN'
+          ].join('\n')
+        },
+        verification: {
+          overview: 'The reviewed PR is safe.',
+          review_target_claim: null,
+          validation_level: 'static',
+          patch_coverage: 'full',
+          regression_status: 'not-run',
+          resolution_next_step: 'none',
+          patch_findings: [],
+          verification_findings: [],
+          residual_risks: []
+        }
+      })
     },
     store: stepStore as never,
     claim_token: 'test-claim',
@@ -613,29 +578,24 @@ test('pull request publish does not create a fallback review after an uncertain 
           event_type: 'manual_review'
         }
       },
-      status: {
-        run_id: 'run-uncertain',
-        workflow: 'pull-request-review',
-        status: 'succeeded',
-        result: {
-          contract_version: 'v5',
-          review_record: review_record({
-            mitigation: {
-              overview: 'Remove the unsafe default.',
-              changed_files: ['src/server.js'],
-              file_changes: [],
-              patch_diff: [
-                'diff --git a/src/server.js b/src/server.js',
-                'index 1111111..2222222 100644',
-                '--- a/src/server.js',
-                '+++ b/src/server.js',
-                '@@ -1 +1 @@',
-                "-const token = 'debug'",
-                '+const token = process.env.TOKEN'
-              ].join('\n')
-            }
-          })
-        }
+      result: {
+        contract_version: 'v5',
+        review_record: review_record({
+          mitigation: {
+            overview: 'Remove the unsafe default.',
+            changed_files: ['src/server.js'],
+            file_changes: [],
+            patch_diff: [
+              'diff --git a/src/server.js b/src/server.js',
+              'index 1111111..2222222 100644',
+              '--- a/src/server.js',
+              '+++ b/src/server.js',
+              '@@ -1 +1 @@',
+              "-const token = 'debug'",
+              '+const token = process.env.TOKEN'
+            ].join('\n')
+          }
+        })
       },
       store: stepStore as never,
       claim_token: 'test-claim',

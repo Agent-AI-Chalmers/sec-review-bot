@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
 
-import { ReviewRunStore } from '../../src/index.js'
+import { ReviewRunStore, type RunnerArtifactStorage } from '../../src/index.js'
 
 const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
@@ -90,8 +90,8 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
   const store = await createStore()
   try {
     const queuedId = await createQueuedRun(store)
-    const artifactStorage = {
-      status: 'available' as const,
+    const artifactStorage: RunnerArtifactStorage = {
+      status: 'available',
       artifact: {
         kind: 'diagnostic_bundle',
         uri: `s3://sec-review/runs/${queuedId}/artifacts/diagnostic-tree.v1.tar.zst`,
@@ -107,7 +107,7 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
       publish_context: {}
     })
     const queued = await store.getRun(queuedId)
-    assert.equal(queued?.status, 'queued')
+    assert.equal(queued?.runner_status, 'queued')
     assert.deepEqual(queued?.artifact_storage, artifactStorage)
     assert.deepEqual(
       (await store.listActiveRuns()).map((run) => run.run_id),
@@ -130,7 +130,7 @@ test('ReviewRunStore terminates preparation after its claim expires', async () =
 
     assert.equal(await store.expireStalePreparations(), 1)
     const run = await store.getRun(runId)
-    assert.equal(run?.status, 'failed')
+    assert.equal(run?.runner_status, 'failed')
     assert.equal(run?.failure_code, 'PREPARATION_INTERRUPTED')
     assert.equal(await store.claimPublication(runId), null)
     assert.equal(await store.expireStalePreparations(), 0)
@@ -195,7 +195,7 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
     })
 
     const failed = await store.getRun(runId)
-    assert.equal(failed?.status, 'failed')
+    assert.equal(failed?.runner_status, 'failed')
     assert.equal(failed?.ingress_kind, 'github_webhook')
     assert.equal(failed?.ingress_key, ingressKey)
     assert.equal(failed?.failure_code, 'REVIEW_START_FAILED')
@@ -259,7 +259,7 @@ test('ReviewRunStore initialization does not steal another replica preparation',
   const restarted = await createStore({ connectorId: sharedConnector })
   try {
     const record = await restarted.getRun(runId)
-    assert.equal(record?.status, 'preparing')
+    assert.equal(record?.runner_status, 'preparing')
     assert.equal(record?.failure_code, null)
   } finally {
     await restarted.close()
@@ -321,7 +321,7 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
       /claim was lost/
     )
     await ownerB.mark_queued(takeover.record.run_id, takeover.preparation_token, {})
-    assert.equal((await ownerA.getRun(first.record.run_id))?.status, 'queued')
+    assert.equal((await ownerA.getRun(first.record.run_id))?.runner_status, 'queued')
   } finally {
     await Promise.all([ownerA.close(), ownerB.close()])
   }
@@ -354,7 +354,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
     assert.notEqual(staleToken, currentToken)
     assert.equal(await store.completeSubmissionRecovery(runId, staleToken), false)
     assert.equal(await store.completeSubmissionRecovery(runId, currentToken), true)
-    assert.equal((await store.getRun(runId))?.status, 'queued')
+    assert.equal((await store.getRun(runId))?.runner_status, 'queued')
     assert.equal(
       (await store.listActiveRuns()).some((run) => run.run_id === runId),
       true
@@ -382,7 +382,7 @@ test('ReviewRunStore fences a stale publisher after another connection takes ove
     )
     assert.equal(await ownerB.completePublication(runId, currentToken), true)
     const record = await ownerA.getRun(runId)
-    assert.equal(record?.status, 'published')
+    assert.equal(record?.publication_status, 'published')
   } finally {
     await Promise.all([ownerA.close(), ownerB.close()])
   }
@@ -398,7 +398,7 @@ test('ReviewRunStore does not publish while a required step is incomplete', asyn
     const [step] = await store.listPublicationSteps(runId)
     assert.equal(step?.failure_count, 0)
     assert.equal(await store.completePublication(runId, token), false)
-    assert.equal((await store.getRun(runId))?.status, 'publishing')
+    assert.equal((await store.getRun(runId))?.publication_status, 'publishing')
   } finally {
     await store.close()
   }
@@ -420,7 +420,7 @@ test('ReviewRunStore spends retry budget only for the current publication owner'
       true
     )
     const record = await store.getRun(runId)
-    assert.equal(record?.status, 'succeeded')
+    assert.equal(record?.runner_status, 'succeeded')
     assert.deepEqual(await store.listActiveRuns(), [])
   } finally {
     await store.close()
@@ -510,7 +510,7 @@ test('ReviewRunStore records Runner execution failure without publication failur
       true
     )
     const record = await store.getRun(runId)
-    assert.equal(record?.status, 'failed')
+    assert.equal(record?.runner_status, 'failed')
     assert.equal(record?.failure_code, 'RUNNER_EXECUTION_FAILED')
     assert.equal(await store.claimPublication(runId), null)
   } finally {

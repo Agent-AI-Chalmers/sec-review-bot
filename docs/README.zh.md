@@ -2,6 +2,8 @@
 
 语言：[English](README.md) | 中文
 
+本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 这里是 `sec-review-bot` 的项目文档入口，包含 agent 设计说明、public contracts、workflow 设计说明和本地运行指南。
 
 如果想先看项目概览，从仓库根目录的 [README](../README.zh.md) 开始。
@@ -21,30 +23,21 @@
 
 ### contracts/
 
-```mermaid
-flowchart LR
-  subgraph app[Caller / Integration side]
-    caller[Caller / Integration]
-  end
-  subgraph agent[Agent side]
-    create["POST /v1/workflows/workflow/runs"]
-    status["GET /v1/runs/run_id"]
-    workflow[Agent workflow execution]
-    state["Run state and result (Temporal workflow state)"]
-  end
-  caller --> create
-  caller --> status
-  create --> workflow
-  workflow --> state
-  status --> state
-```
+`contracts/` 记录的是那些**彼此看不到对方类型**的组件之间的接口：App 侧、Control Plane、Agent 侧。每个族各留一份规范、JSON Schema 和 fixtures，并在两侧各放一组测试；形状一旦漂移，两边都会挂掉。执行得比这少的族，会写明自己没覆盖什么。
 
-App 侧和 agent 侧之间的契约，看这里：
+一个族对应一条边界：
 
-- [Contracts README](../contracts/README.md) / [中文](../contracts/README.zh.md)：契约目录索引、它的布局规则，以及每个族都要遵守的规则。
-- [integration-contract/README.md](../contracts/integration-contract/README.md) / [中文](../contracts/integration-contract/README.zh.md)：面向 Runner 的集成点、它的公开边界与归属。
-- [RUNNER_HTTP_API.md](../contracts/integration-contract/RUNNER_HTTP_API.md) / [中文](../contracts/integration-contract/RUNNER_HTTP_API.zh.md)：Agent Runner HTTP API。
-- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md) / [中文](../contracts/integration-contract/v5/CONTRACT.zh.md)：workflow 输入和结果契约。
+| 族 | 边界 | 两侧 |
+| --- | --- | --- |
+| [integration-contract](../contracts/integration-contract/README.zh.md) | Runner 的 HTTP 面，以及 workflow 的 `input` / `result` 数据 | Runner 与它的调用方 |
+| [control-plane-api](../contracts/control-plane-api/README.zh.md) | 控制台读取的运行形状，以及集成方经 `POST /v1/store` 交换的协调记录 | Control Plane 与它的调用方 |
+
+先读 [Contracts README](../contracts/README.zh.md)：它定义了族目录的布局、命名规则、schema 该拥有什么，以及 fixtures 如何参与校验。各族 README 再分别说明消费者可以依赖什么、哪一侧归谁、以及哪些是刻意不做成 schema 的。
+
+- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md) / [中文](../contracts/integration-contract/v5/CONTRACT.zh.md)：workflow 数据契约。
+- [integration-contract/openapi.json](../contracts/integration-contract/openapi.json)：Agent Runner HTTP API，由服务代码生成。
+- [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json)：控制台读取返回的脱敏运行形状。
+- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json)：经 `POST /v1/store` 交换的记录。
 
 ### workflows/
 
@@ -55,11 +48,11 @@ App 侧和 agent 侧之间的契约，看这里：
 - [CONCURRENCY_MODEL.md](workflows/CONCURRENCY_MODEL.md) / [中文](workflows/CONCURRENCY_MODEL.zh.md)：Workflow 并发模型。
 - [NARRATIVE_FIRST_REVIEW.md](workflows/NARRATIVE_FIRST_REVIEW.md) / [中文](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：Narrative-first analyzer 输出纪律。
 - [REVIEW_INTENT.md](workflows/REVIEW_INTENT.md) / [中文](workflows/REVIEW_INTENT.zh.md)：Review intent 和修复阶段约束。
-- [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md) / [中文](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：Bounded verifier feedback retry。
+- [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md) / [中文](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：Verifier 反馈的有界重试。
 
 #### issue-review
 
-- [INPUT_PREANALYSIS.md](workflows/issue-review/INPUT_PREANALYSIS.md) / [中文](workflows/issue-review/INPUT_PREANALYSIS.zh.md)：Issue input pre-analysis。
+- [INPUT_PREANALYSIS.md](workflows/issue-review/INPUT_PREANALYSIS.md) / [中文](workflows/issue-review/INPUT_PREANALYSIS.zh.md)：Issue input 的预分析。
 
 #### pull-request-review
 
@@ -70,9 +63,9 @@ App 侧和 agent 侧之间的契约，看这里：
 - [REPOSITORY_REVIEW_STRATEGY.md](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.md) / [中文](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.zh.md)：Repository review 策略和 delivery 边界。
 - [DISCOVERY_AGENT_DESIGN.md](workflows/repository-review/DISCOVERY_AGENT_DESIGN.md) / [中文](workflows/repository-review/DISCOVERY_AGENT_DESIGN.zh.md)：Discovery agent 的职责、文件选择、chunking 和资源边界。
 - [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md) / [中文](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.zh.md)：Incremental review 策略。
-- [TRIAGE_BOUNDARIES.md](workflows/repository-review/TRIAGE_BOUNDARIES.md) / [中文](workflows/repository-review/TRIAGE_BOUNDARIES.zh.md)：Triage boundaries。
-- [AGENT_PARTITION_WORKBENCH.md](workflows/repository-review/AGENT_PARTITION_WORKBENCH.md) / [中文](workflows/repository-review/AGENT_PARTITION_WORKBENCH.zh.md)：Agent-edited partition workbench。
-- [CVSSV4.md](workflows/repository-review/CVSSV4.md) / [中文](workflows/repository-review/CVSSV4.zh.md)：CVSS v4 scoring。
+- [TRIAGE_BOUNDARIES.md](workflows/repository-review/TRIAGE_BOUNDARIES.md) / [中文](workflows/repository-review/TRIAGE_BOUNDARIES.zh.md)：Triage 的边界。
+- [AGENT_PARTITION_WORKBENCH.md](workflows/repository-review/AGENT_PARTITION_WORKBENCH.md) / [中文](workflows/repository-review/AGENT_PARTITION_WORKBENCH.zh.md)：Agent 直接编辑的分组工作台。
+- [CVSSV4.md](workflows/repository-review/CVSSV4.md) / [中文](workflows/repository-review/CVSSV4.zh.md)：CVSS v4 评分。
 - [CONCURRENCY_AND_FAILURES.md](workflows/repository-review/CONCURRENCY_AND_FAILURES.md) / [中文](workflows/repository-review/CONCURRENCY_AND_FAILURES.zh.md)：Repository review 并发与失败边界。
 
 ### architecture/

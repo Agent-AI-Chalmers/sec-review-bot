@@ -40,14 +40,12 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
 
 ## Architecture
 
-This repository contains four runtime entities: GitHub integration, Review Control Plane, Control Plane UI, and Agent Runner. They cooperate through authenticated HTTP, `ArtifactRef`, and durable PostgreSQL state, while keeping separate responsibilities, configuration, and deployment boundaries.
+This repository contains four runtime entities: GitHub integration, Review Control Plane, Control Plane UI, and Agent Runner. They cooperate through authenticated HTTP, shared object storage, and durable PostgreSQL state, while keeping separate responsibilities, configuration, and deployment boundaries.
 
-- [`apps/github-integration/`](apps/github-integration/): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
-- [`apps/control-plane-ui/`](apps/control-plane-ui/): independently deployed, read-only web console for inspecting Control Plane runs
-- [`control-plane/`](control-plane/): independently deployed TypeScript service for review-run admission and durable coordination
-- [`agents/src/sec_review_agents`](agents/src/sec_review_agents/): Python multi-agent runner and review logic
-
-`github-integration` does not call the Runner directly. It submits and observes review runs through the Control Plane, which coordinates the HTTP Runner service and Temporal worker.
+- [`apps/github-integration/`](apps/github-integration/README.md): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
+- [`control-plane/`](control-plane/README.md): independently deployed TypeScript service for review-run admission and durable coordination
+- [`apps/control-plane-ui/`](apps/control-plane-ui/README.md): independently deployed, read-only web console for inspecting Control Plane runs
+- [`agents/`](agents/README.md): Python multi-agent runner and review logic
 
 ```mermaid
 flowchart LR
@@ -62,7 +60,7 @@ flowchart LR
   github -->|webhook or Actions request| integration
   integration -->|authenticated review request| control
   control -->|run submission and observation| agents
-  integration -->|input ArtifactRef| storage
+  integration -->|input bundle| storage
   agents -->|terminal artifact| storage
   control <-->|run and publication state| state
   ui -->|read-only query API| control
@@ -71,14 +69,14 @@ flowchart LR
 
 ## Runtime Stack
 
-- GitHub integration: TypeScript / Node.js service for GitHub App webhooks, GitHub Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing.
-- Agent execution backend: Python / FastAPI service plus Temporal worker.
-- LangChain / LangGraph: agent runtime for chat model adapters, structured output, tools, and workflow-local agent loops.
-- [Langfuse](https://langfuse.com/docs): optional tracing backend for LLM calls and agent run diagnostics. It is configured as an external service; this repository's Compose stack does not start Langfuse.
-- Temporal: durable execution layer and task queue for long-running agent runs (the RQ-style job queue role); owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
-- Docker Compose: local control-plane environment for the App, runner service, and Temporal.
-- Execution worker: host process that polls Temporal and owns Docker sandbox execution.
-- Docker sandbox: default execution backend for agent file and command tools.
+- **Languages**: [TypeScript](https://www.typescriptlang.org/) ([Node.js](https://nodejs.org/)) for the integration, Control Plane, and UI server; [Python](https://www.python.org/) 3.14 for the agent backend.
+- **Web and UI**: [FastAPI](https://fastapi.tiangolo.com/) serves the agent execution service (Runner) HTTP API; [Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) make up the read-only console.
+- **Agent runtime**: [LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/) ([deepagents](https://github.com/langchain-ai/deepagents)) for chat-model adapters, structured output, and tool calls.
+- **Durable execution**: [Temporal](https://temporal.io/) owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
+- **State and storage**: [PostgreSQL](https://www.postgresql.org/) for coordination state; S3-compatible object storage ([RustFS](https://github.com/rustfs/rustfs) locally) for input bundles and diagnostic artifacts.
+- **Observability**: [Langfuse](https://langfuse.com/) (optional, external) for LLM-call tracing and run diagnostics.
+- **Execution isolation**: [Docker](https://www.docker.com/) sandbox (default) or [bubblewrap](https://github.com/containers/bubblewrap) (bwrap, optional), used by the host execution worker.
+- **Local deployment**: [Docker Compose](https://docs.docker.com/compose/) + [systemd](https://systemd.io/).
 
 ## Project Status
 
@@ -132,16 +130,6 @@ sudo systemctl enable --now sec-review-bot.target
 ```
 
 `sec-review-bot.target` is the systemd entry point for the complete service. See the [local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) for configuration, status inspection, updates, and component-level development.
-
-Check the runner service:
-
-```bash
-RUNNER_SERVICE_TOKEN=<paste-your-token>
-curl -sS http://127.0.0.1:8000/healthz \
-  -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
-```
-
-In Compose, Control Plane UI is exposed at `127.0.0.1:8091`, Temporal Web UI at `127.0.0.1:8233`, the runner service at `127.0.0.1:8000`, Review Control Plane at `127.0.0.1:8090`, and GitHub integration at `127.0.0.1:30000`.
 
 ## Where To Start
 

@@ -1,5 +1,9 @@
 # 系统架构
 
+语言：[English](SYSTEM_ARCHITECTURE.md) | 中文
+
+本文是 [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 Sec Review Bot 包含四个运行实体，各自拥有独立的职责和部署边界：
 
 ```mermaid

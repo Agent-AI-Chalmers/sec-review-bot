@@ -40,14 +40,12 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 
 ## 架构
 
-这个仓库包含四个运行实体：GitHub integration、Review Control Plane、Control Plane UI 和 Agent Runner。它们通过受认证的 HTTP、`ArtifactRef` 和持久化 PostgreSQL 状态协作，同时保持各自独立的职责、配置和部署边界。
+这个仓库包含四个运行实体：GitHub integration、Review Control Plane、Control Plane UI 和 Agent Runner。它们通过受认证的 HTTP、共享对象存储和持久化 PostgreSQL 状态协作，同时保持各自独立的职责、配置和部署边界。
 
-- [`apps/github-integration/`](apps/github-integration/)：TS 编写，GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
+- [`apps/github-integration/`](apps/github-integration/README.zh.md)：TypeScript 编写的 GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
 - [`control-plane/`](control-plane/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
-- [`apps/control-plane-ui/`](apps/control-plane-ui/)：独立部署、只读的 Control Plane 运维界面
-- [`agents/src/sec_review_agents`](agents/src/sec_review_agents/)：Python 编写，multi-agent runner 和审查逻辑
-
-`github-integration` 不直接调用 agents 代码，也不直接协调 Runner；它通过 Control Plane 提交和观察 review run，由 Control Plane 协调 HTTP Runner service 和 Temporal worker。
+- [`apps/control-plane-ui/`](apps/control-plane-ui/README.zh.md)：独立部署、只读的 Control Plane 运维界面
+- [`agents/`](agents/README.zh.md)：Python 编写的 multi-agent runner 和审查逻辑
 
 ```mermaid
 flowchart LR
@@ -62,7 +60,7 @@ flowchart LR
   github -->|webhook 或 Actions 请求| integration
   integration -->|受认证的 review 请求| control
   control -->|提交并观察 run| agents
-  integration -->|input ArtifactRef| storage
+  integration -->|input bundle| storage
   agents -->|终态 artifact| storage
   control <-->|run 和 publication 状态| state
   ui -->|只读查询 API| control
@@ -71,14 +69,14 @@ flowchart LR
 
 ## 运行技术栈
 
-- GitHub integration：TypeScript / Node.js service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布。
-- Agent 运行后端：Python / FastAPI 服务加 Temporal worker。
-- LangChain / LangGraph：agent 运行时，负责模型适配、结构化输出、工具调用和 workflow 内部的 agent loop。
-- [Langfuse](https://langfuse.com/docs)：可选 tracing backend，用于 LLM 调用和 agent run 诊断。它按外部服务配置；本仓库的 Compose stack 不负责启动 Langfuse。
-- Temporal：长时间 agent run 的可靠执行层和任务队列（承担类似 RQ 的 job queue 角色），负责 workflow / activity 的调度、worker 分发、重试、超时和失败状态。
-- Docker Compose：App、runner service 和 Temporal 的本地控制平面环境。
-- 执行 worker：轮询 Temporal 并负责 Docker sandbox 执行的宿主机进程。
-- Docker sandbox：agent 文件和命令工具的默认执行后端。
+- **语言**：[TypeScript](https://www.typescriptlang.org/)（[Node.js](https://nodejs.org/)）用于集成、Control Plane 和 UI 服务端；[Python](https://www.python.org/) 3.14 用于 agent 后端。
+- **Web 与 UI**：[FastAPI](https://fastapi.tiangolo.com/) 提供 agent 执行服务（Runner）的 HTTP API；[Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) 构成只读控制台。
+- **Agent 运行时**：[LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/)（[deepagents](https://github.com/langchain-ai/deepagents)），负责模型适配、结构化输出和工具调用。
+- **持久执行**：[Temporal](https://temporal.io/) 负责 workflow/activity 调度、worker 分发、重试、超时和失败状态。
+- **状态与存储**：[PostgreSQL](https://www.postgresql.org/) 存协调状态；S3 兼容对象存储（本地为 [RustFS](https://github.com/rustfs/rustfs)）存输入材料包和诊断产物。
+- **可观测性**：[Langfuse](https://langfuse.com/)（可选、外部），用于 LLM 调用追踪和 run 诊断。
+- **执行隔离**：[Docker](https://www.docker.com/) sandbox（默认）或 [bubblewrap](https://github.com/containers/bubblewrap)（bwrap，可选），由宿主机执行 worker 使用。
+- **本地部署**：[Docker Compose](https://docs.docker.com/compose/) + [systemd](https://systemd.io/)。
 
 ## 项目状态
 
@@ -131,16 +129,6 @@ sudo systemctl enable --now sec-review-bot.target
 ```
 
 `sec-review-bot.target` 是整套服务的 systemd 入口。配置、状态查看、更新和组件级调试见[本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
-
-验证运行服务：
-
-```bash
-RUNNER_SERVICE_TOKEN=<paste-your-token>
-curl -sS http://127.0.0.1:8000/healthz \
-  -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
-```
-
-Compose 里的 Temporal Web UI 默认暴露在 `127.0.0.1:8233`；运行服务默认暴露在 `127.0.0.1:8000`，Review Control Plane 默认暴露在 `127.0.0.1:8090`，GitHub integration 默认暴露在 `127.0.0.1:30000`。
 
 ## 从哪里开始
 

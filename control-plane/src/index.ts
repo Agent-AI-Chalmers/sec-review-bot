@@ -1,12 +1,5 @@
-export type {
-  AdmittedReviewRun,
-  ControlPlaneWorkflow,
-  InputArtifactRef,
-  RunnerArtifactStorage,
-  ReviewRunAdmissionRequest,
-  ReviewRunCoordinator
-} from './contracts.js'
-export { admitReviewRun, type ReviewRunAdmissionStore } from './admission.js'
+export { controlPlaneOperations, type ControlPlaneOperation } from './contracts.js'
+export type { ControlPlaneWorkflow, RunnerArtifactStorage } from './contracts.js'
 export { submitPreparedRun } from './prepared-submission.js'
 export {
   coordinateReviewRunsOnce,
@@ -22,8 +15,7 @@ export {
   type PublishContext,
   type PublishContextValidator,
   type ReviewRunAdmission,
-  type ReviewRunRecord,
-  type ReviewRunStatus
+  type ReviewRunRecord
 } from './review-store.js'
 export {
   recoverReviewRunSubmission,

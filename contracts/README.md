@@ -23,8 +23,15 @@ A family may also hold documents that apply to every version, such as a transpor
 
 - [integration-contract](integration-contract/README.md): the public integration point
   between the Runner and its callers. Current version: [v5](integration-contract/v5/CONTRACT.md).
+- [control-plane-api](control-plane-api/README.md): the shapes Control Plane exchanges
+  with its callers. Current version:
+  [v1](control-plane-api/README.md).
 
 ## Rules For Every Family
+
+A family is named for what it covers. If one component owns every shape in it, name it after that component — `control-plane-api` is Control Plane's own shapes. If the shapes span several parties, name it after where they meet — `integration-contract` spans the Runner, its callers, and a downstream publisher.
+
+Do not name a family after one of its consumers: consumers change, the provider does not. And do not reuse a word that another family already uses for a different meaning.
 
 The specification, its schemas, its fixtures, and the fixture manifest change together.
 

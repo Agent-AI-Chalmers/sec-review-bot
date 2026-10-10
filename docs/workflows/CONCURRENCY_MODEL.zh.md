@@ -2,6 +2,8 @@
 
 语言：[English](CONCURRENCY_MODEL.md) | 中文
 
+本文是 [CONCURRENCY_MODEL.md](CONCURRENCY_MODEL.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 本文说明系统级并发层次：run、workflow 和 activity 如何共享容量。
 repository-review 阶段内部的并发另见
 [repository-review/CONCURRENCY_AND_FAILURES.zh.md](repository-review/CONCURRENCY_AND_FAILURES.zh.md)。

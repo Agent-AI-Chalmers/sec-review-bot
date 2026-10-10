@@ -24,8 +24,13 @@ contracts/
 ## 契约族
 
 - [integration-contract](integration-contract/README.zh.md)：Runner 与其调用方之间的公开集成点。当前版本：[v5](integration-contract/v5/CONTRACT.zh.md)。
+- [control-plane-api](control-plane-api/README.zh.md)：Control Plane 与其调用方交换的形状。当前版本：[v1](control-plane-api/README.zh.md)。
 
 ## 适用于每个族的规则
+
+族名取自这个族覆盖的内容。若所有形状都属于同一个组件，就以该组件命名——`control-plane-api` 就是 Control Plane 自己的形状；若形状横跨多方，就以它们的交汇点命名——`integration-contract` 横跨 Runner、其调用方和下游发布方。
+
+不要用某个消费方命名，因为消费方会变、提供方不会；也不要复用别的族已用于其他含义的词。
 
 规范、schema、fixture 和 fixture manifest 一起变更。
 

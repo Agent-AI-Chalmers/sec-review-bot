@@ -1,16 +1,7 @@
-import type { RunnerArtifactStorage, WorkflowName } from '../runner/client.js'
+import type { RunnerArtifactStorage, WorkflowName } from '../runner/shapes.js'
 import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 
 type JsonObject = Record<string, unknown>
-export type ReviewRunStatus =
-  | 'preparing'
-  | 'recovering'
-  | 'queued'
-  | 'running'
-  | 'succeeded'
-  | 'publishing'
-  | 'published'
-  | 'failed'
 
 export interface CreateReviewRunArgs {
   run_id: string
@@ -22,7 +13,7 @@ export interface CreateReviewRunArgs {
 }
 
 export interface ReviewRunRecord extends CreateReviewRunArgs {
-  status: ReviewRunStatus
+  runner_status: string
   created_at: string
   published_at: string | null
   failure_code: string | null
@@ -134,25 +125,6 @@ class HttpControlPlaneClient {
     return await this.call<ReviewRunAdmission>('admit_review_run', run)
   }
 
-  async save_prepared_submission(
-    runId: string,
-    token: string,
-    context: PublishContext,
-    input: JsonObject
-  ): Promise<void> {
-    await this.call(
-      'save_prepared_submission',
-      runId,
-      token,
-      await this.validateContext(runId, context),
-      input
-    )
-  }
-
-  async mark_queued(runId: string, token: string, context: PublishContext): Promise<void> {
-    await this.call('mark_queued', runId, token, await this.validateContext(runId, context))
-  }
-
   async submit_prepared_run(
     runId: string,
     token: string,
@@ -188,8 +160,13 @@ class HttpControlPlaneClient {
     return await this.call('preparationHeartbeatIntervalMs')
   }
 
-  async claimNextPublication(): Promise<PublicationWork | null> {
-    const work = await this.call<PublicationWork | null>('claimNextPublication')
+  /**
+   * Claim the next publishable run, optionally asking Control Plane to hold the request
+   * until one appears. The wait is served where the state lives, so it costs Control
+   * Plane one indexed query per tick instead of a request per poll interval.
+   */
+  async claimNextPublication(waitMs = 0): Promise<PublicationWork | null> {
+    const work = await this.call<PublicationWork | null>('claimNextPublication', waitMs)
     if (work === null) return null
     try {
       return {
@@ -281,8 +258,6 @@ export type ControlPlaneClient = Pick<
   HttpControlPlaneClient,
   | 'connector_id'
   | 'admit_review_run'
-  | 'save_prepared_submission'
-  | 'mark_queued'
   | 'submit_prepared_run'
   | 'getRun'
   | 'renewPreparationClaim'

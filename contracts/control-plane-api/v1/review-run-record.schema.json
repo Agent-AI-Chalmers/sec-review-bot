@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.local/contracts/control-plane-api/v1/review-run-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "workflow",
+    "publish_context",
+    "runner_status",
+    "publication_status",
+    "created_at",
+    "execution_updated_at",
+    "publication_updated_at",
+    "published_at",
+    "failure_code",
+    "failure_message",
+    "artifact_storage"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow": {
+      "enum": [
+        "issue-review",
+        "pull-request-review",
+        "repository-review"
+      ]
+    },
+    "publish_context": {
+      "type": "object"
+    },
+    "runner_input": {
+      "type": "object"
+    },
+    "ingress_kind": {
+      "enum": [
+        "github_webhook",
+        "github_actions_dispatch"
+      ]
+    },
+    "ingress_key": {
+      "type": "string"
+    },
+    "runner_status": {
+      "enum": [
+        "preparing",
+        "recovering",
+        "queued",
+        "running",
+        "succeeded",
+        "failed"
+      ]
+    },
+    "publication_status": {
+      "enum": [
+        "pending",
+        "publishing",
+        "published",
+        "failed",
+        "skipped"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "execution_updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publication_updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "published_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "failure_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "failure_message": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "artifact_storage": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "available",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "artifact": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "uri",
+                "media_type",
+                "digest",
+                "size_bytes"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uri": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "media_type": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "digest": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "size_bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "error_code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

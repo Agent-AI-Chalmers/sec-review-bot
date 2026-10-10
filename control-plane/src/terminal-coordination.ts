@@ -10,7 +10,7 @@ export interface RunnerObservationEvent {
   kind: 'runner_poll_retry' | 'runner_state_changed' | 'runner_terminal_recorded'
   run_id: string
   workflow: ReviewRunRecord['workflow']
-  from: ReviewRunRecord['status']
+  from: ReviewRunRecord['runner_status']
   to: RunnerObservationResult
   error_code?: string
 }
@@ -40,7 +40,7 @@ export async function observeRunnerRun(
         kind: 'runner_poll_retry',
         run_id: run.run_id,
         workflow: run.workflow,
-        from: run.status,
+        from: run.runner_status,
         to: 'poll_retry'
       })
       return 'poll_retry'
@@ -50,7 +50,7 @@ export async function observeRunnerRun(
       kind: 'runner_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
-      from: run.status,
+      from: run.runner_status,
       to: 'failed',
       error_code: errorInfo(error).code
     })
@@ -62,7 +62,7 @@ export async function observeRunnerRun(
       kind: 'runner_state_changed',
       run_id: run.run_id,
       workflow: run.workflow,
-      from: run.status,
+      from: run.runner_status,
       to: 'active'
     })
     return 'active'
@@ -87,7 +87,7 @@ export async function observeRunnerRun(
       kind: 'runner_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
-      from: run.status,
+      from: run.runner_status,
       to: 'failed',
       error_code: status.error?.code ?? 'RUNNER_EXECUTION_FAILED'
     })
@@ -102,7 +102,7 @@ export async function observeRunnerRun(
       kind: 'runner_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
-      from: run.status,
+      from: run.runner_status,
       to: 'failed',
       error_code: 'RUNNER_RESULT_MISSING'
     })
@@ -115,7 +115,7 @@ export async function observeRunnerRun(
     kind: 'runner_terminal_recorded',
     run_id: run.run_id,
     workflow: run.workflow,
-    from: run.status,
+    from: run.runner_status,
     to: 'succeeded'
   })
   return 'succeeded'
