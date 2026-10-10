@@ -27,7 +27,6 @@ Consumers can rely on:
 The following are not part of this contract:
 
 - internal store records, such as the row shape exchanged over `POST /v1/store`;
-- the flattened status, which appears only on those store records;
 - anything the console derives for display, such as relative times or phase durations.
 
 ## What Is Not Schematized

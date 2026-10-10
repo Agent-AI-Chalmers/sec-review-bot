@@ -75,8 +75,6 @@ flowchart LR
   publishing -.->|initializes side effects| steppending
 ```
 
-`ReviewRunStatus` is a read projection rather than a database column. It shows Runner status while publication is `pending` or `skipped`, then shows `publishing`, `published`, or publication `failed`. Publication-step status is queried separately.
-
 `publication_steps.failure_count` records failed executions only. A successful execution does not increment it; a failed step becomes `terminal_failed` after reaching the configured failure limit.
 
 ## Claims and recovery
@@ -99,7 +97,7 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
-Read responses report the two status axes (`execution_status`, `publication_status`) rather than the flattened `ReviewRunStatus`, and filter on the same names; [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is their contract. The flattened status appears only on the records exchanged over `POST /v1/store`.
+Read responses report the two status axes (`execution_status`, `publication_status`), and filter on the same names; [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is their contract.
 
 ## Configuration
 

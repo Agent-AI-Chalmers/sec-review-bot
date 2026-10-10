@@ -29,7 +29,6 @@ Control Plane 通过 `observeRun()` 产出每个 observed run，通过 `rowToRec
 以下不属于本契约：
 
 - 内部存储记录，例如经 `POST /v1/store` 交换的行形状；
-- 扁平状态，它只出现在那些存储记录上；
 - 控制台为展示而派生的任何内容，例如相对时间或各阶段耗时。
 
 ## 没有 schema 的部分

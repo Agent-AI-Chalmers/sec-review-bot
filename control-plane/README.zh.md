@@ -77,8 +77,6 @@ flowchart LR
   publishing -.->|初始化副作用| steppending
 ```
 
-`ReviewRunStatus` 是读取投影，不是数据库字段。Publication 为 `pending` 或 `skipped` 时，它显示 Runner 状态；之后显示 `publishing`、`published` 或 publication `failed`。Publication step 状态需要单独查询。
-
 `publication_steps.failure_count` 只记录失败的执行。成功执行不会增加该值；失败步骤达到配置的失败次数上限后进入 `terminal_failed`。
 
 ## Claim 和恢复
@@ -101,7 +99,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 查询响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
-查询响应报告两个状态轴（`execution_status`、`publication_status`），而不是扁平的 `ReviewRunStatus`，筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。扁平状态只出现在通过 `POST /v1/store` 交换的记录上。
+查询响应报告两个状态轴（`execution_status`、`publication_status`），筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。
 
 ## 配置
 
