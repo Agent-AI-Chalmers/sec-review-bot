@@ -362,9 +362,37 @@ export type RunnerRunStatusToken = components['schemas']['RunStatusToken']
  * means re-reading every listed workflow on a timer, which costs far more reads than the
  * polling it replaced. A wait belongs where the state lives, not in this layer.
  */
+/**
+ * How many run IDs one status request carries.
+ *
+ * The runner rejects a longer batch, so a caller tracking more runs than this has its
+ * request split rather than failing. The number is the contract's `maxItems` for
+ * `RunStatusQuery.run_ids`, and a test asserts the two agree: a client-side copy of a
+ * contract limit is exactly the kind of value that otherwise drifts.
+ */
+export const RUNNER_STATUS_QUERY_LIMIT = 200
+
 export async function getRunnerRunStatuses(
   runIds: readonly string[]
 ): Promise<RunnerRunStatusBatch> {
+  const runs: RunnerRunStatusToken[] = []
+  const missing: string[] = []
+  const byRunId = new Map<string, string>()
+
+  for (let start = 0; start < runIds.length; start += RUNNER_STATUS_QUERY_LIMIT) {
+    const batch = await readRunnerRunStatuses(
+      runIds.slice(start, start + RUNNER_STATUS_QUERY_LIMIT)
+    )
+    runs.push(...batch.runs)
+    missing.push(...batch.missing)
+    for (const [runId, status] of batch.byRunId) byRunId.set(runId, status)
+  }
+
+  return { runs, missing, byRunId }
+}
+
+/** One status request, within the batch size the runner accepts. */
+async function readRunnerRunStatuses(runIds: readonly string[]): Promise<RunnerRunStatusBatch> {
   const { response, body, bodyParseError } = await request('/v1/runs/status', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

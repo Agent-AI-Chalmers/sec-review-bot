@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
   getRunnerRunStatus,
+  getRunnerRunStatuses,
   isTerminalRunnerPollingError,
+  RUNNER_STATUS_QUERY_LIMIT,
   RunnerSubmissionUncertainError,
   submitRunnerRun
 } from '../src/runner-client.js'
+import { SPEC_PATH } from '../scripts/generate-runner-api-types.js'
 
 const originalFetch = globalThis.fetch
 
@@ -202,4 +206,49 @@ test('status response rejects an unknown Runner state', async () => {
     assert.equal((error as { retryable?: boolean }).retryable, false)
     return true
   })
+})
+
+test('a status query is split into batches the runner accepts', async () => {
+  // The runner rejects a longer batch, so a caller tracking more runs than the limit would
+  // otherwise fail every pass and stop observing runs altogether.
+  configureRunner()
+  const sent: string[][] = []
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String(init?.body)) as { run_ids: string[] }
+    sent.push(body.run_ids)
+    return new Response(
+      JSON.stringify({
+        runs: body.run_ids.map((runId) => ({ run_id: runId, status: 'running' })),
+        missing: []
+      }),
+      { status: 200 }
+    )
+  }
+
+  const runIds = Array.from({ length: RUNNER_STATUS_QUERY_LIMIT + 1 }, (_, index) => `run-${index}`)
+  const batch = await getRunnerRunStatuses(runIds)
+
+  assert.equal(sent.length, 2)
+  assert.equal(sent[0]?.length, RUNNER_STATUS_QUERY_LIMIT)
+  assert.equal(sent[1]?.length, 1)
+  // Split requests must still answer in the order the caller asked about runs.
+  assert.deepEqual(
+    batch.runs.map((entry) => entry.run_id),
+    runIds
+  )
+  assert.equal(batch.byRunId.get('run-0'), 'running')
+  assert.deepEqual(batch.missing, [])
+})
+
+test('the status batch size is the limit the contract publishes', () => {
+  const spec = JSON.parse(readFileSync(SPEC_PATH, 'utf8')) as {
+    components: {
+      schemas: { RunStatusQuery: { properties: { run_ids: { maxItems: number } } } }
+    }
+  }
+
+  assert.equal(
+    spec.components.schemas.RunStatusQuery.properties.run_ids.maxItems,
+    RUNNER_STATUS_QUERY_LIMIT
+  )
 })

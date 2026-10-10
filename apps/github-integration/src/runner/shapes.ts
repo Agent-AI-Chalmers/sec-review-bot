@@ -7,7 +7,13 @@ export type WorkflowName = 'issue-review' | 'pull-request-review' | 'repository-
 
 export interface RunnerArtifactStorage {
   status: 'available' | 'unavailable' | 'failed'
-  artifact?: { kind: string; uri: string; media_type: string; digest: string; size_bytes: number }
-  error_code?: string
-  message?: string
+  artifact?: {
+    kind: 'diagnostic_bundle'
+    uri: string
+    media_type: string
+    digest: string
+    size_bytes: number
+  } | null
+  error_code?: string | null
+  message?: string | null
 }

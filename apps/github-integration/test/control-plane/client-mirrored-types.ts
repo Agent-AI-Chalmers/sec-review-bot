@@ -64,8 +64,13 @@ export type PublicationWorkKeysMatch = Expect<KeysWithin<ClientWork, ControlPlan
 
 export type PublicationStepKeysMatch = Expect<SameKeys<ClientStep, ControlPlaneStep>>
 
-export type ArtifactStorageKeysMatch = Expect<
-  SameKeys<ClientArtifactStorage, ControlPlaneArtifactStorage>
+/**
+ * Compared by value rather than by key set: this shape's fields are literals
+ * (`kind` is a constant) and nullable, so a key comparison would miss a widened field.
+ * It did: the integration declared `kind: string` while the contract fixes one value.
+ */
+export type ArtifactStorageMatchesTheContract = Expect<
+  SameValues<ClientArtifactStorage, ControlPlaneArtifactStorage>
 >
 
 /** One whole call signature: its argument tuple and its return type. */

@@ -1,7 +1,7 @@
 """Define shared run IDs, workflow names, validation, and error responses."""
 
 import re
-from typing import Any, NamedTuple
+from typing import Any
 
 from sec_review_agents.entrypoints.contract_schema import INPUT_SCHEMA_BY_WORKFLOW
 
@@ -47,51 +47,6 @@ def build_runner_error(
     }
 
 
-def validate_run_request_body(body: Any) -> str | None:
-    if not isinstance(body, dict):
-        return "Runner run request body must be a JSON object."
-    try:
-        validate_run_id(body.get("run_id"))
-    except ValueError as error:
-        return str(error)
-    if not isinstance(body.get("input"), dict):
-        return "Runner run request body is missing input."
-    return None
-
-
-class StatusQuery(NamedTuple):
-    """A parsed status query: which runs to read."""
-
-    run_ids: list[str]
-
-
-def parse_status_query_body(body: Any) -> StatusQuery | str:
-    """Return the parsed status query, or a message describing why it is unusable.
-
-    Returning the message rather than raising keeps this beside validate_run_request_body,
-    which the create-run route reports the same way.
-    """
-    if not isinstance(body, dict):
-        return "Runner status query body must be a JSON object."
-    run_ids = body.get("run_ids")
-    if not isinstance(run_ids, list) or not run_ids:
-        return "Runner status query body must list at least one run_id."
-    if len(run_ids) > MAX_STATUS_QUERY_RUN_IDS:
-        return (
-            f"Runner status query accepts at most {MAX_STATUS_QUERY_RUN_IDS} run ids."
-        )
-    parsed_ids: list[str] = []
-    for value in run_ids:
-        try:
-            run_id = validate_run_id(value)
-        except ValueError as error:
-            return f"Runner status query run_ids: {error}"
-        # A repeated id would make the caller read the response positionally for no gain.
-        if run_id not in parsed_ids:
-            parsed_ids.append(run_id)
-    return StatusQuery(run_ids=parsed_ids)
-
-
 def validate_run_id(value: object) -> str:
     if not isinstance(value, str) or value == "":
         raise ValueError("Runner run request body is missing run_id.")
@@ -115,10 +70,7 @@ __all__ = [
     "RUN_ID_PATTERN",
     "RUN_ID_REQUIREMENT_MESSAGE",
     "SUPPORTED_RUNNER_WORKFLOWS",
-    "StatusQuery",
     "build_runner_error",
     "is_supported_workflow",
-    "parse_status_query_body",
     "validate_run_id",
-    "validate_run_request_body",
 ]

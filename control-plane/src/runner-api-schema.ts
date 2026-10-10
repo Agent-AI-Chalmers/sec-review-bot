@@ -158,7 +158,10 @@ export interface components {
     RunStatusToken: {
       /** Run Id */
       run_id: string
-      /** Status */
+      /**
+       * Status
+       * @description The run's status as the workflow gateway reports it.
+       */
       status: string
     }
     /**

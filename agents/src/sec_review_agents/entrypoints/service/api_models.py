@@ -114,7 +114,13 @@ class RunStatusToken(BaseModel):
     """
 
     run_id: RunId
-    status: str
+    # A plain string rather than the run-status union: this value is read straight off the
+    # gateway record, and declaring the union here would turn an unexpected status into a
+    # response-validation failure (HTTP 500) instead of a status the caller can see. The
+    # control plane validates it against its own status set when it reads the response.
+    status: str = Field(
+        description="The run's status as the workflow gateway reports it.",
+    )
 
 
 class RunStatusResponse(BaseModel):

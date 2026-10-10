@@ -188,6 +188,7 @@
             "type": "string"
           },
           "status": {
+            "description": "The run's status as the workflow gateway reports it.",
             "title": "Status",
             "type": "string"
           }

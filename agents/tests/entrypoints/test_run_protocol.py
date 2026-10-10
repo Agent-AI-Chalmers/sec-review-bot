@@ -3,12 +3,6 @@ import pytest
 from sec_review_agents.entrypoints import run_protocol
 
 
-def test_validate_run_request_body_rejects_invalid_body() -> None:
-    assert run_protocol.validate_run_request_body({}) == (
-        "Runner run request body is missing run_id."
-    )
-
-
 @pytest.mark.parametrize(
     "run_id",
     [
@@ -24,9 +18,9 @@ def test_validate_run_id_accepts_public_slug_shape(run_id: str) -> None:
 
 
 def test_validate_run_id_rejects_empty_value_as_missing() -> None:
-    assert run_protocol.validate_run_request_body({"run_id": "", "input": {}}) == (
-        "Runner run request body is missing run_id."
-    )
+    with pytest.raises(ValueError) as error:
+        run_protocol.validate_run_id("")
+    assert str(error.value) == "Runner run request body is missing run_id."
 
 
 @pytest.mark.parametrize(
@@ -45,9 +39,9 @@ def test_validate_run_id_rejects_empty_value_as_missing() -> None:
 def test_validate_run_id_rejects_path_like_or_noncanonical_values(
     run_id: str,
 ) -> None:
-    assert run_protocol.validate_run_request_body({"run_id": run_id, "input": {}}) == (
-        "Runner run_id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$."
-    )
+    with pytest.raises(ValueError) as error:
+        run_protocol.validate_run_id(run_id)
+    assert str(error.value) == run_protocol.RUN_ID_REQUIREMENT_MESSAGE
 
 
 def test_public_runner_workflow_allowlist() -> None:
