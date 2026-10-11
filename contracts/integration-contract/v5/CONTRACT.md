@@ -159,7 +159,7 @@ Repository scan scope controls cost and coverage. The runner must not guess it:
 
 - Missing or unknown `scan_mode` does not default to `full`. A full scan can scan the whole repository, so cost and latency must be explicit caller decisions.
 - `incremental` also cannot be inferred from missing configuration. The caller must provide an explicit incremental window and `scan_scope.incremental_changed_files`.
-- `scan_scope` is a required safety valve, not an optional optimization; it declares file size limits, ignored paths, and incremental changed-file scope.
+- `scan_scope` is a required safety valve, not an optional optimization; it declares ignored paths and incremental changed-file scope.
 
 ## 2. Workflow Results
 
@@ -319,6 +319,7 @@ The GitHub summary renderer can render confirmed cases that did not reach the de
 interface RepositoryDelivery {
   delivery_id: string
   case_ids: string[]
+  patch_diff: string
   file_changes: Array<
     | {
         path: string
@@ -335,7 +336,7 @@ interface RepositoryDelivery {
 }
 ```
 
-`RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry final `file_changes`; display file paths are derived from `file_changes[].path`. `case_ids` links back to case-level review details in top-level `case_results[]`.
+`RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry the generated `patch_diff` and final `file_changes`; display file paths are derived from `file_changes[].path`. `file_changes` is authoritative for applying content; `patch_diff` is the diff/reference view and must not be used to reconstruct publishable file contents. `case_ids` links back to case-level review details in top-level `case_results[]`.
 
 ### Validation Ownership
 

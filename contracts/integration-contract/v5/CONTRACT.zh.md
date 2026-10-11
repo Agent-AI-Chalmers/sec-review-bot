@@ -161,7 +161,7 @@ Repository scan scope 用来控制成本和覆盖面，不能由 runner 猜测�
 
 - 缺失或未知 `scan_mode` 不会默认成 `full`。full scan 可能扫描整个仓库，成本和耗时都是调用方必须显式承担的决定。
 - `incremental` 也不能从缺失配置中推断。调用方必须提供明确的增量窗口与 `scan_scope.incremental_changed_files`。
-- `scan_scope` 是必填安全阀，而不是可选优化项；它声明文件大小上限、忽略路径和增量 changed-file 范围。
+- `scan_scope` 是必填安全阀，而不是可选优化项；它声明忽略路径和增量 changed-file 范围。
 
 ## 2. Workflow 结果
 
@@ -321,6 +321,7 @@ GitHub summary renderer 可以从 `case_results[]` 渲染已确认但未达到 d
 interface RepositoryDelivery {
   delivery_id: string
   case_ids: string[]
+  patch_diff: string
   file_changes: Array<
     | {
         path: string
@@ -337,7 +338,7 @@ interface RepositoryDelivery {
 }
 ```
 
-调用方发布 repository delivery draft PR 时应使用 `RepositoryDelivery`。每个 delivery 必须携带最终 `file_changes`；展示文件路径从 `file_changes[].path` 派生。`case_ids` 用于关联顶层 `case_results[]` 中的 case-level review 详情。
+调用方发布 repository delivery draft PR 时应使用 `RepositoryDelivery`。每个 delivery 必须携带生成的 `patch_diff` 和最终 `file_changes`；展示文件路径从 `file_changes[].path` 派生。`file_changes` 是应用文件内容的权威表示；`patch_diff` 是 diff/reference 视图，不得用于重建可发布的文件内容。`case_ids` 用于关联顶层 `case_results[]` 中的 case-level review 详情。
 
 ### 校验责任
 
