@@ -7,6 +7,7 @@ from sec_review_agents.cli.local_previewing.shared import (
     patch_block,
     render_analysis_narratives,
     render_mitigation_preview_lines,
+    render_review_status_lines,
     render_verification_preview_lines,
 )
 from sec_review_agents.utils.markdown import (
@@ -41,61 +42,17 @@ def _analysis_lines(analysis: dict[str, Any]) -> list[str]:
     ]
 
 
-def _analysis_headline(verdict: Any) -> str:
-    return {
-        "no-actionable-finding": "no actionable security finding",
-        "confirmed-vulnerability": "confirmed security vulnerability",
-        "confirmed-defect": "confirmed security defect",
-        "plausible-risk": "plausible security risk",
-        "inconclusive": "inconclusive",
-    }.get(verdict, "unknown")
-
-
-def _mitigation_headline(verdict: Any, changed_files: list[Any]) -> str:
-    if changed_files:
-        noun = "file" if len(changed_files) == 1 else "files"
-        return f"patch proposed, {len(changed_files)} {noun} changed"
-    return "not needed" if verdict == "no-actionable-finding" else "no patch proposed"
-
-
-def _verification_headline(validation_level: Any) -> str:
-    return {
-        "static": "static review",
-        "logic-simulated": "logic simulation",
-        "runtime-partial": "partial runtime validation",
-        "runtime-endpoint": "runtime endpoint validation",
-    }.get(validation_level, "not recorded")
-
-
-def _checks_headline(regression_status: Any) -> str:
-    return {
-        "passed": "checks passed",
-        "failed": "checks failed",
-        "not-run": "checks not run",
-        "not-applicable": "checks not applicable",
-        "unresolved": "checks unresolved",
-    }.get(regression_status, "checks not recorded")
-
-
 def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
     analysis, mitigation, verification = _fix_sections(review_record)
     changed_files = as_list(mitigation.get("changed_files"))
     lines = [
         "## PR Security Review",
         "",
-        f"- Analysis: {inline_code(_analysis_headline(analysis.get('verdict')))}",
-        f"- Mitigation: {inline_code(_mitigation_headline(analysis.get('verdict'), changed_files))}",
-        "- Verification: "
-        + inline_code(
-            f"{_verification_headline(verification.get('validation_level'))}; "
-            f"{_checks_headline(verification.get('regression_status'))}"
-        ),
-        *(
-            [
-                f"- Resolution next step: {inline_code(verification.get('resolution_next_step'), 'unknown')}"
-            ]
-            if verification.get("resolution_next_step") != "none"
-            else []
+        *render_review_status_lines(
+            analysis,
+            mitigation,
+            verification,
+            include_resolution_next_step=True,
         ),
         "",
         plain_text(analysis.get("overview"), "No overview provided."),

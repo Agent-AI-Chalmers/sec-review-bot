@@ -7,6 +7,7 @@ import {
   optionalNumber,
   renderAnalysisNarratives,
   renderChangedFilesLines,
+  renderReviewStatusLines,
   renderVerificationSummaryLines,
   type AnyRecord
 } from '../view-utils.js'
@@ -350,17 +351,11 @@ function blockedConfirmedCaseId(caseResult: AnyRecord): string {
   return nonEmptyText(caseResult.case_id) || 'unknown'
 }
 
-function blockedConfirmedCaseTitle(
-  case_id: string,
-  analysis: AnyRecord,
-  cvss: AnyRecord,
-  verification: AnyRecord
-): string {
+function blockedConfirmedCaseTitle(case_id: string, analysis: AnyRecord, cvss: AnyRecord): string {
   const severity = nonEmptyText(cvss.severity) || 'unscored'
-  const coverage = nonEmptyText(verification.patch_coverage)
   const overview = compactText(analysis.overview, 96)
   const suffix = overview || 'confirmed but not fully verified'
-  return `[${severity}] ${case_id} — ${suffix}${coverage ? ` (${coverage})` : ''}`
+  return `[${severity}] ${case_id} — ${suffix}`
 }
 
 function renderReferencePatch(patch_diff: unknown): string[] {
@@ -413,6 +408,10 @@ function renderBlockedConfirmedCases(case_results: AnyRecord[]): string[] {
     const dispositionReason = nonEmptyText(caseResult.reason) || 'No verified fix was produced.'
 
     const body = [
+      // The status lines belong in the card body so the title only carries case
+      // identity; the title used to repeat the coverage rating as a suffix.
+      ...renderReviewStatusLines({ analysis, mitigation, verification }),
+      '',
       ...renderFoldedBlock('Analysis', [
         nonEmptyText(analysis.overview) ||
           'Analyzer confirmed this case, but no analysis overview was recorded.',
@@ -430,9 +429,7 @@ function renderBlockedConfirmedCases(case_results: AnyRecord[]): string[] {
       )
     ]
 
-    blocks.push(
-      ...renderFoldedBlock(blockedConfirmedCaseTitle(case_id, analysis, cvss, verification), body)
-    )
+    blocks.push(...renderFoldedBlock(blockedConfirmedCaseTitle(case_id, analysis, cvss), body))
   }
   return blocks
 }
@@ -613,10 +610,10 @@ export function buildDeliveryDraftPrBody({
     const body = [
       `### Case ${inlineCode(case_id)}`,
       '',
-      `- Analyzer verdict: ${inlineCode(analysis.verdict ?? 'unknown')}`,
-      `- Patch coverage: ${inlineCode(verification.patch_coverage ?? 'unknown')}`,
-      `- Regression status: ${inlineCode(verification.regression_status ?? 'unknown')}`,
-      `- Resolution next step: ${inlineCode(verification.resolution_next_step ?? 'unknown')}`,
+      ...renderReviewStatusLines(
+        { analysis, mitigation, verification },
+        { includeResolutionNextStep: true }
+      ),
       '',
       ...renderFoldedBlock('Analysis', [
         nonEmptyText(analysis.overview) || 'No analyzer overview was recorded.',

@@ -6,6 +6,7 @@ import {
   isRecord,
   renderAnalysisNarratives,
   renderChangedFilesLines,
+  renderReviewStatusLines,
   renderVerificationSummaryLines
 } from '../view-utils.js'
 
@@ -58,34 +59,6 @@ const EMPTY_VERIFICATION: ReviewRecord['verification'] = {
   residual_risks: []
 }
 
-function uniqueNonEmptyStrings(items: unknown, limit = Infinity): string[] {
-  const seen = new Set<string>()
-  const normalizedItems: string[] = []
-
-  for (const item of asList(items)) {
-    const normalized = String(item ?? '').trim()
-
-    if (!normalized) {
-      continue
-    }
-
-    const dedupeKey = normalized.toLowerCase()
-
-    if (seen.has(dedupeKey)) {
-      continue
-    }
-
-    seen.add(dedupeKey)
-    normalizedItems.push(normalized)
-
-    if (normalizedItems.length >= limit) {
-      break
-    }
-  }
-
-  return normalizedItems
-}
-
 function asNonEmptyString(value: unknown): string {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : ''
 }
@@ -95,13 +68,6 @@ function buildVerifierHeadline(verification: unknown): string {
   const patch_coverage = asNonEmptyString(safeVerifier.patch_coverage) || 'unknown'
 
   return `Verifier assessed patch=${patch_coverage}.`
-}
-
-function escapeHtmlCommentValue(value: unknown): string {
-  return String(value ?? '')
-    .replace(/-->/g, '--&gt;')
-    .replace(/\r?\n/g, ' ')
-    .trim()
 }
 
 function renderIssueAnalysisSection(analysis: unknown): string | null {
@@ -324,22 +290,18 @@ function buildPatchPreviewFromReviewRecord(
 }
 
 function renderFoldedBlock(summary: string, bodyLines: unknown): string[] {
+  // Keep interior blank lines: callers use them as Markdown paragraph breaks, and
+  // dropping them glues a label to the text that follows it. Only an entirely
+  // blank body means the block has nothing to show.
   const lines = Array.isArray(bodyLines)
-    ? bodyLines.filter((line) => line !== null && line !== undefined && line !== '')
+    ? bodyLines.map((line) => (line === null || line === undefined ? '' : String(line)))
     : []
 
-  if (lines.length === 0) {
+  if (lines.every((line) => line.trim() === '')) {
     return []
   }
 
-  return [
-    '<details>',
-    `<summary>${summary}</summary>`,
-    '',
-    ...lines.map((line) => String(line)),
-    '',
-    '</details>'
-  ]
+  return ['<details>', `<summary>${summary}</summary>`, '', ...lines, '', '</details>']
 }
 
 export function buildDraftPullRequestTitleFromReviewRecord(issue: IssueLike): string {
@@ -360,8 +322,6 @@ export function buildDraftPullRequestBodyFromReviewRecord({
   const mitigation = review_record?.mitigation ?? EMPTY_MITIGATION
   const verification = review_record?.verification ?? EMPTY_VERIFICATION
   const changed_files = normalizeDisplayFiles(mitigation.changed_files)
-  const residual_risks = uniqueNonEmptyStrings(verification.residual_risks, 6)
-  const visibleResidualRisks = residual_risks.slice(0, 3)
   const analysisLines = [
     `- Verdict: ${inlineCode(analysis.verdict ?? 'unknown')}`,
     '',
@@ -379,14 +339,15 @@ export function buildDraftPullRequestBodyFromReviewRecord({
     'Exact code changes are available in the PR Files changed view.',
     'The PR body intentionally summarizes the patch instead of duplicating the full diff.'
   ]
-  const verificationLines = [
-    `- Patch coverage: ${inlineCode(verification.patch_coverage ?? 'unknown')}`,
-    `- Regression status: ${inlineCode(verification.regression_status ?? 'unknown')}`,
-    `- Resolution next step: ${inlineCode(verification.resolution_next_step ?? 'unknown')}`,
-    `- Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`,
-    `- Patch findings: ${inlineCode(asList(verification.patch_findings).length)}`,
-    `- Verification findings: ${inlineCode(asList(verification.verification_findings).length)}`
-  ]
+  // Use the shared verification renderer so this body carries the reviewed claim
+  // and the full finding lists instead of a hand-built count summary that hides
+  // which claim the coverage rating applies to.
+  const verificationLines = renderVerificationSummaryLines(verification, {
+    includeHeadline: true,
+    includeOverview: false,
+    includeUnknownResolutionNextStep: true,
+    reviewTargetClaimFallback: '(none)'
+  })
   const reviewerNotesLines = [
     '- This PR is intentionally narrow.',
     '- It focuses on the concrete code change already produced by the mitigation stage.',
@@ -395,25 +356,12 @@ export function buildDraftPullRequestBodyFromReviewRecord({
   const lines = [
     `Refs #${issue.issue_number}`,
     '',
-    `<!-- sec-review-bot:generated-from-issue-${issue.issue_number} -->`,
-    `<!-- sec-review-bot-patch-coverage: ${verification.patch_coverage ?? 'unknown'} -->`,
-    `<!-- sec-review-bot-regression-status: ${verification.regression_status ?? 'unknown'} -->`,
-    `<!-- sec-review-bot-resolution-next-step: ${verification.resolution_next_step ?? 'unknown'} -->`,
-    `<!-- sec-review-bot-validation-level: ${verification.validation_level ?? 'unknown'} -->`,
-    `<!-- sec-review-bot-changed-file-count: ${changed_files.length} -->`,
-    `<!-- sec-review-bot-residual-risk-count: ${residual_risks.length} -->`,
-    ...residual_risks.map(
-      (item) => `<!-- sec-review-bot-residual-risk: ${escapeHtmlCommentValue(item)} -->`
-    ),
-    '',
     '## Summary',
     '',
-    `This draft PR applies a focused mitigation for security issue #${issue.issue_number}.`,
-    '',
-    `**Patch Coverage:** ${inlineCode(verification.patch_coverage ?? 'unknown')}`,
-    `**Regression Status:** ${inlineCode(verification.regression_status ?? 'unknown')}`,
-    `**Resolution Next Step:** ${inlineCode(verification.resolution_next_step ?? 'unknown')}`,
-    `**Changed Files:** ${inlineCode(changed_files.length)}`,
+    ...renderReviewStatusLines(
+      { analysis, mitigation, verification },
+      { includeResolutionNextStep: true }
+    ),
     '',
     String(
       mitigation.overview ||
@@ -426,17 +374,6 @@ export function buildDraftPullRequestBodyFromReviewRecord({
   lines.push(...renderFoldedBlock('Analysis', analysisLines), '')
   lines.push(...renderFoldedBlock('Code Changes', code_changesLines), '')
   lines.push(...renderFoldedBlock('Verification', verificationLines), '')
-
-  if (visibleResidualRisks.length > 0) {
-    const visibleRiskLines = visibleResidualRisks.map((item) => `- ${item}`)
-    if (residual_risks.length > visibleResidualRisks.length) {
-      visibleRiskLines.push(
-        `- (+${residual_risks.length - visibleResidualRisks.length} more item(s) in PR metadata comments)`
-      )
-    }
-    lines.push(...renderFoldedBlock('Residual Risks', visibleRiskLines), '')
-  }
-
   lines.push(...renderFoldedBlock('Notes For Reviewers', reviewerNotesLines))
 
   return lines.join('\n')
@@ -500,12 +437,9 @@ export function renderIssueReviewCommentFromReviewRecord({
     ? [
         '## Issue Security Review',
         '',
-        `**Analyzer Verdict:** ${inlineCode(analysis.verdict ?? 'unknown')}`,
-        `**Verification:** ${inlineCode(verification.patch_coverage ?? 'unknown')}`,
-        `**Regression Status:** ${inlineCode(verification.regression_status ?? 'unknown')}`,
-        '**Patch Ready:** `yes`',
+        ...renderReviewStatusLines({ analysis, mitigation, verification }),
         '',
-        'A concrete mitigation patch was produced and promoted into a draft PR for full review.',
+        String(analysis.overview ?? 'Issue review completed.'),
         '',
         `PR: #${draftPullRequest.number} (${draftPullRequest.html_url})`,
         '',
@@ -515,11 +449,9 @@ export function renderIssueReviewCommentFromReviewRecord({
   const securitySummary = [
     '## Security Review',
     '',
-    `**Risk Verdict:** ${inlineCode(analysis.verdict ?? 'unknown')}`,
-    `**Patch Coverage:** ${inlineCode(verification.patch_coverage ?? 'unknown')}`,
-    `**Regression Status:** ${inlineCode(verification.regression_status ?? 'unknown')}`,
-    `**Patch Ready:** ${inlineCode(draftPrPlan?.patch_ready ? 'yes' : 'no')}`,
-    `**Next Step:** ${inlineCode(draftPrPlan?.recommended_action ?? 'issue-only')}`,
+    ...renderReviewStatusLines({ analysis, mitigation, verification }),
+    `- Patch ready: ${inlineCode(draftPrPlan?.patch_ready ? 'yes' : 'no')}`,
+    `- Next step: ${inlineCode(draftPrPlan?.recommended_action ?? 'issue-only')}`,
     '',
     String(
       verification.patch_coverage

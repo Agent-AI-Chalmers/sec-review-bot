@@ -1,7 +1,12 @@
 from pathlib import Path
+from typing import Any
 
 from sec_review_agents.cli.local_previewing.repository import (
     write_repository_draft_pr_previews,
+)
+from sec_review_agents.cli.local_previewing.shared import (
+    coverage_headline,
+    render_review_status_lines,
 )
 
 
@@ -128,7 +133,7 @@ def test_writes_publishable_preview_outside_patch_synthesis(tmp_path: Path) -> N
     assert "- Patch coverage: `full`" in content
     assert "- Resolution next step: `none`" in content
     assert "- Case disposition: `keep`" not in content
-    assert "- Analyzer verdict: `confirmed-vulnerability`" in content
+    assert "- Analysis: `confirmed security vulnerability`" in content
     assert "<summary>CVSS</summary>" in content
     assert "<summary>Mitigation</summary>" in content
     assert "#### Mitigation notes" not in content
@@ -249,6 +254,28 @@ def test_final_patch_preview_handles_deleted_and_binary_file_changes(
 def test_writes_blocked_confirmed_cases_preview(tmp_path: Path) -> None:
     local_root = tmp_path / "local"
     run_artifacts = local_root / "artifacts"
+    review_record: dict[str, Any] = {
+        "analysis": {
+            "verdict": "confirmed-defect",
+            "overview": "Webhook retry payloads can reuse stale signature metadata.",
+        },
+        "cvss": {
+            "outcome": "scored",
+            "base_score": 5.8,
+            "severity": "medium",
+            "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
+            "overview": "Replay can affect queued webhook processing.",
+        },
+        "mitigation": {
+            "overview": "The attempted patch covers direct webhook requests only.",
+            "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()\n",
+        },
+        "verification": {
+            "patch_coverage": "partial",
+            "resolution_next_step": "Manual review needed.",
+            "overview": "Queued retry payloads remain unverified.",
+        },
+    }
     result = write_repository_draft_pr_previews(
         local_root_path=local_root,
         deliveries=[],
@@ -257,28 +284,7 @@ def test_writes_blocked_confirmed_cases_preview(tmp_path: Path) -> None:
                 "case_id": "case-1",
                 "disposition": "blocked",
                 "reason": "The verifier did not fully approve the patch.",
-                "review_record": {
-                    "analysis": {
-                        "verdict": "confirmed-defect",
-                        "overview": "Webhook retry payloads can reuse stale signature metadata.",
-                    },
-                    "cvss": {
-                        "outcome": "scored",
-                        "base_score": 5.8,
-                        "severity": "medium",
-                        "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
-                        "overview": "Replay can affect queued webhook processing.",
-                    },
-                    "mitigation": {
-                        "overview": "The attempted patch covers direct webhook requests only.",
-                        "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()\n",
-                    },
-                    "verification": {
-                        "patch_coverage": "partial",
-                        "resolution_next_step": "Manual review needed.",
-                        "overview": "Queued retry payloads remain unverified.",
-                    },
-                },
+                "review_record": review_record,
             }
         ],
     )
@@ -291,6 +297,27 @@ def test_writes_blocked_confirmed_cases_preview(tmp_path: Path) -> None:
     assert "# Blocked Confirmed Cases" in content
     assert "Local developer preview only" in content
     assert "<summary>[medium] case-1" in content
+    # The card reuses the shared status vocabulary instead of restating it, and the
+    # title carries case identity rather than repeating the coverage rating.
+    assert (
+        "\n".join(
+            render_review_status_lines(
+                review_record["analysis"],
+                review_record["mitigation"],
+                review_record["verification"],
+            )
+        )
+        in content
+    )
+    title_line = next(
+        line
+        for line in content.splitlines()
+        if line.startswith("<summary>[medium] case-1")
+    )
+    assert (
+        coverage_headline(review_record["verification"]["patch_coverage"])
+        not in title_line
+    )
     assert "<summary>Analysis</summary>" in content
     assert "<summary>CVSS</summary>" in content
     assert "<summary>Mitigation</summary>" in content

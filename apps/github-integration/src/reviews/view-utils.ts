@@ -302,3 +302,102 @@ export function renderAnalysisNarratives(narratives: unknown): string[] {
   }
   return lines
 }
+
+// The opening status lines shared by every review-record surface: the PR review
+// comment, the issue review comment, and the draft PR bodies. Keeping one
+// vocabulary here is what lets the surfaces stay comparable.
+export function analysisHeadline(verdict: unknown): string {
+  switch (verdict) {
+    case 'no-actionable-finding':
+      return 'no actionable security finding'
+    case 'confirmed-vulnerability':
+      return 'confirmed security vulnerability'
+    case 'confirmed-defect':
+      return 'confirmed security defect'
+    case 'plausible-risk':
+      return 'plausible security risk'
+    case 'inconclusive':
+      return 'inconclusive'
+    default:
+      return 'unknown'
+  }
+}
+
+export function mitigationHeadline(verdict: unknown, changedFiles: unknown[]): string {
+  if (changedFiles.length > 0) {
+    return `patch proposed, ${changedFiles.length} ${changedFiles.length === 1 ? 'file' : 'files'} changed`
+  }
+  return verdict === 'no-actionable-finding' ? 'not needed' : 'no patch proposed'
+}
+
+export function coverageHeadline(patchCoverage: unknown): string {
+  switch (patchCoverage) {
+    case 'full':
+      return 'full coverage'
+    case 'partial':
+      return 'partial coverage'
+    case 'local-only':
+      return 'local fix only'
+    case 'misaligned':
+      return 'misaligned patch'
+    case 'unresolved':
+      return 'coverage unresolved'
+    case 'no-patch':
+      return 'no patch'
+    case 'not-applicable':
+      return 'patch review n/a'
+    default:
+      return 'coverage not recorded'
+  }
+}
+
+export function verificationHeadline(validationLevel: unknown): string {
+  switch (validationLevel) {
+    case 'static':
+      return 'static review'
+    case 'logic-simulated':
+      return 'logic simulation'
+    case 'runtime-partial':
+      return 'partial runtime validation'
+    case 'runtime-endpoint':
+      return 'runtime endpoint validation'
+    default:
+      return 'not recorded'
+  }
+}
+
+export function checksHeadline(regressionStatus: unknown): string {
+  switch (regressionStatus) {
+    case 'passed':
+      return 'checks passed'
+    case 'failed':
+      return 'checks failed'
+    case 'not-run':
+      return 'checks not run'
+    case 'not-applicable':
+      return 'checks not applicable'
+    case 'unresolved':
+      return 'checks unresolved'
+    default:
+      return 'checks not recorded'
+  }
+}
+
+export function renderReviewStatusLines(
+  review: { analysis?: unknown; mitigation?: unknown; verification?: unknown },
+  options: { includeResolutionNextStep?: boolean } = {}
+): string[] {
+  const analysis = isRecord(review.analysis) ? review.analysis : {}
+  const mitigation = isRecord(review.mitigation) ? review.mitigation : {}
+  const verification = isRecord(review.verification) ? review.verification : {}
+  const resolution_next_step = displayText(verification.resolution_next_step, 'unknown')
+
+  return [
+    `- Analysis: ${inlineCode(analysisHeadline(analysis.verdict))}`,
+    `- Mitigation: ${inlineCode(mitigationHeadline(analysis.verdict, asList(mitigation.changed_files)))}`,
+    `- Verification: ${inlineCode(`${coverageHeadline(verification.patch_coverage)}; ${verificationHeadline(verification.validation_level)}; ${checksHeadline(verification.regression_status)}`)}`,
+    ...(options.includeResolutionNextStep && resolution_next_step !== 'none'
+      ? [`- Resolution next step: ${inlineCode(resolution_next_step)}`]
+      : [])
+  ]
+}

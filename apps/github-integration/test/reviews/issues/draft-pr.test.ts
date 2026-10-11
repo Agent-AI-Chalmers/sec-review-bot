@@ -327,8 +327,14 @@ test('issue draft PR publishes from review_record file_changes without workspace
     }
   ])
   assert.equal(octokit.calls.pulls[0]?.draft, true)
-  assert.match(octokit.calls.pulls[0]?.body ?? '', /\*\*Regression Status:\*\* `not-run`/)
-  assert.match(octokit.calls.pulls[0]?.body ?? '', /sec-review-bot-regression-status: not-run/)
+  // The opening status lines come from the shared vocabulary, so this body stays
+  // comparable with the PR review comment and the repository delivery bodies.
+  assert.match(octokit.calls.pulls[0]?.body ?? '', /- Analysis: `unknown`/)
+  assert.match(
+    octokit.calls.pulls[0]?.body ?? '',
+    /- Verification: `full coverage; not recorded; checks not run`/
+  )
+  assert.match(octokit.calls.pulls[0]?.body ?? '', /Verifier assessed patch=/)
 })
 
 test('issue draft PR is not promoted when file_changes are absent', async () => {

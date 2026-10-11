@@ -6,8 +6,32 @@ import {
   buildDeliveryDraftPrBody,
   renderRepositorySecuritySummaryComment
 } from '../../../src/reviews/repositories/renderer.js'
+import { coverageHeadline, renderReviewStatusLines } from '../../../src/reviews/view-utils.js'
 
 test('repository renderer derives blocked confirmed case cards from case results', () => {
+  const review_record = {
+    analysis: {
+      verdict: 'confirmed-defect',
+      overview: 'Webhook retry payloads can reuse stale signature metadata.'
+    },
+    cvss: {
+      base_score: 5.8,
+      severity: 'medium',
+      vector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N',
+      overview: 'This can allow replay through the internal queue.'
+    },
+    mitigation: {
+      overview: 'The attempted patch covers direct webhook requests only.',
+      patch_diff: 'diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()'
+    },
+    verification: {
+      patch_coverage: 'partial',
+      regression_status: 'not-run',
+      validation_level: 'static',
+      resolution_next_step: 'Manual review needed.',
+      overview: 'Queued retry payloads remain unverified.'
+    }
+  }
   const body = renderRepositorySecuritySummaryComment({
     workflow_result: {
       run_id: 'run-1',
@@ -22,29 +46,7 @@ test('repository renderer derives blocked confirmed case cards from case results
           case_id: 'case-1',
           disposition: 'blocked',
           reason: 'The verifier did not fully approve the patch.',
-          review_record: {
-            analysis: {
-              verdict: 'confirmed-defect',
-              overview: 'Webhook retry payloads can reuse stale signature metadata.'
-            },
-            cvss: {
-              base_score: 5.8,
-              severity: 'medium',
-              vector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N',
-              overview: 'This can allow replay through the internal queue.'
-            },
-            mitigation: {
-              overview: 'The attempted patch covers direct webhook requests only.',
-              patch_diff: 'diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()'
-            },
-            verification: {
-              patch_coverage: 'partial',
-              regression_status: 'not-run',
-              validation_level: 'static',
-              resolution_next_step: 'Manual review needed.',
-              overview: 'Queued retry payloads remain unverified.'
-            }
-          }
+          review_record
         }
       ]
     },
@@ -67,6 +69,21 @@ test('repository renderer derives blocked confirmed case cards from case results
   assert.ok(
     body.indexOf('<summary>Mitigation</summary>') < body.indexOf('<summary>Verification</summary>')
   )
+
+  // The card reuses the shared status vocabulary instead of restating it, and the
+  // title carries case identity rather than repeating the coverage rating.
+  assert.ok(
+    body.includes(
+      renderReviewStatusLines({
+        analysis: review_record.analysis,
+        mitigation: review_record.mitigation,
+        verification: review_record.verification
+      }).join('\n')
+    )
+  )
+  const titleLine = body.split('\n').find((line) => line.startsWith('<summary>[medium] case-1'))
+  assert.ok(titleLine)
+  assert.ok(!titleLine.includes(coverageHeadline(review_record.verification.patch_coverage)))
 })
 
 test('repository blocked confirmed case uses disposition reason as mitigation and verification fallback', () => {
@@ -176,7 +193,7 @@ test('repository renderer preserves CVSS not-scored state', () => {
   assert.doesNotMatch(body, /Patch coverage: `full`/)
   assert.doesNotMatch(body, /Resolution next step: `none`/)
   assert.doesNotMatch(body, /Case disposition: `keep`/)
-  assert.doesNotMatch(body, /Analyzer verdict: `confirmed-defect`/)
+  assert.doesNotMatch(body, /- Analysis: `confirmed security defect`/)
   assert.doesNotMatch(body, /## Delivery CVSS/)
   assert.match(body, /<summary>CVSS<\/summary>/)
   assert.doesNotMatch(body, /<!-- case-level mitigation overview -->/)
@@ -301,7 +318,7 @@ test('repository draft PR body renders case details from case results', () => {
 
   assert.match(body, /## Case Details/)
   assert.match(body, /<summary>View case case-1<\/summary>/)
-  assert.match(body, /Analyzer verdict: `confirmed-defect`/)
+  assert.match(body, /- Analysis: `confirmed security defect`/)
   assert.match(body, /<summary>Analysis<\/summary>/)
   assert.match(body, /<summary>CVSS<\/summary>/)
   assert.match(body, /<summary>Mitigation<\/summary>/)
