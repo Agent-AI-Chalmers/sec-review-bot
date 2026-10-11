@@ -243,7 +243,7 @@ interface IssueWorkflowResult {
 }
 ```
 
-`issue-review-two-stage` and `issue-review-single-agent` are local evaluation / ablation paths. They may be started by local CLI as local-only Temporal workflows, but they are not part of the standard public runner contract.
+The `two-stage` and `single-agent` issue strategies (`--strategy` on the local issue CLI) are local evaluation / ablation paths. They start as local-only Temporal workflows on the `issue-review` workflow, but they are not part of the standard public runner contract.
 
 Callers must render issue comments, decide whether a patch exists, and create draft PRs from `review_record`. When publishing a draft PR, `review_record.mitigation.file_changes` is the authoritative source for final file contents.
 

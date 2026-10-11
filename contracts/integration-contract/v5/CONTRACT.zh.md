@@ -245,7 +245,7 @@ interface IssueWorkflowResult {
 }
 ```
 
-`issue-review-two-stage` 和 `issue-review-single-agent` 是本地评测 / ablation 专用路径，可由 local CLI 启动为 local-only Temporal workflow，但不属于标准公开 runner contract。
+`two-stage` 和 `single-agent` 两种 issue 策略（本地 issue CLI 的 `--strategy`）是本地评测 / ablation 专用路径：它们在 `issue-review` workflow 上作为 local-only Temporal workflow 启动，但不属于标准公开 runner contract。
 
 调用方必须从 `review_record` 渲染 issue 评论、判断是否有 patch、创建 draft PR。发布 draft PR 时，最终文件内容以 `review_record.mitigation.file_changes` 为准。
 
