@@ -22,7 +22,7 @@ Consumers can rely on:
 
 - the field names and required fields of an observed run;
 - the two status axes, `execution_status` and `publication_status`, as separate values;
-- the `artifact_storage` variants: absent, unavailable, or available with a stored bundle.
+- the `artifact_storage` variants: absent; an error variant whose status is `unavailable` or `failed`, with optional `error_code` and `message`; or `available` with a stored bundle.
 
 The following are not part of this contract:
 
