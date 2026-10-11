@@ -8,6 +8,8 @@ export const RUNNER_PUBLISH_ERROR_CODES = {
   github_publish_rejected: 'GITHUB_PUBLISH_REJECTED',
   github_validation_rejected: 'GITHUB_VALIDATION_REJECTED',
   publication_step_retry_exhausted: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
+  publication_step_set_duplicate: 'PUBLICATION_STEP_SET_DUPLICATE',
+  publication_step_set_changed: 'PUBLICATION_STEP_SET_CHANGED',
   runner_publish_non_retryable: 'RUNNER_PUBLISH_NON_RETRYABLE'
 } as const
 

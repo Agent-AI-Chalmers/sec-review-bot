@@ -538,3 +538,95 @@ test('ReviewRunStore renews a publication claim before another owner can take it
     await Promise.all([ownerA.close(), ownerB.close()])
   }
 })
+
+test('ReviewRunStore accepts an identical publication step set under a case-insensitive collation', async () => {
+  // Regression guard for the #96 wedge. Persisted step keys come back in the
+  // database collation order (`en_US.utf8` orders `case-7` before
+  // `CVE-2024-1008`, while JavaScript sorts by UTF-16 code unit). Comparing the
+  // two raw orders made the second call with an identical key set throw
+  // 'Publication step set changed', and the publication could never leave
+  // 'pending'.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  const stepKeys = [
+    'repository:delivery:CVE-2024-1008',
+    'repository:delivery:case-7',
+    'repository:summary-issue'
+  ]
+  try {
+    const firstToken = await store.claimPublication(runId)
+    assert.ok(firstToken)
+    await store.initializePublicationSteps(runId, firstToken, stepKeys)
+    assert.equal(
+      await store.failPublication(
+        runId,
+        firstToken,
+        { message: 'temporary failure' },
+        { retry: true }
+      ),
+      true
+    )
+
+    const secondToken = await store.claimPublication(runId)
+    assert.ok(secondToken)
+    await store.initializePublicationSteps(runId, secondToken, stepKeys)
+
+    const persisted = (await store.listPublicationSteps(runId)).map((step) => step.step_key)
+    assert.deepEqual(persisted.sort(), [...stepKeys].sort())
+  } finally {
+    await store.close()
+  }
+})
+
+test('ReviewRunStore reports a duplicate publication step set as deterministic', async () => {
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await assert.rejects(
+      store.initializePublicationSteps(runId, token, [
+        'repository:summary-issue',
+        'repository:summary-issue'
+      ]),
+      (error: unknown) =>
+        error instanceof Error && 'code' in error && error.code === 'PUBLICATION_STEP_SET_DUPLICATE'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('ReviewRunStore reports a changed publication step set as deterministic', async () => {
+  // A stored run's step set is fixed, so a genuine change can never be repaired
+  // by re-claiming the publication; it must reach a terminal state instead.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const firstToken = await store.claimPublication(runId)
+    assert.ok(firstToken)
+    await store.initializePublicationSteps(runId, firstToken, ['repository:summary-issue'])
+    assert.equal(
+      await store.failPublication(
+        runId,
+        firstToken,
+        { message: 'temporary failure' },
+        { retry: true }
+      ),
+      true
+    )
+
+    const secondToken = await store.claimPublication(runId)
+    assert.ok(secondToken)
+    await assert.rejects(
+      store.initializePublicationSteps(runId, secondToken, [
+        'repository:summary-issue',
+        'repository:summary-comment'
+      ]),
+      (error: unknown) =>
+        error instanceof Error && 'code' in error && error.code === 'PUBLICATION_STEP_SET_CHANGED'
+    )
+  } finally {
+    await store.close()
+  }
+})
