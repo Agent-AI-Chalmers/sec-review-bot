@@ -286,3 +286,85 @@ def final_patch_block_from_diff(
         )
     lines.extend(["", "</details>"])
     return lines
+
+
+def analysis_headline(verdict: Any) -> str:
+    return {
+        "no-actionable-finding": "no actionable security finding",
+        "confirmed-vulnerability": "confirmed security vulnerability",
+        "confirmed-defect": "confirmed security defect",
+        "plausible-risk": "plausible security risk",
+        "inconclusive": "inconclusive",
+    }.get(verdict, "unknown")
+
+
+def mitigation_headline(verdict: Any, changed_files: list[Any]) -> str:
+    if changed_files:
+        noun = "file" if len(changed_files) == 1 else "files"
+        return f"patch proposed, {len(changed_files)} {noun} changed"
+    return "not needed" if verdict == "no-actionable-finding" else "no patch proposed"
+
+
+def coverage_headline(patch_coverage: Any) -> str:
+    return {
+        "full": "full coverage",
+        "partial": "partial coverage",
+        "local-only": "local fix only",
+        "misaligned": "misaligned patch",
+        "unresolved": "coverage unresolved",
+        "no-patch": "no patch",
+        "not-applicable": "patch review n/a",
+    }.get(patch_coverage, "coverage not recorded")
+
+
+def verification_headline(validation_level: Any) -> str:
+    return {
+        "static": "static review",
+        "logic-simulated": "logic simulation",
+        "runtime-partial": "partial runtime validation",
+        "runtime-endpoint": "runtime endpoint validation",
+    }.get(validation_level, "not recorded")
+
+
+def checks_headline(regression_status: Any) -> str:
+    return {
+        "passed": "checks passed",
+        "failed": "checks failed",
+        "not-run": "checks not run",
+        "not-applicable": "checks not applicable",
+        "unresolved": "checks unresolved",
+    }.get(regression_status, "checks not recorded")
+
+
+def render_review_status_lines(
+    analysis: dict[str, Any],
+    mitigation: dict[str, Any],
+    verification: dict[str, Any],
+    *,
+    include_resolution_next_step: bool = False,
+) -> list[str]:
+    """The opening status lines shared by every review-record preview surface."""
+    lines = [
+        f"- Analysis: {inline_code(analysis_headline(analysis.get('verdict')))}",
+        "- Mitigation: "
+        + inline_code(
+            mitigation_headline(
+                analysis.get("verdict"),
+                as_list(mitigation.get("changed_files")),
+            )
+        ),
+        "- Verification: "
+        + inline_code(
+            f"{coverage_headline(verification.get('patch_coverage'))}; "
+            f"{verification_headline(verification.get('validation_level'))}; "
+            f"{checks_headline(verification.get('regression_status'))}"
+        ),
+    ]
+    if (
+        include_resolution_next_step
+        and verification.get("resolution_next_step") != "none"
+    ):
+        lines.append(
+            f"- Resolution next step: {inline_code(verification.get('resolution_next_step'), 'unknown')}"
+        )
+    return lines

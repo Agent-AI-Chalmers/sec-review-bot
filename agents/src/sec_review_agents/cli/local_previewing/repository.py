@@ -8,6 +8,7 @@ from sec_review_agents.cli.local_previewing.shared import (
     final_patch_block_from_diff,
     render_analysis_narratives,
     render_mitigation_preview_lines,
+    render_review_status_lines,
     render_verification_preview_lines,
 )
 from sec_review_agents.utils.markdown import (
@@ -159,12 +160,12 @@ def _delivery_case_details(
     mitigation = as_dict(review_record.get("mitigation"))
     verification = as_dict(review_record.get("verification"))
     cvss = as_dict(review_record.get("cvss"))
-    case_summary = [
-        f"- Analyzer verdict: {inline_code(analysis.get('verdict'), 'unknown')}",
-        f"- Patch coverage: {inline_code(verification.get('patch_coverage'), 'unknown')}",
-        f"- Regression status: {inline_code(verification.get('regression_status'), 'unknown')}",
-        f"- Resolution next step: {inline_code(verification.get('resolution_next_step'), 'unknown')}",
-    ]
+    case_summary = render_review_status_lines(
+        analysis,
+        mitigation,
+        verification,
+        include_resolution_next_step=True,
+    )
     case_details = [
         f"### Case {inline_code(case_id)}",
         "",
@@ -261,13 +262,11 @@ def _blocked_confirmed_case_title(
     case_id: str,
     analysis: dict[str, Any],
     cvss: dict[str, Any],
-    verification: dict[str, Any],
 ) -> str:
     severity = compact_plain_text(cvss.get("severity"), "unscored")
-    coverage = compact_plain_text(verification.get("patch_coverage"))
     overview = _compact_summary(analysis.get("overview"), max_chars=96)
     suffix = overview or "confirmed but not fully verified"
-    return f"[{severity}] {case_id} - {suffix}{f' ({coverage})' if coverage else ''}"
+    return f"[{severity}] {case_id} - {suffix}"
 
 
 def _reference_patch_block(patch_diff: Any) -> list[str]:
@@ -324,6 +323,10 @@ def _build_blocked_confirmed_cases_preview(
             case_result.get("reason"), "No verified fix was produced."
         )
         body = [
+            # The status lines belong in the card body so the title only carries
+            # case identity; the title used to repeat the coverage rating.
+            *render_review_status_lines(analysis, mitigation, verification),
+            "",
             *folded_block(
                 "Analysis",
                 [
@@ -360,7 +363,6 @@ def _build_blocked_confirmed_cases_preview(
                     case_id=case_id,
                     analysis=analysis,
                     cvss=cvss,
-                    verification=verification,
                 ),
                 body,
             )

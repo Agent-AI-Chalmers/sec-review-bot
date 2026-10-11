@@ -7,6 +7,7 @@ from sec_review_agents.cli.local_previewing.shared import (
     patch_block,
     render_analysis_narratives,
     render_mitigation_preview_lines,
+    render_review_status_lines,
     render_verification_preview_lines,
 )
 from sec_review_agents.utils.markdown import (
@@ -47,10 +48,9 @@ def _render_issue_comment(
     lines = [
         "## Security Review",
         "",
-        f"**Risk Verdict:** {inline_code(analysis.get('verdict'), 'unknown')}",
-        f"**Patch Coverage:** {inline_code(verification.get('patch_coverage'), 'unknown')}",
-        f"**Patch Ready:** {inline_code('yes' if draft_pr_ready else 'no')}",
-        f"**Next Step:** {inline_code('open-draft-pr' if draft_pr_ready else 'issue-only')}",
+        *render_review_status_lines(analysis, mitigation, verification),
+        f"- Patch ready: {inline_code('yes' if draft_pr_ready else 'no')}",
+        f"- Next step: {inline_code('open-draft-pr' if draft_pr_ready else 'issue-only')}",
         "",
         headline,
         "",
@@ -89,27 +89,17 @@ def _render_issue_draft_pr(
 ) -> list[str]:
     analysis, mitigation, verification = _fix_sections(review_record)
     changed_files = dedupe_text_items(as_list(mitigation.get("changed_files")))
-    residual_risks = dedupe_text_items(
-        as_list(verification.get("residual_risks")),
-        limit=6,
-    )
     return [
         f"Refs #{issue_number}",
         "",
-        f"<!-- sec-review-bot:generated-from-issue-{issue_number} -->",
-        f"<!-- sec-review-bot-patch-coverage: {verification.get('patch_coverage') or 'unknown'} -->",
-        f"<!-- sec-review-bot-resolution-next-step: {verification.get('resolution_next_step') or 'unknown'} -->",
-        f"<!-- sec-review-bot-validation-level: {verification.get('validation_level') or 'unknown'} -->",
-        f"<!-- sec-review-bot-changed-file-count: {len(changed_files)} -->",
-        f"<!-- sec-review-bot-residual-risk-count: {len(residual_risks)} -->",
-        "",
         "## Summary",
         "",
-        f"This draft PR applies a focused mitigation for security issue #{issue_number}.",
-        "",
-        f"**Patch Coverage:** {inline_code(verification.get('patch_coverage'), 'unknown')}",
-        f"**Resolution Next Step:** {inline_code(verification.get('resolution_next_step'), 'unknown')}",
-        f"**Changed Files:** {inline_code(len(changed_files))}",
+        *render_review_status_lines(
+            analysis,
+            mitigation,
+            verification,
+            include_resolution_next_step=True,
+        ),
         "",
         plain_text(
             mitigation.get("overview")

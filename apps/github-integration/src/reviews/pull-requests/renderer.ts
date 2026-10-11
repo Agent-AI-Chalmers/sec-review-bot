@@ -1,10 +1,10 @@
 import type { ReviewRecord } from '../review-record.js'
 import {
-  asList,
   displayText,
   inlineCode,
   renderAnalysisNarratives,
   renderChangedFilesLines,
+  renderReviewStatusLines,
   renderVerificationSummaryLines
 } from '../view-utils.js'
 
@@ -22,62 +22,6 @@ function renderFoldedSection(summary: string, body: string | null): string | nul
 
 function joinParagraphBlocks(blocks: Array<string | null>): string {
   return blocks.filter((item): item is string => Boolean(item)).join('\n\n')
-}
-
-function analysisHeadline(verdict: unknown): string {
-  switch (verdict) {
-    case 'no-actionable-finding':
-      return 'no actionable security finding'
-    case 'confirmed-vulnerability':
-      return 'confirmed security vulnerability'
-    case 'confirmed-defect':
-      return 'confirmed security defect'
-    case 'plausible-risk':
-      return 'plausible security risk'
-    case 'inconclusive':
-      return 'inconclusive'
-    default:
-      return 'unknown'
-  }
-}
-
-function mitigationHeadline(verdict: unknown, changedFiles: unknown[]): string {
-  if (changedFiles.length > 0) {
-    return `patch proposed, ${changedFiles.length} ${changedFiles.length === 1 ? 'file' : 'files'} changed`
-  }
-  return verdict === 'no-actionable-finding' ? 'not needed' : 'no patch proposed'
-}
-
-function verificationHeadline(validationLevel: unknown): string {
-  switch (validationLevel) {
-    case 'static':
-      return 'static review'
-    case 'logic-simulated':
-      return 'logic simulation'
-    case 'runtime-partial':
-      return 'partial runtime validation'
-    case 'runtime-endpoint':
-      return 'runtime endpoint validation'
-    default:
-      return 'not recorded'
-  }
-}
-
-function checksHeadline(regressionStatus: unknown): string {
-  switch (regressionStatus) {
-    case 'passed':
-      return 'checks passed'
-    case 'failed':
-      return 'checks failed'
-    case 'not-run':
-      return 'checks not run'
-    case 'not-applicable':
-      return 'checks not applicable'
-    case 'unresolved':
-      return 'checks unresolved'
-    default:
-      return 'checks not recorded'
-  }
 }
 
 function renderMitigationSection(mitigation: ReviewRecord['mitigation']): string | null {
@@ -154,18 +98,14 @@ export function renderAnalysisSummaryCommentFromReviewRecord(
     residual_risks: []
   }
   const overview = displayText(analysis.overview, 'No overview provided.')
-  const changed_files = asList(mitigation.changed_files)
-  const resolution_next_step = displayText(verification.resolution_next_step, 'unknown')
 
   const lines = [
     '## PR Security Review',
     '',
-    `- Analysis: ${inlineCode(analysisHeadline(analysis.verdict))}`,
-    `- Mitigation: ${inlineCode(mitigationHeadline(analysis.verdict, changed_files))}`,
-    `- Verification: ${inlineCode(`${verificationHeadline(verification.validation_level)}; ${checksHeadline(verification.regression_status)}`)}`,
-    ...(resolution_next_step !== 'none'
-      ? [`- Resolution next step: ${inlineCode(resolution_next_step)}`]
-      : []),
+    ...renderReviewStatusLines(
+      { analysis, mitigation, verification },
+      { includeResolutionNextStep: true }
+    ),
     '',
     overview
   ]

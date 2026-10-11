@@ -78,7 +78,7 @@ test('pull request renderer summarizes each review stage without implying PR fil
 
   assert.match(body, /- Analysis: `no actionable security finding`/)
   assert.match(body, /- Mitigation: `not needed`/)
-  assert.match(body, /- Verification: `static review; checks not run`/)
+  assert.match(body, /- Verification: `full coverage; static review; checks not run`/)
   assert.doesNotMatch(body, /- Tests:/)
   assert.doesNotMatch(body, /Changed files: `0`/)
   assert.doesNotMatch(body, /Resolution next step: `none`/)
@@ -113,7 +113,10 @@ test('pull request renderer reports mitigation file count only when a patch exis
 
   assert.match(body, /- Analysis: `confirmed security vulnerability`/)
   assert.match(body, /- Mitigation: `patch proposed, 2 files changed`/)
-  assert.match(body, /- Verification: `partial runtime validation; checks failed`/)
+  assert.match(
+    body,
+    /- Verification: `partial coverage; partial runtime validation; checks failed`/
+  )
   assert.doesNotMatch(body, /- Tests:/)
   assert.match(body, /- Resolution next step: `manual-review`/)
 })
