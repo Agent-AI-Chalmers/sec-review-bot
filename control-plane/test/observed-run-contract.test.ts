@@ -17,21 +17,23 @@ import * as ajvFormats from 'ajv-formats'
 import { observeRun } from '../src/observability.js'
 import type { ReviewRunRecord } from '../src/review-store.js'
 
-const FAMILY = path.join('contracts', 'control-plane-api', 'v1')
-const FIXTURES = path.join(FAMILY, 'fixtures')
+const CONTRACT_VERSION_DIR = path.join('contracts', 'control-plane-api', 'v1')
+const FIXTURES = path.join(CONTRACT_VERSION_DIR, 'fixtures')
 
 function workspaceRoot(): string {
   let current = path.dirname(fileURLToPath(import.meta.url))
   for (;;) {
-    if (existsSync(path.join(current, FAMILY, 'observed-run.schema.json'))) return current
+    if (existsSync(path.join(current, CONTRACT_VERSION_DIR, 'observed-run.schema.json'))) {
+      return current
+    }
     const parent = path.dirname(current)
-    if (parent === current) throw new Error('Could not locate the contract family root.')
+    if (parent === current) throw new Error('Could not locate the workspace contracts root.')
     current = parent
   }
 }
 
 const root = workspaceRoot()
-// One family can hold several schemas, so each fixture is validated against the schema the
+// One contract version can hold several schemas, so each fixture is validated against the schema the
 // manifest names for it rather than against whichever schema was loaded first.
 const manifest = JSON.parse(readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')) as {
   schema_fixtures: Record<string, string>
@@ -48,7 +50,7 @@ function validate(schemaName: string, value: unknown): boolean {
   const cached = validators.get(schemaName)
   if (cached !== undefined) return cached(value)
   const schema = JSON.parse(
-    readFileSync(path.join(root, FAMILY, schemaName), 'utf8')
+    readFileSync(path.join(root, CONTRACT_VERSION_DIR, schemaName), 'utf8')
   ) as AnySchemaObject
   // `ajv-formats` supplies the implementations the schema's `date-time` and `uri`
   // annotations need. Without it ajv's strict mode refuses the schema outright rather than
