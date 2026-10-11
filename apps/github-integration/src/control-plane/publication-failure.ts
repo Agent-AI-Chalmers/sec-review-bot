@@ -8,6 +8,14 @@ interface PublishFailureClassification {
   reason: string
 }
 
+// Control Plane publication faults that retrying cannot repair. The step set is
+// fixed for a stored run, so re-claiming the publication re-enters the same
+// condition and fails identically. Treat them as terminal instead of looping.
+const DETERMINISTIC_CONTROL_PLANE_PUBLICATION_CODES = new Set<string>([
+  RUNNER_PUBLISH_ERROR_CODES.publication_step_set_duplicate,
+  RUNNER_PUBLISH_ERROR_CODES.publication_step_set_changed
+])
+
 function isRateLimitOrAbuseLimit(error: unknown): boolean {
   const errorInfo = asErrorWithResponse(error)
   const headers = errorInfo.response?.headers ?? {}
@@ -34,6 +42,17 @@ export function classifyPublicationFailure(error: unknown): PublishFailureClassi
       retry: false,
       code: errorCode(error),
       reason: 'publication-step-retry-exhausted'
+    }
+  }
+  const controlPlaneCode = errorCode(error)
+  if (
+    controlPlaneCode !== null &&
+    DETERMINISTIC_CONTROL_PLANE_PUBLICATION_CODES.has(controlPlaneCode)
+  ) {
+    return {
+      retry: false,
+      code: controlPlaneCode,
+      reason: 'control-plane-deterministic-publication-fault'
     }
   }
 

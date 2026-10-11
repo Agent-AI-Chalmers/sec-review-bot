@@ -695,7 +695,10 @@ export class ReviewRunStore {
   ): Promise<void> {
     const uniqueKeys = [...new Set(stepKeys)].sort()
     if (uniqueKeys.length !== stepKeys.length)
-      throw new Error(`Publication ${runId} contains duplicate step keys.`)
+      throw new DeterministicControlPlaneError(
+        `Publication ${runId} contains duplicate step keys.`,
+        'PUBLICATION_STEP_SET_DUPLICATE'
+      )
     await transaction(this.pool, async (client) => {
       const owner = await client.query(
         `
@@ -728,9 +731,12 @@ export class ReviewRunStore {
         }
         return
       }
-      const persisted = existing.rows.map((row) => row.step_key)
+      const persisted = existing.rows.map((row) => row.step_key).sort()
       if (JSON.stringify(persisted) !== JSON.stringify(uniqueKeys)) {
-        throw new Error(`Publication step set changed for run ${runId}.`)
+        throw new DeterministicControlPlaneError(
+          `Publication step set changed for run ${runId}.`,
+          'PUBLICATION_STEP_SET_CHANGED'
+        )
       }
     })
   }

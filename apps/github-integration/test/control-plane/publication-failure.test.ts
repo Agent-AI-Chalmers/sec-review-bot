@@ -19,3 +19,29 @@ test('a publication step that exhausted its retry budget fails rather than retri
     reason: 'publication-step-retry-exhausted'
   })
 })
+
+test('Control Plane publication faults that cannot be repaired fail rather than retry', () => {
+  // The step set of a stored run is fixed once publication starts, so a
+  // duplicate or changed step set is re-derived identically on every claim.
+  // A generic Error without a code stays retryable, which is why these need
+  // their own codes: an uncoded deterministic fault looped forever.
+  for (const [code, reason] of [
+    [
+      RUNNER_PUBLISH_ERROR_CODES.publication_step_set_duplicate,
+      'control-plane-deterministic-publication-fault'
+    ],
+    [
+      RUNNER_PUBLISH_ERROR_CODES.publication_step_set_changed,
+      'control-plane-deterministic-publication-fault'
+    ]
+  ] as const) {
+    const error = Object.assign(new Error('Publication step set is not usable.'), { code })
+    assert.deepEqual(classifyPublicationFailure(error), { retry: false, code, reason })
+  }
+
+  assert.deepEqual(classifyPublicationFailure(new Error('Publication step set changed.')), {
+    retry: true,
+    code: null,
+    reason: 'unknown-publish-error'
+  })
+})
