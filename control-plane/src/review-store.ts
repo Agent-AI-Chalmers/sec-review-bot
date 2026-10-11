@@ -728,7 +728,7 @@ export class ReviewRunStore {
         }
         return
       }
-      const persisted = existing.rows.map((row) => row.step_key)
+      const persisted = existing.rows.map((row) => row.step_key).sort()
       if (JSON.stringify(persisted) !== JSON.stringify(uniqueKeys)) {
         throw new Error(`Publication step set changed for run ${runId}.`)
       }
