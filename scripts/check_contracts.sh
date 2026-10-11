@@ -26,9 +26,10 @@ python "$ROOT/scripts/check_markdown_wrapping.py" "$ROOT"
   # The client's record mirror is a type-only check, so it needs tsc rather than the runner.
   pnpm run typecheck
   pnpm run build
-  node --test --test-reporter=spec \
-    dist/test/control-plane/client-operation-surface.test.js \
-    dist/test/contracts/contract-schemas.test.js \
-    dist/test/contracts/repository-result.test.js \
-    dist/test/contracts/review-record.test.js
+  # The production build intentionally excludes test/; run the contract tests from source.
+  node --import tsx --test --test-reporter=spec \
+    test/control-plane/client-operation-surface.test.ts \
+    test/contracts/contract-schemas.test.ts \
+    test/contracts/repository-result.test.ts \
+    test/contracts/review-record.test.ts
 )
