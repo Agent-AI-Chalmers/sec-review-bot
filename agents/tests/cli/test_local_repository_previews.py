@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from sec_review_agents.cli.local_previewing.repository import (
     write_repository_draft_pr_previews,
@@ -253,7 +254,7 @@ def test_final_patch_preview_handles_deleted_and_binary_file_changes(
 def test_writes_blocked_confirmed_cases_preview(tmp_path: Path) -> None:
     local_root = tmp_path / "local"
     run_artifacts = local_root / "artifacts"
-    review_record = {
+    review_record: dict[str, Any] = {
         "analysis": {
             "verdict": "confirmed-defect",
             "overview": "Webhook retry payloads can reuse stale signature metadata.",
