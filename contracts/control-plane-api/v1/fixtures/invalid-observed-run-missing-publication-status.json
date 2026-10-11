@@ -12,7 +12,7 @@
     "artifact": {
       "kind": "diagnostic_bundle",
       "uri": "s3://sec-review/runs/5c1f0a52-3d4b-4e6f-8a91-0b2c3d4e5f60/artifacts/diagnostic-tree.v1.tar.zst",
-      "media_type": "application/zstd",
+      "media_type": "application/tar+zstd",
       "digest": "sha256:a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
       "size_bytes": 12345
     }

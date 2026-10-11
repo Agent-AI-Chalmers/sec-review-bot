@@ -14,7 +14,7 @@ flowchart LR
   control -->|提交并轮询| runner[Runner]
   control <-->|run 和 publication 状态| postgres[(PostgreSQL)]
   integration <-->|领取并记录 publication| control
-  ui[Control Plane UI] -->|只读查询| control
+  ui[Control Plane UI] -->|查询| control
 ```
 
 GitHub integration 负责解析 GitHub 请求、准备 input 和执行 GitHub 副作用。Runner、Temporal 和 worker 负责 workflow 执行。Control Plane 协调这些边界，但不解析原始 GitHub payload、不解释 workflow 专用 result，也不执行 agent。完整数据流见[系统架构](../docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
@@ -29,7 +29,7 @@ GitHub integration 负责解析 GitHub 请求、准备 input 和执行 GitHub �
 - 轮询 Runner，并记录执行进度、终态 workflow result 和终态 artifact 引用。
 - 让所属 integration 可以领取成功终态并执行 GitHub 发布。
 - 持久化 publication step，避免进程重启后重复已完成的远程副作用。
-- 为 Control Plane UI 提供脱敏的只读 run 查询。
+- 为 Control Plane UI 提供脱敏的 run 查询。
 
 ## Run 生命周期
 
@@ -77,8 +77,6 @@ flowchart LR
   publishing -.->|初始化副作用| steppending
 ```
 
-`ReviewRunStatus` 是读取投影，不是数据库字段。Publication 为 `pending` 或 `skipped` 时，它显示 Runner 状态；之后显示 `publishing`、`published` 或 publication `failed`。Publication step 状态需要单独查询。
-
 `publication_steps.failure_count` 只记录失败的执行。成功执行不会增加该值；失败步骤达到配置的失败次数上限后进入 `terminal_failed`。
 
 ## Claim 和恢复
@@ -99,9 +97,9 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 | `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN`    | 脱敏的 run 详情                         |
 | `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`    | Publication step 摘要                   |
 
-只读响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
+查询响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
-只读响应报告两个状态轴（`execution_status`、`publication_status`），而不是扁平的 `ReviewRunStatus`，筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。扁平状态只出现在通过 `POST /v1/store` 交换的记录上。
+查询响应报告两个状态轴（`execution_status`、`publication_status`），筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。
 
 ## 配置
 
@@ -109,7 +107,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 | ------------------------------------------ | ---------------------------------- | ----------------------------------------- |
 | `DATABASE_URL`                             | 是                                 | PostgreSQL connection string              |
 | `CONTROL_PLANE_SERVICE_TOKEN`              | 是                                 | 内部 mutation 和协调认证                  |
-| `CONTROL_PLANE_READ_TOKEN`                 | 是                                 | 只读查询认证                              |
+| `CONTROL_PLANE_READ_TOKEN`                 | 是                                 | 查询 API 认证                             |
 | `AGENT_RUNNER_SERVICE_URL`                 | 是                                 | Runner service base URL                   |
 | `AGENT_RUNNER_SERVICE_TOKEN`               | 非 loopback 或受保护的 Runner 必需 | Runner 认证                               |
 | `CONTROL_PLANE_PORT`                       | 否                                 | 监听端口；默认 `8090`                     |

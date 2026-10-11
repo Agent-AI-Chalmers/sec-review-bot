@@ -22,12 +22,11 @@ Consumers can rely on:
 
 - the field names and required fields of an observed run;
 - the two status axes, `execution_status` and `publication_status`, as separate values;
-- the `artifact_storage` variants: absent, unavailable, or available with a stored bundle.
+- the `artifact_storage` variants: absent; an error variant whose status is `unavailable` or `failed`, with optional `error_code` and `message`; or `available` with a stored bundle.
 
 The following are not part of this contract:
 
 - internal store records, such as the row shape exchanged over `POST /v1/store`;
-- the flattened status, which appears only on those store records;
 - anything the console derives for display, such as relative times or phase durations.
 
 ## What Is Not Schematized

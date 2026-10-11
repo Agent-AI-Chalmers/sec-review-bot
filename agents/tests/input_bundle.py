@@ -30,6 +30,6 @@ def write_test_input_bundle(
     return {
         "uri": archive_path.as_uri(),
         "digest": f"sha256:{hashlib.sha256(content).hexdigest()}",
-        "media_type": "application/vnd.sec-review.input-bundle.v1+tar+zstd",
+        "media_type": "application/tar+zstd",
         "size_bytes": len(content),
     }

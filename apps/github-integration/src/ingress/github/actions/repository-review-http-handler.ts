@@ -9,6 +9,7 @@ import {
   RepositoryReviewDispatchValidationError
 } from '../../../triggers/repository-review.js'
 import { splitRepoFullName } from '../../../github/repository-service.js'
+import { asErrorMessage } from '../../../utils/error-utils.js'
 import {
   authorizeRepositoryReviewDispatchOidc,
   RepositoryReviewOidcError,
@@ -122,13 +123,6 @@ async function readBody(request: IncomingMessage): Promise<Buffer> {
     request.on('end', onEnd)
     request.on('error', onError)
   })
-}
-
-function asErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
 }
 
 export async function handleRepositoryReviewDispatch({

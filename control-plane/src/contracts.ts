@@ -28,14 +28,15 @@ export type ControlPlaneWorkflow =
  * had: two methods kept sending names Control Plane had stopped accepting.
  */
 export const controlPlaneOperations = [
-  'submit_prepared_run',
-  'admit_review_run',
+  'submitPreparedRun',
+  'admitReviewRun',
   'getRun',
   'failPreparation',
   'renewPreparationClaim',
   'preparationHeartbeatIntervalMs',
   'claimNextPublication',
   'renewPublicationClaim',
+  'publicationHeartbeatIntervalMs',
   'initializePublicationSteps',
   'listPublicationSteps',
   'requirePublicationStepClaim',

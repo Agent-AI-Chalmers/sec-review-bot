@@ -13,6 +13,8 @@ For project facts, read the maintained docs:
 
 Prefer deleting misleading compatibility, obsolete paths, and false abstractions over adding concepts. Add managers, registries, base classes, adapters, framework layers, or packages only when the current code is already failing without that boundary.
 
+Do not add abstractions for a speculative future (YAGNI — You Aren't Gonna Need It). A seam whose default is an identity function or an empty adapter, and which no caller overrides, is a false abstraction, not an extension point — inline it, and add a real seam only once a second concrete implementation needs it.
+
 Split code only when the current boundary causes bugs, misleads maintainers, leaks internals, or forces repeated local knowledge. Prefer small destructive cleanup over broad redesign: remove stale names and compatibility paths, inline false indirection, tighten inputs and outputs, and add short responsibility comments only when they prevent misreads.
 
 Internal implementation choices are fair game when they create confusion, bug risk, implicit state, or maintenance cost. Public contracts can change too, but require stronger evidence and an explicit compatibility choice:

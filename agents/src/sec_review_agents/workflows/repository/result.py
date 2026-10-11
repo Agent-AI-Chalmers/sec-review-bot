@@ -8,14 +8,25 @@ from sec_review_agents.utils.payloads import mapping_payload
 
 
 class RepositoryCaseResult(BaseModel):
-    case_id: str | None = None
-    disposition: str | None = None
+    # The published repository result requires a non-empty `case_id`, a non-empty
+    # `disposition`, and a `review_record`. Keeping them optional here would serialize
+    # `null` into that result and make the integration parser reject the whole run, so
+    # fail at the builder instead.
+    case_id: str
+    disposition: str
     reason: str | None = None
-    review_record: dict[str, Any] | None = None
+    review_record: dict[str, Any]
 
     model_config = ConfigDict(extra="ignore")
 
-    @field_validator("case_id", "disposition", "reason", mode="before")
+    @field_validator("case_id", "disposition", mode="before")
+    @classmethod
+    def required_stripped_string(cls, value: Any) -> str:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        raise ValueError("a repository case result requires a non-empty value")
+
+    @field_validator("reason", mode="before")
     @classmethod
     def stripped_string_or_none(cls, value: Any) -> str | None:
         return value.strip() if isinstance(value, str) and value.strip() else None
@@ -58,9 +69,14 @@ def _repository_deliveries(
     ]
 
 
-def _repository_review_record(review_record: Any) -> dict[str, Any] | None:
+def _repository_review_record(review_record: Any) -> dict[str, Any]:
     if not isinstance(review_record, Mapping):
-        return None
+        return build_review_record(
+            analysis_result=None,
+            mitigation_result=None,
+            verifier_result=None,
+            cvss_result=None,
+        )
     return build_review_record(
         analysis_result=mapping_payload(review_record.get("analysis")),
         mitigation_result=mapping_payload(review_record.get("mitigation")),
@@ -88,10 +104,7 @@ def _repository_case_results(
                 "review_record": review_record,
             }
         )
-        result = model.model_dump(mode="json")
-        if review_record is None:
-            result.pop("review_record", None)
-        results.append(result)
+        results.append(model.model_dump(mode="json"))
     return results
 
 

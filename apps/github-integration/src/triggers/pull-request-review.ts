@@ -18,15 +18,13 @@ import {
 type PullRequestReviewEventType = 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 type StartPullRequestReview = typeof startPullRequestReviewRun
 type PullRequestReviewControlPlaneClient = {
-  admit_review_run: (
-    ...args: Parameters<typeof controlPlaneClient.admit_review_run>
+  admitReviewRun: (
+    ...args: Parameters<typeof controlPlaneClient.admitReviewRun>
   ) =>
-    | Awaited<ReturnType<typeof controlPlaneClient.admit_review_run>>
-    | ReturnType<typeof controlPlaneClient.admit_review_run>
+    | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
+    | ReturnType<typeof controlPlaneClient.admitReviewRun>
   failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
-  submit_prepared_run: (
-    ...args: Parameters<typeof controlPlaneClient.submit_prepared_run>
-  ) => unknown
+  submitPreparedRun: (...args: Parameters<typeof controlPlaneClient.submitPreparedRun>) => unknown
   renewPreparationClaim: (
     ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
   ) => Promise<boolean>
@@ -111,7 +109,7 @@ export async function startPullRequestReviewCommand({
         // Confirm the lease immediately before crossing the durable submission
         // boundary; the submission itself remains token-fenced by Control Plane.
         await heartbeat.assertOwned()
-        await store.submit_prepared_run(
+        await store.submitPreparedRun(
           run_id,
           preparationToken,
           pullRequestReviewPublishContext(prepared),

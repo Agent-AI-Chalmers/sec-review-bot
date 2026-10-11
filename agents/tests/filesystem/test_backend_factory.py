@@ -79,7 +79,7 @@ def test_local_backend_routes_use_agent_path(tmp_path: Path) -> None:
                 container_path="/mnt/material/workspace",
             )
         ],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )
 
     assert "/workspace/" in backend.routes
@@ -139,7 +139,7 @@ def test_local_backend_routes_agent_workspace_to_host_backend(tmp_path: Path) ->
         path_views=[
             workspace_view(host_path=tmp_path, writable=True),
         ],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )
 
     assert isinstance(backend, CompositeBackend)
@@ -157,7 +157,7 @@ def test_local_backend_routes_respect_writable_views(
         path_views=[
             workspace_view(host_path=tmp_path, writable=False),
         ],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )
 
     assert isinstance(backend, CompositeBackend)
@@ -182,7 +182,7 @@ def test_docker_backend_mounts_use_container_path(tmp_path: Path) -> None:
                 ),
                 tmp_view_for_backend("docker"),
             ],
-            use_docker_sandbox=True,
+            backend_kind="docker",
         )
 
     assert backend is docker_backend_cls.return_value
@@ -221,7 +221,7 @@ def test_docker_backend_adds_deepagents_artifact_roots() -> None:
         create_backend_with_path_views(
             container_name_prefix="test",
             path_views=[tmp_view_for_backend("docker")],
-            use_docker_sandbox=True,
+            backend_kind="docker",
         )
 
     container = docker_backend_cls.call_args.kwargs["container"]
@@ -264,7 +264,7 @@ def test_docker_backend_allows_container_native_path_view() -> None:
                 ),
                 tmp_view_for_backend("docker"),
             ],
-            use_docker_sandbox=True,
+            backend_kind="docker",
         )
 
     assert backend is docker_backend_cls.return_value
@@ -303,7 +303,7 @@ def test_docker_backend_does_not_add_implicit_tmp_path_view(tmp_path: Path) -> N
                     host_path=tmp_path,
                 )
             ],
-            use_docker_sandbox=True,
+            backend_kind="docker",
         )
 
     routes = docker_backend_cls.call_args.kwargs["routes"]
@@ -331,7 +331,7 @@ def test_docker_backend_rejects_host_tmp_view() -> None:
         create_backend_with_path_views(
             container_name_prefix="test",
             path_views=[tmp_view_for_backend("local")],
-            use_docker_sandbox=True,
+            backend_kind="docker",
         )
 
 
@@ -350,7 +350,7 @@ def test_local_backend_rejects_container_native_path_view() -> None:
                     writable=False,
                 )
             ],
-            use_docker_sandbox=False,
+            backend_kind="local",
         )
 
 
@@ -377,7 +377,7 @@ def test_docker_backend_explicit_image_overrides_environment_image(
                 )
             ],
             image="explicit-image:latest",
-            use_docker_sandbox=True,
+            backend_kind="docker",
         )
 
     container = docker_backend_cls.call_args.kwargs["container"]
@@ -402,7 +402,7 @@ def test_docker_path_view_rejects_missing_source_directory(tmp_path: Path) -> No
                     host_path=missing_source,
                 )
             ],
-            use_docker_sandbox=True,
+            backend_kind="docker",
         )
 
     assert not missing_source.exists()

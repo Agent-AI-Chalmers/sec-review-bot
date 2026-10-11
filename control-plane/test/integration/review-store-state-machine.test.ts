@@ -34,13 +34,13 @@ async function createQueuedRun(
   runId = `run-${randomUUID()}`
 ): Promise<string> {
   const context = {}
-  const admission = await store.create_preparing_review_run({
+  const admission = await store.createPreparingReviewRun({
     workflow: 'issue-review',
     run_id: runId,
     publish_context: context
   })
   assert.ok(admission.preparation_token)
-  await store.mark_queued(runId, admission.preparation_token, context)
+  await store.markQueued(runId, admission.preparation_token, context)
   return runId
 }
 
@@ -95,13 +95,13 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
       artifact: {
         kind: 'diagnostic_bundle',
         uri: `s3://sec-review/runs/${queuedId}/artifacts/diagnostic-tree.v1.tar.zst`,
-        media_type: 'application/zstd',
+        media_type: 'application/tar+zstd',
         digest: `sha256:${'a'.repeat(64)}`,
         size_bytes: 123
       }
     }
     await store.recordArtifactStorage(queuedId, artifactStorage)
-    await store.create_preparing_review_run({
+    await store.createPreparingReviewRun({
       workflow: 'issue-review',
       run_id: `run-${randomUUID()}`,
       publish_context: {}
@@ -122,7 +122,7 @@ test('ReviewRunStore terminates preparation after its claim expires', async () =
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-stale-preparation-${randomUUID()}`
   try {
-    await store.create_preparing_review_run({
+    await store.createPreparingReviewRun({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: {}
@@ -145,7 +145,7 @@ test('ReviewRunStore renews only the current preparation owner', async () => {
   const observer = new Pool({ connectionString: requireTestDatabase() })
   try {
     assert.equal(store.preparationHeartbeatIntervalMs(), 333)
-    const admission = await store.create_preparing_review_run({
+    const admission = await store.createPreparingReviewRun({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: {}
@@ -178,7 +178,7 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
   const runId = `run-preparation-failed-${randomUUID()}`
   const ingressKey = `delivery-${randomUUID()}`
   try {
-    const admission = await store.admit_review_run({
+    const admission = await store.admitReviewRun({
       workflow: 'pull-request-review',
       run_id: runId,
       publish_context: {},
@@ -203,7 +203,7 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
     assert.deepEqual(await store.listActiveRuns(), [])
     assert.equal(await store.claimPublication(runId), null)
 
-    const replay = await store.admit_review_run({
+    const replay = await store.admitReviewRun({
       workflow: 'pull-request-review',
       run_id: `run-replay-${randomUUID()}`,
       publish_context: {},
@@ -249,7 +249,7 @@ test('ReviewRunStore initialization does not steal another replica preparation',
   const sharedConnector = connectorId()
   const runId = `run-${randomUUID()}`
   const first = await createStore({ connectorId: sharedConnector })
-  await first.create_preparing_review_run({
+  await first.createPreparingReviewRun({
     workflow: 'issue-review',
     run_id: runId,
     publish_context: {}
@@ -278,8 +278,8 @@ test('ReviewRunStore atomically deduplicates concurrent ingress across connectio
   }
   try {
     const admissions = await Promise.all([
-      first.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` }),
-      second.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` })
+      first.admitReviewRun({ ...ingress, run_id: `run-${randomUUID()}` }),
+      second.admitReviewRun({ ...ingress, run_id: `run-${randomUUID()}` })
     ])
     assert.equal(admissions.filter((item) => item.created).length, 1)
     assert.equal(new Set(admissions.map((item) => item.record.run_id)).size, 1)
@@ -299,19 +299,19 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
     ingress_key: `delivery-${randomUUID()}`
   }
   try {
-    const first = await ownerA.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` })
-    const takeover = await ownerB.admit_review_run({ ...ingress, run_id: `run-${randomUUID()}` })
+    const first = await ownerA.admitReviewRun({ ...ingress, run_id: `run-${randomUUID()}` })
+    const takeover = await ownerB.admitReviewRun({ ...ingress, run_id: `run-${randomUUID()}` })
     assert.ok(first.preparation_token)
     assert.ok(takeover.preparation_token)
     assert.equal(takeover.record.run_id, first.record.run_id)
     assert.notEqual(takeover.preparation_token, first.preparation_token)
 
     await assert.rejects(
-      ownerA.save_prepared_submission(first.record.run_id, first.preparation_token, {}, {}),
+      ownerA.savePreparedSubmission(first.record.run_id, first.preparation_token, {}, {}),
       /cannot save prepared submission/
     )
     await assert.rejects(
-      ownerA.mark_queued(first.record.run_id, first.preparation_token, {}),
+      ownerA.markQueued(first.record.run_id, first.preparation_token, {}),
       /cannot transition/
     )
     await assert.rejects(
@@ -320,7 +320,7 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
       }),
       /claim was lost/
     )
-    await ownerB.mark_queued(takeover.record.run_id, takeover.preparation_token, {})
+    await ownerB.markQueued(takeover.record.run_id, takeover.preparation_token, {})
     assert.equal((await ownerA.getRun(first.record.run_id))?.runner_status, 'queued')
   } finally {
     await Promise.all([ownerA.close(), ownerB.close()])
@@ -331,13 +331,13 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-${randomUUID()}`
   try {
-    const admission = await store.create_preparing_review_run({
+    const admission = await store.createPreparingReviewRun({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: {}
     })
     assert.ok(admission.preparation_token)
-    await store.save_prepared_submission(
+    await store.savePreparedSubmission(
       runId,
       admission.preparation_token,
       {},

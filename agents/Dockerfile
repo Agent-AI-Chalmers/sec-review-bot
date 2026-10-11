@@ -1,4 +1,4 @@
-ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.10.9
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.13
 
 FROM ${UV_IMAGE} AS uv
 
@@ -8,8 +8,10 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     PATH="/app/.venv/bin:$PATH"
 
-# Keep the uv tool version explicit: it is a build tool, not an application
-# dependency.  Updating it should be a deliberate image-toolchain change.
+# Pin uv to a minor line rather than an exact patch: patch releases add newly
+# published Python versions, so following them keeps the image able to install
+# the Python this project targets. A major or minor upgrade stays a deliberate
+# image-toolchain change.
 COPY --from=uv /uv /uvx /bin/
 
 RUN apt-get update \

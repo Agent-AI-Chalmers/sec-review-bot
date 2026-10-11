@@ -26,7 +26,7 @@ interface StoredAdmission {
 }
 
 export interface ReviewRunAdmissionStore {
-  admit_review_run: (run: {
+  admitReviewRun: (run: {
     run_id: string
     workflow: ControlPlaneWorkflow
     publish_context: Record<string, never>
@@ -44,7 +44,7 @@ export async function admitReviewRun(
   request: ReviewRunAdmissionRequest,
   createRunId: () => string = randomUUID
 ): Promise<AdmittedReviewRun> {
-  const admission = await store.admit_review_run({
+  const admission = await store.admitReviewRun({
     run_id: createRunId(),
     workflow: request.workflow,
     publish_context: {},

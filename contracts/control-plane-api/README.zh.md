@@ -24,12 +24,11 @@ Control Plane 通过 `observeRun()` 产出每个 observed run，通过 `rowToRec
 
 - observed run 的字段名与必填字段；
 - 两条状态轴 `execution_status` 与 `publication_status`，它们是彼此独立的值；
-- `artifact_storage` 的三种变体：不存在、不可用，或可用且带有已存储的 bundle。
+- `artifact_storage` 的变体：不存在；状态为 `unavailable` 或 `failed` 的错误变体，可带 `error_code` 与 `message`；或 `available` 且带有已存储的 bundle。
 
 以下不属于本契约：
 
 - 内部存储记录，例如经 `POST /v1/store` 交换的行形状；
-- 扁平状态，它只出现在那些存储记录上；
 - 控制台为展示而派生的任何内容，例如相对时间或各阶段耗时。
 
 ## 没有 schema 的部分

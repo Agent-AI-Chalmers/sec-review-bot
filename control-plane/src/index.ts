@@ -13,7 +13,6 @@ export {
   type PublicationStepRecord,
   type PublicationWork,
   type PublishContext,
-  type PublishContextValidator,
   type ReviewRunAdmission,
   type ReviewRunRecord
 } from './review-store.js'

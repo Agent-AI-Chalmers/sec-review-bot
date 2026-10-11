@@ -1,4 +1,5 @@
 import shutil
+import subprocess
 from pathlib import Path
 
 from sec_review_agents.cli.local_materialization.common import (
@@ -8,7 +9,6 @@ from sec_review_agents.cli.local_materialization.common import (
     create_local_run_id,
     ensure_run_directories,
     history_path,
-    initialize_workspace_git_repo,
     workspace_path,
     write_input_bundle_manifest,
 )
@@ -25,6 +25,62 @@ from scripts.patcheval.dataset import (
     load_patcheval_case,
 )
 from scripts.patcheval.workspace_seed import materialize_patcheval_workspace
+
+
+def initialize_workspace_git_repo(workspace_path: Path) -> None:
+    """Create a local baseline commit for later workspace.patch generation."""
+    # Disable auto-gc while writing objects so a concurrent workspace copy does not
+    # race with loose-object pruning; then pack the repo once before snapshotting.
+    subprocess.run(
+        ["git", "init"],
+        cwd=workspace_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "sec-review-agents"],
+        cwd=workspace_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "sec-review-agents@localhost"],
+        cwd=workspace_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "-c", "gc.auto=0", "add", "--all", "."],
+        cwd=workspace_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "gc.auto=0",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "chore: initialize workspace snapshot",
+        ],
+        cwd=workspace_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "-c", "gc.auto=0", "gc", "--quiet"],
+        cwd=workspace_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def build_patcheval_issue_bundle(

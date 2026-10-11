@@ -22,7 +22,7 @@
     "artifact": {
       "kind": "diagnostic_bundle",
       "uri": "s3://sec-review/runs/9d2b7c41-6e58-4a30-9f12-3b7c8d9e0a1b/artifacts/diagnostic-tree.v1.tar.zst",
-      "media_type": "application/zstd",
+      "media_type": "application/tar+zstd",
       "digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
       "size_bytes": 4096
     }

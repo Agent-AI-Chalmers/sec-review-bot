@@ -8,7 +8,7 @@ import { promisify } from 'util'
 import { pathToFileURL } from 'url'
 import { createZstdCompress } from 'zlib'
 
-import type { InputBundleArtifactRef } from '../../runner/input.js'
+import { INPUT_BUNDLE_MEDIA_TYPE, type InputBundleArtifactRef } from '../../runner/input.js'
 import { publishInputBundle } from '../../artifacts/input-storage.js'
 
 import {
@@ -19,7 +19,6 @@ import { writeInputBundleManifest } from '../../runner/input-bundle-manifest.js'
 import { input_bundle_staging_root } from '../../config.js'
 
 const execFileAsync = promisify(execFile)
-export const INPUT_BUNDLE_MEDIA_TYPE = 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
 
 export function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, '-')

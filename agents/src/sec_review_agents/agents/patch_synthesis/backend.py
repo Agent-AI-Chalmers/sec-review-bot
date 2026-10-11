@@ -21,5 +21,5 @@ def create_patch_synthesis_backend(
                 writable=workspace_writable,
             ),
         ],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )

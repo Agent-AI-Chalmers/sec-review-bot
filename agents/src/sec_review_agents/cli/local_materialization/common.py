@@ -19,7 +19,7 @@ ReviewWorkflow = Literal[
 ]
 BUNDLE_MANIFEST_NAME = "manifest.json"
 LOCAL_INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_INPUT_BUNDLE_ROOT"
-INPUT_BUNDLE_MEDIA_TYPE = "application/vnd.sec-review.input-bundle.v1+tar+zstd"
+INPUT_BUNDLE_MEDIA_TYPE = "application/tar+zstd"
 
 
 def create_local_run_id() -> str:
@@ -146,62 +146,6 @@ def archive_input_bundle(
     # Remove the redundant repository copy only after the archive is complete.
     shutil.rmtree(workspace_path(paths), ignore_errors=True)
     return reference
-
-
-def initialize_workspace_git_repo(workspace_path: Path) -> None:
-    """Create a local baseline commit for later workspace.patch generation."""
-    # Disable auto-gc while writing objects so a concurrent workspace copy does not
-    # race with loose-object pruning; then pack the repo once before snapshotting.
-    subprocess.run(
-        ["git", "init"],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "sec-review-agents"],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.email", "sec-review-agents@localhost"],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        ["git", "-c", "gc.auto=0", "add", "--all", "."],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        [
-            "git",
-            "-c",
-            "gc.auto=0",
-            "commit",
-            "--allow-empty",
-            "-m",
-            "chore: initialize workspace snapshot",
-        ],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        ["git", "-c", "gc.auto=0", "gc", "--quiet"],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
 
 
 def materialize_workspace_with_limited_commit_history(

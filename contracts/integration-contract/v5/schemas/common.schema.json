@@ -26,7 +26,7 @@
           "pattern": "^sha256:[0-9a-f]{64}$"
         },
         "media_type": {
-          "const": "application/vnd.sec-review.input-bundle.v1+tar+zstd"
+          "const": "application/tar+zstd"
         },
         "size_bytes": {
           "type": "integer",
@@ -38,7 +38,7 @@
       "type": "string",
       "minLength": 1,
       "$comment": "Repository-relative path only: rejects leading/trailing whitespace, absolute paths, Windows drive paths, backslashes, empty path segments, . or .. segments, and .git segments.",
-      "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)(?:\\.{1,2}|\\.git)(?:/|$))(?!.*\\s$).+$"
+      "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*/$)(?!.*(?:^|/)(?:\\.{1,2}|\\.git)(?:/|$))(?!.*\\s$).+$"
     },
     "reviewIntent": {
       "type": "object",

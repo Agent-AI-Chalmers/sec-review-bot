@@ -3,6 +3,7 @@
     "observed-run.json": "observed-run.schema.json",
     "observed-run-with-steps.json": "observed-run.schema.json",
     "review-run-record.json": "review-run-record.schema.json",
+    "review-run-record-artifact-unavailable.json": "review-run-record.schema.json",
     "review-run-record-publication-failed.json": "review-run-record.schema.json"
   },
   "invalid_schema_fixtures": {
@@ -11,6 +12,9 @@
     "invalid-observed-run-artifact-without-uri.json": "observed-run.schema.json",
     "invalid-observed-run-created-at.json": "observed-run.schema.json",
     "invalid-review-run-record-raw-column.json": "review-run-record.schema.json",
-    "invalid-review-run-record-missing-publication-status.json": "review-run-record.schema.json"
+    "invalid-review-run-record-missing-publication-status.json": "review-run-record.schema.json",
+    "invalid-review-run-record-available-without-artifact.json": "review-run-record.schema.json",
+    "invalid-review-run-record-error-with-artifact.json": "review-run-record.schema.json",
+    "invalid-review-run-record-available-with-error-code.json": "review-run-record.schema.json"
   }
 }

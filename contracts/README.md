@@ -53,6 +53,4 @@ For any contract change:
 - update the specification for the affected version;
 - update its schemas;
 - update or add its fixtures and manifest entries;
-- make both the Python and TypeScript tests validate the same files;
-- keep [scripts/check_contracts.sh](../scripts/check_contracts.sh) aligned with the
-  validation surface, and run it before publishing the change.
+- make both the Python and TypeScript tests validate the same files.

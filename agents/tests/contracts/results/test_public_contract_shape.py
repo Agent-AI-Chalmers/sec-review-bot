@@ -1,6 +1,9 @@
 from collections.abc import Mapping
 from typing import Any
 
+import pytest
+from pydantic import ValidationError
+
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
@@ -391,3 +394,55 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
     assert review_record["mitigation"]["changed_files"] == []
     assert review_record["verification"]["patch_coverage"] is None
     assert review_record["cvss"] is None
+
+
+def test_repository_case_result_defaults_missing_review_record_to_not_run() -> None:
+    """A public case result must carry a schema-valid review_record, never null."""
+    result = build_repository_workflow_result(
+        discovery_result={},
+        triage_result={},
+        delivery_result=None,
+        case_results=[
+            {
+                "case_id": "case-1",
+                "disposition": "blocked",
+                "reason": "case processing failed",
+            },
+        ],
+    )
+
+    review_record = result["case_results"][0]["review_record"]
+    assert review_record == not_run_review_record()
+    assert_matches_v5_schema(result, "repository-review-result.schema.json")
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        {"disposition": "blocked", "review_record": {}},
+        {"case_id": "case-1", "review_record": {}},
+        {"case_id": "case-1", "disposition": "   ", "review_record": {}},
+        {"case_id": "  ", "disposition": "blocked", "review_record": {}},
+    ],
+    ids=[
+        "missing-case-id",
+        "missing-disposition",
+        "blank-disposition",
+        "blank-case-id",
+    ],
+)
+def test_repository_case_result_rejects_a_null_public_identity(
+    case: dict[str, Any],
+) -> None:
+    """The v5 schema requires a non-empty case_id and disposition.
+
+    Serializing `null` for either makes the integration parser reject the whole run, so
+    the builder must fail instead of emitting an invalid public result.
+    """
+    with pytest.raises(ValidationError):
+        build_repository_workflow_result(
+            discovery_result={},
+            triage_result={},
+            delivery_result=None,
+            case_results=[case],
+        )

@@ -36,7 +36,7 @@ flowchart LR
 
 Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run，Runner Service 和 Temporal 分派任务，宿主机 worker 在 Docker sandbox 中执行 agent。PostgreSQL 保存控制状态，RustFS 保存运行输入和 artifact。
 
-Control Plane UI 是独立部署的只读控制台。它的同源服务端从 Control Plane 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
+Control Plane UI 是独立部署的控制台。它的同源服务端从 Control Plane 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 没有 worker 时，提交的任务会停留在 Temporal 中等待执行。
 
@@ -300,7 +300,7 @@ sudo systemctl stop sec-review-bot.target
 sudo systemctl restart sec-review-bot.target
 ```
 
-Temporal development server 的状态保存在 `.agent-temporal-state` 下，因此上述日常启停和重启会保留 workflow history 与待处理任务。
+Temporal development server 的状态保存在 `.agent-temporal-state` 下，因此上述日常启停和重启会保留 workflow history 与待处理任务。停止会移除 Compose 容器与网络（`docker compose down`），每次启动重新创建，因此容器不可能比它创建时所在的网络活得更久；所有状态都保存在仓库本地的 bind mount 中。
 
 查看整体状态和日志：
 
@@ -393,13 +393,13 @@ sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
 
 `.agent-memory` 会跨多次运行持续保存，不属于常规清理范围。只有在确实需要重置 agent memory 时，才应先停止 worker，再单独删除 `.agent-memory`。该操作会永久删除已提取的 observations 和维护后的 memory。
 
-### 备份与恢复
-
-RustFS 状态和 PostgreSQL 状态是两套独立数据。应将 `.agent-rustfs-state`、`.agent-postgres-state` 与部署配置一起备份，但不要把密码和 access key 写入备份包，应交由 secret manager 单独保存。恢复时先恢复 RustFS，再运行 RustFS 初始化器重新核对 bucket 和策略，最后恢复 PostgreSQL，这样 run 记录中的对象引用才有对应的存储内容。初始化器可以重复运行，不会覆盖已有对象。
-
 ```bash
 sudo rm -rf .agent-memory
 ```
+
+### 备份与恢复
+
+RustFS 状态和 PostgreSQL 状态是两套独立数据。应将 `.agent-rustfs-state`、`.agent-postgres-state` 与部署配置一起备份，但不要把密码和 access key 写入备份包，应交由 secret manager 单独保存。恢复时先恢复 RustFS，再运行 RustFS 初始化器重新核对 bucket 和策略，最后恢复 PostgreSQL，这样 run 记录中的对象引用才有对应的存储内容。初始化器可以重复运行，不会覆盖已有对象。
 
 ## 代理
 

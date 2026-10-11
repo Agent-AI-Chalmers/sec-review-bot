@@ -10,6 +10,7 @@ import {
   renderIssueReviewCommentFromReviewRecord
 } from './renderer.js'
 import { logInfo } from '../../utils/logger.js'
+import { asErrorMessage } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
 import type { ControlPlaneClient } from '../../control-plane/client.js'
@@ -46,13 +47,6 @@ type InstallationOctokitForRepo = (repo_full_name: string) => Promise<unknown>
 type CompletedRunnerRun = {
   run_id: string
   publish_context: Record<string, unknown>
-}
-
-function asErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
 }
 
 function issueReviewResultFromWorkflowResult(result: unknown): IssueReviewWorkflowResult | null {

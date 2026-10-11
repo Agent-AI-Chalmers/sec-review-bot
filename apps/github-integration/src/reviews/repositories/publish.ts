@@ -19,6 +19,7 @@ import {
   REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE
 } from './renderer.js'
 import { logError, logInfo } from '../../utils/logger.js'
+import { asErrorMessage } from '../../utils/error-utils.js'
 import {
   parseRepositoryWorkflowResult,
   type RepositoryCaseResult,
@@ -57,13 +58,6 @@ type CompletedRunnerRun = {
 
 function repositorySummaryRunMarker(run_id: string): string {
   return `<!-- sec-review-bot:repository-summary-run:${run_id} -->`
-}
-
-function asErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
 }
 
 function repositoryResultFromWorkflowResult(result: unknown): RepositoryWorkflowResult | null {

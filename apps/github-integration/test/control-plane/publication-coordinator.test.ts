@@ -41,7 +41,7 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
     failPublication: async () => {
       throw new Error('A lease failure must not be converted into publication failure.')
     },
-    connector_id: 'github-app:test'
+    connectorId: 'github-app:test'
   } as unknown as ControlPlaneClient
   const app = {
     octokit: {

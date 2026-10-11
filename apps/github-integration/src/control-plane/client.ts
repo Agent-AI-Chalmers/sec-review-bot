@@ -70,7 +70,7 @@ function requestTimeoutMs(): number {
 }
 
 class HttpControlPlaneClient {
-  readonly connector_id = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
+  readonly connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
 
   private async call<T>(operation: string, ...args: unknown[]): Promise<T> {
     const controller = new AbortController()
@@ -113,19 +113,15 @@ class HttpControlPlaneClient {
     return parsePublishContextForWorkflow(run.workflow, context)
   }
 
-  async initialize(): Promise<void> {}
-
-  async close(): Promise<void> {}
-
   // Admission deliberately persists an empty context: run identity exists
   // before input preparation discovers the workflow-specific publish target.
-  async admit_review_run(
+  async admitReviewRun(
     run: CreateReviewRunArgs & Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
   ): Promise<ReviewRunAdmission> {
-    return await this.call<ReviewRunAdmission>('admit_review_run', run)
+    return await this.call<ReviewRunAdmission>('admitReviewRun', run)
   }
 
-  async submit_prepared_run(
+  async submitPreparedRun(
     runId: string,
     token: string,
     context: PublishContext,
@@ -133,7 +129,7 @@ class HttpControlPlaneClient {
   ): Promise<void> {
     const publishContext = await this.validateContext(runId, context)
     try {
-      await this.call('submit_prepared_run', runId, token, publishContext, input)
+      await this.call('submitPreparedRun', runId, token, publishContext, input)
     } catch (error) {
       const code =
         error instanceof Error && 'code' in error && typeof error.code === 'string'
@@ -197,8 +193,8 @@ class HttpControlPlaneClient {
     return await this.call('renewPublicationClaim', runId, token)
   }
 
-  publicationHeartbeatIntervalMs(): number {
-    return 60_000
+  async publicationHeartbeatIntervalMs(): Promise<number> {
+    return await this.call('publicationHeartbeatIntervalMs')
   }
 
   async initializePublicationSteps(runId: string, token: string, keys: string[]): Promise<void> {
@@ -256,9 +252,9 @@ class HttpControlPlaneClient {
 
 export type ControlPlaneClient = Pick<
   HttpControlPlaneClient,
-  | 'connector_id'
-  | 'admit_review_run'
-  | 'submit_prepared_run'
+  | 'connectorId'
+  | 'admitReviewRun'
+  | 'submitPreparedRun'
   | 'getRun'
   | 'renewPreparationClaim'
   | 'preparationHeartbeatIntervalMs'

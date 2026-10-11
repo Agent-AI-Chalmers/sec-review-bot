@@ -72,8 +72,8 @@ Python runner 支持：
   - discovery / triage / analyzer / cvss-v4-scoring / mitigator / verifier / delivery
   - delivery 会把 repository cases 组织成可发布的交付结果；未交付 case 仍通过 case result 展示
 - 本地评测 / ablation 路径：
-  - `issue-review-two-stage`
-  - `issue-review-single-agent`（local baseline）
+  - `issue-review` 配 `--strategy two-stage`
+  - `issue-review` 配 `--strategy single-agent`（local baseline）
 
 resources 位于 package 内部：
 

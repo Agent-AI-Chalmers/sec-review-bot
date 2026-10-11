@@ -11,12 +11,6 @@ const RESULT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
   'repository-review': 'repository-review-result.schema.json'
 }
 
-const INPUT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
-  'issue-review': 'issue-review-input.schema.json',
-  'pull-request-review': 'pull-request-review-input.schema.json',
-  'repository-review': 'repository-review-input.schema.json'
-}
-
 let validators: Map<string, ValidateFunction> | null = null
 
 function contractSchemasRoot(): string {
@@ -50,14 +44,9 @@ function resultValidators(): Map<string, ValidateFunction> {
   const ajv = new Ajv2020({ allErrors: true })
   const commonSchema = readSchema(root, 'common.schema.json')
   ajv.addSchema(commonSchema)
-  ajv.addSchema(commonSchema, 'common.schema.json')
 
   validators = new Map<string, ValidateFunction>([
     ['review-record.schema.json', ajv.compile(readSchema(root, 'review-record.schema.json'))],
-    ...Object.values(INPUT_SCHEMA_BY_WORKFLOW).map((name): [string, ValidateFunction] => [
-      name,
-      ajv.compile(readSchema(root, name))
-    ]),
     ...Object.values(RESULT_SCHEMA_BY_WORKFLOW).map((name): [string, ValidateFunction] => [
       name,
       ajv.compile(readSchema(root, name))
@@ -81,10 +70,6 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
 
 export function assertV5WorkflowResult(workflow: WorkflowName, value: unknown): void {
   assertSchema(RESULT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} result`)
-}
-
-export function assertV5WorkflowInput(workflow: WorkflowName, value: unknown): void {
-  assertSchema(INPUT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} input`)
 }
 
 export function assertV5ReviewRecord(value: unknown): void {

@@ -34,7 +34,7 @@ flowchart LR
 
 Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, Runner Service and Temporal dispatch its work, and the host worker executes the agents in Docker sandboxes. PostgreSQL stores control state, while RustFS stores run inputs and artifacts.
 
-Control Plane UI is a separately deployed, read-only console. Its same-origin server reads run state from Control Plane and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
+Control Plane UI is a separately deployed console. Its same-origin server reads run state from Control Plane and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
 
 Without a worker, submitted tasks remain in Temporal waiting for execution.
 
@@ -298,7 +298,7 @@ sudo systemctl stop sec-review-bot.target
 sudo systemctl restart sec-review-bot.target
 ```
 
-Temporal development-server state is stored under `.agent-temporal-state`, so these routine lifecycle operations preserve workflow history and pending tasks.
+Temporal development-server state is stored under `.agent-temporal-state`, so these routine lifecycle operations preserve workflow history and pending tasks. Stopping removes the Compose containers and network (`docker compose down`); every start creates them again, so a container can never outlive the network it was created on. All state lives in the repository-local bind mounts.
 
 Inspect the deployment status and logs:
 
@@ -391,13 +391,13 @@ sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
 
 The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.
 
-### Backup and recovery
-
-RustFS state and PostgreSQL state are independent data sets. Back up `.agent-rustfs-state` and `.agent-postgres-state` together with the deployment configuration, but store passwords and access keys in the secret manager rather than in the backup archive. A recovery must restore RustFS first, run the RustFS initializer to reconcile the bucket and policies, and then restore PostgreSQL so run records can resolve their stored artifact references. The initializer is safe to run repeatedly; it does not replace existing objects.
-
 ```bash
 sudo rm -rf .agent-memory
 ```
+
+### Backup and recovery
+
+RustFS state and PostgreSQL state are independent data sets. Back up `.agent-rustfs-state` and `.agent-postgres-state` together with the deployment configuration, but store passwords and access keys in the secret manager rather than in the backup archive. A recovery must restore RustFS first, run the RustFS initializer to reconcile the bucket and policies, and then restore PostgreSQL so run records can resolve their stored artifact references. The initializer is safe to run repeatedly; it does not replace existing objects.
 
 ## Proxies
 

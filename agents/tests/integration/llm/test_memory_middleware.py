@@ -81,7 +81,7 @@ async def test_llm_uses_memory_index_to_read_relevant_topic(tmp_path: Path) -> N
     backend = create_backend_with_path_views(
         container_name_prefix="memory-middleware-probe",
         path_views=[memory_view(host_path=runtime_memory_root)],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )
 
     deployment = llm_test_deployment()

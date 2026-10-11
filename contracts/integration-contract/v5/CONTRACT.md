@@ -35,7 +35,7 @@ The `tar.zst` archive must contain `manifest.json`, the workspace snapshot, hist
 interface InputBundleArtifactRef {
   uri: string // file: or s3:
   digest: `sha256:${string}`
-  media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
+  media_type: 'application/tar+zstd'
   size_bytes: number
 }
 ```
@@ -159,7 +159,7 @@ Repository scan scope controls cost and coverage. The runner must not guess it:
 
 - Missing or unknown `scan_mode` does not default to `full`. A full scan can scan the whole repository, so cost and latency must be explicit caller decisions.
 - `incremental` also cannot be inferred from missing configuration. The caller must provide an explicit incremental window and `scan_scope.incremental_changed_files`.
-- `scan_scope` is a required safety valve, not an optional optimization; it declares file size limits, ignored paths, and incremental changed-file scope.
+- `scan_scope` is a required safety valve, not an optional optimization; it declares ignored paths and incremental changed-file scope.
 
 ## 2. Workflow Results
 
@@ -243,7 +243,7 @@ interface IssueWorkflowResult {
 }
 ```
 
-`issue-review-two-stage` and `issue-review-single-agent` are local evaluation / ablation paths. They may be started by local CLI as local-only Temporal workflows, but they are not part of the standard public runner contract.
+The `two-stage` and `single-agent` issue strategies (`--strategy` on the local issue CLI) are local evaluation / ablation paths. They start as local-only Temporal workflows on the `issue-review` workflow, but they are not part of the standard public runner contract.
 
 Callers must render issue comments, decide whether a patch exists, and create draft PRs from `review_record`. When publishing a draft PR, `review_record.mitigation.file_changes` is the authoritative source for final file contents.
 
@@ -319,6 +319,7 @@ The GitHub summary renderer can render confirmed cases that did not reach the de
 interface RepositoryDelivery {
   delivery_id: string
   case_ids: string[]
+  patch_diff: string
   file_changes: Array<
     | {
         path: string
@@ -335,7 +336,7 @@ interface RepositoryDelivery {
 }
 ```
 
-`RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry final `file_changes`; display file paths are derived from `file_changes[].path`. `case_ids` links back to case-level review details in top-level `case_results[]`.
+`RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry the generated `patch_diff` and final `file_changes`; display file paths are derived from `file_changes[].path`. `file_changes` is authoritative for applying content; `patch_diff` is the diff/reference view and must not be used to reconstruct publishable file contents. `case_ids` links back to case-level review details in top-level `case_results[]`.
 
 ### Validation Ownership
 

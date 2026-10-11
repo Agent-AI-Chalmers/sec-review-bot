@@ -17,6 +17,7 @@ import { controlPlaneClient } from '../control-plane/client.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import { createRunId } from '../reviews/shared/input-bundle.js'
 import { logInfo } from '../utils/logger.js'
+import { asErrorMessage } from '../utils/error-utils.js'
 
 export interface RepositoryReviewDispatchPayload {
   repo_full_name?: unknown
@@ -184,28 +185,19 @@ interface DispatchRepositoryReviewCommandDeps {
   resolve_dispatch: typeof resolveRepositoryReviewDispatch
   submit_run: typeof startRepositoryReviewRun
   store: {
-    admit_review_run: (
-      ...args: Parameters<typeof controlPlaneClient.admit_review_run>
+    admitReviewRun: (
+      ...args: Parameters<typeof controlPlaneClient.admitReviewRun>
     ) =>
-      | Awaited<ReturnType<typeof controlPlaneClient.admit_review_run>>
-      | ReturnType<typeof controlPlaneClient.admit_review_run>
+      | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
+      | ReturnType<typeof controlPlaneClient.admitReviewRun>
     failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
-    submit_prepared_run: (
-      ...args: Parameters<typeof controlPlaneClient.submit_prepared_run>
-    ) => unknown
+    submitPreparedRun: (...args: Parameters<typeof controlPlaneClient.submitPreparedRun>) => unknown
     renewPreparationClaim: (
       ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
     ) => Promise<boolean>
     preparationHeartbeatIntervalMs: typeof controlPlaneClient.preparationHeartbeatIntervalMs
   }
   create_run_id: typeof createRunId
-}
-
-function asErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
 }
 
 async function getRepositoryInstallationOctokit(
@@ -295,7 +287,7 @@ export async function dispatchRepositoryReview({
         // Confirm the lease immediately before crossing the durable submission
         // boundary; the submission itself remains token-fenced by Control Plane.
         await heartbeat.assertOwned()
-        await store.submit_prepared_run(
+        await store.submitPreparedRun(
           run_id,
           preparationToken,
           repositoryReviewPublishContext(prepared),

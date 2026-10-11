@@ -26,10 +26,10 @@ test('prepared submission persists input before crossing the Runner boundary', a
       async getRun() {
         return run
       },
-      async save_prepared_submission() {
+      async savePreparedSubmission() {
         events.push('persist')
       },
-      async mark_queued() {
+      async markQueued() {
         events.push('queued')
       },
       async failPreparation() {
@@ -60,8 +60,8 @@ test('uncertain Runner submission is persisted for recovery', async () => {
         async getRun() {
           return run
         },
-        async save_prepared_submission() {},
-        async mark_queued() {
+        async savePreparedSubmission() {},
+        async markQueued() {
           assert.fail('uncertain submission must not queue')
         },
         async failPreparation(_runId, _token, value) {
@@ -91,8 +91,8 @@ test('a queued-state write failure after Runner accepts is recoverable uncertain
         async getRun() {
           return run
         },
-        async save_prepared_submission() {},
-        async mark_queued() {
+        async savePreparedSubmission() {},
+        async markQueued() {
           throw new Error('database unavailable')
         },
         async failPreparation(_runId, _token, value) {

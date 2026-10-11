@@ -140,11 +140,6 @@ done
 
 cd "$REPO_ROOT" || exit 1
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "jq is required to read the PatchEval dataset." >&2
-  exit 2
-fi
-
 if [ ! -f "$DATASET" ]; then
   echo "Dataset not found: $DATASET" >&2
   exit 2
@@ -194,112 +189,9 @@ shell_join() {
   printf '%s' "$out"
 }
 
-experiment_specs() {
-  local cve="$1"
-  printf '%s|%s|%s\n' "$cve" "end-to-end-default" ""
-  printf '%s|%s|%s\n' "$cve" "end-to-end-single-agent" "--single-agent"
-  printf '%s|%s|%s\n' "$cve" "end-to-end-two-stage" "--two-stage"
-  printf '%s|%s|%s\n' "$cve" "location-oracle-default" "--location-oracle"
-  printf '%s|%s|%s\n' "$cve" "location-oracle-single-agent" "--single-agent --location-oracle"
-  printf '%s|%s|%s\n' "$cve" "location-oracle-two-stage" "--two-stage --location-oracle"
-}
-
-first_workspace_patch() {
-  local run_dir="$1"
-  local artifacts="$run_dir/artifacts/$(basename "$run_dir")"
-  local path
-
-  # PatchEval CVE experiments currently use issue/PR-style workflow artifacts.
-  # This helper is not repository-delivery-aware.
-  for path in \
-    "$artifacts/mitigator/workspace.patch" \
-    "$artifacts/single-agent/workspace.patch"
-  do
-    if [ -f "$path" ]; then
-      printf '%s\n' "$path"
-      return 0
-    fi
-  done
-
-  for path in "$artifacts"/*/workspace.patch; do
-    if [ -f "$path" ]; then
-      printf '%s\n' "$path"
-      return 0
-    fi
-  done
-
-  find "$artifacts" -name workspace.patch -type f 2>/dev/null | sort | head -n1
-}
-
-experiment_status() {
-  local cve="$1"
-  local variant="$2"
-  local experiment_name="${cve}-${variant}"
-  local out_dir="$REPO_ROOT/.agent-workspace-patcheval-${cve}-${TAG}"
-  local link_path="$out_dir/$experiment_name"
-  local target=""
-  local run_dir=""
-  local exit_code=""
-  local patch_path=""
-  local patch_bytes=""
-
-  if [ ! -e "$out_dir" ]; then
-    printf 'missing-workspace'
-    return 0
-  fi
-
-  if [ ! -d "$out_dir" ]; then
-    printf 'blocked-workspace'
-    return 0
-  fi
-
-  if [ ! -e "$link_path" ]; then
-    printf 'missing-symlink'
-    return 0
-  fi
-
-  if [ ! -L "$link_path" ]; then
-    printf 'blocked-non-symlink'
-    return 0
-  fi
-
-  target="$(readlink "$link_path")"
-  run_dir="$out_dir/$target"
-  if [ ! -d "$run_dir" ]; then
-    printf 'missing-target'
-    return 0
-  fi
-
-  if [ ! -f "$run_dir/exit-code.txt" ]; then
-    printf 'missing-exit-code'
-    return 0
-  fi
-
-  exit_code="$(tr -d '[:space:]' < "$run_dir/exit-code.txt")"
-  if [ "$exit_code" != "0" ]; then
-    printf 'exit-%s' "$exit_code"
-    return 0
-  fi
-
-  patch_path="$(first_workspace_patch "$run_dir")"
-  if [ -z "$patch_path" ]; then
-    printf 'missing-patch'
-    return 0
-  fi
-
-  patch_bytes="$(wc -c < "$patch_path")"
-  if [ "$REQUIRE_NONEMPTY_PATCH" -eq 1 ] && [ "$patch_bytes" -eq 0 ]; then
-    printf 'empty-patch'
-    return 0
-  fi
-
-  printf 'complete'
-}
-
 run_experiment() {
   local cve="$1"
   local variant="$2"
-  local arg_string="$3"
   local experiment_name="${cve}-${variant}"
   local out_dir="$REPO_ROOT/.agent-workspace-patcheval-${cve}-${TAG}"
   local tmp_log_dir="$out_dir/_logs"
@@ -309,19 +201,9 @@ run_experiment() {
   local tmp_runlog="$tmp_log_dir/${experiment_name}.run.log"
   local local_root=""
   local status=0
-  local -a extra_args=()
   local -a cmd=()
 
-  if [ -n "$arg_string" ]; then
-    # arg_string is controlled by experiment_specs above.
-    # shellcheck disable=SC2206
-    extra_args=($arg_string)
-  fi
-
-  cmd=("${RUN_PATCHEVAL[@]}" --cve "$cve" --dataset "$DATASET" --output-dir "$out_dir")
-  if [ "${#extra_args[@]}" -gt 0 ]; then
-    cmd+=("${extra_args[@]}")
-  fi
+  cmd=("${RUN_PATCHEVAL[@]}" --cve "$cve" --dataset "$DATASET" --output-dir "$out_dir" --variant "$variant")
 
   mkdir -p "$out_dir" "$tmp_log_dir"
   echo "[$(date -u +%H:%M:%SZ)] START $experiment_name"
@@ -353,7 +235,7 @@ run_experiment() {
       perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' "$local_root/logs/run.stderr.log"
       echo
       echo "===== STDOUT (metadata) ====="
-      grep -E '^(LOCAL_ROOT|WORKFLOW_RESULT|PATCH_JSON)=' "$local_root/logs/run.stdout.log" || true
+      grep -E '^(LOCAL_ROOT|WORKFLOW_RESULT)=' "$local_root/logs/run.stdout.log" || true
     } > "$tmp_runlog"
     mv "$tmp_runlog" "$local_root/logs/run.log"
     rm -f "$tmp_header"
@@ -378,52 +260,69 @@ run_experiment() {
   return "$status"
 }
 
-mapfile -t ALL_CVES < <(jq -r '.[].cve_id' "$DATASET")
-
 QUEUE=()
 complete_count=0
 queued_count=0
 skipped_incomplete_count=0
 blocked_count=0
 
-for cve in "${ALL_CVES[@]}"; do
-  if [ "${#ONLY[@]}" -gt 0 ] && ! contains "$cve" "${ONLY[@]}"; then
+# One status line per CVE and executable variant, straight from the shared workspace
+# inspection so this driver and the collector cannot disagree about what is complete.
+# The output is captured rather than streamed so a failure to read it is not mistaken for
+# an empty queue, and so the counters below stay in this shell.
+if ! WORKSPACE_STATES="$(
+  "$PYTHON_BIN" -m scripts.patcheval.workspace_state \
+    --root "$REPO_ROOT" --tag "$TAG" --dataset "$DATASET"
+)"; then
+  echo "Could not read PatchEval workspace statuses." >&2
+  exit 2
+fi
+if [ -z "$WORKSPACE_STATES" ]; then
+  echo "No PatchEval workspace statuses were produced for $DATASET." >&2
+  exit 2
+fi
+
+while IFS=$'\t' read -r spec_cve variant status; do
+  if [ "${#ONLY[@]}" -gt 0 ] && ! contains "$spec_cve" "${ONLY[@]}"; then
     continue
   fi
-  if contains "$cve" "${EXCLUDE[@]}"; then
+  if contains "$spec_cve" "${EXCLUDE[@]}"; then
     continue
   fi
 
-  while IFS='|' read -r spec_cve variant arg_string; do
-    status="$(experiment_status "$spec_cve" "$variant")"
-    case "$status" in
-      complete)
-        complete_count=$((complete_count + 1))
-        ;;
-      blocked-*)
-        blocked_count=$((blocked_count + 1))
-        printf 'SKIP %s\t%s\t%s\n' "$status" "$spec_cve" "$variant" >&2
-        ;;
-      exit-*|missing-target|missing-exit-code|missing-patch|empty-patch)
-        if [ "$RESUME_INCOMPLETE" -eq 1 ]; then
-          QUEUE+=("${spec_cve}|${variant}|${arg_string}|${status}")
-          queued_count=$((queued_count + 1))
-        else
-          skipped_incomplete_count=$((skipped_incomplete_count + 1))
-          printf 'SKIP %s\t%s\t%s\n' "$status" "$spec_cve" "$variant" >&2
-        fi
-        ;;
-      missing-workspace|missing-symlink)
-        QUEUE+=("${spec_cve}|${variant}|${arg_string}|${status}")
+  # An empty patch counts as complete unless the caller demands a non-empty one.
+  effective_status="$status"
+  if [ "$status" = "empty-patch" ] && [ "$REQUIRE_NONEMPTY_PATCH" -eq 0 ]; then
+    effective_status="complete"
+  fi
+
+  case "$effective_status" in
+    complete)
+      complete_count=$((complete_count + 1))
+      ;;
+    blocked-*)
+      blocked_count=$((blocked_count + 1))
+      printf 'SKIP %s\t%s\t%s\n' "$effective_status" "$spec_cve" "$variant" >&2
+      ;;
+    exit-*|missing-target|missing-exit-code|missing-patch|empty-patch)
+      if [ "$RESUME_INCOMPLETE" -eq 1 ]; then
+        QUEUE+=("${spec_cve}|${variant}|${effective_status}")
         queued_count=$((queued_count + 1))
-        ;;
-      *)
-        blocked_count=$((blocked_count + 1))
-        printf 'SKIP unknown:%s\t%s\t%s\n' "$status" "$spec_cve" "$variant" >&2
-        ;;
-    esac
-  done < <(experiment_specs "$cve")
-done
+      else
+        skipped_incomplete_count=$((skipped_incomplete_count + 1))
+        printf 'SKIP %s\t%s\t%s\n' "$effective_status" "$spec_cve" "$variant" >&2
+      fi
+      ;;
+    missing-workspace|missing-symlink)
+      QUEUE+=("${spec_cve}|${variant}|${effective_status}")
+      queued_count=$((queued_count + 1))
+      ;;
+    *)
+      blocked_count=$((blocked_count + 1))
+      printf 'SKIP unknown:%s\t%s\t%s\n' "$effective_status" "$spec_cve" "$variant" >&2
+      ;;
+  esac
+done <<< "$WORKSPACE_STATES"
 
 if [ -n "$LIMIT" ] && [ "${#QUEUE[@]}" -gt "$LIMIT" ]; then
   QUEUE=("${QUEUE[@]:0:$LIMIT}")
@@ -449,14 +348,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo
   echo "Queued commands:"
   for spec in "${QUEUE[@]}"; do
-    IFS='|' read -r cve variant arg_string reason <<< "$spec"
+    IFS='|' read -r cve variant reason <<< "$spec"
     out_dir="$REPO_ROOT/.agent-workspace-patcheval-${cve}-${TAG}"
-    cmd=("${RUN_PATCHEVAL[@]}" --cve "$cve" --dataset "$DATASET" --output-dir "$out_dir")
-    if [ -n "$arg_string" ]; then
-      # shellcheck disable=SC2206
-      extra_args=($arg_string)
-      cmd+=("${extra_args[@]}")
-    fi
+    cmd=("${RUN_PATCHEVAL[@]}" --cve "$cve" --dataset "$DATASET" --output-dir "$out_dir" --variant "$variant")
     printf '  # %s %s (%s)\n' "$cve" "$variant" "$reason"
     printf '  %s\n' "$(shell_join "${cmd[@]}")"
   done
@@ -501,8 +395,8 @@ for spec in "${QUEUE[@]}"; do
     break
   fi
 
-  IFS='|' read -r cve variant arg_string reason <<< "$spec"
-  run_experiment "$cve" "$variant" "$arg_string" &
+  IFS='|' read -r cve variant reason <<< "$spec"
+  run_experiment "$cve" "$variant" &
   pid=$!
   printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$cve" "$variant" "$reason" "$pid" >> "$MANIFEST"
 done

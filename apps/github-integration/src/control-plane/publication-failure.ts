@@ -1,4 +1,4 @@
-import { asErrorWithResponse } from '../utils/error-utils.js'
+import { asErrorWithResponse, errorCode } from '../utils/error-utils.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../runner/publish-error-code.js'
 import { isDeterministicRunnerPublishError } from '../runner/publish-error.js'
 
@@ -6,14 +6,6 @@ interface PublishFailureClassification {
   retry: boolean
   code: string | null
   reason: string
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function errorCode(error: unknown): string | null {
-  return isRecord(error) && typeof error.code === 'string' ? error.code : null
 }
 
 function isRateLimitOrAbuseLimit(error: unknown): boolean {
@@ -33,6 +25,16 @@ function isRateLimitOrAbuseLimit(error: unknown): boolean {
 export function classifyPublicationFailure(error: unknown): PublishFailureClassification {
   if (isDeterministicRunnerPublishError(error)) {
     return { retry: false, code: errorCode(error), reason: 'deterministic-publish-result' }
+  }
+  // A publication step that exhausted its retry budget is terminal. Retrying the
+  // whole publication re-claims the same terminal_failed step and fails the same
+  // way, so it must fail rather than loop.
+  if (errorCode(error) === RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted) {
+    return {
+      retry: false,
+      code: errorCode(error),
+      reason: 'publication-step-retry-exhausted'
+    }
   }
 
   const responseStatus = asErrorWithResponse(error).status

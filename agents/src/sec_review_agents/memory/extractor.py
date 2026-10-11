@@ -289,7 +289,7 @@ async def _extract_memory_observation_for_refs(
                     host_path=transcript_root,
                 ),
             ],
-            use_docker_sandbox=False,
+            backend_kind="local",
         )
         model = create_chat_model(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,

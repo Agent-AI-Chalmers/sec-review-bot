@@ -12,7 +12,7 @@ flowchart LR
   control -->|submit and poll| runner[Runner]
   control <-->|run and publication state| postgres[(PostgreSQL)]
   integration <-->|claim and record publication| control
-  ui[Control Plane UI] -->|read-only queries| control
+  ui[Control Plane UI] -->|queries| control
 ```
 
 GitHub integration owns GitHub request parsing, input preparation, and GitHub side effects. Runner, Temporal, and the worker own workflow execution. Control Plane coordinates those boundaries without parsing raw GitHub payloads, interpreting workflow-specific results, or executing agents. See the [system architecture](../docs/architecture/SYSTEM_ARCHITECTURE.md) for the complete data flow.
@@ -27,7 +27,7 @@ The service runs as an independent Node.js process on port `8090` by default. Po
 - Polls Runner and records execution progress, terminal workflow results, and terminal artifact references.
 - Makes successful terminal results claimable by the owning integration for GitHub publication.
 - Persists publication steps so completed remote side effects are not repeated after restart.
-- Exposes redacted, read-only run queries for the Control Plane UI.
+- Exposes redacted run queries for the Control Plane UI.
 
 ## Run lifecycle
 
@@ -75,8 +75,6 @@ flowchart LR
   publishing -.->|initializes side effects| steppending
 ```
 
-`ReviewRunStatus` is a read projection rather than a database column. It shows Runner status while publication is `pending` or `skipped`, then shows `publishing`, `published`, or publication `failed`. Publication-step status is queried separately.
-
 `publication_steps.failure_count` records failed executions only. A successful execution does not increment it; a failed step becomes `terminal_failed` after reaching the configured failure limit.
 
 ## Claims and recovery
@@ -99,7 +97,7 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
-Read responses report the two status axes (`execution_status`, `publication_status`) rather than the flattened `ReviewRunStatus`, and filter on the same names; [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is their contract. The flattened status appears only on the records exchanged over `POST /v1/store`.
+Read responses report the two status axes (`execution_status`, `publication_status`), and filter on the same names; [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is their contract.
 
 ## Configuration
 
@@ -107,7 +105,7 @@ Read responses report the two status axes (`execution_status`, `publication_stat
 | ------------------------------------------ | ------------------------------------ | ---------------------------------------------------- |
 | `DATABASE_URL`                             | Yes                                  | PostgreSQL connection string                         |
 | `CONTROL_PLANE_SERVICE_TOKEN`              | Yes                                  | Internal mutation and coordination authentication    |
-| `CONTROL_PLANE_READ_TOKEN`                 | Yes                                  | Read-only query authentication                       |
+| `CONTROL_PLANE_READ_TOKEN`                 | Yes                                  | Query API authentication                             |
 | `AGENT_RUNNER_SERVICE_URL`                 | Yes                                  | Runner service base URL                              |
 | `AGENT_RUNNER_SERVICE_TOKEN`               | For non-loopback or protected Runner | Runner authentication                                |
 | `CONTROL_PLANE_PORT`                       | No                                   | Listen port; default `8090`                          |

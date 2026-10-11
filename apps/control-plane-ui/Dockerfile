@@ -11,7 +11,7 @@ RUN corepack enable pnpm \
     && pnpm install --frozen-lockfile
 COPY apps/control-plane-ui/ ./
 RUN pnpm run build
-RUN pnpm deploy --filter . --prod --legacy /app/prod
+RUN pnpm deploy --filter . --prod /app/prod
 
 FROM node:24-bookworm-slim
 WORKDIR /app

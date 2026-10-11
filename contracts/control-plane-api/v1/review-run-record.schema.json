@@ -108,10 +108,28 @@
           "properties": {
             "status": {
               "enum": [
-                "available",
                 "unavailable",
                 "failed"
               ]
+            },
+            "error_code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "artifact"
+          ],
+          "properties": {
+            "status": {
+              "const": "available"
             },
             "artifact": {
               "type": "object",
@@ -125,32 +143,24 @@
               ],
               "properties": {
                 "kind": {
-                  "type": "string",
-                  "minLength": 1
+                  "const": "diagnostic_bundle"
                 },
                 "uri": {
                   "type": "string",
-                  "minLength": 1
+                  "pattern": "^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
                 },
                 "media_type": {
-                  "type": "string",
-                  "minLength": 1
+                  "const": "application/tar+zstd"
                 },
                 "digest": {
                   "type": "string",
-                  "minLength": 1
+                  "pattern": "^sha256:[0-9a-f]{64}$"
                 },
                 "size_bytes": {
                   "type": "integer",
                   "minimum": 0
                 }
               }
-            },
-            "error_code": {
-              "type": "string"
-            },
-            "message": {
-              "type": "string"
             }
           }
         }

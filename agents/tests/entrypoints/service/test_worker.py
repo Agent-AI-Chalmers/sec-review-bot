@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import Any, Self
 from unittest.mock import AsyncMock
 
@@ -62,3 +63,41 @@ async def test_worker_applies_activity_concurrency_to_temporal_and_executor(
     assert captured["executor_max_workers"] == expected
     assert captured["worker_max_concurrent_activities"] == expected
     assert isinstance(captured["activity_executor"], FakeExecutor)
+
+
+@pytest.mark.asyncio
+async def test_worker_waits_for_temporal_instead_of_exiting(monkeypatch) -> None:
+    """The worker starts with the control plane, so a refused connection is retried.
+
+    Retrying here keeps a normal boot out of the journal; exiting instead made every
+    start print a traceback until systemd's five second timer tried again.
+    """
+    client = object()
+    connect = AsyncMock(
+        side_effect=[
+            RuntimeError("connection refused"),
+            RuntimeError("connection refused"),
+            client,
+        ]
+    )
+    monkeypatch.setattr(worker_module, "Client", SimpleNamespace(connect=connect))
+    monkeypatch.setattr(worker_module, "TEMPORAL_CONNECT_INITIAL_BACKOFF_SECONDS", 0.0)
+    monkeypatch.setattr(worker_module, "TEMPORAL_CONNECT_MAX_BACKOFF_SECONDS", 0.0)
+    monkeypatch.setattr(worker_module, "TEMPORAL_CONNECT_TIMEOUT_SECONDS", 30.0)
+    monkeypatch.setenv("TEMPORAL_ADDRESS", "127.0.0.1:7233")
+
+    assert await worker_module._connect_temporal_client() is client
+    assert connect.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_worker_gives_up_when_temporal_never_arrives(monkeypatch) -> None:
+    """The wait is bounded: a control plane that never starts must still fail."""
+    connect = AsyncMock(side_effect=RuntimeError("connection refused"))
+    monkeypatch.setattr(worker_module, "Client", SimpleNamespace(connect=connect))
+    monkeypatch.setattr(worker_module, "TEMPORAL_CONNECT_TIMEOUT_SECONDS", 0.0)
+    monkeypatch.setenv("TEMPORAL_ADDRESS", "127.0.0.1:7233")
+
+    with pytest.raises(RuntimeError, match="connection refused"):
+        await worker_module._connect_temporal_client()
+    assert connect.await_count == 1

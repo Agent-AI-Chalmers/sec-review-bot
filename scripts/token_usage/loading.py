@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,28 @@ NUMERIC_FIELDS = (
     "cache_read_tokens",
     "reasoning_tokens",
 )
-PASS_STAGE_DIRS = {"triage", "delivery-planning"}
+TRANSCRIPTS_DIRNAME = "transcripts"
+# The artifact directory each stage writes its transcripts under, keyed by the directory
+# name the stage modules actually use and valued by pipeline order for report sorting.
+# These are directory names, not the Python modules that implement the stages: the
+# analyzer writes `analyzer/`, the mitigator writes `mitigator/`, and the CVSS stage
+# writes `cvss/`.
+#
+# This mapping is the only source for which directories are stages and how they sort, so
+# the two cannot drift: `_classify_transcript` resolves a transcript to a stage only when
+# the directory is a key here, and `_stage_sort_key` then reads that stage's rank. A
+# stage directory this map does not name is not reported at all rather than sorted last.
+STAGE_ORDER = {
+    "discovery": 10,
+    "triage": 20,
+    "analyzer": 40,
+    "cvss": 50,
+    "mitigator": 60,
+    "verifier": 70,
+    "delivery-planning": 80,
+    "patch-synthesis": 90,
+    "single-agent": 100,
+}
 
 
 def _artifact_root(run_dir: Path) -> Path:
@@ -159,7 +181,7 @@ def _fallback_model_id(messages: list[dict[str, Any]]) -> str | None:
     return None
 
 
-def _read_transcript_usage(path: Path) -> StageUsage:
+def _read_transcript_usage(path: Path, *, stage: str) -> StageUsage:
     value = json.loads(path.read_text(encoding="utf-8"))
     messages = value if isinstance(value, list) else []
     records = _usage_records_from_value(messages)
@@ -182,7 +204,6 @@ def _read_transcript_usage(path: Path) -> StageUsage:
     else:
         model_id = _fallback_model_id(messages) or "unknown"
 
-    stage, _attempt = _transcript_stage_attempt(path)
     return StageUsage(
         stage=stage,
         model_id=model_id,
@@ -207,33 +228,65 @@ def _attempt_sort_key(label: str) -> tuple[int, int]:
     return (2, 999999)
 
 
-def _transcript_stage_attempt(path: Path) -> tuple[str, str]:
-    if path.parent.name == "transcripts":
-        return path.parent.parent.name, path.stem
-    if path.name == "transcript.json":
-        if (
-            path.parent.parent.name == "batches"
-            and path.parent.parent.parent.name in PASS_STAGE_DIRS
-        ):
-            return path.parent.parent.parent.name, path.parent.name
-        if path.parent.parent.name in PASS_STAGE_DIRS:
-            return path.parent.parent.name, path.parent.name
-        return path.parent.name, "initial"
-    return path.parent.name, path.stem
+def _classify_transcript(artifact_root: Path, path: Path) -> tuple[str, str] | None:
+    """Return the stage and attempt a stage-local transcript belongs to.
 
-
-def _discover_transcripts(artifact_root: Path) -> list[Path]:
-    transcripts: set[Path] = set()
-    published_root = artifact_root / "transcripts"
-
-    for candidate in artifact_root.rglob("*.json"):
-        if published_root in candidate.parents:
+    A transcript belongs to the nearest ancestor directory that is a known stage
+    directory, so container directories such as `cases/`, `batches/`, or a delivery id
+    never become a stage. The attempt comes from how the stage nests the file: a bare
+    `transcript.json` is the initial attempt, a file under `transcripts/` is named by that
+    file, and any other subdirectory names the attempt. Published copies at the artifact
+    root are not under a stage directory and return ``None``.
+    """
+    parts = path.relative_to(artifact_root).parts
+    for index in range(len(parts) - 1, -1, -1):
+        # Membership and report rank are both STAGE_ORDER, so every returned stage sorts.
+        if parts[index] not in STAGE_ORDER:
             continue
+        stage = parts[index]
+        remainder = parts[index + 1 :]
+        if len(remainder) == 1:
+            return stage, "initial"
+        parent = remainder[-2]
+        if parent == TRANSCRIPTS_DIRNAME:
+            return stage, Path(remainder[-1]).stem
+        return stage, parent
+    return None
+
+
+def _discover_transcripts(artifact_root: Path) -> list[tuple[Path, str, str]]:
+    """Return every stage-local transcript with the stage and attempt it belongs to.
+
+    A transcript under no known stage directory is not counted; if any such transcript is
+    stage-local rather than a published copy, its tokens would otherwise disappear
+    silently, so report the count once.
+    """
+    published_root = artifact_root / TRANSCRIPTS_DIRNAME
+    transcripts: set[tuple[Path, str, str]] = set()
+    unclassified: list[Path] = []
+    for candidate in artifact_root.rglob("*.json"):
         if (
-            candidate.name == "transcript.json"
-            or candidate.parent.name == "transcripts"
+            candidate.name != "transcript.json"
+            and candidate.parent.name != TRANSCRIPTS_DIRNAME
         ):
-            transcripts.add(candidate)
+            continue
+        if published_root in candidate.parents:
+            # The published copies at the artifact root are not stage-local.
+            continue
+        classified = _classify_transcript(artifact_root, candidate)
+        if classified is None:
+            unclassified.append(candidate)
+            continue
+        stage, attempt = classified
+        transcripts.add((candidate, stage, attempt))
+    if unclassified:
+        first = min(unclassified)
+        print(
+            f"warning: {len(unclassified)} transcript(s) are not under a known stage "
+            f"directory, so they were not counted (first: {first}). Add the stage "
+            f"directory to STAGE_ORDER if it is a stage this report should attribute.",
+            file=sys.stderr,
+        )
     return sorted(transcripts)
 
 
@@ -257,29 +310,17 @@ def _aggregate_stage_usage(
 
 
 def _stage_sort_key(stage: StageUsage) -> tuple[int, str, str]:
-    order = {
-        "discovery": 10,
-        "triage": 20,
-        "triage-refiner": 30,
-        "analysis": 40,
-        "analyzer": 40,
-        "cvss-v4-scoring": 50,
-        "mitigation": 60,
-        "mitigator": 60,
-        "verification": 70,
-        "verifier": 70,
-        "delivery-planning": 80,
-        "patch-synthesis": 90,
-        "single-agent": 100,
-    }
-    return (order.get(stage.stage, 999), stage.stage, stage.model_id)
+    # Only `_classify_transcript` builds `StageUsage.stage`, and it returns a stage only
+    # when that directory is a key in STAGE_ORDER, so the lookup cannot miss here.
+    return (STAGE_ORDER[stage.stage], stage.stage, stage.model_id)
 
 
 def _load_attempt_usages(artifact_root: Path) -> list[AttemptUsage]:
     attempts: list[AttemptUsage] = []
-    for transcript_path in _discover_transcripts(artifact_root):
-        stage_name, attempt_label = _transcript_stage_attempt(transcript_path)
-        usage = _read_transcript_usage(transcript_path)
+    for transcript_path, stage_name, attempt_label in _discover_transcripts(
+        artifact_root
+    ):
+        usage = _read_transcript_usage(transcript_path, stage=stage_name)
         attempts.append(
             AttemptUsage(
                 stage=stage_name,

@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,9 +24,36 @@ from sec_review_agents.memory.state import (
     OBSERVATION_STATUS_PENDING,
     OBSERVATION_STATUS_PROCESSED,
     open_memory_state,
-    upsert_extraction_job,
     upsert_observation,
 )
+from sec_review_agents.utils.time import utc_now_iso
+
+
+def _seed_extraction_job(
+    connection: sqlite3.Connection,
+    *,
+    job_id: str,
+    source_workflow: str,
+    run_id: str,
+    artifact_root_path: str,
+    status: str,
+) -> None:
+    """Insert an extraction job in an arbitrary status, bypassing the state machine.
+
+    Tests seed each status (pending/running/processed/failed) directly to verify how the
+    workflow handles a job that already exists in that status. The production seeder
+    ``register_pending_extraction_job`` can only create ``pending`` rows, so it cannot
+    be reused here.
+    """
+    now = utc_now_iso()
+    connection.execute(
+        """
+        insert into extraction_jobs (
+          job_id, source_workflow, run_id, artifact_root_path, status, created_at, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (job_id, source_workflow, run_id, artifact_root_path, status, now, now),
+    )
 
 
 def test_memory_cli_observations_extract_command_is_removed(
@@ -60,7 +88,7 @@ def test_memory_cli_extraction_list_and_temporal_triggers_e2e(
     artifacts = tmp_path / "repo-run" / "artifacts"
     artifacts.mkdir(parents=True)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="repo-review-run-1",
             source_workflow="repo-review",

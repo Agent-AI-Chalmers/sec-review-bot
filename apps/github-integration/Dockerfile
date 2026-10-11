@@ -13,9 +13,9 @@ RUN corepack enable pnpm \
 
 COPY apps/github-integration/ ./
 RUN pnpm run build
-# This package is the workspace root; legacy deploy keeps pnpm's production
-# deployment command usable without injected workspace packages.
-RUN pnpm deploy --filter . --prod --legacy /prod
+# Deploy a self-contained production tree: this package is its own workspace
+# root, so the default implementation needs no injected workspace packages.
+RUN pnpm deploy --filter . --prod /prod
 
 FROM node:24-bookworm-slim
 

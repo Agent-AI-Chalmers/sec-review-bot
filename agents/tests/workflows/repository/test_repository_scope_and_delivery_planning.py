@@ -268,24 +268,34 @@ class TestRepositoryScopeAndDeliveryPlanning:
     def test_workflow_result_keeps_cvss_on_case_results(self) -> None:
         case_results: list[dict[str, Any]] = [
             {
+                "case_id": "case-1",
+                "disposition": "keep",
                 "review_record": {
                     "cvss": {"base_score": 9.8, "severity": "critical"},
-                }
+                },
             },
             {
+                "case_id": "case-2",
+                "disposition": "keep",
                 "review_record": {
                     "cvss": {"base_score": 7.4, "severity": "high"},
-                }
+                },
             },
-            {"review_record": {"cvss": None}},
             {
+                "case_id": "case-3",
+                "disposition": "blocked",
+                "review_record": {"cvss": None},
+            },
+            {
+                "case_id": "case-4",
+                "disposition": "blocked",
                 "review_record": {
                     "cvss": {
                         "outcome": "not-scored",
                         "base_score": None,
                         "severity": None,
                     }
-                }
+                },
             },
         ]
 
@@ -296,6 +306,13 @@ class TestRepositoryScopeAndDeliveryPlanning:
             case_results=case_results,
         )
         assert len(result["case_results"]) == len(case_results)
+
+        first_cvss = result["case_results"][0]["review_record"]["cvss"]
+        assert first_cvss["base_score"] == 9.8
+        assert first_cvss["severity"] == "critical"
+        assert result["case_results"][3]["review_record"]["cvss"]["outcome"] == (
+            "not-scored"
+        )
 
     def test_delivery_planning_batch_cases_preserve_input_order(
         self,

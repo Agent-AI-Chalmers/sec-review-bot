@@ -28,10 +28,12 @@ export interface ReviewIntent {
   repair_mode?: RepairMode
 }
 
+export const INPUT_BUNDLE_MEDIA_TYPE = 'application/tar+zstd' as const
+
 export interface InputBundleArtifactRef {
   uri: string
   digest: `sha256:${string}`
-  media_type: 'application/vnd.sec-review.input-bundle.v1+tar+zstd'
+  media_type: typeof INPUT_BUNDLE_MEDIA_TYPE
   size_bytes: number
 }
 

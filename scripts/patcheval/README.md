@@ -47,7 +47,7 @@ Batch helpers:
 
 - `scripts/patcheval/run-patcheval-six.sh`
 - `scripts/patcheval/run-patcheval-experiment-pool.sh`
-- `scripts/patcheval/audit-patcheval-workspaces.sh`
+- `python -m scripts.patcheval.audit`
 - `python -m scripts.patcheval.collect_patcheval_patches`
 - `python -m scripts.patcheval.summarize_patcheval_evaluation`
 

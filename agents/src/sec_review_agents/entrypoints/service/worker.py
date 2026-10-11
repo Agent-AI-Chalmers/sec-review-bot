@@ -92,12 +92,35 @@ from sec_review_agents.workflows.repository.workflow import (
 
 DEFAULT_MAX_CONCURRENT_ACTIVITIES = 2
 
+# The worker starts alongside the control plane, so Temporal may still be
+# starting. Waiting here keeps a normal boot quiet; exiting instead would put a
+# traceback in the journal and hand the retry to systemd's five second timer.
+TEMPORAL_CONNECT_TIMEOUT_SECONDS = 60.0
+TEMPORAL_CONNECT_INITIAL_BACKOFF_SECONDS = 1.0
+TEMPORAL_CONNECT_MAX_BACKOFF_SECONDS = 8.0
+
+
+async def _connect_temporal_client() -> Client:
+    """Connect to Temporal, waiting out a control plane that is still starting."""
+    address = env_value("TEMPORAL_ADDRESS") or DEFAULT_TEMPORAL_ADDRESS
+    namespace = env_value("TEMPORAL_NAMESPACE") or DEFAULT_TEMPORAL_NAMESPACE
+    deadline = asyncio.get_running_loop().time() + TEMPORAL_CONNECT_TIMEOUT_SECONDS
+    backoff = TEMPORAL_CONNECT_INITIAL_BACKOFF_SECONDS
+    while True:
+        try:
+            return await Client.connect(address, namespace=namespace)
+        except Exception:
+            # The bridge reports a refused connection and an unreachable address
+            # the same way, so there is no narrower error to catch; a real
+            # misconfiguration still surfaces once the wait is over.
+            if asyncio.get_running_loop().time() >= deadline:
+                raise
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, TEMPORAL_CONNECT_MAX_BACKOFF_SECONDS)
+
 
 async def run_worker() -> None:
-    client = await Client.connect(
-        env_value("TEMPORAL_ADDRESS") or DEFAULT_TEMPORAL_ADDRESS,
-        namespace=env_value("TEMPORAL_NAMESPACE") or DEFAULT_TEMPORAL_NAMESPACE,
-    )
+    client = await _connect_temporal_client()
     task_queue = env_value("TEMPORAL_TASK_QUEUE") or DEFAULT_TEMPORAL_TASK_QUEUE
     await ensure_configured_memory_schedules(
         client,

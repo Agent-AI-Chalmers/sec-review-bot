@@ -236,7 +236,7 @@ def test_skips_local_backend_without_host_workspace_path(tmp_path: Path) -> None
         path_views=[
             workspace_view(host_path=tmp_path, writable=True),
         ],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )
 
     with patch(
@@ -259,7 +259,7 @@ def test_prepares_host_index_and_returns_local_mcp_connection(tmp_path: Path) ->
         path_views=[
             workspace_view(host_path=workspace, writable=True),
         ],
-        use_docker_sandbox=False,
+        backend_kind="local",
     )
     completed = subprocess.CompletedProcess(
         args=["codegraph"],

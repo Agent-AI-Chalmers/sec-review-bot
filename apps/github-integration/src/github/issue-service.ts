@@ -1,8 +1,5 @@
 import type { GitHubAppOctokit } from './octokit.js'
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
+import { isRecord } from '../utils/error-utils.js'
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {}

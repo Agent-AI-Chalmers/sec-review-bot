@@ -70,8 +70,8 @@ The Python runner supports:
   - discovery / triage / analyzer / cvss-v4-scoring / mitigator / verifier / delivery
   - delivery organizes repository cases into publishable delivery results; non-delivered cases are still shown through case results
 - local evaluation / ablation paths:
-  - `issue-review-two-stage`
-  - `issue-review-single-agent` (local baseline)
+  - `issue-review` with `--strategy two-stage`
+  - `issue-review` with `--strategy single-agent` (local baseline)
 
 Resources live inside the package:
 

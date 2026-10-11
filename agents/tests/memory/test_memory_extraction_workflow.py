@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -43,15 +44,42 @@ from sec_review_agents.memory.state import (
     initialize_memory_state,
     oldest_observation_created_at_by_status,
     open_memory_state,
-    upsert_extraction_job,
     upsert_observation,
 )
+from sec_review_agents.utils.time import utc_now_iso
 
 
 def _fake_workflow_logger() -> SimpleNamespace:
     return SimpleNamespace(
         info=lambda *_args, **_kwargs: None,
         warning=lambda *_args, **_kwargs: None,
+    )
+
+
+def _seed_extraction_job(
+    connection: sqlite3.Connection,
+    *,
+    job_id: str,
+    source_workflow: str,
+    run_id: str,
+    artifact_root_path: str,
+    status: str,
+) -> None:
+    """Insert an extraction job in an arbitrary status, bypassing the state machine.
+
+    Tests seed each status (pending/running/processed/failed) directly to verify how the
+    workflow handles a job that already exists in that status. The production seeder
+    ``register_pending_extraction_job`` can only create ``pending`` rows, so it cannot
+    be reused here.
+    """
+    now = utc_now_iso()
+    connection.execute(
+        """
+        insert into extraction_jobs (
+          job_id, source_workflow, run_id, artifact_root_path, status, created_at, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (job_id, source_workflow, run_id, artifact_root_path, status, now, now),
     )
 
 
@@ -121,7 +149,7 @@ def test_register_memory_extraction_job_activity_skips_processed_job(
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="issue-review-run-1",
             source_workflow="issue-review",
@@ -160,7 +188,7 @@ def test_register_memory_extraction_job_activity_does_not_demote_running_job(
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="issue-review-run-1",
             source_workflow="issue-review",
@@ -204,7 +232,7 @@ async def test_run_memory_extraction_job_requires_claimed_running_job(
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="issue-review-run-1",
             source_workflow="issue-review",
@@ -246,7 +274,7 @@ def test_register_memory_extraction_job_activity_skips_failed_job(
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="issue-review-run-1",
             source_workflow="issue-review",
@@ -287,7 +315,7 @@ def test_claim_pending_extraction_jobs_marks_rows_running(tmp_path: Path) -> Non
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="first",
             source_workflow="issue-review",
@@ -295,7 +323,7 @@ def test_claim_pending_extraction_jobs_marks_rows_running(tmp_path: Path) -> Non
             artifact_root_path="/tmp/run/one",
             status=EXTRACTION_JOB_STATUS_PENDING,
         )
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="second",
             source_workflow="issue-review",
@@ -320,7 +348,7 @@ def test_claim_pending_memory_extraction_jobs_fails_stale_running_jobs(
     initialize_memory_state(memory_store_dir)
     stale_created_at = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="stale",
             source_workflow="issue-review",
@@ -367,7 +395,7 @@ async def test_run_memory_extraction_job_leaves_running_job_for_workflow_finaliz
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="first",
             source_workflow="issue-review",
@@ -405,7 +433,7 @@ async def test_run_memory_extraction_job_activity_raises_for_temporal_retry(
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="first",
             source_workflow="issue-review",
@@ -446,7 +474,7 @@ def test_mark_memory_extraction_job_failed_activity_marks_running_job(
     memory_store_dir.mkdir(parents=True)
     initialize_memory_state(memory_store_dir)
     with open_memory_state(memory_store_dir) as connection:
-        upsert_extraction_job(
+        _seed_extraction_job(
             connection,
             job_id="first",
             source_workflow="issue-review",

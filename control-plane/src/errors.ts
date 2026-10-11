@@ -3,7 +3,7 @@ export class DeterministicControlPlaneError extends Error {
 
   constructor(message: string, code: string, options: ErrorOptions = {}) {
     super(message, options)
-    this.name = 'DeterministicRunnerPublishError'
+    this.name = 'DeterministicControlPlaneError'
     this.code = code
   }
 }

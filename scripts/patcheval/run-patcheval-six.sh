@@ -96,8 +96,8 @@ TMP_LOG_DIR="$OUT/_logs"
 mkdir -p "$TMP_LOG_DIR"
 
 run_exp() {
-  local name="$1"
-  shift
+  local variant="$1"
+  local name="${CVE}-${variant}"
 
   local tmp_header="$TMP_LOG_DIR/${name}.header.log"
   local tmp_stdout="$TMP_LOG_DIR/${name}.stdout.log"
@@ -113,7 +113,7 @@ run_exp() {
     echo "CVE=$CVE"
     echo "DATASET=$DATASET"
     echo "OUT=$OUT"
-    echo "ARGS=$*"
+    echo "VARIANT=$variant"
     echo
   } > "$tmp_header"
 
@@ -121,7 +121,7 @@ run_exp() {
     --cve "$CVE" \
     --dataset "$DATASET" \
     --output-dir "$OUT" \
-    "$@" \
+    --variant "$variant" \
     >> "$tmp_stdout" 2>> "$tmp_stderr"
   status=$?
 
@@ -138,7 +138,7 @@ run_exp() {
       perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' "$local_root/logs/run.stderr.log"
       echo
       echo "===== STDOUT (metadata) ====="
-      grep -E '^(LOCAL_ROOT|WORKFLOW_RESULT|PATCH_JSON)=' "$local_root/logs/run.stdout.log" || true
+      grep -E '^(LOCAL_ROOT|WORKFLOW_RESULT)=' "$local_root/logs/run.stdout.log" || true
     } > "$tmp_runlog"
     mv "$tmp_runlog" "$local_root/logs/run.log"
     rm -f "$tmp_header"
@@ -168,30 +168,24 @@ echo "Temporary logs: $TMP_LOG_DIR"
 echo "Logs move to <local-run>/logs/run.log after each experiment resolves LOCAL_ROOT."
 echo
 
-run_exp "${CVE}-end-to-end-default" &
-pid_default_e2e=$!
-run_exp "${CVE}-location-oracle-default" --location-oracle &
-pid_default_location=$!
+if ! EXPERIMENT_MATRIX="$("$PYTHON_BIN" -m scripts.patcheval.experiments)"; then
+  echo "Could not read the PatchEval experiment matrix." >&2
+  exit 2
+fi
+if [ -z "$EXPERIMENT_MATRIX" ]; then
+  echo "The PatchEval experiment matrix is empty." >&2
+  exit 2
+fi
+mapfile -t EXPERIMENT_VARIANTS <<< "$EXPERIMENT_MATRIX"
 
-run_exp "${CVE}-end-to-end-two-stage" --two-stage &
-pid_two_stage_e2e=$!
-run_exp "${CVE}-location-oracle-two-stage" --two-stage --location-oracle &
-pid_two_stage_location=$!
-
-run_exp "${CVE}-end-to-end-single-agent" --single-agent &
-pid_single_agent_e2e=$!
-run_exp "${CVE}-location-oracle-single-agent" --single-agent --location-oracle &
-pid_single_agent_location=$!
+pids=()
+for variant in "${EXPERIMENT_VARIANTS[@]}"; do
+  run_exp "$variant" &
+  pids+=("$!")
+done
 
 status=0
-for pid in \
-  "$pid_default_e2e" \
-  "$pid_default_location" \
-  "$pid_two_stage_e2e" \
-  "$pid_two_stage_location" \
-  "$pid_single_agent_e2e" \
-  "$pid_single_agent_location"
-do
+for pid in "${pids[@]}"; do
   if ! wait "$pid"; then
     status=1
   fi

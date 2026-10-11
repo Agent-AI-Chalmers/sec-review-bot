@@ -232,7 +232,7 @@ function artifactFor(run_id: string, kind: ArtifactStatus | null): FixtureArtifa
       artifact: {
         kind: 'diagnostic_bundle',
         uri: `s3://sec-review/runs/${run_id}/artifacts/diagnostic-tree.v1.tar.zst`,
-        media_type: 'application/zstd',
+        media_type: 'application/tar+zstd',
         digest: `sha256:${'0'.repeat(64)}`,
         size_bytes: 12_345
       }

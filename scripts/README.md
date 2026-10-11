@@ -13,12 +13,9 @@ Check scripts are intended to be repeatable from the repository root:
 python scripts/check_markdown_links.py
 python scripts/check_markdown_wrapping.py
 python scripts/check_translated_doc_headings.py
-scripts/check_contracts.sh
 ```
 
 `check_translated_doc_headings.py` scans all tracked `*.zh.md` files, finds the matching English `.md` source, and verifies that heading levels and numbered section markers stay aligned.
-
-`check_contracts.sh` is the aggregate contract validation entrypoint. Keep it aligned with the contract validation surface when adding schema, fixture, parser, or contract-document checks.
 
 ## Local Helpers
 

@@ -31,7 +31,7 @@ test('repository preparation can replace the admitted empty publish context', as
 
   t.mock.method(globalThis, 'fetch', async (_input: string | URL | Request, init?: RequestInit) => {
     const request = JSON.parse(String(init?.body)) as { operation: string; args: unknown[] }
-    if (request.operation === 'admit_review_run') {
+    if (request.operation === 'admitReviewRun') {
       return Response.json({
         result: {
           record: preparingRun,
@@ -43,7 +43,7 @@ test('repository preparation can replace the admitted empty publish context', as
     if (request.operation === 'getRun') {
       return Response.json({ result: preparingRun })
     }
-    if (request.operation === 'submit_prepared_run') {
+    if (request.operation === 'submitPreparedRun') {
       assert.deepEqual(request.args[2], {
         repo: {
           owner_login: 'octo',
@@ -64,7 +64,7 @@ test('repository preparation can replace the admitted empty publish context', as
     }
     return Response.json({ error: 'unexpected operation' }, { status: 500 })
   })
-  const admission = await controlPlaneClient.admit_review_run({
+  const admission = await controlPlaneClient.admitReviewRun({
     run_id: 'run-1',
     workflow: 'repository-review',
     publish_context: {},
@@ -73,7 +73,7 @@ test('repository preparation can replace the admitted empty publish context', as
   })
   assert.equal(admission.record.runner_status, 'preparing')
 
-  await controlPlaneClient.submit_prepared_run(
+  await controlPlaneClient.submitPreparedRun(
     'run-1',
     'preparation-token',
     {

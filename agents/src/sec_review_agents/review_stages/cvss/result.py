@@ -1,6 +1,8 @@
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from sec_review_agents.review_stages.types import CvssOutcome
 
 # Stage result payload
 
@@ -27,7 +29,7 @@ class CvssStageResult(BaseModel):
 
 def build_cvss_v4_stage_result(
     *,
-    outcome: Literal["scored", "not-scored", "skipped"],
+    outcome: CvssOutcome,
     overview: str,
     version: str | None = None,
     vector: str | None = None,

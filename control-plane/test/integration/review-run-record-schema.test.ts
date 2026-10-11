@@ -21,14 +21,16 @@ import { ReviewRunStore } from '../../src/index.js'
 // validates what `getRun` really returns — the same thing the observed-run check does for
 // `observeRun()`.
 
-const FAMILY = path.join('contracts', 'control-plane-api', 'v1')
+const CONTRACT_VERSION_DIR = path.join('contracts', 'control-plane-api', 'v1')
 
 function workspaceRoot(): string {
   let current = path.dirname(fileURLToPath(import.meta.url))
   for (;;) {
-    if (existsSync(path.join(current, FAMILY, 'review-run-record.schema.json'))) return current
+    if (existsSync(path.join(current, CONTRACT_VERSION_DIR, 'review-run-record.schema.json'))) {
+      return current
+    }
     const parent = path.dirname(current)
-    if (parent === current) throw new Error('Could not locate the contract family root.')
+    if (parent === current) throw new Error('Could not locate the workspace contracts root.')
     current = parent
   }
 }
@@ -37,7 +39,7 @@ const root = workspaceRoot()
 
 function readSchema(): ValidateFunction {
   const schema = JSON.parse(
-    readFileSync(path.join(root, FAMILY, 'review-run-record.schema.json'), 'utf8')
+    readFileSync(path.join(root, CONTRACT_VERSION_DIR, 'review-run-record.schema.json'), 'utf8')
   ) as AnySchemaObject
   const ajv = new Ajv2020({ allErrors: true })
   const addFormats = ajvFormats.default as unknown as (instance: Ajv2020) => Ajv2020
@@ -67,7 +69,7 @@ test('the record getRun returns validates against the shared schema', async () =
   const store = await createStore()
   try {
     const runId = `run-${randomUUID()}`
-    const admission = await store.create_preparing_review_run({
+    const admission = await store.createPreparingReviewRun({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: { repository: 'octo/example' },
@@ -83,7 +85,7 @@ test('the record getRun returns validates against the shared schema', async () =
       `a preparing record must be accepted: ${JSON.stringify(validate.errors)}`
     )
 
-    await store.mark_queued(runId, admission.preparation_token, { repository: 'octo/example' })
+    await store.markQueued(runId, admission.preparation_token, { repository: 'octo/example' })
     await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'unavailable' })
 
     const succeeded = await store.getRun(runId)

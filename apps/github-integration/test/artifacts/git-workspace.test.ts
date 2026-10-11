@@ -64,7 +64,7 @@ test('withConfiguredGitFetchProxy leaves fetch options unchanged without a proxy
     env: { GIT_TERMINAL_PROMPT: '0' }
   }
 
-  assert.equal(withConfiguredGitFetchProxy(options, undefined), options)
+  assert.equal(withConfiguredGitFetchProxy(options, ''), options)
   assert.equal(withConfiguredGitFetchProxy(options, '  '), options)
 })
 

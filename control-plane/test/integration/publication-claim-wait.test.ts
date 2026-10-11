@@ -24,13 +24,13 @@ async function createStore(): Promise<ReviewRunStore> {
 /** A run in the state `claimNextPublication` looks for. */
 async function createPublishableRun(store: ReviewRunStore): Promise<string> {
   const runId = `run-${randomUUID()}`
-  const admission = await store.create_preparing_review_run({
+  const admission = await store.createPreparingReviewRun({
     workflow: 'issue-review',
     run_id: runId,
     publish_context: {}
   })
   assert.ok(admission.preparation_token)
-  await store.mark_queued(runId, admission.preparation_token, {})
+  await store.markQueued(runId, admission.preparation_token, {})
   assert.equal(
     await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'unavailable' }),
     true
