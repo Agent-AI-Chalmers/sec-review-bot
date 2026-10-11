@@ -391,3 +391,23 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
     assert review_record["mitigation"]["changed_files"] == []
     assert review_record["verification"]["patch_coverage"] is None
     assert review_record["cvss"] is None
+
+
+def test_repository_case_result_defaults_missing_review_record_to_not_run() -> None:
+    """A public case result must carry a schema-valid review_record, never null."""
+    result = build_repository_workflow_result(
+        discovery_result={},
+        triage_result={},
+        delivery_result=None,
+        case_results=[
+            {
+                "case_id": "case-1",
+                "disposition": "blocked",
+                "reason": "case processing failed",
+            },
+        ],
+    )
+
+    review_record = result["case_results"][0]["review_record"]
+    assert review_record == not_run_review_record()
+    assert_matches_v5_schema(result, "repository-review-result.schema.json")

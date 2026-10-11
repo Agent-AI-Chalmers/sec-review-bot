@@ -58,9 +58,14 @@ def _repository_deliveries(
     ]
 
 
-def _repository_review_record(review_record: Any) -> dict[str, Any] | None:
+def _repository_review_record(review_record: Any) -> dict[str, Any]:
     if not isinstance(review_record, Mapping):
-        return None
+        return build_review_record(
+            analysis_result=None,
+            mitigation_result=None,
+            verifier_result=None,
+            cvss_result=None,
+        )
     return build_review_record(
         analysis_result=mapping_payload(review_record.get("analysis")),
         mitigation_result=mapping_payload(review_record.get("mitigation")),
@@ -88,10 +93,7 @@ def _repository_case_results(
                 "review_record": review_record,
             }
         )
-        result = model.model_dump(mode="json")
-        if review_record is None:
-            result.pop("review_record", None)
-        results.append(result)
+        results.append(model.model_dump(mode="json"))
     return results
 
 
