@@ -148,62 +148,6 @@ def archive_input_bundle(
     return reference
 
 
-def initialize_workspace_git_repo(workspace_path: Path) -> None:
-    """Create a local baseline commit for later workspace.patch generation."""
-    # Disable auto-gc while writing objects so a concurrent workspace copy does not
-    # race with loose-object pruning; then pack the repo once before snapshotting.
-    subprocess.run(
-        ["git", "init"],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "sec-review-agents"],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.email", "sec-review-agents@localhost"],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        ["git", "-c", "gc.auto=0", "add", "--all", "."],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        [
-            "git",
-            "-c",
-            "gc.auto=0",
-            "commit",
-            "--allow-empty",
-            "-m",
-            "chore: initialize workspace snapshot",
-        ],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(
-        ["git", "-c", "gc.auto=0", "gc", "--quiet"],
-        cwd=workspace_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-
 def materialize_workspace_with_limited_commit_history(
     *,
     source_repo_path: Path,
