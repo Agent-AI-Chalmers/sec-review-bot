@@ -181,7 +181,7 @@ async def main() -> int:
         backend = create_backend_with_path_views(
             container_name_prefix="memory-maintenance-experiment",
             path_views=[writable_memory_view(host_path=worktree)],
-            use_docker_sandbox=False,
+            backend_kind="local",
         )
         model = create_chat_model(
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
