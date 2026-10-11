@@ -124,25 +124,6 @@ def upsert_observation(
         )
 
 
-def set_observation_status(
-    connection: sqlite3.Connection,
-    *,
-    observation_id: str,
-    status: str,
-) -> None:
-    if status not in OBSERVATION_STATUSES:
-        raise ValueError(f"Invalid observation status: {status}")
-    now = utc_now_iso()
-    connection.execute(
-        """
-        update observations
-        set status = ?, updated_at = ?
-        where observation_id = ?
-        """,
-        (status, now, observation_id),
-    )
-
-
 @dataclass(frozen=True)
 class ObservationRow:
     observation_id: str
@@ -192,14 +173,6 @@ def fetch_observations_by_status(
     return [ObservationRow(*row) for row in rows]
 
 
-def extraction_job_id_exists(connection: sqlite3.Connection, job_id: str) -> bool:
-    row = connection.execute(
-        "select 1 from extraction_jobs where job_id = ?",
-        (job_id,),
-    ).fetchone()
-    return row is not None
-
-
 def fetch_extraction_job_by_id(
     connection: sqlite3.Connection,
     job_id: str,
@@ -220,65 +193,6 @@ def fetch_extraction_job_by_id(
         (job_id,),
     ).fetchone()
     return None if row is None else ExtractionJobRow(*row)
-
-
-def upsert_extraction_job(
-    connection: sqlite3.Connection,
-    *,
-    job_id: str,
-    source_workflow: str,
-    run_id: str,
-    artifact_root_path: str,
-    status: str,
-) -> None:
-    if status not in EXTRACTION_JOB_STATUSES:
-        raise ValueError(f"Invalid extraction job status: {status}")
-    now = utc_now_iso()
-    if extraction_job_id_exists(connection, job_id):
-        connection.execute(
-            """
-            update extraction_jobs
-            set
-              source_workflow = ?,
-              run_id = ?,
-              artifact_root_path = ?,
-              status = ?,
-              updated_at = ?
-            where job_id = ? and status != ?
-            """,
-            (
-                source_workflow,
-                run_id,
-                artifact_root_path,
-                status,
-                now,
-                job_id,
-                EXTRACTION_JOB_STATUS_PROCESSED,
-            ),
-        )
-    else:
-        connection.execute(
-            """
-            insert into extraction_jobs (
-              job_id,
-              source_workflow,
-              run_id,
-              artifact_root_path,
-              status,
-              created_at,
-              updated_at
-            ) values (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                job_id,
-                source_workflow,
-                run_id,
-                artifact_root_path,
-                status,
-                now,
-                now,
-            ),
-        )
 
 
 def register_pending_extraction_job(

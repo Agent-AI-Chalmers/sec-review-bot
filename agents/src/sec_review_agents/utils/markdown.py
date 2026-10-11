@@ -1,4 +1,3 @@
-import difflib
 import json
 import re
 from collections.abc import Callable
@@ -162,22 +161,3 @@ def write_markdown(path: Path, title: str, body_lines: list[str]) -> None:
         f"{heading(title)}\n\n" + "\n".join(body_lines).rstrip() + "\n",
         encoding="utf-8",
     )
-
-
-def unified_diff_text(
-    *,
-    before: str,
-    after: str,
-    relative_path: str,
-) -> str:
-    diff_lines = list(
-        difflib.unified_diff(
-            before.splitlines(keepends=True),
-            after.splitlines(keepends=True),
-            fromfile=f"a/{relative_path}",
-            tofile=f"b/{relative_path}",
-        )
-    )
-    if diff_lines and not diff_lines[-1].endswith("\n"):
-        diff_lines[-1] += "\n"
-    return "".join(diff_lines)
