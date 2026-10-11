@@ -3,6 +3,9 @@ import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import type { ReviewRecord } from '../review-record.js'
 import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
 
+// Consumer-side view for repository delivery publishing. Unlike the JSON Schema, this
+// intentionally lists only fields this integration reads; add another public field here
+// only when a concrete call site needs it.
 export interface RepositoryDelivery {
   delivery_id: string
   file_changes: FileChange[]
