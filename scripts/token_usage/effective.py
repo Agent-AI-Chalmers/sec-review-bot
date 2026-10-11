@@ -1,28 +1,15 @@
 from .models import AttemptUsage, EffectivePatchUsage, RunUsage, StageUsage
 
-STAGE_ALIASES = {
-    "analyzer": ("analyzer", "analysis"),
-    "mitigator": ("mitigator", "mitigation"),
-    "verifier": ("verifier", "verification"),
-    "single-agent": ("single-agent",),
-}
-
-
-def _stage_aliases(stage_name: str) -> tuple[str, ...]:
-    return STAGE_ALIASES.get(stage_name, (stage_name,))
-
 
 def stage_by_name(run: RunUsage, stage_name: str) -> StageUsage | None:
-    aliases = set(_stage_aliases(stage_name))
     for stage in run.stages:
-        if stage.stage in aliases:
+        if stage.stage == stage_name:
             return stage
     return None
 
 
 def _attempts_for_stage(run: RunUsage, stage_name: str) -> list[AttemptUsage]:
-    aliases = set(_stage_aliases(stage_name))
-    return [attempt for attempt in run.attempts if attempt.stage in aliases]
+    return [attempt for attempt in run.attempts if attempt.stage == stage_name]
 
 
 def _final_stage_attempt(run: RunUsage, stage_name: str) -> AttemptUsage | None:
