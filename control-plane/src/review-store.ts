@@ -290,14 +290,7 @@ export class ReviewRunStore {
         AND runner_status='preparing' AND preparation_claim_token=$2
         AND workflow=$6
     `,
-      [
-        runId,
-        token,
-        JSON.stringify(context),
-        JSON.stringify(input),
-        this.connectorId,
-        run.workflow
-      ]
+      [runId, token, JSON.stringify(context), JSON.stringify(input), this.connectorId, run.workflow]
     )
     if (result.rowCount !== 1)
       throw new Error(`Review run ${runId} cannot save prepared submission outside preparing.`)
