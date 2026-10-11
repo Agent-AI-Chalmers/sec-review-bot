@@ -13,6 +13,7 @@ from sec_review_agents.review_stages.cvss.stage import (
 from sec_review_agents.review_stages.record import (
     ReviewRecordAnalysis,
     ReviewRecordVerification,
+    build_review_record,
 )
 from sec_review_agents.review_stages.single_agent import SingleAgentFixOutcome
 from sec_review_agents.workflows.issue.single_agent import (
@@ -171,3 +172,23 @@ def test_repository_cvss_stage_builder_emits_json_serializable_public_payload() 
     assert result["base_score"] is None
     assert result["severity"] is None
     assert "not_scored_reason" not in result
+
+
+def test_review_record_cvss_outcome_is_limited_to_the_schema_enum() -> None:
+    """An outcome outside the contract enum must not reach the public review record."""
+    unknown = build_review_record(
+        analysis_result=None,
+        mitigation_result=None,
+        verifier_result=None,
+        cvss_result={"outcome": "invented", "overview": "Unrecognized outcome."},
+    )
+    assert unknown["cvss"]["outcome"] is None
+    assert unknown["cvss"]["overview"] == "Unrecognized outcome."
+
+    known = build_review_record(
+        analysis_result=None,
+        mitigation_result=None,
+        verifier_result=None,
+        cvss_result={"outcome": "not-scored", "overview": "No score."},
+    )
+    assert known["cvss"]["outcome"] == "not-scored"

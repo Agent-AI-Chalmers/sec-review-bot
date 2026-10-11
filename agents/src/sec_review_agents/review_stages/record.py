@@ -4,11 +4,13 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from sec_review_agents.review_stages.types import (
+    CVSS_OUTCOME_VALUES,
     PATCH_COVERAGE_VALUES,
     REGRESSION_STATUS_VALUES,
     RESOLUTION_NEXT_STEP_VALUES,
     VALIDATION_LEVEL_VALUES,
     VERDICT_VALUES,
+    CvssOutcome,
     PatchCoverage,
     RegressionStatus,
     ResolutionNextStep,
@@ -127,7 +129,7 @@ class ReviewRecordVerification(BaseModel):
 
 
 class ReviewRecordCvss(BaseModel):
-    outcome: str | None = None
+    outcome: CvssOutcome | None = None
     base_score: float | None = None
     severity: str | None = None
     vector: str | None = None
@@ -136,8 +138,12 @@ class ReviewRecordCvss(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    @field_validator("outcome", mode="before")
+    @classmethod
+    def known_outcome(cls, value: Any) -> CvssOutcome | None:
+        return value if value in CVSS_OUTCOME_VALUES else None
+
     @field_validator(
-        "outcome",
         "severity",
         "vector",
         "overview",

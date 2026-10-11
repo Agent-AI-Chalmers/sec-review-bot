@@ -23,6 +23,7 @@ PatchCoverage = Literal[
     "not-applicable",
 ]
 ResolutionNextStep = Literal["none", "retry-ai", "manual-review"]
+CvssOutcome = Literal["scored", "not-scored", "skipped"]
 
 # Runtime projection allowlists for the public review-record contract.
 # Keep these in sync with the aliases above whenever adding or removing a
@@ -60,4 +61,9 @@ RESOLUTION_NEXT_STEP_VALUES: tuple[ResolutionNextStep, ...] = (
     "none",
     "retry-ai",
     "manual-review",
+)
+CVSS_OUTCOME_VALUES: tuple[CvssOutcome, ...] = (
+    "scored",
+    "not-scored",
+    "skipped",
 )

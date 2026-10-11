@@ -307,6 +307,13 @@ class TestRepositoryScopeAndDeliveryPlanning:
         )
         assert len(result["case_results"]) == len(case_results)
 
+        first_cvss = result["case_results"][0]["review_record"]["cvss"]
+        assert first_cvss["base_score"] == 9.8
+        assert first_cvss["severity"] == "critical"
+        assert result["case_results"][3]["review_record"]["cvss"]["outcome"] == (
+            "not-scored"
+        )
+
     def test_delivery_planning_batch_cases_preserve_input_order(
         self,
     ) -> None:
