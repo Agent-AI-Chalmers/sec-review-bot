@@ -5,6 +5,10 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from scripts.patcheval.experiments import (
+    EVALUATION_EXPERIMENTS,
+    LIGHTWEIGHT_COST_VARIANTS,
+)
 from scripts.token_usage import (
     PricingSelection,
     effective_patch_run,
@@ -12,23 +16,6 @@ from scripts.token_usage import (
     lightweight_two_stage_run,
     load_run_usage,
 )
-
-VARIANTS = (
-    "end-to-end-default",
-    "end-to-end-lightweight-two-stage",
-    "end-to-end-single-agent",
-    "end-to-end-two-stage",
-    "location-oracle-default",
-    "location-oracle-lightweight-two-stage",
-    "location-oracle-single-agent",
-    "location-oracle-two-stage",
-)
-# lightweight-two-stage is a derived cost view of default runs, not a separate
-# PatchEval execution variant.
-LIGHTWEIGHT_COST_VARIANTS = {
-    "end-to-end-default": "end-to-end-lightweight-two-stage",
-    "location-oracle-default": "location-oracle-lightweight-two-stage",
-}
 
 
 @dataclass
@@ -83,7 +70,7 @@ def collect_language_totals(
     patch_input_dir: Path, tag: str, cve_languages: dict[str, str]
 ) -> dict[str, dict[str, int]]:
     totals: dict[str, dict[str, int]] = {}
-    for variant in VARIANTS:
+    for variant in EVALUATION_EXPERIMENTS:
         patch_file = patch_input_dir / f"patcheval-{tag}-{variant}.json"
         if not patch_file.exists():
             totals[variant] = {}
@@ -118,7 +105,7 @@ def rates_by_language(
 
 
 def experiment_variant(experiment_name: str) -> str | None:
-    for variant in VARIANTS:
+    for variant in EVALUATION_EXPERIMENTS:
         if experiment_name.endswith(f"-{variant}"):
             return variant
     return None
@@ -158,11 +145,17 @@ def collect_costs(
         output_rate=None,
         currency=None,
     )
-    tokens_by_variant: dict[str, list[int]] = {variant: [] for variant in VARIANTS}
-    costs_by_variant: dict[str, list[float]] = {variant: [] for variant in VARIANTS}
-    ai_turns_by_variant: dict[str, list[int]] = {variant: [] for variant in VARIANTS}
+    tokens_by_variant: dict[str, list[int]] = {
+        variant: [] for variant in EVALUATION_EXPERIMENTS
+    }
+    costs_by_variant: dict[str, list[float]] = {
+        variant: [] for variant in EVALUATION_EXPERIMENTS
+    }
+    ai_turns_by_variant: dict[str, list[int]] = {
+        variant: [] for variant in EVALUATION_EXPERIMENTS
+    }
     currencies_by_variant: dict[str, set[str]] = {
-        variant: set() for variant in VARIANTS
+        variant: set() for variant in EVALUATION_EXPERIMENTS
     }
 
     for run_dir in iter_cost_run_dirs(
@@ -199,7 +192,7 @@ def collect_costs(
                 )
 
     summaries: dict[str, CostSummary] = {}
-    for variant in VARIANTS:
+    for variant in EVALUATION_EXPERIMENTS:
         token_values = tokens_by_variant[variant]
         cost_values = costs_by_variant[variant]
         ai_turn_values = ai_turns_by_variant[variant]
@@ -370,7 +363,7 @@ def main() -> int:
 
     rows: list[EvaluationRow] = []
     missing: list[Path] = []
-    for variant in VARIANTS:
+    for variant in EVALUATION_EXPERIMENTS:
         summary_path = base / f"{args.prefix}-{variant}" / "summary.json"
         if not summary_path.exists():
             missing.append(summary_path)

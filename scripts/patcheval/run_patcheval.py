@@ -19,6 +19,10 @@ from sec_review_agents.runtime.runtime_config import (
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 from sec_review_agents.utils.env import bootstrap_agents_env
 
+from scripts.patcheval.experiments import (
+    EXECUTED_EXPERIMENTS,
+    EXECUTED_EXPERIMENTS_BY_NAME,
+)
 from scripts.patcheval.issue_bundle import build_patcheval_issue_bundle
 
 
@@ -39,19 +43,10 @@ def parse_args() -> argparse.Namespace:
         help="Directory where the materialized PatchEval workspace should be created. Defaults to a temp root.",
     )
     parser.add_argument(
-        "--location-oracle",
-        action="store_true",
-        help="Use PatchEval location-oracle mode. Default is end-to-end mode.",
-    )
-    parser.add_argument(
-        "--two-stage",
-        action="store_true",
-        help="Run the PatchEval case through the local issue-review-two-stage ablation path.",
-    )
-    parser.add_argument(
-        "--single-agent",
-        action="store_true",
-        help="Run the PatchEval case through the local issue-review-single-agent baseline.",
+        "--variant",
+        choices=EXECUTED_EXPERIMENTS,
+        default=EXECUTED_EXPERIMENTS[0],
+        help="Experiment from the PatchEval matrix. Defaults to %(default)s.",
     )
     return parser.parse_args()
 
@@ -69,8 +64,7 @@ async def main() -> None:
     # PatchEval cases intentionally replay benchmark-provided sandbox images.
     os.environ.setdefault(ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV, "true")
     args = parse_args()
-    if args.two_stage and args.single_agent:
-        raise SystemExit("--two-stage and --single-agent are mutually exclusive.")
+    spec = EXECUTED_EXPERIMENTS_BY_NAME[args.variant]
     dataset_path = Path(args.dataset).resolve()
     output_dir = (
         Path(args.output_dir).resolve()
@@ -83,9 +77,9 @@ async def main() -> None:
         cve_id=args.cve,
         dataset_path=dataset_path,
         output_dir=output_dir,
-        location_oracle=args.location_oracle,
-        two_stage=args.two_stage,
-        single_agent=args.single_agent,
+        location_oracle=spec.location_oracle,
+        two_stage=spec.issue_strategy == "two-stage",
+        single_agent=spec.issue_strategy == "single-agent",
     )
 
     print(f"LOCAL_ROOT={bundle.local_root_path}")
