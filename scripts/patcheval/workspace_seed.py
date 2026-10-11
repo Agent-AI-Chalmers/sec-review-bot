@@ -70,7 +70,7 @@ def extract_dir_from_image(
     """
     Extract a directory from a Docker image into a host directory.
 
-    The extracted archive is unpacked using Python 3.12's tar safety filter
+    The extracted archive is unpacked using Python's tar safety filter
     to prevent path traversal outside the destination root.
     """
     destination = Path(host_path).resolve()
