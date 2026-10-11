@@ -268,24 +268,34 @@ class TestRepositoryScopeAndDeliveryPlanning:
     def test_workflow_result_keeps_cvss_on_case_results(self) -> None:
         case_results: list[dict[str, Any]] = [
             {
+                "case_id": "case-1",
+                "disposition": "keep",
                 "review_record": {
                     "cvss": {"base_score": 9.8, "severity": "critical"},
-                }
+                },
             },
             {
+                "case_id": "case-2",
+                "disposition": "keep",
                 "review_record": {
                     "cvss": {"base_score": 7.4, "severity": "high"},
-                }
+                },
             },
-            {"review_record": {"cvss": None}},
             {
+                "case_id": "case-3",
+                "disposition": "blocked",
+                "review_record": {"cvss": None},
+            },
+            {
+                "case_id": "case-4",
+                "disposition": "blocked",
                 "review_record": {
                     "cvss": {
                         "outcome": "not-scored",
                         "base_score": None,
                         "severity": None,
                     }
-                }
+                },
             },
         ]
 
