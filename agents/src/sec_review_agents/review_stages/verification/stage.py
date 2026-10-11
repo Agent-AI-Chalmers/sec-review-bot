@@ -104,6 +104,23 @@ def _apply_workspace_patch(
     try:
         patch_copy_path.write_text(patch_content, encoding="utf-8")
 
+        # `git apply` exits 0 while skipping every path when the workspace sits inside
+        # another repository, which would leave the verifier on the unpatched baseline
+        # and report success. `--numstat` prints one line per file the patch resolves to,
+        # so empty output with a zero exit code is exactly that silent skip; a malformed
+        # patch exits non-zero and falls through to `--check` for its real message.
+        stat_process = subprocess.run(
+            ["git", "apply", "--numstat", "-p1", str(patch_copy_path)],
+            cwd=workspace_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if stat_process.returncode == 0 and not stat_process.stdout.strip():
+            raise RuntimeError(
+                "workspace.patch resolves to no file in the verifier workspace."
+            )
+
         check_process = subprocess.run(
             ["git", "apply", "--check", "-p1", str(patch_copy_path)],
             cwd=workspace_path,
