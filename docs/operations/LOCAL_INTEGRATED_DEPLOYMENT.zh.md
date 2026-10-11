@@ -300,7 +300,7 @@ sudo systemctl stop sec-review-bot.target
 sudo systemctl restart sec-review-bot.target
 ```
 
-Temporal development server 的状态保存在 `.agent-temporal-state` 下，因此上述日常启停和重启会保留 workflow history 与待处理任务。
+Temporal development server 的状态保存在 `.agent-temporal-state` 下，因此上述日常启停和重启会保留 workflow history 与待处理任务。停止会移除 Compose 容器与网络（`docker compose down`），每次启动重新创建，因此容器不可能比它创建时所在的网络活得更久；所有状态都保存在仓库本地的 bind mount 中。
 
 查看整体状态和日志：
 

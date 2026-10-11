@@ -298,7 +298,7 @@ sudo systemctl stop sec-review-bot.target
 sudo systemctl restart sec-review-bot.target
 ```
 
-Temporal development-server state is stored under `.agent-temporal-state`, so these routine lifecycle operations preserve workflow history and pending tasks.
+Temporal development-server state is stored under `.agent-temporal-state`, so these routine lifecycle operations preserve workflow history and pending tasks. Stopping removes the Compose containers and network (`docker compose down`); every start creates them again, so a container can never outlive the network it was created on. All state lives in the repository-local bind mounts.
 
 Inspect the deployment status and logs:
 
