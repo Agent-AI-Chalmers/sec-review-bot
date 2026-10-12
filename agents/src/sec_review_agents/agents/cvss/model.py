@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from sec_review_agents.utils.pydantic_types import NonEmptyText
+
 CVSS_VECTOR_ORDER = (
     "AV",
     "AC",
@@ -27,7 +29,7 @@ class CvssMetricRationale(BaseModel):
     """
 
     metric: Literal["AV", "AC", "AT", "PR", "UI", "VC", "VI", "VA", "SC", "SI", "SA"]
-    rationale: str = Field(
+    rationale: NonEmptyText = Field(
         description="Brief evidence-grounded reason for the chosen metric value."
     )
 
@@ -49,7 +51,7 @@ class CvssV4ScoringOutput(BaseModel):
             "not independently scoreable."
         ),
     )
-    overview: str = Field()
+    overview: NonEmptyText = Field()
     not_scored_reason: str | None = Field(
         default=None,
         description=(

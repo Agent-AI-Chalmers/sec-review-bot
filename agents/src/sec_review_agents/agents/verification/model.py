@@ -6,6 +6,7 @@ from sec_review_agents.review_stages.types import (
     ResolutionNextStep,
     ValidationLevel,
 )
+from sec_review_agents.utils.pydantic_types import NonEmptyText
 
 # Agent structured output
 
@@ -24,7 +25,7 @@ class VerificationOutput(BaseModel):
     `validate_result` enforces valid combinations.
     """
 
-    overview: str = Field(
+    overview: NonEmptyText = Field(
         description=(
             "Compact top-line summary of the verification judgment. "
             "Keep it consistent with the structured outcome fields. "
@@ -32,7 +33,7 @@ class VerificationOutput(BaseModel):
             "patch_findings or verification_findings."
         ),
     )
-    review_target_claim: str = Field(
+    review_target_claim: NonEmptyText = Field(
         description="The strongest repository-grounded claim the verifier treated as the target of patch review.",
     )
     patch_coverage: PatchCoverage = Field(

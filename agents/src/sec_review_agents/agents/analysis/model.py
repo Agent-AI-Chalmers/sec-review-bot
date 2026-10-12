@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from sec_review_agents.review_stages.types import ValidationLevel, Verdict
+from sec_review_agents.utils.pydantic_types import NonEmptyText
 
 VULNERABILITY_TYPE_PLACEHOLDERS = {"unspecified", "none", "unknown", "n/a", ""}
 
@@ -10,7 +11,7 @@ VULNERABILITY_TYPE_PLACEHOLDERS = {"unspecified", "none", "unknown", "n/a", ""}
 # Domain types
 
 ScopeShape = Literal["local-defect", "shared-enforcement-point", "unresolved"]
-NearbyPathRelationship = Literal["same-semantics", "different-semantics", "unresolved"]
+RelatedPathRelationship = Literal["same-semantics", "different-semantics", "unresolved"]
 
 
 # Agent structured output
@@ -23,7 +24,7 @@ class Location(BaseModel):
     Keep `label` short and role-oriented so nearby fields can explain the deeper significance.
     """
 
-    file: str = Field(
+    file: NonEmptyText = Field(
         description="Repository-relative file path for a code location relevant to the analysis."
     )
     line: int | None = Field(
@@ -37,32 +38,31 @@ class Location(BaseModel):
     )
 
 
-class ReviewedNearbyPath(BaseModel):
+class RelatedPath(BaseModel):
     """
-    Keep nearby-path scope notes compact and evidence-oriented.
-    Use these entries only for the small checked set that materially informed scope-shape judgment.
-    Do not use this structure as a catch-all list of every related vector, issue variant, or theoretically similar path.
+    One other code site checked against this narrative's mechanism.
     """
 
-    label: str = Field(
-        description=(
-            "Short identifier for the checked nearby path, helper, stage, fallback, or entry point that materially "
-            "informed scope-shape judgment."
-        )
+    label: NonEmptyText = Field(
+        description="Short identifier for the code site: a path, helper, stage, fallback, or entry point."
     )
-    relationship: NearbyPathRelationship = Field(
+    relationship: RelatedPathRelationship = Field(
         description=(
-            "How this checked nearby path relates to the current narrative scope after repository review. "
-            "Use this only for paths that materially changed, constrained, or clarified scope-shape judgment."
+            "How this code site relates to the narrative's mechanism. Judge by failure class and boundary, not by "
+            "code resemblance: `same-semantics` when it reaches the same failure class through the same classifier, "
+            "dispatcher, guard, validator, or shared helper the narrative depends on, and `different-semantics` "
+            "when it reaches a different failure class or a different boundary. Code that merely resembles the "
+            "cited code, or that reaches the same boundary with a different outcome, is not `same-semantics`."
         )
     )
     note: str | None = Field(
         default=None,
-        description=(
-            "Optional brief explanation of why this nearby path was judged same, different, or unresolved. "
-            "Keep the note focused on checked semantics, reachability, or boundary behavior."
-        ),
+        description="Brief explanation of why this site is same, different, or unresolved.",
     )
+
+    model_config = {
+        "extra": "forbid",
+    }
 
 
 class ControlReview(BaseModel):
@@ -150,53 +150,55 @@ class SupportReview(BaseModel):
     }
 
 
+# Verdicts that assert something to repair, so the narrative owes the control point whose
+# behavior decides its outcome. `plausible-risk` counts: the concern is unconfirmed, but the
+# control point that would decide it is already identifiable, and the field description says
+# so. `no-actionable-finding` and `inconclusive` assert no such outcome, so they owe only the
+# scope analysis.
+FINDING_VERDICTS = frozenset(
+    {"plausible-risk", "confirmed-defect", "confirmed-vulnerability"}
+)
+
+
 # ScopeReview asks whether the issue is a local defect or lies in a shared
 # control point used by multiple execution paths.
 class ScopeReview(BaseModel):
     """
-    Capture repair-relevant scope and the checked nearby paths that informed it.
+    Capture repair-relevant scope and the control point that decides the outcome.
     """
 
     scope_shape: ScopeShape = Field(
         default="unresolved",
         description=(
             "Whether the repair-relevant scope is best understood as a single local defect, "
-            "a shared enforcement point affecting multiple reachable paths, or still unresolved."
+            "a shared enforcement point affecting multiple reachable paths, or still unresolved. "
+            "Choose `shared-enforcement-point` when the narrative's mechanism is implemented by a boundary that "
+            "other reachable entries also depend on, even when only one entry is reported or only one entry is wrong."
         ),
     )
-    shared_boundary: str | None = Field(
+    outcome_deciding_control_point: str | None = Field(
         default=None,
         description=(
-            "Name the single common control point, trust boundary, or shared enforcement surface when repository "
-            "evidence directly supports one and `scope_shape` is `shared-enforcement-point`. Do not combine "
-            "separate defense-in-depth controls into one shared boundary."
+            "Short identifier of the single control point whose behavior decides this narrative's outcome, for "
+            "example `checkAccess`. Name the symbol that decides the outcome, not where the error "
+            "is raised and not which callers are affected; describe what that outcome is and how it is decided in "
+            "`scope_analysis`. Required for `plausible-risk`, `confirmed-defect`, and `confirmed-vulnerability`: a "
+            "`plausible-risk` names the control point that would decide the outcome if the concern is real. "
+            "`no-actionable-finding` and `inconclusive` record what they examined in `scope_analysis` instead."
         ),
     )
-    reviewed_nearby_paths: list[ReviewedNearbyPath] = Field(
-        default_factory=list,
-        max_length=5,
+    scope_analysis: NonEmptyText = Field(
         description=(
-            "Small checked set of nearby paths, helpers, stages, or fallbacks that materially informed "
-            "scope-shape judgment; use only entries marked same-semantics, different-semantics, or unresolved, "
-            "not as a catch-all list of every related vector."
+            "Explain, in this order: how the control point decides the outcome, why the repair-relevant scope "
+            "is local or shared, and, when the scope is still unresolved, what evidence would settle it. List the "
+            "entries that reach the control point in `related_paths` rather than repeating them here."
         ),
     )
-
+    # Whether a control point must be named is validated on Narrative: it depends on
+    # the narrative verdict, which this nested model cannot see.
     model_config = {
         "extra": "forbid",
     }
-
-    @model_validator(mode="after")
-    def validate_scope_review(self) -> ScopeReview:
-        if (
-            self.scope_shape == "shared-enforcement-point"
-            and not (self.shared_boundary or "").strip()
-        ):
-            raise ValueError(
-                "shared_boundary is required when scope_shape is shared-enforcement-point."
-            )
-
-        return self
 
 
 class CweMapping(BaseModel):
@@ -239,6 +241,8 @@ class Narrative(BaseModel):
     A narrative is a review direction with its own evidence and verdict; it may conclude no actionable finding.
     When `verdict=confirmed-vulnerability`, use a concrete `vulnerability_type` and include at least one
     `location`, `flow_review.source_facts`, and `flow_review.sink_facts`.
+    A `confirmed-defect` includes at least one `location`; source and sink facts stay optional because no
+    attacker-influenced flow has to exist for a defect to be confirmed.
     Keep `description`, `support_review`, and overall wording consistent with `validation_level`; do not write
     as though end-to-end behavior was exercised when validation stayed static or partial.
     Use `flow_review` for source/sink-style facts when attacker influence, preconditions, dangerous operations,
@@ -248,8 +252,8 @@ class Narrative(BaseModel):
     Use `control_review` when a guard, sanitizer, validation, deny rule, allowlist, policy, authorization check,
     parser rule, crypto check, or boundary materially affects the verdict; state reachable assets, verified
     controls, and concrete control limits separately.
-    Use `scope_review` to record whether repair-relevant scope is local, shared, or unresolved and which nearby
-    paths, helpers, stages, or fallbacks materially informed that judgment.
+    Use `scope_review` to record whether repair-relevant scope is local, shared, or unresolved and which control
+    point decides the outcome; list the related code sites that informed that judgment in `related_paths`.
     Use `cwe_mapping` only when a CWE mapping is justified; if `cwe_mapping.cwe_id` is present, also provide the
     matching `cwe_mapping.cwe_name` and a brief `cwe_mapping.cwe_rationale`.
     """
@@ -261,10 +265,10 @@ class Narrative(BaseModel):
     verdict: Verdict = Field(
         description="Evidence-grounded outcome for this narrative.",
     )
-    title: str = Field(
+    title: NonEmptyText = Field(
         description="Short title naming the review direction or confirmed defect being described."
     )
-    description: str = Field(
+    description: NonEmptyText = Field(
         description="Concise evidence-based explanation of the narrative, scoped to the current repository and trigger."
     )
     vulnerability_type: str = Field(
@@ -308,8 +312,17 @@ class Narrative(BaseModel):
         ),
     )
     scope_review: ScopeReview = Field(
-        default_factory=ScopeReview,
         description="Repair-relevant scope review for this narrative.",
+    )
+    related_paths: list[RelatedPath] = Field(
+        default_factory=list,
+        max_length=5,
+        description=(
+            "Small checked set of code sites that materially informed the scope judgment; use it only for the "
+            "entries that changed, constrained, or clarified that judgment, not as a catch-all list of every "
+            "related vector. When the narrative names a mechanism rather than a cited location, check the boundary "
+            "that implements the mechanism before concluding `local-defect`."
+        ),
     )
     cwe_mapping: CweMapping = Field(
         default_factory=CweMapping,
@@ -346,6 +359,39 @@ class Narrative(BaseModel):
                     "narratives with verdict=confirmed-vulnerability require a concrete vulnerability_type."
                 )
 
+        # A confirmed defect must point somewhere. Source and sink facts belong to
+        # attacker-influenced flows, but "this code is wrong" without a location leaves the
+        # reader an unlocatable claim. `plausible-risk` stays exempt because incomplete
+        # evidence is what that verdict states.
+        if self.verdict == "confirmed-defect" and not self.locations:
+            raise ValueError(
+                "narratives with verdict=confirmed-defect must include at least one location."
+            )
+
+        if (
+            self.verdict in FINDING_VERDICTS
+            and not (self.scope_review.outcome_deciding_control_point or "").strip()
+        ):
+            raise ValueError(
+                f"narratives with verdict={self.verdict} require "
+                "scope_review.outcome_deciding_control_point: name the control point whose behavior decides "
+                "the outcome."
+            )
+
+        # A `same-semantics` path says another entry reaches the same failure class through
+        # the same boundary, which is what a shared scope means. Claiming a local defect
+        # while listing one contradicts the label the mitigator reads.
+        # The reverse is deliberately not enforced: a shared boundary can be argued from
+        # sibling throws in the same file without listing a same-semantics path.
+        if self.scope_review.scope_shape == "local-defect" and any(
+            path.relationship == "same-semantics" for path in self.related_paths
+        ):
+            raise ValueError(
+                "scope_review.scope_shape=local-defect contradicts a same-semantics related path: another entry "
+                "reaches the same failure class through the same boundary, so claim shared-enforcement-point or "
+                "drop the entry."
+            )
+
         return self
 
 
@@ -364,7 +410,7 @@ class AnalysisOutput(BaseModel):
     Non-empty actionable verdicts should be backed by at least one narrative, ordered by unique `priority` values.
     """
 
-    overview: str = Field(
+    overview: NonEmptyText = Field(
         description=(
             "Compact top-line summary of the analyzer's current repository-grounded assessment. "
             "Use it as brief orientation for downstream stages rather than as a compressed full narrative set. "

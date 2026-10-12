@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, model_validator
 
+from sec_review_agents.utils.pydantic_types import NonEmptyText
 from sec_review_agents.workspace.patches import normalize_declared_changed_files
 
 # Agent structured output
@@ -16,7 +17,7 @@ class MitigationOutput(BaseModel):
     repository files are intentionally part of the patch.
     """
 
-    overview: str = Field(
+    overview: NonEmptyText = Field(
         description=(
             "Compact top-line summary of the mitigation direction or why the stage could not fully act. "
             "Use it as brief downstream context rather than as a declaration of full repair. "

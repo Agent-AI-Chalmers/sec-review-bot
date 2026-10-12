@@ -5,6 +5,7 @@ from sec_review_agents.review_stages.types import (
     ValidationLevel,
     Verdict,
 )
+from sec_review_agents.utils.pydantic_types import NonEmptyText
 from sec_review_agents.workspace.patches import normalize_declared_changed_files
 
 # Agent structured output
@@ -20,9 +21,8 @@ class SingleAgentFixOutput(BaseModel):
     `residual_risks` for remaining exposure or uncertainty after that self-check.
     """
 
-    overview: str = Field(
-        description="Compact repository-grounded summary of the final decision and any applied repair.",
-        min_length=1,
+    overview: NonEmptyText = Field(
+        description="Compact repository-grounded summary of the final decision and any applied repair."
     )
     verdict: Verdict = Field(
         description="Top-level repository-grounded outcome after the agent completed its inspection and self-check.",
