@@ -4,36 +4,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from sec_review_agents.utils.files import persist_text_artifact
-from sec_review_agents.workspace.paths import normalize_workspace_file_path
+from sec_review_agents.workspace.paths import normalize_declared_file_path
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
-
-
-def derive_changed_files_from_patch(patch_content: str) -> list[str]:
-    changed_files: list[str] = []
-    seen: set[str] = set()
-
-    for line in str(patch_content or "").splitlines():
-        before_path = ""
-        after_path = ""
-
-        if line.startswith(("diff -ruN ", "diff --git ")):
-            parts = line.split()
-            if len(parts) != 4:
-                continue
-            _, _, before_path, after_path = parts
-        else:
-            continue
-
-        candidate = after_path if after_path != "/dev/null" else before_path
-        normalized = normalize_workspace_file_path(candidate)
-
-        if not normalized or normalized in seen:
-            continue
-
-        seen.add(normalized)
-        changed_files.append(normalized)
-
-    return changed_files
 
 
 def normalize_declared_changed_files(
@@ -43,7 +15,7 @@ def normalize_declared_changed_files(
     seen: set[str] = set()
 
     for raw_path in declared_changed_files:
-        normalized = normalize_workspace_file_path(str(raw_path or ""))
+        normalized = normalize_declared_file_path(str(raw_path or ""))
         if not normalized:
             raise ValueError(
                 "declared_changed_files entries must name repository files."
@@ -100,7 +72,7 @@ def _filter_paths(paths: Sequence[str] | None) -> list[str]:
     filtered: list[str] = []
     seen: set[str] = set()
     for path in paths or []:
-        normalized = normalize_workspace_file_path(path)
+        normalized = normalize_declared_file_path(path)
         if not normalized or normalized in seen:
             continue
         seen.add(normalized)
@@ -117,13 +89,15 @@ def _path_matches_any(path: str, include_paths: list[str]) -> bool:
 
 def _build_git_workspace_patch(
     workspace_path: Path, *, include_paths: Sequence[str] | None = None
-) -> str:
+) -> tuple[str, list[str]]:
     scoped_paths = _filter_paths(include_paths)
     untracked_paths = _list_untracked_paths(workspace_path)
     if scoped_paths:
         untracked_paths = [
             path for path in untracked_paths if _path_matches_any(path, scoped_paths)
         ]
+
+    scope_args = ["--", *scoped_paths] if scoped_paths else []
 
     try:
         if untracked_paths:
@@ -147,7 +121,7 @@ def _build_git_workspace_patch(
                 "--src-prefix=a/",
                 "--dst-prefix=b/",
                 "HEAD",
-                *(["--", *scoped_paths] if scoped_paths else []),
+                *scope_args,
             ],
             cwd=workspace_path,
             capture_output=True,
@@ -160,7 +134,39 @@ def _build_git_workspace_patch(
                 or "git diff failed while building workspace.patch"
             )
 
-        return process.stdout or ""
+        # Changed files come straight from git (NUL-separated, repository-relative)
+        # rather than re-parsing the patch text. Text parsing is ambiguous for bare
+        # paths containing spaces or a ` b/` substring and cannot see mode-only
+        # changes; `--name-only -z` reports the exact paths git acted on.
+        names_process = subprocess.run(
+            [
+                "git",
+                "diff",
+                "--name-only",
+                "-z",
+                "--no-color",
+                "--no-ext-diff",
+                "--no-renames",
+                "HEAD",
+                *scope_args,
+            ],
+            cwd=workspace_path,
+            capture_output=True,
+            text=False,
+            check=False,
+        )
+        if names_process.returncode != 0:
+            raise RuntimeError(
+                names_process.stderr.decode("utf-8", errors="ignore").strip()
+                or "git diff --name-only failed while building workspace.patch"
+            )
+        changed_files = [
+            value.decode("utf-8", errors="ignore")
+            for value in (names_process.stdout or b"").split(b"\x00")
+            if value
+        ]
+
+        return process.stdout or "", changed_files
     finally:
         if untracked_paths:
             _run_git_with_path_batches(
@@ -185,14 +191,15 @@ def build_workspace_patch(
         )
 
     scoped_paths = _filter_paths(include_paths)
-    normalized_patch = (
-        _build_git_workspace_patch(worktree_path, include_paths=scoped_paths)
-        if scoped_paths
-        else ""
-    )
+    if scoped_paths:
+        patch_content, changed_files = _build_git_workspace_patch(
+            worktree_path, include_paths=scoped_paths
+        )
+    else:
+        patch_content, changed_files = "", []
     return {
-        "patch_content": normalized_patch,
-        "changed_files": derive_changed_files_from_patch(normalized_patch),
+        "patch_content": patch_content,
+        "changed_files": changed_files,
     }
 
 
@@ -263,5 +270,5 @@ def observe_workspace_changed_files(worktree_path: Path) -> list[str]:
         )
 
     # Observation is diagnostic: publishable patch export still requires an explicit scope.
-    patch_content = _build_git_workspace_patch(worktree_path, include_paths=None)
-    return derive_changed_files_from_patch(patch_content)
+    _, changed_files = _build_git_workspace_patch(worktree_path, include_paths=None)
+    return changed_files

@@ -32,6 +32,7 @@ jobs:
       scripts: ${{ steps.filter.outputs.scripts }}
       documentation: ${{ steps.filter.outputs.documentation }}
       automation-config: ${{ steps.filter.outputs.automation-config }}
+      ops: ${{ steps.filter.outputs.ops }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -78,6 +79,13 @@ jobs:
             automation-config:
               - '.github/dependabot.yml'
               - '.github/workflows/**'
+            # ops/ and the root Compose files are not covered by any app suite;
+            # give them lightweight validation so they still gate CI Status.
+            ops:
+              - 'ops/**'
+              - 'compose.yaml'
+              - 'compose.env.sample'
+              - '.github/workflows/ci.yml'
 
   automation-config:
     name: Automation Config
@@ -99,6 +107,31 @@ jobs:
       # file still prevents malformed YAML from reaching the default branch.
       - name: Parse Dependabot configuration
         run: ruby -e 'require "yaml"; YAML.parse_file(".github/dependabot.yml")'
+
+  ops:
+    name: Ops
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.ops == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # ops/ and the root Compose files sit outside every app suite; validate them
+      # cheaply so a change there cannot land with CI Status green but untested.
+      - name: Syntax-check the install script
+        run: bash -n ops/systemd/install.sh
+
+      - name: Compile the RustFS init script
+        run: python3 -m py_compile ops/rustfs-init/init.py
+
+      - name: Validate the Compose file
+        # --no-interpolate: CI has no `.env` (it is gitignored) and the `:?`
+        # interpolations require real secrets, so interpolating would always fail.
+        # We validate the compose structure, not the operator's secret values.
+        run: docker compose -f compose.yaml config -q --no-interpolate
 
   control-plane:
     name: Control Plane
@@ -403,6 +436,7 @@ jobs:
     needs:
       - changes
       - automation-config
+      - ops
       - control-plane
       - github-integration
       - control-plane-ui
@@ -415,7 +449,9 @@ jobs:
       # Use this aggregate job as the required branch-protection check.
       - name: Check CI result
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
+          OPS_RESULT: ${{ needs.ops.result }}
           CONTROL_PLANE_RESULT: ${{ needs.control-plane.result }}
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
           CONTROL_PLANE_UI_RESULT: ${{ needs.control-plane-ui.result }}
@@ -424,8 +460,13 @@ jobs:
           DOCUMENTATION_RESULT: ${{ needs.documentation.result }}
         run: |
           set -euo pipefail
+          # CHANGES_RESULT is checked too: if change detection itself fails, every
+          # area job is skipped but the aggregate must still go red rather than
+          # pass with nothing executed.
           for result in \
+            "$CHANGES_RESULT" \
             "$AUTOMATION_CONFIG_RESULT" \
+            "$OPS_RESULT" \
             "$CONTROL_PLANE_RESULT" \
             "$GITHUB_INTEGRATION_RESULT" \
             "$CONTROL_PLANE_UI_RESULT" \

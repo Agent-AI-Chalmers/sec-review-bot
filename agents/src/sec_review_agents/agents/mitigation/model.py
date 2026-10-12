@@ -30,7 +30,9 @@ class MitigationOutput(BaseModel):
         default_factory=list,
         description=(
             "Repository-relative files intentionally changed by this mitigation and intended for patch export. "
-            "Use paths like `src/app.py`; do not include `/workspace`, `workspace/`, `a/`, or `b/` prefixes. "
+            "Use paths like `src/app.py`; do not use the absolute `/workspace` mount prefix, and do not copy "
+            "the git diff `a/`/`b/` header prefixes. A real top-level `a/`, `b/`, or `workspace/` directory is a valid "
+            "path and should be declared as-is. "
             "Exclude generated runtime artifacts, dependency install output, caches, coverage, build outputs, and temporary files."
         ),
     )

@@ -23,7 +23,6 @@ from sec_review_agents.workspace.file_changes import (
     collect_publishable_file_changes,
 )
 from sec_review_agents.workspace.patches import (
-    derive_changed_files_from_patch,
     observe_workspace_changed_files,
     persist_workspace_patch,
 )
@@ -63,7 +62,7 @@ def _build_file_changes_from_workspace_patch(
             )
         return collect_publishable_file_changes(
             patched_workspace_path,
-            include_paths or derive_changed_files_from_patch(patch_content),
+            include_paths or observe_workspace_changed_files(patched_workspace_path),
         )
 
 

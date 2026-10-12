@@ -10,6 +10,9 @@ export const RUNNER_PUBLISH_ERROR_CODES = {
   publication_step_retry_exhausted: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
   publication_step_set_duplicate: 'PUBLICATION_STEP_SET_DUPLICATE',
   publication_step_set_changed: 'PUBLICATION_STEP_SET_CHANGED',
+  // A step that is already 'succeeded' (or otherwise not claimable and not
+  // retry-exhausted) cannot be repaired by re-claiming, so it is terminal.
+  publication_step_not_claimable: 'PUBLICATION_STEP_NOT_CLAIMABLE',
   runner_publish_non_retryable: 'RUNNER_PUBLISH_NON_RETRYABLE'
 } as const
 

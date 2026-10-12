@@ -158,8 +158,13 @@ function parseListQuery(url: URL): ListQueryOptions {
   for (const name of ['from', 'to'] as const) {
     const value = url.searchParams.get(name)
     if (value !== null) {
-      if (Number.isNaN(Date.parse(value))) throw invalidQuery(`${name} must be a valid date.`)
-      options[name] = value
+      const parsed = Date.parse(value)
+      if (Number.isNaN(parsed)) throw invalidQuery(`${name} must be a valid date.`)
+      // Normalize to a canonical ISO-8601 instant before binding. Date.parse
+      // accepts inputs like `1` (year 2001) that `'1'::timestamptz` rejects; if we
+      // bound the raw string, Postgres raised `22007` and the generic catch leaked
+      // the SQLSTATE as a 500 instead of the documented 400 INVALID_QUERY.
+      options[name] = new Date(parsed).toISOString()
     }
   }
   return options
@@ -303,13 +308,8 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       if (listQuery) {
         const url = new URL(request.url ?? '/', 'http://control-plane.local')
         const listOptions = parseListQuery(url)
-        const runs = await store.listRuns(listOptions)
+        const { runs, next_cursor } = await store.listRunsPage(listOptions)
         const observed = runs.map(observeRun)
-        const last = runs.at(-1)
-        const next_cursor =
-          last === undefined || runs.length < listOptions.limit!
-            ? null
-            : Buffer.from(`${last.created_at}|${last.run_id}`).toString('base64url')
         sendJson(response, 200, { runs: observed, next_cursor })
         return
       }
@@ -359,6 +359,20 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       })
       sendJson(response, 200, { result })
     } catch (error) {
+      // Defense in depth: a Postgres datetime parse error (22007/22008) can only
+      // originate from a bad `from`/`to` filter. Map it to the documented 400
+      // INVALID_QUERY rather than a 500 that would leak the driver message.
+      const pgCode =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        typeof error.code === 'string'
+          ? error.code
+          : null
+      if (pgCode === '22007' || pgCode === '22008') {
+        sendJson(response, 400, { error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
+        return
+      }
       const status =
         typeof error === 'object' &&
         error !== null &&

@@ -1,15 +1,49 @@
+import subprocess
+
 import pytest
 
 from sec_review_agents.workspace.patches import (
     normalize_declared_changed_files,
+    observe_workspace_changed_files,
     persist_workspace_patch,
 )
-from sec_review_agents.workspace.paths import normalize_workspace_file_path
 
 
-def test_normalize_declared_changed_files_deduplicates_normalized_path() -> None:
+def _init_git_repo(workspace, files: dict[str, str]) -> None:
+    workspace.mkdir()
+    for relative, content in files.items():
+        path = workspace / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=workspace, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "t@t"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "t"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "add", "-A"], cwd=workspace, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "init"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_normalize_declared_changed_files_preserves_declared_prefix() -> None:
+    # A declared path may legitimately start with a top-level a/ or b/ directory;
+    # the git diff prefixes must not be stripped from declared paths, or an agent
+    # that edits a/x.py and declares a/x.py would silently target x.py instead.
     assert normalize_declared_changed_files(["a/src/app.py", "src/app.py"]) == [
-        "src/app.py"
+        "a/src/app.py",
+        "src/app.py",
     ]
 
 
@@ -18,27 +52,36 @@ def test_normalize_declared_changed_files_rejects_empty_path() -> None:
         normalize_declared_changed_files(["/workspace"])
 
 
-@pytest.mark.parametrize(
-    "path",
-    ("../secret.txt", "a/../secret.txt", "/workspace/../secret.txt"),
-)
-def test_normalize_workspace_file_path_rejects_workspace_escape(path: str) -> None:
-    with pytest.raises(ValueError, match="must not escape"):
-        normalize_workspace_file_path(path)
+def test_normalize_declared_changed_files_strips_only_absolute_workspace_prefix() -> (
+    None
+):
+    # `/workspace/...` is the unambiguous workspace-root spelling and is stripped;
+    # a relative `workspace/...` may be a real top-level `workspace/` directory and
+    # must not be retargeted.
+    assert normalize_declared_changed_files(["/workspace/src/app.py"]) == ["src/app.py"]
+    assert normalize_declared_changed_files(["workspace/src/app.py"]) == [
+        "workspace/src/app.py"
+    ]
 
 
-@pytest.mark.parametrize(
-    "path",
-    (
-        ".git/config",
-        "a/.git/config",
-        "/workspace/.git/config",
-        "src/.git/config",
-    ),
-)
-def test_normalize_workspace_file_path_rejects_git_paths(path: str) -> None:
-    with pytest.raises(ValueError, match="must not target .git"):
-        normalize_workspace_file_path(path)
+def test_observe_workspace_changed_files_reports_spaced_and_mode_only_paths(
+    tmp_path,
+) -> None:
+    """Observation reads paths from `git diff --name-only -z`, so it reports spaced
+    names, ` b/` substrings, and mode-only changes that patch-text parsing could
+    not recover reliably.
+    """
+    workspace = tmp_path / "workspace"
+    _init_git_repo(workspace, {"a b.txt": "x\n", "foo b/bar.txt": "x\n"})
+
+    # Mode-only change on the spaced path + content change on the ` b/` path.
+    (workspace / "a b.txt").chmod(0o755)
+    (workspace / "foo b" / "bar.txt").write_text("y\n", encoding="utf-8")
+
+    assert sorted(observe_workspace_changed_files(workspace)) == [
+        "a b.txt",
+        "foo b/bar.txt",
+    ]
 
 
 def test_persist_workspace_patch_rejects_path_like_artifact_filenames(

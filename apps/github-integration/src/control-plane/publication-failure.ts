@@ -13,7 +13,8 @@ interface PublishFailureClassification {
 // condition and fails identically. Treat them as terminal instead of looping.
 const DETERMINISTIC_CONTROL_PLANE_PUBLICATION_CODES = new Set<string>([
   RUNNER_PUBLISH_ERROR_CODES.publication_step_set_duplicate,
-  RUNNER_PUBLISH_ERROR_CODES.publication_step_set_changed
+  RUNNER_PUBLISH_ERROR_CODES.publication_step_set_changed,
+  RUNNER_PUBLISH_ERROR_CODES.publication_step_not_claimable
 ])
 
 function isRateLimitOrAbuseLimit(error: unknown): boolean {

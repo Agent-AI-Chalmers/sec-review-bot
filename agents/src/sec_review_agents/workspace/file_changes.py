@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TypedDict
 
-from sec_review_agents.workspace.paths import normalize_workspace_file_path
+from sec_review_agents.workspace.paths import normalize_declared_file_path
 
 FILE_MODE_REGULAR = "100644"
 FILE_MODE_EXECUTABLE = "100755"
@@ -57,7 +57,10 @@ def collect_publishable_file_changes(
     seen: set[str] = set()
 
     for raw_path in changed_files or []:
-        normalized_path = normalize_workspace_file_path(str(raw_path or ""))
+        # Paths here are already repository-relative (they come from
+        # `git diff --name-only -z`, not diff headers); a top-level a/ or b/
+        # directory is a real path segment, so do not strip the diff prefixes.
+        normalized_path = normalize_declared_file_path(str(raw_path or ""))
         if not normalized_path or normalized_path in seen:
             continue
         seen.add(normalized_path)

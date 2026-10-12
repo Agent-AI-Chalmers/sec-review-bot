@@ -29,14 +29,18 @@ export async function handlePullRequestSynchronize({
   octokit,
   payload
 }: PullRequestSynchronizeWebhookEvent): Promise<void> {
-  const pr = extractPullRequestContext(payload)
-
-  logPullRequestPayload(payload)
-
+  // Self-origin checks only need the webhook envelope, so skip before validating
+  // workflow-specific pull request fields (mirrors pull_request.opened). A
+  // self-originated payload with missing fields would otherwise throw out of
+  // extractPullRequestContext instead of being skipped cleanly.
   if (isSelfOriginatedWebhookEvent(payload)) {
     logSkippedSelfOriginatedEvent('pull_request.synchronize', payload)
     return
   }
+
+  const pr = extractPullRequestContext(payload)
+
+  logPullRequestPayload(payload)
 
   let triggerConfig
   try {

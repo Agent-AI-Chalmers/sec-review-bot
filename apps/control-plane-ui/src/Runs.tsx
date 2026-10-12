@@ -30,6 +30,9 @@ const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
 /** Mirrors the Control Plane's own default, so an unadorned `/runs` asks for what
  * the server would have returned anyway. */
 const DEFAULT_PAGE_SIZE = 50
+/** sessionStorage key for the visited-page trail, so it survives navigation to a
+ * run detail and back (see the cursorParents state below). */
+const CURSOR_PARENTS_KEY = 'runs:cursor-parents'
 
 export function Runs(): React.JSX.Element {
   const { language } = useLanguage()
@@ -38,9 +41,21 @@ export function Runs(): React.JSX.Element {
   // The Control Plane walks pages forward by cursor only, so remember which cursor
   // each page was opened from in order to offer a previous page. Keyed by cursor
   // rather than by position, so the browser back button cannot desynchronise it.
-  const [cursorParents, setCursorParents] = React.useState<Record<string, string>>({})
+  // Persisted in sessionStorage because navigating to a run detail unmounts this
+  // component; without it, returning would reset the trail and strand the reader
+  // with no Previous control (the Detail "Back to runs" link restores only the URL).
+  const [cursorParents, setCursorParents] = React.useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(window.sessionStorage.getItem(CURSOR_PARENTS_KEY) ?? '{}')
+    } catch {
+      return {}
+    }
+  })
   const [data, setData] = React.useState<{ runs: Run[]; next_cursor: string | null }>()
   const [error, setError] = React.useState<unknown>()
+  React.useEffect(() => {
+    window.sessionStorage.setItem(CURSOR_PARENTS_KEY, JSON.stringify(cursorParents))
+  }, [cursorParents])
   const cursor = search.get('cursor') ?? ''
   const previousCursor = cursorParents[cursor]
   const requestedPageSize = Number(search.get('limit') ?? DEFAULT_PAGE_SIZE)

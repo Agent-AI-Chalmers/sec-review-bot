@@ -3,6 +3,7 @@ import { buildDeliveryDraftPrBody } from './renderer.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { FileChange, FileMode, TextEncoding } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
+import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import type { RepositoryCaseResult, RepositoryDelivery } from './result.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
 
@@ -33,14 +34,6 @@ interface DraftPullRequestSummary {
   html_url: string
   number: number
   reused: boolean
-}
-
-function sanitizeBranchSegment(value: unknown): string {
-  return String(value ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9._/-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^[-/]+|[-/]+$/g, '')
 }
 
 function stableBranchSegment(value: unknown): string {
@@ -243,8 +236,17 @@ export async function createRepositoryDeliveryDraftPr({
       sha: newCommitResponse.data.sha
     })
   } catch (error) {
-    const status = asErrorWithResponse(error).status
-    if (status !== 422) {
+    const errorInfo = asErrorWithResponse(error)
+    if (errorInfo.status !== 422) {
+      throw error
+    }
+
+    // createRef returns 422 both for "reference already exists" (safe to
+    // force-update) and for an invalid ref name (never safe to retry). Only take
+    // the force-update path when GitHub reports the ref already exists; an invalid
+    // ref is a real error that must surface instead of failing identically again.
+    const message = String(errorInfo.response?.data?.message ?? '').toLowerCase()
+    if (!message.includes('already exists')) {
       throw error
     }
 

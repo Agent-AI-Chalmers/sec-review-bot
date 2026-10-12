@@ -649,12 +649,11 @@ async def test_review_stage_enables_memory_when_runtime_memory_exists(
     assert captured_kwargs["agent_name"] == "issue-analyzer"
 
 
-def test_observation_id_uses_source_workflow_and_run_id() -> None:
+def test_observation_id_slugs_job_id() -> None:
     assert (
         memory_extraction.observation_id(
             [Path("/tmp/a.json")],
-            source_workflow="Issue Review",
-            run_id="run-1",
+            job_id="Issue Review-run-1",
         )
         == "issue-review-run-1"
     )
@@ -667,6 +666,23 @@ def test_observation_id_falls_back_to_transcript_hash() -> None:
 
     assert obs_id.startswith("transcripts-")
     assert len(obs_id) == len("transcripts-") + 16
+
+
+def test_observation_id_distinguishes_extraction_jobs() -> None:
+    # The workflow layer owns uniqueness: it builds one job_id per case, so the
+    # memory layer only slugs the opaque job_id into the observation id.
+    assert (
+        memory_extraction.observation_id(
+            [Path("/tmp/case.json")],
+            job_id="repository-review-run-1-case-a",
+        )
+        == "repository-review-run-1-case-a"
+    )
+    assert memory_extraction.observation_id(
+        [Path("/tmp/case.json")], job_id="repository-review-run-1-case-b"
+    ) != memory_extraction.observation_id(
+        [Path("/tmp/case.json")], job_id="repository-review-run-1-case-a"
+    )
 
 
 @pytest.mark.asyncio
@@ -697,6 +713,7 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
             [transcript.parent.parent],
             memory_store_dir=memory_root,
             deployment="test-deployment",
+            job_id="issue-review-run-1",
             source_workflow="issue-review",
             run_id="run-1",
             artifact_root_path=transcript.parent.parent,

@@ -7,6 +7,7 @@ import {
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { ReviewRecord } from '../review-record.js'
 import type { FileChange, FileMode } from '../file-change.js'
+import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
 
 interface IssueContext {
@@ -15,14 +16,6 @@ interface IssueContext {
   owner_login: string
   repo_name: string
   default_branch: string
-}
-
-function sanitizeBranchSegment(value: unknown): string {
-  return String(value ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9._/-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^[-/]+|[-/]+$/g, '')
 }
 
 function buildDraftBranchName(issue: IssueContext, run_id: string | undefined): string {

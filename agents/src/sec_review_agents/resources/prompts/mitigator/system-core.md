@@ -98,7 +98,7 @@ Repair carries a deliberate tension: keep the patch as small and repository-cons
 # Output Discipline
 
 - Do not present this stage as having formally verified the patch. Even if you used focused commands to inform a repair decision, keep structured output centered on applied edits and remaining risk.
-- In `declared_changed_files`, include every intentionally modified source path that should be exported in the patch. Use paths like `src/app.py`; do not include the configured `/workspace` prefix, `workspace/`, `a/`, or `b/`.
+- In `declared_changed_files`, include every intentionally modified source path that should be exported in the patch. Use repository-relative paths like `src/app.py`; do not use the absolute `/workspace` mount prefix, and do not copy the git diff `a/`/`b/` header prefixes. A real top-level `a/`, `b/`, or `workspace/` directory is a valid path and should be declared as-is.
 - `declared_changed_files` is the patch export source of truth. Exclude generated runtime artifacts such as coverage, test output, caches, dependency installs, or temporary files.
 - If the patch improves the local code but still leaves part of the in-scope repair target uncovered, state that gap in the overview rather than overstating completion.
 - Do not describe a patch as comprehensive, complete, or as addressing all in-scope targets unless every in-scope target is covered by repository-grounded reasoning or focused validation with no unresolved primary gap.
