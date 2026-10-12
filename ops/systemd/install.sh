@@ -140,6 +140,16 @@ awk -v repository_root="$repository_root" \
         }
     }
 ' "$deployment_env_source" >"$rendered_deployment_env"
+# POSTGRES_PASSWORD belongs in the project `.env` (Compose interpolation), not
+# here: the systemd unit exports this file into the Compose process environment,
+# where it shadows `.env` and leaves the data volume unauthenticated against a
+# later foreground compose run. Refuse a deployment.env that still sets it, so a
+# stale sample placeholder cannot be reinstalled silently.
+if grep -qE '^[[:space:]]*POSTGRES_PASSWORD=' "$rendered_deployment_env"; then
+    echo "Refusing to install: deployment.env sets POSTGRES_PASSWORD." >&2
+    echo "Remove it from $deployment_env_source and set the password in the project .env instead." >&2
+    exit 1
+fi
 # Copy only the completed merged file and keep deployment secrets private.
 install -m 0600 "$rendered_deployment_env" "$deployment_env"
 
