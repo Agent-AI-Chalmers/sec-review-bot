@@ -363,7 +363,10 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       // originate from a bad `from`/`to` filter. Map it to the documented 400
       // INVALID_QUERY rather than a 500 that would leak the driver message.
       const pgCode =
-        typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        typeof error.code === 'string'
           ? error.code
           : null
       if (pgCode === '22007' || pgCode === '22008') {
