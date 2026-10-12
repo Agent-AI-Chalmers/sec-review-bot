@@ -157,6 +157,7 @@ async def run_memory_extraction_job(
         [Path(artifact_root_path)],
         memory_store_dir=memory_store_dir,
         deployment=deployment,
+        job_id=job_id,
         source_workflow=source_workflow,
         run_id=run_id,
         artifact_root_path=Path(artifact_root_path),

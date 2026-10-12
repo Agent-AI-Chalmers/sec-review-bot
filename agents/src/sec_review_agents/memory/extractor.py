@@ -81,16 +81,10 @@ def _slug_component(value: str) -> str:
 def observation_id(
     transcript_paths: list[Path],
     *,
-    source_workflow: str | None = None,
-    run_id: str | None = None,
+    job_id: str | None = None,
 ) -> str:
-    if source_workflow and run_id:
-        return "-".join(
-            [
-                _slug_component(source_workflow),
-                _slug_component(run_id),
-            ]
-        )
+    if job_id:
+        return _slug_component(job_id)
 
     hasher = hashlib.sha256()
     for path in transcript_paths:
@@ -103,18 +97,11 @@ def _observation_id_for_transcripts(
     transcript_refs: list[TranscriptRef],
     *,
     explicit_observation_id: str | None,
-    source_workflow: str | None,
-    run_id: str | None,
+    job_id: str | None,
 ) -> str:
     if explicit_observation_id:
         return _slug_component(explicit_observation_id)
-    if source_workflow and run_id:
-        return observation_id(
-            [ref.path for ref in transcript_refs],
-            source_workflow=source_workflow,
-            run_id=run_id,
-        )
-    return observation_id([ref.path for ref in transcript_refs])
+    return observation_id([ref.path for ref in transcript_refs], job_id=job_id)
 
 
 def collect_review_memory_transcripts(
@@ -368,6 +355,7 @@ async def extract_memory_observations_from_paths(
     memory_store_dir: Path | None = None,
     deployment: str | None = None,
     observation_id_value: str | None = None,
+    job_id: str | None = None,
     source_workflow: str | None = None,
     run_id: str | None = None,
     artifact_root_path: Path | None = None,
@@ -388,8 +376,7 @@ async def extract_memory_observations_from_paths(
         resolved_observation_id=_observation_id_for_transcripts(
             transcript_refs,
             explicit_observation_id=observation_id_value,
-            source_workflow=source_workflow,
-            run_id=run_id,
+            job_id=job_id,
         ),
         source_workflow=source_workflow,
         run_id=run_id,

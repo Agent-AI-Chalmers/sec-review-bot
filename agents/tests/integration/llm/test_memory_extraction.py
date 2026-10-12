@@ -108,6 +108,7 @@ async def test_llm_extractor_writes_observation_without_updating_memory() -> Non
             [artifacts],
             memory_store_dir=memory_root,
             deployment=llm_test_deployment(),
+            job_id="llm-memory-extraction-probe-run-1",
             source_workflow="llm-memory-extraction-probe",
             run_id="run-1",
             artifact_root_path=artifacts,
