@@ -656,7 +656,11 @@ export class ReviewRunStore {
           failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
       FROM review_runs r
       WHERE p.run_id=$1 AND p.connector_id=$3 AND r.run_id=p.run_id
-        AND r.runner_status='succeeded' AND r.workflow_result IS NOT NULL
+        -- A JSON 'null' result satisfies 'IS NOT NULL' (it is stored as the JSON
+        -- value null, not SQL NULL), yet node-pg reads it back as JS null, which
+        -- would poison the claim path. Exclude it so a null-result run is never
+        -- claimed, instead of blocking every other publication head-of-line.
+        AND r.runner_status='succeeded' AND jsonb_typeof(r.workflow_result) <> 'null'
         AND (
           p.status='pending'
           OR (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
@@ -695,7 +699,10 @@ export class ReviewRunStore {
         SELECT p.run_id
         FROM publications p JOIN review_runs r ON r.run_id=p.run_id
         WHERE p.connector_id=$1 AND r.connector_id=$1
-          AND r.runner_status='succeeded' AND r.workflow_result IS NOT NULL
+          -- Same JSON-null guard as claimPublication: a JSON 'null' result must not
+          -- be selected as claimable work, or claimNextPublication would throw and
+          -- roll back on the same row every poll.
+          AND r.runner_status='succeeded' AND jsonb_typeof(r.workflow_result) <> 'null'
           AND (p.status='pending' OR
             (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
         ORDER BY p.updated_at
@@ -853,7 +860,10 @@ export class ReviewRunStore {
         'PUBLICATION_STEP_RETRY_EXHAUSTED'
       )
     }
-    throw new Error(`Publication step is not claimable: ${stepKey}`)
+    throw new DeterministicControlPlaneError(
+      `Publication step is not claimable: ${stepKey}`,
+      'PUBLICATION_STEP_NOT_CLAIMABLE'
+    )
   }
   async completePublicationStep(
     runId: string,
