@@ -405,3 +405,61 @@ test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR'
   assert.equal(octokit.calls.refs.length, 0)
   assert.equal(octokit.calls.pulls.length, 0)
 })
+
+function minimalDelivery(deliveryId: string): RepositoryDelivery {
+  return {
+    delivery_id: deliveryId,
+    case_ids: ['case-1'],
+    case_count: 1,
+    file_changes: [
+      { path: 'src/app.txt', status: 'upsert', content: 'fixed\n', content_encoding: 'utf-8' }
+    ]
+  }
+}
+
+test('delivery-draft-pr force-updates when createRef reports the ref already exists', async () => {
+  const octokit = createOctokitMock()
+  let updateRefCalls = 0
+  octokit.rest.git.createRef = async () => {
+    throw { status: 422, response: { status: 422, data: { message: 'Reference already exists' } } }
+  }
+  octokit.rest.git.updateRef = async () => {
+    updateRefCalls += 1
+    return { data: {} }
+  }
+
+  await createRepositoryDeliveryDraftPr({
+    octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+    repo: { owner_login: 'octo-org', repo_name: 'example-repo', default_branch: 'main' },
+    run_id: 'run-ref-exists',
+    input: { workspace_ref: 'base-sha' },
+    delivery: minimalDelivery('delivery-ref-exists')
+  })
+
+  assert.equal(updateRefCalls, 1)
+})
+
+test('delivery-draft-pr does not force-update a createRef 422 that is not "already exists"', async () => {
+  const octokit = createOctokitMock()
+  let updateRefCalls = 0
+  octokit.rest.git.createRef = async () => {
+    throw { status: 422, response: { status: 422, data: { message: 'Reference name is invalid' } } }
+  }
+  octokit.rest.git.updateRef = async () => {
+    updateRefCalls += 1
+    return { data: {} }
+  }
+
+  await assert.rejects(
+    createRepositoryDeliveryDraftPr({
+      octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+      repo: { owner_login: 'octo-org', repo_name: 'example-repo', default_branch: 'main' },
+      run_id: 'run-invalid-ref',
+      input: { workspace_ref: 'base-sha' },
+      delivery: minimalDelivery('delivery-invalid-ref')
+    }),
+    (error: unknown) => (error as { status?: unknown }).status === 422
+  )
+
+  assert.equal(updateRefCalls, 0)
+})
