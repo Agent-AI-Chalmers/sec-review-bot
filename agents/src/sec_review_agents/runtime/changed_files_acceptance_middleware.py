@@ -133,10 +133,12 @@ def _invalid_declared_changed_files_prompt(error: Exception) -> str:
         "Patch declaration failed:\n"
         f"{str(error).strip() or 'declared_changed_files contained invalid paths'}\n\n"
         "`declared_changed_files` must contain repository-relative file paths that "
-        "are intentionally part of the patch. Do not use `/workspace`, "
-        "`workspace/`, `a/`, `b/`, `.git`, parent-directory escapes, generated "
-        "artifacts, caches, build output, or temporary files. Return one "
-        "corrected structured response."
+        "are intentionally part of the patch. Declare paths as they exist in the "
+        "repository: do not copy the git diff `a/`/`b/` header prefixes or the "
+        "`/workspace` mount prefix. A real top-level `a/`, `b/`, or `workspace/` "
+        "directory is a valid path and may be declared. Do not use `.git`, parent-directory "
+        "escapes, generated artifacts, caches, build output, or temporary files. "
+        "Return one corrected structured response."
     )
 
 
