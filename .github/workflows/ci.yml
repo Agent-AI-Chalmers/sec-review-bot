@@ -121,8 +121,10 @@ jobs:
 
       # ops/ and the root Compose files sit outside every app suite; validate them
       # cheaply so a change there cannot land with CI Status green but untested.
+      # install.sh is `#!/bin/sh`, so check it with the POSIX shell (dash on the
+      # runner), not bash — bash is a superset and would accept syntax dash rejects.
       - name: Syntax-check the install script
-        run: bash -n ops/systemd/install.sh
+        run: sh -n ops/systemd/install.sh
 
       - name: Compile the RustFS init script
         run: python3 -m py_compile ops/rustfs-init/init.py

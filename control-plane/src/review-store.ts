@@ -393,21 +393,6 @@ export class ReviewRunStore {
     return result.rows
   }
 
-  async listRuns(
-    options: {
-      limit?: number
-      cursor?: string
-      execution_status?: RunnerStatus
-      publication_status?: PublicationStatus
-      workflow?: WorkflowName
-      from?: string
-      to?: string
-    } = {}
-  ): Promise<ReviewRunRecord[]> {
-    const boundedLimit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 100)
-    return (await this.listRunRows(options, boundedLimit)).map(rowToRecord)
-  }
-
   /** Page of records plus a keyset cursor, for the HTTP list endpoint.
    *
    * Two cursor bugs are fixed together here:

@@ -68,7 +68,7 @@ const workflows = new Set<ControlPlaneWorkflow>([
   'pull-request-review',
   'repository-review'
 ])
-type ListQueryOptions = NonNullable<Parameters<ReviewRunStore['listRuns']>[0]>
+type ListQueryOptions = NonNullable<Parameters<ReviewRunStore['listRunsPage']>[0]>
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
