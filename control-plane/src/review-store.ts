@@ -61,6 +61,7 @@ interface ReviewRunRow {
   workflow_result: unknown | null
   publication_status: PublicationStatus
   created_at: Date | string
+  created_at_cursor: string
   runner_updated_at: Date | string
   publication_updated_at: Date | string
   published_at: Date | string | null
@@ -81,6 +82,11 @@ const RUN_SELECT = `
     r.runner_failure_code, r.runner_failure_message, r.artifact_storage, r.workflow_result,
     r.ingress_kind, r.ingress_key,
     r.created_at, r.updated_at AS runner_updated_at,
+    -- Full-precision (microsecond) UTC timestamp for keyset cursors. node-pg maps
+    -- created_at to a millisecond JS Date, so a cursor built from the truncated
+    -- value skips every row in the same millisecond; this string keeps the
+    -- microseconds for an exact (created_at, run_id) < boundary.
+    to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_cursor,
     p.status AS publication_status, p.updated_at AS publication_updated_at,
     p.published_at,
     p.failure_code AS publication_failure_code, p.failure_message AS publication_failure_message
@@ -344,7 +350,7 @@ export class ReviewRunStore {
     return result.rows[0] === undefined ? null : rowToRecord(result.rows[0])
   }
 
-  async listRuns(
+  private async listRunRows(
     options: {
       limit?: number
       cursor?: string
@@ -353,10 +359,10 @@ export class ReviewRunStore {
       workflow?: WorkflowName
       from?: string
       to?: string
-    } = {}
-  ): Promise<ReviewRunRecord[]> {
+    },
+    limit: number
+  ): Promise<ReviewRunRow[]> {
     this.ready()
-    const boundedLimit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 100)
     const values: unknown[] = [this.connectorId]
     const clauses = ['r.connector_id=$1']
     const add = (value: unknown): string => {
@@ -381,10 +387,58 @@ export class ReviewRunStore {
     }
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
-      WHERE ${clauses.join(' AND ')} ORDER BY r.created_at DESC, r.run_id DESC LIMIT ${add(boundedLimit)}`,
+      WHERE ${clauses.join(' AND ')} ORDER BY r.created_at DESC, r.run_id DESC LIMIT ${add(limit)}`,
       values
     )
-    return result.rows.map(rowToRecord)
+    return result.rows
+  }
+
+  async listRuns(
+    options: {
+      limit?: number
+      cursor?: string
+      execution_status?: RunnerStatus
+      publication_status?: PublicationStatus
+      workflow?: WorkflowName
+      from?: string
+      to?: string
+    } = {}
+  ): Promise<ReviewRunRecord[]> {
+    const boundedLimit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 100)
+    return (await this.listRunRows(options, boundedLimit)).map(rowToRecord)
+  }
+
+  /** Page of records plus a keyset cursor, for the HTTP list endpoint.
+   *
+   * Two cursor bugs are fixed together here:
+   * - The cursor carries `created_at_cursor` (microseconds). The public record's
+   *   `created_at` is a millisecond JS Date, so a cursor built from it skipped every
+   *   row sharing the cursor's millisecond.
+   * - It peeks `limit + 1` rows and emits a cursor only when the extra row exists, so
+   *   a full final page no longer hands out a cursor that strands the reader on an
+   *   empty page.
+   */
+  async listRunsPage(
+    options: {
+      limit?: number
+      cursor?: string
+      execution_status?: RunnerStatus
+      publication_status?: PublicationStatus
+      workflow?: WorkflowName
+      from?: string
+      to?: string
+    } = {}
+  ): Promise<{ runs: ReviewRunRecord[]; next_cursor: string | null }> {
+    const boundedLimit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 100)
+    const rows = await this.listRunRows(options, boundedLimit + 1)
+    const hasMore = rows.length > boundedLimit
+    const page = rows.slice(0, boundedLimit)
+    const last = page.at(-1)
+    const next_cursor =
+      hasMore && last !== undefined
+        ? Buffer.from(`${last.created_at_cursor}|${last.run_id}`).toString('base64url')
+        : null
+    return { runs: page.map(rowToRecord), next_cursor }
   }
   async expireStalePreparations(): Promise<number> {
     return await transaction(this.pool, async (client) => {
