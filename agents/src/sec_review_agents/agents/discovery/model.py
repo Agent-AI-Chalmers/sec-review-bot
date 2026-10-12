@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from sec_review_agents.utils.pydantic_types import NonEmptyText
+
 
 class DiscoveryLocation(BaseModel):
     """
@@ -7,8 +9,7 @@ class DiscoveryLocation(BaseModel):
     Keep `label` short and specific to why this line matters.
     """
 
-    file: str = Field(
-        min_length=1,
+    file: NonEmptyText = Field(
         description="Repository-relative file path for this anchor.",
     )
     line: int | None = Field(
@@ -19,7 +20,7 @@ class DiscoveryLocation(BaseModel):
             "anchored. Omit when the anchor is file-level."
         ),
     )
-    label: str = Field(
+    label: NonEmptyText = Field(
         max_length=120,
         description="Short anchor label describing why this line is relevant.",
     )
@@ -33,11 +34,10 @@ class DiscoveryCandidate(BaseModel):
     cited chunk evidence does not support.
     """
 
-    category: str = Field(
+    category: NonEmptyText = Field(
         description="Broad risk class label used for triage grouping."
     )
-    description: str = Field(
-        min_length=1,
+    description: NonEmptyText = Field(
         description="Concise security risk description grounded in the scanned files.",
     )
     locations: list[DiscoveryLocation] = Field(
