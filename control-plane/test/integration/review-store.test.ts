@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { Pool } from 'pg'
 
 import { ReviewRunStore } from '../../src/index.js'
 
@@ -85,14 +86,16 @@ test('run queries survive a fresh store connection and preserve stable paginatio
   const restarted = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
   await restarted.initialize()
   try {
-    const firstPage = await restarted.listRuns({ limit: 1 })
+    const { runs: firstPage, next_cursor: cursor } = await restarted.listRunsPage({ limit: 1 })
     assert.equal(firstPage.length, 1)
-    const cursor = Buffer.from(`${firstPage[0]?.created_at}|${firstPage[0]?.run_id}`).toString(
-      'base64url'
-    )
-    const secondPage = await restarted.listRuns({ limit: 1, cursor })
+    assert.ok(cursor, 'a second run remains, so the first page must carry a cursor')
+    const { runs: secondPage, next_cursor: finalCursor } = await restarted.listRunsPage({
+      limit: 1,
+      cursor
+    })
     assert.equal(secondPage.length, 1)
     assert.notEqual(secondPage[0]?.run_id, firstPage[0]?.run_id)
+    assert.equal(finalCursor, null)
     assert.equal((await restarted.getRun(runIds[0] ?? ''))?.runner_input?.secret, true)
   } finally {
     await restarted.close()
@@ -126,12 +129,50 @@ test('run queries apply status filters before pagination limits', async () => {
       })
     }
 
-    const failedRuns = await store.listRuns({ execution_status: 'failed', limit: 1 })
+    const { runs: failedRuns } = await store.listRunsPage({ execution_status: 'failed', limit: 1 })
     assert.deepEqual(
       failedRuns.map((run) => run.run_id),
       [failedRunId]
     )
   } finally {
+    await store.close()
+  }
+})
+
+test('keyset cursors do not skip rows that share a millisecond', async () => {
+  const connectorId = `query-same-ms:${randomUUID()}`
+  const store = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
+  await store.initialize()
+  const runIds = [`run-${randomUUID()}`, `run-${randomUUID()}`]
+  const observer = new Pool({ connectionString: databaseUrl() })
+  try {
+    for (const run_id of runIds) {
+      await store.createPreparingReviewRun({
+        run_id,
+        workflow: 'issue-review',
+        publish_context: {}
+      })
+    }
+    // Pin both runs to the same millisecond (different microseconds) so a
+    // millisecond-truncated cursor cannot order past the second row.
+    await observer.query(
+      `UPDATE review_runs
+       SET created_at = CASE
+         WHEN run_id=$1 THEN '2026-01-01T00:00:00.111222Z'::timestamptz
+         ELSE '2026-01-01T00:00:00.111888Z'::timestamptz
+       END
+       WHERE connector_id=$2`,
+      [runIds[0], connectorId]
+    )
+
+    const { runs: firstPage, next_cursor: cursor } = await store.listRunsPage({ limit: 1 })
+    assert.equal(firstPage.length, 1)
+    assert.ok(cursor)
+    const { runs: secondPage } = await store.listRunsPage({ limit: 1, cursor })
+    assert.equal(secondPage.length, 1)
+    assert.deepEqual([firstPage[0]?.run_id, secondPage[0]?.run_id].sort(), [...runIds].sort())
+  } finally {
+    await observer.end()
     await store.close()
   }
 })
