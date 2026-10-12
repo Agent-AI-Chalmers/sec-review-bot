@@ -4,6 +4,7 @@ from sec_review_agents.cli.local_previewing.issue import write_issue_previews
 from sec_review_agents.cli.local_previewing.pull_request import (
     write_pull_request_previews,
 )
+from sec_review_agents.cli.local_previewing.shared import render_analysis_narratives
 
 
 def _materialized_input(local_root: Path) -> dict:
@@ -206,3 +207,39 @@ def test_pull_request_preview_reports_patch_and_manual_review(tmp_path: Path) ->
     )
     assert "- Tests:" not in content
     assert "- Resolution next step: `manual-review`" in content
+
+
+def test_analysis_narrative_rendering_keeps_scope_decisions_visible() -> None:
+    """Scope data must reach the reader; the narrative layout is an explicit allow-list.
+
+    The narrative body is rendered field by field, so a renamed or added scope field
+    silently disappears from the preview and the review bodies unless the layout and
+    this assertion follow it.
+    """
+    lines = render_analysis_narratives(
+        [
+            {
+                "title": "Path traversal in the export endpoint",
+                "verdict": "confirmed-vulnerability",
+                "vulnerability_type": "path-traversal",
+                "validation_level": "logic-simulated",
+                "description": "The export route joins request input onto the export root.",
+                "scope_review": {
+                    "scope_shape": "local-defect",
+                    "outcome_deciding_control_point": "path.join(EXPORT_ROOT, file)",
+                    "scope_analysis": "Only this route builds an export path.",
+                },
+                "related_paths": [
+                    {
+                        "label": "src/server.ts route mounting",
+                        "relationship": "different-semantics",
+                    }
+                ],
+            }
+        ]
+    )
+    rendered = "\n".join(lines)
+
+    assert "path.join(EXPORT_ROOT, file)" in rendered
+    assert "Only this route builds an export path." in rendered
+    assert "src/server.ts route mounting" in rendered

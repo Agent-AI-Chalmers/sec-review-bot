@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   inlineCode,
+  renderAnalysisNarratives,
   renderChangedFilesLines,
   renderVerificationSummaryLines
 } from '../../src/reviews/view-utils.js'
@@ -95,4 +96,31 @@ test('view utils preserve inline code in review prose', () => {
       '- `MemoryObservationOutput` remains unchanged.'
     ]
   )
+})
+
+test('view utils keep narrative scope decisions visible', () => {
+  // The narrative body is an explicit allow-list of fields, so scope data silently
+  // disappears from the review bodies unless the layout follows the model.
+  const lines = renderAnalysisNarratives([
+    {
+      title: 'Path traversal in the export endpoint',
+      verdict: 'confirmed-vulnerability',
+      vulnerability_type: 'path-traversal',
+      validation_level: 'logic-simulated',
+      description: 'The export route joins request input onto the export root.',
+      scope_review: {
+        scope_shape: 'local-defect',
+        outcome_deciding_control_point: 'path.join(EXPORT_ROOT, file)',
+        scope_analysis: 'Only this route builds an export path.'
+      },
+      related_paths: [
+        { label: 'src/server.ts route mounting', relationship: 'different-semantics' }
+      ]
+    }
+  ])
+  const rendered = lines.join('\n')
+
+  assert.ok(rendered.includes('path.join(EXPORT_ROOT, file)'))
+  assert.ok(rendered.includes('Only this route builds an export path.'))
+  assert.ok(rendered.includes('src/server.ts route mounting'))
 })

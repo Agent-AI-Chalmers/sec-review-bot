@@ -135,11 +135,18 @@ def _location_section(locations: Any) -> list[str]:
     return lines
 
 
-def _nearby_paths_section(paths: Any) -> list[str]:
+def _scope_analysis_section(scope_review: dict[str, Any]) -> list[str]:
+    analysis = compact_plain_text(scope_review.get("scope_analysis"))
+    if not analysis:
+        return []
+    return ["", "Scope analysis:", "", analysis]
+
+
+def _related_paths_section(paths: Any) -> list[str]:
     items = [item for item in as_list(paths) if isinstance(item, dict)]
     if not items:
         return []
-    lines = ["", "Reviewed nearby paths:", ""]
+    lines = ["", "Related code paths:", ""]
     for item in items:
         label = inline_code(item.get("label"), "unnamed path")
         relationship = inline_code(item.get("relationship"), "unknown")
@@ -178,7 +185,7 @@ def _narrative_body_lines(item: dict[str, Any]) -> list[str]:
         ("Vulnerability type", item.get("vulnerability_type")),
         ("Validation level", item.get("validation_level")),
         ("Scope shape", scope_review.get("scope_shape")),
-        ("Shared boundary", scope_review.get("shared_boundary")),
+        ("Outcome control point", scope_review.get("outcome_deciding_control_point")),
         (
             "CWE",
             " - ".join(
@@ -215,7 +222,8 @@ def _narrative_body_lines(item: dict[str, Any]) -> list[str]:
             ),
             *_string_list_section("Proof gaps", support_review.get("proof_gaps")),
             *_control_review_section(item.get("control_review")),
-            *_nearby_paths_section(scope_review.get("reviewed_nearby_paths")),
+            *_scope_analysis_section(scope_review),
+            *_related_paths_section(item.get("related_paths")),
         ]
     )
 

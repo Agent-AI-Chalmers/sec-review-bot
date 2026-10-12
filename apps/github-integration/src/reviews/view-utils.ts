@@ -194,7 +194,12 @@ function renderLocationList(locations: unknown): string[] {
   ]
 }
 
-function renderReviewedNearbyPaths(paths: unknown): string[] {
+function renderScopeAnalysis(scope_review: AnyRecord): string[] {
+  const analysis = nonEmptyText(scope_review.scope_analysis)
+  return analysis ? ['', 'Scope analysis:', '', analysis] : []
+}
+
+function renderRelatedPaths(paths: unknown): string[] {
   const items = asList<AnyRecord>(paths).filter(isRecord)
   if (items.length === 0) {
     return []
@@ -202,7 +207,7 @@ function renderReviewedNearbyPaths(paths: unknown): string[] {
 
   return [
     '',
-    'Reviewed nearby paths:',
+    'Related code paths:',
     '',
     ...items.map((item) => {
       const label = nonEmptyText(item.label) || 'unnamed path'
@@ -249,7 +254,7 @@ function analysisNarrativeBodyLines(item: AnyRecord): string[] {
     ['Vulnerability type', item.vulnerability_type],
     ['Validation level', item.validation_level],
     ['Scope shape', scope_review.scope_shape],
-    ['Shared boundary', scope_review.shared_boundary],
+    ['Outcome control point', scope_review.outcome_deciding_control_point],
     [
       'CWE',
       [cwe_mapping.cwe_id, cwe_mapping.cwe_name].map(nonEmptyText).filter(Boolean).join(' - ')
@@ -276,7 +281,8 @@ function analysisNarrativeBodyLines(item: AnyRecord): string[] {
     ...renderStringListSection('Supported inferences', support_review.supported_inferences),
     ...renderStringListSection('Proof gaps', support_review.proof_gaps),
     ...renderControlReview(item.control_review),
-    ...renderReviewedNearbyPaths(scope_review.reviewed_nearby_paths)
+    ...renderScopeAnalysis(scope_review),
+    ...renderRelatedPaths(item.related_paths)
   )
 
   const cwe_rationale = nonEmptyText(cwe_mapping.cwe_rationale)
