@@ -32,9 +32,11 @@ WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /prod ./
-# The runtime reads canonical schemas from `contracts/`, supplied by compose as a
-# separate build context now that the build context is this service alone.
-COPY --from=contracts . /contracts
+# The runtime reads canonical schemas from `contracts/` (found relative to the process
+# working directory, which is /app), supplied by compose as a separate build context now
+# that the build context is this service alone. Copy it under /app rather than the image
+# root so it lands on the resolver's primary candidate instead of its `../../` fallback.
+COPY --from=contracts . /app/contracts
 RUN rm -rf dist/test
 
 CMD ["node", "dist/app.js"]
