@@ -512,6 +512,24 @@ export interface components {
         'application/json': components['schemas']['ErrorResponse']
       }
     }
+    /** @description The request body exceeded the service's limit (1 MiB). Only operations that read a body can return this; the body is rejected before the contract's own schema sees it. */
+    PayloadTooLarge: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description An internal fault. The response is deliberately opaque (it never carries the fault's message or `code`); the identity is logged server-side. Every operation can return it. */
+    InternalError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
   }
   parameters: never
   requestBodies: never
@@ -540,6 +558,7 @@ export interface operations {
           }
         }
       }
+      500: components['responses']['InternalError']
     }
   }
   listRuns: {
@@ -582,6 +601,7 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
     }
   }
   admitRun: {
@@ -620,6 +640,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   getRun: {
@@ -648,6 +670,7 @@ export interface operations {
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
       404: components['responses']['RunNotFound']
+      500: components['responses']['InternalError']
     }
   }
   listRunPublicationSteps: {
@@ -677,6 +700,7 @@ export interface operations {
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
       404: components['responses']['RunNotFound']
+      500: components['responses']['InternalError']
     }
   }
   submitPreparedRun: {
@@ -720,6 +744,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   renewPreparationClaim: {
@@ -751,6 +777,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   failPreparation: {
@@ -784,6 +812,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   claimNextPublication: {
@@ -812,6 +842,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   renewPublicationClaim: {
@@ -843,6 +875,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   initializePublicationSteps: {
@@ -874,6 +908,8 @@ export interface operations {
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
       409: components['responses']['DeterministicPublicationFailure']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   requirePublicationStepClaim: {
@@ -906,6 +942,8 @@ export interface operations {
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
       409: components['responses']['DeterministicPublicationFailure']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   completePublicationStep: {
@@ -944,6 +982,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   failPublicationStep: {
@@ -982,6 +1022,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   completePublication: {
@@ -1013,6 +1055,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   failPublication: {
@@ -1049,6 +1093,8 @@ export interface operations {
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
     }
   }
   getInternalRun: {
@@ -1075,6 +1121,7 @@ export interface operations {
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
       404: components['responses']['RunNotFound']
+      500: components['responses']['InternalError']
     }
   }
   listInternalPublicationSteps: {
@@ -1101,6 +1148,7 @@ export interface operations {
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
       404: components['responses']['RunNotFound']
+      500: components['responses']['InternalError']
     }
   }
   getPreparationHeartbeatInterval: {
@@ -1122,6 +1170,7 @@ export interface operations {
         }
       }
       401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
     }
   }
   getPublicationHeartbeatInterval: {
@@ -1143,6 +1192,7 @@ export interface operations {
         }
       }
       401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
     }
   }
 }

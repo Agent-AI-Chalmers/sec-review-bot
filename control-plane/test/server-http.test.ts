@@ -428,3 +428,46 @@ test('the query string is coerced to the declared types, and only there', async 
     await app.close()
   }
 })
+
+test('a malformed JSON body is a 400 that names the body, like any other bad body', async () => {
+  // The contract's `InvalidRequest` response says every 400 carries a `code` naming which part
+  // failed. A body that is not JSON at all reached the server with no code, which overstated the
+  // contract; it is a bad body, so it now carries `INVALID_BODY`.
+  const app = await buildApp({})
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/runs',
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      payload: '{not json'
+    })
+    assert.equal(response.statusCode, 400)
+    assert.deepEqual(response.json(), {
+      error: 'Request body must be valid JSON.',
+      code: 'INVALID_BODY'
+    })
+  } finally {
+    await app.close()
+  }
+})
+
+test('a request body over the size limit is a 413 with the declared envelope', async () => {
+  // The server bounds every body at 1 MiB. The contract declares a shared `PayloadTooLarge`
+  // (413) response for exactly the operations that read a body, so the wire shape is asserted
+  // here rather than left to a Fastify default.
+  const app = await buildApp({
+    admitReviewRun: async () => assert.fail('the handler must not run for an oversized body')
+  })
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/runs',
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      payload: JSON.stringify({ padding: 'a'.repeat(1024 * 1024 + 1) })
+    })
+    assert.equal(response.statusCode, 413)
+    assert.deepEqual(response.json(), { error: 'Request body is too large.' })
+  } finally {
+    await app.close()
+  }
+})

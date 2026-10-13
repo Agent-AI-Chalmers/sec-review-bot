@@ -30,6 +30,7 @@ extends:
 functionsDir: tools/spectral-functions
 functions:
   - operationRequiresSecurity
+  - operationDeclaresServerErrors
 rules:
   operation-operationId: error
   operation-tags: 'off'
@@ -52,3 +53,16 @@ rules:
     given: $.paths[*][get,post,put,patch,delete]
     then:
       function: operationRequiresSecurity
+
+  # Every operation must declare the non-schema errors the service can return: a `500` for any
+  # internal fault, and a `413` for an operation that reads a body. The service applies a single
+  # error handler and one body limit, so both are reachable without the operation's own schema
+  # describing them; the document is meant to be the whole surface, so omitting them understates
+  # it. This makes the omission an error rather than a gap discovered in review.
+  operation-declares-server-errors:
+    description: Every operation must declare `500`, and `413` when it reads a request body.
+    message: '{{error}}'
+    severity: error
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      function: operationDeclaresServerErrors

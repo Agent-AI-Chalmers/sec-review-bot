@@ -439,7 +439,13 @@ export async function registerControlPlaneRoutes(
       return reply.code(413).send({ error: 'Request body is too large.' })
     }
     if (errorCode === 'FST_ERR_CTP_INVALID_JSON_BODY') {
-      return reply.code(400).send({ error: 'Request body must be valid JSON.' })
+      // A body that is not JSON at all is still a bad body, so it carries the same
+      // `INVALID_BODY` code the contract promises every 400 names which part with — rather
+      // than a code-less 400, which the contract's `InvalidRequest` description would
+      // overstate.
+      return reply
+        .code(400)
+        .send({ error: 'Request body must be valid JSON.', code: 'INVALID_BODY' })
     }
     // A request rejected by the contract's own schema (glue mounts it as the route's query,
     // body, and params schema) names which part failed, so a caller classifying by `code`

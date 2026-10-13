@@ -47,6 +47,22 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    PayloadTooLarge:
+      description: >-
+        The request body exceeded the service's limit (1 MiB). Only operations that read a body
+        can return this; the body is rejected before the contract's own schema sees it.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: >-
+        An internal fault. The response is deliberately opaque (it never carries the fault's
+        message or `code`); the identity is logged server-side. Every operation can return it.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 
   schemas:
     ErrorResponse:
@@ -471,6 +487,8 @@ paths:
                 properties:
                   status:
                     type: string
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs:
     get:
       operationId: listRuns
@@ -556,6 +574,8 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       operationId: admitRun
       description: >-
@@ -607,6 +627,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}:
     get:
       operationId: getRun
@@ -640,6 +664,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/publication-steps:
     get:
       operationId: listRunPublicationSteps
@@ -678,6 +704,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/submission:
     post:
       operationId: submitPreparedRun
@@ -743,6 +771,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/preparation/claim:
     post:
       operationId: renewPreparationClaim
@@ -783,6 +815,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/preparation/failure:
     post:
       operationId: failPreparation
@@ -831,6 +867,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /v1/publication/claims/next:
     post:
@@ -864,6 +904,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/publication/claim:
     post:
       operationId: renewPublicationClaim
@@ -903,6 +947,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/publication/steps:
     post:
       operationId: initializePublicationSteps
@@ -947,6 +995,10 @@ paths:
           $ref: "#/components/responses/DeterministicPublicationFailure"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/publication/steps/{stepKey}/claim:
     post:
       operationId: requirePublicationStepClaim
@@ -991,6 +1043,10 @@ paths:
           $ref: "#/components/responses/DeterministicPublicationFailure"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/publication/steps/{stepKey}/complete:
     post:
       operationId: completePublicationStep
@@ -1053,6 +1109,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/publication/steps/{stepKey}/fail:
     post:
       operationId: failPublicationStep
@@ -1114,6 +1174,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/publication/complete:
     post:
       operationId: completePublication
@@ -1153,6 +1217,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs/{runId}/publication/fail:
     post:
       operationId: failPublication
@@ -1208,6 +1276,10 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/internal/runs/{runId}:
     get:
       operationId: getInternalRun
@@ -1237,6 +1309,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/internal/runs/{runId}/publication/steps:
     get:
       operationId: listInternalPublicationSteps
@@ -1268,6 +1342,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/config/preparation-heartbeat-interval:
     get:
       operationId: getPreparationHeartbeatInterval
@@ -1284,6 +1360,8 @@ paths:
                 type: integer
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/config/publication-heartbeat-interval:
     get:
       operationId: getPublicationHeartbeatInterval
@@ -1300,4 +1378,6 @@ paths:
                 type: integer
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
