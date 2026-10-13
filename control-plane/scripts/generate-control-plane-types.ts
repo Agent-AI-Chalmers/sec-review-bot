@@ -98,12 +98,23 @@ export async function renderControlPlaneApiTypes(): Promise<string> {
 // contract (and vice-versa) by a compile-time check.
 export const ERROR_CODES_PATH = path.resolve(CONTROL_PLANE_ROOT, 'src', 'error-codes-generated.ts')
 
-/** Every member of the contract's ErrorResponse.code enum. */
+/** Every member of the contract's ErrorResponse.code enum.
+ *
+ * A non-string member is an error rather than something to filter out: the generated file
+ * advertises itself as "Every code the contract's ErrorResponse.code enum allows", and that
+ * array is a security control — `server.ts` refuses to emit any code outside it, so a member
+ * silently dropped here would be stripped from a response as if it were an internal code. */
 export function errorResponseCodes(spec: OpenAPI3): string[] {
   const codeSchema = spec.components?.schemas?.ErrorResponse as
     { properties?: { code?: { enum?: (string | number)[] } } } | undefined
   const values = codeSchema?.properties?.code?.enum ?? []
-  return values.filter((value): value is string => typeof value === 'string').sort()
+  const nonString = values.filter((value) => typeof value !== 'string')
+  if (nonString.length > 0) {
+    throw new Error(
+      `ErrorResponse.code must contain only strings; found ${JSON.stringify(nonString)}.`
+    )
+  }
+  return (values as string[]).sort()
 }
 
 /** Pull the `PUBLICATION_STEP_*` members out of the contract's ErrorResponse.code enum. */

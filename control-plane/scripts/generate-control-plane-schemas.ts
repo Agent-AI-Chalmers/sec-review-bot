@@ -39,12 +39,26 @@ function componentSchema(name: string): unknown {
 
 /** Inline any local `#/components/schemas/…` references so the committed v1 file is a
  * self-contained JSON Schema (ajv validates it against its own `$id`, where those refs would
- * otherwise dangle). */
+ * otherwise dangle).
+ *
+ * A `$ref` carrying sibling keywords is rejected rather than silently reduced to its target.
+ * JSON Schema ignores those siblings, but this generator would *drop* them, so a rule like
+ * `description`, `nullable`, or `default` written beside a `$ref` would vanish from the
+ * committed schema without a word — the schema would then accept or describe something other
+ * than what openapi.yaml says. Nothing in the current contract does this, so failing loudly
+ * costs nothing today and prevents a silent mistranslation later. */
 function inlineLocalRefs(node: unknown, schemas: Record<string, unknown>): unknown {
   if (Array.isArray(node)) return node.map((item) => inlineLocalRefs(item, schemas))
   if (typeof node !== 'object' || node === null) return node
   const record = node as Record<string, unknown>
   if (typeof record.$ref === 'string' && record.$ref.startsWith('#/components/schemas/')) {
+    const siblings = Object.keys(record).filter((key) => key !== '$ref')
+    if (siblings.length > 0) {
+      throw new Error(
+        `$ref ${record.$ref} has sibling keywords (${siblings.join(', ')}); this generator ` +
+          'would drop them. Inline the target or move the keywords into it.'
+      )
+    }
     const target = record.$ref.slice('#/components/schemas/'.length)
     const schema = schemas[target]
     if (schema === undefined) throw new Error(`dangling $ref to ${record.$ref}`)
@@ -56,6 +70,10 @@ function inlineLocalRefs(node: unknown, schemas: Record<string, unknown>): unkno
   }
   return out
 }
+
+/** Exposed for the guard tests, which pin the two inputs this would otherwise mistranslate
+ * silently. Not used by the render functions, which call it through the local binding. */
+export const inlineLocalRefsForTest = inlineLocalRefs
 
 function renderSchema(id: string, schema: unknown): string {
   return `${JSON.stringify({ $schema: META_SCHEMA, $id: id, ...(schema as object) }, null, 2)}\n`
