@@ -19,6 +19,9 @@ interface RunIssueReviewArgs {
     submitted: SubmittedIssueReviewRun,
     input: IssueReviewInput & Record<string, unknown>
   ) => void | Promise<void>
+  // Test seam: defaults to the real preparer. Lets a unit test assert what this
+  // layer forwards to the runner input without materializing a git workspace.
+  prepare_input?: typeof prepareIssueReviewInput
 }
 
 export interface SubmittedIssueReviewRun {
@@ -44,7 +47,8 @@ async function materializeIssueReviewInput({
   issue,
   event_type = 'manual_review',
   review_objective = 'audit',
-  repair_mode
+  repair_mode,
+  prepare_input = prepareIssueReviewInput
 }: RunIssueReviewArgs): Promise<{
   run_id: string
   input: IssueReviewInput
@@ -52,8 +56,13 @@ async function materializeIssueReviewInput({
 }> {
   const resolvedEventType = event_type ?? 'manual_review'
   const resolvedReviewObjective = review_objective ?? 'audit'
+  // `repair_mode` constrains the repair stage, not the objective. An `audit` review
+  // enters that stage as soon as the analyzer confirms a vulnerability, so an explicit
+  // repair_mode must reach the runner for both objectives. When the caller does not
+  // supply one, `repair` keeps its historical default of `test-changes-allowed`; `audit`
+  // leaves the field absent and the runner applies the same default.
   const resolvedRepairMode =
-    resolvedReviewObjective === 'repair' ? (repair_mode ?? 'test-changes-allowed') : undefined
+    repair_mode ?? (resolvedReviewObjective === 'repair' ? 'test-changes-allowed' : undefined)
 
   logInfo('issue_review_workflow_started', {
     event_type: resolvedEventType,
@@ -67,7 +76,7 @@ async function materializeIssueReviewInput({
     repo: issue.repo_full_name
   })
 
-  const prepared = await prepareIssueReviewInput({
+  const prepared = await prepare_input({
     run_id,
     octokit: octokit as GitHubAppOctokit,
     issue,
