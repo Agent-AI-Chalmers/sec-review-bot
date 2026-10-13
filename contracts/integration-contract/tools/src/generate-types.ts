@@ -8,7 +8,6 @@
 // `renderRunnerApiTypes`, so they cannot disagree about what "current" means.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import openapiTS, { astToString, type OpenAPI3 } from 'openapi-typescript'
 import prettier from 'prettier'
@@ -47,10 +46,4 @@ export async function renderRunnerApiTypes(): Promise<string> {
 /** This generator's outputs as the shared descriptor the checker walks. */
 export function generatedArtifacts(): GeneratedArtifact[] {
   return [{ output: OUTPUT_PATH, render: renderRunnerApiTypes }]
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { writeFileSync } = await import('node:fs')
-  writeFileSync(OUTPUT_PATH, await renderRunnerApiTypes())
-  console.log(`Wrote ${path.relative(process.cwd(), OUTPUT_PATH)}`)
 }

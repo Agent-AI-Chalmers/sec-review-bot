@@ -10,7 +10,6 @@
 // "current" means.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import openapiTS, { astToString, type OpenAPI3 } from 'openapi-typescript'
 import prettier from 'prettier'
@@ -308,16 +307,4 @@ export function generatedArtifacts(): GeneratedArtifact[] {
     { output: CONTRACT_TYPES_PATH, render: renderContractTypes },
     { output: LIST_RUN_QUERY_PARAMS_PATH, render: renderListRunQueryParams }
   ]
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { writeFileSync } = await import('node:fs')
-  writeFileSync(OUTPUT_PATH, await renderControlPlaneApiTypes())
-  writeFileSync(ERROR_CODES_PATH, await renderErrorCodeTypes())
-  writeFileSync(CONTRACT_TYPES_PATH, await renderContractTypes())
-  writeFileSync(LIST_RUN_QUERY_PARAMS_PATH, await renderListRunQueryParams())
-  console.log(`Wrote ${path.relative(process.cwd(), OUTPUT_PATH)}`)
-  console.log(`Wrote ${path.relative(process.cwd(), ERROR_CODES_PATH)}`)
-  console.log(`Wrote ${path.relative(process.cwd(), CONTRACT_TYPES_PATH)}`)
-  console.log(`Wrote ${path.relative(process.cwd(), LIST_RUN_QUERY_PARAMS_PATH)}`)
 }

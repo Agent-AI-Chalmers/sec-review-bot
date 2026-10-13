@@ -3,9 +3,8 @@
 // contracts/control-plane-api/v1/ and is a projection of the contract's `components.schemas`,
 // so the console-fixture schemas and the contract cannot drift. Regenerate with
 // `pnpm --dir contracts/control-plane-api/tools run generate`.
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { parse as parseYaml } from 'yaml'
 
@@ -111,12 +110,4 @@ export function generatedArtifacts(): GeneratedArtifact[] {
     output: path.join(SCHEMA_DIR, filename),
     render
   }))
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  for (const [filename, render] of GENERATED_SCHEMAS) {
-    const output = path.join(SCHEMA_DIR, filename)
-    writeFileSync(output, render())
-    console.log(`Wrote ${path.relative(process.cwd(), output)}`)
-  }
 }
