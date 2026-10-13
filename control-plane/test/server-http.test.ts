@@ -88,6 +88,86 @@ test('operations reject missing or wrong credentials with 401', async () => {
   }
 })
 
+test('the two bearer tokens are not interchangeable', async () => {
+  // Every operation declares exactly one security scheme, so each handler must compare the
+  // credential against its own token. If the read token were accepted on a write (or the
+  // service token on a redacted read), possession of the weaker credential would silently
+  // grant the other surface — so pin the separation, not just the "missing" case above.
+  const app = await buildApp({
+    listRunsPage: async () => ({ runs: [], next_cursor: null, dropped: [] })
+  })
+  try {
+    const readOnWrite = await app.inject({
+      method: 'POST',
+      url: '/v1/runs',
+      headers: {
+        authorization: `Bearer ${READ_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: {
+        workflow: 'issue-review',
+        publish_context: {},
+        ingress_kind: 'github_webhook',
+        ingress_key: 'k'
+      }
+    })
+    assert.equal(readOnWrite.statusCode, 401)
+    assert.deepEqual(readOnWrite.json(), { error: 'unauthorized' })
+
+    const serviceOnRedactedRead = await app.inject({
+      method: 'GET',
+      url: '/v1/runs',
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
+    })
+    assert.equal(serviceOnRedactedRead.statusCode, 401)
+    assert.deepEqual(serviceOnRedactedRead.json(), { error: 'unauthorized' })
+
+    // Each token still authenticates its own surface, so the rejections above are the
+    // separation rather than a blanket refusal.
+    const read = await app.inject({
+      method: 'GET',
+      url: '/v1/runs',
+      headers: { authorization: `Bearer ${READ_TOKEN}` }
+    })
+    assert.equal(read.statusCode, 200)
+  } finally {
+    await app.close()
+  }
+})
+
+test('an internal fault is logged with its identity but not returned to the caller', async () => {
+  // A 5xx is a server defect, so the response is deliberately opaque. It still has to be
+  // diagnosable operationally: without a log, a corrupt stored row (for example an
+  // `available` artifact without its reference) surfaces only as a bare "Internal error".
+  const app = await buildApp({
+    getRun: async () => {
+      throw new Error('available artifact storage record is missing its artifact')
+    }
+  })
+  const logged: string[] = []
+  const originalError = console.error
+  console.error = (...args: unknown[]) => {
+    logged.push(args.map((arg) => String(arg)).join(' '))
+  }
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/internal/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
+    })
+    assert.equal(response.statusCode, 500)
+    assert.deepEqual(response.json(), { error: 'Internal error' })
+    assert.equal(logged.length, 1, 'the fault must be logged exactly once')
+    const record = JSON.parse(logged[0] ?? '') as Record<string, unknown>
+    assert.equal(record.event, 'control_plane_request_failed')
+    assert.equal(record.run_id, '3f2504e0-4f89-41d3-9a0c-0305e82c3301')
+    assert.match(String(record.message), /missing its artifact/)
+  } finally {
+    console.error = originalError
+    await app.close()
+  }
+})
+
 test('a request body missing a required contract field is rejected before the handler', async () => {
   let handlerCalls = 0
   const app = await buildApp({
@@ -122,7 +202,7 @@ test('schema validation names which part of the request failed', async () => {
   const app = await buildApp({
     listRunsPage: async () => {
       listCalls += 1
-      return { runs: [], next_cursor: null }
+      return { runs: [], next_cursor: null, dropped: [] }
     }
   })
   try {
@@ -322,7 +402,7 @@ test('the query string is coerced to the declared types, and only there', async 
   const app = await buildApp({
     listRunsPage: async () => {
       calls += 1
-      return { runs: [], next_cursor: null }
+      return { runs: [], next_cursor: null, dropped: [] }
     }
   })
   try {

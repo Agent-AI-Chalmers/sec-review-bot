@@ -176,6 +176,17 @@ function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   console.info(JSON.stringify({ event, ...fields }))
 }
 
+/** Report a stored row the contract cannot represent, with the identity and fault needed to
+ * find it. The reads that can hit one skip and report it rather than failing the whole read,
+ * so this is the only record that the row was dropped. */
+function logDroppedRunRow(connectorId: string, dropped: { run_id: string; error: unknown }): void {
+  logEvent('control_plane_run_row_dropped', {
+    connector_id: connectorId,
+    run_id: dropped.run_id,
+    error: dropped.error instanceof Error ? dropped.error.message : String(dropped.error)
+  })
+}
+
 /** Compare a bearer credential in constant time.
  *
  * The equality check runs for every request, so `!==` would let an attacker recover a token
@@ -258,7 +269,12 @@ export async function registerControlPlaneRoutes(
     listRuns: async (request) => {
       const url = new URL(request.url ?? '/', 'http://control-plane.local')
       const listOptions = parseListQuery(url)
-      const { runs, next_cursor } = await store.listRunsPage(listOptions)
+      const { runs, next_cursor, dropped } = await store.listRunsPage(listOptions)
+      // A single stored row the contract cannot represent is reported and omitted rather
+      // than failing the whole page; the caller still gets a usable listing.
+      for (const droppedRow of dropped) {
+        logDroppedRunRow(store.connectorId, droppedRow)
+      }
       return { runs: runs.map(observeRun), next_cursor }
     },
 
@@ -391,7 +407,7 @@ export async function registerControlPlaneRoutes(
     reply.code(404).send({ error: 'not_found' })
   })
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     // A deterministic publication failure is a state conflict, not an internal fault: it
     // returns 409 with its PUBLICATION_STEP_* code so the client can classify it as terminal.
     // Handling it here (rather than per-handler) keeps every store method that can throw it
@@ -455,6 +471,24 @@ export async function registerControlPlaneRoutes(
     // An unexpected internal fault (5xx) must not leak its message (which may carry SQLSTATE
     // or connection details); the caller only learns that the request failed. Known 4xx
     // results keep their message, since those are the caller's own input being rejected.
+    if (status >= 500) {
+      // A 5xx is a defect, not caller input, so it has to be diagnosable operationally even
+      // though the response is deliberately opaque — a corrupt stored row (for example an
+      // `available` artifact without its reference) otherwise surfaces only as a bare
+      // "Internal error" with nothing naming the run. Log the identity and the error, never
+      // request arguments, which may carry claim credentials.
+      const runId = (request.params as { runId?: string } | undefined)?.runId
+      console.error(
+        JSON.stringify({
+          event: 'control_plane_request_failed',
+          method: request.method,
+          url: request.url,
+          ...(runId === undefined ? {} : { run_id: runId }),
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        })
+      )
+    }
     const message =
       status >= 500 ? 'Internal error' : error instanceof Error ? error.message : String(error)
     return reply.code(status).send({
@@ -565,6 +599,13 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
           })
         },
         readRunnerStatuses: (runs) => getRunnerRunStatuses(runs.map((run) => run.run_id)),
+        // A row the contract cannot represent is reported and skipped rather than aborting
+        // the pass, so one corrupt row cannot stop coordination for every other run. The log
+        // carries the run id and the underlying fault, which is the diagnosis the opaque
+        // read-side failure used to lack.
+        onDroppedRunRow: (dropped) => {
+          logDroppedRunRow(store.connectorId, dropped)
+        },
         observeActiveRun: async (run, statuses) => {
           await observeRunnerRun(
             store,

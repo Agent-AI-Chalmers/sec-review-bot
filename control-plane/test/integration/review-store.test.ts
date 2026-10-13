@@ -176,3 +176,62 @@ test('keyset cursors do not skip rows that share a millisecond', async () => {
     await store.close()
   }
 })
+
+test('a row the contract cannot represent is dropped from a read, not thrown', async () => {
+  // `rowToRecord` throws on a stored shape the contract forbids (here an `available` artifact
+  // without its reference, which only an out-of-band write can produce now that the store
+  // narrows on the write path). The fan-out reads must report and skip it rather than failing
+  // the whole read: a listing should still return its healthy rows, and the coordinator's
+  // active-run read must still hand the runs around it to the pass.
+  const connectorId = `drop-run-row:${randomUUID()}`
+  const store = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
+  await store.initialize()
+  const healthyId = `run-${randomUUID()}`
+  const poisonedId = `run-${randomUUID()}`
+  try {
+    for (const runId of [healthyId, poisonedId]) {
+      const admission = await store.createPreparingReviewRun({
+        workflow: 'issue-review',
+        run_id: runId,
+        publish_context: {}
+      })
+      assert.ok(admission.preparation_token)
+      await store.markQueued(runId, admission.preparation_token, {})
+    }
+
+    const pool = new Pool({ connectionString: databaseUrl() })
+    await pool.query('UPDATE review_runs SET artifact_storage=$2::jsonb WHERE run_id=$1', [
+      poisonedId,
+      JSON.stringify({ status: 'available' })
+    ])
+    try {
+      const page = await store.listRunsPage({ limit: 10 })
+      assert.deepEqual(
+        page.dropped.map((entry) => entry.run_id),
+        [poisonedId],
+        'the unrepresentable row is reported'
+      )
+      assert.deepEqual(
+        page.runs.map((entry) => entry.run_id),
+        [healthyId],
+        'the healthy row is still listed'
+      )
+
+      const active = await store.listActiveRuns()
+      assert.deepEqual(
+        active.dropped.map((entry) => entry.run_id),
+        [poisonedId],
+        'the poisoned active run is reported, not thrown'
+      )
+      assert.deepEqual(
+        active.runs.map((entry) => entry.run_id),
+        [healthyId],
+        'the pass still receives the healthy active run'
+      )
+    } finally {
+      await pool.end()
+    }
+  } finally {
+    await store.close()
+  }
+})

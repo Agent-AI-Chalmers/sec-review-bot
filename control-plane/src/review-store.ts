@@ -92,10 +92,41 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     failure_message: publicationFailure
       ? row.publication_failure_message
       : row.runner_failure_message,
-    artifact_storage: normalizeArtifactStorage(row.artifact_storage),
+    artifact_storage: normalizeArtifactStorage(row.artifact_storage, `run ${row.run_id}`),
     ...(row.ingress_kind ? { ingress_kind: row.ingress_kind } : {}),
     ...(row.ingress_key ? { ingress_key: row.ingress_key } : {})
   }
+}
+
+/** A stored row the contract cannot represent, kept so a fan-out read can report it. */
+export interface DroppedRunRow {
+  run_id: string
+  error: unknown
+}
+
+/** A fan-out read's result: the rows that project cleanly, and the ones that do not.
+ *
+ * `rowToRecord` can throw (a stored shape the contract forbids, such as an `available`
+ * artifact without its reference). Applying it with `.map` over a result set turns one bad
+ * row into a failed read of *every* row, which for the coordinator's polling reads means the
+ * whole pass stops and no run is observed. Returning the failures alongside the records lets
+ * the caller keep making progress and still report each dropped row with its identity. */
+export interface RunRowsProjection {
+  runs: ReviewRunRecord[]
+  dropped: DroppedRunRow[]
+}
+
+function projectRunRows(rows: ReviewRunRow[]): RunRowsProjection {
+  const runs: ReviewRunRecord[] = []
+  const dropped: DroppedRunRow[] = []
+  for (const row of rows) {
+    try {
+      runs.push(rowToRecord(row))
+    } catch (error) {
+      dropped.push({ run_id: row.run_id, error })
+    }
+  }
+  return { runs, dropped }
 }
 async function transaction<T>(
   pool: Pool,
@@ -381,7 +412,12 @@ export class ReviewRunStore {
    * - It peeks `limit + 1` rows and emits a cursor only when the extra row exists, so
    *   a full final page no longer hands out a cursor that strands the reader on an
    *   empty page.
-   */
+   *
+   * A row the contract cannot represent is returned in `dropped` rather than aborting the
+   * page, so one corrupt row does not turn a listing into a 500. The cursor is still taken
+   * from the raw boundary row, so a dropped row is skipped once instead of stranding the
+   * reader on it. */
+
   async listRunsPage(
     options: {
       limit?: number
@@ -392,7 +428,7 @@ export class ReviewRunStore {
       from?: string
       to?: string
     } = {}
-  ): Promise<{ runs: ReviewRunRecord[]; next_cursor: string | null }> {
+  ): Promise<{ runs: ReviewRunRecord[]; next_cursor: string | null; dropped: DroppedRunRow[] }> {
     const boundedLimit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 100)
     const rows = await this.listRunRows(options, boundedLimit + 1)
     const hasMore = rows.length > boundedLimit
@@ -402,7 +438,8 @@ export class ReviewRunStore {
       hasMore && last !== undefined
         ? Buffer.from(`${last.created_at_cursor}|${last.run_id}`).toString('base64url')
         : null
-    return { runs: page.map(rowToRecord), next_cursor }
+    const { runs, dropped } = projectRunRows(page)
+    return { runs, next_cursor, dropped }
   }
   async expireStalePreparations(): Promise<number> {
     return await transaction(this.pool, async (client) => {
@@ -433,7 +470,9 @@ export class ReviewRunStore {
       return expired.rowCount ?? 0
     })
   }
-  async listSubmissionRecoveries(): Promise<ReviewRunRecord[]> {
+  /** Recoverable runs, as a projection rather than a bare array: a row the contract cannot
+   * represent is returned in `dropped` instead of aborting the read. */
+  async listSubmissionRecoveries(): Promise<RunRowsProjection> {
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE r.connector_id=$1
@@ -444,7 +483,7 @@ export class ReviewRunStore {
       ORDER BY r.updated_at`,
       [this.connectorId, this.claimTimeoutMs]
     )
-    return result.rows.map(rowToRecord)
+    return projectRunRows(result.rows)
   }
   async claimSubmissionRecovery(runId: string): Promise<string | null> {
     const token = crypto.randomUUID()
@@ -517,7 +556,9 @@ export class ReviewRunStore {
       return true
     })
   }
-  async listActiveRuns(): Promise<ReviewRunRecord[]> {
+  /** Active (queued/running) runs for this connector, as a projection: a row the contract
+   * cannot represent is returned in `dropped` instead of aborting the read for every run. */
+  async listActiveRuns(): Promise<RunRowsProjection> {
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE r.connector_id=$1
@@ -525,7 +566,7 @@ export class ReviewRunStore {
       ORDER BY r.updated_at`,
       [this.connectorId]
     )
-    return result.rows.map(rowToRecord)
+    return projectRunRows(result.rows)
   }
   async markRunning(runId: string): Promise<boolean> {
     const result = await this.pool.query(
@@ -549,7 +590,7 @@ export class ReviewRunStore {
       SET artifact_storage=$3::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2
     `,
-      [runId, this.connectorId, JSON.stringify(storage)]
+      [runId, this.connectorId, JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))]
     )
   }
   async recordRunnerSuccess(
@@ -569,7 +610,9 @@ export class ReviewRunStore {
         runId,
         this.connectorId,
         JSON.stringify(workflowResult),
-        storage === undefined ? null : JSON.stringify(storage)
+        storage === undefined
+          ? null
+          : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
       ]
     )
     return result.rowCount === 1
@@ -593,7 +636,9 @@ export class ReviewRunStore {
           this.connectorId,
           error.code ?? null,
           error.message,
-          storage === undefined ? null : JSON.stringify(storage)
+          storage === undefined
+            ? null
+            : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
         ]
       )
       if (run.rowCount !== 1) return false

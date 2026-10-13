@@ -9,11 +9,13 @@ export {
 export {
   ReviewRunStore,
   type CreateReviewRunArgs,
+  type DroppedRunRow,
   type PublicationStepRecord,
   type PublicationWork,
   type PublishContext,
   type ReviewRunAdmission,
-  type ReviewRunRecord
+  type ReviewRunRecord,
+  type RunRowsProjection
 } from './review-store.js'
 export {
   recoverReviewRunSubmission,

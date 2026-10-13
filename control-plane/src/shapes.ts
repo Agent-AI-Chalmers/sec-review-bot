@@ -55,13 +55,26 @@ export type CreateReviewRunArgs = Pick<
  * fully-checked reference. Every value reaching here has crossed it, so the narrowing below
  * restates an invariant rather than guessing one — and asserts it instead of casting, so a
  * future caller that skips that boundary fails loudly instead of persisting a record the
- * contract forbids. */
-export function normalizeArtifactStorage(storage: RunnerArtifactStorage | null): ArtifactStorage {
+ * contract forbids.
+ *
+ * `context` names the record being normalized (the run id) so a violation surfaces in logs
+ * as an actionable fault rather than a bare "Internal error". The store calls this on the
+ * write path too, so a value that reaches the database has been narrowed once already; a
+ * stored record can therefore only fail here if it was written outside this store (a manual
+ * edit, or a future code path that bypasses the write methods), and the read-side check is
+ * the backstop for exactly that case. */
+export function normalizeArtifactStorage(
+  storage: RunnerArtifactStorage | null,
+  context = 'artifact_storage'
+): ArtifactStorage {
   if (storage === null) return null
   if (storage.status === 'available') {
     const artifact = storage.artifact
     if (artifact == null) {
-      throw new Error('An available artifact storage record must carry its artifact reference.')
+      throw new Error(
+        `${context} is an available artifact storage record without its artifact reference; ` +
+          'it does not satisfy the contract.'
+      )
     }
     return {
       status: 'available',

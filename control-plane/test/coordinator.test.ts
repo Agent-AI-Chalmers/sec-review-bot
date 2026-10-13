@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from '../src/index.js'
+import {
+  coordinateReviewRunsOnce,
+  startReviewRunCoordinatorLoop,
+  type ReviewRunRecord,
+  type RunRowsProjection
+} from '../src/index.js'
 
 const run = {
   run_id: 'run-1',
@@ -18,6 +23,11 @@ const run = {
   artifact_storage: null
 }
 
+/** A pass result with nothing dropped, for the common stub case. */
+function projected(runs: ReviewRunRecord[]): RunRowsProjection {
+  return { runs, dropped: [] }
+}
+
 test('coordination expires preparations before recovery and active observation', async () => {
   const events: string[] = []
   const store = {
@@ -26,23 +36,26 @@ test('coordination expires preparations before recovery and active observation',
       return 0
     },
     async listSubmissionRecoveries() {
-      return [{ ...run, run_id: 'recover-1' }]
+      return projected([{ ...run, run_id: 'recover-1' }])
     },
     async listActiveRuns() {
-      return [{ ...run, run_id: 'active-1' }]
+      return projected([{ ...run, run_id: 'active-1' }])
     }
   }
 
   await coordinateReviewRunsOnce(store, {
-    async recoverSubmission(run) {
-      events.push(`recover:${run.run_id}`)
+    async recoverSubmission(entry) {
+      events.push(`recover:${entry.run_id}`)
     },
     async readRunnerStatuses() {
       events.push('read')
       return { runs: [], missing: [], byRunId: new Map() }
     },
-    async observeActiveRun(run) {
-      events.push(`observe:${run.run_id}`)
+    async observeActiveRun(entry) {
+      events.push(`observe:${entry.run_id}`)
+    },
+    onDroppedRunRow() {
+      throw new Error('this pass drops no rows')
     }
   })
 
@@ -58,10 +71,10 @@ test('one pass reads every active run status in a single request', async () => {
       return 0
     },
     async listSubmissionRecoveries() {
-      return []
+      return projected([])
     },
     async listActiveRuns() {
-      return [1, 2, 3].map((index) => ({ ...run, run_id: `active-${index}` }))
+      return projected([1, 2, 3].map((index) => ({ ...run, run_id: `active-${index}` })))
     }
   }
   const reads: string[][] = []
@@ -77,6 +90,9 @@ test('one pass reads every active run status in a single request', async () => {
     },
     async observeActiveRun(entry) {
       observed.push(entry.run_id)
+    },
+    onDroppedRunRow() {
+      throw new Error('this pass drops no rows')
     }
   })
 
@@ -91,10 +107,10 @@ test('a pass with no active runs asks the Runner nothing', async () => {
       return 0
     },
     async listSubmissionRecoveries() {
-      return []
+      return projected([])
     },
     async listActiveRuns() {
-      return []
+      return projected([])
     }
   }
 
@@ -108,10 +124,57 @@ test('a pass with no active runs asks the Runner nothing', async () => {
     },
     async observeActiveRun() {
       throw new Error('this pass has nothing to observe')
+    },
+    onDroppedRunRow() {
+      throw new Error('this pass drops no rows')
     }
   })
 
   assert.deepEqual(reads, [])
+})
+
+test('a single row the contract cannot represent degrades that run, not the pass', async () => {
+  // The reads are fan-outs, so a bad row would otherwise abort the whole result set and the
+  // pass would observe nothing (ordered, sticky). Report the bad row and keep going: the
+  // healthy runs on both sides of it are still observed.
+  const store = {
+    async expireStalePreparations() {
+      return 0
+    },
+    async listSubmissionRecoveries() {
+      return { runs: [], dropped: [{ run_id: 'recover-bad', error: new Error('poison') }] }
+    },
+    async listActiveRuns() {
+      return {
+        runs: [
+          { ...run, run_id: 'active-1' },
+          { ...run, run_id: 'active-2' }
+        ],
+        dropped: [{ run_id: 'active-bad', error: new Error('unrepresentable artifact') }]
+      }
+    }
+  }
+  const observed: string[] = []
+  const reported: Array<{ run_id: string; message: string }> = []
+
+  await coordinateReviewRunsOnce(store, {
+    async recoverSubmission() {},
+    async readRunnerStatuses() {
+      return { runs: [], missing: [], byRunId: new Map() }
+    },
+    async observeActiveRun(entry) {
+      observed.push(entry.run_id)
+    },
+    onDroppedRunRow({ run_id, error }) {
+      reported.push({ run_id, message: error instanceof Error ? error.message : String(error) })
+    }
+  })
+
+  assert.deepEqual(observed, ['active-1', 'active-2'], 'the healthy runs are still observed')
+  assert.deepEqual(reported, [
+    { run_id: 'recover-bad', message: 'poison' },
+    { run_id: 'active-bad', message: 'unrepresentable artifact' }
+  ])
 })
 
 test('coordinator loop does not overlap passes and stop drains the active pass', async () => {
