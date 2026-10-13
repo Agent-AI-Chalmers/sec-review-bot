@@ -243,7 +243,11 @@ export function listRunQueryParameters(spec: OpenAPI3): string[] {
       in?: string
       style?: string
       explode?: boolean
-      schema?: { type?: string; properties?: Record<string, unknown> }
+      schema?: {
+        type?: string
+        properties?: Record<string, unknown>
+        additionalProperties?: unknown
+      }
     }
     if (candidate.in !== 'query') continue
     if (
@@ -255,6 +259,17 @@ export function listRunQueryParameters(spec: OpenAPI3): string[] {
       throw new Error(
         'listRuns query parameters are not the expected form-exploded object; ' +
           'update the projection or the contract.'
+      )
+    }
+    // The strictness is the whole point of the object form: `additionalProperties: false`
+    // is what makes an undeclared query parameter a 400 instead of a silently ignored one.
+    // A conventional per-parameter list cannot express it, but neither can the object form
+    // alone — dropping just this keyword would leave the projection unchanged (same property
+    // names) while the surface quietly accepted anything, so it is asserted here too.
+    if (candidate.schema.additionalProperties !== false) {
+      throw new Error(
+        'listRuns must declare additionalProperties: false on its query object, or an ' +
+          'undeclared query parameter stops being rejected; update the contract.'
       )
     }
     return Object.keys(candidate.schema.properties)
