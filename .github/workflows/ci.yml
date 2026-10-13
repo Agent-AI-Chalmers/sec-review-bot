@@ -49,9 +49,7 @@ jobs:
               - '.github/workflows/ci.yml'
             github-integration:
               - 'apps/github-integration/**'
-              # The integration suite imports the Control Plane store directly.
-              - 'control-plane/**'
-              # ... and validates the shared contract fixtures.
+              # It validates the shared contract fixtures.
               - 'contracts/**'
               - '.github/workflows/ci.yml'
             control-plane-ui:
@@ -233,14 +231,10 @@ jobs:
           node-version-file: apps/github-integration/package.json
           check-latest: true
           cache: pnpm
-          cache-dependency-path: |
-            apps/github-integration/pnpm-lock.yaml
-            control-plane/pnpm-lock.yaml
+          cache-dependency-path: apps/github-integration/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: |
-          pnpm --dir ../../control-plane install --frozen-lockfile
-          pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: |
@@ -254,8 +248,6 @@ jobs:
         run: pnpm test
 
       - name: Integration test
-        env:
-          TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
         run: pnpm run test:integration
 
   control-plane-ui:
