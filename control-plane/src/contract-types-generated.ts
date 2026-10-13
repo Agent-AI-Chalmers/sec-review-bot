@@ -151,7 +151,44 @@ export interface components {
         }
       | null
   }
-  responses: never
+  responses: {
+    /** @description The request failed the contract's own schema. `code` names which part — `INVALID_QUERY`, `INVALID_BODY`, or `INVALID_PATH_PARAMETER`. */
+    InvalidRequest: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description Missing or invalid bearer credential for the operation's security scheme. */
+    Unauthorized: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description The referenced run was not found. */
+    RunNotFound: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description A deterministic publication failure; `code` carries the terminal reason (`PUBLICATION_STEP_*`). */
+    DeterministicPublicationFailure: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+  }
   parameters: never
   requestBodies: never
   headers: never
@@ -219,24 +256,8 @@ export interface operations {
           }
         }
       }
-      /** @description The request was rejected; see `code` for the machine-readable reason. */
-      400: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   admitRun: {
@@ -273,15 +294,8 @@ export interface operations {
           'application/json': components['schemas']['ReviewRunAdmission']
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   getRun: {
@@ -307,24 +321,9 @@ export interface operations {
           }
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
-      /** @description The referenced run was not found. */
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
     }
   }
   listRunPublicationSteps: {
@@ -351,24 +350,9 @@ export interface operations {
           }
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
-      /** @description The referenced run was not found. */
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
     }
   }
   submitPreparedRun: {
@@ -410,15 +394,8 @@ export interface operations {
           }
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   renewPreparationClaim: {
@@ -448,15 +425,8 @@ export interface operations {
           'application/json': boolean
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   failPreparation: {
@@ -488,15 +458,8 @@ export interface operations {
         }
         content?: never
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   claimNextPublication: {
@@ -523,15 +486,8 @@ export interface operations {
           'application/json': components['schemas']['PublicationWork'] | null
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   renewPublicationClaim: {
@@ -561,15 +517,8 @@ export interface operations {
           'application/json': boolean
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   initializePublicationSteps: {
@@ -598,15 +547,9 @@ export interface operations {
         }
         content?: never
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      409: components['responses']['DeterministicPublicationFailure']
     }
   }
   requirePublicationStepClaim: {
@@ -636,15 +579,9 @@ export interface operations {
         }
         content?: never
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      409: components['responses']['DeterministicPublicationFailure']
     }
   }
   completePublicationStep: {
@@ -680,15 +617,8 @@ export interface operations {
           'application/json': boolean
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   failPublicationStep: {
@@ -725,15 +655,8 @@ export interface operations {
           'application/json': boolean
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   completePublication: {
@@ -763,15 +686,8 @@ export interface operations {
           'application/json': boolean
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   failPublication: {
@@ -806,15 +722,8 @@ export interface operations {
           'application/json': boolean
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
     }
   }
   getInternalRun: {
@@ -838,24 +747,9 @@ export interface operations {
           'application/json': components['schemas']['ReviewRunRecord']
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
-      /** @description The referenced run was not found. */
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
     }
   }
   listInternalPublicationSteps: {
@@ -879,24 +773,9 @@ export interface operations {
           'application/json': components['schemas']['PublicationStepRecord'][]
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
-      /** @description The referenced run was not found. */
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
     }
   }
   getPreparationHeartbeatInterval: {
@@ -917,15 +796,7 @@ export interface operations {
           'application/json': number
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      401: components['responses']['Unauthorized']
     }
   }
   getPublicationHeartbeatInterval: {
@@ -946,15 +817,7 @@ export interface operations {
           'application/json': number
         }
       }
-      /** @description Missing or invalid bearer credential for the operation's security scheme. */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ErrorResponse']
-        }
-      }
+      401: components['responses']['Unauthorized']
     }
   }
 }

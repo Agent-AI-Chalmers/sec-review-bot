@@ -18,6 +18,36 @@ components:
       type: http
       scheme: bearer
       description: Redacted read access (console).
+  responses:
+    InvalidRequest:
+      description: >-
+        The request failed the contract's own schema. `code` names which part —
+        `INVALID_QUERY`, `INVALID_BODY`, or `INVALID_PATH_PARAMETER`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid bearer credential for the operation's security scheme.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RunNotFound:
+      description: The referenced run was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    DeterministicPublicationFailure:
+      description: >-
+        A deterministic publication failure; `code` carries the terminal reason
+        (`PUBLICATION_STEP_*`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     ErrorResponse:
       type: object
@@ -523,17 +553,9 @@ paths:
                       - string
                       - "null"
         "400":
-          description: The request was rejected; see `code` for the machine-readable reason.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
     post:
       operationId: admitRun
       description: >-
@@ -581,12 +603,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewRunAdmission"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}:
     get:
       operationId: getRun
@@ -614,18 +634,12 @@ paths:
                 properties:
                   run:
                     $ref: "#/components/schemas/ObservedRun"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: The referenced run was not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/RunNotFound"
   /v1/runs/{runId}/publication-steps:
     get:
       operationId: listRunPublicationSteps
@@ -658,18 +672,12 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ObservedPublicationStep"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: The referenced run was not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/RunNotFound"
   /v1/runs/{runId}/submission:
     post:
       operationId: submitPreparedRun
@@ -731,12 +739,10 @@ paths:
                     type: string
                     enum:
                       - queued
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/preparation/claim:
     post:
       operationId: renewPreparationClaim
@@ -773,12 +779,10 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/preparation/failure:
     post:
       operationId: failPreparation
@@ -823,12 +827,10 @@ paths:
       responses:
         "200":
           description: Fail acknowledgement (empty).
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
 
   /v1/publication/claims/next:
     post:
@@ -858,12 +860,10 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/PublicationWork"
                   - type: "null"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/publication/claim:
     post:
       operationId: renewPublicationClaim
@@ -899,12 +899,10 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/publication/steps:
     post:
       operationId: initializePublicationSteps
@@ -943,12 +941,12 @@ paths:
       responses:
         "200":
           description: Initialization acknowledgement (empty).
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "409":
+          $ref: "#/components/responses/DeterministicPublicationFailure"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/publication/steps/{stepKey}/claim:
     post:
       operationId: requirePublicationStepClaim
@@ -987,12 +985,12 @@ paths:
       responses:
         "200":
           description: Claim acknowledgement (empty).
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "409":
+          $ref: "#/components/responses/DeterministicPublicationFailure"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/publication/steps/{stepKey}/complete:
     post:
       operationId: completePublicationStep
@@ -1048,12 +1046,10 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/publication/steps/{stepKey}/fail:
     post:
       operationId: failPublicationStep
@@ -1111,12 +1107,10 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/publication/complete:
     post:
       operationId: completePublication
@@ -1152,12 +1146,10 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/runs/{runId}/publication/fail:
     post:
       operationId: failPublication
@@ -1209,12 +1201,10 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/internal/runs/{runId}:
     get:
       operationId: getInternalRun
@@ -1238,18 +1228,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewRunRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: The referenced run was not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/RunNotFound"
   /v1/internal/runs/{runId}/publication/steps:
     get:
       operationId: listInternalPublicationSteps
@@ -1275,18 +1259,12 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PublicationStepRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: The referenced run was not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/RunNotFound"
   /v1/config/preparation-heartbeat-interval:
     get:
       operationId: getPreparationHeartbeatInterval
@@ -1302,11 +1280,7 @@ paths:
               schema:
                 type: integer
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
   /v1/config/publication-heartbeat-interval:
     get:
       operationId: getPublicationHeartbeatInterval
@@ -1322,9 +1296,5 @@ paths:
               schema:
                 type: integer
         "401":
-          description: Missing or invalid bearer credential for the operation's security scheme.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
 
