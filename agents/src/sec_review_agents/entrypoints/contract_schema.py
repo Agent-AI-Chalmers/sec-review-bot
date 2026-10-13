@@ -1,6 +1,7 @@
 """Validate public Runner workflow inputs and results against contract schemas."""
 
 import json
+import os
 from functools import cache
 from importlib.resources import files
 from importlib.resources.abc import Traversable
@@ -23,18 +24,56 @@ RESULT_SCHEMA_BY_WORKFLOW = {
 }
 
 
+# The subtree under a contracts root that holds the canonical v5 schemas. An
+# operator points `SEC_REVIEW_CONTRACTS_ROOT` at the directory that contains it.
+_CONTRACT_SUBTREE = Path("integration-contract") / "v5" / "schemas"
+_SCHEMAS_ROOT_ENV = "SEC_REVIEW_CONTRACTS_ROOT"
+
+
+def _has_schemas(root: Path) -> bool:
+    return (root / _CONTRACT_SUBTREE / "common.schema.json").is_file()
+
+
 def _schema_root() -> Traversable:
+    """Locate the canonical v5 schemas.
+
+    Resolution is explicit and ordered, not a search:
+
+    1. `SEC_REVIEW_CONTRACTS_ROOT`, if set, is authoritative — it is the operator's
+       declaration of where the schemas are. A set-but-wrong value is an error rather
+       than something to fall through, so a misconfigured deployment fails loudly
+       instead of silently reading a different copy.
+    2. The schemas packaged in the wheel (`sec_review_agents.resources`), which is how
+       an installed Runner carries them.
+    3. The source-checkout layout, read relative to the working directory. This is the
+       finite pair the repository uses (a checkout run from `agents/`, or from the
+       repository root); the Docker image (`WORKDIR /app`, schemas at `/contracts`) is
+       the first of these. Nothing here walks the filesystem upward without bound — the
+       location is a fact about the deployment, not something to guess at.
+    """
+    configured = os.environ.get(_SCHEMAS_ROOT_ENV)
+    if configured is not None:
+        root = Path(configured)
+        if not _has_schemas(root):
+            raise RuntimeError(
+                f"{_SCHEMAS_ROOT_ENV}={configured} does not contain "
+                f"{_CONTRACT_SUBTREE / 'common.schema.json'}."
+            )
+        return root / _CONTRACT_SUBTREE
+
     packaged = files("sec_review_agents.resources").joinpath("contracts", "v5")
     if packaged.joinpath("common.schema.json").is_file():
         return packaged
 
-    # A source checkout reads the same canonical files before a wheel has
-    # copied them into package data.
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / "contracts" / "integration-contract" / "v5" / "schemas"
-        if (candidate / "common.schema.json").is_file():
-            return candidate
-    raise RuntimeError("Could not locate contract v5 schemas for Runner validation.")
+    cwd = Path.cwd()
+    for candidate in (cwd.parent / "contracts", cwd / "contracts"):
+        if _has_schemas(candidate):
+            return candidate / _CONTRACT_SUBTREE
+
+    raise RuntimeError(
+        "Could not locate contract v5 schemas for Runner validation. Set "
+        f"{_SCHEMAS_ROOT_ENV} to the directory containing {_CONTRACT_SUBTREE}."
+    )
 
 
 @cache

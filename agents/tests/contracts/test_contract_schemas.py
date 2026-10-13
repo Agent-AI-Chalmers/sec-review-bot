@@ -1,7 +1,9 @@
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
+from sec_review_agents.entrypoints import contract_schema
 from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_result
 from tests.contract_fixtures import (
     contract_fixture,
@@ -175,3 +177,23 @@ def test_v5_review_record_schema_rejects_unsafe_file_change_paths() -> None:
         errors = list(validator.iter_errors(payload))
 
         assert errors != [], f"{path} should not be schema-valid"
+
+
+def test_contracts_root_env_var_is_authoritative(monkeypatch, tmp_path: Path) -> None:
+    # A set root must be used as-is: the operator names where the schemas are.
+    schemas = tmp_path / "integration-contract" / "v5" / "schemas"
+    schemas.mkdir(parents=True)
+    (schemas / "common.schema.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setenv("SEC_REVIEW_CONTRACTS_ROOT", str(tmp_path))
+    assert contract_schema._schema_root() == schemas
+
+
+def test_contracts_root_env_var_that_lacks_schemas_fails_loudly(
+    monkeypatch, tmp_path: Path
+) -> None:
+    # A set-but-wrong root is a misconfiguration, not a reason to silently read some other
+    # copy: the resolver must reject it rather than fall through to the source layout.
+    monkeypatch.setenv("SEC_REVIEW_CONTRACTS_ROOT", str(tmp_path))
+    with pytest.raises(RuntimeError, match="SEC_REVIEW_CONTRACTS_ROOT"):
+        contract_schema._schema_root()
