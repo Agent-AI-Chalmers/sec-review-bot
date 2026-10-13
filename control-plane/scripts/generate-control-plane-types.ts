@@ -14,6 +14,8 @@ import openapiTS, { astToString, type OpenAPI3 } from 'openapi-typescript'
 import prettier from 'prettier'
 import { parse as parseYaml } from 'yaml'
 
+import type { GeneratedArtifact } from './generated-artifact.js'
+
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
 
 export const CONTROL_PLANE_ROOT = path.resolve(moduleDirectory, '..')
@@ -292,6 +294,16 @@ ${entries}
 `
   const options = await prettier.resolveConfig(LIST_RUN_QUERY_PARAMS_PATH)
   return await prettier.format(body, { ...options, filepath: LIST_RUN_QUERY_PARAMS_PATH })
+}
+
+/** This generator's outputs as the shared descriptor the checker walks. */
+export function generatedArtifacts(): GeneratedArtifact[] {
+  return [
+    { output: OUTPUT_PATH, render: renderControlPlaneApiTypes },
+    { output: ERROR_CODES_PATH, render: renderErrorCodeTypes },
+    { output: CONTRACT_TYPES_PATH, render: renderContractTypes },
+    { output: LIST_RUN_QUERY_PARAMS_PATH, render: renderListRunQueryParams }
+  ]
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url'
 import openapiTS, { astToString, type OpenAPI3 } from 'openapi-typescript'
 import prettier from 'prettier'
 
+import type { GeneratedArtifact } from './generated-artifact.js'
+
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
 
 export const CONTROL_PLANE_ROOT = path.resolve(moduleDirectory, '..')
@@ -41,6 +43,11 @@ export async function renderRunnerApiTypes(): Promise<string> {
   // `format:check`.
   const options = await prettier.resolveConfig(OUTPUT_PATH)
   return await prettier.format(rendered, { ...options, filepath: OUTPUT_PATH })
+}
+
+/** This generator's outputs as the shared descriptor the checker walks. */
+export function generatedArtifacts(): GeneratedArtifact[] {
+  return [{ output: OUTPUT_PATH, render: renderRunnerApiTypes }]
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -185,6 +185,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check generated artifacts are fresh
+        # The single staleness entry point, driven by `contracts/generated-artifacts.json`.
+        # It runs inside `pnpm test` too, but as its own step so a failure reads as one
+        # unambiguous check and does not depend on the test runner's discovery.
+        run: pnpm run check:generated-artifacts
+
       - name: Check
         run: |
           pnpm run format:check

@@ -1,53 +1,47 @@
-// The generated-artifacts manifest must match what the generators actually write.
+// Every committed artifact derived from a contract must match a fresh render of it.
 //
-// `contracts/generated-artifacts.json` is the single list of "what is derived from a
-// hand-written contract, and where it lands". CI derives its change filters from it, and
-// people use it to find a projection. If it drifts from the generators it guards nothing,
-// so this asserts the manifest's paths equal the generators' own exported paths — the
-// manifest and the code check each other, rather than each being trusted alone.
+// The check itself lives in one place — `scripts/check-generated-artifacts.ts`, driven by
+// `contracts/generated-artifacts.json` — and this asserts through it, so the test and the
+// standalone CI entry cannot disagree about what "fresh" means. When a projection is stale
+// the message names the file and the command that regenerates it.
+//
+// The three projections used to restate this comparison in their own test files, each
+// reading a path it also had to keep in step; consolidating them means a new projection is
+// covered by being added to the manifest, not by remembering to write another test.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 
 import {
-  CONTRACT_TYPES_PATH,
-  ERROR_CODES_PATH,
-  LIST_RUN_QUERY_PARAMS_PATH,
-  OUTPUT_PATH as CONTROL_PLANE_API_TYPES_PATH
-} from '../scripts/generate-control-plane-types.js'
-import { SCHEMA_DIR, SCHEMA_FILENAMES } from '../scripts/generate-control-plane-schemas.js'
-import { OUTPUT_PATH as RUNNER_API_SCHEMA_PATH } from '../scripts/generate-runner-api-types.js'
+  REPO_ROOT,
+  readManifest,
+  staleGeneratedArtifacts,
+  type Manifest
+} from '../scripts/check-generated-artifacts.js'
+import { GENERATORS } from '../scripts/check-generated-artifacts.js'
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-const MANIFEST_PATH = path.join(REPO_ROOT, 'contracts', 'generated-artifacts.json')
-
-interface Manifest {
-  generators: Array<{ name: string; outputs: string[] }>
-}
+test('every contract-derived artifact matches a fresh render', async () => {
+  const stale = await staleGeneratedArtifacts()
+  assert.deepEqual(
+    stale,
+    [],
+    `these are stale:\n${stale.map((s) => `  ${s.output} -> ${s.command}`).join('\n')}`
+  )
+})
 
 /** The outputs each generator writes, relative to the repository root, taken from the
- * generator's own exports — the authority the manifest is checked against. */
-const ACTUAL_OUTPUTS: Record<string, string[]> = {
-  'control-plane-types': [
-    CONTRACT_TYPES_PATH,
-    ERROR_CODES_PATH,
-    CONTROL_PLANE_API_TYPES_PATH,
-    LIST_RUN_QUERY_PARAMS_PATH
-  ].map((p) => path.relative(REPO_ROOT, p)),
-  'control-plane-schemas': SCHEMA_FILENAMES.map((name) =>
-    path.relative(REPO_ROOT, path.join(SCHEMA_DIR, name))
-  ),
-  'runner-api-types': [path.relative(REPO_ROOT, RUNNER_API_SCHEMA_PATH)]
-}
-
-function readManifest(): Manifest {
-  return JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
-}
+ * generators' own `generatedArtifacts()` — the authority the manifest is checked against.
+ * Derived from the checker's registry so there is one name-to-generator map, not two. */
+const ACTUAL_OUTPUTS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(GENERATORS).map(([name, artifacts]) => [
+    name,
+    artifacts().map((artifact) => path.relative(REPO_ROOT, artifact.output))
+  ])
+)
 
 test('every generator in the manifest lists exactly the artifacts it writes', () => {
-  const manifest = readManifest()
+  const manifest: Manifest = readManifest()
   const byName = new Map(manifest.generators.map((g) => [g.name, g.outputs]))
 
   assert.deepEqual(
@@ -83,8 +77,8 @@ function globCovers(patterns: string[], filePath: string): boolean {
   return patterns.some((pattern) => {
     if (pattern === filePath) return true
     const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    // Translate the glob to a regex without a control-character sentinel: `**` spans `/`,
-    // `*` does not.
+    // `**` spans `/`, `*` does not. The \uE000 placeholder (private-use, never in a path)
+    // keeps the two substitutions from interfering.
     const regex = new RegExp(
       '^' +
         escaped
@@ -98,11 +92,11 @@ function globCovers(patterns: string[], filePath: string): boolean {
 }
 
 test('the control-plane CI filter triggers on every generated artifact', () => {
-  // The control-plane job is the only place the generators are re-rendered and compared, so
-  // its change filter has to fire for any hand edit of any artifact — including the ones in
-  // other packages. Deriving the required set from the manifest is what keeps that list from
-  // silently missing a file (as it did before: the github-integration projection was not
-  // listed, so a hand edit of it ran no job that could detect the drift).
+  // The check runs in the control-plane job (and as its own step), so its change filter has
+  // to fire for any hand edit of any artifact — including the ones in other packages.
+  // Deriving the required set from the manifest keeps that list from silently missing a file
+  // (as it did before: the github-integration projection was not listed, so a hand edit of
+  // it ran no job that could detect the drift).
   const ci = readFileSync(path.join(REPO_ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')
   const lines = ci.split('\n')
   const start = lines.findIndex((line) => line.trim() === 'control-plane:')
@@ -113,7 +107,6 @@ test('the control-plane CI filter triggers on every generated artifact', () => {
   for (let index = start + 1; index < lines.length; index += 1) {
     const line = lines[index] ?? ''
     const lineIndent = line.match(/^\s*/)?.[0].length ?? 0
-    // A non-comment key at the same indent ends this filter's block.
     if (line.trim() !== '' && lineIndent <= indent && !line.trim().startsWith('#')) break
     const match = line.match(/^\s*-\s*'([^']+)'\s*$/)
     if (match?.[1] !== undefined) patterns.push(match[1])

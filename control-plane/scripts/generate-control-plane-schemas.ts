@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 
 import { parse as parseYaml } from 'yaml'
 
+import type { GeneratedArtifact } from './generated-artifact.js'
+
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
 export const CONTROL_PLANE_ROOT = path.resolve(moduleDirectory, '..')
 export const SPEC_PATH = path.resolve(
@@ -114,6 +116,14 @@ const GENERATED_SCHEMAS = [
 
 /** The schema file names under {@link SCHEMA_DIR}, for the manifest check. */
 export const SCHEMA_FILENAMES = GENERATED_SCHEMAS.map(([filename]) => filename)
+
+/** This generator's outputs as the shared descriptor the checker walks. */
+export function generatedArtifacts(): GeneratedArtifact[] {
+  return GENERATED_SCHEMAS.map(([filename, render]) => ({
+    output: path.join(SCHEMA_DIR, filename),
+    render
+  }))
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const [filename, render] of GENERATED_SCHEMAS) {

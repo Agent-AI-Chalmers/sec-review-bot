@@ -23,6 +23,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:contract": "spectral lint ../contracts/control-plane-api/openapi.yaml --ruleset ../contracts/control-plane-api/.spectral.yaml",
+    "check:generated-artifacts": "node --import tsx scripts/check-generated-artifacts.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
