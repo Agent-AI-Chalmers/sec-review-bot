@@ -102,16 +102,25 @@ const SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
   ['ObservedRun', 'ObservedRun']
 ]
 
+type ContractAst = Awaited<ReturnType<typeof openapiTS>>
+
+/** The `components` interface node, selected from the AST rather than by matching rendered
+ * text: the server needs only the domain shapes, not the paths, and a change in how
+ * openapi-typescript prints its output must not silently break this projection. */
+function componentsNode(ast: ContractAst): ContractAst[number] {
+  const node = ast.find(
+    (candidate) => (candidate as { name?: { text?: string } }).name?.text === 'components'
+  )
+  if (node === undefined) {
+    throw new Error('openapi-typescript produced no components interface')
+  }
+  return node
+}
+
 /** The committed content of `control-plane/src/contract-types-generated.ts`. */
 export async function renderContractTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
-  // Ask openapi-typescript for the full document, then keep only the `components` interface
-  // (the server only needs the domain shapes, not the paths).
-  const ast = await openapiTS(spec)
-  const components = astToString(ast).match(/export interface components \{[\s\S]*?\n\}\n/)?.[0]
-  if (components === undefined) {
-    throw new Error('openapi-typescript produced no components interface')
-  }
+  const components = astToString(componentsNode(await openapiTS(spec)))
   const lines = SHAPE_ALIASES.map(
     ([alias, schema]) => `export type ${alias} = components['schemas']['${schema}']`
   )

@@ -12,10 +12,7 @@
  * key here — is checked by `error-codes.test.ts`, because the semantic keys are not the code
  * strings and cannot express that direction as a clean compile-time type.
  */
-import {
-  PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT,
-  type PublicationStepErrorCode
-} from './error-codes-generated.js'
+import type { PublicationStepErrorCode } from './error-codes-generated.js'
 
 export const PUBLICATION_STEP_ERROR_CODES = {
   set_duplicate: 'PUBLICATION_STEP_SET_DUPLICATE',
@@ -23,10 +20,6 @@ export const PUBLICATION_STEP_ERROR_CODES = {
   retry_exhausted: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
   not_claimable: 'PUBLICATION_STEP_NOT_CLAIMABLE'
 } as const satisfies Record<string, PublicationStepErrorCode>
-
-// Keep the unused import's value use honest: the values are the contract strings, and the
-// coverage test below (error-codes.test.ts) asserts they also cover every contract code.
-void PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT
 
 export class DeterministicControlPlaneError extends Error {
   readonly code: PublicationStepErrorCode
