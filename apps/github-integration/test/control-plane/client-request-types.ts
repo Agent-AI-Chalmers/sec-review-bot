@@ -1,11 +1,14 @@
-// The client's request bodies and success values come from the contract, not from a cast.
+// The client's request bodies, success values, and URLs come from the contract, not from a
+// cast or a hand-written string.
 //
-// `request()` used to take `body?: unknown` and a hand-written `<T>` for the response, so the
-// object literals at each call site were unchecked: renaming a request field in `openapi.yaml`
-// left the client compiling, and the failure only appeared as a field the service ignored.
-// `request()` now takes the operationId and derives both sides from it.
+// `request()` used to take `body?: unknown`, a hand-written `<T>` for the response, and a
+// free-standing `path` beside the `operationId` — so the operation could be paired with any
+// other operation's URL and still compile. `request()` now takes only the operationId, and
+// derives the path, method, request body, and success value from the generated contract
+// projection (`operationRoutes`).
 //
 // These assertions are type-level only; `client.test.ts` covers the transport behaviour.
+import { operationRoutes } from '../../src/control-plane/control-plane-api.js'
 import type { operations } from '../../src/control-plane/control-plane-api.js'
 import type { ControlPlaneClient } from '../../src/control-plane/client.js'
 
@@ -36,3 +39,16 @@ export type GetRunMayReportAbsence = Expect<
     operations['getInternalRun']['responses'][200]['content']['application/json'] | null
   >
 >
+
+/** Every operation the contract declares has a route, so `request()` can look one up for any
+ * `operationId` — the map and `operations` stay in step (both are projections of the same
+ * document). A new operation without a route fails here. */
+export type EveryOperationHasARoute = Expect<Equals<keyof typeof operationRoutes, keyof operations>>
+
+/** The route map carries the path and method as literal strings from the document, which is
+ * what lets `request()` name only the operation: the URL is looked up, never passed in. A
+ * value typed as `string` (a hand-written URL) would not satisfy this. */
+export type RoutesAreLiteral = Expect<
+  Equals<typeof operationRoutes.submitPreparedRun.path, '/v1/runs/{runId}/submission'>
+>
+export type RouteMethodsAreLiteral = Expect<Equals<typeof operationRoutes.admitRun.method, 'post'>>

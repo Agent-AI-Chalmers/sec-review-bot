@@ -1,4 +1,5 @@
-import type { components, operations, paths } from './control-plane-api.js'
+import { operationRoutes } from './control-plane-api.js'
+import type { components, operations } from './control-plane-api.js'
 import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 
 export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
@@ -8,26 +9,43 @@ export type PublicationStepRecord = components['schemas']['PublicationStepRecord
 
 type JsonObject = Record<string, unknown>
 
-/** A contract path template, e.g. `/v1/runs/{runId}/submission`. */
-type ContractPath = keyof paths
+type OperationId = keyof operations
+
+/** The path template the contract serves an operation at, e.g. `/v1/runs/{runId}/submission`.
+ * Taken from the generated `operationRoutes` map (a projection of `openapi.yaml`), not from
+ * the `paths` type: two operations with identical shapes (both taking `{ token }` and
+ * returning a boolean, say) are indistinguishable structurally, so a type-level match would
+ * pair an operation with the wrong path. The map is keyed by `operationId`, so it is exact. */
+type PathOf<Id extends OperationId> = (typeof operationRoutes)[Id]['path']
+
+/** The HTTP method the contract serves an operation with, from the same generated map. */
+type MethodOf<Id extends OperationId> = (typeof operationRoutes)[Id]['method']
 
 /** The `{param}` names a path template declares, as a union. */
 type PathParam<T extends string> = T extends `${string}{${infer P}}${infer Rest}`
   ? P | PathParam<Rest>
   : never
 
-/** Build a request URL from the contract's own path template, so a renamed path in
- * `openapi.yaml` fails to compile here instead of silently calling a stale URL — the drift
- * the generated `paths` type exists to prevent. The parameter names are checked too. */
-function contractPath<T extends ContractPath>(
-  template: T,
-  params: Record<PathParam<T>, string>
+/** Build a request URL from an operation's *own* contract path. The operation is the only
+ * routing input: the path is looked up in the generated map rather than passed in, so a call
+ * cannot target another operation's URL, and a renamed path in `openapi.yaml` fails to
+ * compile here instead of silently calling a stale one. */
+function contractPath<Id extends OperationId>(
+  operation: Id,
+  params: Record<PathParam<PathOf<Id> & string>, string>
 ): string {
+  const template = operationRoutes[operation].path
   return template.replace(/\{(\w+)\}/g, (_match, name: string) => {
     const value = (params as Record<string, string | undefined>)[name]
-    if (value === undefined) throw new Error(`Missing path parameter ${name} for ${template}`)
+    if (value === undefined) throw new Error(`Missing path parameter ${name} for ${operation}`)
     return encodeURIComponent(value)
   })
+}
+
+/** The HTTP method the contract serves an operation with, uppercased for `fetch`, from the
+ * same generated map — so the method cannot drift from the operation either. */
+function contractMethod<Id extends OperationId>(operation: Id): Uppercase<MethodOf<Id> & string> {
+  return operationRoutes[operation].method.toUpperCase() as Uppercase<MethodOf<Id> & string>
 }
 
 export class ControlPlaneSubmissionError extends Error {
@@ -63,7 +81,6 @@ interface HttpErrorBody {
   code?: string
 }
 
-type OperationId = keyof operations
 type Operation<Id extends OperationId> = operations[Id]
 
 /** The JSON request body the contract declares for an operation. A `POST` must pass exactly
@@ -88,22 +105,23 @@ class HttpControlPlaneClient {
   // One HTTP request with auth, timeout, and error/status handling. `nullOn404` maps a 404
   // to `null` for reads that distinguish "absent" from "error".
   //
-  // `operation` is the contract's own operationId: the body and the parsed success value are
-  // both typed from it, so this call site cannot drift from `openapi.yaml` without failing
-  // to compile.
+  // The contract's `operationId` is the only routing input: the URL, the HTTP method, the
+  // request body shape, and the parsed success value are all derived from it, so an operation
+  // cannot be sent to another operation's URL (or with another operation's method or body)
+  // without failing to compile.
   private async request<Id extends OperationId>(
-    method: 'GET' | 'POST',
     operation: Id,
-    path: string,
+    params: Record<PathParam<PathOf<Id> & string>, string>,
     body?: RequestBody<Id>,
     nullOn404 = false
   ): Promise<SuccessBody<Id>> {
+    const path = contractPath(operation, params)
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), requestTimeoutMs())
     timeout.unref?.()
     try {
       const response = await fetch(`${serviceUrl()}${path}`, {
-        method,
+        method: contractMethod(operation),
         headers: {
           authorization: `Bearer ${serviceToken()}`,
           ...(body === undefined ? {} : { 'content-type': 'application/json' })
@@ -149,7 +167,7 @@ class HttpControlPlaneClient {
     ingress_kind: 'github_webhook' | 'github_actions_dispatch'
     ingress_key: string
   }): Promise<ReviewRunAdmission> {
-    return await this.request('POST', 'admitRun', contractPath('/v1/runs', {}), run)
+    return await this.request('admitRun', {}, run)
   }
 
   async submitPreparedRun(
@@ -161,9 +179,8 @@ class HttpControlPlaneClient {
     const publishContext = await this.validateContext(runId, context)
     try {
       await this.request(
-        'POST',
         'submitPreparedRun',
-        contractPath('/v1/runs/{runId}/submission', { runId }),
+        { runId },
         {
           preparation_token: token,
           publish_context: publishContext,
@@ -185,30 +202,15 @@ class HttpControlPlaneClient {
   // Status queries must expose preparing runs whose publish context is not ready.
   // Publication claims below remain the strict persisted-context boundary.
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
-    return await this.request(
-      'GET',
-      'getInternalRun',
-      contractPath('/v1/internal/runs/{runId}', { runId }),
-      undefined,
-      true
-    )
+    return await this.request('getInternalRun', { runId }, undefined, true)
   }
 
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
-    return await this.request(
-      'POST',
-      'renewPreparationClaim',
-      contractPath('/v1/runs/{runId}/preparation/claim', { runId }),
-      { token }
-    )
+    return await this.request('renewPreparationClaim', { runId }, { token })
   }
 
   async preparationHeartbeatIntervalMs(): Promise<number> {
-    return await this.request(
-      'GET',
-      'getPreparationHeartbeatInterval',
-      contractPath('/v1/config/preparation-heartbeat-interval', {})
-    )
+    return await this.request('getPreparationHeartbeatInterval', {})
   }
 
   /**
@@ -218,9 +220,8 @@ class HttpControlPlaneClient {
    */
   async claimNextPublication(waitMs = 0): Promise<PublicationWork | null> {
     const work = await this.request(
-      'POST',
       'claimNextPublication',
-      contractPath('/v1/publication/claims/next', {}),
+      {},
       {
         wait_ms: waitMs
       }
@@ -252,20 +253,11 @@ class HttpControlPlaneClient {
   }
 
   async renewPublicationClaim(runId: string, token: string): Promise<boolean> {
-    return await this.request(
-      'POST',
-      'renewPublicationClaim',
-      contractPath('/v1/runs/{runId}/publication/claim', { runId }),
-      { token }
-    )
+    return await this.request('renewPublicationClaim', { runId }, { token })
   }
 
   async publicationHeartbeatIntervalMs(): Promise<number> {
-    return await this.request(
-      'GET',
-      'getPublicationHeartbeatInterval',
-      contractPath('/v1/config/publication-heartbeat-interval', {})
-    )
+    return await this.request('getPublicationHeartbeatInterval', {})
   }
 
   async initializePublicationSteps(
@@ -274,9 +266,8 @@ class HttpControlPlaneClient {
     stepKeys: string[]
   ): Promise<void> {
     await this.request(
-      'POST',
       'initializePublicationSteps',
-      contractPath('/v1/runs/{runId}/publication/steps', { runId }),
+      { runId },
       {
         token,
         step_keys: stepKeys
@@ -285,20 +276,11 @@ class HttpControlPlaneClient {
   }
 
   async listPublicationSteps(runId: string): Promise<PublicationStepRecord[]> {
-    return await this.request(
-      'GET',
-      'listInternalPublicationSteps',
-      contractPath('/v1/internal/runs/{runId}/publication/steps', { runId })
-    )
+    return await this.request('listInternalPublicationSteps', { runId })
   }
 
   async requirePublicationStepClaim(runId: string, token: string, stepKey: string): Promise<void> {
-    await this.request(
-      'POST',
-      'requirePublicationStepClaim',
-      contractPath('/v1/runs/{runId}/publication/steps/{stepKey}/claim', { runId, stepKey }),
-      { token }
-    )
+    await this.request('requirePublicationStepClaim', { runId, stepKey }, { token })
   }
 
   async completePublicationStep(
@@ -308,9 +290,8 @@ class HttpControlPlaneClient {
     remote: { id?: string | number | null; url?: string | null } = {}
   ): Promise<boolean> {
     return await this.request(
-      'POST',
       'completePublicationStep',
-      contractPath('/v1/runs/{runId}/publication/steps/{stepKey}/complete', { runId, stepKey }),
+      { runId, stepKey },
       { token, remote_object: remote }
     )
   }
@@ -323,18 +304,16 @@ class HttpControlPlaneClient {
     options: { retry?: boolean } = {}
   ): Promise<boolean> {
     return await this.request(
-      'POST',
       'failPublicationStep',
-      contractPath('/v1/runs/{runId}/publication/steps/{stepKey}/fail', { runId, stepKey }),
+      { runId, stepKey },
       { token, failure, ...(options.retry === undefined ? {} : { retry: options.retry }) }
     )
   }
 
   async completePublication(runId: string, token: string): Promise<boolean> {
     return await this.request(
-      'POST',
       'completePublication',
-      contractPath('/v1/runs/{runId}/publication/complete', { runId }),
+      { runId },
       {
         token
       }
@@ -348,9 +327,8 @@ class HttpControlPlaneClient {
     options: { retry: boolean }
   ): Promise<boolean> {
     return await this.request(
-      'POST',
       'failPublication',
-      contractPath('/v1/runs/{runId}/publication/fail', { runId }),
+      { runId },
       {
         token,
         failure,
@@ -365,9 +343,8 @@ class HttpControlPlaneClient {
     failure: { code?: string | null; message: string }
   ): Promise<void> {
     await this.request(
-      'POST',
       'failPreparation',
-      contractPath('/v1/runs/{runId}/preparation/failure', { runId }),
+      { runId },
       {
         token,
         failure

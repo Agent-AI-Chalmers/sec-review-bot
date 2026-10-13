@@ -1283,3 +1283,48 @@ export interface operations {
     }
   }
 }
+
+/** Each operation's contract path and HTTP method, keyed by `operationId` and taken from
+ * the document itself. The client builds every request from this map, so an operation cannot
+ * be sent to another operation's URL or with another operation's method: the call site names
+ * the operation, and the URL is looked up, never passed in. */
+export const operationRoutes = {
+  getHealth: { path: '/healthz', method: 'get' },
+  listRuns: { path: '/v1/runs', method: 'get' },
+  admitRun: { path: '/v1/runs', method: 'post' },
+  getRun: { path: '/v1/runs/{runId}', method: 'get' },
+  listRunPublicationSteps: { path: '/v1/runs/{runId}/publication-steps', method: 'get' },
+  submitPreparedRun: { path: '/v1/runs/{runId}/submission', method: 'post' },
+  renewPreparationClaim: { path: '/v1/runs/{runId}/preparation/claim', method: 'post' },
+  failPreparation: { path: '/v1/runs/{runId}/preparation/failure', method: 'post' },
+  claimNextPublication: { path: '/v1/publication/claims/next', method: 'post' },
+  renewPublicationClaim: { path: '/v1/runs/{runId}/publication/claim', method: 'post' },
+  initializePublicationSteps: { path: '/v1/runs/{runId}/publication/steps', method: 'post' },
+  requirePublicationStepClaim: {
+    path: '/v1/runs/{runId}/publication/steps/{stepKey}/claim',
+    method: 'post'
+  },
+  completePublicationStep: {
+    path: '/v1/runs/{runId}/publication/steps/{stepKey}/complete',
+    method: 'post'
+  },
+  failPublicationStep: {
+    path: '/v1/runs/{runId}/publication/steps/{stepKey}/fail',
+    method: 'post'
+  },
+  completePublication: { path: '/v1/runs/{runId}/publication/complete', method: 'post' },
+  failPublication: { path: '/v1/runs/{runId}/publication/fail', method: 'post' },
+  getInternalRun: { path: '/v1/internal/runs/{runId}', method: 'get' },
+  listInternalPublicationSteps: {
+    path: '/v1/internal/runs/{runId}/publication/steps',
+    method: 'get'
+  },
+  getPreparationHeartbeatInterval: {
+    path: '/v1/config/preparation-heartbeat-interval',
+    method: 'get'
+  },
+  getPublicationHeartbeatInterval: {
+    path: '/v1/config/publication-heartbeat-interval',
+    method: 'get'
+  }
+} as const

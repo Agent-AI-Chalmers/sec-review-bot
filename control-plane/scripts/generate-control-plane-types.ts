@@ -40,10 +40,54 @@ const HEADER = `// Generated from ${path.relative(CONTROL_PLANE_ROOT, SPEC_PATH)
 // copy. Regenerate it with \`pnpm run generate:control-plane-types\`.
 `
 
+type OpenApiPathItem = Record<string, unknown>
+
+/** Every `(operationId, path, method)` the contract declares, in document order. The
+ * operationId is what the client is keyed by, and the path/method are the URL it must be
+ * called at — the pairing the generated types alone cannot express, because two operations
+ * with identical shapes (both taking `{ token }` and returning a boolean, say) are
+ * indistinguishable structurally. */
+export function operationRoutes(
+  spec: OpenAPI3
+): Array<{ operationId: string; path: string; method: string }> {
+  const methods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']
+  const paths = (spec.paths ?? {}) as Record<string, OpenApiPathItem>
+  const routes: Array<{ operationId: string; path: string; method: string }> = []
+  for (const [path, item] of Object.entries(paths)) {
+    for (const method of methods) {
+      const operation = item[method] as { operationId?: string } | undefined
+      if (operation?.operationId !== undefined) {
+        routes.push({ operationId: operation.operationId, path, method })
+      }
+    }
+  }
+  return routes
+}
+
+/** The runtime `operationRoutes` map projected into the generated file. It is data, not a
+ * type, because the client needs the actual strings at request time; deriving them from the
+ * `paths` type is impossible when operations are structurally identical. */
+function renderOperationRoutes(spec: OpenAPI3): string {
+  const entries = operationRoutes(spec)
+    .map(
+      ({ operationId, path, method }) =>
+        `  ${operationId}: { path: '${path}', method: '${method}' }`
+    )
+    .join(',\n')
+  return `/** Each operation's contract path and HTTP method, keyed by \`operationId\` and taken from
+ * the document itself. The client builds every request from this map, so an operation cannot
+ * be sent to another operation's URL or with another operation's method: the call site names
+ * the operation, and the URL is looked up, never passed in. */
+export const operationRoutes = {
+${entries}
+} as const
+`
+}
+
 /** The committed content of the github-integration control-plane API types. */
 export async function renderControlPlaneApiTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
-  const rendered = HEADER + astToString(await openapiTS(spec))
+  const rendered = HEADER + astToString(await openapiTS(spec)) + '\n' + renderOperationRoutes(spec)
   const options = await prettier.resolveConfig(OUTPUT_PATH)
   return await prettier.format(rendered, { ...options, filepath: OUTPUT_PATH })
 }
