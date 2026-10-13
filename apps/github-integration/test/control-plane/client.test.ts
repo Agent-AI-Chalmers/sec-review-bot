@@ -181,3 +181,38 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
   assert.equal(requests[1]?.body.token, 'claim-1')
   assert.deepEqual(requests[1]?.body.retry, false)
 })
+
+test('void operations accept the empty 200 body the real server sends', async (t) => {
+  // Three operations (`failPreparation`, `initializePublicationSteps`,
+  // `requirePublicationStepClaim`) declare a 200 with no content, and the server answers
+  // `reply.code(200).send()` — a zero-byte body. Every other mock in this file uses
+  // `Response.json(...)`, which always has a body, so `request()` parsing the success
+  // unconditionally looked fine here while throwing `SyntaxError: Unexpected end of JSON
+  // input` against the real server. Use a real empty-bodied `Response` so this suite can see
+  // the difference between a body and none.
+  const previousUrl = process.env.CONTROL_PLANE_SERVICE_URL
+  const previousToken = process.env.CONTROL_PLANE_SERVICE_TOKEN
+  process.env.CONTROL_PLANE_SERVICE_URL = 'http://control-plane.test'
+  process.env.CONTROL_PLANE_SERVICE_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousUrl === undefined) delete process.env.CONTROL_PLANE_SERVICE_URL
+    else process.env.CONTROL_PLANE_SERVICE_URL = previousUrl
+    if (previousToken === undefined) delete process.env.CONTROL_PLANE_SERVICE_TOKEN
+    else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
+  })
+
+  t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 200 }))
+
+  assert.equal(
+    await controlPlaneClient.initializePublicationSteps('run-1', 'claim-1', ['a']),
+    undefined
+  )
+  assert.equal(
+    await controlPlaneClient.requirePublicationStepClaim('run-1', 'claim-1', 'a'),
+    undefined
+  )
+  assert.equal(
+    await controlPlaneClient.failPreparation('run-1', 'prep-1', { message: 'x' }),
+    undefined
+  )
+})

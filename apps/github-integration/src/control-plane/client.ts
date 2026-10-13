@@ -137,7 +137,16 @@ class HttpControlPlaneClient {
           { code: parsed.code ?? null }
         )
       }
-      return (await response.json()) as SuccessBody<Id>
+      // A success body may legitimately be empty: three operations (`failPreparation`,
+      // `initializePublicationSteps`, `requirePublicationStepClaim`) declare a 200 with no
+      // content, and the server answers with `reply.code(200).send()` — a zero-byte body. The
+      // contract's `SuccessBody` for those operations is `void`, so the caller expects
+      // `undefined`. Parsing unconditionally threw `SyntaxError: Unexpected end of JSON input`
+      // on every such call, which carried no `code` or HTTP status and was therefore
+      // misclassified as a retryable publication fault — the exact "loops forever" failure the
+      // terminal-code alignment exists to prevent. Parse only when there is a body.
+      const text = await response.text()
+      return (text === '' ? undefined : JSON.parse(text)) as SuccessBody<Id>
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw Object.assign(new Error(`Control Plane ${operation} request timed out.`), {
