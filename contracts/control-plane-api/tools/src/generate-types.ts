@@ -4,8 +4,10 @@
 // openapi.yaml); this module only produces its TypeScript view, so the client derives its
 // types from the contract rather than a hand-authored copy.
 //
-// Mirrors `generate-runner-api-types.ts`: the generator and the stale-check test both
-// call `renderControlPlaneApiTypes`, so they cannot disagree about what "current" means.
+// Mirrors the integration-contract family's generator
+// (`contracts/integration-contract/tools/src/generate-types.ts`): the generator and the
+// stale-check test both call `renderControlPlaneApiTypes`, so they cannot disagree about what
+// "current" means.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
