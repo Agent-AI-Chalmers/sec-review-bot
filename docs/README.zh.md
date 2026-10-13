@@ -38,6 +38,7 @@
 - [integration-contract/openapi.json](../contracts/integration-contract/openapi.json)：Agent Runner HTTP API，由服务代码生成。
 - [control-plane-api/openapi.yaml](../contracts/control-plane-api/openapi.yaml)：Control Plane HTTP 契约——路由、schema、安全方案与错误码。
 - [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json)：控制台读取返回的脱敏运行形状。
+- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json)：协调记录的形状。
 
 ### workflows/
 

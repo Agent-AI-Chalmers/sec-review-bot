@@ -36,6 +36,7 @@ Read [Contracts README](../contracts/README.md) first: it defines the family lay
 - [integration-contract/openapi.json](../contracts/integration-contract/openapi.json): the Agent Runner HTTP API, generated from the service.
 - [control-plane-api/openapi.yaml](../contracts/control-plane-api/openapi.yaml): the Control Plane HTTP contract — routes, schemas, security, and error codes.
 - [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json): the redacted run a console read returns.
+- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json): the coordination record shape.
 
 ### workflows/
 
