@@ -28,8 +28,14 @@ components:
           type: string
         code:
           type: string
+          description: |
+            The machine-readable reason. `INVALID_QUERY`, `INVALID_BODY`, and
+            `INVALID_PATH_PARAMETER` identify which part of the request failed schema
+            validation; the `PUBLICATION_STEP_*` codes are terminal publication failures.
           enum:
             - INVALID_QUERY
+            - INVALID_BODY
+            - INVALID_PATH_PARAMETER
             - PUBLICATION_STEP_SET_DUPLICATE
             - PUBLICATION_STEP_SET_CHANGED
             - PUBLICATION_STEP_RETRY_EXHAUSTED
@@ -113,59 +119,7 @@ components:
             - string
             - "null"
         artifact_storage:
-          oneOf:
-            - type: object
-              additionalProperties: false
-              required:
-                - status
-              properties:
-                status:
-                  type: string
-                  enum:
-                    - unavailable
-                    - failed
-                error_code:
-                  type: string
-                message:
-                  type: string
-            - type: object
-              additionalProperties: false
-              required:
-                - status
-                - artifact
-              properties:
-                status:
-                  type: string
-                  enum:
-                    - available
-                artifact:
-                  type: object
-                  additionalProperties: false
-                  required:
-                    - kind
-                    - uri
-                    - media_type
-                    - digest
-                    - size_bytes
-                  properties:
-                    kind:
-                      type: string
-                      enum:
-                        - diagnostic_bundle
-                    uri:
-                      type: string
-                      pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
-                    media_type:
-                      type: string
-                      enum:
-                        - application/tar+zstd
-                    digest:
-                      type: string
-                      pattern: ^sha256:[0-9a-f]{64}$
-                    size_bytes:
-                      type: integer
-                      minimum: 0
-            - type: "null"
+          $ref: "#/components/schemas/ArtifactStorage"
     ReviewRunAdmission:
       type: object
       additionalProperties: false
@@ -263,59 +217,7 @@ components:
             - string
             - "null"
         artifact_storage:
-          oneOf:
-            - type: object
-              additionalProperties: false
-              required:
-                - status
-              properties:
-                status:
-                  type: string
-                  enum:
-                    - unavailable
-                    - failed
-                error_code:
-                  type: string
-                message:
-                  type: string
-            - type: object
-              additionalProperties: false
-              required:
-                - status
-                - artifact
-              properties:
-                status:
-                  type: string
-                  enum:
-                    - available
-                artifact:
-                  type: object
-                  additionalProperties: false
-                  required:
-                    - kind
-                    - uri
-                    - media_type
-                    - digest
-                    - size_bytes
-                  properties:
-                    kind:
-                      type: string
-                      enum:
-                        - diagnostic_bundle
-                    uri:
-                      type: string
-                      pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
-                    media_type:
-                      type: string
-                      enum:
-                        - application/tar+zstd
-                    digest:
-                      type: string
-                      pattern: ^sha256:[0-9a-f]{64}$
-                    size_bytes:
-                      type: integer
-                      minimum: 0
-            - type: "null"
+          $ref: "#/components/schemas/ArtifactStorage"
         workflow_result: {}
         claim_token:
           type: string
@@ -461,63 +363,66 @@ components:
             - string
             - "null"
         artifact_storage:
-          oneOf:
-            - type: "null"
-            - type: object
-              additionalProperties: false
-              required:
-                - status
-              properties:
-                status:
-                  type: string
-                  enum:
-                    - unavailable
-                    - failed
-                error_code:
-                  type: string
-                message:
-                  type: string
-            - type: object
-              additionalProperties: false
-              required:
-                - status
-                - artifact
-              properties:
-                status:
-                  type: string
-                  enum:
-                    - available
-                artifact:
-                  type: object
-                  additionalProperties: false
-                  required:
-                    - kind
-                    - uri
-                    - media_type
-                    - digest
-                    - size_bytes
-                  properties:
-                    kind:
-                      type: string
-                      enum:
-                        - diagnostic_bundle
-                    uri:
-                      type: string
-                      pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
-                    media_type:
-                      type: string
-                      enum:
-                        - application/tar+zstd
-                    digest:
-                      type: string
-                      pattern: ^sha256:[0-9a-f]{64}$
-                    size_bytes:
-                      type: integer
-                      minimum: 0
+          $ref: "#/components/schemas/ArtifactStorage"
         publication_steps:
           type: array
           items:
             $ref: "#/components/schemas/ObservedPublicationStep"
+    ArtifactStorage:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+          properties:
+            status:
+              type: string
+              enum:
+                - unavailable
+                - failed
+            error_code:
+              type: string
+            message:
+              type: string
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+            - artifact
+          properties:
+            status:
+              type: string
+              enum:
+                - available
+            artifact:
+              type: object
+              additionalProperties: false
+              required:
+                - kind
+                - uri
+                - media_type
+                - digest
+                - size_bytes
+              properties:
+                kind:
+                  type: string
+                  enum:
+                    - diagnostic_bundle
+                uri:
+                  type: string
+                  pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
+                media_type:
+                  type: string
+                  enum:
+                    - application/tar+zstd
+                digest:
+                  type: string
+                  pattern: ^sha256:[0-9a-f]{64}$
+                size_bytes:
+                  type: integer
+                  minimum: 0
+        - type: "null"
+
 paths:
   /healthz:
     get:

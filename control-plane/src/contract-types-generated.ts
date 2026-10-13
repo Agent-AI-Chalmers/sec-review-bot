@@ -8,9 +8,16 @@ export interface components {
   schemas: {
     ErrorResponse: {
       error: string
-      /** @enum {string} */
+      /**
+       * @description The machine-readable reason. `INVALID_QUERY`, `INVALID_BODY`, and
+       *     `INVALID_PATH_PARAMETER` identify which part of the request failed schema
+       *     validation; the `PUBLICATION_STEP_*` codes are terminal publication failures.
+       * @enum {string}
+       */
       code?:
         | 'INVALID_QUERY'
+        | 'INVALID_BODY'
+        | 'INVALID_PATH_PARAMETER'
         | 'PUBLICATION_STEP_SET_DUPLICATE'
         | 'PUBLICATION_STEP_SET_CHANGED'
         | 'PUBLICATION_STEP_RETRY_EXHAUSTED'
@@ -43,27 +50,7 @@ export interface components {
       published_at: string | null
       failure_code: string | null
       failure_message: string | null
-      artifact_storage:
-        | {
-            /** @enum {string} */
-            status: 'unavailable' | 'failed'
-            error_code?: string
-            message?: string
-          }
-        | {
-            /** @enum {string} */
-            status: 'available'
-            artifact: {
-              /** @enum {string} */
-              kind: 'diagnostic_bundle'
-              uri: string
-              /** @enum {string} */
-              media_type: 'application/tar+zstd'
-              digest: string
-              size_bytes: number
-            }
-          }
-        | null
+      artifact_storage: components['schemas']['ArtifactStorage']
     }
     ReviewRunAdmission: {
       record: components['schemas']['ReviewRunRecord']
@@ -97,27 +84,7 @@ export interface components {
       published_at: string | null
       failure_code: string | null
       failure_message: string | null
-      artifact_storage:
-        | {
-            /** @enum {string} */
-            status: 'unavailable' | 'failed'
-            error_code?: string
-            message?: string
-          }
-        | {
-            /** @enum {string} */
-            status: 'available'
-            artifact: {
-              /** @enum {string} */
-              kind: 'diagnostic_bundle'
-              uri: string
-              /** @enum {string} */
-              media_type: 'application/tar+zstd'
-              digest: string
-              size_bytes: number
-            }
-          }
-        | null
+      artifact_storage: components['schemas']['ArtifactStorage']
       workflow_result: unknown
       claim_token: string
     }
@@ -159,29 +126,30 @@ export interface components {
       /** Format: date-time */
       published_at: string | null
       failure_code: string | null
-      artifact_storage:
-        | null
-        | {
-            /** @enum {string} */
-            status: 'unavailable' | 'failed'
-            error_code?: string
-            message?: string
-          }
-        | {
-            /** @enum {string} */
-            status: 'available'
-            artifact: {
-              /** @enum {string} */
-              kind: 'diagnostic_bundle'
-              uri: string
-              /** @enum {string} */
-              media_type: 'application/tar+zstd'
-              digest: string
-              size_bytes: number
-            }
-          }
+      artifact_storage: components['schemas']['ArtifactStorage']
       publication_steps?: components['schemas']['ObservedPublicationStep'][]
     }
+    ArtifactStorage:
+      | {
+          /** @enum {string} */
+          status: 'unavailable' | 'failed'
+          error_code?: string
+          message?: string
+        }
+      | {
+          /** @enum {string} */
+          status: 'available'
+          artifact: {
+            /** @enum {string} */
+            kind: 'diagnostic_bundle'
+            uri: string
+            /** @enum {string} */
+            media_type: 'application/tar+zstd'
+            digest: string
+            size_bytes: number
+          }
+        }
+      | null
   }
   responses: never
   parameters: never

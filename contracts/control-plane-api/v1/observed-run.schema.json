@@ -77,9 +77,6 @@
     "artifact_storage": {
       "oneOf": [
         {
-          "type": "null"
-        },
-        {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -153,6 +150,9 @@
               }
             }
           }
+        },
+        {
+          "type": "null"
         }
       ]
     },

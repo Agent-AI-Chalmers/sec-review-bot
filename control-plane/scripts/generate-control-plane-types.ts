@@ -54,15 +54,17 @@ export async function renderControlPlaneApiTypes(): Promise<string> {
 // contract (and vice-versa) by a compile-time check.
 export const ERROR_CODES_PATH = path.resolve(CONTROL_PLANE_ROOT, 'src', 'error-codes-generated.ts')
 
-/** Pull the `PUBLICATION_STEP_*` members out of the contract's ErrorResponse.code enum. */
-export function publicationStepCodes(spec: OpenAPI3): string[] {
+/** Every member of the contract's ErrorResponse.code enum. */
+export function errorResponseCodes(spec: OpenAPI3): string[] {
   const codeSchema = spec.components?.schemas?.ErrorResponse as
     { properties?: { code?: { enum?: (string | number)[] } } } | undefined
   const values = codeSchema?.properties?.code?.enum ?? []
-  return values
-    .filter((value): value is string => typeof value === 'string')
-    .filter((value) => value.startsWith('PUBLICATION_STEP_'))
-    .sort()
+  return values.filter((value): value is string => typeof value === 'string').sort()
+}
+
+/** Pull the `PUBLICATION_STEP_*` members out of the contract's ErrorResponse.code enum. */
+export function publicationStepCodes(spec: OpenAPI3): string[] {
+  return errorResponseCodes(spec).filter((value) => value.startsWith('PUBLICATION_STEP_'))
 }
 
 /** The committed content of `control-plane/src/error-codes-generated.ts`. */
@@ -71,14 +73,20 @@ export async function renderErrorCodeTypes(): Promise<string> {
   const codes = publicationStepCodes(spec)
   const union = codes.map((code) => `  | '${code}'`).join('\n')
   const array = codes.map((code) => `  '${code}',`).join('\n')
+  const all = errorResponseCodes(spec)
+    .map((code) => `  '${code}',`)
+    .join('\n')
   const body = `// Generated from ${path.relative(CONTROL_PLANE_ROOT, SPEC_PATH)}. Do not edit.
 //
-// The hand-written openapi.yaml owns the publication-step error-code vocabulary; this file
-// is its server-side projection. Regenerate it with \`pnpm run generate:control-plane-types\`.
+// The hand-written openapi.yaml owns the error-code vocabulary; this file is its server-side
+// projection. Regenerate it with \`pnpm run generate:control-plane-types\`.
 
 export type PublicationStepErrorCode =\n${union}
 
 export const PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT = [\n${array}\n] as const satisfies readonly PublicationStepErrorCode[]
+
+/** Every code the contract's ErrorResponse.code enum allows. */
+export const ERROR_RESPONSE_CODES_FROM_CONTRACT = [\n${all}\n] as const
 `
   const options = await prettier.resolveConfig(ERROR_CODES_PATH)
   return await prettier.format(body, { ...options, filepath: ERROR_CODES_PATH })
