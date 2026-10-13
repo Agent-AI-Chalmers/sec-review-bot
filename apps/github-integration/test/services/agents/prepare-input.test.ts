@@ -237,6 +237,7 @@ test(
       }
 
       const prepared = await prepareIssueReviewInput({
+        run_id: 'run-issue-fixture',
         octokit,
         issue
       })

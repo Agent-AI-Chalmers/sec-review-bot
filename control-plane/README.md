@@ -90,10 +90,11 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 | Endpoint                                 | Authentication                | Purpose                                                              |
 | ---------------------------------------- | ----------------------------- | -------------------------------------------------------------------- |
 | `GET /healthz`                           | None                          | Process health                                                       |
-| `POST /v1/store`                         | `CONTROL_PLANE_SERVICE_TOKEN` | Internal admission, submission, recovery, and publication operations |
 | `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN`    | Filtered, cursor-paginated run list                                  |
 | `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN`    | Redacted run detail                                                  |
 | `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`    | Publication-step summary                                             |
+
+The write surface — admission, submission, preparation and publication claims and their terminal outcomes — is a set of REST routes whose request/response shapes, security, and error codes are the hand-written [openapi.yaml](../contracts/control-plane-api/openapi.yaml) contract; that document is the single source of truth for the whole surface, not this table.
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 

@@ -1,13 +1,11 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
+
+import openapiGlue from '@platformatic/fastify-openapi-glue'
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 
 import { ReviewRunStore } from './review-store.js'
 import type { PublicationStatus, RunnerStatus } from './review-store.js'
-import {
-  controlPlaneOperations,
-  type ControlPlaneOperation,
-  type ControlPlaneWorkflow
-} from './contracts.js'
+import { type ControlPlaneWorkflow } from './contracts.js'
 import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from './coordinator.js'
 import { observeRunnerRun } from './terminal-coordination.js'
 import {
@@ -22,6 +20,7 @@ import {
 import { recoverReviewRunSubmission } from './submission-recovery.js'
 import { submitPreparedRun } from './prepared-submission.js'
 import { observePublicationStep, observeRun } from './observability.js'
+import { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } from './errors.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
 // Statuses whose handling needs the run record itself, because the terminal writes
@@ -46,8 +45,6 @@ function runnerStatusFromBatch(
     return await getRunnerRunStatus(runId, workflow)
   }
 }
-type Operation = ControlPlaneOperation
-const allowedOperations = new Set<string>(controlPlaneOperations)
 const runnerStatuses = new Set<RunnerStatus>([
   'preparing',
   'recovering',
@@ -68,6 +65,10 @@ const workflows = new Set<ControlPlaneWorkflow>([
   'pull-request-review',
   'repository-review'
 ])
+// The error-envelope `code` values. `INVALID_QUERY` is the run-list query filter; the four
+// `PUBLICATION_STEP_*` codes also surface here, carried by the REST write routes for
+// deterministic publication failures the client must classify as terminal.
+const errorCodeEnum = ['INVALID_QUERY', ...Object.values(PUBLICATION_STEP_ERROR_CODES)]
 type ListQueryOptions = NonNullable<Parameters<ReviewRunStore['listRunsPage']>[0]>
 
 function requiredEnv(name: string): string {
@@ -76,41 +77,8 @@ function requiredEnv(name: string): string {
   return value
 }
 
-async function readJson(request: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = []
-  let size = 0
-  for await (const chunk of request) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += buffer.byteLength
-    if (size > MAX_BODY_BYTES)
-      throw Object.assign(new Error('Request body is too large.'), { statusCode: 413 })
-    chunks.push(buffer)
-  }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
-  } catch {
-    throw Object.assign(new Error('Request body must be valid JSON.'), { statusCode: 400 })
-  }
-}
-
-function sendJson(response: ServerResponse, status: number, value: unknown): void {
-  response.writeHead(status, { 'content-type': 'application/json' })
-  response.end(JSON.stringify(value))
-}
-
 function invalidQuery(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 400, code: 'INVALID_QUERY' })
-}
-
-export function decodeRunId(value: string): string {
-  try {
-    return decodeURIComponent(value)
-  } catch {
-    throw Object.assign(new Error('run_id must use valid percent-encoding.'), {
-      statusCode: 400,
-      code: 'INVALID_PATH_PARAMETER'
-    })
-  }
 }
 
 function parseListQuery(url: URL): ListQueryOptions {
@@ -176,14 +144,212 @@ function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   console.info(JSON.stringify({ event, ...fields }))
 }
 
-function isRpcRequest(value: unknown): value is { operation: Operation; args: unknown[] } {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  return (
-    typeof record.operation === 'string' &&
-    allowedOperations.has(record.operation) &&
-    Array.isArray(record.args)
-  )
+interface ControlPlaneRouteDeps {
+  store: ReviewRunStore
+  serviceToken: string
+  readToken: string
+}
+
+/** Register the Control Plane HTTP surface from the OpenAPI contract. Routes, request/response
+ * schemas, and security all come from `contracts/control-plane-api/openapi.yaml` via
+ * fastify-openapi-glue; the handlers below only carry the domain logic against the store.
+ * Kept separate from `startControlPlaneServer` so the routes can be registered with a stub
+ * store (for tests) without a database.
+ */
+export async function registerControlPlaneRoutes(
+  app: FastifyInstance,
+  deps: ControlPlaneRouteDeps
+): Promise<void> {
+  const { store, serviceToken, readToken } = deps
+
+  // A deterministic publication failure reaches the client with its string code (classified
+  // terminal on the github side) as a 409; anything else is a generic 500.
+  const writeError = (reply: FastifyReply, error: unknown): void => {
+    if (error instanceof DeterministicControlPlaneError) {
+      reply.code(409).send({ error: error.message, code: error.code })
+      return
+    }
+    reply.code(500).send({ error: 'Internal error' })
+  }
+
+  // The handlers, keyed by operationId. Each handler calls the store directly and does only
+  // the domain logic: routing, body/query/path validation, and auth come from the OpenAPI
+  // spec via fastify-openapi-glue, so nothing here re-states a schema.
+  const handlers: Record<string, (request: FastifyRequest, reply: FastifyReply) => unknown> = {
+    getHealth: async () => ({ status: 'ok' }),
+
+    listRuns: async (request) => {
+      const url = new URL(request.url ?? '/', 'http://control-plane.local')
+      const listOptions = parseListQuery(url)
+      const { runs, next_cursor } = await store.listRunsPage(listOptions)
+      return { runs: runs.map(observeRun), next_cursor }
+    },
+
+    getRun: async (request, reply) => {
+      const { runId } = request.params as { runId: string }
+      const run = await store.getRun(runId)
+      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      return { run: observeRun(run) }
+    },
+
+    listRunPublicationSteps: async (request, reply) => {
+      const { runId } = request.params as { runId: string }
+      const run = await store.getRun(runId)
+      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      const steps = await store.listPublicationSteps(run.run_id)
+      return { run_id: run.run_id, publication_steps: steps.map(observePublicationStep) }
+    },
+
+    admitRun: async (request, reply) => {
+      const body = request.body as {
+        workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+        publish_context: Record<string, unknown>
+        runner_input?: Record<string, unknown>
+        ingress_kind: 'github_webhook' | 'github_actions_dispatch'
+        ingress_key: string
+      }
+      try {
+        return await store.admitReviewRun({ run_id: randomUUID(), ...body })
+      } catch (error) {
+        return writeError(reply, error)
+      }
+    },
+
+    submitPreparedRun: async (request, reply) => {
+      const { runId } = request.params as { runId: string }
+      const { preparation_token, publish_context, input } = request.body as {
+        preparation_token: string
+        publish_context: Record<string, unknown>
+        input: Record<string, unknown>
+      }
+      try {
+        return await submitPreparedRun(
+          store,
+          { runId, preparationToken: preparation_token, publishContext: publish_context, input },
+          submitRunnerRun
+        )
+      } catch (error) {
+        return writeError(reply, error)
+      }
+    },
+
+    renewPreparationClaim: async (request) => {
+      const { runId } = request.params as { runId: string }
+      const { token } = request.body as { token: string }
+      return await store.renewPreparationClaim(runId, token)
+    },
+
+    failPreparation: async (request) => {
+      const { runId } = request.params as { runId: string }
+      const { token, failure } = request.body as {
+        token: string
+        failure: { code?: string | null; message: string }
+      }
+      await store.failPreparation(runId, token, failure)
+      return null
+    },
+
+    claimNextPublication: async (request) => {
+      const { wait_ms } = request.body as { wait_ms?: number }
+      return await store.claimNextPublication(wait_ms ?? 0)
+    },
+
+    renewPublicationClaim: async (request) => {
+      const { runId } = request.params as { runId: string }
+      const { token } = request.body as { token: string }
+      return await store.renewPublicationClaim(runId, token)
+    },
+
+    initializePublicationSteps: async (request) => {
+      const { runId } = request.params as { runId: string }
+      const { token, step_keys } = request.body as { token: string; step_keys: string[] }
+      await store.initializePublicationSteps(runId, token, step_keys)
+      return null
+    },
+
+    requirePublicationStepClaim: async (request) => {
+      const { runId, stepKey } = request.params as { runId: string; stepKey: string }
+      const { token } = request.body as { token: string }
+      await store.requirePublicationStepClaim(runId, token, stepKey)
+      return null
+    },
+
+    completePublicationStep: async (request) => {
+      const { runId, stepKey } = request.params as { runId: string; stepKey: string }
+      const { token, remote_object } = request.body as {
+        token: string
+        remote_object?: { id?: string | number | null; url?: string | null }
+      }
+      return await store.completePublicationStep(runId, token, stepKey, remote_object ?? {})
+    },
+
+    failPublicationStep: async (request) => {
+      const { runId, stepKey } = request.params as { runId: string; stepKey: string }
+      const { token, failure, retry } = request.body as {
+        token: string
+        failure: { code?: string | null; message: string }
+        retry?: boolean
+      }
+      return await store.failPublicationStep(runId, token, stepKey, failure, retry === undefined ? {} : { retry })
+    },
+
+    completePublication: async (request) => {
+      const { runId } = request.params as { runId: string }
+      const { token } = request.body as { token: string }
+      return await store.completePublication(runId, token)
+    },
+
+    failPublication: async (request) => {
+      const { runId } = request.params as { runId: string }
+      const { token, failure, retry } = request.body as {
+        token: string
+        failure: { code?: string | null; message: string }
+        retry: boolean
+      }
+      return await store.failPublication(runId, token, failure, { retry })
+    },
+
+    getInternalRun: async (request, reply) => {
+      const { runId } = request.params as { runId: string }
+      const run = await store.getRun(runId)
+      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      return reply.send(run)
+    },
+
+    listInternalPublicationSteps: async (request, reply) => {
+      const { runId } = request.params as { runId: string }
+      const run = await store.getRun(runId)
+      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      return reply.send(await store.listPublicationSteps(run.run_id))
+    },
+
+    getPreparationHeartbeatInterval: async () => store.preparationHeartbeatIntervalMs(),
+
+    getPublicationHeartbeatInterval: async () => store.publicationHeartbeatIntervalMs()
+  }
+
+  await app.register(openapiGlue, {
+    specification: '../contracts/control-plane-api/openapi.yaml',
+    operationResolver: (operationId) => {
+      const handler = handlers[operationId]
+      if (handler === undefined) {
+        throw new Error(`No handler registered for operation ${operationId}`)
+      }
+      return handler
+    },
+    securityHandlers: {
+      serviceToken: async (request: FastifyRequest) => {
+        if (request.headers.authorization !== `Bearer ${serviceToken}`) {
+          throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
+        }
+      },
+      readToken: async (request: FastifyRequest) => {
+        if (request.headers.authorization !== `Bearer ${readToken}`) {
+          throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
+        }
+      }
+    }
+  })
 }
 
 export async function startControlPlaneServer(): Promise<{ close: () => Promise<void> }> {
@@ -250,158 +416,57 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       console.error('control_plane_runner_coordination_failed', error)
     }
   })
-  const server = createServer(async (request, response) => {
-    try {
-      if (request.method === 'GET' && request.url === '/healthz') {
-        sendJson(response, 200, { status: 'ok' })
-        return
-      }
-      const runQuery =
-        request.method === 'GET' ? /^\/v1\/runs\/([^/?]+)$/.exec(request.url ?? '') : null
-      const stepsQuery =
-        request.method === 'GET'
-          ? /^\/v1\/runs\/([^/]+)\/publication-steps$/.exec(request.url ?? '')
-          : null
-      const listQuery =
-        request.method === 'GET' &&
-        (request.url === '/v1/runs' || request.url?.startsWith('/v1/runs?'))
-      if (
-        (request.method !== 'POST' || request.url !== '/v1/store') &&
-        runQuery === null &&
-        stepsQuery === null &&
-        !listQuery
-      ) {
-        sendJson(response, 404, { error: 'not_found' })
-        return
-      }
-      const expectedToken =
-        runQuery !== null || stepsQuery !== null || listQuery ? readToken : token
-      if (request.headers.authorization !== `Bearer ${expectedToken}`) {
-        sendJson(response, 401, { error: 'unauthorized' })
-        return
-      }
-      if (runQuery !== null) {
-        const requestedRunId = runQuery[1]
-        if (requestedRunId === undefined) throw new Error('Run query did not include a run id.')
-        const run = await store.getRun(decodeRunId(requestedRunId))
-        if (run === null) {
-          sendJson(response, 404, { error: 'run_not_found' })
-          return
-        }
-        sendJson(response, 200, { run: observeRun(run) })
-        return
-      }
-      if (stepsQuery !== null) {
-        const requestedRunId = stepsQuery[1]
-        if (requestedRunId === undefined)
-          throw new Error('Publication step query did not include a run id.')
-        const run = await store.getRun(decodeRunId(requestedRunId))
-        if (run === null) {
-          sendJson(response, 404, { error: 'run_not_found' })
-          return
-        }
-        const steps = await store.listPublicationSteps(run.run_id)
-        const summary = steps.map(observePublicationStep)
-        sendJson(response, 200, { run_id: run.run_id, publication_steps: summary })
-        return
-      }
-      if (listQuery) {
-        const url = new URL(request.url ?? '/', 'http://control-plane.local')
-        const listOptions = parseListQuery(url)
-        const { runs, next_cursor } = await store.listRunsPage(listOptions)
-        const observed = runs.map(observeRun)
-        sendJson(response, 200, { runs: observed, next_cursor })
-        return
-      }
-      const body = await readJson(request)
-      if (!isRpcRequest(body)) {
-        sendJson(response, 400, { error: 'invalid_request' })
-        return
-      }
-      const args =
-        body.operation === 'admitReviewRun' &&
-        typeof body.args[0] === 'object' &&
-        body.args[0] !== null
-          ? [{ ...(body.args[0] as Record<string, unknown>), run_id: randomUUID() }]
-          : body.args
-      const runId = typeof body.args[0] === 'string' ? body.args[0] : undefined
-      logEvent('control_plane_operation_started', {
-        operation: body.operation,
-        ...(runId === undefined ? {} : { run_id: runId }),
-        connector_id: store.connectorId
-      })
-      if (body.operation === 'submitPreparedRun') {
-        const [runId, preparationToken, publishContext, input] = args as [
-          string,
-          string,
-          Record<string, unknown>,
-          Record<string, unknown>
-        ]
-        const result = await submitPreparedRun(
-          store,
-          { runId, preparationToken, publishContext, input },
-          submitRunnerRun
-        )
-        logEvent('control_plane_operation_completed', {
-          operation: body.operation,
-          run_id: runId,
-          connector_id: store.connectorId
-        })
-        sendJson(response, 200, { result })
-        return
-      }
-      const method = store[body.operation] as (...operationArgs: unknown[]) => Promise<unknown>
-      const result = await method.apply(store, args)
-      logEvent('control_plane_operation_completed', {
-        operation: body.operation,
-        ...(runId === undefined ? {} : { run_id: runId }),
-        connector_id: store.connectorId
-      })
-      sendJson(response, 200, { result })
-    } catch (error) {
-      // Defense in depth: a Postgres datetime parse error (22007/22008) can only
-      // originate from a bad `from`/`to` filter. Map it to the documented 400
-      // INVALID_QUERY rather than a 500 that would leak the driver message.
-      const pgCode =
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        typeof error.code === 'string'
-          ? error.code
-          : null
-      if (pgCode === '22007' || pgCode === '22008') {
-        sendJson(response, 400, { error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
-        return
-      }
-      const status =
-        typeof error === 'object' &&
-        error !== null &&
-        'statusCode' in error &&
-        typeof error.statusCode === 'number'
-          ? error.statusCode
-          : 500
-      sendJson(response, status, {
-        error: error instanceof Error ? error.message : String(error),
-        code:
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          typeof error.code === 'string'
-            ? error.code
-            : undefined
-      })
+  const app = Fastify({ bodyLimit: MAX_BODY_BYTES })
+
+  // Error/not-found handlers must be registered on the root instance *before* the routes
+  // (and before fastify-openapi-glue registers its child scope), otherwise handler-thrown
+  // errors get Fastify's default envelope instead of the Control Plane error envelope.
+  app.setNotFoundHandler((_request, reply) => {
+    reply.code(404).send({ error: 'not_found' })
+  })
+
+  app.setErrorHandler((error, _request, reply) => {
+    const errorCode =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof error.code === 'string'
+        ? error.code
+        : null
+    // Defense in depth: a Postgres datetime parse error (22007/22008) can only
+    // originate from a bad `from`/`to` filter.
+    if (errorCode === '22007' || errorCode === '22008') {
+      return reply.code(400).send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
     }
+    if (errorCode === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      return reply.code(413).send({ error: 'Request body is too large.' })
+    }
+    if (errorCode === 'FST_ERR_CTP_INVALID_JSON_BODY') {
+      return reply.code(400).send({ error: 'Request body must be valid JSON.' })
+    }
+    const status =
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      typeof error.statusCode === 'number'
+        ? error.statusCode
+        : 500
+    // Only surface codes in the closed set; internal codes (e.g. Postgres SQLSTATE)
+    // must not leak into the envelope, which would also break the OpenAPI enum.
+    const code = errorCode !== null && errorCodeEnum.includes(errorCode) ? errorCode : undefined
+    return reply.code(status).send({
+      error: error instanceof Error ? error.message : String(error),
+      ...(code === undefined ? {} : { code })
+    })
   })
+
+  await registerControlPlaneRoutes(app, { store, serviceToken: token, readToken })
+
   const port = Number.parseInt(process.env.CONTROL_PLANE_PORT || '8090', 10)
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject)
-    server.listen(port, '0.0.0.0', resolve)
-  })
+  await app.listen({ port, host: '0.0.0.0' })
   return {
     close: async () => {
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve()))
-      )
+      await app.close()
       await coordinator.stop()
       await store.close()
     }

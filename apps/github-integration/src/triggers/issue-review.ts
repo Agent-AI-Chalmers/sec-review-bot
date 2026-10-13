@@ -8,7 +8,6 @@ import type { IssueContext } from '../github/issue-service.js'
 import { issueReviewPublishContext } from '../control-plane/publish-context.js'
 import { startIssueReviewRun, type SubmittedIssueReviewRun } from '../reviews/issues/submit.js'
 import type { RepairMode } from '../runner/input.js'
-import { createRunId } from '../reviews/shared/input-bundle.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 
@@ -30,7 +29,6 @@ type IssueReviewControlPlaneClient = {
 interface StartIssueReviewCommandDeps {
   start_review: StartIssueReview
   store: IssueReviewControlPlaneClient
-  create_run_id: typeof createRunId
 }
 
 interface StartIssueReviewCommandArgs {
@@ -58,20 +56,12 @@ export async function startIssueReviewCommand({
   on_admitted,
   deps = {}
 }: StartIssueReviewCommandArgs): Promise<StartedIssueReview> {
-  const {
-    start_review = startIssueReviewRun,
-    store = controlPlaneClient,
-    create_run_id = createRunId
-  } = deps
-  const admission = await admitReviewRun(
-    store,
-    {
-      workflow: 'issue-review',
-      ingress_kind: 'github_webhook',
-      ingress_key: delivery_id
-    },
-    create_run_id
-  )
+  const { start_review = startIssueReviewRun, store = controlPlaneClient } = deps
+  const admission = await admitReviewRun(store, {
+    workflow: 'issue-review',
+    ingress_kind: 'github_webhook',
+    ingress_key: delivery_id
+  })
   on_admitted?.({
     run_id: admission.run_id,
     status: admission.status,

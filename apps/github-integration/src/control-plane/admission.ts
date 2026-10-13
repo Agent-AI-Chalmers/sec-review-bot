@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 import type { WorkflowName as ControlPlaneWorkflow } from '../runner/shapes.js'
 
 interface ReviewRunAdmissionRequest {
@@ -27,7 +25,6 @@ interface StoredAdmission {
 
 export interface ReviewRunAdmissionStore {
   admitReviewRun: (run: {
-    run_id: string
     workflow: ControlPlaneWorkflow
     publish_context: Record<string, never>
     ingress_kind: ReviewRunAdmissionRequest['ingress_kind']
@@ -37,15 +34,14 @@ export interface ReviewRunAdmissionStore {
 
 /**
  * Assigns identity before input preparation so every post-admission failure is
- * queryable. The store resolves ingress replays to the original run identity.
+ * queryable. The store resolves ingress replays to the original run identity, and Control
+ * Plane owns the run id — it generates one on admission and returns it in `record.run_id`.
  */
 export async function admitReviewRun(
   store: ReviewRunAdmissionStore,
-  request: ReviewRunAdmissionRequest,
-  createRunId: () => string = randomUUID
+  request: ReviewRunAdmissionRequest
 ): Promise<AdmittedReviewRun> {
   const admission = await store.admitReviewRun({
-    run_id: createRunId(),
     workflow: request.workflow,
     publish_context: {},
     ingress_kind: request.ingress_kind,

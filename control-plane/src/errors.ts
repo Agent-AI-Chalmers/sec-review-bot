@@ -17,9 +17,6 @@ export type PublicationStepErrorCode =
 
 export class DeterministicControlPlaneError extends Error {
   readonly code: PublicationStepErrorCode
-  // The publication step is in a state that conflicts with the re-claim, not an
-  // internal fault, so it is a 409 Conflict rather than a 500.
-  readonly statusCode = 409
 
   constructor(message: string, code: PublicationStepErrorCode, options: ErrorOptions = {}) {
     super(message, options)

@@ -24,15 +24,6 @@ export function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, '-')
 }
 
-export function createRunId(): string {
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[-:]/g, '')
-    .replace(/\.\d+Z$/, 'Z')
-  const suffix = crypto.randomBytes(4).toString('hex')
-  return `run-${timestamp}-${suffix}`
-}
-
 export async function ensureCleanDirectory(dir_path: string): Promise<void> {
   await fs.rm(dir_path, { recursive: true, force: true })
   await fs.mkdir(dir_path, { recursive: true })

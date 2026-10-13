@@ -1,36 +1,12 @@
-import type { RunnerArtifactStorage, WorkflowName } from '../runner/shapes.js'
+import type { components } from './control-plane-api.js'
 import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
 
+export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
+export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
+export type PublicationWork = components['schemas']['PublicationWork']
+export type PublicationStepRecord = components['schemas']['PublicationStepRecord']
+
 type JsonObject = Record<string, unknown>
-
-export interface CreateReviewRunArgs {
-  run_id: string
-  workflow: WorkflowName
-  publish_context: JsonObject
-  runner_input?: JsonObject
-  ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
-  ingress_key?: string
-}
-
-export interface ReviewRunRecord extends CreateReviewRunArgs {
-  runner_status: string
-  created_at: string
-  published_at: string | null
-  failure_code: string | null
-  failure_message: string | null
-  artifact_storage: RunnerArtifactStorage | null
-}
-
-export interface ReviewRunAdmission {
-  record: ReviewRunRecord
-  created: boolean
-  preparation_token: string | null
-}
-
-export interface PublicationWork extends ReviewRunRecord {
-  workflow_result: unknown
-  claim_token: string
-}
 
 export class ControlPlaneSubmissionError extends Error {
   readonly code: string | null
@@ -40,16 +16,6 @@ export class ControlPlaneSubmissionError extends Error {
     this.name = 'ControlPlaneSubmissionError'
     this.code = code
   }
-}
-
-export interface PublicationStepRecord {
-  step_key: string
-  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-  failure_count: number
-  remote_object_id: string | null
-  remote_object_url: string | null
-  failure_code: string | null
-  failure_message: string | null
 }
 
 function serviceUrl(): string {
@@ -69,34 +35,48 @@ function requestTimeoutMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 30_000
 }
 
+/** The REST error envelope: `{ error: string, code?: string }` (HTTP 400/404/409/500). */
+interface HttpErrorBody {
+  error?: string
+  code?: string
+}
+
 class HttpControlPlaneClient {
   readonly connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
 
-  private async call<T>(operation: string, ...args: unknown[]): Promise<T> {
+  // One HTTP request with auth, timeout, and error/status handling. `nullOn404` maps a 404
+  // to `null` for reads that distinguish "absent" from "error".
+  private async request<T>(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    body?: unknown,
+    nullOn404 = false
+  ): Promise<T> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), requestTimeoutMs())
     timeout.unref?.()
     try {
-      const response = await fetch(`${serviceUrl()}/v1/store`, {
-        method: 'POST',
+      const response = await fetch(`${serviceUrl()}${path}`, {
+        method,
         headers: {
           authorization: `Bearer ${serviceToken()}`,
-          'content-type': 'application/json'
+          ...(body === undefined ? {} : { 'content-type': 'application/json' })
         },
-        body: JSON.stringify({ operation, args }),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: controller.signal
       })
-      const body = (await response.json()) as { result?: T; error?: string; code?: string }
       if (!response.ok) {
+        if (nullOn404 && response.status === 404) return null as T
+        const parsed = (await response.json().catch(() => ({}))) as HttpErrorBody
         throw Object.assign(
-          new Error(body.error ?? `Control Plane returned HTTP ${response.status}.`),
-          { code: body.code ?? null }
+          new Error(parsed.error ?? `Control Plane returned HTTP ${response.status}.`),
+          { code: parsed.code ?? null }
         )
       }
-      return body.result as T
+      return (await response.json()) as T
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw Object.assign(new Error(`Control Plane ${operation} request timed out.`), {
+        throw Object.assign(new Error(`Control Plane ${method} ${path} timed out.`), {
           code: 'CONTROL_PLANE_REQUEST_TIMEOUT',
           cause: error
         })
@@ -113,12 +93,17 @@ class HttpControlPlaneClient {
     return parsePublishContextForWorkflow(run.workflow, context)
   }
 
-  // Admission deliberately persists an empty context: run identity exists
-  // before input preparation discovers the workflow-specific publish target.
-  async admitReviewRun(
-    run: CreateReviewRunArgs & Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
-  ): Promise<ReviewRunAdmission> {
-    return await this.call<ReviewRunAdmission>('admitReviewRun', run)
+  // Admission deliberately persists an empty context: run identity exists before input
+  // preparation discovers the workflow-specific publish target. Control Plane owns the run
+  // id, so `run_id` is omitted here and returned on `record`.
+  async admitReviewRun(run: {
+    workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+    publish_context: JsonObject
+    runner_input?: JsonObject
+    ingress_kind: 'github_webhook' | 'github_actions_dispatch'
+    ingress_key: string
+  }): Promise<ReviewRunAdmission> {
+    return await this.request<ReviewRunAdmission>('POST', '/v1/runs', run)
   }
 
   async submitPreparedRun(
@@ -129,7 +114,11 @@ class HttpControlPlaneClient {
   ): Promise<void> {
     const publishContext = await this.validateContext(runId, context)
     try {
-      await this.call('submitPreparedRun', runId, token, publishContext, input)
+      await this.request('POST', `/v1/runs/${runId}/submission`, {
+        preparation_token: token,
+        publish_context: publishContext,
+        input
+      })
     } catch (error) {
       const code =
         error instanceof Error && 'code' in error && typeof error.code === 'string'
@@ -145,24 +134,26 @@ class HttpControlPlaneClient {
   // Status queries must expose preparing runs whose publish context is not ready.
   // Publication claims below remain the strict persisted-context boundary.
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
-    return await this.call<ReviewRunRecord | null>('getRun', runId)
+    return await this.request<ReviewRunRecord>('GET', `/v1/internal/runs/${runId}`, undefined, true)
   }
 
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
-    return await this.call('renewPreparationClaim', runId, token)
+    return await this.request<boolean>('POST', `/v1/runs/${runId}/preparation/claim`, { token })
   }
 
   async preparationHeartbeatIntervalMs(): Promise<number> {
-    return await this.call('preparationHeartbeatIntervalMs')
+    return await this.request<number>('GET', '/v1/config/preparation-heartbeat-interval')
   }
 
   /**
    * Claim the next publishable run, optionally asking Control Plane to hold the request
-   * until one appears. The wait is served where the state lives, so it costs Control
-   * Plane one indexed query per tick instead of a request per poll interval.
+   * until one appears. The wait is served where the state lives, so it costs Control Plane
+   * one indexed query per tick instead of a request per poll interval.
    */
   async claimNextPublication(waitMs = 0): Promise<PublicationWork | null> {
-    const work = await this.call<PublicationWork | null>('claimNextPublication', waitMs)
+    const work = await this.request<PublicationWork | null>('POST', '/v1/publication/claims/next', {
+      wait_ms: waitMs
+    })
     if (work === null) return null
     try {
       return {
@@ -170,9 +161,9 @@ class HttpControlPlaneClient {
         publish_context: parsePublishContextForWorkflow(work.workflow, work.publish_context)
       }
     } catch (error) {
-      // Validation happens after the durable claim because connector-specific
-      // context does not belong in Control Plane. A corrupt record must still
-      // consume that claim into a terminal failure instead of timing out forever.
+      // Validation happens after the durable claim because connector-specific context does
+      // not belong in Control Plane. A corrupt record must still consume that claim into a
+      // terminal failure instead of timing out forever.
       await this.failPublication(
         work.run_id,
         work.claim_token,
@@ -190,63 +181,87 @@ class HttpControlPlaneClient {
   }
 
   async renewPublicationClaim(runId: string, token: string): Promise<boolean> {
-    return await this.call('renewPublicationClaim', runId, token)
+    return await this.request<boolean>('POST', `/v1/runs/${runId}/publication/claim`, { token })
   }
 
   async publicationHeartbeatIntervalMs(): Promise<number> {
-    return await this.call('publicationHeartbeatIntervalMs')
+    return await this.request<number>('GET', '/v1/config/publication-heartbeat-interval')
   }
 
-  async initializePublicationSteps(runId: string, token: string, keys: string[]): Promise<void> {
-    await this.call('initializePublicationSteps', runId, token, keys)
+  async initializePublicationSteps(
+    runId: string,
+    token: string,
+    stepKeys: string[]
+  ): Promise<void> {
+    await this.request('POST', `/v1/runs/${runId}/publication/steps`, {
+      token,
+      step_keys: stepKeys
+    })
   }
 
   async listPublicationSteps(runId: string): Promise<PublicationStepRecord[]> {
-    return await this.call('listPublicationSteps', runId)
+    return await this.request<PublicationStepRecord[]>(
+      'GET',
+      `/v1/internal/runs/${runId}/publication/steps`
+    )
   }
 
-  async requirePublicationStepClaim(runId: string, token: string, key: string): Promise<void> {
-    await this.call('requirePublicationStepClaim', runId, token, key)
+  async requirePublicationStepClaim(runId: string, token: string, stepKey: string): Promise<void> {
+    await this.request('POST', `/v1/runs/${runId}/publication/steps/${stepKey}/claim`, { token })
   }
 
   async completePublicationStep(
     runId: string,
     token: string,
-    key: string,
+    stepKey: string,
     remote: { id?: string | number | null; url?: string | null } = {}
   ): Promise<boolean> {
-    return await this.call('completePublicationStep', runId, token, key, remote)
+    return await this.request<boolean>(
+      'POST',
+      `/v1/runs/${runId}/publication/steps/${stepKey}/complete`,
+      { token, remote_object: remote }
+    )
   }
 
   async failPublicationStep(
     runId: string,
     token: string,
-    key: string,
-    error: { code?: string | null; message: string },
+    stepKey: string,
+    failure: { code?: string | null; message: string },
     options: { retry?: boolean } = {}
   ): Promise<boolean> {
-    return await this.call('failPublicationStep', runId, token, key, error, options)
+    return await this.request<boolean>(
+      'POST',
+      `/v1/runs/${runId}/publication/steps/${stepKey}/fail`,
+      { token, failure, ...(options.retry === undefined ? {} : { retry: options.retry }) }
+    )
   }
 
   async completePublication(runId: string, token: string): Promise<boolean> {
-    return await this.call('completePublication', runId, token)
+    return await this.request<boolean>('POST', `/v1/runs/${runId}/publication/complete`, {
+      token
+    })
   }
 
   async failPublication(
     runId: string,
     token: string,
-    error: { code?: string | null; message: string },
+    failure: { code?: string | null; message: string },
     options: { retry: boolean }
   ): Promise<boolean> {
-    return await this.call('failPublication', runId, token, error, options)
+    return await this.request<boolean>('POST', `/v1/runs/${runId}/publication/fail`, {
+      token,
+      failure,
+      retry: options.retry
+    })
   }
 
   async failPreparation(
     runId: string,
     token: string,
-    error: { code?: string | null; message: string }
+    failure: { code?: string | null; message: string }
   ): Promise<void> {
-    await this.call('failPreparation', runId, token, error)
+    await this.request('DELETE', `/v1/runs/${runId}/preparation/claim`, { token, failure })
   }
 }
 

@@ -76,7 +76,6 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
     event_type: 'opened',
     delivery_id: 'delivery-issue-1',
     deps: {
-      create_run_id: () => 'run-issue-1',
       start_review: async ({
         issue: submittedIssue,
         run_id,
@@ -103,7 +102,11 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         ...preparationClaim,
         admitReviewRun: (run) => {
           transitions.push(['preparing', run])
-          return { record: run, created: true, preparation_token: 'claim' } as never
+          return {
+            record: { ...run, run_id: 'run-issue-1' },
+            created: true,
+            preparation_token: 'claim'
+          } as never
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
@@ -118,7 +121,6 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
       'preparing',
       {
         workflow: 'issue-review',
-        run_id: 'run-issue-1',
         publish_context: {},
         ingress_kind: 'github_webhook',
         ingress_key: 'delivery-issue-1'
@@ -154,7 +156,6 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
     delivery_id: 'delivery-pr-1',
     repair_mode: 'no-test-changes',
     deps: {
-      create_run_id: () => 'run-pr-1',
       start_review: async ({ pr: submittedPr, run_id, event_type, repair_mode, on_prepared }) => {
         assert.equal(run_id, 'run-pr-1')
         assert.equal(event_type, 'manual_review')
@@ -173,7 +174,11 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         ...preparationClaim,
         admitReviewRun: (run) => {
           transitions.push(['preparing', run])
-          return { record: run, created: true, preparation_token: 'claim' } as never
+          return {
+            record: { ...run, run_id: 'run-pr-1' },
+            created: true,
+            preparation_token: 'claim'
+          } as never
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
@@ -188,7 +193,6 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
       'preparing',
       {
         workflow: 'pull-request-review',
-        run_id: 'run-pr-1',
         publish_context: {},
         ingress_kind: 'github_webhook',
         ingress_key: 'delivery-pr-1'
@@ -225,7 +229,6 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
       event_type: 'opened',
       delivery_id: 'delivery-pr-failed',
       deps: {
-        create_run_id: () => 'run-pr-failed',
         start_review: async ({ run_id }) => {
           assert.equal(run_id, 'run-pr-failed')
           throw new Error('workspace clone failed')
@@ -234,7 +237,11 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
           ...preparationClaim,
           admitReviewRun: (run) => {
             transitions.push(['preparing', run])
-            return { record: run, created: true, preparation_token: 'claim' } as never
+            return {
+              record: { ...run, run_id: 'run-pr-failed' },
+              created: true,
+              preparation_token: 'claim'
+            } as never
           },
           submitPreparedRun: () => assert.fail('failed review must not be queued'),
           failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
@@ -249,7 +256,6 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
       'preparing',
       {
         workflow: 'pull-request-review',
-        run_id: 'run-pr-failed',
         publish_context: {},
         ingress_kind: 'github_webhook',
         ingress_key: 'delivery-pr-failed'
@@ -273,7 +279,6 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
       event_type: 'opened',
       delivery_id: 'delivery-uncertain',
       deps: {
-        create_run_id: () => 'run-uncertain',
         start_review: async (args) => {
           args.on_prepared?.(
             {
@@ -291,7 +296,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, runner_status: 'preparing' },
+              record: { ...run, run_id: 'run-uncertain', runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             }) as never,
@@ -322,7 +327,6 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
       event_type: 'opened',
       delivery_id: 'delivery-pr-uncertain',
       deps: {
-        create_run_id: () => 'run-pr-uncertain',
         start_review: async (args) => {
           args.on_prepared?.(
             {
@@ -340,7 +344,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, runner_status: 'preparing' },
+              record: { ...run, run_id: 'run-pr-uncertain', runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             }) as never,
@@ -370,14 +374,13 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
         throw new Error('GitHub PR lookup failed')
       },
       deps: {
-        create_run_id: () => 'run-context-failure',
         start_review: async () => assert.fail('review must not start without PR context'),
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', run.run_id])
+            transitions.push(['preparing', 'run-context-failure'])
             return {
-              record: { ...run, runner_status: 'preparing' },
+              record: { ...run, run_id: 'run-context-failure', runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             } as never
@@ -409,7 +412,6 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
     event_type: 'opened',
     delivery_id: 'delivery-1',
     deps: {
-      create_run_id: () => 'run-new',
       start_review: async () => {
         starts += 1
         throw new Error('replayed delivery must not start')
@@ -439,7 +441,6 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
     event_type: 'opened',
     delivery_id: 'delivery-issue-1',
     deps: {
-      create_run_id: () => 'run-unused',
       start_review: async () => {
         starts += 1
         throw new Error('replayed delivery must not start')

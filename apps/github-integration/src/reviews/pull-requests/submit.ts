@@ -89,7 +89,7 @@ async function materializePullRequestReviewInput({
   event_type,
   repair_mode = null
 }: {
-  run_id?: string
+  run_id: string
   octokit: unknown
   pr: PullRequestContext
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
@@ -131,7 +131,7 @@ async function materializePullRequestReviewInput({
   })
 
   const prepared = await preparePullRequestReviewInput({
-    ...(run_id ? { run_id } : {}),
+    run_id,
     octokit: octokit as GitHubAppOctokit,
     pr,
     files,
@@ -169,7 +169,7 @@ async function materializePullRequestReviewInput({
 }
 
 export async function startPullRequestReviewRun(args: {
-  run_id?: string
+  run_id: string
   octokit: unknown
   pr: PullRequestContext
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'

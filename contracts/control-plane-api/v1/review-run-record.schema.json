@@ -2,7 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sec-review-bot.local/contracts/control-plane-api/v1/review-run-record.schema.json",
   "type": "object",
-  "additionalProperties": false,
   "required": [
     "run_id",
     "workflow",
@@ -23,44 +22,98 @@
       "minLength": 1
     },
     "workflow": {
-      "enum": [
-        "issue-review",
-        "pull-request-review",
-        "repository-review"
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "issue-review"
+        },
+        {
+          "type": "string",
+          "const": "pull-request-review"
+        },
+        {
+          "type": "string",
+          "const": "repository-review"
+        }
       ]
     },
     "publish_context": {
-      "type": "object"
+      "type": "object",
+      "patternProperties": {
+        "^.*$": {}
+      }
     },
     "runner_input": {
-      "type": "object"
+      "type": "object",
+      "patternProperties": {
+        "^.*$": {}
+      }
     },
     "ingress_kind": {
-      "enum": [
-        "github_webhook",
-        "github_actions_dispatch"
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "github_webhook"
+        },
+        {
+          "type": "string",
+          "const": "github_actions_dispatch"
+        }
       ]
     },
     "ingress_key": {
       "type": "string"
     },
     "runner_status": {
-      "enum": [
-        "preparing",
-        "recovering",
-        "queued",
-        "running",
-        "succeeded",
-        "failed"
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "preparing"
+        },
+        {
+          "type": "string",
+          "const": "recovering"
+        },
+        {
+          "type": "string",
+          "const": "queued"
+        },
+        {
+          "type": "string",
+          "const": "running"
+        },
+        {
+          "type": "string",
+          "const": "succeeded"
+        },
+        {
+          "type": "string",
+          "const": "failed"
+        }
       ]
     },
     "publication_status": {
-      "enum": [
-        "pending",
-        "publishing",
-        "published",
-        "failed",
-        "skipped"
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "pending"
+        },
+        {
+          "type": "string",
+          "const": "publishing"
+        },
+        {
+          "type": "string",
+          "const": "published"
+        },
+        {
+          "type": "string",
+          "const": "failed"
+        },
+        {
+          "type": "string",
+          "const": "skipped"
+        }
       ]
     },
     "created_at": {
@@ -76,40 +129,57 @@
       "format": "date-time"
     },
     "published_at": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "format": "date-time"
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "failure_code": {
-      "type": [
-        "string",
-        "null"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "failure_message": {
-      "type": [
-        "string",
-        "null"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "artifact_storage": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "null"
         },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": [
             "status"
           ],
           "properties": {
             "status": {
-              "enum": [
-                "unavailable",
-                "failed"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "unavailable"
+                },
+                {
+                  "type": "string",
+                  "const": "failed"
+                }
               ]
             },
             "error_code": {
@@ -118,22 +188,22 @@
             "message": {
               "type": "string"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": [
             "status",
             "artifact"
           ],
           "properties": {
             "status": {
+              "type": "string",
               "const": "available"
             },
             "artifact": {
               "type": "object",
-              "additionalProperties": false,
               "required": [
                 "kind",
                 "uri",
@@ -143,6 +213,7 @@
               ],
               "properties": {
                 "kind": {
+                  "type": "string",
                   "const": "diagnostic_bundle"
                 },
                 "uri": {
@@ -150,6 +221,7 @@
                   "pattern": "^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
                 },
                 "media_type": {
+                  "type": "string",
                   "const": "application/tar+zstd"
                 },
                 "digest": {
@@ -160,11 +232,14 @@
                   "type": "integer",
                   "minimum": 0
                 }
-              }
+              },
+              "additionalProperties": false
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     }
-  }
+  },
+  "additionalProperties": false
 }

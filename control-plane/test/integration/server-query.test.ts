@@ -55,26 +55,34 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const invalidLimit = await fetch(`${base}/v1/runs?limit=10junk`, { headers: readAuth })
     assert.equal(invalidLimit.status, 400)
 
+    // The write surface now speaks REST: a malformed admission body is a 400 from Fastify's
+    // schema validation (auth aside), not a JSON-RPC protocol error.
+    const missingWorkflow = await fetch(`${base}/v1/runs`, {
+      method: 'POST',
+      headers: mutationAuth,
+      body: JSON.stringify({
+        publish_context: { secret: 'must-not-leak' },
+        ingress_kind: 'github_webhook',
+        ingress_key: 'delivery:missing-workflow'
+      })
+    })
+    assert.equal(missingWorkflow.status, 400)
+
     const runIds: string[] = []
     for (const ingressKey of [`delivery:${randomUUID()}`, `delivery:${randomUUID()}`]) {
-      const admitted = await fetch(`${base}/v1/store`, {
+      const admitted = await fetch(`${base}/v1/runs`, {
         method: 'POST',
         headers: mutationAuth,
         body: JSON.stringify({
-          operation: 'admitReviewRun',
-          args: [
-            {
-              workflow: 'issue-review',
-              ingress_kind: 'github_webhook',
-              ingress_key: ingressKey,
-              publish_context: { secret: 'must-not-leak' }
-            }
-          ]
+          workflow: 'issue-review',
+          ingress_kind: 'github_webhook',
+          ingress_key: ingressKey,
+          publish_context: { secret: 'must-not-leak' }
         })
       })
       assert.equal(admitted.status, 200)
-      const body = (await admitted.json()) as { result: { record: { run_id: string } } }
-      runIds.push(body.result.record.run_id)
+      const body = (await admitted.json()) as { record: { run_id: string } }
+      runIds.push(body.record.run_id)
     }
 
     const detail = await fetch(`${base}/v1/runs/${runIds[0]}`, { headers: readAuth })

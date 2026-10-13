@@ -3,51 +3,30 @@ import { Pool, type PoolClient } from 'pg'
 
 import type { ControlPlaneWorkflow as WorkflowName, RunnerArtifactStorage } from './contracts.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
-import { DeterministicControlPlaneError } from './errors.js'
+import { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } from './errors.js'
+import {
+  normalizeArtifactStorage,
+  type CreateReviewRunArgs,
+  type PublicationStatus,
+  type PublicationStepRecord,
+  type PublicationWork,
+  type ReviewRunAdmission,
+  type ReviewRunRecord,
+  type RunnerStatus
+} from './shapes.js'
+
+export type {
+  CreateReviewRunArgs,
+  PublicationStatus,
+  PublicationStepRecord,
+  PublicationWork,
+  ReviewRunAdmission,
+  ReviewRunRecord,
+  RunnerStatus
+} from './shapes.js'
 
 type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject
-export type RunnerStatus =
-  'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
-
-export interface CreateReviewRunArgs {
-  run_id: string
-  workflow: WorkflowName
-  publish_context: JsonObject
-  runner_input?: JsonObject
-  ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
-  ingress_key?: string
-}
-export interface ReviewRunAdmission {
-  record: ReviewRunRecord
-  created: boolean
-  preparation_token: string | null
-}
-export interface ReviewRunRecord extends CreateReviewRunArgs {
-  runner_status: RunnerStatus
-  publication_status: PublicationStatus
-  created_at: string
-  execution_updated_at: string
-  publication_updated_at: string
-  published_at: string | null
-  failure_code: string | null
-  failure_message: string | null
-  artifact_storage: RunnerArtifactStorage | null
-}
-export interface PublicationWork extends ReviewRunRecord {
-  workflow_result: unknown
-  claim_token: string
-}
-export interface PublicationStepRecord {
-  step_key: string
-  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-  failure_count: number
-  remote_object_id: string | null
-  remote_object_url: string | null
-  failure_code: string | null
-  failure_message: string | null
-}
 
 interface ReviewRunRow {
   run_id: string
@@ -113,7 +92,7 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     failure_message: publicationFailure
       ? row.publication_failure_message
       : row.runner_failure_message,
-    artifact_storage: row.artifact_storage,
+    artifact_storage: normalizeArtifactStorage(row.artifact_storage),
     ...(row.ingress_kind ? { ingress_kind: row.ingress_kind } : {}),
     ...(row.ingress_key ? { ingress_key: row.ingress_key } : {})
   }
@@ -743,7 +722,7 @@ export class ReviewRunStore {
     if (uniqueKeys.length !== stepKeys.length)
       throw new DeterministicControlPlaneError(
         `Publication ${runId} contains duplicate step keys.`,
-        'PUBLICATION_STEP_SET_DUPLICATE'
+        PUBLICATION_STEP_ERROR_CODES.set_duplicate
       )
     await transaction(this.pool, async (client) => {
       const owner = await client.query(
@@ -781,7 +760,7 @@ export class ReviewRunStore {
       if (JSON.stringify(persisted) !== JSON.stringify(uniqueKeys)) {
         throw new DeterministicControlPlaneError(
           `Publication step set changed for run ${runId}.`,
-          'PUBLICATION_STEP_SET_CHANGED'
+          PUBLICATION_STEP_ERROR_CODES.set_changed
         )
       }
     })
@@ -842,12 +821,12 @@ export class ReviewRunStore {
     if (step?.status === 'terminal_failed') {
       throw new DeterministicControlPlaneError(
         `Publication step exhausted its retry budget: ${stepKey}`,
-        'PUBLICATION_STEP_RETRY_EXHAUSTED'
+        PUBLICATION_STEP_ERROR_CODES.retry_exhausted
       )
     }
     throw new DeterministicControlPlaneError(
       `Publication step is not claimable: ${stepKey}`,
-      'PUBLICATION_STEP_NOT_CLAIMABLE'
+      PUBLICATION_STEP_ERROR_CODES.not_claimable
     )
   }
   async completePublicationStep(

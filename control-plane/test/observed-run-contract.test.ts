@@ -1,10 +1,9 @@
-// The value-level half of the observed-run contract.
+// The value-level check of the observed-run contract.
 //
-// `observed-run-contract-types.ts` compares key sets, which catches fields that are added,
-// removed, or renamed. It cannot see a value that stays inside the same field: the status
-// vocabulary, a digest pattern, or a required-versus-optional change. This test covers that
-// half by running a real JSON Schema validator over the shared fixtures, and by validating
-// what `observeRun()` actually returns.
+// The type and the schema now share one TypeBox source (`src/shapes.ts`), so they cannot
+// drift apart by construction. This test covers what that cannot see: that the producer's
+// own output actually satisfies the schema, and that the shared fixtures match or violate
+// it exactly as the manifest claims, by running a real JSON Schema validator.
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'

@@ -1,0 +1,1186 @@
+openapi: 3.1.0
+info:
+  title: Control Plane
+  version: v1
+  description: |
+    Control Plane coordination API. The read surface (runs listing/detail) is
+    consumed by the console; the write surface (admission, submission, publication)
+    and the internal full reads are consumed by the GitHub integration. This document
+    is the single source of truth: routes, validation, and client types are all derived
+    from it.
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: Mutation and internal full-read access (GitHub integration).
+    readToken:
+      type: http
+      scheme: bearer
+      description: Redacted read access (console).
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum:
+            - INVALID_QUERY
+            - PUBLICATION_STEP_SET_DUPLICATE
+            - PUBLICATION_STEP_SET_CHANGED
+            - PUBLICATION_STEP_RETRY_EXHAUSTED
+            - PUBLICATION_STEP_NOT_CLAIMABLE
+    ReviewRunRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - publish_context
+        - runner_status
+        - publication_status
+        - created_at
+        - execution_updated_at
+        - publication_updated_at
+        - published_at
+        - failure_code
+        - failure_message
+        - artifact_storage
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        publish_context:
+          type: object
+          additionalProperties: {}
+        runner_input:
+          type: object
+          additionalProperties: {}
+        ingress_kind:
+          type: string
+          enum:
+            - github_webhook
+            - github_actions_dispatch
+        ingress_key:
+          type: string
+        runner_status:
+          type: string
+          enum:
+            - preparing
+            - recovering
+            - queued
+            - running
+            - succeeded
+            - failed
+        publication_status:
+          type: string
+          enum:
+            - pending
+            - publishing
+            - published
+            - failed
+            - skipped
+        created_at:
+          type: string
+          format: date-time
+        execution_updated_at:
+          type: string
+          format: date-time
+        publication_updated_at:
+          type: string
+          format: date-time
+        published_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - unavailable
+                    - failed
+                error_code:
+                  type: string
+                message:
+                  type: string
+            - type: object
+              additionalProperties: false
+              required:
+                - status
+                - artifact
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - available
+                artifact:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - kind
+                    - uri
+                    - media_type
+                    - digest
+                    - size_bytes
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                        - diagnostic_bundle
+                    uri:
+                      type: string
+                      pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
+                    media_type:
+                      type: string
+                      enum:
+                        - application/tar+zstd
+                    digest:
+                      type: string
+                      pattern: ^sha256:[0-9a-f]{64}$
+                    size_bytes:
+                      type: integer
+                      minimum: 0
+            - type: "null"
+    ReviewRunAdmission:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - created
+        - preparation_token
+      properties:
+        record:
+          $ref: "#/components/schemas/ReviewRunRecord"
+        created:
+          type: boolean
+        preparation_token:
+          type:
+            - string
+            - "null"
+    PublicationWork:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - publish_context
+        - runner_status
+        - publication_status
+        - created_at
+        - execution_updated_at
+        - publication_updated_at
+        - published_at
+        - failure_code
+        - failure_message
+        - artifact_storage
+        - workflow_result
+        - claim_token
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        publish_context:
+          type: object
+          additionalProperties: {}
+        runner_input:
+          type: object
+          additionalProperties: {}
+        ingress_kind:
+          type: string
+          enum:
+            - github_webhook
+            - github_actions_dispatch
+        ingress_key:
+          type: string
+        runner_status:
+          type: string
+          enum:
+            - preparing
+            - recovering
+            - queued
+            - running
+            - succeeded
+            - failed
+        publication_status:
+          type: string
+          enum:
+            - pending
+            - publishing
+            - published
+            - failed
+            - skipped
+        created_at:
+          type: string
+          format: date-time
+        execution_updated_at:
+          type: string
+          format: date-time
+        publication_updated_at:
+          type: string
+          format: date-time
+        published_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - unavailable
+                    - failed
+                error_code:
+                  type: string
+                message:
+                  type: string
+            - type: object
+              additionalProperties: false
+              required:
+                - status
+                - artifact
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - available
+                artifact:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - kind
+                    - uri
+                    - media_type
+                    - digest
+                    - size_bytes
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                        - diagnostic_bundle
+                    uri:
+                      type: string
+                      pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
+                    media_type:
+                      type: string
+                      enum:
+                        - application/tar+zstd
+                    digest:
+                      type: string
+                      pattern: ^sha256:[0-9a-f]{64}$
+                    size_bytes:
+                      type: integer
+                      minimum: 0
+            - type: "null"
+        workflow_result:
+          type: object
+        claim_token:
+          type: string
+          minLength: 1
+    PublicationStepRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - step_key
+        - status
+        - failure_count
+        - remote_object_id
+        - remote_object_url
+        - failure_code
+        - failure_message
+      properties:
+        step_key:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - terminal_failed
+        failure_count:
+          type: integer
+          minimum: 0
+        remote_object_id:
+          type:
+            - string
+            - "null"
+        remote_object_url:
+          type:
+            - string
+            - "null"
+          format: uri
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+
+    ObservedPublicationStep:
+      type: object
+      additionalProperties: false
+      required:
+        - step_key
+        - status
+        - failure_count
+        - remote_object_url
+        - failure_code
+        - failure_message
+      properties:
+        step_key:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - terminal_failed
+        failure_count:
+          type: integer
+          minimum: 0
+        remote_object_url:
+          type:
+            - string
+            - "null"
+          format: uri
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+
+    ObservedRun:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - execution_status
+        - publication_status
+        - created_at
+        - execution_updated_at
+        - publication_updated_at
+        - published_at
+        - failure_code
+        - artifact_storage
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        execution_status:
+          type: string
+          enum:
+            - preparing
+            - recovering
+            - queued
+            - running
+            - succeeded
+            - failed
+        publication_status:
+          type: string
+          enum:
+            - pending
+            - publishing
+            - published
+            - failed
+            - skipped
+        created_at:
+          type: string
+          format: date-time
+        execution_updated_at:
+          type: string
+          format: date-time
+        publication_updated_at:
+          type: string
+          format: date-time
+        published_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          oneOf:
+            - type: "null"
+            - type: object
+              additionalProperties: false
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - unavailable
+                    - failed
+                error_code:
+                  type: string
+                message:
+                  type: string
+            - type: object
+              additionalProperties: false
+              required:
+                - status
+                - artifact
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - available
+                artifact:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - kind
+                    - uri
+                    - media_type
+                    - digest
+                    - size_bytes
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                        - diagnostic_bundle
+                    uri:
+                      type: string
+                      pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
+                    media_type:
+                      type: string
+                      enum:
+                        - application/tar+zstd
+                    digest:
+                      type: string
+                      pattern: ^sha256:[0-9a-f]{64}$
+                    size_bytes:
+                      type: integer
+                      minimum: 0
+        publication_steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObservedPublicationStep"
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: Process health.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+  /v1/runs:
+    get:
+      operationId: listRuns
+      security:
+        - readToken: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: query
+          name: execution_status
+          schema:
+            type: string
+        - in: query
+          name: publication_status
+          schema:
+            type: string
+        - in: query
+          name: workflow
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+        - in: query
+          name: to
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated redacted runs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - runs
+                  - next_cursor
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ObservedRun"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "400":
+          $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: admitRun
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - workflow
+                - publish_context
+                - ingress_kind
+                - ingress_key
+              properties:
+                workflow:
+                  type: string
+                  enum:
+                    - issue-review
+                    - pull-request-review
+                    - repository-review
+                publish_context:
+                  type: object
+                  additionalProperties: {}
+                runner_input:
+                  type: object
+                  additionalProperties: {}
+                ingress_kind:
+                  type: string
+                  enum:
+                    - github_webhook
+                    - github_actions_dispatch
+                ingress_key:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: The admitted (or re-admitted) run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunAdmission"
+  /v1/runs/{runId}:
+    get:
+      operationId: getRun
+      security:
+        - readToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Redacted run detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run
+                properties:
+                  run:
+                    $ref: "#/components/schemas/ObservedRun"
+        "404":
+          $ref: "#/components/schemas/ErrorResponse"
+  /v1/runs/{runId}/publication-steps:
+    get:
+      operationId: listRunPublicationSteps
+      security:
+        - readToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Redacted publication-step summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run_id
+                  - publication_steps
+                properties:
+                  run_id:
+                    type: string
+                  publication_steps:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ObservedPublicationStep"
+        "404":
+          $ref: "#/components/schemas/ErrorResponse"
+  /v1/runs/{runId}/submission:
+    post:
+      operationId: submitPreparedRun
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - preparation_token
+                - publish_context
+                - input
+              properties:
+                preparation_token:
+                  type: string
+                  minLength: 1
+                publish_context:
+                  type: object
+                  additionalProperties: {}
+                input:
+                  type: object
+                  additionalProperties: {}
+      responses:
+        "200":
+          description: Queued acknowledgement.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run_id
+                  - workflow
+                  - status
+                properties:
+                  run_id:
+                    type: string
+                  workflow:
+                    type: string
+                    enum:
+                      - issue-review
+                      - pull-request-review
+                      - repository-review
+                  status:
+                    type: string
+                    enum:
+                      - queued
+  /v1/runs/{runId}/preparation/claim:
+    post:
+      operationId: renewPreparationClaim
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether the claim was renewed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+    delete:
+      operationId: failPreparation
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+      responses:
+        "200":
+          description: Fail acknowledgement (empty).
+  /v1/publication/claims/next:
+    post:
+      operationId: claimNextPublication
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                wait_ms:
+                  type: integer
+                  minimum: 0
+      responses:
+        "200":
+          description: The claimed publication work, or null if none.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PublicationWork"
+                  - type: "null"
+  /v1/runs/{runId}/publication/claim:
+    post:
+      operationId: renewPublicationClaim
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether the claim was renewed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+  /v1/runs/{runId}/publication/steps:
+    post:
+      operationId: initializePublicationSteps
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - step_keys
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                step_keys:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+      responses:
+        "200":
+          description: Initialization acknowledgement (empty).
+  /v1/runs/{runId}/publication/steps/{stepKey}/claim:
+    post:
+      operationId: requirePublicationStepClaim
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stepKey
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Claim acknowledgement (empty).
+  /v1/runs/{runId}/publication/steps/{stepKey}/complete:
+    post:
+      operationId: completePublicationStep
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stepKey
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                remote_object:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id:
+                      oneOf:
+                        - type: string
+                        - type: number
+                        - type: "null"
+                    url:
+                      type:
+                        - string
+                        - "null"
+      responses:
+        "200":
+          description: Whether the step completed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+  /v1/runs/{runId}/publication/steps/{stepKey}/fail:
+    post:
+      operationId: failPublicationStep
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stepKey
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+                retry:
+                  type: boolean
+      responses:
+        "200":
+          description: Whether the step failed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+  /v1/runs/{runId}/publication/complete:
+    post:
+      operationId: completePublication
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether publication completed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+  /v1/runs/{runId}/publication/fail:
+    post:
+      operationId: failPublication
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+                - retry
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+                retry:
+                  type: boolean
+      responses:
+        "200":
+          description: Whether publication failed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+  /v1/internal/runs/{runId}:
+    get:
+      operationId: getInternalRun
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full run record (includes runner_input/publish_context).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunRecord"
+        "404":
+          $ref: "#/components/schemas/ErrorResponse"
+  /v1/internal/runs/{runId}/publication/steps:
+    get:
+      operationId: listInternalPublicationSteps
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full publication-step records.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicationStepRecord"
+        "404":
+          $ref: "#/components/schemas/ErrorResponse"
+  /v1/config/preparation-heartbeat-interval:
+    get:
+      operationId: getPreparationHeartbeatInterval
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: Preparation heartbeat interval in milliseconds.
+          content:
+            application/json:
+              schema:
+                type: integer
+  /v1/config/publication-heartbeat-interval:
+    get:
+      operationId: getPublicationHeartbeatInterval
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: Publication heartbeat interval in milliseconds.
+          content:
+            application/json:
+              schema:
+                type: integer
+
