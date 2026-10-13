@@ -5,11 +5,11 @@ ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
     npm_config_registry=${NPM_CONFIG_REGISTRY}
 
 WORKDIR /app
-COPY apps/control-plane-ui/package.json apps/control-plane-ui/pnpm-lock.yaml apps/control-plane-ui/pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable pnpm \
     && pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
     && pnpm install --frozen-lockfile
-COPY apps/control-plane-ui/ ./
+COPY . ./
 RUN pnpm run build
 RUN pnpm deploy --filter . --prod /app/prod
 
