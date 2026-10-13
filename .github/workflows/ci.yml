@@ -198,20 +198,6 @@ jobs:
       github.event_name == 'merge_group' ||
       needs.changes.outputs.github-integration == 'true'
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-bookworm
-        env:
-          POSTGRES_DB: sec_review_bot_test
-          POSTGRES_USER: sec_review_bot
-          POSTGRES_PASSWORD: ci-test-password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U sec_review_bot -d sec_review_bot_test"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
     defaults:
       run:
         working-directory: apps/github-integration
