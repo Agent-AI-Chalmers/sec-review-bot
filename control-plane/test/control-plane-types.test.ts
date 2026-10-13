@@ -53,7 +53,12 @@ test('the generated types still describe the shapes the client depends on', asyn
   // client reads are present rather than only that the file matches.
   const generated = readFileSync(OUTPUT_PATH, 'utf8')
 
-  for (const name of ['ReviewRunRecord', 'ReviewRunAdmission', 'PublicationWork', 'PublicationStepRecord']) {
+  for (const name of [
+    'ReviewRunRecord',
+    'ReviewRunAdmission',
+    'PublicationWork',
+    'PublicationStepRecord'
+  ]) {
     assert.ok(generated.includes(name), `${name} is missing from the generated types`)
   }
 })

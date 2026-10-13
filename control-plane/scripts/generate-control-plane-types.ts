@@ -57,8 +57,7 @@ export const ERROR_CODES_PATH = path.resolve(CONTROL_PLANE_ROOT, 'src', 'error-c
 /** Pull the `PUBLICATION_STEP_*` members out of the contract's ErrorResponse.code enum. */
 export function publicationStepCodes(spec: OpenAPI3): string[] {
   const codeSchema = spec.components?.schemas?.ErrorResponse as
-    | { properties?: { code?: { enum?: (string | number)[] } } }
-    | undefined
+    { properties?: { code?: { enum?: (string | number)[] } } } | undefined
   const values = codeSchema?.properties?.code?.enum ?? []
   return values
     .filter((value): value is string => typeof value === 'string')
@@ -88,7 +87,11 @@ export const PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT = [\n${array}\n] as cons
 // The server's projection of the contract's domain shapes. The hand-written openapi.yaml owns
 // the shapes; this file re-exports them under the names the server already uses, so the server
 // derives its types from the contract instead of a parallel hand-written TypeBox schema.
-export const CONTRACT_TYPES_PATH = path.resolve(CONTROL_PLANE_ROOT, 'src', 'contract-types-generated.ts')
+export const CONTRACT_TYPES_PATH = path.resolve(
+  CONTROL_PLANE_ROOT,
+  'src',
+  'contract-types-generated.ts'
+)
 
 const SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
   ['ReviewRunRecord', 'ReviewRunRecord'],

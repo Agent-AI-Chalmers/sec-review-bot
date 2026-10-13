@@ -37,47 +37,43 @@ test('repository preparation can replace the admitted empty publish context', as
     else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
   })
 
-  t.mock.method(
-    globalThis,
-    'fetch',
-    async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input)
-      if (url.endsWith('/v1/runs') && init?.method === 'POST') {
-        return Response.json({
-          record: preparingRun,
-          created: true,
-          preparation_token: 'preparation-token'
-        })
-      }
-      if (url.endsWith('/v1/internal/runs/run-1') && init?.method === 'GET') {
-        return Response.json(preparingRun)
-      }
-      if (url.endsWith('/v1/runs/run-1/submission') && init?.method === 'POST') {
-        assert.deepEqual(sentBody(init).publish_context, {
-          repo: {
-            owner_login: 'octo',
-            repo_name: 'example',
-            repo_full_name: 'octo/example',
-            default_branch: 'main'
-          },
-          workspace_ref: '0123456789abcdef',
-          scan_target: {
-            target_branch: 'main',
-            scan_mode: 'full',
-            base_sha: null,
-            head_sha: '0123456789abcdef'
-          },
-          event_type: 'manual'
-        })
-        return Response.json({
-          run_id: 'run-1',
-          workflow: 'repository-review',
-          status: 'queued'
-        })
-      }
-      return Response.json({ error: 'not_found' }, { status: 404 })
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    if (url.endsWith('/v1/runs') && init?.method === 'POST') {
+      return Response.json({
+        record: preparingRun,
+        created: true,
+        preparation_token: 'preparation-token'
+      })
     }
-  )
+    if (url.endsWith('/v1/internal/runs/run-1') && init?.method === 'GET') {
+      return Response.json(preparingRun)
+    }
+    if (url.endsWith('/v1/runs/run-1/submission') && init?.method === 'POST') {
+      assert.deepEqual(sentBody(init).publish_context, {
+        repo: {
+          owner_login: 'octo',
+          repo_name: 'example',
+          repo_full_name: 'octo/example',
+          default_branch: 'main'
+        },
+        workspace_ref: '0123456789abcdef',
+        scan_target: {
+          target_branch: 'main',
+          scan_mode: 'full',
+          base_sha: null,
+          head_sha: '0123456789abcdef'
+        },
+        event_type: 'manual'
+      })
+      return Response.json({
+        run_id: 'run-1',
+        workflow: 'repository-review',
+        status: 'queued'
+      })
+    }
+    return Response.json({ error: 'not_found' }, { status: 404 })
+  })
 
   const admission = await controlPlaneClient.admitReviewRun({
     workflow: 'repository-review',
@@ -155,27 +151,23 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
     else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
   })
   const requests: Array<{ url: string; method: string; body: Record<string, unknown> }> = []
-  t.mock.method(
-    globalThis,
-    'fetch',
-    async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input)
-      requests.push({ url, method: init?.method ?? 'GET', body: sentBody(init) })
-      if (url.endsWith('/v1/publication/claims/next') && init?.method === 'POST') {
-        return Response.json({
-          ...preparingRun,
-          publication_status: 'publishing',
-          workflow_result: {},
-          claim_token: 'claim-1',
-          publish_context: {}
-        })
-      }
-      if (url.endsWith('/v1/runs/run-1/publication/fail') && init?.method === 'POST') {
-        return Response.json(true)
-      }
-      return Response.json({ error: 'not_found' }, { status: 404 })
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    requests.push({ url, method: init?.method ?? 'GET', body: sentBody(init) })
+    if (url.endsWith('/v1/publication/claims/next') && init?.method === 'POST') {
+      return Response.json({
+        ...preparingRun,
+        publication_status: 'publishing',
+        workflow_result: {},
+        claim_token: 'claim-1',
+        publish_context: {}
+      })
     }
-  )
+    if (url.endsWith('/v1/runs/run-1/publication/fail') && init?.method === 'POST') {
+      return Response.json(true)
+    }
+    return Response.json({ error: 'not_found' }, { status: 404 })
+  })
 
   await assert.rejects(
     controlPlaneClient.claimNextPublication(),

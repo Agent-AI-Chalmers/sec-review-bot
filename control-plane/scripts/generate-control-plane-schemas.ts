@@ -76,7 +76,10 @@ export function renderReviewRunRecordSchema(): string {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as {
     components?: { schemas?: Record<string, unknown> }
   }
-  const inlined = inlineLocalRefs(componentSchema('ReviewRunRecord'), spec.components?.schemas ?? {})
+  const inlined = inlineLocalRefs(
+    componentSchema('ReviewRunRecord'),
+    spec.components?.schemas ?? {}
+  )
   return renderSchema(
     'https://sec-review-bot.local/contracts/control-plane-api/v1/review-run-record.schema.json',
     inlined

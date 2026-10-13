@@ -27,7 +27,8 @@ export type {
 
 export type WorkflowName = 'issue-review' | 'pull-request-review' | 'repository-review'
 export type IngressKind = 'github_webhook' | 'github_actions_dispatch'
-export type RunnerStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+export type RunnerStatus =
+  'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
 export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
 export type JsonObject = Record<string, unknown>
 
@@ -47,16 +48,16 @@ export type CreateReviewRunArgs = Pick<
  * shape. The runner's OpenAPI types `artifact` and `media_type` loosely, so this is where
  * the observer makes the discrimination explicit rather than passing the flat record
  * through. */
-export function normalizeArtifactStorage(
-  storage: RunnerArtifactStorage | null
-): ArtifactStorage {
+export function normalizeArtifactStorage(storage: RunnerArtifactStorage | null): ArtifactStorage {
   if (storage === null) return null
   if (storage.status === 'available') {
     return {
       status: 'available',
       // The runner only reports `available` once an artifact is stored, and its
       // `media_type` is always the single value the observed contract pins down.
-      artifact: storage.artifact as NonNullable<Extract<ArtifactStorage, { artifact: unknown }>>['artifact']
+      artifact: storage.artifact as NonNullable<
+        Extract<ArtifactStorage, { artifact: unknown }>
+      >['artifact']
     }
   }
   return {

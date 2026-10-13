@@ -290,7 +290,13 @@ export async function registerControlPlaneRoutes(
         failure: { code?: string | null; message: string }
         retry?: boolean
       }
-      return await store.failPublicationStep(runId, token, stepKey, failure, retry === undefined ? {} : { retry })
+      return await store.failPublicationStep(
+        runId,
+        token,
+        stepKey,
+        failure,
+        retry === undefined ? {} : { retry }
+      )
     },
 
     completePublication: async (request) => {
