@@ -17,6 +17,8 @@ The Control Plane produces each observed run from `observeRun()` and each record
 
 The GitHub integration imports Control Plane's shapes directly, so its view of the record is the same type rather than a hand-written copy. The console instead pins its own `Run` type to the committed fixture, so the two callers keep their own compile-time ties to the one schema.
 
+Both sides of a request are typed from the contract too, not only the response: the integration's client takes the contract's own `operationId` and derives each request body and success value from it, and the Control Plane's route handlers read `request.body` and `request.params` through their operation's types (`control-plane/src/route-types.ts`). Renaming a request field in [openapi.yaml](openapi.yaml) therefore fails both typechecks, rather than leaving a call site that compiles while the field is quietly ignored.
+
 ## Public Boundary
 
 Consumers can rely on:
