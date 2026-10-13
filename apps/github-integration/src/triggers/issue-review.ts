@@ -37,6 +37,7 @@ interface StartIssueReviewCommandArgs {
   event_type: IssueReviewEventType
   review_objective?: 'audit' | 'repair' | null
   repair_mode?: RepairMode | null
+  open_pr?: boolean | null
   delivery_id: string
   on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   deps?: Partial<StartIssueReviewCommandDeps>
@@ -52,6 +53,7 @@ export async function startIssueReviewCommand({
   event_type,
   review_objective = 'audit',
   repair_mode = null,
+  open_pr = false,
   delivery_id,
   on_admitted,
   deps = {}
@@ -85,6 +87,8 @@ export async function startIssueReviewCommand({
       event_type,
       review_objective: event_type === 'opened' ? 'audit' : review_objective,
       repair_mode: event_type === 'opened' ? null : repair_mode,
+      // Automatic triggers have no per-run comment to opt in, so they never open a PR.
+      open_pr: event_type === 'opened' ? false : open_pr,
       on_prepared: async (prepared, input) => {
         // Confirm the lease immediately before crossing the durable submission
         // boundary; the submission itself remains token-fenced by Control Plane.

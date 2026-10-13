@@ -11,6 +11,9 @@ interface RunIssueReviewArgs {
   event_type?: 'opened' | 'manual_review' | null
   review_objective?: 'audit' | 'repair' | null
   repair_mode?: 'test-changes-allowed' | 'no-test-changes' | null
+  // Whether this run may open a draft PR when the review record contains a ready patch.
+  // The end user opts in per comment; automatic triggers leave this false.
+  open_pr?: boolean | null
   // The caller hands the prepared input to Control Plane for durable submission.
   on_prepared?: (
     submitted: SubmittedIssueReviewRun,
@@ -24,6 +27,7 @@ export interface SubmittedIssueReviewRun {
   workspace_ref: string
   workflow: string
   event_type: 'opened' | 'manual_review'
+  open_pr: boolean
 }
 
 function assertIssueReviewInput(
@@ -105,7 +109,8 @@ export async function startIssueReviewRun(
     run_id: prepared.run_id,
     workspace_ref: prepared.workspace_ref,
     workflow: 'issue-review',
-    event_type
+    event_type,
+    open_pr: args.open_pr ?? false
   }
   if (args.on_prepared === undefined)
     throw new Error('Issue review submission callback is required.')

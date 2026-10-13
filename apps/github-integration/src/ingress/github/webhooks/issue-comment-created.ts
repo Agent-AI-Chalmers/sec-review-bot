@@ -142,6 +142,7 @@ export async function handleIssueCommentCreatedWithDeps(
       // only reachable from trusted callers (the PatchEval harness), never from a comment.
       review_objective: 'audit',
       repair_mode: command.repair_mode,
+      open_pr: command.open_pr,
       on_admitted: () => {
         resolveAdmission?.()
       }

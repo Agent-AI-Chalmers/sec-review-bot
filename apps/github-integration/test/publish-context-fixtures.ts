@@ -13,7 +13,8 @@ export function publishContextForWorkflow(workflow: WorkflowName): PublishContex
         issue_title: 'Example issue'
       },
       workspace_ref: 'workspace-sha',
-      event_type: 'manual_review'
+      event_type: 'manual_review',
+      open_pr: false
     }
   }
   if (workflow === 'pull-request-review') {

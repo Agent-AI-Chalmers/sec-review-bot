@@ -157,12 +157,14 @@ issue 与 PR conversation comment 支持同一组命令：
 ```text
 @<app-slug> review
 @<app-slug> review --repair-mode=no-test-changes
+@<app-slug> review --open-pr
 ```
 
 - `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
 - `--repair-mode=no-test-changes`：最终 patch 不应包含测试改动；测试只能作为临时验证手段。（也接受 `--repair-mode=test-changes-allowed`，它等于默认值。）
+- `--open-pr`：仅对 issue review 生效；当 review 产出可用的 patch 时，允许本次运行创建 draft pull request。不带该参数时 patch 只保留在 issue 的 summary comment 中。`issues.opened` 自动触发的 review 永不创建 draft PR。
 
-没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
+各参数与顺序无关，可组合使用。没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
 
 ### 仓库级 Actions 触发
 

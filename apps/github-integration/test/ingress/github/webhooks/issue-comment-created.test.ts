@@ -107,7 +107,8 @@ function submittedIssueRun(issue: IssueContext): SubmittedIssueReviewRun {
     run_id: 'run-issue-test',
     workspace_ref: 'workspace-ref',
     workflow: 'issue-review',
-    event_type: 'manual_review'
+    event_type: 'manual_review',
+    open_pr: false
   }
 }
 
@@ -155,6 +156,7 @@ test('issue-comment-created skips manual command when commenter lacks write perm
 
 test('issue-comment-created starts an audited issue manual review for write commenter', async () => {
   let review_objective: 'audit' | 'repair' | null | undefined = null
+  let open_pr: boolean | null | undefined
 
   await handleIssueCommentCreatedWithDeps(
     {
@@ -166,8 +168,13 @@ test('issue-comment-created starts an audited issue manual review for write comm
     },
     {
       authorizeManualCommentCommandFn: async () => authorizationDecision(),
-      startIssueReviewCommandFn: async ({ issue, review_objective: next_review_objective }) => {
+      startIssueReviewCommandFn: async ({
+        issue,
+        review_objective: next_review_objective,
+        open_pr: next_open_pr
+      }) => {
         review_objective = next_review_objective
+        open_pr = next_open_pr
         return submittedIssueRun(issue)
       }
     }
@@ -176,6 +183,31 @@ test('issue-comment-created starts an audited issue manual review for write comm
   // An issue is an unverified claim, so a comment can only start an audit; the objective the
   // command path passes is always `audit`, never a user-chosen `repair`.
   assert.equal(review_objective, 'audit')
+  // A plain comment does not opt in to opening a draft PR.
+  assert.equal(open_pr, false)
+})
+
+test('issue-comment-created forwards the open-pr opt-in for issue reviews', async () => {
+  let open_pr: boolean | null | undefined
+
+  await handleIssueCommentCreatedWithDeps(
+    {
+      id: 'delivery-draft-pr',
+      octokit: {},
+      payload: createIssueCommentPayload({
+        body: '@sec-review-bot review --open-pr'
+      })
+    },
+    {
+      authorizeManualCommentCommandFn: async () => authorizationDecision(),
+      startIssueReviewCommandFn: async ({ issue, open_pr: next_open_pr }) => {
+        open_pr = next_open_pr
+        return submittedIssueRun(issue)
+      }
+    }
+  )
+
+  assert.equal(open_pr, true)
 })
 
 test('issue-comment-created starts pull request manual review for write commenter', async () => {

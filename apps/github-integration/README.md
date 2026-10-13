@@ -156,12 +156,14 @@ Both issue and PR conversation comments support the same commands:
 ```text
 @<app-slug> review
 @<app-slug> review --repair-mode=no-test-changes
+@<app-slug> review --open-pr
 ```
 
 - `review`: triggers a review. The final patch, if any, may include reasonable test changes.
 - `--repair-mode=no-test-changes`: the final patch should not contain test changes; tests may only be used as temporary validation work. (`--repair-mode=test-changes-allowed`, the default, is also accepted.)
+- `--open-pr`: for issue reviews only, allows the run to open a draft pull request when the review produces a ready patch. Without this flag the patch stays in the issue summary comment. Automatic `issues.opened` reviews never open a draft PR.
 
-There is no objective argument: the GitHub integration always reviews in `audit` mode.
+Flags are order-independent and may be combined. There is no objective argument: the GitHub integration always reviews in `audit` mode.
 
 ### Repository-level Actions trigger
 

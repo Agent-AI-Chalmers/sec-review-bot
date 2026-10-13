@@ -93,7 +93,8 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           run_id: 'run-issue-1',
           workspace_ref: 'workspace-ref',
           workflow: 'issue-review',
-          event_type: 'opened' as const
+          event_type: 'opened' as const,
+          open_pr: false
         }
         await on_prepared?.(prepared, { contract_version: 'v5' } as never)
         return prepared
@@ -139,7 +140,8 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           issue_title: 'Example issue'
         },
         workspace_ref: 'workspace-ref',
-        event_type: 'opened'
+        event_type: 'opened',
+        open_pr: false
       }
     ]
   ])
@@ -286,7 +288,8 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               run_id: 'run-uncertain',
               workspace_ref: 'workspace-ref',
               workflow: 'issue-review',
-              event_type: 'opened'
+              event_type: 'opened',
+              open_pr: false
             },
             { contract_version: 'v5' } as never
           )
