@@ -4,7 +4,7 @@
 // copy. Regenerate it with `pnpm --dir contracts/control-plane-api/tools run generate`.
 //
 // The hand-written openapi.yaml owns the error-code vocabulary; this file is its server-side
-// projection. Regenerate it with `pnpm --dir contracts/control-plane-api/tools run generate`.
+// projection.
 
 export type PublicationStepErrorCode =
   | 'PUBLICATION_STEP_NOT_CLAIMABLE'

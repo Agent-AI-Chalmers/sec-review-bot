@@ -138,7 +138,7 @@ export async function renderErrorCodeTypes(): Promise<string> {
     headerComment() +
     `//
 // The hand-written openapi.yaml owns the error-code vocabulary; this file is its server-side
-// projection. Regenerate it with \`pnpm --dir contracts/control-plane-api/tools run generate\`.
+// projection.
 
 export type PublicationStepErrorCode =\n${union}
 
@@ -201,7 +201,7 @@ export async function renderContractTypes(): Promise<string> {
     `//
 // The hand-written openapi.yaml owns the domain shapes and the request shapes; these
 // interfaces are its server-side projection, so the server's types follow the contract
-// instead of a parallel schema. Regenerate it with \`pnpm --dir contracts/control-plane-api/tools run generate\`.
+// instead of a parallel schema.
 
 ${components}
 
@@ -272,8 +272,7 @@ export async function renderListRunQueryParams(): Promise<string> {
     `//
 // The contract's \`listRuns\` operation declares these query parameters (as one form-exploded
 // object). The console builds each request, and the BFF proxies it, from this one list, so
-// neither can send a parameter the contract does not accept. Regenerate it with
-// \`pnpm --dir contracts/control-plane-api/tools run generate\`.
+// neither can send a parameter the contract does not accept.
 
 /** The query parameter names \`listRuns\` declares, in document order. */
 export const LIST_RUN_QUERY_PARAMS = [

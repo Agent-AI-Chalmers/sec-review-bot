@@ -5,7 +5,7 @@
 //
 // The hand-written openapi.yaml owns the domain shapes and the request shapes; these
 // interfaces are its server-side projection, so the server's types follow the contract
-// instead of a parallel schema. Regenerate it with `pnpm --dir contracts/control-plane-api/tools run generate`.
+// instead of a parallel schema.
 
 export interface components {
   schemas: {

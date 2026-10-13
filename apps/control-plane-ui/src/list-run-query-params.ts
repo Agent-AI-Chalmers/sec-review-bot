@@ -5,8 +5,7 @@
 //
 // The contract's `listRuns` operation declares these query parameters (as one form-exploded
 // object). The console builds each request, and the BFF proxies it, from this one list, so
-// neither can send a parameter the contract does not accept. Regenerate it with
-// `pnpm --dir contracts/control-plane-api/tools run generate`.
+// neither can send a parameter the contract does not accept.
 
 /** The query parameter names `listRuns` declares, in document order. */
 export const LIST_RUN_QUERY_PARAMS = [
