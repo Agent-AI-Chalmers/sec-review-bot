@@ -38,5 +38,5 @@ The Control Plane owns the value-level half in `control-plane/test/observed-run-
 
 ## Error codes
 
-- **Control-flow codes** — the four `PUBLICATION_STEP_*` codes the Control Plane emits as terminal publication failures — are single-sourced in `PUBLICATION_STEP_ERROR_CODES` (control-plane) and surface on the write surface as an HTTP 409 with a string `code`. The GitHub integration classifies each as `retry: false`, so a new code on one side is caught by `publication-error-code-alignment.test.ts` rather than silently looping the runner forever.
+- **Control-flow codes** — the four `PUBLICATION_STEP_*` codes the Control Plane emits as terminal publication failures — are single-sourced in [openapi.yaml](openapi.yaml)'s `ErrorResponse.code` enum and surface on the write surface as an HTTP 409 with a string `code`. The server's `PUBLICATION_STEP_ERROR_CODES` (control-plane) is a projection of that enum, and the GitHub integration classifies each as `retry: false`, so a new code on one side is caught by `publication-error-code-alignment.test.ts` rather than silently looping the runner forever.
 - **Diagnostic codes** (`failure_code`, the runner error `code`) are open sets and remain un-enumerated until their vocabulary stabilizes.

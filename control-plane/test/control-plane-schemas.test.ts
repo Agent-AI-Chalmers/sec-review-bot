@@ -1,7 +1,7 @@
-// Keep the committed Control Plane data-shape schemas in step with their TypeBox source.
+// Keep the committed Control Plane data-shape schemas in step with the OpenAPI contract.
 //
-// Each schema is a projection of a single TypeBox definition, so a stale committed file
-// would let callers validate against a shape the service no longer produces.
+// Each schema is a projection of the hand-written openapi.yaml components.schemas, so a stale
+// committed file would let callers validate against a shape the service no longer produces.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -22,10 +22,10 @@ function assertSchemaMatches(filename: string, render: () => string): void {
   )
 }
 
-test('the committed observed-run schema matches the TypeBox source', () => {
+test('the committed observed-run schema matches the contract', () => {
   assertSchemaMatches('observed-run.schema.json', renderObservedRunSchema)
 })
 
-test('the committed review-run-record schema matches the TypeBox source', () => {
+test('the committed review-run-record schema matches the contract', () => {
   assertSchemaMatches('review-run-record.schema.json', renderReviewRunRecordSchema)
 })

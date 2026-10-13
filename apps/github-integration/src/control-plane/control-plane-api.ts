@@ -407,7 +407,7 @@ export interface components {
             }
           }
         | null
-      workflow_result: Record<string, never> | null
+      workflow_result: unknown
       claim_token: string
     }
     PublicationStepRecord: {

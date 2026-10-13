@@ -316,8 +316,7 @@ components:
                       type: integer
                       minimum: 0
             - type: "null"
-        workflow_result:
-          type: object
+        workflow_result: {}
         claim_token:
           type: string
           minLength: 1

@@ -10,8 +10,12 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
+  CONTRACT_TYPES_PATH,
+  ERROR_CODES_PATH,
   OUTPUT_PATH,
-  renderControlPlaneApiTypes
+  renderContractTypes,
+  renderControlPlaneApiTypes,
+  renderErrorCodeTypes
 } from '../scripts/generate-control-plane-types.js'
 
 test('the committed control-plane API types match the contract document', async () => {
@@ -21,6 +25,26 @@ test('the committed control-plane API types match the contract document', async 
     committed,
     await renderControlPlaneApiTypes(),
     `${OUTPUT_PATH} is stale. Regenerate it with: pnpm run generate:control-plane-types`
+  )
+})
+
+test('the committed server contract types match the contract document', async () => {
+  const committed = readFileSync(CONTRACT_TYPES_PATH, 'utf8')
+
+  assert.equal(
+    committed,
+    await renderContractTypes(),
+    `${CONTRACT_TYPES_PATH} is stale. Regenerate it with: pnpm run generate:control-plane-types`
+  )
+})
+
+test('the committed error-code types match the contract document', async () => {
+  const committed = readFileSync(ERROR_CODES_PATH, 'utf8')
+
+  assert.equal(
+    committed,
+    await renderErrorCodeTypes(),
+    `${ERROR_CODES_PATH} is stale. Regenerate it with: pnpm run generate:control-plane-types`
   )
 })
 

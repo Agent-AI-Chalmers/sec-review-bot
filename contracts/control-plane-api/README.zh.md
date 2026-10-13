@@ -40,5 +40,5 @@ GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图
 
 ## 错误码
 
-- **控制流错误码** —— Control Plane 作为终态（确定性）发布失败而发出的四个 `PUBLICATION_STEP_*` 码 —— 在 `PUBLICATION_STEP_ERROR_CODES`（control-plane）里单一事实来源化，并在写面上以 HTTP 409 + 字符串 `code` 呈现。GitHub 集成为每个码分类为 `retry: false`，因此任一侧新增一个码都会被 `publication-error-code-alignment.test.ts` 捕获，而不是让 runner 永续重试。
+- **控制流错误码** —— Control Plane 作为终态（确定性）发布失败而发出的四个 `PUBLICATION_STEP_*` 码 —— 单一事实来源化在 [openapi.yaml](openapi.yaml) 的 `ErrorResponse.code` enum 里，并在写面上以 HTTP 409 + 字符串 `code` 呈现。服务端的 `PUBLICATION_STEP_ERROR_CODES`（control-plane）是这份 enum 的投影，GitHub 集成为每个码分类为 `retry: false`，因此任一侧新增一个码都会被 `publication-error-code-alignment.test.ts` 捕获，而不是让 runner 永续重试。
 - **诊断错误码**（`failure_code`、runner 错误 `code`）是开放集合，在词汇稳定之前不做枚举。
