@@ -14,8 +14,12 @@ import Fastify from 'fastify'
 // Set before importing the server: its module body starts a real server unless NODE_ENV is
 // 'test'. The import is dynamic so the assignment below runs first.
 process.env.NODE_ENV = 'test'
-const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } =
-  await import('../dist/server.js')
+// Each import of a built artifact uses a computed specifier so `tsc` typechecks this file
+// without a prior build: a literal `'../dist/server.js'` is unresolvable when `dist/` is absent
+// (`TS2307`), but the URL form loads the same file at runtime and is not a static reference.
+const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } = await import(
+  new URL('../dist/server.js', import.meta.url).href
+)
 
 const SERVICE_TOKEN = 'service-token'
 const READ_TOKEN = 'read-token'
@@ -258,8 +262,9 @@ test('an operation with no response body sends an empty 200, not a null body', a
 })
 
 test('a deterministic publication failure maps to 409 with its code', async () => {
-  const { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } =
-    await import('../dist/errors.js')
+  const { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } = await import(
+    new URL('../dist/errors.js', import.meta.url).href
+  )
   const app = await buildApp({
     renewPreparationClaim: async () => {
       throw new DeterministicControlPlaneError(

@@ -24,8 +24,13 @@ import Fastify from 'fastify'
 // The server's module body starts a real server (and reads required env) unless NODE_ENV is
 // 'test'; set it before the dynamic import.
 process.env.NODE_ENV = 'test'
-const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } =
-  await import('../../dist/server.js')
+// Load the built server via a computed specifier: `tsc` typechecks this file without building,
+// so a literal `'../../dist/server.js'` would be unresolvable there (`TS2307`). The URL form is
+// the same file at runtime, but it is not a static module reference, so typechecking stays
+// independent of the build.
+const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } = await import(
+  new URL('../../dist/server.js', import.meta.url).href
+)
 
 // Load the client through `createRequire`, not a static import: it lives in another package
 // whose `rootDir` is the repository root, and importing its TypeScript directly would pull that
