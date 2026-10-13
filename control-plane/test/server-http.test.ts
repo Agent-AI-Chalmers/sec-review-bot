@@ -99,6 +99,55 @@ test('a request body missing a required contract field is rejected before the ha
     })
     assert.equal(response.statusCode, 400)
     assert.equal(handlerCalls, 0, 'validation must reject before the handler runs')
+    assert.equal(
+      (response.json() as { code?: string }).code,
+      'INVALID_BODY',
+      'a body that fails the contract is INVALID_BODY, not the query filter code'
+    )
+  } finally {
+    await app.close()
+  }
+})
+
+test('schema validation names which part of the request failed', async () => {
+  // A caller classifying by `code` must be able to tell a bad filter from a bad body from a
+  // bad path parameter; reusing one code for all three (as it did) made that impossible.
+  const app = await buildApp({ listRunsPage: async () => ({ runs: [], next_cursor: null }) })
+  try {
+    const query = await app.inject({
+      method: 'GET',
+      url: '/v1/runs?limit=0',
+      headers: { authorization: `Bearer ${READ_TOKEN}` }
+    })
+    assert.equal(query.statusCode, 400)
+    assert.equal((query.json() as { code?: string }).code, 'INVALID_QUERY')
+
+    const path = await app.inject({
+      method: 'POST',
+      url: '/v1/runs/not-a-uuid/submission',
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      payload: { preparation_token: 't', publish_context: {}, input: {} }
+    })
+    assert.equal(path.statusCode, 400)
+    assert.equal((path.json() as { code?: string }).code, 'INVALID_PATH_PARAMETER')
+  } finally {
+    await app.close()
+  }
+})
+
+test('an operation with no response body sends an empty 200, not a null body', async () => {
+  // The contract declares no content for these; returning `null` produced a literal "null"
+  // body that disagreed with the generated `void` type.
+  const app = await buildApp({ failPreparation: async () => {} })
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/preparation/failure',
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      payload: { token: 't', failure: { message: 'm' } }
+    })
+    assert.equal(response.statusCode, 200)
+    assert.equal(response.body, '')
   } finally {
     await app.close()
   }

@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { randomUUID, createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
@@ -22,7 +22,8 @@ import {
 import { recoverReviewRunSubmission } from './submission-recovery.js'
 import { submitPreparedRun } from './prepared-submission.js'
 import { observePublicationStep, observeRun } from './observability.js'
-import { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } from './errors.js'
+import { DeterministicControlPlaneError } from './errors.js'
+import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from './error-codes-generated.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
 
@@ -61,7 +62,10 @@ function runnerStatusFromBatch(
 // The error-envelope `code` values. `INVALID_QUERY` is the run-list query filter; the four
 // `PUBLICATION_STEP_*` codes also surface here, carried by the REST write routes for
 // deterministic publication failures the client must classify as terminal.
-const errorCodeEnum = ['INVALID_QUERY', ...Object.values(PUBLICATION_STEP_ERROR_CODES)]
+// The closed set of `code` values the envelope may carry, projected from the contract's
+// ErrorResponse.code enum so the surface cannot advertise a code the contract omits. Typed as
+// string[] because the membership check guards an arbitrary thrown error's `code`.
+const errorCodeEnum: readonly string[] = [...ERROR_RESPONSE_CODES_FROM_CONTRACT]
 type ListQueryOptions = NonNullable<Parameters<ReviewRunStore['listRunsPage']>[0]>
 
 function requiredEnv(name: string): string {
@@ -130,19 +134,36 @@ interface ControlPlaneRouteDeps {
  *
  * fastify-openapi-glue resolves a relative `specification` against the CWD, which breaks as
  * soon as the server runs from a different directory (notably the container, where only
- * `dist/` is present). The build copies the contract next to the compiled output
- * (`copy:spec`), so the compiled server finds it first; running from source (tsx) falls back
- * to the repository's contracts tree. */
+ * `dist/` is present). The build copies the contract next to the compiled output (`copy:spec`)
+ * together with its SHA-256, so the compiled server finds it first and can prove it is the one
+ * that build produced — a stale or hand-edited copy beside `server.js` fails loudly instead of
+ * silently shaping the surface. Running from source (tsx) falls back to the repository's
+ * contracts tree, which is the source of truth in that mode. */
 function resolveSpecPath(): string {
-  const candidates = [
-    new URL('./openapi.yaml', import.meta.url), // dist/openapi.yaml (built)
-    new URL('../../contracts/control-plane-api/openapi.yaml', import.meta.url) // src/ -> repo contracts/
-  ]
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return fileURLToPath(candidate)
+  const built = new URL('./openapi.yaml', import.meta.url)
+  if (existsSync(built)) {
+    const builtPath = fileURLToPath(built)
+    const digestPath = `${builtPath}.sha256`
+    if (!existsSync(digestPath)) {
+      throw new Error(`${builtPath} has no ${digestPath}; the build must produce both.`)
+    }
+    const expected = readFileSync(digestPath, 'utf8').trim()
+    const actual = createHash('sha256').update(readFileSync(builtPath)).digest('hex')
+    if (actual !== expected) {
+      throw new Error(
+        `${builtPath} does not match its recorded digest; rebuild so the contract and ` +
+          'server.js come from the same build.'
+      )
+    }
+    return builtPath
   }
+  const fromSource = fileURLToPath(
+    new URL('../../contracts/control-plane-api/openapi.yaml', import.meta.url)
+  )
+  if (existsSync(fromSource)) return fromSource
   throw new Error(
-    `OpenAPI contract not found. Looked for ${candidates.map((c) => fileURLToPath(c)).join(', ')}.`
+    `OpenAPI contract not found next to the module (${fileURLToPath(built)}) or in the ` +
+      `repository tree (${fromSource}).`
   )
 }
 
@@ -220,14 +241,15 @@ export async function registerControlPlaneRoutes(
       return await store.renewPreparationClaim(runId, token)
     },
 
-    failPreparation: async (request) => {
+    failPreparation: async (request, reply) => {
       const { runId } = request.params as { runId: string }
       const { token, failure } = request.body as {
         token: string
         failure: { code?: string | null; message: string }
       }
       await store.failPreparation(runId, token, failure)
-      return null
+      // The contract declares no body; send an empty 200 rather than a literal `null`.
+      return reply.code(200).send()
     },
 
     claimNextPublication: async (request) => {
@@ -241,18 +263,18 @@ export async function registerControlPlaneRoutes(
       return await store.renewPublicationClaim(runId, token)
     },
 
-    initializePublicationSteps: async (request) => {
+    initializePublicationSteps: async (request, reply) => {
       const { runId } = request.params as { runId: string }
       const { token, step_keys } = request.body as { token: string; step_keys: string[] }
       await store.initializePublicationSteps(runId, token, step_keys)
-      return null
+      return reply.code(200).send()
     },
 
-    requirePublicationStepClaim: async (request) => {
+    requirePublicationStepClaim: async (request, reply) => {
       const { runId, stepKey } = request.params as { runId: string; stepKey: string }
       const { token } = request.body as { token: string }
       await store.requirePublicationStepClaim(runId, token, stepKey)
-      return null
+      return reply.code(200).send()
     },
 
     completePublicationStep: async (request) => {
@@ -349,12 +371,22 @@ export async function registerControlPlaneRoutes(
     if (errorCode === 'FST_ERR_CTP_INVALID_JSON_BODY') {
       return reply.code(400).send({ error: 'Request body must be valid JSON.' })
     }
-    // A request rejected by the contract's own schema (glue mounts it as the route's query /
-    // body schema) is the caller's input being invalid, so it uses the documented
-    // INVALID_QUERY envelope rather than Fastify's default FST_ERR_VALIDATION shape.
+    // A request rejected by the contract's own schema (glue mounts it as the route's query,
+    // body, and params schema) names which part failed, so a caller classifying by `code`
+    // can tell a bad filter from a bad body from a bad path parameter.
     if (errorCode === 'FST_ERR_VALIDATION') {
       const detail = error instanceof Error ? error.message : String(error)
-      return reply.code(400).send({ error: detail, code: 'INVALID_QUERY' })
+      const context =
+        typeof error === 'object' && error !== null && 'validationContext' in error
+          ? (error as { validationContext?: string }).validationContext
+          : undefined
+      const code =
+        context === 'body'
+          ? 'INVALID_BODY'
+          : context === 'params'
+            ? 'INVALID_PATH_PARAMETER'
+            : 'INVALID_QUERY'
+      return reply.code(400).send({ error: detail, code })
     }
     const status =
       typeof error === 'object' &&
@@ -384,22 +416,30 @@ export async function registerControlPlaneRoutes(
       if (handler === undefined) {
         throw new Error(`No handler registered for operation ${operationId}`)
       }
-      // Log every durable operation with its identity (the README promises connector_id and
-      // run_id), wrapping here so a new operation is logged without repeating the call. Only
-      // identifiers are logged, never request arguments, which may carry claim credentials.
+      // Log the state-changing operations with their identity (the README promises
+      // durable-operation logs carrying connector_id and run_id). Reads — the health probe and
+      // the GET queries — are deliberately not logged: they carry no durable effect and would
+      // only dilute the audit signal. Wrapping here means a new operation is logged without
+      // repeating the call. Only identifiers are logged, never request arguments, which may
+      // carry claim credentials.
       return async (request: FastifyRequest, reply: FastifyReply) => {
+        const durable = request.method !== 'GET'
         const runId = (request.params as { runId?: string }).runId
-        logEvent('control_plane_operation_started', {
-          operation: operationId,
-          ...(runId === undefined ? {} : { run_id: runId }),
-          connector_id: store.connectorId
-        })
+        if (durable) {
+          logEvent('control_plane_operation_started', {
+            operation: operationId,
+            ...(runId === undefined ? {} : { run_id: runId }),
+            connector_id: store.connectorId
+          })
+        }
         const result = await handler(request, reply)
-        logEvent('control_plane_operation_completed', {
-          operation: operationId,
-          ...(runId === undefined ? {} : { run_id: runId }),
-          connector_id: store.connectorId
-        })
+        if (durable) {
+          logEvent('control_plane_operation_completed', {
+            operation: operationId,
+            ...(runId === undefined ? {} : { run_id: runId }),
+            connector_id: store.connectorId
+          })
+        }
         return result
       }
     },
