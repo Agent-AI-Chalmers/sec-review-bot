@@ -31,7 +31,10 @@ function stripMarkdownQuotedLines(body: string): string {
 }
 
 /** The values `--repair-mode` accepts, taken from the runner input contract. */
-const REPAIR_MODES = ['test-changes-allowed', 'no-test-changes'] as const satisfies readonly RepairMode[]
+const REPAIR_MODES = [
+  'test-changes-allowed',
+  'no-test-changes'
+] as const satisfies readonly RepairMode[]
 
 /** Parse `--name` flags and `--k=v` options after the command. Unknown options fail the whole
  * command, so a typo is not silently ignored. Options are order-independent. */

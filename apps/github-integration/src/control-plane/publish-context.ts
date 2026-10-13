@@ -254,7 +254,10 @@ export function parseIssueReviewPublishContext(value: unknown): IssueReviewPubli
   return {
     issue: issue(context.issue),
     workspace_ref: text(context.workspace_ref, 'publish_context.workspace_ref'),
-    event_type: oneOf(context.event_type, 'publish_context.event_type', ['opened', 'manual_review']),
+    event_type: oneOf(context.event_type, 'publish_context.event_type', [
+      'opened',
+      'manual_review'
+    ]),
     open_pr: open_pr === true
   }
 }
