@@ -130,7 +130,6 @@ export interface components {
       published_at: string | null
       failure_code: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
-      publication_steps?: components['schemas']['ObservedPublicationStep'][]
     }
     ArtifactStorage:
       | {

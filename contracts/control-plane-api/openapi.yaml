@@ -394,10 +394,6 @@ components:
             - "null"
         artifact_storage:
           $ref: "#/components/schemas/ArtifactStorage"
-        publication_steps:
-          type: array
-          items:
-            $ref: "#/components/schemas/ObservedPublicationStep"
     ArtifactStorage:
       oneOf:
         - type: object

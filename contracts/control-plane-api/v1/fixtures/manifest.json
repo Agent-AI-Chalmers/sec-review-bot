@@ -1,7 +1,6 @@
 {
   "schema_fixtures": {
     "observed-run.json": "observed-run.schema.json",
-    "observed-run-with-steps.json": "observed-run.schema.json",
     "review-run-record.json": "review-run-record.schema.json",
     "review-run-record-artifact-unavailable.json": "review-run-record.schema.json",
     "review-run-record-publication-failed.json": "review-run-record.schema.json"
