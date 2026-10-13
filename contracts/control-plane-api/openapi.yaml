@@ -459,6 +459,10 @@ paths:
       operationId: getHealth
       description: >-
         Report process health. Requires no credential.
+      # Explicitly public: the liveness probe must answer an unauthenticated caller. The empty
+      # requirement is what says so; omitting the key would be indistinguishable from a
+      # forgotten requirement, which the `operation-requires-security` rule rejects.
+      security: []
       responses:
         "200":
           description: Process health.

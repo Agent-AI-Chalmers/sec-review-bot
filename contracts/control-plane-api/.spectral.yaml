@@ -25,8 +25,9 @@
 extends:
   - spectral:oas
 # Spectral resolves `functionsDir` relative to this ruleset file, and loads only the modules
-# named in `functions`, so both keys are needed for a custom rule to resolve.
-functionsDir: spectral-functions
+# named in `functions`, so both keys are needed for a custom rule to resolve. The functions
+# live under the tool so they are covered by its formatter and linter.
+functionsDir: tools/spectral-functions
 functions:
   - operationRequiresSecurity
 rules:
@@ -36,17 +37,16 @@ rules:
   oas3-api-servers: 'off'
   info-contact: 'off'
 
-  # Every operation must require a credential, except the health probe.
+  # Every operation must declare its own `security`.
   #
-  # This document declares no top-level `security`, so each operation has to carry its own
-  # requirement. Nothing else enforced that: an operation written without `security` is
-  # accepted by Spectral and mounted by fastify-openapi-glue with no authentication at all,
-  # so the omission is silent and the endpoint is public. The custom function also rejects a
-  # blank requirement (`security: []` or `[{}]`), which names no scheme and authenticates
-  # nobody. `/healthz` is the deliberate exception — it is the liveness probe and must answer
-  # an unauthenticated caller — so the check lives in a function that can express it.
+  # This document declares no top-level `security`, so an operation that omits the key
+  # inherits nothing and is mounted by fastify-openapi-glue with no authentication at all: a
+  # public endpoint created by a silent omission. The rule makes the omission an error. An
+  # explicit `security: []` is allowed — it is a deliberate, greppable "this is public",
+  # which the liveness probe uses — so the check distinguishes an intentional public
+  # operation from a forgotten requirement without a hard-coded list of public paths.
   operation-requires-security:
-    description: Every operation except /healthz must declare a non-empty security requirement.
+    description: Every operation must declare a security requirement (`security: []` if deliberately public).
     message: '{{error}}'
     severity: error
     given: $.paths[*][get,post,put,patch,delete]

@@ -27,6 +27,8 @@ tools/
     repo-root.ts             the repository root, for absolute output paths
     generate-types.ts        the API projections (types, error codes, console params)
     generate-schemas.ts      the committed v1 JSON Schemas
+  spectral-functions/
+    operationRequiresSecurity.js   the every-operation-declares-security rule (../.spectral.yaml)
   test/
     generated-artifacts.test.ts       manifest ↔ generators ↔ CI filter
     contract-generation-guards.test.ts  generators fail on input they cannot represent
