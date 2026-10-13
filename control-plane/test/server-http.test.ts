@@ -77,6 +77,12 @@ test('operations reject missing or wrong credentials with 401', async () => {
       }
     })
     assert.equal(write.statusCode, 401)
+
+    // The envelope is the surface's own, not glue's default: glue's message names the
+    // security scheme ("None of the security schemes (readToken) ..."), which is not the
+    // caller's business and is the only response body outside the `{ error, code? }` shape.
+    assert.deepEqual(read.json(), { error: 'unauthorized' })
+    assert.deepEqual(write.json(), { error: 'unauthorized' })
   } finally {
     await app.close()
   }

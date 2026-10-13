@@ -347,6 +347,14 @@ export async function registerControlPlaneRoutes(
     if (error instanceof DeterministicControlPlaneError) {
       return reply.code(409).send({ error: error.message, code: error.code })
     }
+    // fastify-openapi-glue reports a failed authentication as a `SecurityError` whose message
+    // names the security scheme ("None of the security schemes (readToken) successfully
+    // authenticated this request."). Replace it with the surface's own envelope: the scheme
+    // name is not the caller's business, and every other error here is `{ error }`. The
+    // status stays 401, which the contract declares for these routes.
+    if (error instanceof Error && error.name === 'Unauthorized') {
+      return reply.code(401).send({ error: 'unauthorized' })
+    }
     const errorCode =
       typeof error === 'object' &&
       error !== null &&
