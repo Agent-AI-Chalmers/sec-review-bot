@@ -439,7 +439,9 @@ test('ReviewRunStore fences publication step commits with the current publicatio
     const currentToken = await store.claimPublication(runId)
     assert.ok(currentToken)
     assert.equal(
-      await store.completePublicationStep(runId, staleToken, 'repository:summary-issue', { id: 7 }),
+      await store.completePublicationStep(runId, staleToken, 'repository:summary-issue', {
+        id: '7'
+      }),
       false
     )
     assert.equal(

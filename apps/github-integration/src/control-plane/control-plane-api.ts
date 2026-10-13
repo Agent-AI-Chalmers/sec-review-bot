@@ -926,7 +926,8 @@ export interface operations {
         'application/json': {
           token: string
           remote_object?: {
-            id?: string | number | null
+            /** @description The created object's numeric id in its canonical string form. It is persisted as text and read back with `Number(...)`; a `null` id means the step produced no remote object. */
+            id?: string | null
             url?: string | null
           }
         }

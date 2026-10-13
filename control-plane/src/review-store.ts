@@ -833,7 +833,7 @@ export class ReviewRunStore {
     runId: string,
     token: string,
     stepKey: string,
-    remote: { id?: string | number | null; url?: string | null } = {}
+    remote: { id?: string | null; url?: string | null } = {}
   ): Promise<boolean> {
     // A publication token fences every step commit, not only the final run
     // state. This prevents a timed-out worker from recording stale remote data.
@@ -847,14 +847,7 @@ export class ReviewRunStore {
         AND p.run_id=s.run_id AND p.connector_id=s.connector_id
         AND p.status='publishing' AND p.claim_token=$4
     `,
-      [
-        runId,
-        this.connectorId,
-        stepKey,
-        token,
-        remote.id == null ? null : String(remote.id),
-        remote.url ?? null
-      ]
+      [runId, this.connectorId, stepKey, token, remote.id ?? null, remote.url ?? null]
     )
     return result.rowCount === 1
   }

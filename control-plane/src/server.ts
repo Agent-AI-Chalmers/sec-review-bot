@@ -29,14 +29,67 @@ import type { PathParams, RequestBody } from './route-types.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
 
-/** Fastify options shared by the server and its tests. `removeAdditional: false` makes the
- * contract's `additionalProperties: false` mean what it says — a request with an undeclared
- * field is rejected, rather than having the field silently stripped (Fastify's ajv default),
- * which would make the contract overstate the validation. */
+/** Fastify options shared by the server and its tests.
+ *
+ * `removeAdditional: false` makes the contract's `additionalProperties: false` mean what it
+ * says — a request with an undeclared field is rejected, rather than having the field silently
+ * stripped (Fastify's ajv default), which would make the contract overstate the validation.
+ *
+ * `coerceTypes: false` makes every declared type mean literally what it says, which the default
+ * (`true`) does not: a JSON body is already typed by its parser, so coercion only ever *loosens*
+ * a body there. With coercion on, `remote_object.id` (declared `[string, "null"]`) accepted
+ * `true` as `"true"` and `1234` as `"1234"` — values the contract never declared. Bodies must
+ * therefore be validated without coercion.
+ *
+ * The query string is the one place coercion is genuinely needed, because a URL can only carry
+ * `limit=10` and the contract declares `limit` an `integer`. Rather than re-enable coercion for
+ * every body, `coerceQueryStrings` restores it for the query alone, driven by each route's own
+ * contract-derived schema — so the query still validates as declared and no body is loosened.
+ *
+ * `allowUnionTypes` is a guard rather than a current need: ajv's strict-types check warns on a
+ * non-nullable `type` array, and no request schema declares one today (`remote_object.id` is
+ * `[string, "null"]`, which ajv accepts). It is set so that adding such a union later fails
+ * *validation* rather than silently emitting a warning nobody reads. */
 export const CONTROL_PLANE_FASTIFY_OPTIONS = {
   bodyLimit: MAX_BODY_BYTES,
-  ajv: { customOptions: { removeAdditional: false } }
+  ajv: { customOptions: { removeAdditional: false, coerceTypes: false, allowUnionTypes: true } }
 } as const
+
+/** The scalar JSON types the query string can declare, and how a raw string becomes one. */
+type QueryScalarType = 'integer' | 'number' | 'boolean'
+
+/**
+ * Coerce the query string to the types the route's own schema declares.
+ *
+ * The query string is always strings, so a contract that says `limit: { type: integer }` can
+ * only be satisfied by coercion; ajv does that when `coerceTypes` is on, but turning it on
+ * globally would also loosen every JSON body (see `CONTROL_PLANE_FASTIFY_OPTIONS`). This hook
+ * runs before schema validation and coerces only the properties the route declares, read from
+ * `request.routeOptions.schema.querystring` — the schema fastify-openapi-glue built from the
+ * contract — so it duplicates no knowledge and stays in step with the document. A value that
+ * does not parse is left untouched and rejected by the schema, not guessed at.
+ */
+function coerceQueryStrings(request: FastifyRequest): void {
+  const querystring = (request.routeOptions?.schema as { querystring?: unknown } | undefined)
+    ?.querystring
+  const properties = (
+    querystring as { properties?: Record<string, { type?: QueryScalarType }> } | undefined
+  )?.properties
+  if (properties === undefined) return
+  const query = request.query as Record<string, unknown> | null
+  if (query === null || typeof query !== 'object') return
+  for (const [name, value] of Object.entries(query)) {
+    if (typeof value !== 'string') continue
+    const type = properties[name]?.type
+    if (type === 'integer' || type === 'number') {
+      const parsed = Number(value)
+      if (value.trim() !== '' && Number.isFinite(parsed)) query[name] = parsed
+    } else if (type === 'boolean') {
+      if (value === 'true') query[name] = true
+      else if (value === 'false') query[name] = false
+    }
+  }
+}
 // Statuses whose handling needs the run record itself, because the terminal writes
 // persist the result, the error, and the artifact reference. Every other status is
 // answered from the pass's batch, so a poll where nothing changed costs one request
@@ -408,6 +461,13 @@ export async function registerControlPlaneRoutes(
       error: message,
       ...(code === undefined ? {} : { code })
     })
+  })
+
+  // Runs before the route's own schema (Fastify order: preValidation, then validation), and the
+  // hook is inherited by the child scope fastify-openapi-glue registers its routes in. Registered
+  // here, on this HTTP surface, so it applies to (and only to) the contract's routes.
+  app.addHook('preValidation', async (request) => {
+    coerceQueryStrings(request)
   })
 
   await app.register(openapiGlue, {

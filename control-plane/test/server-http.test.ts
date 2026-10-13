@@ -243,3 +243,108 @@ test('an undeclared body field is rejected, matching the contract', async () => 
     await app.close()
   }
 })
+
+test('remote_object.id is accepted only in its canonical string form', async () => {
+  // The contract declares `remote_object.id` as `type: [string, "null"]`, and Control Plane
+  // validates bodies with `coerceTypes: false`, so a value must be that type literally — a
+  // JSON number (the pre-normalization GitHub shape) and a boolean are rejected, not coerced.
+  // The client's `String(remote.id)` is what turns a GitHub number into the accepted form.
+  let received: unknown
+  const app = await buildApp({
+    completePublicationStep: async (
+      _runId: string,
+      _token: string,
+      _stepKey: string,
+      remote: unknown
+    ) => {
+      received = remote
+      return true
+    }
+  })
+  try {
+    for (const id of ['1234', null]) {
+      received = undefined
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/publication/steps/issue:draft-pr/complete',
+        headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+        payload: { token: 'token-1', remote_object: { id, url: 'https://example.test/1' } }
+      })
+      assert.equal(response.statusCode, 200, `id ${JSON.stringify(id)} must validate`)
+      assert.deepEqual(received, { id, url: 'https://example.test/1' })
+    }
+  } finally {
+    await app.close()
+  }
+})
+
+test('a remote_object.id the contract does not declare is rejected', async () => {
+  // A JSON number, a boolean, and an array are all outside `[string, "null"]`. With coercion
+  // off there is no silent conversion, so each is a 400 before the handler runs — the behavior
+  // the default `coerceTypes: true` would have hidden (it turned `true` into `"true"`).
+  let handlerCalls = 0
+  const app = await buildApp({
+    completePublicationStep: async () => {
+      handlerCalls += 1
+      return true
+    }
+  })
+  try {
+    for (const id of [1234, true, [1, 2]]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/publication/steps/issue:draft-pr/complete',
+        headers: {
+          authorization: `Bearer ${SERVICE_TOKEN}`,
+          'content-type': 'application/json'
+        },
+        payload: { token: 'token-1', remote_object: { id } }
+      })
+      assert.equal(response.statusCode, 400, `id ${JSON.stringify(id)} must be rejected`)
+      assert.equal(
+        (response.json() as { code?: string }).code,
+        'INVALID_BODY',
+        'a body that fails the contract is INVALID_BODY'
+      )
+    }
+    assert.equal(handlerCalls, 0, 'an invalid id must be rejected before the handler')
+  } finally {
+    await app.close()
+  }
+})
+
+test('the query string is coerced to the declared types, and only there', async () => {
+  // `coerceTypes` is off so bodies mean exactly what they say, but the query string can only
+  // carry strings and the contract declares `limit` an integer. The preValidation hook coerces
+  // the query from the route's own contract-derived schema, so the integer is accepted and a
+  // non-integer is still rejected — coercion never becomes a way to bypass the schema.
+  let calls = 0
+  const app = await buildApp({
+    listRunsPage: async () => {
+      calls += 1
+      return { runs: [], next_cursor: null }
+    }
+  })
+  try {
+    const ok = await app.inject({
+      method: 'GET',
+      url: '/v1/runs?limit=10',
+      headers: { authorization: `Bearer ${READ_TOKEN}` }
+    })
+    assert.equal(ok.statusCode, 200)
+    assert.equal(calls, 1, 'a coerced integer must reach the handler')
+
+    for (const bad of ['abc', '10.5', '']) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/v1/runs?limit=${bad}`,
+        headers: { authorization: `Bearer ${READ_TOKEN}` }
+      })
+      assert.equal(response.statusCode, 400, `limit=${JSON.stringify(bad)} must be rejected`)
+      assert.equal((response.json() as { code?: string }).code, 'INVALID_QUERY')
+    }
+    assert.equal(calls, 1, 'a rejected query must not reach the handler')
+  } finally {
+    await app.close()
+  }
+})

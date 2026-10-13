@@ -289,10 +289,21 @@ class HttpControlPlaneClient {
     stepKey: string,
     remote: { id?: string | number | null; url?: string | null } = {}
   ): Promise<boolean> {
+    // The contract carries `remote_object.id` as a string (`type: [string, "null"]`), matching
+    // how Control Plane persists it (as text) and reads it back (`Number(...)`). GitHub object
+    // ids arrive as numbers, so normalize here; Control Plane validates bodies without
+    // coercion, so a raw number would be rejected rather than silently converted.
+    const remoteObject = {
+      ...(remote.id === undefined ? {} : { id: remote.id === null ? null : String(remote.id) }),
+      url: remote.url ?? null
+    }
     return await this.request(
       'completePublicationStep',
       { runId, stepKey },
-      { token, remote_object: remote }
+      {
+        token,
+        remote_object: remoteObject
+      }
     )
   }
 

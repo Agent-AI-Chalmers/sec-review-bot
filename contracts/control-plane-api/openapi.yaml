@@ -1031,10 +1031,13 @@ paths:
                   additionalProperties: false
                   properties:
                     id:
-                      oneOf:
-                        - type: string
-                        - type: number
-                        - type: "null"
+                      description: >-
+                        The created object's numeric id in its canonical string form. It is
+                        persisted as text and read back with `Number(...)`; a `null` id means
+                        the step produced no remote object.
+                      type:
+                        - string
+                        - "null"
                     url:
                       type:
                         - string
