@@ -91,12 +91,9 @@ function parseListQuery(url: URL): ListQueryOptions {
   }
   const cursor = url.searchParams.get('cursor')
   if (cursor !== null) {
-    let decoded: string
-    try {
-      decoded = Buffer.from(cursor, 'base64url').toString('utf8')
-    } catch {
-      throw invalidQuery('cursor must be a valid run list cursor.')
-    }
+    // `Buffer.from(x, 'base64url')` never throws on malformed input — it decodes as much as
+    // it can and drops the rest — so the validity check is the structure below, not a catch.
+    const decoded = Buffer.from(cursor, 'base64url').toString('utf8')
     const [createdAt, runId, extra] = decoded.split('|')
     if (!createdAt || !runId || extra !== undefined || Number.isNaN(Date.parse(createdAt))) {
       throw invalidQuery('cursor must be a valid run list cursor.')
@@ -229,7 +226,9 @@ export async function registerControlPlaneRoutes(
 
     admitRun: async (request) => {
       const body = request.body as RequestBody<'admitRun'>
-      return await store.admitReviewRun({ run_id: randomUUID(), ...body })
+      // `run_id` last, so a body field of the same name (today the contract forbids one)
+      // could never override the id Control Plane assigns.
+      return await store.admitReviewRun({ ...body, run_id: randomUUID() })
     },
 
     submitPreparedRun: async (request) => {
