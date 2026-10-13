@@ -9,8 +9,10 @@
 # therefore names it explicitly (`pnpm run lint:contract` in `control-plane`).
 #
 # The spec is the single source of truth; this ruleset keeps it valid OpenAPI and enforces
-# the minimum invariant the whole pipeline (glue routing, client type generation) relies on:
-# every operation must carry an operationId, because glue and service handlers key off it.
+# the minimum invariants the whole pipeline (glue routing, client type generation, request
+# authorization) relies on: every operation must carry an operationId, because glue and
+# service handlers key off it, and every operation except the health probe must name a
+# security scheme, because glue only authenticates what the document declares.
 #
 # Two `spectral:oas` rules are off because they describe a published, discoverable API rather
 # than this internal service, and leaving them on would bury real findings in permanent noise:
@@ -22,9 +24,31 @@
 # meant to be readable on its own, so a missing description is a real gap to fix.
 extends:
   - spectral:oas
+# Spectral resolves `functionsDir` relative to this ruleset file, and loads only the modules
+# named in `functions`, so both keys are needed for a custom rule to resolve.
+functionsDir: spectral-functions
+functions:
+  - operationRequiresSecurity
 rules:
   operation-operationId: error
   operation-tags: 'off'
   operation-description: warn
   oas3-api-servers: 'off'
   info-contact: 'off'
+
+  # Every operation must require a credential, except the health probe.
+  #
+  # This document declares no top-level `security`, so each operation has to carry its own
+  # requirement. Nothing else enforced that: an operation written without `security` is
+  # accepted by Spectral and mounted by fastify-openapi-glue with no authentication at all,
+  # so the omission is silent and the endpoint is public. The custom function also rejects a
+  # blank requirement (`security: []` or `[{}]`), which names no scheme and authenticates
+  # nobody. `/healthz` is the deliberate exception — it is the liveness probe and must answer
+  # an unauthenticated caller — so the check lives in a function that can express it.
+  operation-requires-security:
+    description: Every operation except /healthz must declare a non-empty security requirement.
+    message: '{{error}}'
+    severity: error
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      function: operationRequiresSecurity
