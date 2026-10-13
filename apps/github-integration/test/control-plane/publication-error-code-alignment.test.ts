@@ -3,17 +3,54 @@
 // `classifyPublicationFailure` decides retry vs. terminal from the string `code` that crosses
 // the REST boundary (a 409 with `code`). If Control Plane emits a new deterministic code this
 // package does not recognize, it falls through to `retry: true` and the runner retries the
-// same stored run forever. Read the codes from Control Plane's single source so the two
-// packages stay aligned.
+// same stored run forever. Read the codes from Control Plane's contract — the shared,
+// single source both packages derive from — rather than from its source tree, so this test
+// does not couple the two packages' source layouts.
 import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
-import { PUBLICATION_STEP_ERROR_CODES } from '../../../../control-plane/src/errors.js'
+import { parse as parseYaml } from 'yaml'
+
 import { classifyPublicationFailure } from '../../src/control-plane/publication-failure.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../src/runner/publish-error-code.js'
 
+/** Locate the workspace root by walking up to the contracts tree, as `contract-fixtures.ts`
+ * does, so the test does not depend on the current working directory. */
+function workspaceRoot(): string {
+  let current = path.dirname(fileURLToPath(import.meta.url))
+  while (true) {
+    if (existsSync(path.join(current, 'contracts', 'control-plane-api', 'openapi.yaml'))) {
+      return current
+    }
+    const parent = path.dirname(current)
+    if (parent === current) throw new Error('Could not locate the workspace contracts root.')
+    current = parent
+  }
+}
+
+/** The `PUBLICATION_STEP_*` members of the contract's `ErrorResponse.code` enum. The
+ * contract is the single source of truth for the vocabulary Control Plane emits. */
+function publicationStepCodesFromContract(): string[] {
+  const spec = parseYaml(
+    readFileSync(
+      path.join(workspaceRoot(), 'contracts', 'control-plane-api', 'openapi.yaml'),
+      'utf8'
+    )
+  ) as {
+    components?: { schemas?: { ErrorResponse?: { properties?: { code?: { enum?: unknown[] } } } } }
+  }
+  const values = spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
+  return values
+    .filter((value): value is string => typeof value === 'string')
+    .filter((value) => value.startsWith('PUBLICATION_STEP_'))
+    .sort()
+}
+
 test('every Control Plane publication-step code is known and terminal', () => {
-  const codes = Object.values(PUBLICATION_STEP_ERROR_CODES)
+  const codes = publicationStepCodesFromContract()
   assert.ok(codes.length > 0, 'expected publication-step codes')
 
   const known = new Set<string>(Object.values(RUNNER_PUBLISH_ERROR_CODES))

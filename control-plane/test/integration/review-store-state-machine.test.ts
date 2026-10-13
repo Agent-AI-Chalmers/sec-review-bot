@@ -630,3 +630,76 @@ test('ReviewRunStore reports a changed publication step set as deterministic', a
     await store.close()
   }
 })
+
+test('claimNextPublication returns the persisted result, context, and artifact', async () => {
+  // `claimNextPublication` hands the publisher everything it needs to publish: the Runner's
+  // opaque result, the publish context, and the artifact reference, alongside the claim
+  // token. `claimPublication` (covered above) only returns a token, so this is the shape a
+  // publisher actually receives and must match what was persisted.
+  const store = await createStore()
+  const runId = `run-${randomUUID()}`
+  const context = { repository: 'octo/example' }
+  const admission = await store.createPreparingReviewRun({
+    workflow: 'issue-review',
+    run_id: runId,
+    publish_context: context
+  })
+  assert.ok(admission.preparation_token)
+  await store.markQueued(runId, admission.preparation_token, context)
+  const workflowResult = { run_id: runId, review_record: { analysis: { verdict: 'no-findings' } } }
+  assert.equal(
+    await store.recordRunnerSuccess(runId, workflowResult, { status: 'unavailable' }),
+    true
+  )
+  try {
+    const work = await store.claimNextPublication()
+    assert.equal(work?.run_id, runId)
+    assert.equal(work?.claim_token.length, 36)
+    assert.deepEqual(work?.artifact_storage, { status: 'unavailable' })
+    assert.deepEqual(work?.workflow_result, workflowResult)
+    assert.deepEqual(work?.publish_context, context)
+  } finally {
+    await store.close()
+  }
+})
+
+test('concurrent claimNextPublication consumers cannot own the same ready run', async () => {
+  // Two publishers polling the same connector must not both claim the ready run: the claim is
+  // `FOR UPDATE ... SKIP LOCKED`, so one wins and the other finds nothing. Asserting this with
+  // real concurrent connections (rather than sequential calls) is what exercises the lock.
+  const connectorId = `publisher:${randomUUID()}`
+  const first = await createStore({ connectorId })
+  const second = await createStore({ connectorId })
+  try {
+    await createSuccessfulRun(first)
+    const claims = await Promise.all([first.claimNextPublication(), second.claimNextPublication()])
+    assert.equal(claims.filter((claim) => claim !== null).length, 1)
+  } finally {
+    await first.close()
+    await second.close()
+  }
+})
+
+test('a retryable publication failure makes the run claimable again', async () => {
+  // The counterpart to `spends retry budget only for the current publication owner`, which
+  // asserts the retryable failure is accepted: this asserts the run becomes claimable again
+  // afterwards, so the retry the budget allowed actually happens.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const work = await store.claimNextPublication()
+    assert.ok(work)
+    assert.equal(
+      await store.failPublication(
+        runId,
+        work.claim_token,
+        { message: 'GitHub unavailable' },
+        { retry: true }
+      ),
+      true
+    )
+    assert.equal((await store.claimNextPublication())?.run_id, runId)
+  } finally {
+    await store.close()
+  }
+})
