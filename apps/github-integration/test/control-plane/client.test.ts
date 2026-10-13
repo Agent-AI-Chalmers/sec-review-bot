@@ -20,7 +20,7 @@ const preparingRun: ReviewRunRecord = {
   ingress_key: 'octo/example:dispatch-1'
 }
 
-/** The request body a POST/DELETE sent, parsed from `init.body`. */
+/** The request body a request sent, parsed from `init.body`. */
 function sentBody(init?: RequestInit): Record<string, unknown> {
   return JSON.parse(String(init?.body)) as Record<string, unknown>
 }

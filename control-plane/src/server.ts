@@ -25,6 +25,15 @@ import { observePublicationStep, observeRun } from './observability.js'
 import { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } from './errors.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
+
+/** Fastify options shared by the server and its tests. `removeAdditional: false` makes the
+ * contract's `additionalProperties: false` mean what it says — a request with an undeclared
+ * field is rejected, rather than having the field silently stripped (Fastify's ajv default),
+ * which would make the contract overstate the validation. */
+export const CONTROL_PLANE_FASTIFY_OPTIONS = {
+  bodyLimit: MAX_BODY_BYTES,
+  ajv: { customOptions: { removeAdditional: false } }
+} as const
 // Statuses whose handling needs the run record itself, because the terminal writes
 // persist the result, the error, and the artifact reference. Every other status is
 // answered from the pass's batch, so a poll where nothing changed costs one request
@@ -375,7 +384,24 @@ export async function registerControlPlaneRoutes(
       if (handler === undefined) {
         throw new Error(`No handler registered for operation ${operationId}`)
       }
-      return handler
+      // Log every durable operation with its identity (the README promises connector_id and
+      // run_id), wrapping here so a new operation is logged without repeating the call. Only
+      // identifiers are logged, never request arguments, which may carry claim credentials.
+      return async (request: FastifyRequest, reply: FastifyReply) => {
+        const runId = (request.params as { runId?: string }).runId
+        logEvent('control_plane_operation_started', {
+          operation: operationId,
+          ...(runId === undefined ? {} : { run_id: runId }),
+          connector_id: store.connectorId
+        })
+        const result = await handler(request, reply)
+        logEvent('control_plane_operation_completed', {
+          operation: operationId,
+          ...(runId === undefined ? {} : { run_id: runId }),
+          connector_id: store.connectorId
+        })
+        return result
+      }
     },
     securityHandlers: {
       serviceToken: async (request: FastifyRequest) => {
@@ -456,7 +482,7 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
       console.error('control_plane_runner_coordination_failed', error)
     }
   })
-  const app = Fastify({ bodyLimit: MAX_BODY_BYTES })
+  const app = Fastify(CONTROL_PLANE_FASTIFY_OPTIONS)
 
   await registerControlPlaneRoutes(app, { store, serviceToken: token, readToken })
 

@@ -609,9 +609,17 @@ paths:
                       - string
                       - "null"
         "400":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: The request was rejected; see `code` for the machine-readable reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     post:
       operationId: admitRun
       security:
@@ -657,7 +665,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReviewRunAdmission"
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}:
     get:
       operationId: getRun
@@ -667,6 +679,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       responses:
@@ -682,9 +696,17 @@ paths:
                   run:
                     $ref: "#/components/schemas/ObservedRun"
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: The referenced run was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication-steps:
     get:
       operationId: listRunPublicationSteps
@@ -694,6 +716,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       responses:
@@ -714,9 +738,17 @@ paths:
                     items:
                       $ref: "#/components/schemas/ObservedPublicationStep"
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: The referenced run was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/submission:
     post:
       operationId: submitPreparedRun
@@ -726,6 +758,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       requestBody:
@@ -774,7 +808,11 @@ paths:
                     enum:
                       - queued
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/preparation/claim:
     post:
       operationId: renewPreparationClaim
@@ -784,6 +822,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       requestBody:
@@ -807,8 +847,13 @@ paths:
               schema:
                 type: boolean
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
-    delete:
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/runs/{runId}/preparation/failure:
+    post:
       operationId: failPreparation
       security:
         - serviceToken: []
@@ -816,6 +861,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       requestBody:
@@ -848,7 +895,12 @@ paths:
         "200":
           description: Fail acknowledgement (empty).
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /v1/publication/claims/next:
     post:
       operationId: claimNextPublication
@@ -875,7 +927,11 @@ paths:
                   - $ref: "#/components/schemas/PublicationWork"
                   - type: "null"
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/claim:
     post:
       operationId: renewPublicationClaim
@@ -885,6 +941,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       requestBody:
@@ -908,7 +966,11 @@ paths:
               schema:
                 type: boolean
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/steps:
     post:
       operationId: initializePublicationSteps
@@ -918,6 +980,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       requestBody:
@@ -943,7 +1007,11 @@ paths:
         "200":
           description: Initialization acknowledgement (empty).
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/steps/{stepKey}/claim:
     post:
       operationId: requirePublicationStepClaim
@@ -953,11 +1021,14 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
         - in: path
           name: stepKey
           required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
           schema:
             type: string
       requestBody:
@@ -977,7 +1048,11 @@ paths:
         "200":
           description: Claim acknowledgement (empty).
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/steps/{stepKey}/complete:
     post:
       operationId: completePublicationStep
@@ -987,11 +1062,14 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
         - in: path
           name: stepKey
           required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
           schema:
             type: string
       requestBody:
@@ -1028,7 +1106,11 @@ paths:
               schema:
                 type: boolean
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/steps/{stepKey}/fail:
     post:
       operationId: failPublicationStep
@@ -1038,11 +1120,14 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
         - in: path
           name: stepKey
           required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
           schema:
             type: string
       requestBody:
@@ -1081,7 +1166,11 @@ paths:
               schema:
                 type: boolean
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/complete:
     post:
       operationId: completePublication
@@ -1091,6 +1180,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       requestBody:
@@ -1114,7 +1205,11 @@ paths:
               schema:
                 type: boolean
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/fail:
     post:
       operationId: failPublication
@@ -1124,6 +1219,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       requestBody:
@@ -1163,7 +1260,11 @@ paths:
               schema:
                 type: boolean
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/internal/runs/{runId}:
     get:
       operationId: getInternalRun
@@ -1173,6 +1274,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       responses:
@@ -1183,9 +1286,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReviewRunRecord"
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: The referenced run was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/internal/runs/{runId}/publication/steps:
     get:
       operationId: listInternalPublicationSteps
@@ -1195,6 +1306,8 @@ paths:
         - in: path
           name: runId
           required: true
+          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
+            it is passed through verbatim.
           schema:
             type: string
       responses:
@@ -1207,9 +1320,17 @@ paths:
                 items:
                   $ref: "#/components/schemas/PublicationStepRecord"
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: The referenced run was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/config/preparation-heartbeat-interval:
     get:
       operationId: getPreparationHeartbeatInterval
@@ -1223,7 +1344,11 @@ paths:
               schema:
                 type: integer
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/config/publication-heartbeat-interval:
     get:
       operationId: getPublicationHeartbeatInterval
@@ -1237,5 +1362,9 @@ paths:
               schema:
                 type: integer
         "401":
-          $ref: "#/components/schemas/ErrorResponse"
+          description: Missing or invalid bearer credential for the operation's security scheme.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 

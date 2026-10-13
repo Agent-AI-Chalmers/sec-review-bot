@@ -14,13 +14,16 @@ import Fastify from 'fastify'
 // Set before importing the server: its module body starts a real server unless NODE_ENV is
 // 'test'. The import is dynamic so the assignment below runs first.
 process.env.NODE_ENV = 'test'
-const { registerControlPlaneRoutes } = await import('../dist/server.js')
+const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } =
+  await import('../dist/server.js')
 
 const SERVICE_TOKEN = 'service-token'
 const READ_TOKEN = 'read-token'
 
 async function buildApp(store: Record<string, unknown>) {
-  const app = Fastify()
+  // Same options as the real server, so validation behaviour (notably additionalProperties)
+  // is exercised as deployed rather than with Fastify's defaults.
+  const app = Fastify(CONTROL_PLANE_FASTIFY_OPTIONS)
   // registerControlPlaneRoutes installs the error/not-found handlers too, so this exercises
   // the same envelope the deployment returns.
   await registerControlPlaneRoutes(app, {
@@ -124,6 +127,41 @@ test('a deterministic publication failure maps to 409 with its code', async () =
       error: 'duplicate step set',
       code: 'PUBLICATION_STEP_SET_DUPLICATE'
     })
+  } finally {
+    await app.close()
+  }
+})
+
+test('an undeclared body field is rejected, matching the contract', async () => {
+  // The contract declares additionalProperties: false. Fastify's ajv would silently strip an
+  // extra field by default, which would make the contract overstate the validation; the
+  // server configures removeAdditional: false so the field is an error instead.
+  let handlerCalls = 0
+  const app = await buildApp({
+    admitReviewRun: async () => {
+      handlerCalls += 1
+      return {
+        record: { run_id: 'run-1', workflow: 'issue-review', runner_status: 'preparing' },
+        created: true,
+        preparation_token: 'token'
+      }
+    }
+  })
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/runs',
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      payload: {
+        workflow: 'issue-review',
+        publish_context: {},
+        ingress_kind: 'github_webhook',
+        ingress_key: 'k',
+        run_id: 'attacker-supplied'
+      }
+    })
+    assert.equal(response.statusCode, 400)
+    assert.equal(handlerCalls, 0, 'an undeclared field must be rejected before the handler')
   } finally {
     await app.close()
   }

@@ -93,7 +93,23 @@ export interface paths {
     get?: never
     put?: never
     post: operations['renewPreparationClaim']
-    delete: operations['failPreparation']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/runs/{runId}/preparation/failure': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['failPreparation']
+    delete?: never
     options?: never
     head?: never
     patch?: never
@@ -532,8 +548,24 @@ export interface operations {
           }
         }
       }
-      400: components['schemas']['ErrorResponse']
-      401: components['schemas']['ErrorResponse']
+      /** @description The request was rejected; see `code` for the machine-readable reason. */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   admitRun: {
@@ -570,7 +602,15 @@ export interface operations {
           'application/json': components['schemas']['ReviewRunAdmission']
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   getRun: {
@@ -578,6 +618,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -595,8 +636,24 @@ export interface operations {
           }
         }
       }
-      401: components['schemas']['ErrorResponse']
-      404: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description The referenced run was not found. */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   listRunPublicationSteps: {
@@ -604,6 +661,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -622,8 +680,24 @@ export interface operations {
           }
         }
       }
-      401: components['schemas']['ErrorResponse']
-      404: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description The referenced run was not found. */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   submitPreparedRun: {
@@ -631,6 +705,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -664,7 +739,15 @@ export interface operations {
           }
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   renewPreparationClaim: {
@@ -672,6 +755,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -693,7 +777,15 @@ export interface operations {
           'application/json': boolean
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   failPreparation: {
@@ -701,6 +793,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -724,7 +817,15 @@ export interface operations {
         }
         content?: never
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   claimNextPublication: {
@@ -751,7 +852,15 @@ export interface operations {
           'application/json': components['schemas']['PublicationWork'] | null
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   renewPublicationClaim: {
@@ -759,6 +868,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -780,7 +890,15 @@ export interface operations {
           'application/json': boolean
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   initializePublicationSteps: {
@@ -788,6 +906,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -808,7 +927,15 @@ export interface operations {
         }
         content?: never
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   requirePublicationStepClaim: {
@@ -816,7 +943,9 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
+        /** @description The publication step key, as supplied at initializePublicationSteps. */
         stepKey: string
       }
       cookie?: never
@@ -836,7 +965,15 @@ export interface operations {
         }
         content?: never
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   completePublicationStep: {
@@ -844,7 +981,9 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
+        /** @description The publication step key, as supplied at initializePublicationSteps. */
         stepKey: string
       }
       cookie?: never
@@ -870,7 +1009,15 @@ export interface operations {
           'application/json': boolean
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   failPublicationStep: {
@@ -878,7 +1025,9 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
+        /** @description The publication step key, as supplied at initializePublicationSteps. */
         stepKey: string
       }
       cookie?: never
@@ -905,7 +1054,15 @@ export interface operations {
           'application/json': boolean
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   completePublication: {
@@ -913,6 +1070,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -934,7 +1092,15 @@ export interface operations {
           'application/json': boolean
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   failPublication: {
@@ -942,6 +1108,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -968,7 +1135,15 @@ export interface operations {
           'application/json': boolean
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   getInternalRun: {
@@ -976,6 +1151,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -991,8 +1167,24 @@ export interface operations {
           'application/json': components['schemas']['ReviewRunRecord']
         }
       }
-      401: components['schemas']['ErrorResponse']
-      404: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description The referenced run was not found. */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   listInternalPublicationSteps: {
@@ -1000,6 +1192,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
+        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
         runId: string
       }
       cookie?: never
@@ -1015,8 +1208,24 @@ export interface operations {
           'application/json': components['schemas']['PublicationStepRecord'][]
         }
       }
-      401: components['schemas']['ErrorResponse']
-      404: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description The referenced run was not found. */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   getPreparationHeartbeatInterval: {
@@ -1037,7 +1246,15 @@ export interface operations {
           'application/json': number
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
   getPublicationHeartbeatInterval: {
@@ -1058,7 +1275,15 @@ export interface operations {
           'application/json': number
         }
       }
-      401: components['schemas']['ErrorResponse']
+      /** @description Missing or invalid bearer credential for the operation's security scheme. */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
     }
   }
 }
