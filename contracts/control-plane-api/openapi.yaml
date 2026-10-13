@@ -363,7 +363,6 @@ components:
           type:
             - string
             - "null"
-
     ObservedPublicationStep:
       type: object
       additionalProperties: false
@@ -402,7 +401,6 @@ components:
           type:
             - string
             - "null"
-
     ObservedRun:
       type: object
       additionalProperties: false
@@ -520,7 +518,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ObservedPublicationStep"
-
 paths:
   /healthz:
     get:
@@ -547,6 +544,8 @@ paths:
           name: limit
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
         - in: query
           name: cursor
           schema:
@@ -555,22 +554,41 @@ paths:
           name: execution_status
           schema:
             type: string
+            enum:
+              - preparing
+              - recovering
+              - queued
+              - running
+              - succeeded
+              - failed
         - in: query
           name: publication_status
           schema:
             type: string
+            enum:
+              - pending
+              - publishing
+              - published
+              - failed
+              - skipped
         - in: query
           name: workflow
           schema:
             type: string
+            enum:
+              - issue-review
+              - pull-request-review
+              - repository-review
         - in: query
           name: from
           schema:
             type: string
+            format: date-time
         - in: query
           name: to
           schema:
             type: string
+            format: date-time
       responses:
         "200":
           description: Paginated redacted runs.
@@ -591,6 +609,8 @@ paths:
                       - string
                       - "null"
         "400":
+          $ref: "#/components/schemas/ErrorResponse"
+        "401":
           $ref: "#/components/schemas/ErrorResponse"
     post:
       operationId: admitRun
@@ -636,6 +656,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewRunAdmission"
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}:
     get:
       operationId: getRun
@@ -659,6 +681,8 @@ paths:
                 properties:
                   run:
                     $ref: "#/components/schemas/ObservedRun"
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
         "404":
           $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication-steps:
@@ -689,6 +713,8 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ObservedPublicationStep"
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
         "404":
           $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/submission:
@@ -747,6 +773,8 @@ paths:
                     type: string
                     enum:
                       - queued
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/preparation/claim:
     post:
       operationId: renewPreparationClaim
@@ -778,6 +806,8 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
     delete:
       operationId: failPreparation
       security:
@@ -817,6 +847,8 @@ paths:
       responses:
         "200":
           description: Fail acknowledgement (empty).
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/publication/claims/next:
     post:
       operationId: claimNextPublication
@@ -842,6 +874,8 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/PublicationWork"
                   - type: "null"
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/claim:
     post:
       operationId: renewPublicationClaim
@@ -873,6 +907,8 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/steps:
     post:
       operationId: initializePublicationSteps
@@ -906,6 +942,8 @@ paths:
       responses:
         "200":
           description: Initialization acknowledgement (empty).
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/steps/{stepKey}/claim:
     post:
       operationId: requirePublicationStepClaim
@@ -938,6 +976,8 @@ paths:
       responses:
         "200":
           description: Claim acknowledgement (empty).
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/steps/{stepKey}/complete:
     post:
       operationId: completePublicationStep
@@ -987,6 +1027,8 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/steps/{stepKey}/fail:
     post:
       operationId: failPublicationStep
@@ -1038,6 +1080,8 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/complete:
     post:
       operationId: completePublication
@@ -1069,6 +1113,8 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/runs/{runId}/publication/fail:
     post:
       operationId: failPublication
@@ -1116,6 +1162,8 @@ paths:
             application/json:
               schema:
                 type: boolean
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/internal/runs/{runId}:
     get:
       operationId: getInternalRun
@@ -1134,6 +1182,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewRunRecord"
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
         "404":
           $ref: "#/components/schemas/ErrorResponse"
   /v1/internal/runs/{runId}/publication/steps:
@@ -1156,6 +1206,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PublicationStepRecord"
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
         "404":
           $ref: "#/components/schemas/ErrorResponse"
   /v1/config/preparation-heartbeat-interval:
@@ -1170,6 +1222,8 @@ paths:
             application/json:
               schema:
                 type: integer
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
   /v1/config/publication-heartbeat-interval:
     get:
       operationId: getPublicationHeartbeatInterval
@@ -1182,4 +1236,6 @@ paths:
             application/json:
               schema:
                 type: integer
+        "401":
+          $ref: "#/components/schemas/ErrorResponse"
 

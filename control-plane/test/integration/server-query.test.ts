@@ -36,22 +36,25 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     const unfiltered = await fetch(`${base}/v1/runs`, { headers: readAuth })
     assert.equal(unfiltered.status, 200)
     assert.deepEqual(await unfiltered.json(), { runs: [], next_cursor: null })
+    // The query filters are validated by the contract (glue mounts it as the route schema),
+    // so the envelope's stable part is the status and code; the message comes from the schema
+    // validator and is deliberately not pinned here.
     const invalidExecutionStatus = await fetch(`${base}/v1/runs?execution_status=typo`, {
       headers: readAuth
     })
     assert.equal(invalidExecutionStatus.status, 400)
-    assert.deepEqual(await invalidExecutionStatus.json(), {
-      error: 'execution_status is invalid.',
-      code: 'INVALID_QUERY'
-    })
+    assert.equal(((await invalidExecutionStatus.json()) as { code?: string }).code, 'INVALID_QUERY')
     const invalidPublicationStatus = await fetch(`${base}/v1/runs?publication_status=typo`, {
       headers: readAuth
     })
     assert.equal(invalidPublicationStatus.status, 400)
-    assert.deepEqual(await invalidPublicationStatus.json(), {
-      error: 'publication_status is invalid.',
-      code: 'INVALID_QUERY'
-    })
+    assert.equal(
+      ((await invalidPublicationStatus.json()) as { code?: string }).code,
+      'INVALID_QUERY'
+    )
+    const invalidWorkflow = await fetch(`${base}/v1/runs?workflow=typo`, { headers: readAuth })
+    assert.equal(invalidWorkflow.status, 400)
+    assert.equal(((await invalidWorkflow.json()) as { code?: string }).code, 'INVALID_QUERY')
     const invalidLimit = await fetch(`${base}/v1/runs?limit=10junk`, { headers: readAuth })
     assert.equal(invalidLimit.status, 400)
 
@@ -118,10 +121,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     assert.deepEqual(await beforeEverything.json(), { runs: [], next_cursor: null })
     const invalidFrom = await fetch(`${base}/v1/runs?from=not-a-date`, { headers: readAuth })
     assert.equal(invalidFrom.status, 400)
-    assert.deepEqual(await invalidFrom.json(), {
-      error: 'from must be a valid date.',
-      code: 'INVALID_QUERY'
-    })
+    assert.equal(((await invalidFrom.json()) as { code?: string }).code, 'INVALID_QUERY')
 
     await server.close()
     server = await startControlPlaneServer()

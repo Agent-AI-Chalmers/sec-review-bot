@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
@@ -45,26 +47,8 @@ function runnerStatusFromBatch(
     return await getRunnerRunStatus(runId, workflow)
   }
 }
-const runnerStatuses = new Set<RunnerStatus>([
-  'preparing',
-  'recovering',
-  'queued',
-  'running',
-  'succeeded',
-  'failed'
-])
-const publicationStatuses = new Set<PublicationStatus>([
-  'pending',
-  'publishing',
-  'published',
-  'failed',
-  'skipped'
-])
-const workflows = new Set<ControlPlaneWorkflow>([
-  'issue-review',
-  'pull-request-review',
-  'repository-review'
-])
+// The list-query filter values are constrained by the contract's query schema (glue mounts it
+// on the route), so there is no enumeration to restate here.
 // The error-envelope `code` values. `INVALID_QUERY` is the run-list query filter; the four
 // `PUBLICATION_STEP_*` codes also surface here, carried by the REST write routes for
 // deterministic publication failures the client must classify as terminal.
@@ -81,15 +65,15 @@ function invalidQuery(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 400, code: 'INVALID_QUERY' })
 }
 
+// The list-query filters are validated by the contract's query schema (glue mounts it on the
+// route), so this only does what a schema cannot express: the cursor's base64 structure, and
+// normalizing `from`/`to` to a canonical instant before binding (Date.parse accepts inputs like
+// `1` that `'1'::timestamptz` rejects, which surfaced as a 500 instead of a 400).
 function parseListQuery(url: URL): ListQueryOptions {
   const rawLimit = url.searchParams.get('limit')
-  const limit = rawLimit === null ? 50 : Number(rawLimit)
-  if (rawLimit !== null && (!/^\d+$/.test(rawLimit) || !Number.isSafeInteger(limit))) {
-    throw invalidQuery('limit must be an integer.')
+  const options: ListQueryOptions = {
+    limit: rawLimit === null ? 50 : Number(rawLimit)
   }
-  if (limit < 1 || limit > 100) throw invalidQuery('limit must be between 1 and 100.')
-
-  const options: ListQueryOptions = { limit }
   const cursor = url.searchParams.get('cursor')
   if (cursor !== null) {
     let decoded: string
@@ -105,34 +89,17 @@ function parseListQuery(url: URL): ListQueryOptions {
     options.cursor = cursor
   }
   const executionStatus = url.searchParams.get('execution_status')
-  if (executionStatus !== null) {
-    if (!runnerStatuses.has(executionStatus as RunnerStatus)) {
-      throw invalidQuery('execution_status is invalid.')
-    }
-    options.execution_status = executionStatus as RunnerStatus
-  }
+  if (executionStatus !== null) options.execution_status = executionStatus as RunnerStatus
   const publicationStatus = url.searchParams.get('publication_status')
-  if (publicationStatus !== null) {
-    if (!publicationStatuses.has(publicationStatus as PublicationStatus)) {
-      throw invalidQuery('publication_status is invalid.')
-    }
+  if (publicationStatus !== null)
     options.publication_status = publicationStatus as PublicationStatus
-  }
   const workflow = url.searchParams.get('workflow')
-  if (workflow !== null) {
-    if (!workflows.has(workflow as ControlPlaneWorkflow)) throw invalidQuery('workflow is invalid.')
-    options.workflow = workflow as ControlPlaneWorkflow
-  }
+  if (workflow !== null) options.workflow = workflow as ControlPlaneWorkflow
   for (const name of ['from', 'to'] as const) {
     const value = url.searchParams.get(name)
     if (value !== null) {
-      const parsed = Date.parse(value)
-      if (Number.isNaN(parsed)) throw invalidQuery(`${name} must be a valid date.`)
-      // Normalize to a canonical ISO-8601 instant before binding. Date.parse
-      // accepts inputs like `1` (year 2001) that `'1'::timestamptz` rejects; if we
-      // bound the raw string, Postgres raised `22007` and the generic catch leaked
-      // the SQLSTATE as a 500 instead of the documented 400 INVALID_QUERY.
-      options[name] = new Date(parsed).toISOString()
+      // The route schema already pinned the date-time format; this canonicalizes it.
+      options[name] = new Date(Date.parse(value)).toISOString()
     }
   }
   return options
@@ -150,6 +117,26 @@ interface ControlPlaneRouteDeps {
   readToken: string
 }
 
+/** Locate the OpenAPI contract relative to this module, not the process CWD.
+ *
+ * fastify-openapi-glue resolves a relative `specification` against the CWD, which breaks as
+ * soon as the server runs from a different directory (notably the container, where only
+ * `dist/` is present). The build copies the contract next to the compiled output
+ * (`copy:spec`), so the compiled server finds it first; running from source (tsx) falls back
+ * to the repository's contracts tree. */
+function resolveSpecPath(): string {
+  const candidates = [
+    new URL('./openapi.yaml', import.meta.url), // dist/openapi.yaml (built)
+    new URL('../../contracts/control-plane-api/openapi.yaml', import.meta.url) // src/ -> repo contracts/
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return fileURLToPath(candidate)
+  }
+  throw new Error(
+    `OpenAPI contract not found. Looked for ${candidates.map((c) => fileURLToPath(c)).join(', ')}.`
+  )
+}
+
 /** Register the Control Plane HTTP surface from the OpenAPI contract. Routes, request/response
  * schemas, and security all come from `contracts/control-plane-api/openapi.yaml` via
  * fastify-openapi-glue; the handlers below only carry the domain logic against the store.
@@ -162,15 +149,8 @@ export async function registerControlPlaneRoutes(
 ): Promise<void> {
   const { store, serviceToken, readToken } = deps
 
-  // A deterministic publication failure reaches the client with its string code (classified
-  // terminal on the github side) as a 409; anything else is a generic 500.
-  const writeError = (reply: FastifyReply, error: unknown): void => {
-    if (error instanceof DeterministicControlPlaneError) {
-      reply.code(409).send({ error: error.message, code: error.code })
-      return
-    }
-    reply.code(500).send({ error: 'Internal error' })
-  }
+  // Errors propagate to the Fastify error handler, which maps a DeterministicControlPlaneError
+  // to 409 + code and keeps every other fault a message-free 500; handlers stay domain-only.
 
   // The handlers, keyed by operationId. Each handler calls the store directly and does only
   // the domain logic: routing, body/query/path validation, and auth come from the OpenAPI
@@ -200,7 +180,7 @@ export async function registerControlPlaneRoutes(
       return { run_id: run.run_id, publication_steps: steps.map(observePublicationStep) }
     },
 
-    admitRun: async (request, reply) => {
+    admitRun: async (request) => {
       const body = request.body as {
         workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
         publish_context: Record<string, unknown>
@@ -208,29 +188,21 @@ export async function registerControlPlaneRoutes(
         ingress_kind: 'github_webhook' | 'github_actions_dispatch'
         ingress_key: string
       }
-      try {
-        return await store.admitReviewRun({ run_id: randomUUID(), ...body })
-      } catch (error) {
-        return writeError(reply, error)
-      }
+      return await store.admitReviewRun({ run_id: randomUUID(), ...body })
     },
 
-    submitPreparedRun: async (request, reply) => {
+    submitPreparedRun: async (request) => {
       const { runId } = request.params as { runId: string }
       const { preparation_token, publish_context, input } = request.body as {
         preparation_token: string
         publish_context: Record<string, unknown>
         input: Record<string, unknown>
       }
-      try {
-        return await submitPreparedRun(
-          store,
-          { runId, preparationToken: preparation_token, publishContext: publish_context, input },
-          submitRunnerRun
-        )
-      } catch (error) {
-        return writeError(reply, error)
-      }
+      return await submitPreparedRun(
+        store,
+        { runId, preparationToken: preparation_token, publishContext: publish_context, input },
+        submitRunnerRun
+      )
     },
 
     renewPreparationClaim: async (request) => {
@@ -334,8 +306,70 @@ export async function registerControlPlaneRoutes(
     getPublicationHeartbeatInterval: async () => store.publicationHeartbeatIntervalMs()
   }
 
+  // Error/not-found handlers belong to this HTTP surface, so they are registered here (and
+  // before fastify-openapi-glue registers its child scope) rather than in
+  // startControlPlaneServer: otherwise handler-thrown errors would get Fastify's default
+  // envelope, and the surface could not be exercised without a database.
+  app.setNotFoundHandler((_request, reply) => {
+    reply.code(404).send({ error: 'not_found' })
+  })
+
+  app.setErrorHandler((error, _request, reply) => {
+    // A deterministic publication failure is a state conflict, not an internal fault: it
+    // returns 409 with its PUBLICATION_STEP_* code so the client can classify it as terminal.
+    // Handling it here (rather than per-handler) keeps every store method that can throw it
+    // covered, including ones added later.
+    if (error instanceof DeterministicControlPlaneError) {
+      return reply.code(409).send({ error: error.message, code: error.code })
+    }
+    const errorCode =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof error.code === 'string'
+        ? error.code
+        : null
+    // Defense in depth: a Postgres datetime parse error (22007/22008) can only
+    // originate from a bad `from`/`to` filter.
+    if (errorCode === '22007' || errorCode === '22008') {
+      return reply.code(400).send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
+    }
+    if (errorCode === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      return reply.code(413).send({ error: 'Request body is too large.' })
+    }
+    if (errorCode === 'FST_ERR_CTP_INVALID_JSON_BODY') {
+      return reply.code(400).send({ error: 'Request body must be valid JSON.' })
+    }
+    // A request rejected by the contract's own schema (glue mounts it as the route's query /
+    // body schema) is the caller's input being invalid, so it uses the documented
+    // INVALID_QUERY envelope rather than Fastify's default FST_ERR_VALIDATION shape.
+    if (errorCode === 'FST_ERR_VALIDATION') {
+      const detail = error instanceof Error ? error.message : String(error)
+      return reply.code(400).send({ error: detail, code: 'INVALID_QUERY' })
+    }
+    const status =
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      typeof error.statusCode === 'number'
+        ? error.statusCode
+        : 500
+    // Only surface codes in the closed set; internal codes (e.g. Postgres SQLSTATE)
+    // must not leak into the envelope, which would also break the OpenAPI enum.
+    const code = errorCode !== null && errorCodeEnum.includes(errorCode) ? errorCode : undefined
+    // An unexpected internal fault (5xx) must not leak its message (which may carry SQLSTATE
+    // or connection details); the caller only learns that the request failed. Known 4xx
+    // results keep their message, since those are the caller's own input being rejected.
+    const message =
+      status >= 500 ? 'Internal error' : error instanceof Error ? error.message : String(error)
+    return reply.code(status).send({
+      error: message,
+      ...(code === undefined ? {} : { code })
+    })
+  })
+
   await app.register(openapiGlue, {
-    specification: '../contracts/control-plane-api/openapi.yaml',
+    specification: resolveSpecPath(),
     operationResolver: (operationId) => {
       const handler = handlers[operationId]
       if (handler === undefined) {
@@ -423,48 +457,6 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
     }
   })
   const app = Fastify({ bodyLimit: MAX_BODY_BYTES })
-
-  // Error/not-found handlers must be registered on the root instance *before* the routes
-  // (and before fastify-openapi-glue registers its child scope), otherwise handler-thrown
-  // errors get Fastify's default envelope instead of the Control Plane error envelope.
-  app.setNotFoundHandler((_request, reply) => {
-    reply.code(404).send({ error: 'not_found' })
-  })
-
-  app.setErrorHandler((error, _request, reply) => {
-    const errorCode =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : null
-    // Defense in depth: a Postgres datetime parse error (22007/22008) can only
-    // originate from a bad `from`/`to` filter.
-    if (errorCode === '22007' || errorCode === '22008') {
-      return reply.code(400).send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
-    }
-    if (errorCode === 'FST_ERR_CTP_BODY_TOO_LARGE') {
-      return reply.code(413).send({ error: 'Request body is too large.' })
-    }
-    if (errorCode === 'FST_ERR_CTP_INVALID_JSON_BODY') {
-      return reply.code(400).send({ error: 'Request body must be valid JSON.' })
-    }
-    const status =
-      typeof error === 'object' &&
-      error !== null &&
-      'statusCode' in error &&
-      typeof error.statusCode === 'number'
-        ? error.statusCode
-        : 500
-    // Only surface codes in the closed set; internal codes (e.g. Postgres SQLSTATE)
-    // must not leak into the envelope, which would also break the OpenAPI enum.
-    const code = errorCode !== null && errorCodeEnum.includes(errorCode) ? errorCode : undefined
-    return reply.code(status).send({
-      error: error instanceof Error ? error.message : String(error),
-      ...(code === undefined ? {} : { code })
-    })
-  })
 
   await registerControlPlaneRoutes(app, { store, serviceToken: token, readToken })
 

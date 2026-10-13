@@ -507,9 +507,10 @@ export interface operations {
       query?: {
         limit?: number
         cursor?: string
-        execution_status?: string
-        publication_status?: string
-        workflow?: string
+        execution_status?:
+          'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+        publication_status?: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+        workflow?: 'issue-review' | 'pull-request-review' | 'repository-review'
         from?: string
         to?: string
       }
@@ -532,6 +533,7 @@ export interface operations {
         }
       }
       400: components['schemas']['ErrorResponse']
+      401: components['schemas']['ErrorResponse']
     }
   }
   admitRun: {
@@ -568,6 +570,7 @@ export interface operations {
           'application/json': components['schemas']['ReviewRunAdmission']
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   getRun: {
@@ -592,6 +595,7 @@ export interface operations {
           }
         }
       }
+      401: components['schemas']['ErrorResponse']
       404: components['schemas']['ErrorResponse']
     }
   }
@@ -618,6 +622,7 @@ export interface operations {
           }
         }
       }
+      401: components['schemas']['ErrorResponse']
       404: components['schemas']['ErrorResponse']
     }
   }
@@ -659,6 +664,7 @@ export interface operations {
           }
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   renewPreparationClaim: {
@@ -687,6 +693,7 @@ export interface operations {
           'application/json': boolean
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   failPreparation: {
@@ -717,6 +724,7 @@ export interface operations {
         }
         content?: never
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   claimNextPublication: {
@@ -743,6 +751,7 @@ export interface operations {
           'application/json': components['schemas']['PublicationWork'] | null
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   renewPublicationClaim: {
@@ -771,6 +780,7 @@ export interface operations {
           'application/json': boolean
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   initializePublicationSteps: {
@@ -798,6 +808,7 @@ export interface operations {
         }
         content?: never
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   requirePublicationStepClaim: {
@@ -825,6 +836,7 @@ export interface operations {
         }
         content?: never
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   completePublicationStep: {
@@ -858,6 +870,7 @@ export interface operations {
           'application/json': boolean
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   failPublicationStep: {
@@ -892,6 +905,7 @@ export interface operations {
           'application/json': boolean
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   completePublication: {
@@ -920,6 +934,7 @@ export interface operations {
           'application/json': boolean
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   failPublication: {
@@ -953,6 +968,7 @@ export interface operations {
           'application/json': boolean
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   getInternalRun: {
@@ -975,6 +991,7 @@ export interface operations {
           'application/json': components['schemas']['ReviewRunRecord']
         }
       }
+      401: components['schemas']['ErrorResponse']
       404: components['schemas']['ErrorResponse']
     }
   }
@@ -998,6 +1015,7 @@ export interface operations {
           'application/json': components['schemas']['PublicationStepRecord'][]
         }
       }
+      401: components['schemas']['ErrorResponse']
       404: components['schemas']['ErrorResponse']
     }
   }
@@ -1019,6 +1037,7 @@ export interface operations {
           'application/json': number
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
   getPublicationHeartbeatInterval: {
@@ -1039,6 +1058,7 @@ export interface operations {
           'application/json': number
         }
       }
+      401: components['schemas']['ErrorResponse']
     }
   }
 }
