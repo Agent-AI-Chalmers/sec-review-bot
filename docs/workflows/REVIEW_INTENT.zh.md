@@ -9,7 +9,7 @@
 **调用方**与**最终用户**是两个不同角色，这个区分在这里很关键：
 
 - **调用方（caller）**是真正调用 runner、设置 `review_intent` 的程序：GitHub integration、PatchEval harness，或本地 CLI 运行。
-- **最终用户（end user）**通过调用方交互——例如在 GitHub issue 下评论 `@<app-slug> review`。最终用户从不选择 `objective`；在 GitHub 上他们仍然可以设置 `repair_mode`，方法是在评论里加上 `no-test-changes`。
+- **最终用户（end user）**通过调用方交互——例如在 GitHub issue 下评论 `@<app-slug> review`。最终用户从不选择 `objective`；在 GitHub 上他们仍然可以设置 `repair_mode`，方法是在评论里加上 `--repair-mode=no-test-changes`。
 
 调用方如何选择 objective 是它自己的产品决策，不是 `review_intent` 决定的。GitHub integration 恒送 `audit`，因为它转发的是别人写的 issue 或 pull request——一个未经证实的说法。PatchEval harness 可以送 `repair`，因为它的输入是已知 CVE。契约两者都接受；由每个调用方各选其一。
 

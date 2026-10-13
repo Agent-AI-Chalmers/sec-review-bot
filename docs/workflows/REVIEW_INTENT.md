@@ -7,7 +7,7 @@ Language: English | [中文](REVIEW_INTENT.zh.md)
 The caller and the end user are different roles, and the distinction matters here:
 
 - The **caller** is whatever program invokes the runner and sets `review_intent`: the GitHub integration, the PatchEval harness, or a local CLI run.
-- The **end user** interacts with that caller — for example, commenting `@<app-slug> review` on a GitHub issue. An end user never chooses the `objective`; on GitHub they can still set `repair_mode`, by adding `no-test-changes` to the comment.
+- The **end user** interacts with that caller — for example, commenting `@<app-slug> review` on a GitHub issue. An end user never chooses the `objective`; on GitHub they can still set `repair_mode`, by adding `--repair-mode=no-test-changes` to the comment.
 
 How a caller chooses the objective is its own product decision, not something `review_intent` decides. The GitHub integration always sends `audit`, because the input it forwards (an issue or pull request someone wrote) is an unverified claim. The PatchEval harness may send `repair`, because its input is a known CVE. The contract accepts both; each caller picks one.
 

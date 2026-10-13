@@ -156,11 +156,11 @@ issue 与 PR conversation comment 支持同一组命令：
 
 ```text
 @<app-slug> review
-@<app-slug> review no-test-changes
+@<app-slug> review --repair-mode=no-test-changes
 ```
 
 - `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
-- `review no-test-changes`：同样触发一次 review，但最终 patch 不应包含测试改动；测试只能作为临时验证手段。
+- `--repair-mode=no-test-changes`：最终 patch 不应包含测试改动；测试只能作为临时验证手段。（也接受 `--repair-mode=test-changes-allowed`，它等于默认值。）
 
 没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
 

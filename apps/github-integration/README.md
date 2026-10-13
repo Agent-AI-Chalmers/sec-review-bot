@@ -155,11 +155,11 @@ Both issue and PR conversation comments support the same commands:
 
 ```text
 @<app-slug> review
-@<app-slug> review no-test-changes
+@<app-slug> review --repair-mode=no-test-changes
 ```
 
 - `review`: triggers a review. The final patch, if any, may include reasonable test changes.
-- `review no-test-changes`: triggers a review, but the final patch should not contain test changes. Tests may only be used as temporary validation work.
+- `--repair-mode=no-test-changes`: the final patch should not contain test changes; tests may only be used as temporary validation work. (`--repair-mode=test-changes-allowed`, the default, is also accepted.)
 
 There is no objective argument: the GitHub integration always reviews in `audit` mode.
 
