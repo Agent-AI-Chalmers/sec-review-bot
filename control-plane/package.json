@@ -10,9 +10,6 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "generate:runner-api": "node --import tsx scripts/generate-runner-api-types.ts",
-    "generate:control-plane-schemas": "node --import tsx scripts/generate-control-plane-schemas.ts",
-    "generate:control-plane-types": "node --import tsx scripts/generate-control-plane-types.ts",
     "copy:schema": "mkdir -p dist/database && cp -R src/database/schema-versions dist/database/",
     "copy:spec": "node --import tsx scripts/copy-contract.ts",
     "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:schema && pnpm run copy:spec",
@@ -23,7 +20,6 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:contract": "spectral lint ../contracts/control-plane-api/openapi.yaml --ruleset ../contracts/control-plane-api/.spectral.yaml",
-    "check:generated-artifacts": "node --import tsx scripts/check-generated-artifacts.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

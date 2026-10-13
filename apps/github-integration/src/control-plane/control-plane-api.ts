@@ -1,7 +1,7 @@
 // Generated from contracts/control-plane-api/openapi.yaml (path relative to the repository root). Do not edit.
 //
 // That document is the hand-written contract; this file is a projection of it, not a second
-// copy. Regenerate it with `pnpm run generate:control-plane-types`.
+// copy. Regenerate it with `pnpm --dir contracts/control-plane-api/tools run generate`.
 export interface paths {
   '/healthz': {
     parameters: {

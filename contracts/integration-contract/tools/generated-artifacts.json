@@ -1,0 +1,13 @@
+{
+  "$comment": "Every artifact generated from this family's contract, with the file that renders it and the contract it derives from. Paths are relative to the repository root. The tool's test asserts this matches the generator's own declared outputs and that CI triggers on each. Regenerate with: pnpm --dir contracts/integration-contract/tools run generate",
+  "family": "integration-contract",
+  "generators": [
+    {
+      "name": "types",
+      "script": "contracts/integration-contract/tools/src/generate-types.ts",
+      "command": "pnpm --dir contracts/integration-contract/tools run generate",
+      "inputs": ["contracts/integration-contract/openapi.json"],
+      "outputs": ["control-plane/src/runner-api-schema.ts"]
+    }
+  ]
+}

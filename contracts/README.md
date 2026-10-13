@@ -48,9 +48,9 @@ Each family README records who owns which side of its boundary and what callers 
 
 ## Derived Artifacts
 
-Some artifacts are generated from a hand-written contract rather than maintained by hand — a TypeScript projection of an API, committed JSON Schemas, a generated parameter list. They are listed in one place, [generated-artifacts.json](generated-artifacts.json): each entry names the generator script, the contract it reads, and every file it writes, with paths relative to the repository root.
+Some artifacts are generated from a hand-written contract rather than maintained by hand — a TypeScript projection of an API, committed JSON Schemas, a generated parameter list. Each family owns the tool that renders and checks its projections, under `<family>/tools/`, so the tool that reads a contract lives beside it and where its outputs land (which may be another package) does not change who owns the check. A family's `tools/generated-artifacts.json` lists what it derives and where it lands.
 
-That manifest is the single answer to "what is derived from a contract, and where does it land". The generators' staleness tests compare the committed files against a fresh render, so a hand edit of a generated file fails the build; a test also checks the manifest against the generators' own declared paths and asserts the CI filter triggers on every listed artifact. Adding a generator means adding it to the manifest.
+Each tool provides `pnpm --dir contracts/<family>/tools run generate` to render every artifact and `pnpm --dir contracts/<family>/tools run check` to prove the committed copies match. A family's test asserts the manifest matches the generators' own declared outputs and that the CI change filter triggers on every listed artifact, so a new projection is covered by being listed, not by remembering to wire up a check.
 
 ## Change Checklist
 
@@ -59,5 +59,5 @@ For any contract change:
 - update the specification for the affected version;
 - update its schemas;
 - update or add its fixtures and manifest entries;
-- regenerate any derived artifact (such as the Control Plane's committed `v1` schemas and generated types) with the family's generator;
+- regenerate any derived artifact (such as the Control Plane's committed `v1` schemas and generated types) with its family's tool: `pnpm --dir contracts/<family>/tools run generate`, then confirm with `... run check`;
 - make both the Python and TypeScript tests validate the same files.

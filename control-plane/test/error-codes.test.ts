@@ -15,7 +15,7 @@ import {
   ERROR_RESPONSE_CODES_FROM_CONTRACT,
   PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT
 } from '../src/error-codes-generated.js'
-import { SPEC_PATH } from '../scripts/generate-control-plane-types.js'
+import { CONTROL_PLANE_API_SPEC_PATH as SPEC_PATH } from './generated-paths.js'
 
 test('the keyed error-code map covers exactly the contract enum', () => {
   const fromKeys = Object.values(PUBLICATION_STEP_ERROR_CODES).sort()

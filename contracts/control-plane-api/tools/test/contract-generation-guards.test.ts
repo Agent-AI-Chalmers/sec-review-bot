@@ -9,8 +9,8 @@ import test from 'node:test'
 
 import type { OpenAPI3 } from 'openapi-typescript'
 
-import { inlineLocalRefsForTest } from '../scripts/generate-control-plane-schemas.js'
-import { errorResponseCodes } from '../scripts/generate-control-plane-types.js'
+import { inlineLocalRefsForTest } from '../src/generate-schemas.js'
+import { errorResponseCodes } from '../src/generate-types.js'
 
 test('a non-string ErrorResponse.code member fails rather than disappearing', () => {
   // The generated array is advertised as every code the contract allows, and the server

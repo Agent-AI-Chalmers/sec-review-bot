@@ -15,24 +15,13 @@ import prettier from 'prettier'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
+import { REPO_ROOT } from './repo-root.js'
 
-const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
-
-export const CONTROL_PLANE_ROOT = path.resolve(moduleDirectory, '..')
-/** The repository root. Generated headers name the contract relative to it, which is the one
- * anchor that is unambiguous from every output location (the projections live in three
- * different packages) and stable when a file moves. */
-export const REPO_ROOT = path.resolve(CONTROL_PLANE_ROOT, '..')
-export const SPEC_PATH = path.resolve(
-  CONTROL_PLANE_ROOT,
-  '..',
-  'contracts',
-  'control-plane-api',
-  'openapi.yaml'
-)
+export { REPO_ROOT }
+export const CONTROL_PLANE_ROOT = path.join(REPO_ROOT, 'control-plane')
+export const SPEC_PATH = path.resolve(REPO_ROOT, 'contracts', 'control-plane-api', 'openapi.yaml')
 export const OUTPUT_PATH = path.resolve(
-  CONTROL_PLANE_ROOT,
-  '..',
+  REPO_ROOT,
   'apps',
   'github-integration',
   'src',
@@ -48,7 +37,7 @@ function headerComment(): string {
   return `// Generated from ${source} (path relative to the repository root). Do not edit.
 //
 // That document is the hand-written contract; this file is a projection of it, not a second
-// copy. Regenerate it with \`pnpm run generate:control-plane-types\`.
+// copy. Regenerate it with \`pnpm --dir contracts/control-plane-api/tools run generate\`.
 `
 }
 
@@ -149,7 +138,7 @@ export async function renderErrorCodeTypes(): Promise<string> {
     headerComment() +
     `//
 // The hand-written openapi.yaml owns the error-code vocabulary; this file is its server-side
-// projection. Regenerate it with \`pnpm run generate:control-plane-types\`.
+// projection. Regenerate it with \`pnpm --dir contracts/control-plane-api/tools run generate\`.
 
 export type PublicationStepErrorCode =\n${union}
 
@@ -212,7 +201,7 @@ export async function renderContractTypes(): Promise<string> {
     `//
 // The hand-written openapi.yaml owns the domain shapes and the request shapes; these
 // interfaces are its server-side projection, so the server's types follow the contract
-// instead of a parallel schema. Regenerate it with \`pnpm run generate:control-plane-types\`.
+// instead of a parallel schema. Regenerate it with \`pnpm --dir contracts/control-plane-api/tools run generate\`.
 
 ${components}
 
@@ -229,8 +218,7 @@ ${lines.join('\n')}
 // parameters. The BFF and the browser both forward/request only these, and were keeping
 // their own copy of the list; deriving it here removes that third hand-kept description.
 export const LIST_RUN_QUERY_PARAMS_PATH = path.resolve(
-  CONTROL_PLANE_ROOT,
-  '..',
+  REPO_ROOT,
   'apps',
   'control-plane-ui',
   'src',
@@ -285,7 +273,7 @@ export async function renderListRunQueryParams(): Promise<string> {
 // The contract's \`listRuns\` operation declares these query parameters (as one form-exploded
 // object). The console builds each request, and the BFF proxies it, from this one list, so
 // neither can send a parameter the contract does not accept. Regenerate it with
-// \`pnpm run generate:control-plane-types\` in the control-plane package.
+// \`pnpm --dir contracts/control-plane-api/tools run generate\`.
 
 /** The query parameter names \`listRuns\` declares, in document order. */
 export const LIST_RUN_QUERY_PARAMS = [

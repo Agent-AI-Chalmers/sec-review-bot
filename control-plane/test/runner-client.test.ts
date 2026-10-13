@@ -10,7 +10,7 @@ import {
   RunnerSubmissionUncertainError,
   submitRunnerRun
 } from '../src/runner-client.js'
-import { SPEC_PATH } from '../scripts/generate-runner-api-types.js'
+import { RUNNER_API_SPEC_PATH as SPEC_PATH } from './generated-paths.js'
 
 const originalFetch = globalThis.fetch
 

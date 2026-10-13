@@ -14,24 +14,23 @@ import openapiTS, { astToString, type OpenAPI3 } from 'openapi-typescript'
 import prettier from 'prettier'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
+import { REPO_ROOT } from './repo-root.js'
 
-const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
-
-export const CONTROL_PLANE_ROOT = path.resolve(moduleDirectory, '..')
+export { REPO_ROOT }
+export const CONTROL_PLANE_ROOT = path.join(REPO_ROOT, 'control-plane')
 export const SPEC_PATH = path.resolve(
-  CONTROL_PLANE_ROOT,
-  '..',
+  REPO_ROOT,
   'contracts',
   'integration-contract',
   'openapi.json'
 )
 export const OUTPUT_PATH = path.join(CONTROL_PLANE_ROOT, 'src', 'runner-api-schema.ts')
 
-const HEADER = `// Generated from ${path.relative(CONTROL_PLANE_ROOT, SPEC_PATH)}. Do not edit.
+const HEADER = `// Generated from ${path.relative(REPO_ROOT, SPEC_PATH)} (path relative to the repository root). Do not edit.
 //
 // That document is owned by the agents package and checked there against the service code,
 // so this file is a projection of a contract rather than a second copy of one. Regenerate
-// it with \`pnpm run generate:runner-api\`.
+// it with \`pnpm --dir contracts/integration-contract/tools run generate\`.
 `
 
 /** The committed content of `src/runner-api-schema.ts`. */

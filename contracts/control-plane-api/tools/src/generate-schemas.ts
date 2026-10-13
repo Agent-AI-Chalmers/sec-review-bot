@@ -10,23 +10,11 @@ import { fileURLToPath } from 'node:url'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
+import { REPO_ROOT } from './repo-root.js'
 
-const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
-export const CONTROL_PLANE_ROOT = path.resolve(moduleDirectory, '..')
-export const SPEC_PATH = path.resolve(
-  CONTROL_PLANE_ROOT,
-  '..',
-  'contracts',
-  'control-plane-api',
-  'openapi.yaml'
-)
-export const SCHEMA_DIR = path.resolve(
-  CONTROL_PLANE_ROOT,
-  '..',
-  'contracts',
-  'control-plane-api',
-  'v1'
-)
+export { REPO_ROOT }
+export const SPEC_PATH = path.resolve(REPO_ROOT, 'contracts', 'control-plane-api', 'openapi.yaml')
+export const SCHEMA_DIR = path.resolve(REPO_ROOT, 'contracts', 'control-plane-api', 'v1')
 
 const META_SCHEMA = 'https://json-schema.org/draft/2020-12/schema'
 

@@ -25,6 +25,7 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
+      contract-tools: ${{ steps.filter.outputs.contract-tools }}
       control-plane: ${{ steps.filter.outputs.control-plane }}
       github-integration: ${{ steps.filter.outputs.github-integration }}
       control-plane-ui: ${{ steps.filter.outputs.control-plane-ui }}
@@ -42,17 +43,23 @@ jobs:
         uses: dorny/paths-filter@v4
         with:
           filters: |
+            contract-tools:
+              # The per-family tools, their inputs, and (for the schemas) their outputs all
+              # live under `contracts/`.
+              - 'contracts/**'
+              # The projections themselves live across several packages. A hand edit of any
+              # one has to re-run the family check, so list every artifact; each family's
+              # `generated-artifacts.test.ts` asserts this filter covers its outputs.
+              - 'control-plane/src/contract-types-generated.ts'
+              - 'control-plane/src/error-codes-generated.ts'
+              - 'control-plane/src/runner-api-schema.ts'
+              - 'apps/github-integration/src/control-plane/control-plane-api.ts'
+              - 'apps/control-plane-ui/src/list-run-query-params.ts'
+              - '.github/workflows/ci.yml'
             control-plane:
               - 'control-plane/**'
-              # Its contract test reads the checked-in observed-run schema.
+              # It reads the shared contract schemas.
               - 'contracts/**'
-              # This job's staleness test is the only place that re-renders every generated
-              # artifact and compares it to disk. Two of those artifacts live in other
-              # packages, so a hand edit there has to trigger this job or the drift ships;
-              # list both explicitly. (The two in `control-plane/src` are already covered by
-              # `control-plane/**` above.)
-              - 'apps/control-plane-ui/src/list-run-query-params.ts'
-              - 'apps/github-integration/src/control-plane/control-plane-api.ts'
               - '.github/workflows/ci.yml'
             github-integration:
               - 'apps/github-integration/**'
@@ -139,6 +146,53 @@ jobs:
         # interpolations require real secrets, so interpolating would always fail.
         # We validate the compose structure, not the operator's secret values.
         run: docker compose -f compose.yaml config -q --no-interpolate
+
+  contract-tools:
+    name: Contract Tools (${{ matrix.family }})
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.contract-tools == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [control-plane-api, integration-contract]
+    defaults:
+      run:
+        working-directory: contracts/${{ matrix.family }}/tools
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: contracts/${{ matrix.family }}/tools/package.json
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: contracts/${{ matrix.family }}/tools/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: contracts/${{ matrix.family }}/tools/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check generated artifacts are fresh
+        # Re-renders this family's projections and compares them to the committed files. It
+        # also runs inside `pnpm test`, but as its own step so a failure reads as one check.
+        run: pnpm run check
+
+      - name: Check
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
 
   control-plane:
     name: Control Plane
@@ -431,6 +485,7 @@ jobs:
       - changes
       - automation-config
       - ops
+      - contract-tools
       - control-plane
       - github-integration
       - control-plane-ui
@@ -446,6 +501,7 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
           OPS_RESULT: ${{ needs.ops.result }}
+          CONTRACT_TOOLS_RESULT: ${{ needs.contract-tools.result }}
           CONTROL_PLANE_RESULT: ${{ needs.control-plane.result }}
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
           CONTROL_PLANE_UI_RESULT: ${{ needs.control-plane-ui.result }}
@@ -461,6 +517,7 @@ jobs:
             "$CHANGES_RESULT" \
             "$AUTOMATION_CONFIG_RESULT" \
             "$OPS_RESULT" \
+            "$CONTRACT_TOOLS_RESULT" \
             "$CONTROL_PLANE_RESULT" \
             "$GITHUB_INTEGRATION_RESULT" \
             "$CONTROL_PLANE_UI_RESULT" \

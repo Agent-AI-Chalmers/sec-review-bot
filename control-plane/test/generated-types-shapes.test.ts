@@ -7,8 +7,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { OUTPUT_PATH as CONTROL_PLANE_API_TYPES_PATH } from '../scripts/generate-control-plane-types.js'
-import { OUTPUT_PATH as RUNNER_API_SCHEMA_PATH } from '../scripts/generate-runner-api-types.js'
+import { CONTROL_PLANE_API_TYPES_PATH, RUNNER_API_SCHEMA_PATH } from './generated-paths.js'
 
 test('the control-plane API projection still describes the shapes the client reads', () => {
   const generated = readFileSync(CONTROL_PLANE_API_TYPES_PATH, 'utf8')

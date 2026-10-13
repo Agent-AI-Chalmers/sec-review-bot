@@ -47,6 +47,8 @@ This repository contains four runtime entities: GitHub integration, Review Contr
 - [`apps/control-plane-ui/`](apps/control-plane-ui/README.md): independently deployed web console for inspecting Control Plane runs
 - [`agents/`](agents/README.md): Python multi-agent runner and review logic
 
+Each contract family under [`contracts/`](contracts/README.md) owns the tool that renders and checks its projections (`contracts/<family>/tools/`); that is build-time, not a runtime entity.
+
 ```mermaid
 flowchart LR
   github[GitHub]
