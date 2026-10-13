@@ -679,10 +679,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       responses:
         "200":
           description: Redacted run detail.
@@ -716,10 +716,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       responses:
         "200":
           description: Redacted publication-step summary.
@@ -758,10 +758,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       requestBody:
         required: true
         content:
@@ -822,10 +822,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       requestBody:
         required: true
         content:
@@ -861,10 +861,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       requestBody:
         required: true
         content:
@@ -941,10 +941,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       requestBody:
         required: true
         content:
@@ -980,10 +980,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       requestBody:
         required: true
         content:
@@ -1021,16 +1021,17 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         - in: path
           name: stepKey
           required: true
           description: The publication step key, as supplied at initializePublicationSteps.
           schema:
             type: string
+            minLength: 1
       requestBody:
         required: true
         content:
@@ -1062,16 +1063,17 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         - in: path
           name: stepKey
           required: true
           description: The publication step key, as supplied at initializePublicationSteps.
           schema:
             type: string
+            minLength: 1
       requestBody:
         required: true
         content:
@@ -1120,16 +1122,17 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         - in: path
           name: stepKey
           required: true
           description: The publication step key, as supplied at initializePublicationSteps.
           schema:
             type: string
+            minLength: 1
       requestBody:
         required: true
         content:
@@ -1180,10 +1183,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       requestBody:
         required: true
         content:
@@ -1219,10 +1222,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       requestBody:
         required: true
         content:
@@ -1274,10 +1277,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       responses:
         "200":
           description: Full run record (includes runner_input/publish_context).
@@ -1306,10 +1309,10 @@ paths:
         - in: path
           name: runId
           required: true
-          description: The run identifier Control Plane assigned at admission. Treat it as opaque;
-            it is passed through verbatim.
+          description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       responses:
         "200":
           description: Full publication-step records.

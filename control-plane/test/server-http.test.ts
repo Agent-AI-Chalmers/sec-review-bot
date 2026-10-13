@@ -118,7 +118,7 @@ test('a deterministic publication failure maps to 409 with its code', async () =
   try {
     const response = await app.inject({
       method: 'POST',
-      url: '/v1/runs/run-1/preparation/claim',
+      url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/preparation/claim',
       headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
       payload: { token: 'token-1' }
     })
@@ -141,7 +141,11 @@ test('an undeclared body field is rejected, matching the contract', async () => 
     admitReviewRun: async () => {
       handlerCalls += 1
       return {
-        record: { run_id: 'run-1', workflow: 'issue-review', runner_status: 'preparing' },
+        record: {
+          run_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+          workflow: 'issue-review',
+          runner_status: 'preparing'
+        },
         created: true,
         preparation_token: 'token'
       }

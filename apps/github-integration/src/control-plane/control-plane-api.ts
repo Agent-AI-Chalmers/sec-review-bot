@@ -618,7 +618,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -661,7 +661,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -705,7 +705,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -755,7 +755,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -793,7 +793,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -868,7 +868,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -906,7 +906,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -943,7 +943,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
         /** @description The publication step key, as supplied at initializePublicationSteps. */
         stepKey: string
@@ -981,7 +981,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
         /** @description The publication step key, as supplied at initializePublicationSteps. */
         stepKey: string
@@ -1025,7 +1025,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
         /** @description The publication step key, as supplied at initializePublicationSteps. */
         stepKey: string
@@ -1070,7 +1070,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -1108,7 +1108,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -1151,7 +1151,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
@@ -1192,7 +1192,7 @@ export interface operations {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission. Treat it as opaque; it is passed through verbatim. */
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
         runId: string
       }
       cookie?: never
