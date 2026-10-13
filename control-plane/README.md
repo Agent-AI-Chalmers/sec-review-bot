@@ -136,10 +136,11 @@ Checks:
 ```bash
 pnpm run format:check
 pnpm run lint
-pnpm run lint:contract
 pnpm run typecheck
 pnpm test
 pnpm run test:integration
 ```
+
+The contract itself is linted (Spectral) and its projections are freshness-checked by the family tools under [`contracts/control-plane-api/tools`](../contracts/control-plane-api/tools/README.md).
 
 `pnpm run test:integration` requires `TEST_DATABASE_URL` or `DATABASE_URL` pointing to a disposable PostgreSQL database.

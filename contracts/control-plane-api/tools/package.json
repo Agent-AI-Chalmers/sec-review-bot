@@ -13,12 +13,14 @@
     "check": "node --import tsx src/check-generated-artifacts.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
+    "lint:contract": "spectral lint ../openapi.yaml --ruleset ../.spectral.yaml",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
+    "@stoplight/spectral-cli": "^6.17.0",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.9",
     "yaml": "^2.9.1"

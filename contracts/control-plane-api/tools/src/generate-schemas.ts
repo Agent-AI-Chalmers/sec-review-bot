@@ -2,7 +2,7 @@
 // (`contracts/control-plane-api/openapi.yaml`). Each schema is committed to
 // contracts/control-plane-api/v1/ and is a projection of the contract's `components.schemas`,
 // so the console-fixture schemas and the contract cannot drift. Regenerate with
-// `pnpm run generate:control-plane-schemas`.
+// `pnpm --dir contracts/control-plane-api/tools run generate`.
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'

@@ -138,10 +138,11 @@ pnpm run server
 ```bash
 pnpm run format:check
 pnpm run lint
-pnpm run lint:contract
 pnpm run typecheck
 pnpm test
 pnpm run test:integration
 ```
+
+契约本身由族工具（位于 [`contracts/control-plane-api/tools`](../contracts/control-plane-api/tools/README.md)）用 Spectral 检查，其投影也由该工具做新鲜度校验。
 
 `pnpm run test:integration` 需要 `TEST_DATABASE_URL` 或 `DATABASE_URL` 指向可清空的 PostgreSQL 数据库。
