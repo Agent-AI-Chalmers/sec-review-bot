@@ -1,35 +1,27 @@
-import type { WorkflowName as ControlPlaneWorkflow } from '../runner/shapes.js'
+import type { components } from './control-plane-api.js'
+
+type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
 
 interface ReviewRunAdmissionRequest {
-  workflow: ControlPlaneWorkflow
+  workflow: ReviewRunAdmission['record']['workflow']
   ingress_kind: 'github_webhook' | 'github_actions_dispatch'
   ingress_key: string
 }
 interface AdmittedReviewRun {
   run_id: string
-  workflow: ControlPlaneWorkflow
+  workflow: ReviewRunAdmission['record']['workflow']
   status: string
-  created: boolean
-  preparation_token: string | null
-}
-
-interface StoredAdmission {
-  record: {
-    run_id: string
-    workflow: ControlPlaneWorkflow
-    runner_status: string
-  }
   created: boolean
   preparation_token: string | null
 }
 
 export interface ReviewRunAdmissionStore {
   admitReviewRun: (run: {
-    workflow: ControlPlaneWorkflow
+    workflow: ReviewRunAdmission['record']['workflow']
     publish_context: Record<string, never>
     ingress_kind: ReviewRunAdmissionRequest['ingress_kind']
     ingress_key: string
-  }) => StoredAdmission | Promise<StoredAdmission>
+  }) => ReviewRunAdmission | Promise<ReviewRunAdmission>
 }
 
 /**
