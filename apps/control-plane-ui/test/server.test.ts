@@ -42,6 +42,14 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     assert.equal(query.status, 200)
     assert.equal(authorization, 'Bearer read-secret')
     assert.equal(upstreamPath, '/v1/runs')
+    // The BFF forwards only the parameters Control Plane declares: UI state (`range`) and
+    // anything else the browser adds (UTM, typos) are dropped rather than passed upstream.
+    await fetch(`${base}/api/runs?range=1h&utm_source=twitter&limit=10`, { headers: { cookie } })
+    assert.equal(upstreamPath, '/v1/runs?limit=10')
+    await fetch(`${base}/api/runs?workflow=issue-review&range=7d&cursor=abc`, {
+      headers: { cookie }
+    })
+    assert.equal(upstreamPath, '/v1/runs?cursor=abc&workflow=issue-review')
     assert.equal(
       (await fetch(`${base}/api/runs`, { method: 'POST', headers: { cookie } })).status,
       404

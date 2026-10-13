@@ -38,6 +38,36 @@ function securityHeaders(response: ServerResponse): void {
   response.setHeader('x-frame-options', 'DENY')
   response.setHeader('referrer-policy', 'no-referrer')
 }
+/** The query parameters Control Plane's `listRuns` operation declares. The BFF forwards
+ * only these, so a browser cannot smuggle a parameter the API does not understand through
+ * this proxy. Requests to the other proxied routes carry no query. */
+const FORWARDED_QUERY_PARAMS = [
+  'limit',
+  'cursor',
+  'execution_status',
+  'publication_status',
+  'workflow',
+  'from',
+  'to'
+] as const
+
+/**
+ * The upstream path a read proxy should request: the BFF path minus its `/api` prefix,
+ * with the query reduced to the parameters Control Plane declares. Anything else the browser
+ * put in the URL (UI state such as `range`, analytics parameters, typos) is dropped rather
+ * than forwarded, so this proxy cannot send a request outside Control Plane's contract.
+ */
+function forwardedPath(bffUrl: string): string {
+  const url = new URL(bffUrl, 'http://control-plane-ui.local')
+  const forwarded = new URLSearchParams()
+  for (const name of FORWARDED_QUERY_PARAMS) {
+    const value = url.searchParams.get(name)
+    if (value !== null && value !== '') forwarded.set(name, value)
+  }
+  const query = forwarded.toString()
+  return `${url.pathname.slice('/api'.length)}${query === '' ? '' : `?${query}`}`
+}
+
 const allowed = /^\/api\/runs(?:\?.*)?$|^\/api\/runs\/[^/?]+(?:\/publication-steps)?$/
 
 function sendJson(response: ServerResponse, status: number, body: object): void {
@@ -328,7 +358,7 @@ export function createControlPlaneUiServer({
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), CONTROL_PLANE_REQUEST_TIMEOUT_MS)
       try {
-        const upstream = await fetch(`${controlPlaneUrl}/v1${request.url.slice(4)}`, {
+        const upstream = await fetch(`${controlPlaneUrl}/v1${forwardedPath(request.url ?? '/')}`, {
           headers: { authorization: `Bearer ${controlPlaneToken}` },
           signal: controller.signal
         })
