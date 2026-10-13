@@ -22,7 +22,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "lint:contract": "spectral lint ../contracts/control-plane-api/openapi.yaml --ruleset .spectral.yaml",
+    "lint:contract": "spectral lint ../contracts/control-plane-api/openapi.yaml --ruleset ../contracts/control-plane-api/.spectral.yaml",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

@@ -1,0 +1,30 @@
+# House ruleset for this family's OpenAPI contract.
+#
+# It lives beside `openapi.yaml` because it describes that document, not any one consumer:
+# both the Control Plane and the GitHub integration derive their behaviour from the contract,
+# and the rules below are about the contract's own shape.
+#
+# Note that Spectral does not discover this file automatically when linting from another
+# directory: it only scans the current working directory, without walking up. The lint command
+# therefore names it explicitly (`pnpm run lint:contract` in `control-plane`).
+#
+# The spec is the single source of truth; this ruleset keeps it valid OpenAPI and enforces
+# the minimum invariant the whole pipeline (glue routing, client type generation) relies on:
+# every operation must carry an operationId, because glue and service handlers key off it.
+#
+# Two `spectral:oas` rules are off because they describe a published, discoverable API rather
+# than this internal service, and leaving them on would bury real findings in permanent noise:
+#   - oas3-api-servers: the deployment decides the base URL; the document is consumed by this
+#     repository's own client and by glue, both of which already know where the service lives.
+#   - info-contact: a support contact is metadata for third-party consumers, and Control Plane
+#     has none.
+# `operation-description` stays on as a warning rather than being silenced: the contract is
+# meant to be readable on its own, so a missing description is a real gap to fix.
+extends:
+  - spectral:oas
+rules:
+  operation-operationId: error
+  operation-tags: 'off'
+  operation-description: warn
+  oas3-api-servers: 'off'
+  info-contact: 'off'
