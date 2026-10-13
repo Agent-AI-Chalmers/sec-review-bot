@@ -150,37 +150,19 @@ sec_review_bot:
 
 ### 手动命令
 
-这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review repair`。
+这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review`。
 
-普通 issue comment 支持：
-
-```text
-@<app-slug> review audit
-@<app-slug> review repair
-@<app-slug> review repair no-test-changes
-```
-
-普通 issue 上单独写 `@<app-slug> review` 不会触发 workflow，因为系统无法判断你想先审计输入，还是直接按修复意图推进。
-
-issue comment 支持三种模式：
-
-- `review audit`：先审计 issue 输入是否对应当前仓库里的可修复安全问题；只有确认可修复目标后才进入修复阶段。
-- `review repair`：用户已经表达修复意图；workflow 在 analyzer 后进入修复阶段，尝试生成 patch；如果修复不适用或覆盖不足，结果会明确说明原因。默认允许最终 patch 包含合理的测试改动。
-- `review repair no-test-changes`：同样表达修复意图，但最终 patch 不应包含测试改动；测试只能作为临时验证手段。
-
-自动 issue 触发使用 `audit`，因为自动触发时还没有人明确做出“请修”的决断。
-
-PR Conversation comment 支持：
+issue 与 PR conversation comment 支持同一组命令：
 
 ```text
 @<app-slug> review
 @<app-slug> review no-test-changes
 ```
 
-PR 命令含义：
+- `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
+- `review no-test-changes`：同样触发一次 review，但最终 patch 不应包含测试改动；测试只能作为临时验证手段。
 
-- `review`：触发 PR review，默认允许最终 patch 包含合理的测试改动。
-- `review no-test-changes`：同样触发 PR review，但最终 patch 不应包含测试改动；测试只能作为临时验证手段。
+没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
 
 ### 仓库级 Actions 触发
 

@@ -149,37 +149,19 @@ Notes:
 
 ### Manual commands
 
-`<app-slug>` is not a literal placeholder; it is the actual slug registered for the GitHub App. If the app slug is `web-sec-bot`, the real comment is `@web-sec-bot review repair`.
+`<app-slug>` is not a literal placeholder; it is the actual slug registered for the GitHub App. If the app slug is `web-sec-bot`, the real comment is `@web-sec-bot review`.
 
-Normal issue comments support:
-
-```text
-@<app-slug> review audit
-@<app-slug> review repair
-@<app-slug> review repair no-test-changes
-```
-
-Writing only `@<app-slug> review` on a normal issue does not trigger a workflow because the system cannot tell whether you want to audit the input first or proceed with repair intent.
-
-Issue comments support three modes:
-
-- `review audit`: first audit whether the issue input corresponds to a repairable security problem in the current repository; only enter repair after confirming a repairable target.
-- `review repair`: the user has expressed repair intent. After analyzer, the workflow enters the repair stage and attempts to produce a patch. If repair is inapplicable or coverage is insufficient, the result explains why. By default, the final patch may contain reasonable test changes.
-- `review repair no-test-changes`: also expresses repair intent, but the final patch should not contain test changes. Tests may only be used as temporary validation work.
-
-Automatic issue triggers use `audit` because no human has explicitly decided "please fix this" yet.
-
-PR Conversation comments support:
+Both issue and PR conversation comments support the same commands:
 
 ```text
 @<app-slug> review
 @<app-slug> review no-test-changes
 ```
 
-PR command meanings:
+- `review`: triggers a review. The final patch, if any, may include reasonable test changes.
+- `review no-test-changes`: triggers a review, but the final patch should not contain test changes. Tests may only be used as temporary validation work.
 
-- `review`: triggers PR review. By default, the final patch may contain reasonable test changes.
-- `review no-test-changes`: also triggers PR review, but the final patch should not contain test changes. Tests may only be used as temporary validation work.
+There is no objective argument: the GitHub integration always reviews in `audit` mode.
 
 ### Repository-level Actions trigger
 

@@ -32,7 +32,6 @@ function stripMarkdownQuotedLines(body: string): string {
 export function extractCommentCommand(body: unknown): {
   command: 'review'
   mention: string
-  issue_review_objective: 'audit' | 'repair' | null
   repair_mode: 'test-changes-allowed' | 'no-test-changes' | null
 } | null {
   if (typeof body !== 'string' || body.trim() === '') {
@@ -57,51 +56,26 @@ export function extractCommentCommand(body: unknown): {
     const commandText = normalizedBody.slice(startIndex).trim()
     const tokens = commandText.split(/\s+/)
     const command = tokens[0] ?? ''
-    const issueReviewObjectiveToken = tokens[1] ?? ''
-    const issueRepairModeToken = tokens[2] ?? ''
-    const plainReviewRepairModeToken = tokens[1] ?? ''
-    const issue_review_objective =
-      issueReviewObjectiveToken === 'audit' || issueReviewObjectiveToken === 'repair'
-        ? issueReviewObjectiveToken
-        : null
-    const repair_mode =
-      (issue_review_objective === 'repair' && issueRepairModeToken === 'no-test-changes') ||
-      (issue_review_objective === null && plainReviewRepairModeToken === 'no-test-changes')
-        ? 'no-test-changes'
-        : null
+    const repairModeToken = tokens[1] ?? ''
+    const repair_mode = repairModeToken === 'no-test-changes' ? 'no-test-changes' : null
 
     if (command !== 'review') {
       continue
     }
 
-    const expectedTokenCount =
-      issue_review_objective === null
-        ? repair_mode === null
-          ? 1
-          : 2
-        : repair_mode === null
-          ? 2
-          : 3
+    // A trigger comment is `@<bot> review`, optionally followed by `no-test-changes`. The
+    // review objective is not part of the command: the GitHub integration always reviews an
+    // issue in `audit` mode, because the issue is an unverified claim. (`repair` — proceeding
+    // as though the report were already confirmed — is reserved for callers that supply a
+    // trusted input, such as the PatchEval harness; it is not reachable from a comment.)
+    const expectedTokenCount = repair_mode === null ? 1 : 2
     if (tokens.length !== expectedTokenCount) {
-      return null
-    }
-
-    if (
-      issueReviewObjectiveToken !== '' &&
-      issue_review_objective === null &&
-      repair_mode === null
-    ) {
-      return null
-    }
-
-    if (issue_review_objective !== 'repair' && issueRepairModeToken !== '') {
       return null
     }
 
     return {
       command: 'review',
       mention: candidate,
-      issue_review_objective,
       repair_mode
     }
   }

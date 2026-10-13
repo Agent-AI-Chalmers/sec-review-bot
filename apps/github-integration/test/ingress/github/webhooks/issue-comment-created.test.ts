@@ -16,7 +16,7 @@ setGitHubAppMetadata({
 })
 
 function createIssueCommentPayload({
-  body = '@sec-review-bot review audit',
+  body = '@sec-review-bot review',
   is_pull_request = false
 }: {
   body?: string
@@ -153,7 +153,7 @@ test('issue-comment-created skips manual command when commenter lacks write perm
   assert.equal(pullRequestReviewCalled, false)
 })
 
-test('issue-comment-created starts issue manual review for write commenter', async () => {
+test('issue-comment-created starts an audited issue manual review for write commenter', async () => {
   let review_objective: 'audit' | 'repair' | null | undefined = null
 
   await handleIssueCommentCreatedWithDeps(
@@ -161,7 +161,7 @@ test('issue-comment-created starts issue manual review for write commenter', asy
       id: 'delivery-test',
       octokit: {},
       payload: createIssueCommentPayload({
-        body: '@sec-review-bot review repair'
+        body: '@sec-review-bot review'
       })
     },
     {
@@ -173,7 +173,9 @@ test('issue-comment-created starts issue manual review for write commenter', asy
     }
   )
 
-  assert.equal(review_objective, 'repair')
+  // An issue is an unverified claim, so a comment can only start an audit; the objective the
+  // command path passes is always `audit`, never a user-chosen `repair`.
+  assert.equal(review_objective, 'audit')
 })
 
 test('issue-comment-created starts pull request manual review for write commenter', async () => {

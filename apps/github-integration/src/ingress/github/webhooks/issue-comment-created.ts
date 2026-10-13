@@ -97,10 +97,6 @@ export async function handleIssueCommentCreatedWithDeps(
     }
 
     if (issue.is_pull_request) {
-      if (command.issue_review_objective !== null) {
-        return
-      }
-
       let resolveAdmission: (() => void) | undefined
       const admitted = new Promise<void>((resolve) => {
         resolveAdmission = resolve
@@ -133,10 +129,6 @@ export async function handleIssueCommentCreatedWithDeps(
       return
     }
 
-    if (command.issue_review_objective === null) {
-      return
-    }
-
     let resolveAdmission: (() => void) | undefined
     const admitted = new Promise<void>((resolve) => {
       resolveAdmission = resolve
@@ -146,7 +138,9 @@ export async function handleIssueCommentCreatedWithDeps(
       issue,
       event_type: 'manual_review',
       delivery_id: id,
-      review_objective: command.issue_review_objective,
+      // The GitHub integration always audits an issue: it is an unverified claim. `repair` is
+      // only reachable from trusted callers (the PatchEval harness), never from a comment.
+      review_objective: 'audit',
       repair_mode: command.repair_mode,
       on_admitted: () => {
         resolveAdmission?.()

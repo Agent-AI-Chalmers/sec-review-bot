@@ -97,10 +97,11 @@ If you only want to inspect or run the agent side, start from:
 
 | Path                | Trigger                                       | Output                            |
 | ------------------- | --------------------------------------------- | --------------------------------- |
-| Issue audit         | `issues.opened`, `@<app-slug> review audit`   | Issue comment                     |
-| Issue repair        | `@<app-slug> review repair`                   | Issue comment or draft PR         |
+| Issue review        | `issues.opened`, `@<app-slug> review`         | Issue comment (and a draft PR once a confirmed finding yields a patch) |
 | Pull request review | PR webhook, `@<app-slug> review`              | PR review / suggestions           |
 | Repository review   | scheduled / manually dispatched GitHub Action | Repository summary and deliveries |
+
+Every trigger reviews in `audit` mode; there is no `repair` option.
 
 Full trigger behavior is documented in the [GitHub integration triggers guide](apps/github-integration/README.md#triggers).
 
