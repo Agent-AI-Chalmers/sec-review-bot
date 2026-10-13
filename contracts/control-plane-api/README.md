@@ -34,7 +34,7 @@ The following are not part of this contract:
 
 The console pins its own `Run` type to the fixture at build time: if the fixture gains, loses, or renames a field, the console stops compiling until its type follows. That check lives in `apps/control-plane-ui/test/observed-run-fixture-types.ts` and compares key sets rather than values, because TypeScript widens JSON strings and a value-level assignment would reject a correct fixture.
 
-The Control Plane owns the value-level half in `control-plane/test/observed-run-contract.test.ts`: it validates every fixture as the manifest claims, and validates what `observeRun()` actually returns. The type↔schema binding needs no separate key-set comparison because both derive from the same TypeBox schema in `src/shapes.ts`. A status outside the schema enums, a broken pattern, or a malformed timestamp therefore fails the suite instead of reaching the console.
+The Control Plane owns the value-level half in `control-plane/test/observed-run-contract.test.ts`: it validates every fixture as the manifest claims, and validates what `observeRun()` actually returns. The type↔schema binding needs no separate key-set comparison because both derive from the same `ObservedRun` in the contract (`openapi.yaml`). A status outside the schema enums, a broken pattern, or a malformed timestamp therefore fails the suite instead of reaching the console.
 
 ## Error codes
 

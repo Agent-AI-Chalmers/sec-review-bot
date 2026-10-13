@@ -15,10 +15,10 @@ import { ReviewRunStore } from '../../src/index.js'
 
 // The record contract's value-level check.
 //
-// The type and the schema share one TypeBox source (`src/shapes.ts`), so they cannot drift
-// apart, and the unit suite proves the fixtures match. Neither can see an actual record,
-// because one only exists once a row is written. This suite has a database, so it validates
-// what `getRun` really returns — the same thing the observed-run check does for
+// The type and the schema both derive from the contract's `ReviewRunRecord` (`openapi.yaml`),
+// so they cannot drift apart, and the unit suite proves the fixtures match. Neither can see an
+// actual record, because one only exists once a row is written. This suite has a database, so
+// it validates what `getRun` really returns — the same thing the observed-run check does for
 // `observeRun()`.
 
 const CONTRACT_VERSION_DIR = path.join('contracts', 'control-plane-api', 'v1')

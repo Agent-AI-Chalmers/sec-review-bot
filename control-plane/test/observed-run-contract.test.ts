@@ -1,9 +1,9 @@
 // The value-level check of the observed-run contract.
 //
-// The type and the schema now share one TypeBox source (`src/shapes.ts`), so they cannot
-// drift apart by construction. This test covers what that cannot see: that the producer's
-// own output actually satisfies the schema, and that the shared fixtures match or violate
-// it exactly as the manifest claims, by running a real JSON Schema validator.
+// The type and the schema both derive from the contract's `ObservedRun` (`openapi.yaml`), so
+// they cannot drift apart by construction. This test covers what that cannot see: that the
+// producer's own output actually satisfies the schema, and that the shared fixtures match or
+// violate it exactly as the manifest claims, by running a real JSON Schema validator.
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
