@@ -244,9 +244,12 @@ jobs:
 
       - name: Test
         run: pnpm test
-
-      - name: Integration test
-        run: pnpm run test:integration
+      # Deliberately no `test:integration` step. The only integration test here is the opt-in S3
+      # upload check, which self-skips without `SEC_REVIEW_TEST_S3_ENDPOINT`, so a CI step would
+      # pass vacuously. The integration↔control-plane boundary is covered by Control Plane's own
+      # integration suite (real PostgreSQL store) and by
+      # `control-plane/test/integration/client-server-seam.test.ts`, which drives this package's
+      # real client against the real server; both jobs provision what they need.
 
   control-plane-ui:
     name: Control Plane UI
