@@ -33,11 +33,12 @@ export type FixtureIsAcceptableToTheSchema = Expect<
 >
 
 /**
- * The console must model every field the example carries, except the ones it deliberately
- * does not: `publication_steps` travels on its own read path, so `Run` leaves it out. A
- * field that disappears from the example while the console still reads it turns this red.
+ * The console must model exactly the fields the example carries. Publication steps are no
+ * longer part of the run snapshot — they travel on their own read path
+ * (`GET /v1/runs/{runId}/publication-steps`) — so `Run` and the example name the same keys,
+ * and this is the strict pairing that a field added to one side alone turns red.
  */
-export type RunModelsTheExample = Expect<KeysWithin<Run, Omit<typeof fixture, 'publication_steps'>>>
+export type RunModelsTheExample = Expect<SameKeys<Run, typeof fixture>>
 
 /**
  * The artifact is required to be complete, so this pairing is the strict one: the console's

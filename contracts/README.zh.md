@@ -45,6 +45,12 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 
 每个族的 README 记录该边界两侧的归属，以及调用方可以依赖什么。
 
+## 派生产物
+
+有些产物是从手写契约生成的，而不是手工维护——例如 API 的 TypeScript 投影、提交的 JSON Schema、生成的参数列表。每个族拥有渲染并校验其投影的工具，放在 `<family>/tools/` 下：读取契约的工具就挨着契约，而它的产物落在哪里（可能在别的包中）不影响谁拥有该检查。每个族的 `tools/generated-artifacts.json` 列出它派生什么、落到哪里。
+
+每个工具提供 `pnpm --dir contracts/<family>/tools run generate` 重新生成全部产物，以及 `pnpm --dir contracts/<family>/tools run check` 校验已提交副本是否一致。每个族的测试会断言 manifest 与生成器自身声明的输出一致，并断言 CI 的变更过滤器覆盖清单中每一个产物；因此新增一个投影只需把它列进清单，而不必记得再接一个检查。
+
 ## 变更清单
 
 任何契约变更都需要：
@@ -52,4 +58,5 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 - 更新受影响版本的规范；
 - 更新它的 schema；
 - 更新或新增它的 fixture 与 manifest 条目；
+- 用该族的工具重新生成任何派生产物（例如 Control Plane 提交的 `v1` schema 与生成的类型）：`pnpm --dir contracts/<family>/tools run generate`，再用 `... run check` 确认；
 - 让 Python 和 TypeScript 测试校验同一批文件。

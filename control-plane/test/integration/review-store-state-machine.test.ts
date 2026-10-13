@@ -74,8 +74,8 @@ test('ReviewRunStore prevents cross-connector access to a globally unique run id
       /duplicate key value violates unique constraint/
     )
     assert.equal(await second.getRun(runId), null)
-    assert.equal((await first.listActiveRuns()).length, 1)
-    assert.equal((await second.listActiveRuns()).length, 0)
+    assert.equal((await first.listActiveRuns()).runs.length, 1)
+    assert.equal((await second.listActiveRuns()).runs.length, 0)
     assert.equal(await first.claimPublication(runId), null)
     await first.recordRunnerSuccess(runId, { run_id: runId }, { status: 'unavailable' })
     assert.notEqual(await first.claimPublication(runId), null)
@@ -110,7 +110,7 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
     assert.equal(queued?.runner_status, 'queued')
     assert.deepEqual(queued?.artifact_storage, artifactStorage)
     assert.deepEqual(
-      (await store.listActiveRuns()).map((run) => run.run_id),
+      (await store.listActiveRuns()).runs.map((entry) => entry.run_id),
       [queuedId]
     )
   } finally {
@@ -200,7 +200,7 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
     assert.equal(failed?.ingress_key, ingressKey)
     assert.equal(failed?.failure_code, 'REVIEW_START_FAILED')
     assert.equal(failed?.failure_message, 'input bundle upload failed')
-    assert.deepEqual(await store.listActiveRuns(), [])
+    assert.deepEqual((await store.listActiveRuns()).runs, [])
     assert.equal(await store.claimPublication(runId), null)
 
     const replay = await store.admitReviewRun({
@@ -356,7 +356,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
     assert.equal(await store.completeSubmissionRecovery(runId, currentToken), true)
     assert.equal((await store.getRun(runId))?.runner_status, 'queued')
     assert.equal(
-      (await store.listActiveRuns()).some((run) => run.run_id === runId),
+      (await store.listActiveRuns()).runs.some((entry) => entry.run_id === runId),
       true
     )
   } finally {
@@ -421,7 +421,7 @@ test('ReviewRunStore spends retry budget only for the current publication owner'
     )
     const record = await store.getRun(runId)
     assert.equal(record?.runner_status, 'succeeded')
-    assert.deepEqual(await store.listActiveRuns(), [])
+    assert.deepEqual((await store.listActiveRuns()).runs, [])
   } finally {
     await store.close()
   }
@@ -439,7 +439,9 @@ test('ReviewRunStore fences publication step commits with the current publicatio
     const currentToken = await store.claimPublication(runId)
     assert.ok(currentToken)
     assert.equal(
-      await store.completePublicationStep(runId, staleToken, 'repository:summary-issue', { id: 7 }),
+      await store.completePublicationStep(runId, staleToken, 'repository:summary-issue', {
+        id: '7'
+      }),
       false
     )
     assert.equal(
@@ -626,6 +628,106 @@ test('ReviewRunStore reports a changed publication step set as deterministic', a
       (error: unknown) =>
         error instanceof Error && 'code' in error && error.code === 'PUBLICATION_STEP_SET_CHANGED'
     )
+  } finally {
+    await store.close()
+  }
+})
+
+test('claimNextPublication returns the persisted result, context, and artifact', async () => {
+  // `claimNextPublication` hands the publisher everything it needs to publish: the Runner's
+  // opaque result, the publish context, and the artifact reference, alongside the claim
+  // token. `claimPublication` (covered above) only returns a token, so this is the shape a
+  // publisher actually receives and must match what was persisted.
+  const store = await createStore()
+  const runId = `run-${randomUUID()}`
+  const context = { repository: 'octo/example' }
+  const admission = await store.createPreparingReviewRun({
+    workflow: 'issue-review',
+    run_id: runId,
+    publish_context: context
+  })
+  assert.ok(admission.preparation_token)
+  await store.markQueued(runId, admission.preparation_token, context)
+  const workflowResult = { run_id: runId, review_record: { analysis: { verdict: 'no-findings' } } }
+  assert.equal(
+    await store.recordRunnerSuccess(runId, workflowResult, { status: 'unavailable' }),
+    true
+  )
+  try {
+    const work = await store.claimNextPublication()
+    assert.equal(work?.run_id, runId)
+    assert.equal(work?.claim_token.length, 36)
+    assert.deepEqual(work?.artifact_storage, { status: 'unavailable' })
+    assert.deepEqual(work?.workflow_result, workflowResult)
+    assert.deepEqual(work?.publish_context, context)
+  } finally {
+    await store.close()
+  }
+})
+
+test('concurrent claimNextPublication consumers cannot own the same ready run', async () => {
+  // Two publishers polling the same connector must not both claim the ready run: the claim is
+  // `FOR UPDATE ... SKIP LOCKED`, so one wins and the other finds nothing. Asserting this with
+  // real concurrent connections (rather than sequential calls) is what exercises the lock.
+  const connectorId = `publisher:${randomUUID()}`
+  const first = await createStore({ connectorId })
+  const second = await createStore({ connectorId })
+  try {
+    await createSuccessfulRun(first)
+    const claims = await Promise.all([first.claimNextPublication(), second.claimNextPublication()])
+    assert.equal(claims.filter((claim) => claim !== null).length, 1)
+  } finally {
+    await first.close()
+    await second.close()
+  }
+})
+
+test('a retryable publication failure makes the run claimable again', async () => {
+  // The counterpart to `spends retry budget only for the current publication owner`, which
+  // asserts the retryable failure is accepted: this asserts the run becomes claimable again
+  // afterwards, so the retry the budget allowed actually happens.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const work = await store.claimNextPublication()
+    assert.ok(work)
+    assert.equal(
+      await store.failPublication(
+        runId,
+        work.claim_token,
+        { message: 'GitHub unavailable' },
+        { retry: true }
+      ),
+      true
+    )
+    assert.equal((await store.claimNextPublication())?.run_id, runId)
+  } finally {
+    await store.close()
+  }
+})
+
+test('the write path refuses an artifact storage value the contract forbids', async () => {
+  // Every `artifact_storage` write narrows the value through `normalizeArtifactStorage`, so a
+  // shape the contract cannot represent (an `available` record without its artifact) is
+  // rejected before it is persisted rather than being discovered later by a read. The run id
+  // is in the message, so the fault names the record.
+  const store = await createStore()
+  const runId = await createQueuedRun(store)
+  try {
+    await assert.rejects(
+      store.recordArtifactStorage(runId, { status: 'available' }),
+      new RegExp(`run ${runId} is an available artifact storage record without its artifact`)
+    )
+    await assert.rejects(
+      store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'available' }),
+      /without its artifact reference/
+    )
+    await assert.rejects(
+      store.failRunnerExecution(runId, { message: 'failed' }, { status: 'available' }),
+      /without its artifact reference/
+    )
+    // Nothing was written: the run is still exactly as it was queued.
+    assert.equal((await store.getRun(runId))?.artifact_storage, null)
   } finally {
     await store.close()
   }

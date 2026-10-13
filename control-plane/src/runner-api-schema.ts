@@ -1,8 +1,8 @@
-// Generated from ../contracts/integration-contract/openapi.json. Do not edit.
+// Generated from contracts/integration-contract/openapi.json (path relative to the repository root). Do not edit.
 //
 // That document is owned by the agents package and checked there against the service code,
 // so this file is a projection of a contract rather than a second copy of one. Regenerate
-// it with `pnpm run generate:runner-api`.
+// it with `pnpm --dir contracts/integration-contract/tools run generate`.
 export interface paths {
   '/healthz': {
     parameters: {

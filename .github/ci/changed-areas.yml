@@ -1,0 +1,93 @@
+# The changed-area filter set `dorny/paths-filter` reads (see ci.yml, `Detect changed areas`).
+#
+# This file is the single source of truth for which changes run which jobs: each top-level key
+# is an area a job gates on (`needs.changes.outputs.<area>`), and the globs under it select the
+# area. It is read directly — there is no generator — and `check-changed-areas.mjs` guards it.
+#
+# Every glob that belongs to an area that reads the shared contract, or that can affect how a
+# job runs, is listed under that area too: CI cannot see those couplings in an import graph, so
+# they are written down here. The validator checks them (and that every tracked file is covered
+# by an area or is an acknowledged exception).
+#
+# Comments are free-form; the validator reads only the area keys and their globs.
+
+automation-config:
+  # Dependabot configuration and the workflow definitions themselves.
+  - '.github/dependabot.yml'
+  - '.github/workflows/**'
+  # The changed-area model and its validator.
+  - '.github/ci/**'
+
+ops:
+  # Deployment scripts and the Compose topology.
+  - 'ops/**'
+  - 'compose.yaml'
+  - 'compose.env.sample'
+  # A CI change can affect how ops is validated.
+  - '.github/workflows/ci.yml'
+
+contract-tools:
+  # The per-family tools and the contract trees they own.
+  - 'contracts/**'
+  # Every projection a contract tool renders into another package. The validator derives this
+  # set from the tools' generated-artifacts.json manifests, so a new projection cannot be added
+  # without wiring it here.
+  - 'control-plane/src/contract-types-generated.ts'
+  - 'control-plane/src/error-codes-generated.ts'
+  - 'control-plane/src/runner-api-schema.ts'
+  - 'apps/github-integration/src/control-plane/control-plane-api.ts'
+  - 'apps/control-plane-ui/src/list-run-query-params.ts'
+  # CI tooling.
+  - '.github/ci/**'
+  - '.github/workflows/ci.yml'
+
+control-plane:
+  - 'control-plane/**'
+  # It validates requests against the shared contract schemas.
+  - 'contracts/**'
+  # Its integration suite's client<->server seam test drives the GitHub integration client
+  # against the real server, so a client change must re-run this job.
+  - 'apps/github-integration/src/control-plane/client.ts'
+  - 'apps/github-integration/src/control-plane/control-plane-api.ts'
+  # CI tooling.
+  - '.github/ci/**'
+  - '.github/workflows/ci.yml'
+
+github-integration:
+  # The repo-level trigger configuration the service reads.
+  - '.github/sec-review-bot.yml'
+  - 'apps/github-integration/**'
+  # Its tests validate the shared contract fixtures.
+  - 'contracts/**'
+  # CI tooling.
+  - '.github/workflows/ci.yml'
+
+control-plane-ui:
+  - 'apps/control-plane-ui/**'
+  # It pins its response type to the shared contract fixture.
+  - 'contracts/**'
+  # CI tooling.
+  - '.github/workflows/ci.yml'
+
+agents:
+  - 'agents/**'
+  # The wheel packages the canonical contract schemas.
+  - 'contracts/**'
+  # CI tooling.
+  - '.github/workflows/ci.yml'
+
+scripts:
+  - 'scripts/**'
+  # CI tooling.
+  - '.github/workflows/ci.yml'
+
+documentation:
+  # Documentation.
+  - '**/*.md'
+  # The documentation checkers.
+  - 'scripts/check_markdown_links.py'
+  - 'scripts/check_markdown_wrapping.py'
+  - 'scripts/check_translated_doc_headings.py'
+  - 'scripts/markdown_check_utils.py'
+  # CI tooling.
+  - '.github/workflows/ci.yml'

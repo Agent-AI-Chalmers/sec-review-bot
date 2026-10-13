@@ -7,7 +7,6 @@ import {
 import type { PullRequestContext } from '../github/pull-request-service.js'
 import { pullRequestReviewPublishContext } from '../control-plane/publish-context.js'
 import { controlPlaneClient } from '../control-plane/client.js'
-import { createRunId } from '../reviews/shared/input-bundle.js'
 import type { RepairMode } from '../runner/input.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import {
@@ -34,7 +33,6 @@ type PullRequestReviewControlPlaneClient = {
 interface StartPullRequestReviewCommandDeps {
   start_review: StartPullRequestReview
   store: PullRequestReviewControlPlaneClient
-  create_run_id: typeof createRunId
 }
 
 interface StartPullRequestReviewCommandArgs {
@@ -62,20 +60,12 @@ export async function startPullRequestReviewCommand({
   on_admitted,
   deps = {}
 }: StartPullRequestReviewCommandArgs): Promise<StartedPullRequestReview> {
-  const {
-    start_review = startPullRequestReviewRun,
-    store = controlPlaneClient,
-    create_run_id = createRunId
-  } = deps
-  const admission = await admitReviewRun(
-    store,
-    {
-      workflow: 'pull-request-review',
-      ingress_kind: 'github_webhook',
-      ingress_key: delivery_id
-    },
-    create_run_id
-  )
+  const { start_review = startPullRequestReviewRun, store = controlPlaneClient } = deps
+  const admission = await admitReviewRun(store, {
+    workflow: 'pull-request-review',
+    ingress_kind: 'github_webhook',
+    ingress_key: delivery_id
+  })
   on_admitted?.({
     run_id: admission.run_id,
     status: admission.status,

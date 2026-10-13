@@ -15,7 +15,6 @@ import type { RepairMode } from '../runner/input.js'
 import { repositoryReviewPublishContext } from '../control-plane/publish-context.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
-import { createRunId } from '../reviews/shared/input-bundle.js'
 import { logInfo } from '../utils/logger.js'
 import { asErrorMessage } from '../utils/error-utils.js'
 
@@ -197,7 +196,6 @@ interface DispatchRepositoryReviewCommandDeps {
     ) => Promise<boolean>
     preparationHeartbeatIntervalMs: typeof controlPlaneClient.preparationHeartbeatIntervalMs
   }
-  create_run_id: typeof createRunId
 }
 
 async function getRepositoryInstallationOctokit(
@@ -224,8 +222,7 @@ export async function dispatchRepositoryReview({
       getRepositoryInstallationOctokit(app, repo_full_name),
     resolve_dispatch = resolveRepositoryReviewDispatch,
     submit_run = startRepositoryReviewRun,
-    store = controlPlaneClient,
-    create_run_id = createRunId
+    store = controlPlaneClient
   } = deps
   let validated: ValidatedRepositoryReviewDispatch
   try {
@@ -234,15 +231,11 @@ export async function dispatchRepositoryReview({
     throw new RepositoryReviewDispatchValidationError(asErrorMessage(error))
   }
   const { repo_full_name, correlation_id } = validated
-  const admission = await admitReviewRun(
-    store,
-    {
-      workflow: 'repository-review',
-      ingress_kind: 'github_actions_dispatch',
-      ingress_key: `${verified_repository}:${correlation_id}`
-    },
-    create_run_id
-  )
+  const admission = await admitReviewRun(store, {
+    workflow: 'repository-review',
+    ingress_kind: 'github_actions_dispatch',
+    ingress_key: `${verified_repository}:${correlation_id}`
+  })
   on_admitted?.({
     run_id: admission.run_id,
     status: admission.status,

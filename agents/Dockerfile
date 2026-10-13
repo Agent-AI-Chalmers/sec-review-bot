@@ -6,7 +6,8 @@ FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    SEC_REVIEW_CONTRACTS_ROOT=/contracts
 
 # Pin uv to a minor line rather than an exact patch: patch releases add newly
 # published Python versions, so following them keeps the image able to install
@@ -22,9 +23,12 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY . ./
-# Compose supplies the workspace contracts as a separate build context so the
-# Runner image gets canonical schemas without sending the whole repository.
-COPY --from=contracts . /contracts
+# The Runner reads only the canonical v5 schemas, so copy just those (not the whole tree, whose
+# per-family `tools/` and `pnpm-lock.yaml` it never reads). Compose supplies `contracts/` as a
+# separate named context; this lands at `/contracts/integration-contract/v5/schemas`, and
+# `SEC_REVIEW_CONTRACTS_ROOT=/contracts` above names it explicitly — the resolver reads that
+# variable rather than searching the filesystem for a directory that happens to match.
+COPY --from=contracts integration-contract/v5/schemas /contracts/integration-contract/v5/schemas
 RUN uv sync --frozen --no-dev
 
 CMD ["sec-review-agents-service"]

@@ -19,9 +19,9 @@ interface IssueContext {
 }
 
 function buildDraftBranchName(issue: IssueContext, run_id: string | undefined): string {
-  const shortRunId = String(run_id ?? 'manual')
-    .replace(/^run-/, '')
-    .slice(-8)
+  // Control Plane assigns a UUID run id, so the last 8 characters are stable, unique enough
+  // for a branch segment, and already hyphen-free at that offset.
+  const shortRunId = String(run_id ?? 'manual').slice(-8)
   return sanitizeBranchSegment(`sec-review-bot/issue-${issue.issue_number}-${shortRunId}`)
 }
 

@@ -14,7 +14,6 @@ import {
   archiveInputBundle,
   buildGitRemoteUrl,
   createInputBundleRoot,
-  createRunId,
   ensureCleanDirectory,
   finalizeInputBundleWorkspace
 } from '../shared/input-bundle.js'
@@ -88,13 +87,13 @@ async function materializeHistoryArtifacts({
 }
 
 export async function prepareIssueReviewInput({
-  run_id: provided_run_id,
+  run_id,
   octokit,
   issue,
   review_objective = 'audit',
   repair_mode
 }: {
-  run_id?: string
+  run_id: string
   octokit: GitHubAppOctokit
   issue: IssueContext
   review_objective?: 'audit' | 'repair'
@@ -107,7 +106,6 @@ export async function prepareIssueReviewInput({
   workspace_ref: string
 }> {
   const workspace_ref = await getIssueDefaultBranchHeadSha(octokit, issue)
-  const run_id = provided_run_id ?? createRunId()
   const input_bundle_root = createInputBundleRoot(
     issue.repo_full_name,
     `issue-${issue.issue_number}`,

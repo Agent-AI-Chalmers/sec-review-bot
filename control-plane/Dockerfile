@@ -6,12 +6,19 @@ ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
 
 WORKDIR /app
 
-COPY control-plane/package.json control-plane/pnpm-lock.yaml control-plane/pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable pnpm \
     && pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
     && pnpm install --frozen-lockfile
 
-COPY control-plane/ ./
+COPY . ./
+# `copy:spec` reads the hand-written contract to place it (with its digest) beside the
+# compiled server, so the builder needs it too. The build resolves the spec at
+# `<control-plane root>/../contracts/control-plane-api/openapi.yaml`, so compose supplies the
+# contract as a separate named context and this copies only that one file — not the whole
+# tree. The running image does not need it at all: the contract already travels in
+# `dist/openapi.yaml` with its digest.
+COPY --from=contracts control-plane-api/openapi.yaml /contracts/control-plane-api/openapi.yaml
 RUN pnpm run build
 # Deploy a self-contained production tree: this package is its own workspace
 # root, so the default implementation needs no injected workspace packages.

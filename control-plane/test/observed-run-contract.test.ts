@@ -1,38 +1,25 @@
-// The value-level half of the observed-run contract.
+// The value-level check of the observed-run contract.
 //
-// `observed-run-contract-types.ts` compares key sets, which catches fields that are added,
-// removed, or renamed. It cannot see a value that stays inside the same field: the status
-// vocabulary, a digest pattern, or a required-versus-optional change. This test covers that
-// half by running a real JSON Schema validator over the shared fixtures, and by validating
-// what `observeRun()` actually returns.
+// The type and the schema both derive from the contract's `ObservedRun` (`openapi.yaml`), so
+// they cannot drift apart by construction. This test covers what that cannot see: that the
+// producer's own output actually satisfies the schema, and that the shared fixtures match or
+// violate it exactly as the manifest claims, by running a real JSON Schema validator.
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 
 import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
 import * as ajvFormats from 'ajv-formats'
 
+import { REPO_ROOT } from './generated-paths.js'
 import { observeRun } from '../src/observability.js'
 import type { ReviewRunRecord } from '../src/review-store.js'
 
 const CONTRACT_VERSION_DIR = path.join('contracts', 'control-plane-api', 'v1')
 const FIXTURES = path.join(CONTRACT_VERSION_DIR, 'fixtures')
 
-function workspaceRoot(): string {
-  let current = path.dirname(fileURLToPath(import.meta.url))
-  for (;;) {
-    if (existsSync(path.join(current, CONTRACT_VERSION_DIR, 'observed-run.schema.json'))) {
-      return current
-    }
-    const parent = path.dirname(current)
-    if (parent === current) throw new Error('Could not locate the workspace contracts root.')
-    current = parent
-  }
-}
-
-const root = workspaceRoot()
+const root = REPO_ROOT
 // One contract version can hold several schemas, so each fixture is validated against the schema the
 // manifest names for it rather than against whichever schema was loaded first.
 const manifest = JSON.parse(readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')) as {

@@ -15,7 +15,6 @@ import {
   archiveInputBundle,
   buildGitRemoteUrl,
   createInputBundleRoot,
-  createRunId,
   ensureCleanDirectory,
   finalizeInputBundleWorkspace
 } from '../shared/input-bundle.js'
@@ -60,7 +59,7 @@ async function writeJsonArtifact(artifact_path: string, value: unknown): Promise
 }
 
 export async function prepareRepositoryReviewInput({
-  run_id: provided_run_id,
+  run_id,
   octokit,
   repo_full_name,
   target_branch = null,
@@ -71,7 +70,7 @@ export async function prepareRepositoryReviewInput({
   paths_ignore = [],
   repair_mode = null
 }: {
-  run_id?: string
+  run_id: string
   octokit: GitHubAppOctokit
   repo_full_name: string
   target_branch?: string | null
@@ -97,7 +96,6 @@ export async function prepareRepositoryReviewInput({
     repo_name: repo.repo_name,
     ref: headResolutionTarget
   })
-  const run_id = provided_run_id ?? createRunId()
   const input_bundle_root = createInputBundleRoot(
     repo.repo_full_name,
     'repository-review',

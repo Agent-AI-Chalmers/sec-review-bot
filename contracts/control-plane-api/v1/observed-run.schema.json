@@ -21,6 +21,7 @@
       "minLength": 1
     },
     "workflow": {
+      "type": "string",
       "enum": [
         "issue-review",
         "pull-request-review",
@@ -28,6 +29,7 @@
       ]
     },
     "execution_status": {
+      "type": "string",
       "enum": [
         "preparing",
         "recovering",
@@ -38,6 +40,7 @@
       ]
     },
     "publication_status": {
+      "type": "string",
       "enum": [
         "pending",
         "publishing",
@@ -74,9 +77,6 @@
     "artifact_storage": {
       "oneOf": [
         {
-          "type": "null"
-        },
-        {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -84,6 +84,7 @@
           ],
           "properties": {
             "status": {
+              "type": "string",
               "enum": [
                 "unavailable",
                 "failed"
@@ -106,7 +107,10 @@
           ],
           "properties": {
             "status": {
-              "const": "available"
+              "type": "string",
+              "enum": [
+                "available"
+              ]
             },
             "artifact": {
               "type": "object",
@@ -120,14 +124,20 @@
               ],
               "properties": {
                 "kind": {
-                  "const": "diagnostic_bundle"
+                  "type": "string",
+                  "enum": [
+                    "diagnostic_bundle"
+                  ]
                 },
                 "uri": {
                   "type": "string",
                   "pattern": "^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
                 },
                 "media_type": {
-                  "const": "application/tar+zstd"
+                  "type": "string",
+                  "enum": [
+                    "application/tar+zstd"
+                  ]
                 },
                 "digest": {
                   "type": "string",
@@ -140,61 +150,11 @@
               }
             }
           }
+        },
+        {
+          "type": "null"
         }
       ]
-    },
-    "publication_steps": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "step_key",
-          "status",
-          "failure_count",
-          "remote_object_url",
-          "failure_code",
-          "failure_message"
-        ],
-        "properties": {
-          "step_key": {
-            "type": "string",
-            "minLength": 1
-          },
-          "status": {
-            "enum": [
-              "pending",
-              "running",
-              "succeeded",
-              "failed",
-              "terminal_failed"
-            ]
-          },
-          "failure_count": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "remote_object_url": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uri"
-          },
-          "failure_code": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "failure_message": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      }
     }
   }
 }

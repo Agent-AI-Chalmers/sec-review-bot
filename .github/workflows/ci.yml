@@ -25,14 +25,15 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
+      automation-config: ${{ steps.filter.outputs.automation-config }}
+      ops: ${{ steps.filter.outputs.ops }}
+      contract-tools: ${{ steps.filter.outputs.contract-tools }}
       control-plane: ${{ steps.filter.outputs.control-plane }}
       github-integration: ${{ steps.filter.outputs.github-integration }}
       control-plane-ui: ${{ steps.filter.outputs.control-plane-ui }}
       agents: ${{ steps.filter.outputs.agents }}
       scripts: ${{ steps.filter.outputs.scripts }}
       documentation: ${{ steps.filter.outputs.documentation }}
-      automation-config: ${{ steps.filter.outputs.automation-config }}
-      ops: ${{ steps.filter.outputs.ops }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -41,52 +42,7 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v4
         with:
-          filters: |
-            control-plane:
-              - 'control-plane/**'
-              # Its contract test reads the checked-in observed-run schema.
-              - 'contracts/**'
-              - '.github/workflows/ci.yml'
-            github-integration:
-              - 'apps/github-integration/**'
-              # The integration suite imports the Control Plane store directly.
-              - 'control-plane/**'
-              # ... and validates the shared contract fixtures.
-              - 'contracts/**'
-              - '.github/workflows/ci.yml'
-            control-plane-ui:
-              - 'apps/control-plane-ui/**'
-              # The console pins its response type to the shared contract fixture.
-              - 'contracts/**'
-              - '.github/workflows/ci.yml'
-            agents:
-              - 'agents/**'
-              # The wheel packages the canonical contract schemas.
-              - 'contracts/**'
-              - '.github/workflows/ci.yml'
-            scripts:
-              - 'scripts/**'
-              - '.github/workflows/ci.yml'
-            documentation:
-              - '**/*.md'
-              - 'scripts/check_markdown_links.py'
-              - 'scripts/check_markdown_wrapping.py'
-              - 'scripts/check_translated_doc_headings.py'
-              - 'scripts/markdown_check_utils.py'
-              - '.github/workflows/ci.yml'
-            # Automation configuration has its own lightweight validation. A
-            # Dependabot scheduling change should not run both application suites.
-            automation-config:
-              - '.github/dependabot.yml'
-              - '.github/workflows/**'
-            # ops/ and the root Compose files are not covered by any app suite;
-            # give them lightweight validation so they still gate CI Status.
-            ops:
-              - 'ops/**'
-              - 'compose.yaml'
-              - 'compose.env.sample'
-              - '.github/workflows/ci.yml'
-
+          filters: .github/ci/changed-areas.yml
   automation-config:
     name: Automation Config
     needs: changes
@@ -107,6 +63,13 @@ jobs:
       # file still prevents malformed YAML from reaching the default branch.
       - name: Parse Dependabot configuration
         run: ruby -e 'require "yaml"; YAML.parse_file(".github/dependabot.yml")'
+
+      # The changed-area model (`.github/ci/changed-areas.yml`) is the single source of the
+      # `changes` job's filters. This checks the couplings CI cannot see in an import graph: that
+      # a job and its filter still agree, that every generated artifact and every tracked file is
+      # covered — the coupling that, when missing, lets a change run no job at all.
+      - name: Check changed-area model
+        run: node --test .github/ci/check-changed-areas.mjs
 
   ops:
     name: Ops
@@ -134,6 +97,54 @@ jobs:
         # interpolations require real secrets, so interpolating would always fail.
         # We validate the compose structure, not the operator's secret values.
         run: docker compose -f compose.yaml config -q --no-interpolate
+
+  contract-tools:
+    name: Contract Tools (${{ matrix.family }})
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.contract-tools == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [control-plane-api, integration-contract]
+    defaults:
+      run:
+        working-directory: contracts/${{ matrix.family }}/tools
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: contracts/${{ matrix.family }}/tools/package.json
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: contracts/${{ matrix.family }}/tools/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: contracts/${{ matrix.family }}/tools/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check generated artifacts are fresh
+        # Re-renders this family's projections and compares them to the committed files. It
+        # also runs inside `pnpm test`, but as its own step so a failure reads as one check.
+        run: pnpm run check
+
+      - name: Check
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm --if-present run lint:contract
+          pnpm run typecheck
+          pnpm test
 
   control-plane:
     name: Control Plane
@@ -199,20 +210,6 @@ jobs:
       github.event_name == 'merge_group' ||
       needs.changes.outputs.github-integration == 'true'
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-bookworm
-        env:
-          POSTGRES_DB: sec_review_bot_test
-          POSTGRES_USER: sec_review_bot
-          POSTGRES_PASSWORD: ci-test-password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U sec_review_bot -d sec_review_bot_test"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
     defaults:
       run:
         working-directory: apps/github-integration
@@ -232,14 +229,10 @@ jobs:
           node-version-file: apps/github-integration/package.json
           check-latest: true
           cache: pnpm
-          cache-dependency-path: |
-            apps/github-integration/pnpm-lock.yaml
-            control-plane/pnpm-lock.yaml
+          cache-dependency-path: apps/github-integration/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: |
-          pnpm --dir ../../control-plane install --frozen-lockfile
-          pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: |
@@ -251,11 +244,12 @@ jobs:
 
       - name: Test
         run: pnpm test
-
-      - name: Integration test
-        env:
-          TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
-        run: pnpm run test:integration
+      # Deliberately no `test:integration` step. The only integration test here is the opt-in S3
+      # upload check, which self-skips without `SEC_REVIEW_TEST_S3_ENDPOINT`, so a CI step would
+      # pass vacuously. The integration↔control-plane boundary is covered by Control Plane's own
+      # integration suite (real PostgreSQL store) and by
+      # `control-plane/test/integration/client-server-seam.test.ts`, which drives this package's
+      # real client against the real server; both jobs provision what they need.
 
   control-plane-ui:
     name: Control Plane UI
@@ -439,6 +433,7 @@ jobs:
       - changes
       - automation-config
       - ops
+      - contract-tools
       - control-plane
       - github-integration
       - control-plane-ui
@@ -454,6 +449,7 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
           OPS_RESULT: ${{ needs.ops.result }}
+          CONTRACT_TOOLS_RESULT: ${{ needs.contract-tools.result }}
           CONTROL_PLANE_RESULT: ${{ needs.control-plane.result }}
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
           CONTROL_PLANE_UI_RESULT: ${{ needs.control-plane-ui.result }}
@@ -469,6 +465,7 @@ jobs:
             "$CHANGES_RESULT" \
             "$AUTOMATION_CONFIG_RESULT" \
             "$OPS_RESULT" \
+            "$CONTRACT_TOOLS_RESULT" \
             "$CONTROL_PLANE_RESULT" \
             "$GITHUB_INTEGRATION_RESULT" \
             "$CONTROL_PLANE_UI_RESULT" \

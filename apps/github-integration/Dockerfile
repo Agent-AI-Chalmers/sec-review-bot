@@ -6,12 +6,12 @@ ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
 
 WORKDIR /app
 
-COPY apps/github-integration/package.json apps/github-integration/pnpm-lock.yaml apps/github-integration/pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable pnpm \
     && pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
     && pnpm install --frozen-lockfile
 
-COPY apps/github-integration/ ./
+COPY . ./
 RUN pnpm run build
 # Deploy a self-contained production tree: this package is its own workspace
 # root, so the default implementation needs no injected workspace packages.
@@ -32,7 +32,13 @@ WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /prod ./
-COPY contracts ./contracts
+# The runtime reads canonical schemas from `contracts/integration-contract/v5/schemas`
+# (found relative to the process working directory, which is /app). Compose supplies the
+# `contracts/` tree as a separate named context; copy only the schemas the service reads,
+# not the whole tree (each family's `tools/` and its `pnpm-lock.yaml` would otherwise ride
+# along into the runtime image). The path lands on the resolver's primary candidate rather
+# than its `../../` fallback.
+COPY --from=contracts integration-contract/v5/schemas /app/contracts/integration-contract/v5/schemas
 RUN rm -rf dist/test
 
 CMD ["node", "dist/app.js"]

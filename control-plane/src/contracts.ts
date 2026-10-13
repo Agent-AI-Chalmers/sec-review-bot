@@ -18,37 +18,6 @@ export type ControlPlaneWorkflow =
   operations['create_run_v1_workflows__workflow__runs_post']['parameters']['path']['workflow']
 
 /**
- * The operations `POST /v1/store` accepts.
- *
- * The GitHub integration sends these by name over HTTP and Control Plane dispatches them
- * by name, so this list is the boundary's surface rather than an implementation detail:
- * the server refuses anything absent from it, and the client must send nothing else.
- * `apps/github-integration` asserts that its own sends stay inside this list, because the
- * two sides are separate packages whose operation lists can drift silently — which they
- * had: two methods kept sending names Control Plane had stopped accepting.
- */
-export const controlPlaneOperations = [
-  'submitPreparedRun',
-  'admitReviewRun',
-  'getRun',
-  'failPreparation',
-  'renewPreparationClaim',
-  'preparationHeartbeatIntervalMs',
-  'claimNextPublication',
-  'renewPublicationClaim',
-  'publicationHeartbeatIntervalMs',
-  'initializePublicationSteps',
-  'listPublicationSteps',
-  'requirePublicationStepClaim',
-  'completePublicationStep',
-  'failPublicationStep',
-  'completePublication',
-  'failPublication'
-] as const
-
-export type ControlPlaneOperation = (typeof controlPlaneOperations)[number]
-
-/**
  * Where a terminal run's diagnostics went.
  *
  * The runner owns this shape and publishes it in its OpenAPI document, which

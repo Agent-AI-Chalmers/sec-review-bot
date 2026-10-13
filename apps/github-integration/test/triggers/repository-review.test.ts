@@ -174,13 +174,12 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
         args.on_prepared?.(submitted, { contract_version: 'v5' } as never)
         return submitted
       },
-      create_run_id: () => 'run-1',
       store: {
         ...preparationClaim,
         admitReviewRun: (run) => {
           saved_runs.push(run)
           return {
-            record: { ...run, runner_status: 'preparing' },
+            record: { ...run, run_id: 'run-1', runner_status: 'preparing' },
             created: true,
             preparation_token: 'claim'
           } as never
@@ -217,7 +216,6 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
   )
   assert.deepEqual(saved_runs[0], {
     workflow: 'repository-review',
-    run_id: 'run-1',
     publish_context: {},
     ingress_kind: 'github_actions_dispatch',
     ingress_key: 'octo/example:actions-run-1'
@@ -269,7 +267,6 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
         repair_mode: null,
         correlation_id: 'actions-run-replayed'
       }),
-      create_run_id: () => 'run-unused',
       submit_run: async () => {
         submissions += 1
         throw new Error('replayed dispatch must not submit another run')
@@ -305,7 +302,6 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
         correlation_id: 'actions-invalid-window'
       },
       deps: {
-        create_run_id: () => 'run-invalid-window',
         getInstallationOctokit: async () => ({}) as GitHubAppOctokit,
         resolve_dispatch: async () => {
           throw new Error('manual incremental scan requires base_sha.')
@@ -318,7 +314,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
           admitReviewRun: (run) => {
             transitions.push(['preparing', run])
             return {
-              record: { ...run, runner_status: 'preparing' },
+              record: { ...run, run_id: 'run-invalid-window', runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             } as never
@@ -392,7 +388,6 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           repair_mode: 'test-changes-allowed',
           correlation_id: 'actions-run-failed'
         }),
-        create_run_id: () => 'run-repo-failed',
         submit_run: async ({ run_id }) => {
           assert.equal(run_id, 'run-repo-failed')
           throw new Error('bundle preparation failed')
@@ -402,7 +397,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           admitReviewRun: (run) => {
             transitions.push(['preparing', run])
             return {
-              record: { ...run, runner_status: 'preparing' },
+              record: { ...run, run_id: 'run-repo-failed', runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             } as never
@@ -420,7 +415,6 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
       'preparing',
       {
         workflow: 'repository-review',
-        run_id: 'run-repo-failed',
         publish_context: {},
         ingress_kind: 'github_actions_dispatch',
         ingress_key: 'octo/example:actions-run-failed'
@@ -462,7 +456,6 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           repair_mode: null,
           correlation_id: 'actions-run-uncertain'
         }),
-        create_run_id: () => 'run-repo-uncertain',
         submit_run: async (args) => {
           args.on_prepared?.(
             {
@@ -494,7 +487,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, runner_status: 'preparing' },
+              record: { ...run, run_id: 'run-repo-uncertain', runner_status: 'preparing' },
               created: true,
               preparation_token: 'claim'
             }) as never,

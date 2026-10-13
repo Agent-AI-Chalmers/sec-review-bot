@@ -1,4 +1,3 @@
-export { controlPlaneOperations, type ControlPlaneOperation } from './contracts.js'
 export type { ControlPlaneWorkflow, RunnerArtifactStorage } from './contracts.js'
 export { submitPreparedRun } from './prepared-submission.js'
 export {
@@ -10,11 +9,13 @@ export {
 export {
   ReviewRunStore,
   type CreateReviewRunArgs,
+  type DroppedRunRow,
   type PublicationStepRecord,
   type PublicationWork,
   type PublishContext,
   type ReviewRunAdmission,
-  type ReviewRunRecord
+  type ReviewRunRecord,
+  type RunRowsProjection
 } from './review-store.js'
 export {
   recoverReviewRunSubmission,

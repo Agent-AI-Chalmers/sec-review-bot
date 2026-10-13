@@ -104,8 +104,10 @@ services:
   control-plane:
     profiles: ["app"]
     build:
-      context: .
-      dockerfile: control-plane/Dockerfile
+      context: control-plane
+      dockerfile: Dockerfile
+      additional_contexts:
+        contracts: contracts
       args:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     environment:
@@ -133,8 +135,8 @@ services:
   control-plane-ui:
     profiles: ["app"]
     build:
-      context: .
-      dockerfile: apps/control-plane-ui/Dockerfile
+      context: apps/control-plane-ui
+      dockerfile: Dockerfile
       args:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     environment:
@@ -163,8 +165,10 @@ services:
   github-integration:
     profiles: ["app"]
     build:
-      context: .
-      dockerfile: apps/github-integration/Dockerfile
+      context: apps/github-integration
+      dockerfile: Dockerfile
+      additional_contexts:
+        contracts: contracts
       args:
         # Override for networks where the public npm registry is unreliable.
         # The default preserves the normal npm registry behavior.

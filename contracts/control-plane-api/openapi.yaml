@@ -1,0 +1,1383 @@
+openapi: 3.1.0
+info:
+  title: Control Plane
+  version: v1
+  description: |
+    Control Plane coordination API. The read surface (runs listing/detail) is
+    consumed by the console; the write surface (admission, submission, publication)
+    and the internal full reads are consumed by the GitHub integration. This document
+    is the single source of truth: routes, validation, and client types are all derived
+    from it.
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: Mutation and internal full-read access (GitHub integration).
+    readToken:
+      type: http
+      scheme: bearer
+      description: Redacted read access (console).
+  responses:
+    InvalidRequest:
+      description: >-
+        The request failed the contract's own schema. `code` names which part —
+        `INVALID_QUERY`, `INVALID_BODY`, or `INVALID_PATH_PARAMETER`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid bearer credential for the operation's security scheme.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RunNotFound:
+      description: The referenced run was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    DeterministicPublicationFailure:
+      description: >-
+        A deterministic publication failure; `code` carries the terminal reason
+        (`PUBLICATION_STEP_*`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    PayloadTooLarge:
+      description: >-
+        The request body exceeded the service's limit (1 MiB). Only operations that read a body
+        can return this; the body is rejected before the contract's own schema sees it.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: >-
+        An internal fault. The response is deliberately opaque (it never carries the fault's
+        message or `code`); the identity is logged server-side. Every operation can return it.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: |
+            The machine-readable reason. `INVALID_QUERY`, `INVALID_BODY`, and
+            `INVALID_PATH_PARAMETER` identify which part of the request failed schema
+            validation; the `PUBLICATION_STEP_*` codes are terminal publication failures.
+          enum:
+            - INVALID_QUERY
+            - INVALID_BODY
+            - INVALID_PATH_PARAMETER
+            - PUBLICATION_STEP_SET_DUPLICATE
+            - PUBLICATION_STEP_SET_CHANGED
+            - PUBLICATION_STEP_RETRY_EXHAUSTED
+            - PUBLICATION_STEP_NOT_CLAIMABLE
+    ReviewRunRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - publish_context
+        - runner_status
+        - publication_status
+        - created_at
+        - execution_updated_at
+        - publication_updated_at
+        - published_at
+        - failure_code
+        - failure_message
+        - artifact_storage
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        publish_context:
+          type: object
+          additionalProperties: {}
+        runner_input:
+          type: object
+          additionalProperties: {}
+        ingress_kind:
+          type: string
+          enum:
+            - github_webhook
+            - github_actions_dispatch
+        ingress_key:
+          type: string
+        runner_status:
+          type: string
+          enum:
+            - preparing
+            - recovering
+            - queued
+            - running
+            - succeeded
+            - failed
+        publication_status:
+          type: string
+          enum:
+            - pending
+            - publishing
+            - published
+            - failed
+            - skipped
+        created_at:
+          type: string
+          format: date-time
+        execution_updated_at:
+          type: string
+          format: date-time
+        publication_updated_at:
+          type: string
+          format: date-time
+        published_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          $ref: "#/components/schemas/ArtifactStorage"
+    ReviewRunAdmission:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - created
+        - preparation_token
+      properties:
+        record:
+          $ref: "#/components/schemas/ReviewRunRecord"
+        created:
+          type: boolean
+        preparation_token:
+          type:
+            - string
+            - "null"
+    PublicationWork:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - publish_context
+        - runner_status
+        - publication_status
+        - created_at
+        - execution_updated_at
+        - publication_updated_at
+        - published_at
+        - failure_code
+        - failure_message
+        - artifact_storage
+        - workflow_result
+        - claim_token
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        publish_context:
+          type: object
+          additionalProperties: {}
+        runner_input:
+          type: object
+          additionalProperties: {}
+        ingress_kind:
+          type: string
+          enum:
+            - github_webhook
+            - github_actions_dispatch
+        ingress_key:
+          type: string
+        runner_status:
+          type: string
+          enum:
+            - preparing
+            - recovering
+            - queued
+            - running
+            - succeeded
+            - failed
+        publication_status:
+          type: string
+          enum:
+            - pending
+            - publishing
+            - published
+            - failed
+            - skipped
+        created_at:
+          type: string
+          format: date-time
+        execution_updated_at:
+          type: string
+          format: date-time
+        publication_updated_at:
+          type: string
+          format: date-time
+        published_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          $ref: "#/components/schemas/ArtifactStorage"
+        workflow_result: {}
+        claim_token:
+          type: string
+          minLength: 1
+    PublicationStepRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - step_key
+        - status
+        - failure_count
+        - remote_object_id
+        - remote_object_url
+        - failure_code
+        - failure_message
+      properties:
+        step_key:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - terminal_failed
+        failure_count:
+          type: integer
+          minimum: 0
+        remote_object_id:
+          type:
+            - string
+            - "null"
+        remote_object_url:
+          type:
+            - string
+            - "null"
+          format: uri
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+    ObservedPublicationStep:
+      type: object
+      additionalProperties: false
+      required:
+        - step_key
+        - status
+        - failure_count
+        - remote_object_url
+        - failure_code
+        - failure_message
+      properties:
+        step_key:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - terminal_failed
+        failure_count:
+          type: integer
+          minimum: 0
+        remote_object_url:
+          type:
+            - string
+            - "null"
+          format: uri
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+    ObservedRun:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - execution_status
+        - publication_status
+        - created_at
+        - execution_updated_at
+        - publication_updated_at
+        - published_at
+        - failure_code
+        - artifact_storage
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        execution_status:
+          type: string
+          enum:
+            - preparing
+            - recovering
+            - queued
+            - running
+            - succeeded
+            - failed
+        publication_status:
+          type: string
+          enum:
+            - pending
+            - publishing
+            - published
+            - failed
+            - skipped
+        created_at:
+          type: string
+          format: date-time
+        execution_updated_at:
+          type: string
+          format: date-time
+        publication_updated_at:
+          type: string
+          format: date-time
+        published_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          $ref: "#/components/schemas/ArtifactStorage"
+    ArtifactStorage:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+          properties:
+            status:
+              type: string
+              enum:
+                - unavailable
+                - failed
+            error_code:
+              type: string
+            message:
+              type: string
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+            - artifact
+          properties:
+            status:
+              type: string
+              enum:
+                - available
+            artifact:
+              type: object
+              additionalProperties: false
+              required:
+                - kind
+                - uri
+                - media_type
+                - digest
+                - size_bytes
+              properties:
+                kind:
+                  type: string
+                  enum:
+                    - diagnostic_bundle
+                uri:
+                  type: string
+                  pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
+                media_type:
+                  type: string
+                  enum:
+                    - application/tar+zstd
+                digest:
+                  type: string
+                  pattern: ^sha256:[0-9a-f]{64}$
+                size_bytes:
+                  type: integer
+                  minimum: 0
+        - type: "null"
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      description: >-
+        Report process health. Requires no credential.
+      # Explicitly public: the liveness probe must answer an unauthenticated caller. The empty
+      # requirement is what says so; omitting the key would be indistinguishable from a
+      # forgotten requirement, which the `operation-requires-security` rule rejects.
+      security: []
+      responses:
+        "200":
+          description: Process health.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs:
+    get:
+      operationId: listRuns
+      description: >-
+        List runs for the caller's connector, newest first, with cursor pagination. Returns the
+        redacted observed shape; internal inputs and publish context are omitted.
+      security:
+        - readToken: []
+      parameters:
+        # The filters are one `form`-exploded object rather than seven separate parameters
+        # so the route schema can say `additionalProperties: false`: an unknown query
+        # parameter is rejected (400 `INVALID_QUERY`) instead of being ignored, matching how
+        # the request bodies already refuse undeclared fields. When the parameters are
+        # separate there is no place to attach `additionalProperties`, so the contract would
+        # overstate the validation. The name below is only a schema holder; the client sends
+        # the properties themselves (`?limit=…&workflow=…`).
+        - in: query
+          name: filter
+          style: form
+          explode: true
+          description: >-
+            The list filters. Each declared property is a query parameter of the same name;
+            any other query parameter is rejected.
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              limit:
+                type: integer
+                minimum: 1
+                maximum: 100
+              cursor:
+                type: string
+              execution_status:
+                type: string
+                enum:
+                  - preparing
+                  - recovering
+                  - queued
+                  - running
+                  - succeeded
+                  - failed
+              publication_status:
+                type: string
+                enum:
+                  - pending
+                  - publishing
+                  - published
+                  - failed
+                  - skipped
+              workflow:
+                type: string
+                enum:
+                  - issue-review
+                  - pull-request-review
+                  - repository-review
+              from:
+                type: string
+                format: date-time
+              to:
+                type: string
+                format: date-time
+      responses:
+        "200":
+          description: Paginated redacted runs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - runs
+                  - next_cursor
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ObservedRun"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: admitRun
+      description: >-
+        Admit a review run, assigning its `run_id` before input preparation begins. Re-admitting
+        the same `ingress_kind`/`ingress_key` returns the original run instead of creating another.
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - workflow
+                - publish_context
+                - ingress_kind
+                - ingress_key
+              properties:
+                workflow:
+                  type: string
+                  enum:
+                    - issue-review
+                    - pull-request-review
+                    - repository-review
+                publish_context:
+                  type: object
+                  additionalProperties: {}
+                runner_input:
+                  type: object
+                  additionalProperties: {}
+                ingress_kind:
+                  type: string
+                  enum:
+                    - github_webhook
+                    - github_actions_dispatch
+                ingress_key:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: The admitted (or re-admitted) run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunAdmission"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}:
+    get:
+      operationId: getRun
+      description: >-
+        Read one run in the redacted observed shape. Requires the read token.
+      security:
+        - readToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        "200":
+          description: Redacted run detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run
+                properties:
+                  run:
+                    $ref: "#/components/schemas/ObservedRun"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication-steps:
+    get:
+      operationId: listRunPublicationSteps
+      description: >-
+        Read the redacted publication-step summary for one run. Requires the read token.
+      security:
+        - readToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        "200":
+          description: Redacted publication-step summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run_id
+                  - publication_steps
+                properties:
+                  run_id:
+                    type: string
+                  publication_steps:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ObservedPublicationStep"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/submission:
+    post:
+      operationId: submitPreparedRun
+      description: >-
+        Submit a prepared run to the Runner, persisting the input and commit claim before the
+        Runner call so an uncertain submission stays recoverable.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - preparation_token
+                - publish_context
+                - input
+              properties:
+                preparation_token:
+                  type: string
+                  minLength: 1
+                publish_context:
+                  type: object
+                  additionalProperties: {}
+                input:
+                  type: object
+                  additionalProperties: {}
+      responses:
+        "200":
+          description: Queued acknowledgement.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run_id
+                  - workflow
+                  - status
+                properties:
+                  run_id:
+                    type: string
+                  workflow:
+                    type: string
+                    enum:
+                      - issue-review
+                      - pull-request-review
+                      - repository-review
+                  status:
+                    type: string
+                    enum:
+                      - queued
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/preparation/claim:
+    post:
+      operationId: renewPreparationClaim
+      description: >-
+        Renew the caller's preparation claim while input preparation is still active. Returns
+        whether the claim was renewed.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether the claim was renewed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/preparation/failure:
+    post:
+      operationId: failPreparation
+      description: >-
+        Record a terminal preparation failure for a run the caller still owns.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+      responses:
+        "200":
+          description: Fail acknowledgement (empty).
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/publication/claims/next:
+    post:
+      operationId: claimNextPublication
+      description: >-
+        Claim the next publishable run, optionally holding the request until one appears. Returns
+        `null` when the wait elapses with no work.
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                wait_ms:
+                  type: integer
+                  minimum: 0
+      responses:
+        "200":
+          description: The claimed publication work, or null if none.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PublicationWork"
+                  - type: "null"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/claim:
+    post:
+      operationId: renewPublicationClaim
+      description: >-
+        Renew the caller's publication claim. Returns whether the claim was renewed.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether the claim was renewed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps:
+    post:
+      operationId: initializePublicationSteps
+      description: >-
+        Initialize the run's publication step set. The set is fixed once written, so a duplicate or
+        changed set is rejected as a deterministic failure.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - step_keys
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                step_keys:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+      responses:
+        "200":
+          description: Initialization acknowledgement (empty).
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "409":
+          $ref: "#/components/responses/DeterministicPublicationFailure"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps/{stepKey}/claim:
+    post:
+      operationId: requirePublicationStepClaim
+      description: >-
+        Assert the caller still owns the run's publication claim before acting on one step.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        - in: path
+          name: stepKey
+          required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Claim acknowledgement (empty).
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "409":
+          $ref: "#/components/responses/DeterministicPublicationFailure"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps/{stepKey}/complete:
+    post:
+      operationId: completePublicationStep
+      description: >-
+        Record one publication step as succeeded, attaching the remote object it produced.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        - in: path
+          name: stepKey
+          required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                remote_object:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id:
+                      description: >-
+                        The created object's numeric id in its canonical string form. It is
+                        persisted as text and read back with `Number(...)`; a `null` id means
+                        the step produced no remote object.
+                      type:
+                        - string
+                        - "null"
+                    url:
+                      type:
+                        - string
+                        - "null"
+      responses:
+        "200":
+          description: Whether the step completed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps/{stepKey}/fail:
+    post:
+      operationId: failPublicationStep
+      description: >-
+        Record one publication step as failed, optionally spending retry budget.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        - in: path
+          name: stepKey
+          required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+                retry:
+                  type: boolean
+      responses:
+        "200":
+          description: Whether the step failed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/complete:
+    post:
+      operationId: completePublication
+      description: >-
+        Mark the run's publication as complete.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether publication completed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/fail:
+    post:
+      operationId: failPublication
+      description: >-
+        Record the run's publication outcome as failed, choosing whether the failure is retryable.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+                - retry
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+                retry:
+                  type: boolean
+      responses:
+        "200":
+          description: Whether publication failed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/internal/runs/{runId}:
+    get:
+      operationId: getInternalRun
+      description: >-
+        Read the full run record, including `runner_input` and `publish_context`. Requires the
+        service token; never exposed to the console.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        "200":
+          description: Full run record (includes runner_input/publish_context).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/internal/runs/{runId}/publication/steps:
+    get:
+      operationId: listInternalPublicationSteps
+      description: >-
+        Read the full publication-step records for one run, including reconciliation ids. Requires
+        the service token.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        "200":
+          description: Full publication-step records.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicationStepRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/config/preparation-heartbeat-interval:
+    get:
+      operationId: getPreparationHeartbeatInterval
+      description: >-
+        Report how often a preparation owner must renew its claim.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: Preparation heartbeat interval in milliseconds.
+          content:
+            application/json:
+              schema:
+                type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/config/publication-heartbeat-interval:
+    get:
+      operationId: getPublicationHeartbeatInterval
+      description: >-
+        Report how often a publication owner must renew its claim.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: Publication heartbeat interval in milliseconds.
+          content:
+            application/json:
+              schema:
+                type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+

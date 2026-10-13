@@ -1,28 +1,7 @@
 import type { PublicationStepRecord, ReviewRunRecord } from './review-store.js'
+import type { ObservedRun, PublicationStepSummary } from './shapes.js'
 
-/** Stable, connector-neutral fields intended for operators and future query clients. */
-export interface ObservedRun {
-  run_id: string
-  workflow: ReviewRunRecord['workflow']
-  execution_status: ReviewRunRecord['runner_status']
-  publication_status: ReviewRunRecord['publication_status']
-  created_at: string
-  execution_updated_at: string
-  publication_updated_at: string
-  published_at: string | null
-  failure_code: string | null
-  artifact_storage: ReviewRunRecord['artifact_storage']
-  publication_steps?: readonly PublicationStepSummary[]
-}
-
-export interface PublicationStepSummary {
-  step_key: string
-  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-  failure_count: number
-  remote_object_url: string | null
-  failure_code: string | null
-  failure_message: string | null
-}
+export type { ObservedRun, PublicationStepSummary } from './shapes.js'
 
 export function observeRun(run: ReviewRunRecord): ObservedRun {
   return {
@@ -35,6 +14,8 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
     publication_updated_at: run.publication_updated_at,
     published_at: run.published_at,
     failure_code: run.failure_code,
+    // `artifact_storage` is already normalized to the discriminated union in
+    // `rowToRecord`, so it passes through unchanged here.
     artifact_storage: run.artifact_storage
   }
 }

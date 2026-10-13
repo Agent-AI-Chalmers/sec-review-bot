@@ -24,6 +24,7 @@ import {
   runPublicationStatusLabel
 } from './status.js'
 import { abbreviate, failureReason, formatDuration, lastActivity, workflowLabel } from './format.js'
+import { LIST_RUN_QUERY_PARAMS } from './list-run-query-params.js'
 
 const RANGE_MINUTES: Record<string, number> = { '1h': 60, '24h': 1_440, '7d': 10_080 }
 const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
@@ -66,7 +67,15 @@ export function Runs(): React.JSX.Element {
   // State the page size on every request, so the console never depends on the
   // server's own default changing underneath a bookmarked or shared link. A size
   // that the console does not offer is still honoured as an extra option.
-  const pageQuery = new URLSearchParams(search)
+  //
+  // Copy only the parameters Control Plane declares (generated from `openapi.yaml`), never
+  // the whole URL. The URL also carries UI-only state (`range`), which the API does not
+  // accept; forwarding it would send Control Plane a parameter outside its contract.
+  const pageQuery = new URLSearchParams()
+  for (const name of LIST_RUN_QUERY_PARAMS) {
+    const value = search.get(name)
+    if (value !== null && value !== '') pageQuery.set(name, value)
+  }
   pageQuery.set('limit', String(pageSize))
   const rangeMinutes = RANGE_MINUTES[search.get('range') ?? '']
   if (rangeMinutes !== undefined) {

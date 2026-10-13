@@ -1,0 +1,28 @@
+{
+  "$comment": "Every artifact generated from this family's contract, with the file that renders it and the contract it derives from. Paths are relative to the repository root. The tool's test asserts this matches the generators' own declared outputs and that CI triggers on each. Regenerate with: pnpm --dir contracts/control-plane-api/tools run generate",
+  "family": "control-plane-api",
+  "generators": [
+    {
+      "name": "types",
+      "script": "contracts/control-plane-api/tools/src/generate-types.ts",
+      "command": "pnpm --dir contracts/control-plane-api/tools run generate",
+      "inputs": ["contracts/control-plane-api/openapi.yaml"],
+      "outputs": [
+        "control-plane/src/contract-types-generated.ts",
+        "control-plane/src/error-codes-generated.ts",
+        "apps/github-integration/src/control-plane/control-plane-api.ts",
+        "apps/control-plane-ui/src/list-run-query-params.ts"
+      ]
+    },
+    {
+      "name": "schemas",
+      "script": "contracts/control-plane-api/tools/src/generate-schemas.ts",
+      "command": "pnpm --dir contracts/control-plane-api/tools run generate",
+      "inputs": ["contracts/control-plane-api/openapi.yaml"],
+      "outputs": [
+        "contracts/control-plane-api/v1/observed-run.schema.json",
+        "contracts/control-plane-api/v1/review-run-record.schema.json"
+      ]
+    }
+  ]
+}

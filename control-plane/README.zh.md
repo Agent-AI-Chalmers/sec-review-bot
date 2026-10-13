@@ -89,13 +89,16 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 ## HTTP API
 
-| Endpoint                                 | 认证                          | 用途                                    |
-| ---------------------------------------- | ----------------------------- | --------------------------------------- |
-| `GET /healthz`                           | 无                            | 进程健康检查                            |
-| `POST /v1/store`                         | `CONTROL_PLANE_SERVICE_TOKEN` | 内部接纳、提交、恢复和 publication 操作 |
-| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN`    | 支持过滤和 cursor 分页的 run 列表       |
-| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN`    | 脱敏的 run 详情                         |
-| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`    | Publication step 摘要                   |
+| Endpoint                                 | 认证                       | 用途                              |
+| ---------------------------------------- | -------------------------- | --------------------------------- |
+| `GET /healthz`                           | 无                         | 进程健康检查                      |
+| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | 支持过滤和 cursor 分页的 run 列表 |
+| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | 脱敏的 run 详情                   |
+| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication step 摘要             |
+
+写面——接纳、提交、准备与发布租约及其终态——是一组 REST 路由，其请求/响应形状、安全方案与错误码都来自手写的 [openapi.yaml](../contracts/control-plane-api/openapi.yaml) 契约；那份文档才是整个面的单一事实来源，而不是这张表。
+
+契约在**请求侧是强制执行的**：路由、path/query/body 校验与鉴权都由它派生，因此任何不符合该文档的请求都会在进入 handler 之前被拒绝。响应侧由契约**描述**，但运行时并不对其校验——`fastify-openapi-glue` 只处理请求——因此声明的响应 schema 是 handler 需要遵守的约定，由测试而非框架来固定。`control-plane/test/observed-run-contract.test.ts` 会用共享 schema 校验已提交的 fixtures 以及 `observeRun()` 实际产出的形状，`control-plane/test/server-http.test.ts` 则覆盖 HTTP 面，这正是防止响应在无人察觉的情况下偏离其 schema 的机制。
 
 查询响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
@@ -139,5 +142,7 @@ pnpm run typecheck
 pnpm test
 pnpm run test:integration
 ```
+
+契约本身由族工具（位于 [`contracts/control-plane-api/tools`](../contracts/control-plane-api/tools/README.md)）用 Spectral 检查，其投影也由该工具做新鲜度校验。
 
 `pnpm run test:integration` 需要 `TEST_DATABASE_URL` 或 `DATABASE_URL` 指向可清空的 PostgreSQL 数据库。

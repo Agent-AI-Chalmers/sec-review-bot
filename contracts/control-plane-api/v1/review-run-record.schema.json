@@ -23,6 +23,7 @@
       "minLength": 1
     },
     "workflow": {
+      "type": "string",
       "enum": [
         "issue-review",
         "pull-request-review",
@@ -30,12 +31,15 @@
       ]
     },
     "publish_context": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": {}
     },
     "runner_input": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": {}
     },
     "ingress_kind": {
+      "type": "string",
       "enum": [
         "github_webhook",
         "github_actions_dispatch"
@@ -45,6 +49,7 @@
       "type": "string"
     },
     "runner_status": {
+      "type": "string",
       "enum": [
         "preparing",
         "recovering",
@@ -55,6 +60,7 @@
       ]
     },
     "publication_status": {
+      "type": "string",
       "enum": [
         "pending",
         "publishing",
@@ -97,9 +103,6 @@
     "artifact_storage": {
       "oneOf": [
         {
-          "type": "null"
-        },
-        {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -107,6 +110,7 @@
           ],
           "properties": {
             "status": {
+              "type": "string",
               "enum": [
                 "unavailable",
                 "failed"
@@ -129,7 +133,10 @@
           ],
           "properties": {
             "status": {
-              "const": "available"
+              "type": "string",
+              "enum": [
+                "available"
+              ]
             },
             "artifact": {
               "type": "object",
@@ -143,14 +150,20 @@
               ],
               "properties": {
                 "kind": {
-                  "const": "diagnostic_bundle"
+                  "type": "string",
+                  "enum": [
+                    "diagnostic_bundle"
+                  ]
                 },
                 "uri": {
                   "type": "string",
                   "pattern": "^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
                 },
                 "media_type": {
-                  "const": "application/tar+zstd"
+                  "type": "string",
+                  "enum": [
+                    "application/tar+zstd"
+                  ]
                 },
                 "digest": {
                   "type": "string",
@@ -163,6 +176,9 @@
               }
             }
           }
+        },
+        {
+          "type": "null"
         }
       ]
     }

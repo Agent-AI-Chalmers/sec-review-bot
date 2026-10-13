@@ -3,10 +3,9 @@ import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { prepareIssueReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
 import type { IssueReviewInput } from '../../runner/input.js'
-import { createRunId } from '../shared/input-bundle.js'
 
 interface RunIssueReviewArgs {
-  run_id?: string
+  run_id: string
   octokit: unknown
   issue: IssueContext
   event_type?: 'opened' | 'manual_review' | null
@@ -65,7 +64,7 @@ async function materializeIssueReviewInput({
   })
 
   const prepared = await prepareIssueReviewInput({
-    ...(run_id ? { run_id } : {}),
+    run_id,
     octokit: octokit as GitHubAppOctokit,
     issue,
     review_objective: resolvedReviewObjective,
@@ -97,8 +96,7 @@ async function materializeIssueReviewInput({
 export async function startIssueReviewRun(
   args: RunIssueReviewArgs
 ): Promise<SubmittedIssueReviewRun> {
-  const run_id = args.run_id ?? createRunId()
-  const prepared = await materializeIssueReviewInput({ ...args, run_id })
+  const prepared = await materializeIssueReviewInput(args)
   const input = prepared.input
   const event_type = args.event_type ?? 'manual_review'
   assertIssueReviewInput(input)

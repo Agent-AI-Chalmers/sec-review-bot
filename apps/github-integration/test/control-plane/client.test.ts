@@ -8,13 +8,21 @@ const preparingRun: ReviewRunRecord = {
   workflow: 'repository-review',
   publish_context: {},
   runner_status: 'preparing',
+  publication_status: 'pending',
   created_at: '2026-10-07T00:00:00.000Z',
+  execution_updated_at: '2026-10-07T00:00:00.000Z',
+  publication_updated_at: '2026-10-07T00:00:00.000Z',
   published_at: null,
   failure_code: null,
   failure_message: null,
   artifact_storage: null,
   ingress_kind: 'github_actions_dispatch',
   ingress_key: 'octo/example:dispatch-1'
+}
+
+/** The request body a request sent, parsed from `init.body`. */
+function sentBody(init?: RequestInit): Record<string, unknown> {
+  return JSON.parse(String(init?.body)) as Record<string, unknown>
 }
 
 test('repository preparation can replace the admitted empty publish context', async (t) => {
@@ -29,22 +37,20 @@ test('repository preparation can replace the admitted empty publish context', as
     else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
   })
 
-  t.mock.method(globalThis, 'fetch', async (_input: string | URL | Request, init?: RequestInit) => {
-    const request = JSON.parse(String(init?.body)) as { operation: string; args: unknown[] }
-    if (request.operation === 'admitReviewRun') {
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    if (url.endsWith('/v1/runs') && init?.method === 'POST') {
       return Response.json({
-        result: {
-          record: preparingRun,
-          created: true,
-          preparation_token: 'preparation-token'
-        }
+        record: preparingRun,
+        created: true,
+        preparation_token: 'preparation-token'
       })
     }
-    if (request.operation === 'getRun') {
-      return Response.json({ result: preparingRun })
+    if (url.endsWith('/v1/internal/runs/run-1') && init?.method === 'GET') {
+      return Response.json(preparingRun)
     }
-    if (request.operation === 'submitPreparedRun') {
-      assert.deepEqual(request.args[2], {
+    if (url.endsWith('/v1/runs/run-1/submission') && init?.method === 'POST') {
+      assert.deepEqual(sentBody(init).publish_context, {
         repo: {
           owner_login: 'octo',
           repo_name: 'example',
@@ -60,12 +66,16 @@ test('repository preparation can replace the admitted empty publish context', as
         },
         event_type: 'manual'
       })
-      return Response.json({ result: undefined })
+      return Response.json({
+        run_id: 'run-1',
+        workflow: 'repository-review',
+        status: 'queued'
+      })
     }
-    return Response.json({ error: 'unexpected operation' }, { status: 500 })
+    return Response.json({ error: 'not_found' }, { status: 404 })
   })
+
   const admission = await controlPlaneClient.admitReviewRun({
-    run_id: 'run-1',
     workflow: 'repository-review',
     publish_context: {},
     ingress_kind: 'github_actions_dispatch',
@@ -140,31 +150,69 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
     if (previousToken === undefined) delete process.env.CONTROL_PLANE_SERVICE_TOKEN
     else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
   })
-  const requests: Array<{ operation: string; args: unknown[] }> = []
-  t.mock.method(globalThis, 'fetch', async (_input: string | URL | Request, init?: RequestInit) => {
-    const request = JSON.parse(String(init?.body)) as { operation: string; args: unknown[] }
-    requests.push(request)
-    if (request.operation === 'claimNextPublication') {
+  const requests: Array<{ url: string; method: string; body: Record<string, unknown> }> = []
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    requests.push({ url, method: init?.method ?? 'GET', body: sentBody(init) })
+    if (url.endsWith('/v1/publication/claims/next') && init?.method === 'POST') {
       return Response.json({
-        result: {
-          ...preparingRun,
-          status: 'publishing',
-          workflow_result: {},
-          claim_token: 'claim-1',
-          publish_context: {}
-        }
+        ...preparingRun,
+        publication_status: 'publishing',
+        workflow_result: {},
+        claim_token: 'claim-1',
+        publish_context: {}
       })
     }
-    if (request.operation === 'failPublication') return Response.json({ result: true })
-    return Response.json({ error: 'unexpected operation' }, { status: 500 })
+    if (url.endsWith('/v1/runs/run-1/publication/fail') && init?.method === 'POST') {
+      return Response.json(true)
+    }
+    return Response.json({ error: 'not_found' }, { status: 404 })
   })
 
   await assert.rejects(
     controlPlaneClient.claimNextPublication(),
     /Persisted publish context is invalid/
   )
-  assert.deepEqual(requests[0]?.args, [0])
-  assert.equal(requests[1]?.operation, 'failPublication')
-  assert.deepEqual(requests[1]?.args.slice(0, 2), ['run-1', 'claim-1'])
-  assert.deepEqual(requests[1]?.args.at(-1), { retry: false })
+  assert.deepEqual(requests[0]?.body, { wait_ms: 0 })
+  // `run_id` rides the URL path now, not the body: the fail call targets
+  // /v1/runs/run-1/publication/fail with token + failure + retry in the body.
+  assert.equal(requests[1]?.url.endsWith('/v1/runs/run-1/publication/fail'), true)
+  assert.equal('run_id' in requests[1]!.body, false)
+  assert.equal(requests[1]?.body.token, 'claim-1')
+  assert.deepEqual(requests[1]?.body.retry, false)
+})
+
+test('void operations accept the empty 200 body the real server sends', async (t) => {
+  // Three operations (`failPreparation`, `initializePublicationSteps`,
+  // `requirePublicationStepClaim`) declare a 200 with no content, and the server answers
+  // `reply.code(200).send()` — a zero-byte body. Every other mock in this file uses
+  // `Response.json(...)`, which always has a body, so `request()` parsing the success
+  // unconditionally looked fine here while throwing `SyntaxError: Unexpected end of JSON
+  // input` against the real server. Use a real empty-bodied `Response` so this suite can see
+  // the difference between a body and none.
+  const previousUrl = process.env.CONTROL_PLANE_SERVICE_URL
+  const previousToken = process.env.CONTROL_PLANE_SERVICE_TOKEN
+  process.env.CONTROL_PLANE_SERVICE_URL = 'http://control-plane.test'
+  process.env.CONTROL_PLANE_SERVICE_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousUrl === undefined) delete process.env.CONTROL_PLANE_SERVICE_URL
+    else process.env.CONTROL_PLANE_SERVICE_URL = previousUrl
+    if (previousToken === undefined) delete process.env.CONTROL_PLANE_SERVICE_TOKEN
+    else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
+  })
+
+  t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 200 }))
+
+  assert.equal(
+    await controlPlaneClient.initializePublicationSteps('run-1', 'claim-1', ['a']),
+    undefined
+  )
+  assert.equal(
+    await controlPlaneClient.requirePublicationStepClaim('run-1', 'claim-1', 'a'),
+    undefined
+  )
+  assert.equal(
+    await controlPlaneClient.failPreparation('run-1', 'prep-1', { message: 'x' }),
+    undefined
+  )
 })

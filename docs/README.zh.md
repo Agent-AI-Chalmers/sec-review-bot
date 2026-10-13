@@ -30,14 +30,15 @@
 | 族 | 边界 | 两侧 |
 | --- | --- | --- |
 | [integration-contract](../contracts/integration-contract/README.zh.md) | Runner 的 HTTP 面，以及 workflow 的 `input` / `result` 数据 | Runner 与它的调用方 |
-| [control-plane-api](../contracts/control-plane-api/README.zh.md) | 控制台读取的运行形状，以及集成方经 `POST /v1/store` 交换的协调记录 | Control Plane 与它的调用方 |
+| [control-plane-api](../contracts/control-plane-api/README.zh.md) | 控制台读取的运行形状，以及集成方派生客户端所依据的手写 OpenAPI 契约 | Control Plane 与它的调用方 |
 
 先读 [Contracts README](../contracts/README.zh.md)：它定义了族目录的布局、命名规则、schema 该拥有什么，以及 fixtures 如何参与校验。各族 README 再分别说明消费者可以依赖什么、哪一侧归谁、以及哪些是刻意不做成 schema 的。
 
 - [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md) / [中文](../contracts/integration-contract/v5/CONTRACT.zh.md)：workflow 数据契约。
 - [integration-contract/openapi.json](../contracts/integration-contract/openapi.json)：Agent Runner HTTP API，由服务代码生成。
+- [control-plane-api/openapi.yaml](../contracts/control-plane-api/openapi.yaml)：Control Plane HTTP 契约——路由、schema、安全方案与错误码。
 - [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json)：控制台读取返回的脱敏运行形状。
-- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json)：经 `POST /v1/store` 交换的记录。
+- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json)：协调记录的形状。
 
 ### workflows/
 

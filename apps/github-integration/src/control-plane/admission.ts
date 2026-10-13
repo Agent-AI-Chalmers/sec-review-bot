@@ -1,51 +1,39 @@
-import { randomUUID } from 'node:crypto'
+import type { components } from './control-plane-api.js'
 
-import type { WorkflowName as ControlPlaneWorkflow } from '../runner/shapes.js'
+type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
 
 interface ReviewRunAdmissionRequest {
-  workflow: ControlPlaneWorkflow
+  workflow: ReviewRunAdmission['record']['workflow']
   ingress_kind: 'github_webhook' | 'github_actions_dispatch'
   ingress_key: string
 }
 interface AdmittedReviewRun {
   run_id: string
-  workflow: ControlPlaneWorkflow
+  workflow: ReviewRunAdmission['record']['workflow']
   status: string
-  created: boolean
-  preparation_token: string | null
-}
-
-interface StoredAdmission {
-  record: {
-    run_id: string
-    workflow: ControlPlaneWorkflow
-    runner_status: string
-  }
   created: boolean
   preparation_token: string | null
 }
 
 export interface ReviewRunAdmissionStore {
   admitReviewRun: (run: {
-    run_id: string
-    workflow: ControlPlaneWorkflow
+    workflow: ReviewRunAdmission['record']['workflow']
     publish_context: Record<string, never>
     ingress_kind: ReviewRunAdmissionRequest['ingress_kind']
     ingress_key: string
-  }) => StoredAdmission | Promise<StoredAdmission>
+  }) => ReviewRunAdmission | Promise<ReviewRunAdmission>
 }
 
 /**
  * Assigns identity before input preparation so every post-admission failure is
- * queryable. The store resolves ingress replays to the original run identity.
+ * queryable. The store resolves ingress replays to the original run identity, and Control
+ * Plane owns the run id — it generates one on admission and returns it in `record.run_id`.
  */
 export async function admitReviewRun(
   store: ReviewRunAdmissionStore,
-  request: ReviewRunAdmissionRequest,
-  createRunId: () => string = randomUUID
+  request: ReviewRunAdmissionRequest
 ): Promise<AdmittedReviewRun> {
   const admission = await store.admitReviewRun({
-    run_id: createRunId(),
     workflow: request.workflow,
     publish_context: {},
     ingress_kind: request.ingress_kind,

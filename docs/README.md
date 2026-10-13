@@ -28,14 +28,15 @@ One family covers one boundary:
 | Family | Boundary | Sides |
 | --- | --- | --- |
 | [integration-contract](../contracts/integration-contract/README.md) | the Runner's HTTP surface and the workflow `input` / `result` data | Runner and its callers |
-| [control-plane-api](../contracts/control-plane-api/README.md) | the run shapes the console reads, and the coordination record the integration exchanges over `POST /v1/store` | Control Plane and its callers |
+| [control-plane-api](../contracts/control-plane-api/README.md) | the run shapes the console reads, and the hand-written OpenAPI contract the integration derives its client from | Control Plane and its callers |
 
 Read [Contracts README](../contracts/README.md) first: it defines the family layout, the naming rule, what a schema owns, and how fixtures take part in validation. Each family README then states what a consumer may rely on, who owns which side, and what is deliberately not schematized.
 
 - [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md): the workflow data contract.
 - [integration-contract/openapi.json](../contracts/integration-contract/openapi.json): the Agent Runner HTTP API, generated from the service.
+- [control-plane-api/openapi.yaml](../contracts/control-plane-api/openapi.yaml): the Control Plane HTTP contract — routes, schemas, security, and error codes.
 - [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json): the redacted run a console read returns.
-- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json): the record exchanged over `POST /v1/store`.
+- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json): the coordination record shape.
 
 ### workflows/
 
