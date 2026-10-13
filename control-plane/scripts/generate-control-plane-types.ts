@@ -112,15 +112,15 @@ const SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
 
 type ContractAst = Awaited<ReturnType<typeof openapiTS>>
 
-/** The `components` interface node, selected from the AST rather than by matching rendered
- * text: the server needs only the domain shapes, not the paths, and a change in how
- * openapi-typescript prints its output must not silently break this projection. */
-function componentsNode(ast: ContractAst): ContractAst[number] {
+/** Select a top-level interface node from the AST by name, rather than matching rendered
+ * text: a change in how openapi-typescript prints its output must not silently break this
+ * projection. */
+function interfaceNode(ast: ContractAst, name: string): ContractAst[number] {
   const node = ast.find(
-    (candidate) => (candidate as { name?: { text?: string } }).name?.text === 'components'
+    (candidate) => (candidate as { name?: { text?: string } }).name?.text === name
   )
   if (node === undefined) {
-    throw new Error('openapi-typescript produced no components interface')
+    throw new Error(`openapi-typescript produced no ${name} interface`)
   }
   return node
 }
@@ -128,17 +128,24 @@ function componentsNode(ast: ContractAst): ContractAst[number] {
 /** The committed content of `control-plane/src/contract-types-generated.ts`. */
 export async function renderContractTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
-  const components = astToString(componentsNode(await openapiTS(spec)))
+  const ast = await openapiTS(spec)
+  const components = astToString(interfaceNode(ast, 'components'))
+  // The operations interface carries each operation's request body and path parameters, so
+  // the server's route handlers can read a request through its own operation's types
+  // (`route-types.ts`) instead of a hand-written cast that no schema checks.
+  const operations = astToString(interfaceNode(ast, 'operations'))
   const lines = SHAPE_ALIASES.map(
     ([alias, schema]) => `export type ${alias} = components['schemas']['${schema}']`
   )
   const body = `// Generated from ${path.relative(CONTROL_PLANE_ROOT, SPEC_PATH)}. Do not edit.
 //
-// The hand-written openapi.yaml owns the domain shapes; these aliases are its server-side
-// projection, so the server's types follow the contract instead of a parallel schema.
-// Regenerate it with \`pnpm run generate:control-plane-types\`.
+// The hand-written openapi.yaml owns the domain shapes and the request shapes; these
+// interfaces are its server-side projection, so the server's types follow the contract
+// instead of a parallel schema. Regenerate it with \`pnpm run generate:control-plane-types\`.
 
 ${components}
+
+${operations}
 
 ${lines.join('\n')}
 `

@@ -25,6 +25,7 @@ import { submitPreparedRun } from './prepared-submission.js'
 import { observePublicationStep, observeRun } from './observability.js'
 import { DeterministicControlPlaneError } from './errors.js'
 import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from './error-codes-generated.js'
+import type { PathParams, RequestBody } from './route-types.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
 
@@ -185,7 +186,9 @@ export async function registerControlPlaneRoutes(
 
   // The handlers, keyed by operationId. Each handler calls the store directly and does only
   // the domain logic: routing, body/query/path validation, and auth come from the OpenAPI
-  // spec via fastify-openapi-glue, so nothing here re-states a schema.
+  // spec via fastify-openapi-glue, so nothing here re-states a schema. Each handler's body
+  // and params types come from its own operation in the contract (`route-types.ts`), so a
+  // field renamed in `openapi.yaml` breaks the handler that reads it at compile time.
   const handlers: Record<string, (request: FastifyRequest, reply: FastifyReply) => unknown> = {
     getHealth: async () => ({ status: 'ok' }),
 
@@ -197,14 +200,14 @@ export async function registerControlPlaneRoutes(
     },
 
     getRun: async (request, reply) => {
-      const { runId } = request.params as { runId: string }
+      const { runId } = request.params as PathParams<'getRun'>
       const run = await store.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
       return { run: observeRun(run) }
     },
 
     listRunPublicationSteps: async (request, reply) => {
-      const { runId } = request.params as { runId: string }
+      const { runId } = request.params as PathParams<'listRunPublicationSteps'>
       const run = await store.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
       const steps = await store.listPublicationSteps(run.run_id)
@@ -212,23 +215,14 @@ export async function registerControlPlaneRoutes(
     },
 
     admitRun: async (request) => {
-      const body = request.body as {
-        workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
-        publish_context: Record<string, unknown>
-        runner_input?: Record<string, unknown>
-        ingress_kind: 'github_webhook' | 'github_actions_dispatch'
-        ingress_key: string
-      }
+      const body = request.body as RequestBody<'admitRun'>
       return await store.admitReviewRun({ run_id: randomUUID(), ...body })
     },
 
     submitPreparedRun: async (request) => {
-      const { runId } = request.params as { runId: string }
-      const { preparation_token, publish_context, input } = request.body as {
-        preparation_token: string
-        publish_context: Record<string, unknown>
-        input: Record<string, unknown>
-      }
+      const { runId } = request.params as PathParams<'submitPreparedRun'>
+      const { preparation_token, publish_context, input } =
+        request.body as RequestBody<'submitPreparedRun'>
       return await submitPreparedRun(
         store,
         { runId, preparationToken: preparation_token, publishContext: publish_context, input },
@@ -237,63 +231,53 @@ export async function registerControlPlaneRoutes(
     },
 
     renewPreparationClaim: async (request) => {
-      const { runId } = request.params as { runId: string }
-      const { token } = request.body as { token: string }
+      const { runId } = request.params as PathParams<'renewPreparationClaim'>
+      const { token } = request.body as RequestBody<'renewPreparationClaim'>
       return await store.renewPreparationClaim(runId, token)
     },
 
     failPreparation: async (request, reply) => {
-      const { runId } = request.params as { runId: string }
-      const { token, failure } = request.body as {
-        token: string
-        failure: { code?: string | null; message: string }
-      }
+      const { runId } = request.params as PathParams<'failPreparation'>
+      const { token, failure } = request.body as RequestBody<'failPreparation'>
       await store.failPreparation(runId, token, failure)
       // The contract declares no body; send an empty 200 rather than a literal `null`.
       return reply.code(200).send()
     },
 
     claimNextPublication: async (request) => {
-      const { wait_ms } = request.body as { wait_ms?: number }
+      const { wait_ms } = request.body as RequestBody<'claimNextPublication'>
       return await store.claimNextPublication(wait_ms ?? 0)
     },
 
     renewPublicationClaim: async (request) => {
-      const { runId } = request.params as { runId: string }
-      const { token } = request.body as { token: string }
+      const { runId } = request.params as PathParams<'renewPublicationClaim'>
+      const { token } = request.body as RequestBody<'renewPublicationClaim'>
       return await store.renewPublicationClaim(runId, token)
     },
 
     initializePublicationSteps: async (request, reply) => {
-      const { runId } = request.params as { runId: string }
-      const { token, step_keys } = request.body as { token: string; step_keys: string[] }
+      const { runId } = request.params as PathParams<'initializePublicationSteps'>
+      const { token, step_keys } = request.body as RequestBody<'initializePublicationSteps'>
       await store.initializePublicationSteps(runId, token, step_keys)
       return reply.code(200).send()
     },
 
     requirePublicationStepClaim: async (request, reply) => {
-      const { runId, stepKey } = request.params as { runId: string; stepKey: string }
-      const { token } = request.body as { token: string }
+      const { runId, stepKey } = request.params as PathParams<'requirePublicationStepClaim'>
+      const { token } = request.body as RequestBody<'requirePublicationStepClaim'>
       await store.requirePublicationStepClaim(runId, token, stepKey)
       return reply.code(200).send()
     },
 
     completePublicationStep: async (request) => {
-      const { runId, stepKey } = request.params as { runId: string; stepKey: string }
-      const { token, remote_object } = request.body as {
-        token: string
-        remote_object?: { id?: string | number | null; url?: string | null }
-      }
+      const { runId, stepKey } = request.params as PathParams<'completePublicationStep'>
+      const { token, remote_object } = request.body as RequestBody<'completePublicationStep'>
       return await store.completePublicationStep(runId, token, stepKey, remote_object ?? {})
     },
 
     failPublicationStep: async (request) => {
-      const { runId, stepKey } = request.params as { runId: string; stepKey: string }
-      const { token, failure, retry } = request.body as {
-        token: string
-        failure: { code?: string | null; message: string }
-        retry?: boolean
-      }
+      const { runId, stepKey } = request.params as PathParams<'failPublicationStep'>
+      const { token, failure, retry } = request.body as RequestBody<'failPublicationStep'>
       return await store.failPublicationStep(
         runId,
         token,
@@ -304,30 +288,26 @@ export async function registerControlPlaneRoutes(
     },
 
     completePublication: async (request) => {
-      const { runId } = request.params as { runId: string }
-      const { token } = request.body as { token: string }
+      const { runId } = request.params as PathParams<'completePublication'>
+      const { token } = request.body as RequestBody<'completePublication'>
       return await store.completePublication(runId, token)
     },
 
     failPublication: async (request) => {
-      const { runId } = request.params as { runId: string }
-      const { token, failure, retry } = request.body as {
-        token: string
-        failure: { code?: string | null; message: string }
-        retry: boolean
-      }
+      const { runId } = request.params as PathParams<'failPublication'>
+      const { token, failure, retry } = request.body as RequestBody<'failPublication'>
       return await store.failPublication(runId, token, failure, { retry })
     },
 
     getInternalRun: async (request, reply) => {
-      const { runId } = request.params as { runId: string }
+      const { runId } = request.params as PathParams<'getInternalRun'>
       const run = await store.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
       return reply.send(run)
     },
 
     listInternalPublicationSteps: async (request, reply) => {
-      const { runId } = request.params as { runId: string }
+      const { runId } = request.params as PathParams<'listInternalPublicationSteps'>
       const run = await store.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
       return reply.send(await store.listPublicationSteps(run.run_id))
