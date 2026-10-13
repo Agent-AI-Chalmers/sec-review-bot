@@ -52,4 +52,5 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 - 更新受影响版本的规范；
 - 更新它的 schema；
 - 更新或新增它的 fixture 与 manifest 条目；
+- 用该族的生成器重新生成任何派生产物（例如 Control Plane 提交的 `v1` schema 与生成的类型）；
 - 让 Python 和 TypeScript 测试校验同一批文件。

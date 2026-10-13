@@ -427,6 +427,8 @@ paths:
   /healthz:
     get:
       operationId: getHealth
+      description: >-
+        Report process health. Requires no credential.
       responses:
         "200":
           description: Process health.
@@ -442,6 +444,9 @@ paths:
   /v1/runs:
     get:
       operationId: listRuns
+      description: >-
+        List runs for the caller's connector, newest first, with cursor pagination. Returns the
+        redacted observed shape; internal inputs and publish context are omitted.
       security:
         - readToken: []
       parameters:
@@ -527,6 +532,9 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
     post:
       operationId: admitRun
+      description: >-
+        Admit a review run, assigning its `run_id` before input preparation begins. Re-admitting
+        the same `ingress_kind`/`ingress_key` returns the original run instead of creating another.
       security:
         - serviceToken: []
       requestBody:
@@ -578,6 +586,8 @@ paths:
   /v1/runs/{runId}:
     get:
       operationId: getRun
+      description: >-
+        Read one run in the redacted observed shape. Requires the read token.
       security:
         - readToken: []
       parameters:
@@ -615,6 +625,8 @@ paths:
   /v1/runs/{runId}/publication-steps:
     get:
       operationId: listRunPublicationSteps
+      description: >-
+        Read the redacted publication-step summary for one run. Requires the read token.
       security:
         - readToken: []
       parameters:
@@ -657,6 +669,9 @@ paths:
   /v1/runs/{runId}/submission:
     post:
       operationId: submitPreparedRun
+      description: >-
+        Submit a prepared run to the Runner, persisting the input and commit claim before the
+        Runner call so an uncertain submission stays recoverable.
       security:
         - serviceToken: []
       parameters:
@@ -721,6 +736,9 @@ paths:
   /v1/runs/{runId}/preparation/claim:
     post:
       operationId: renewPreparationClaim
+      description: >-
+        Renew the caller's preparation claim while input preparation is still active. Returns
+        whether the claim was renewed.
       security:
         - serviceToken: []
       parameters:
@@ -760,6 +778,8 @@ paths:
   /v1/runs/{runId}/preparation/failure:
     post:
       operationId: failPreparation
+      description: >-
+        Record a terminal preparation failure for a run the caller still owns.
       security:
         - serviceToken: []
       parameters:
@@ -809,6 +829,9 @@ paths:
   /v1/publication/claims/next:
     post:
       operationId: claimNextPublication
+      description: >-
+        Claim the next publishable run, optionally holding the request until one appears. Returns
+        `null` when the wait elapses with no work.
       security:
         - serviceToken: []
       requestBody:
@@ -840,6 +863,8 @@ paths:
   /v1/runs/{runId}/publication/claim:
     post:
       operationId: renewPublicationClaim
+      description: >-
+        Renew the caller's publication claim. Returns whether the claim was renewed.
       security:
         - serviceToken: []
       parameters:
@@ -879,6 +904,9 @@ paths:
   /v1/runs/{runId}/publication/steps:
     post:
       operationId: initializePublicationSteps
+      description: >-
+        Initialize the run's publication step set. The set is fixed once written, so a duplicate or
+        changed set is rejected as a deterministic failure.
       security:
         - serviceToken: []
       parameters:
@@ -920,6 +948,8 @@ paths:
   /v1/runs/{runId}/publication/steps/{stepKey}/claim:
     post:
       operationId: requirePublicationStepClaim
+      description: >-
+        Assert the caller still owns the run's publication claim before acting on one step.
       security:
         - serviceToken: []
       parameters:
@@ -962,6 +992,8 @@ paths:
   /v1/runs/{runId}/publication/steps/{stepKey}/complete:
     post:
       operationId: completePublicationStep
+      description: >-
+        Record one publication step as succeeded, attaching the remote object it produced.
       security:
         - serviceToken: []
       parameters:
@@ -1021,6 +1053,8 @@ paths:
   /v1/runs/{runId}/publication/steps/{stepKey}/fail:
     post:
       operationId: failPublicationStep
+      description: >-
+        Record one publication step as failed, optionally spending retry budget.
       security:
         - serviceToken: []
       parameters:
@@ -1082,6 +1116,8 @@ paths:
   /v1/runs/{runId}/publication/complete:
     post:
       operationId: completePublication
+      description: >-
+        Mark the run's publication as complete.
       security:
         - serviceToken: []
       parameters:
@@ -1121,6 +1157,8 @@ paths:
   /v1/runs/{runId}/publication/fail:
     post:
       operationId: failPublication
+      description: >-
+        Record the run's publication outcome as failed, choosing whether the failure is retryable.
       security:
         - serviceToken: []
       parameters:
@@ -1176,6 +1214,9 @@ paths:
   /v1/internal/runs/{runId}:
     get:
       operationId: getInternalRun
+      description: >-
+        Read the full run record, including `runner_input` and `publish_context`. Requires the
+        service token; never exposed to the console.
       security:
         - serviceToken: []
       parameters:
@@ -1208,6 +1249,9 @@ paths:
   /v1/internal/runs/{runId}/publication/steps:
     get:
       operationId: listInternalPublicationSteps
+      description: >-
+        Read the full publication-step records for one run, including reconciliation ids. Requires
+        the service token.
       security:
         - serviceToken: []
       parameters:
@@ -1242,6 +1286,8 @@ paths:
   /v1/config/preparation-heartbeat-interval:
     get:
       operationId: getPreparationHeartbeatInterval
+      description: >-
+        Report how often a preparation owner must renew its claim.
       security:
         - serviceToken: []
       responses:
@@ -1260,6 +1306,8 @@ paths:
   /v1/config/publication-heartbeat-interval:
     get:
       operationId: getPublicationHeartbeatInterval
+      description: >-
+        Report how often a publication owner must renew its claim.
       security:
         - serviceToken: []
       responses:

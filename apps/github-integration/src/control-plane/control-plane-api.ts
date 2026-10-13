@@ -10,6 +10,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Report process health. Requires no credential. */
     get: operations['getHealth']
     put?: never
     post?: never
@@ -26,8 +27,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description List runs for the caller's connector, newest first, with cursor pagination. Returns the redacted observed shape; internal inputs and publish context are omitted. */
     get: operations['listRuns']
     put?: never
+    /** @description Admit a review run, assigning its `run_id` before input preparation begins. Re-admitting the same `ingress_kind`/`ingress_key` returns the original run instead of creating another. */
     post: operations['admitRun']
     delete?: never
     options?: never
@@ -42,6 +45,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Read one run in the redacted observed shape. Requires the read token. */
     get: operations['getRun']
     put?: never
     post?: never
@@ -58,6 +62,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Read the redacted publication-step summary for one run. Requires the read token. */
     get: operations['listRunPublicationSteps']
     put?: never
     post?: never
@@ -76,6 +81,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Submit a prepared run to the Runner, persisting the input and commit claim before the Runner call so an uncertain submission stays recoverable. */
     post: operations['submitPreparedRun']
     delete?: never
     options?: never
@@ -92,6 +98,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Renew the caller's preparation claim while input preparation is still active. Returns whether the claim was renewed. */
     post: operations['renewPreparationClaim']
     delete?: never
     options?: never
@@ -108,6 +115,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Record a terminal preparation failure for a run the caller still owns. */
     post: operations['failPreparation']
     delete?: never
     options?: never
@@ -124,6 +132,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Claim the next publishable run, optionally holding the request until one appears. Returns `null` when the wait elapses with no work. */
     post: operations['claimNextPublication']
     delete?: never
     options?: never
@@ -140,6 +149,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Renew the caller's publication claim. Returns whether the claim was renewed. */
     post: operations['renewPublicationClaim']
     delete?: never
     options?: never
@@ -156,6 +166,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Initialize the run's publication step set. The set is fixed once written, so a duplicate or changed set is rejected as a deterministic failure. */
     post: operations['initializePublicationSteps']
     delete?: never
     options?: never
@@ -172,6 +183,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Assert the caller still owns the run's publication claim before acting on one step. */
     post: operations['requirePublicationStepClaim']
     delete?: never
     options?: never
@@ -188,6 +200,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Record one publication step as succeeded, attaching the remote object it produced. */
     post: operations['completePublicationStep']
     delete?: never
     options?: never
@@ -204,6 +217,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Record one publication step as failed, optionally spending retry budget. */
     post: operations['failPublicationStep']
     delete?: never
     options?: never
@@ -220,6 +234,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mark the run's publication as complete. */
     post: operations['completePublication']
     delete?: never
     options?: never
@@ -236,6 +251,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Record the run's publication outcome as failed, choosing whether the failure is retryable. */
     post: operations['failPublication']
     delete?: never
     options?: never
@@ -250,6 +266,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Read the full run record, including `runner_input` and `publish_context`. Requires the service token; never exposed to the console. */
     get: operations['getInternalRun']
     put?: never
     post?: never
@@ -266,6 +283,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Read the full publication-step records for one run, including reconciliation ids. Requires the service token. */
     get: operations['listInternalPublicationSteps']
     put?: never
     post?: never
@@ -282,6 +300,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Report how often a preparation owner must renew its claim. */
     get: operations['getPreparationHeartbeatInterval']
     put?: never
     post?: never
@@ -298,6 +317,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Report how often a publication owner must renew its claim. */
     get: operations['getPublicationHeartbeatInterval']
     put?: never
     post?: never

@@ -53,4 +53,5 @@ For any contract change:
 - update the specification for the affected version;
 - update its schemas;
 - update or add its fixtures and manifest entries;
+- regenerate any derived artifact (such as the Control Plane's committed `v1` schemas and generated types) with the family's generator;
 - make both the Python and TypeScript tests validate the same files.
