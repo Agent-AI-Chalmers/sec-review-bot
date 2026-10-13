@@ -46,6 +46,12 @@ Tests read fixtures through their package-local helper instead of hard-coding pa
 
 Each family README records who owns which side of its boundary and what callers may rely on.
 
+## Derived Artifacts
+
+Some artifacts are generated from a hand-written contract rather than maintained by hand — a TypeScript projection of an API, committed JSON Schemas, a generated parameter list. They are listed in one place, [generated-artifacts.json](generated-artifacts.json): each entry names the generator script, the contract it reads, and every file it writes, with paths relative to the repository root.
+
+That manifest is the single answer to "what is derived from a contract, and where does it land". The generators' staleness tests compare the committed files against a fresh render, so a hand edit of a generated file fails the build; a test also checks the manifest against the generators' own declared paths and asserts the CI filter triggers on every listed artifact. Adding a generator means adding it to the manifest.
+
 ## Change Checklist
 
 For any contract change:

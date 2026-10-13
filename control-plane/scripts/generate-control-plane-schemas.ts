@@ -104,13 +104,21 @@ export function renderReviewRunRecordSchema(): string {
   )
 }
 
+/** The schemas this generator writes, each with the renderer that produces it. This one table
+ * is both what the CLI writes and what the generated-artifacts manifest is checked against, so
+ * the two cannot disagree. */
+const GENERATED_SCHEMAS = [
+  ['observed-run.schema.json', renderObservedRunSchema],
+  ['review-run-record.schema.json', renderReviewRunRecordSchema]
+] as const satisfies ReadonlyArray<readonly [string, () => string]>
+
+/** The schema file names under {@link SCHEMA_DIR}, for the manifest check. */
+export const SCHEMA_FILENAMES = GENERATED_SCHEMAS.map(([filename]) => filename)
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  for (const [filename, rendered] of [
-    ['observed-run.schema.json', renderObservedRunSchema()],
-    ['review-run-record.schema.json', renderReviewRunRecordSchema()]
-  ] as const) {
+  for (const [filename, render] of GENERATED_SCHEMAS) {
     const output = path.join(SCHEMA_DIR, filename)
-    writeFileSync(output, rendered)
+    writeFileSync(output, render())
     console.log(`Wrote ${path.relative(process.cwd(), output)}`)
   }
 }
