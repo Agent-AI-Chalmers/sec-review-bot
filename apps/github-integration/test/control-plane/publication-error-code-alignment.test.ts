@@ -7,29 +7,15 @@
 // single source both packages derive from — rather than from its source tree, so this test
 // does not couple the two packages' source layouts.
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 
 import { parse as parseYaml } from 'yaml'
 
+import { workspaceRoot } from '../contract-fixtures.js'
 import { classifyPublicationFailure } from '../../src/control-plane/publication-failure.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../src/runner/publish-error-code.js'
-
-/** Locate the workspace root by walking up to the contracts tree, as `contract-fixtures.ts`
- * does, so the test does not depend on the current working directory. */
-function workspaceRoot(): string {
-  let current = path.dirname(fileURLToPath(import.meta.url))
-  while (true) {
-    if (existsSync(path.join(current, 'contracts', 'control-plane-api', 'openapi.yaml'))) {
-      return current
-    }
-    const parent = path.dirname(current)
-    if (parent === current) throw new Error('Could not locate the workspace contracts root.')
-    current = parent
-  }
-}
 
 /** The `PUBLICATION_STEP_*` members of the contract's `ErrorResponse.code` enum. The
  * contract is the single source of truth for the vocabulary Control Plane emits. */

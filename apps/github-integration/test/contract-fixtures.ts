@@ -2,7 +2,10 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-function workspaceRoot(): string {
+/** The repository root, located by walking up to the shared contracts tree. Exported so the
+ * package's tests anchor on one implementation of "where is the repo" rather than each
+ * carrying its own copy of the walk. */
+export function workspaceRoot(): string {
   let current = path.dirname(fileURLToPath(import.meta.url))
   while (true) {
     if (existsSync(path.join(current, 'contracts', 'integration-contract', 'v5', 'fixtures'))) {
