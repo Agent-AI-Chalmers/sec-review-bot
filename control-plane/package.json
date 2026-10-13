@@ -14,7 +14,7 @@
     "generate:control-plane-schemas": "node --import tsx scripts/generate-control-plane-schemas.ts",
     "generate:control-plane-types": "node --import tsx scripts/generate-control-plane-types.ts",
     "copy:schema": "mkdir -p dist/database && cp -R src/database/schema-versions dist/database/",
-    "copy:spec": "node -e \"const{createHash}=require('node:crypto'),{readFileSync,writeFileSync}=require('node:fs');const s=readFileSync('../contracts/control-plane-api/openapi.yaml');writeFileSync('dist/openapi.yaml',s);writeFileSync('dist/openapi.yaml.sha256',createHash('sha256').update(s).digest('hex')+'\\n')\"",
+    "copy:spec": "node --import tsx scripts/copy-contract.ts",
     "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:schema && pnpm run copy:spec",
     "server": "pnpm run build && node dist/server.js",
     "test": "pnpm run build && node --import tsx --test test/*.test.ts",

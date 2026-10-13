@@ -1,10 +1,11 @@
-import { randomUUID, createHash } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 
+import { contractDigest } from './contract-digest.js'
 import { ReviewRunStore } from './review-store.js'
 import type { PublicationStatus, RunnerStatus } from './review-store.js'
 import { type ControlPlaneWorkflow } from './contracts.js'
@@ -148,7 +149,7 @@ function resolveSpecPath(): string {
       throw new Error(`${builtPath} has no ${digestPath}; the build must produce both.`)
     }
     const expected = readFileSync(digestPath, 'utf8').trim()
-    const actual = createHash('sha256').update(readFileSync(builtPath)).digest('hex')
+    const actual = contractDigest(readFileSync(builtPath))
     if (actual !== expected) {
       throw new Error(
         `${builtPath} does not match its recorded digest; rebuild so the contract and ` +
