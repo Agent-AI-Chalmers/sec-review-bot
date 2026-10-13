@@ -22,9 +22,11 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY . ./
-# Compose supplies the workspace contracts as a separate build context so the
-# Runner image gets canonical schemas without sending the whole repository.
-COPY --from=contracts . /contracts
+# Compose supplies the workspace contracts as a separate named context. The Runner reads only
+# `contracts/integration-contract/v5/schemas` (the wheel packs the same files as package data;
+# this is the source-checkout fallback the resolver also walks to). Copy just those, not the
+# whole tree, so each family's `tools/` and its `pnpm-lock.yaml` do not enter the image.
+COPY --from=contracts integration-contract/v5/schemas /contracts/integration-contract/v5/schemas
 RUN uv sync --frozen --no-dev
 
 CMD ["sec-review-agents-service"]
