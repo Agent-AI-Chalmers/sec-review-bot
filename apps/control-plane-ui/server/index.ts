@@ -9,6 +9,8 @@ import crypto from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 
+import { LIST_RUN_QUERY_PARAMS } from '../src/list-run-query-params.js'
+
 const MAX_SESSION_BODY_BYTES = 1024 * 1024
 const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 10_000
 const ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000
@@ -38,29 +40,17 @@ function securityHeaders(response: ServerResponse): void {
   response.setHeader('x-frame-options', 'DENY')
   response.setHeader('referrer-policy', 'no-referrer')
 }
-/** The query parameters Control Plane's `listRuns` operation declares. The BFF forwards
- * only these, so a browser cannot smuggle a parameter the API does not understand through
- * this proxy. Requests to the other proxied routes carry no query. */
-const FORWARDED_QUERY_PARAMS = [
-  'limit',
-  'cursor',
-  'execution_status',
-  'publication_status',
-  'workflow',
-  'from',
-  'to'
-] as const
-
 /**
  * The upstream path a read proxy should request: the BFF path minus its `/api` prefix,
- * with the query reduced to the parameters Control Plane declares. Anything else the browser
- * put in the URL (UI state such as `range`, analytics parameters, typos) is dropped rather
- * than forwarded, so this proxy cannot send a request outside Control Plane's contract.
+ * with the query reduced to the parameters Control Plane declares (generated from
+ * `openapi.yaml`). Anything else the browser put in the URL (UI state such as `range`,
+ * analytics parameters, typos) is dropped rather than forwarded, so this proxy cannot send
+ * a request outside Control Plane's contract.
  */
 function forwardedPath(bffUrl: string): string {
   const url = new URL(bffUrl, 'http://control-plane-ui.local')
   const forwarded = new URLSearchParams()
-  for (const name of FORWARDED_QUERY_PARAMS) {
+  for (const name of LIST_RUN_QUERY_PARAMS) {
     const value = url.searchParams.get(name)
     if (value !== null && value !== '') forwarded.set(name, value)
   }

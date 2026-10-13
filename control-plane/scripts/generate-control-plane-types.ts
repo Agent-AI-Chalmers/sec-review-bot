@@ -17,6 +17,10 @@ import { parse as parseYaml } from 'yaml'
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
 
 export const CONTROL_PLANE_ROOT = path.resolve(moduleDirectory, '..')
+/** The repository root. Generated headers name the contract relative to it, which is the one
+ * anchor that is unambiguous from every output location (the projections live in three
+ * different packages) and stable when a file moves. */
+export const REPO_ROOT = path.resolve(CONTROL_PLANE_ROOT, '..')
 export const SPEC_PATH = path.resolve(
   CONTROL_PLANE_ROOT,
   '..',
@@ -34,11 +38,19 @@ export const OUTPUT_PATH = path.resolve(
   'control-plane-api.ts'
 )
 
-const HEADER = `// Generated from ${path.relative(CONTROL_PLANE_ROOT, SPEC_PATH)}. Do not edit.
+/** The "do not edit" header every generated file carries. The source path is relative to the
+ * repository root and the header says so, because the projection may live in another package
+ * and a bare relative path would be read (wrongly) as relative to the file itself. */
+function headerComment(): string {
+  const source = path.relative(REPO_ROOT, SPEC_PATH)
+  return `// Generated from ${source} (path relative to the repository root). Do not edit.
 //
 // That document is the hand-written contract; this file is a projection of it, not a second
 // copy. Regenerate it with \`pnpm run generate:control-plane-types\`.
 `
+}
+
+const HEADER = headerComment()
 
 type OpenApiPathItem = Record<string, unknown>
 
@@ -131,8 +143,9 @@ export async function renderErrorCodeTypes(): Promise<string> {
   const all = errorResponseCodes(spec)
     .map((code) => `  '${code}',`)
     .join('\n')
-  const body = `// Generated from ${path.relative(CONTROL_PLANE_ROOT, SPEC_PATH)}. Do not edit.
-//
+  const body =
+    headerComment() +
+    `//
 // The hand-written openapi.yaml owns the error-code vocabulary; this file is its server-side
 // projection. Regenerate it with \`pnpm run generate:control-plane-types\`.
 
@@ -192,8 +205,9 @@ export async function renderContractTypes(): Promise<string> {
   const lines = SHAPE_ALIASES.map(
     ([alias, schema]) => `export type ${alias} = components['schemas']['${schema}']`
   )
-  const body = `// Generated from ${path.relative(CONTROL_PLANE_ROOT, SPEC_PATH)}. Do not edit.
-//
+  const body =
+    headerComment() +
+    `//
 // The hand-written openapi.yaml owns the domain shapes and the request shapes; these
 // interfaces are its server-side projection, so the server's types follow the contract
 // instead of a parallel schema. Regenerate it with \`pnpm run generate:control-plane-types\`.
@@ -208,12 +222,86 @@ ${lines.join('\n')}
   return await prettier.format(body, { ...options, filepath: CONTRACT_TYPES_PATH })
 }
 
+// The console's projection of the parameters `listRuns` accepts. The document models the
+// list filters as one `form`-exploded object, so its declared property names are the query
+// parameters. The BFF and the browser both forward/request only these, and were keeping
+// their own copy of the list; deriving it here removes that third hand-kept description.
+export const LIST_RUN_QUERY_PARAMS_PATH = path.resolve(
+  CONTROL_PLANE_ROOT,
+  '..',
+  'apps',
+  'control-plane-ui',
+  'src',
+  'list-run-query-params.ts'
+)
+
+/** The parameter names `listRuns` declares.
+ *
+ * The contract carries them as the properties of one exploded query object (attaching
+ * `additionalProperties: false` there is what makes an undeclared parameter a 400), so this
+ * reads that object's property names. An operation with no such object is an error rather
+ * than an empty list: an empty allow-list would make the console send no filters at all,
+ * which is a silent loss of function, not a change to an empty set. */
+export function listRunQueryParameters(spec: OpenAPI3): string[] {
+  const list = (spec.paths?.['/v1/runs'] as { get?: { parameters?: unknown[] } } | undefined)?.get
+  const parameters = list?.parameters
+  if (!Array.isArray(parameters)) {
+    throw new Error("openapi.yaml's listRuns has no parameters to project.")
+  }
+  for (const parameter of parameters) {
+    const candidate = parameter as {
+      in?: string
+      style?: string
+      explode?: boolean
+      schema?: { type?: string; properties?: Record<string, unknown> }
+    }
+    if (candidate.in !== 'query') continue
+    if (
+      candidate.style !== 'form' ||
+      candidate.explode !== true ||
+      candidate.schema?.type !== 'object' ||
+      candidate.schema.properties === undefined
+    ) {
+      throw new Error(
+        'listRuns query parameters are not the expected form-exploded object; ' +
+          'update the projection or the contract.'
+      )
+    }
+    return Object.keys(candidate.schema.properties)
+  }
+  throw new Error("openapi.yaml's listRuns declares no query parameters to project.")
+}
+
+/** The committed content of `apps/control-plane-ui/src/list-run-query-params.ts`. */
+export async function renderListRunQueryParams(): Promise<string> {
+  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
+  const names = listRunQueryParameters(spec)
+  const entries = names.map((name) => `  '${name}',`).join('\n')
+  const body =
+    headerComment() +
+    `//
+// The contract's \`listRuns\` operation declares these query parameters (as one form-exploded
+// object). The console builds each request, and the BFF proxies it, from this one list, so
+// neither can send a parameter the contract does not accept. Regenerate it with
+// \`pnpm run generate:control-plane-types\` in the control-plane package.
+
+/** The query parameter names \`listRuns\` declares, in document order. */
+export const LIST_RUN_QUERY_PARAMS = [
+${entries}
+] as const
+`
+  const options = await prettier.resolveConfig(LIST_RUN_QUERY_PARAMS_PATH)
+  return await prettier.format(body, { ...options, filepath: LIST_RUN_QUERY_PARAMS_PATH })
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { writeFileSync } = await import('node:fs')
   writeFileSync(OUTPUT_PATH, await renderControlPlaneApiTypes())
   writeFileSync(ERROR_CODES_PATH, await renderErrorCodeTypes())
   writeFileSync(CONTRACT_TYPES_PATH, await renderContractTypes())
+  writeFileSync(LIST_RUN_QUERY_PARAMS_PATH, await renderListRunQueryParams())
   console.log(`Wrote ${path.relative(process.cwd(), OUTPUT_PATH)}`)
   console.log(`Wrote ${path.relative(process.cwd(), ERROR_CODES_PATH)}`)
   console.log(`Wrote ${path.relative(process.cwd(), CONTRACT_TYPES_PATH)}`)
+  console.log(`Wrote ${path.relative(process.cwd(), LIST_RUN_QUERY_PARAMS_PATH)}`)
 }

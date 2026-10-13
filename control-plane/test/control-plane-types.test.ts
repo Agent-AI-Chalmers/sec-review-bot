@@ -12,10 +12,12 @@ import test from 'node:test'
 import {
   CONTRACT_TYPES_PATH,
   ERROR_CODES_PATH,
+  LIST_RUN_QUERY_PARAMS_PATH,
   OUTPUT_PATH,
   renderContractTypes,
   renderControlPlaneApiTypes,
-  renderErrorCodeTypes
+  renderErrorCodeTypes,
+  renderListRunQueryParams
 } from '../scripts/generate-control-plane-types.js'
 
 test('the committed control-plane API types match the contract document', async () => {
@@ -45,6 +47,16 @@ test('the committed error-code types match the contract document', async () => {
     committed,
     await renderErrorCodeTypes(),
     `${ERROR_CODES_PATH} is stale. Regenerate it with: pnpm run generate:control-plane-types`
+  )
+})
+
+test('the committed console list-query parameters match the contract document', async () => {
+  const committed = readFileSync(LIST_RUN_QUERY_PARAMS_PATH, 'utf8')
+
+  assert.equal(
+    committed,
+    await renderListRunQueryParams(),
+    `${LIST_RUN_QUERY_PARAMS_PATH} is stale. Regenerate it with: pnpm run generate:control-plane-types`
   )
 })
 

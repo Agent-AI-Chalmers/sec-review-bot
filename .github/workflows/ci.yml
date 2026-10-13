@@ -46,6 +46,13 @@ jobs:
               - 'control-plane/**'
               # Its contract test reads the checked-in observed-run schema.
               - 'contracts/**'
+              # This job's staleness test is the only place that re-renders every generated
+              # artifact and compares it to disk. Two of those artifacts live in other
+              # packages, so a hand edit there has to trigger this job or the drift ships;
+              # list both explicitly. (The two in `control-plane/src` are already covered by
+              # `control-plane/**` above.)
+              - 'apps/control-plane-ui/src/list-run-query-params.ts'
+              - 'apps/github-integration/src/control-plane/control-plane-api.ts'
               - '.github/workflows/ci.yml'
             github-integration:
               - 'apps/github-integration/**'

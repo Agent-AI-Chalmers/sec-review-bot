@@ -24,21 +24,9 @@ import {
   runPublicationStatusLabel
 } from './status.js'
 import { abbreviate, failureReason, formatDuration, lastActivity, workflowLabel } from './format.js'
+import { LIST_RUN_QUERY_PARAMS } from './list-run-query-params.js'
 
 const RANGE_MINUTES: Record<string, number> = { '1h': 60, '24h': 1_440, '7d': 10_080 }
-
-/** The query parameters Control Plane's `listRuns` operation declares. The console keeps
- * other state in the URL (`range`) that the API does not understand, so it builds each
- * request from this list instead of forwarding the browser's whole query string. */
-const LIST_QUERY_PARAMS = [
-  'limit',
-  'cursor',
-  'execution_status',
-  'publication_status',
-  'workflow',
-  'from',
-  'to'
-] as const
 const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
 /** Mirrors the Control Plane's own default, so an unadorned `/runs` asks for what
  * the server would have returned anyway. */
@@ -80,11 +68,11 @@ export function Runs(): React.JSX.Element {
   // server's own default changing underneath a bookmarked or shared link. A size
   // that the console does not offer is still honoured as an extra option.
   //
-  // Copy only the parameters Control Plane declares, never the whole URL. The URL also
-  // carries UI-only state (`range`), which the API does not accept; forwarding it would
-  // send Control Plane a parameter outside its contract.
+  // Copy only the parameters Control Plane declares (generated from `openapi.yaml`), never
+  // the whole URL. The URL also carries UI-only state (`range`), which the API does not
+  // accept; forwarding it would send Control Plane a parameter outside its contract.
   const pageQuery = new URLSearchParams()
-  for (const name of LIST_QUERY_PARAMS) {
+  for (const name of LIST_RUN_QUERY_PARAMS) {
     const value = search.get(name)
     if (value !== null && value !== '') pageQuery.set(name, value)
   }

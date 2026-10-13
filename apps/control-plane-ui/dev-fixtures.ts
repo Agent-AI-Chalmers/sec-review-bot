@@ -1,5 +1,7 @@
 import type { Plugin } from 'vite'
 
+import { LIST_RUN_QUERY_PARAMS } from './src/list-run-query-params.js'
+
 type Workflow = 'issue-review' | 'pull-request-review' | 'repository-review'
 type ExecutionStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
 type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
@@ -64,18 +66,11 @@ interface Scenario {
 // page so the console's paging is reachable without a backend.
 const DEV_PAGE_SIZE = 50
 
-/** The query parameters Control Plane's `listRuns` declares. The fixture mirrors the API's
- * strictness: a parameter outside this set is rejected, so local development matches the
- * deployed contract instead of quietly accepting fields production refuses. */
-const LIST_QUERY_PARAMS = new Set([
-  'limit',
-  'cursor',
-  'execution_status',
-  'publication_status',
-  'workflow',
-  'from',
-  'to'
-])
+/** The query parameters Control Plane's `listRuns` declares (generated from the contract).
+ * The fixture mirrors the API's strictness: a parameter outside this set is rejected, so
+ * local development matches the deployed contract instead of quietly accepting fields
+ * production refuses. */
+const DECLARED_QUERY_PARAMS = new Set<string>(LIST_RUN_QUERY_PARAMS)
 const RUN_COUNT = 62
 const BASE_TIME = Date.now() - 20 * 60 * 1000
 const RUN_SPACING_MS = 3 * 60 * 60 * 1000
@@ -421,7 +416,7 @@ export function devFixtures(): Plugin {
         if (request.url.startsWith('/api/runs?')) {
           const url = new URL(request.url, 'http://fixture.local')
           const unknown = [...url.searchParams.keys()].filter(
-            (name) => !LIST_QUERY_PARAMS.has(name)
+            (name) => !DECLARED_QUERY_PARAMS.has(name)
           )
           if (unknown.length > 0) {
             response.statusCode = 400
