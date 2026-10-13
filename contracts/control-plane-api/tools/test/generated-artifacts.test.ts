@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
+import { parse } from 'yaml'
+
 import { staleGeneratedArtifacts } from '../src/check-generated-artifacts.js'
 import { generatedArtifacts as schemas } from '../src/generate-schemas.js'
 import { generatedArtifacts as types } from '../src/generate-types.js'
@@ -86,25 +88,16 @@ function globCovers(patterns: string[], filePath: string): boolean {
 }
 
 test('the contract-tools CI filter triggers on every artifact of this family', () => {
-  // The tool's staleness check runs in the contract-tools job, so its change filter has to
-  // fire for any hand edit of any artifact this family produces — including the ones in other
-  // packages. Deriving the required set from the manifest keeps the list from silently
-  // missing a file.
-  const ci = readFileSync(path.join(REPO_ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')
-  const lines = ci.split('\n')
-  const start = lines.findIndex((line) => line.trim() === 'contract-tools:')
-  assert.notEqual(start, -1, 'contract-tools filter not found in ci.yml')
-  const indent = (lines[start] ?? '').match(/^\s*/)?.[0].length ?? 0
+  // The tool's staleness check runs in the contract-tools job, so its change filter has to fire
+  // for a hand edit of any artifact this family produces — including the projections that land in
+  // other packages. `.github/ci/changed-areas.yml` is CI's single source for this (read directly
+  // by `dorny/paths-filter`; `.github/ci/check-changed-areas.mjs` guards the model itself).
 
-  const patterns: string[] = []
-  for (let index = start + 1; index < lines.length; index += 1) {
-    const line = lines[index] ?? ''
-    const lineIndent = line.match(/^\s*/)?.[0].length ?? 0
-    if (line.trim() !== '' && lineIndent <= indent && !line.trim().startsWith('#')) break
-    const match = line.match(/^\s*-\s*'([^']+)'\s*$/)
-    if (match?.[1] !== undefined) patterns.push(match[1])
-  }
-  assert.ok(patterns.length > 0, 'no patterns parsed for the contract-tools filter')
+  const filters = parse(
+    readFileSync(path.join(REPO_ROOT, '.github', 'ci', 'changed-areas.yml'), 'utf8')
+  ) as Record<string, string[]>
+  const patterns = filters['contract-tools'] ?? []
+  assert.ok(patterns.length > 0, 'no patterns for the contract-tools area')
 
   const required = (JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest).generators.flatMap(
     (generator) => generator.outputs

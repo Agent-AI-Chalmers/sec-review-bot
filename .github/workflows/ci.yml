@@ -25,6 +25,8 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
+      automation-config: ${{ steps.filter.outputs.automation-config }}
+      ops: ${{ steps.filter.outputs.ops }}
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
       control-plane: ${{ steps.filter.outputs.control-plane }}
       github-integration: ${{ steps.filter.outputs.github-integration }}
@@ -32,8 +34,6 @@ jobs:
       agents: ${{ steps.filter.outputs.agents }}
       scripts: ${{ steps.filter.outputs.scripts }}
       documentation: ${{ steps.filter.outputs.documentation }}
-      automation-config: ${{ steps.filter.outputs.automation-config }}
-      ops: ${{ steps.filter.outputs.ops }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -42,63 +42,7 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v4
         with:
-          filters: |
-            contract-tools:
-              # The per-family tools, their inputs, and (for the schemas) their outputs all
-              # live under `contracts/`.
-              - 'contracts/**'
-              # The projections themselves live across several packages. A hand edit of any
-              # one has to re-run the family check, so list every artifact; each family's
-              # `generated-artifacts.test.ts` asserts this filter covers its outputs.
-              - 'control-plane/src/contract-types-generated.ts'
-              - 'control-plane/src/error-codes-generated.ts'
-              - 'control-plane/src/runner-api-schema.ts'
-              - 'apps/github-integration/src/control-plane/control-plane-api.ts'
-              - 'apps/control-plane-ui/src/list-run-query-params.ts'
-              - '.github/workflows/ci.yml'
-            control-plane:
-              - 'control-plane/**'
-              # It reads the shared contract schemas.
-              - 'contracts/**'
-              - '.github/workflows/ci.yml'
-            github-integration:
-              - 'apps/github-integration/**'
-              # It validates the shared contract fixtures.
-              - 'contracts/**'
-              - '.github/workflows/ci.yml'
-            control-plane-ui:
-              - 'apps/control-plane-ui/**'
-              # The console pins its response type to the shared contract fixture.
-              - 'contracts/**'
-              - '.github/workflows/ci.yml'
-            agents:
-              - 'agents/**'
-              # The wheel packages the canonical contract schemas.
-              - 'contracts/**'
-              - '.github/workflows/ci.yml'
-            scripts:
-              - 'scripts/**'
-              - '.github/workflows/ci.yml'
-            documentation:
-              - '**/*.md'
-              - 'scripts/check_markdown_links.py'
-              - 'scripts/check_markdown_wrapping.py'
-              - 'scripts/check_translated_doc_headings.py'
-              - 'scripts/markdown_check_utils.py'
-              - '.github/workflows/ci.yml'
-            # Automation configuration has its own lightweight validation. A
-            # Dependabot scheduling change should not run both application suites.
-            automation-config:
-              - '.github/dependabot.yml'
-              - '.github/workflows/**'
-            # ops/ and the root Compose files are not covered by any app suite;
-            # give them lightweight validation so they still gate CI Status.
-            ops:
-              - 'ops/**'
-              - 'compose.yaml'
-              - 'compose.env.sample'
-              - '.github/workflows/ci.yml'
-
+          filters: .github/ci/changed-areas.yml
   automation-config:
     name: Automation Config
     needs: changes
@@ -119,6 +63,13 @@ jobs:
       # file still prevents malformed YAML from reaching the default branch.
       - name: Parse Dependabot configuration
         run: ruby -e 'require "yaml"; YAML.parse_file(".github/dependabot.yml")'
+
+      # The changed-area model (`.github/ci/changed-areas.yml`) is the single source of the
+      # `changes` job's filters. This checks the couplings CI cannot see in an import graph: that
+      # a job and its filter still agree, that every generated artifact and every tracked file is
+      # covered — the coupling that, when missing, lets a change run no job at all.
+      - name: Check changed-area model
+        run: node --test .github/ci/check-changed-areas.mjs
 
   ops:
     name: Ops
