@@ -690,8 +690,10 @@ export class ReviewRunStore {
    * option.
    */
   async claimNextPublication(waitMs = 0): Promise<PublicationWork | null> {
-    // The RPC boundary passes untyped arguments, so treat anything unusable as "no wait"
-    // rather than trusting the declared type.
+    // The contract declares `wait_ms` a non-negative integer, so the handler passes a value the
+    // schema already bounded below. Clamp it here anyway: the cap keeps one request from holding
+    // a connection longer than intended, and a store method should not assume its caller
+    // validated on its behalf.
     const boundedWaitMs = Number.isFinite(waitMs) && waitMs > 0 ? Math.min(waitMs, 30_000) : 0
     const deadline = Date.now() + boundedWaitMs
     for (;;) {

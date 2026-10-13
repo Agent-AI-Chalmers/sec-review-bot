@@ -28,7 +28,8 @@ tools/
     generate-types.ts        API 投影（类型、错误码、控制台参数）
     generate-schemas.ts      提交的 v1 JSON Schema
   spectral-functions/
-    operationRequiresSecurity.js   每个操作必须声明 security 的规则（../.spectral.yaml）
+    operationRequiresSecurity.js     每个操作必须声明 security 的规则（../.spectral.yaml）
+    operationDeclaresServerErrors.js 每个操作必须声明 500（读 body 时含 413）的规则（../.spectral.yaml）
   test/
     generated-artifacts.test.ts       manifest ↔ 生成器 ↔ CI 过滤器
     contract-generation-guards.test.ts  生成器在无法如实表达的输入上失败

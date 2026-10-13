@@ -81,7 +81,7 @@ export async function withPublicationHeartbeat(
   }
   const renewSerially = async (): Promise<void> => {
     // Lease ownership is monotonic within one publication attempt. A later
-    // successful RPC cannot make work started during an uncertain interval safe.
+    // successful renewal cannot make work started during an uncertain interval safe.
     if (lost) throw new PublicationClaimLostError(work.run_id)
     active ??= renew().finally(() => {
       active = null

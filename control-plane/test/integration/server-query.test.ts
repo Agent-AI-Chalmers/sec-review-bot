@@ -63,8 +63,9 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     assert.equal(unknownParameter.status, 400)
     assert.equal(((await unknownParameter.json()) as { code?: string }).code, 'INVALID_QUERY')
 
-    // The write surface now speaks REST: a malformed admission body is a 400 from Fastify's
-    // schema validation (auth aside), not a JSON-RPC protocol error.
+    // A write request whose body the contract rejects — here an admission missing its required
+    // `workflow` — is a 400 from the route's own schema, the same `InvalidRequest` envelope the
+    // query filters above produce.
     const missingWorkflow = await fetch(`${base}/v1/runs`, {
       method: 'POST',
       headers: mutationAuth,
