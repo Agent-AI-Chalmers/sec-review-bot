@@ -152,7 +152,7 @@ sec_review_bot:
 
 这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review`。
 
-issue 与 PR conversation comment 支持同一组命令：
+issue 与 PR conversation comment 共用同一套命令语法；下面的参数在两种场景下解析方式一致，对当前目标没有意义的参数会被忽略（每个参数下已注明）：
 
 ```text
 @<app-slug> review
@@ -162,7 +162,7 @@ issue 与 PR conversation comment 支持同一组命令：
 
 - `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
 - `--repair-mode=no-test-changes`：最终 patch 不应包含测试改动；测试只能作为临时验证手段。（也接受 `--repair-mode=test-changes-allowed`，它等于默认值。）
-- `--open-pr`：仅对 issue review 生效；当 review 产出可用的 patch 时，允许本次运行创建 draft pull request。不带该参数时 patch 只保留在 issue 的 summary comment 中。`issues.opened` 自动触发的 review 永不创建 draft PR。
+- `--open-pr`：仅对 issue review 生效；当 review 产出可用的 patch 时，允许本次运行创建 draft pull request；不带该参数时 patch 只保留在 issue 的 summary comment 中。`issues.opened` 自动触发的 review 永不创建 draft PR。在 PR 评论上该参数无对应动作，会被忽略，因为 PR review 不会创建分支或新的 pull request。
 
 各参数与顺序无关，可组合使用。没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
 

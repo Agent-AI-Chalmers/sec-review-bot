@@ -151,7 +151,7 @@ Notes:
 
 `<app-slug>` is not a literal placeholder; it is the actual slug registered for the GitHub App. If the app slug is `web-sec-bot`, the real comment is `@web-sec-bot review`.
 
-Both issue and PR conversation comments support the same commands:
+Issue and PR conversation comments share one command grammar. The flags below are parsed the same way in both places; a flag that has no meaning for a target is ignored (noted per flag):
 
 ```text
 @<app-slug> review
@@ -161,7 +161,7 @@ Both issue and PR conversation comments support the same commands:
 
 - `review`: triggers a review. The final patch, if any, may include reasonable test changes.
 - `--repair-mode=no-test-changes`: the final patch should not contain test changes; tests may only be used as temporary validation work. (`--repair-mode=test-changes-allowed`, the default, is also accepted.)
-- `--open-pr`: for issue reviews only, allows the run to open a draft pull request when the review produces a ready patch. Without this flag the patch stays in the issue summary comment. Automatic `issues.opened` reviews never open a draft PR.
+- `--open-pr`: issue reviews only. Allows the run to open a draft pull request when the review produces a ready patch; without it the patch stays in the issue summary comment. Automatic `issues.opened` reviews never open a draft PR. On a PR comment this flag has no effect and is ignored, because a PR review does not create a branch or a new pull request.
 
 Flags are order-independent and may be combined. There is no objective argument: the GitHub integration always reviews in `audit` mode.
 
