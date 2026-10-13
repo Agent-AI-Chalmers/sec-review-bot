@@ -112,7 +112,13 @@ test('a request body missing a required contract field is rejected before the ha
 test('schema validation names which part of the request failed', async () => {
   // A caller classifying by `code` must be able to tell a bad filter from a bad body from a
   // bad path parameter; reusing one code for all three (as it did) made that impossible.
-  const app = await buildApp({ listRunsPage: async () => ({ runs: [], next_cursor: null }) })
+  let listCalls = 0
+  const app = await buildApp({
+    listRunsPage: async () => {
+      listCalls += 1
+      return { runs: [], next_cursor: null }
+    }
+  })
   try {
     const query = await app.inject({
       method: 'GET',
@@ -121,6 +127,18 @@ test('schema validation names which part of the request failed', async () => {
     })
     assert.equal(query.statusCode, 400)
     assert.equal((query.json() as { code?: string }).code, 'INVALID_QUERY')
+
+    // The query is one `additionalProperties: false` object, so a parameter the contract
+    // does not declare is rejected before the handler runs — not silently ignored, which is
+    // what a bare `parameters` list would do.
+    const unknown = await app.inject({
+      method: 'GET',
+      url: '/v1/runs?bogus=1',
+      headers: { authorization: `Bearer ${READ_TOKEN}` }
+    })
+    assert.equal(unknown.statusCode, 400)
+    assert.equal((unknown.json() as { code?: string }).code, 'INVALID_QUERY')
+    assert.equal(listCalls, 0, 'an undeclared query parameter must be rejected before the handler')
 
     const path = await app.inject({
       method: 'POST',

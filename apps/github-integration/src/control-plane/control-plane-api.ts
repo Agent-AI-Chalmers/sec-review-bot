@@ -509,14 +509,22 @@ export interface operations {
   listRuns: {
     parameters: {
       query?: {
-        limit?: number
-        cursor?: string
-        execution_status?:
-          'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-        publication_status?: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
-        workflow?: 'issue-review' | 'pull-request-review' | 'repository-review'
-        from?: string
-        to?: string
+        /** @description The list filters. Each declared property is a query parameter of the same name; any other query parameter is rejected. */
+        filter?: {
+          limit?: number
+          cursor?: string
+          /** @enum {string} */
+          execution_status?:
+            'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+          /** @enum {string} */
+          publication_status?: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+          /** @enum {string} */
+          workflow?: 'issue-review' | 'pull-request-review' | 'repository-review'
+          /** Format: date-time */
+          from?: string
+          /** Format: date-time */
+          to?: string
+        }
       }
       header?: never
       path?: never

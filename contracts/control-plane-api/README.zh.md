@@ -42,6 +42,6 @@ GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图
 
 ## 错误码
 
-- **校验错误码** —— `INVALID_QUERY`、`INVALID_BODY`、`INVALID_PATH_PARAMETER` —— 指明请求的哪一部分未通过契约自身的 schema，因此按 `code` 分类的调用方可以区分运行列表过滤器出错、请求体出错、还是路径参数出错。它们以 HTTP 400 + 字符串 `code` 呈现。服务端把整个 enum 投影为 `ERROR_RESPONSE_CODES_FROM_CONTRACT`，并拒绝发出契约未声明的码，因此信封不会对外宣称一个 [openapi.yaml](openapi.yaml) 的 `ErrorResponse.code` enum 之外的值。
+- **校验错误码** —— `INVALID_QUERY`、`INVALID_BODY`、`INVALID_PATH_PARAMETER` —— 指明请求的哪一部分未通过契约自身的 schema，因此按 `code` 分类的调用方可以区分运行列表过滤器出错、请求体出错、还是路径参数出错。运行列表请求还会对声明的 query 参数做严格校验：未声明的 query 参数会以 `INVALID_QUERY` 被拒绝，而不是被忽略，因为 `listRuns` 把过滤器建模为一个 `additionalProperties: false` 的对象，而非裸参数列表。它们以 HTTP 400 + 字符串 `code` 呈现。服务端把整个 enum 投影为 `ERROR_RESPONSE_CODES_FROM_CONTRACT`，并拒绝发出契约未声明的码，因此信封不会对外宣称一个 [openapi.yaml](openapi.yaml) 的 `ErrorResponse.code` enum 之外的值。
 - **控制流错误码** —— Control Plane 作为终态（确定性）发布失败而发出的四个 `PUBLICATION_STEP_*` 码 —— 单一事实来源化在 [openapi.yaml](openapi.yaml) 的 `ErrorResponse.code` enum 里，并在写面上以 HTTP 409 + 字符串 `code` 呈现。服务端的 `PUBLICATION_STEP_ERROR_CODES`（control-plane）是这份 enum 的投影，GitHub 集成为每个码分类为 `retry: false`，因此任一侧新增一个码都会被 `publication-error-code-alignment.test.ts` 捕获，而不是让 runner 永续重试。
 - **诊断错误码**（`failure_code`、runner 错误 `code`）是开放集合，在词汇稳定之前不做枚举。

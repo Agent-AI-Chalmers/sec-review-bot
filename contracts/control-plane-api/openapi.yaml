@@ -450,55 +450,59 @@ paths:
       security:
         - readToken: []
       parameters:
+        # The filters are one `form`-exploded object rather than seven separate parameters
+        # so the route schema can say `additionalProperties: false`: an unknown query
+        # parameter is rejected (400 `INVALID_QUERY`) instead of being ignored, matching how
+        # the request bodies already refuse undeclared fields. When the parameters are
+        # separate there is no place to attach `additionalProperties`, so the contract would
+        # overstate the validation. The name below is only a schema holder; the client sends
+        # the properties themselves (`?limit=…&workflow=…`).
         - in: query
-          name: limit
+          name: filter
+          style: form
+          explode: true
+          description: >-
+            The list filters. Each declared property is a query parameter of the same name;
+            any other query parameter is rejected.
           schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-        - in: query
-          name: cursor
-          schema:
-            type: string
-        - in: query
-          name: execution_status
-          schema:
-            type: string
-            enum:
-              - preparing
-              - recovering
-              - queued
-              - running
-              - succeeded
-              - failed
-        - in: query
-          name: publication_status
-          schema:
-            type: string
-            enum:
-              - pending
-              - publishing
-              - published
-              - failed
-              - skipped
-        - in: query
-          name: workflow
-          schema:
-            type: string
-            enum:
-              - issue-review
-              - pull-request-review
-              - repository-review
-        - in: query
-          name: from
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: to
-          schema:
-            type: string
-            format: date-time
+            type: object
+            additionalProperties: false
+            properties:
+              limit:
+                type: integer
+                minimum: 1
+                maximum: 100
+              cursor:
+                type: string
+              execution_status:
+                type: string
+                enum:
+                  - preparing
+                  - recovering
+                  - queued
+                  - running
+                  - succeeded
+                  - failed
+              publication_status:
+                type: string
+                enum:
+                  - pending
+                  - publishing
+                  - published
+                  - failed
+                  - skipped
+              workflow:
+                type: string
+                enum:
+                  - issue-review
+                  - pull-request-review
+                  - repository-review
+              from:
+                type: string
+                format: date-time
+              to:
+                type: string
+                format: date-time
       responses:
         "200":
           description: Paginated redacted runs.
