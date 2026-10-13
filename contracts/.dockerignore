@@ -1,0 +1,10 @@
+# Docker reads only the build context's own .dockerignore, and `contracts/` is supplied to
+# the runner-service, control-plane, and github-integration builds as a separate named context
+# (compose's `additional_contexts`). Without this file every family tool's local `node_modules`
+# and any stray secret would be sent to the daemon — and, for github-integration, copied into
+# the runtime image by `COPY --from=contracts . /app/contracts`. The sibling service contexts
+# (agents/, control-plane/, apps/*/) exclude the same patterns; keep them in step.
+**/node_modules
+.env
+*.pem
+*.log
