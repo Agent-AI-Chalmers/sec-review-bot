@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -124,6 +124,19 @@ function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   // Keep operational logs structured, but never serialize request arguments:
   // they may contain runner input, publish context, or claim credentials.
   console.info(JSON.stringify({ event, ...fields }))
+}
+
+/** Compare a bearer credential in constant time.
+ *
+ * The equality check runs for every request, so `!==` would let an attacker recover a token
+ * byte by byte from the response-time difference. `timingSafeEqual` throws when the buffers
+ * differ in length, which is why the length is compared first: the length of the expected
+ * token is not the secret, and a mismatch is a plain rejection. */
+function bearerTokenMatches(header: string | undefined, expected: string): boolean {
+  if (header === undefined) return false
+  const provided = Buffer.from(header)
+  const want = Buffer.from(`Bearer ${expected}`)
+  return provided.length === want.length && timingSafeEqual(provided, want)
 }
 
 interface ControlPlaneRouteDeps {
@@ -426,12 +439,12 @@ export async function registerControlPlaneRoutes(
     },
     securityHandlers: {
       serviceToken: async (request: FastifyRequest) => {
-        if (request.headers.authorization !== `Bearer ${serviceToken}`) {
+        if (!bearerTokenMatches(request.headers.authorization, serviceToken)) {
           throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
         }
       },
       readToken: async (request: FastifyRequest) => {
-        if (request.headers.authorization !== `Bearer ${readToken}`) {
+        if (!bearerTokenMatches(request.headers.authorization, readToken)) {
           throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
         }
       }
