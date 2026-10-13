@@ -134,6 +134,7 @@ Checks:
 ```bash
 pnpm run format:check
 pnpm run lint
+pnpm run lint:contract
 pnpm run typecheck
 pnpm test
 pnpm run test:integration
