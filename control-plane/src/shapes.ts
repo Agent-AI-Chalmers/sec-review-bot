@@ -45,19 +45,27 @@ export type CreateReviewRunArgs = Pick<
 >
 
 /** Narrow the runner's loose artifact-storage type into the status-discriminated contract
- * shape. The runner's OpenAPI types `artifact` and `media_type` loosely, so this is where
- * the observer makes the discrimination explicit rather than passing the flat record
- * through. */
+ * shape. The runner's own contract types `artifact` loosely — `RunnerArtifactStorage` requires
+ * only `status`, and `artifact` is nullable — because the same schema covers the
+ * `unavailable`/`failed` cases where there is no artifact. The contract's `ArtifactStorage`
+ * is stricter: the `available` branch requires `artifact`.
+ *
+ * `parseArtifactStorage` in `runner-client.ts` is what already closes that gap: it rejects an
+ * `available` record whose `artifact` is missing, null, or malformed, and returns a
+ * fully-checked reference. Every value reaching here has crossed it, so the narrowing below
+ * restates an invariant rather than guessing one — and asserts it instead of casting, so a
+ * future caller that skips that boundary fails loudly instead of persisting a record the
+ * contract forbids. */
 export function normalizeArtifactStorage(storage: RunnerArtifactStorage | null): ArtifactStorage {
   if (storage === null) return null
   if (storage.status === 'available') {
+    const artifact = storage.artifact
+    if (artifact == null) {
+      throw new Error('An available artifact storage record must carry its artifact reference.')
+    }
     return {
       status: 'available',
-      // The runner only reports `available` once an artifact is stored, and its
-      // `media_type` is always the single value the observed contract pins down.
-      artifact: storage.artifact as NonNullable<
-        Extract<ArtifactStorage, { artifact: unknown }>
-      >['artifact']
+      artifact: artifact as NonNullable<Extract<ArtifactStorage, { artifact: unknown }>>['artifact']
     }
   }
   return {
