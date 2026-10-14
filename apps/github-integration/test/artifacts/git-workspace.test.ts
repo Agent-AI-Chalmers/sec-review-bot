@@ -9,6 +9,7 @@ import { promisify } from 'node:util'
 import {
   createWorkspaceSnapshotTar,
   materializeWorkspaceWithCommitHistory,
+  readRepositoryFileAtRef,
   retryGitFetch,
   withConfiguredGitFetchProxy
 } from '../../src/artifacts/git-workspace.js'
@@ -228,4 +229,68 @@ test('createWorkspaceSnapshotTar restores a self-consistent git workspace from t
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
+})
+
+test('readRepositoryFileAtRef returns file content at a commit', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-read-file-test-'))
+  try {
+    const source = path.join(root, 'source')
+    await fs.mkdir(path.join(source, '.sec-review'), { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    await fs.writeFile(
+      path.join(source, '.sec-review', 'setup.yml'),
+      'setup:\n  - run: echo hi\n',
+      'utf8'
+    )
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'add setup'])
+    const sha = await git(source, ['rev-parse', 'HEAD'])
+
+    const content = await readRepositoryFileAtRef({
+      commit_sha: sha,
+      file_path: '.sec-review/setup.yml',
+      git_remote_url: source
+    })
+    assert.equal(content, 'setup:\n  - run: echo hi\n')
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('readRepositoryFileAtRef returns null when the file does not exist', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-read-file-missing-'))
+  try {
+    const source = path.join(root, 'source')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    await fs.writeFile(path.join(source, 'README.md'), 'x\n', 'utf8')
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'init'])
+    const sha = await git(source, ['rev-parse', 'HEAD'])
+
+    const content = await readRepositoryFileAtRef({
+      commit_sha: sha,
+      file_path: '.sec-review/setup.yml',
+      git_remote_url: source
+    })
+    assert.equal(content, null)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('readRepositoryFileAtRef rejects unsafe file paths', async () => {
+  await assert.rejects(
+    () =>
+      readRepositoryFileAtRef({
+        commit_sha: 'deadbeef',
+        file_path: '../escape.yml',
+        git_remote_url: 'file:///does/not/matter'
+      }),
+    /invalid file path/
+  )
 })

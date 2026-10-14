@@ -13,12 +13,16 @@ import { publishInputBundle } from '../../artifacts/input-storage.js'
 
 import {
   WORKSPACE_SNAPSHOT_TAR_NAME,
-  createWorkspaceSnapshotTar
+  createWorkspaceSnapshotTar,
+  readRepositoryFileAtRef
 } from '../../artifacts/git-workspace.js'
 import { writeInputBundleManifest } from '../../runner/input-bundle-manifest.js'
 import { input_bundle_staging_root } from '../../config.js'
 
 const execFileAsync = promisify(execFile)
+
+/** Bundle-relative directory holding the trusted setup declaration. */
+export const TRUSTED_SETUP_DIR = 'trusted-setup'
 
 export function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, '-')
@@ -41,11 +45,14 @@ export function createInputBundleRoot(...segments: string[]): string {
 export async function finalizeInputBundleWorkspace({
   input_bundle_root,
   workspace_path,
-  include_incremental_window
+  include_incremental_window,
+  trusted_setup_path
 }: {
   input_bundle_root: string
   workspace_path: string
   include_incremental_window: boolean
+  /** Bundle-relative path to the trusted setup declaration, if any. */
+  trusted_setup_path?: string
 }): Promise<void> {
   await createWorkspaceSnapshotTar({
     workspace_path,
@@ -53,8 +60,46 @@ export async function finalizeInputBundleWorkspace({
   })
   await writeInputBundleManifest({
     input_bundle_root,
-    include_incremental_window
+    include_incremental_window,
+    ...(trusted_setup_path ? { trusted_setup_path } : {})
   })
+}
+
+export const TRUSTED_SETUP_FILE_NAME = 'setup.yml'
+
+/**
+ * Fetch the trusted setup declaration from an exact default-branch commit and
+ * place it at `trusted-setup/setup.yml` inside the bundle. Returns the
+ * bundle-relative path, or null when the repository has no declaration (absence
+ * is not an error -- the environment simply stays unbootstrapped).
+ */
+export async function materializeTrustedSetup({
+  input_bundle_root,
+  default_sha,
+  owner_login,
+  repo_name,
+  git_auth_token
+}: {
+  input_bundle_root: string
+  default_sha: string
+  owner_login: string
+  repo_name: string
+  git_auth_token?: string
+}): Promise<string | null> {
+  const content = await readRepositoryFileAtRef({
+    commit_sha: default_sha,
+    file_path: `.sec-review/${TRUSTED_SETUP_FILE_NAME}`,
+    git_remote_url: buildGitRemoteUrl(owner_login, repo_name),
+    ...(git_auth_token ? { git_auth_token } : {})
+  })
+  if (content === null) {
+    return null
+  }
+  const relative_path = `${TRUSTED_SETUP_DIR}/${TRUSTED_SETUP_FILE_NAME}`
+  const target_dir = path.join(input_bundle_root, TRUSTED_SETUP_DIR)
+  await fs.mkdir(target_dir, { recursive: true })
+  await fs.writeFile(path.join(target_dir, TRUSTED_SETUP_FILE_NAME), content, 'utf8')
+  return relative_path
 }
 
 export async function archiveInputBundle({
@@ -68,11 +113,16 @@ export async function archiveInputBundle({
 }): Promise<InputBundleArtifactRef> {
   const tarPath = `${input_bundle_root}.tar`
   const archivePath = `${tarPath}.zst`
+  const include_trusted_setup = await fs
+    .stat(path.join(input_bundle_root, TRUSTED_SETUP_DIR))
+    .then((stat) => stat.isDirectory())
+    .catch(() => false)
   const entries = [
     'manifest.json',
     WORKSPACE_SNAPSHOT_TAR_NAME,
     'history',
-    ...(include_incremental_window ? ['incremental-window'] : [])
+    ...(include_incremental_window ? ['incremental-window'] : []),
+    ...(include_trusted_setup ? [TRUSTED_SETUP_DIR] : [])
   ]
   await fs.rm(tarPath, { force: true })
   await fs.rm(archivePath, { force: true })

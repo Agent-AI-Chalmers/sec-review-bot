@@ -346,3 +346,85 @@ export async function createWorkspaceSnapshotTar({
     throw error
   }
 }
+
+/**
+ * Read a single file at an exact commit from the remote, without checking out a
+ * workspace. Used to fetch the trusted setup declaration from the repository's
+ * default-branch SHA (which the PR workspace does not necessarily contain).
+ *
+ * Returns the file content, or `null` if the file does not exist at that commit.
+ */
+export async function readRepositoryFileAtRef({
+  commit_sha,
+  file_path,
+  git_remote_url,
+  git_auth_token
+}: {
+  commit_sha: string
+  file_path: string
+  git_remote_url?: string
+  git_auth_token?: string
+}): Promise<string | null> {
+  const normalizedSha = String(commit_sha).trim()
+  const normalizedPath = String(file_path).trim()
+  if (!normalizedSha) {
+    throw new Error('readRepositoryFileAtRef requires a commit SHA.')
+  }
+  if (!normalizedPath || normalizedPath.startsWith('/') || normalizedPath.includes('..')) {
+    throw new Error(`readRepositoryFileAtRef received an invalid file path: ${file_path}`)
+  }
+  if (!git_remote_url || git_remote_url.trim() === '') {
+    throw new Error('readRepositoryFileAtRef requires git_remote_url.')
+  }
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-trusted-setup-'))
+  try {
+    await runGitCommand(tempDir, ['init', '--quiet'])
+    await runGitCommand(tempDir, ['remote', 'add', 'origin', git_remote_url.trim()])
+
+    const auth = git_auth_token ? await createGitAskPassAuth(git_auth_token) : null
+    try {
+      await runGitFetchWithRetry(tempDir, ['fetch', '--depth', '1', 'origin', normalizedSha], {
+        ...(auth ? { config: auth.config, env: auth.env } : {})
+      })
+      const { stdout } = await execFileAsync(
+        'git',
+        ['show', `${normalizedSha}:${normalizedPath}`],
+        {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            GIT_ASKPASS: '',
+            SSH_ASKPASS: '',
+            GIT_TERMINAL_PROMPT: '0'
+          }
+        }
+      )
+      return stdout
+    } catch (error) {
+      if (isGitMissingPathError(error)) {
+        return null
+      }
+      throw error
+    } finally {
+      if (auth) {
+        await auth.cleanup()
+      }
+    }
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true })
+  }
+}
+
+function isGitMissingPathError(error: unknown): boolean {
+  const stderr =
+    typeof error === 'object' && error !== null && 'stderr' in error
+      ? String((error as { stderr?: unknown }).stderr ?? '')
+      : ''
+  return (
+    stderr.includes('does not exist in') ||
+    stderr.includes('exists on disk, but not in') ||
+    (stderr.includes('Path') && stderr.includes('does not exist')) ||
+    stderr.includes('invalid object name')
+  )
+}

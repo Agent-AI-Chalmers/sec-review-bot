@@ -16,7 +16,7 @@ from tests.contract_fixtures import contract_fixture
 
 
 def _write_bundle_manifest(
-    local_root: str, *, incremental: bool = False
+    local_root: str, *, incremental: bool = False, trusted_setup: bool = False
 ) -> dict[str, object]:
     root = Path(local_root)
     root.mkdir(parents=True, exist_ok=True)
@@ -28,11 +28,18 @@ def _write_bundle_manifest(
     }
     if incremental:
         manifest["incremental_window"] = {"path": "incremental-window"}
+    if trusted_setup:
+        manifest["trusted_setup"] = {"path": "trusted-setup/setup.yml"}
     (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (root / "workspace.snapshot.tar").touch()
     (root / "history").mkdir(exist_ok=True)
     if incremental:
         (root / "incremental-window").mkdir(exist_ok=True)
+    if trusted_setup:
+        (root / "trusted-setup").mkdir(exist_ok=True)
+        (root / "trusted-setup" / "setup.yml").write_text(
+            "setup: []\n", encoding="utf-8"
+        )
     archive_path = root.with_suffix(".tar.zst")
     with tarfile.open(archive_path, mode="w:zst") as archive:
         archive.add(root / "manifest.json", arcname="manifest.json")
@@ -40,6 +47,8 @@ def _write_bundle_manifest(
         archive.add(root / "history", arcname="history")
         if incremental:
             archive.add(root / "incremental-window", arcname="incremental-window")
+        if trusted_setup:
+            archive.add(root / "trusted-setup", arcname="trusted-setup")
     content = archive_path.read_bytes()
     return {
         "uri": archive_path.as_uri(),
@@ -91,6 +100,59 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
         "workspace_snapshot_tar_path": str(run_input_root / "workspace.snapshot.tar"),
         "history_path": str(run_input_root / "history"),
     }
+
+
+def test_prepare_run_input_resolves_optional_trusted_setup_path(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle-trusted"
+    input_bundle = _write_bundle_manifest(str(bundle_root), trusted_setup=True)
+    run_input_root = tmp_path / "run-inputs" / "run-input-trusted"
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(
+        input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "run-inputs")
+    )
+    try:
+        prepared = prepare_run_input(
+            {
+                "contract_version": "v6",
+                "input_bundle": input_bundle,
+                "review_intent": {"objective": "audit"},
+                "issue": {"number": 1},
+            },
+            run_id="run-input-trusted",
+            workflow="issue-review",
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert prepared["bundle_paths"]["trusted_setup_path"] == str(
+        run_input_root / "trusted-setup" / "setup.yml"
+    )
+
+
+def test_prepare_run_input_omits_trusted_setup_path_when_absent(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle-no-trusted"
+    input_bundle = _write_bundle_manifest(str(bundle_root))
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(
+        input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "run-inputs")
+    )
+    try:
+        prepared = prepare_run_input(
+            {
+                "contract_version": "v6",
+                "input_bundle": input_bundle,
+                "review_intent": {"objective": "audit"},
+                "issue": {"number": 1},
+            },
+            run_id="run-input-no-trusted",
+            workflow="issue-review",
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert "trusted_setup_path" not in prepared["bundle_paths"]
 
 
 def test_prepare_run_input_rejects_unsupported_workflow() -> None:

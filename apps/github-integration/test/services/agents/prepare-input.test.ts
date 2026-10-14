@@ -341,7 +341,13 @@ test(
             }
           }
         }),
-        rest: { issues: { listEventsForTimeline: async () => ({ data: [] }) } }
+        rest: {
+          repos: {
+            get: async () => ({ data: { default_branch: 'main' } }),
+            getBranch: async () => ({ data: { commit: { sha: refs.head_sha } } })
+          },
+          issues: { listEventsForTimeline: async () => ({ data: [] }) }
+        }
       } as unknown as GitHubAppOctokit
       const prepared = await preparePullRequestReviewInput({
         run_id: 'run-pr-fixture',

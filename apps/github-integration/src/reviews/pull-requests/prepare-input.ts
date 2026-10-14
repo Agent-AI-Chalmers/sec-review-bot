@@ -3,6 +3,7 @@ import path from 'path'
 
 import {
   fetchTimelineLinkedIssues,
+  resolvePullRequestDefaultBranch,
   summarizePullRequestFiles,
   type PullRequestContext,
   type PullRequestFile,
@@ -18,7 +19,8 @@ import {
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
-  finalizeInputBundleWorkspace
+  finalizeInputBundleWorkspace,
+  materializeTrustedSetup
 } from '../shared/input-bundle.js'
 
 interface NormalizedPullRequestFile {
@@ -323,10 +325,20 @@ export async function preparePullRequestReviewInput({
     workspace_path,
     commit_refs: commit_shas
   })
+  const { head_sha: default_sha } = await resolvePullRequestDefaultBranch(octokit, pr)
+  const git_auth_token = await getInstallationAccessToken(octokit)
+  const trusted_setup_path = await materializeTrustedSetup({
+    input_bundle_root,
+    default_sha,
+    owner_login: pr.owner_login,
+    repo_name: pr.repo_name,
+    git_auth_token
+  })
   await finalizeInputBundleWorkspace({
     input_bundle_root,
     workspace_path,
-    include_incremental_window: true
+    include_incremental_window: true,
+    ...(trusted_setup_path ? { trusted_setup_path } : {})
   })
   await materializeIncrementalWindowArtifacts(normalizedFiles, incremental_window_path)
   const historyArtifacts = await materializeHistoryArtifacts({

@@ -325,6 +325,17 @@ def _set_bundle_paths_from_manifest(
         ),
     }
 
+    # Optional trusted-setup declaration (from the repository default branch).
+    # Absent means "no trusted setup declaration" -- environment stays unbootstrapped.
+    trusted_setup = manifest.get("trusted_setup")
+    if isinstance(trusted_setup, dict):
+        bundle_paths["trusted_setup_path"] = str(
+            _resolve_bundle_path(
+                local_root,
+                _read_required_manifest_path(trusted_setup, "trusted_setup.path"),
+            )
+        )
+
     incremental_window = manifest.get("incremental_window")
     if isinstance(incremental_window, dict):
         bundle_paths["incremental_window_path"] = str(

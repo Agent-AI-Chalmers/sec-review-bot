@@ -16,7 +16,8 @@ import {
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
-  finalizeInputBundleWorkspace
+  finalizeInputBundleWorkspace,
+  materializeTrustedSetup
 } from '../shared/input-bundle.js'
 
 const MAX_INCREMENTAL_FILES = 5000
@@ -186,10 +187,24 @@ export async function prepareRepositoryReviewInput({
       ? [resolvedBaseSha, resolvedHeadSha]
       : [resolvedHeadSha]
   await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
+  // Trusted default branch (not the user-selectable target_branch): resolve its
+  // head SHA and pull the setup declaration from it.
+  const trusted_default_sha = await getRepositoryRefSha(octokit, {
+    owner_login: repo.owner_login,
+    repo_name: repo.repo_name,
+    ref: repo.default_branch
+  })
+  const trusted_setup_path = await materializeTrustedSetup({
+    input_bundle_root,
+    default_sha: trusted_default_sha,
+    owner_login: repo.owner_login,
+    repo_name: repo.repo_name
+  })
   await finalizeInputBundleWorkspace({
     input_bundle_root,
     workspace_path,
-    include_incremental_window: resolvedScanMode === 'incremental'
+    include_incremental_window: resolvedScanMode === 'incremental',
+    ...(trusted_setup_path ? { trusted_setup_path } : {})
   })
 
   if (resolvedScanMode === 'full') {
