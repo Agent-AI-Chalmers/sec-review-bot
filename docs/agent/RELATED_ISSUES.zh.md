@@ -47,7 +47,7 @@ agent 设计里也有其他的机制用来遏制上下文的恶性增长，如�
 
 ## Agent 到底是在审计还是修复？
 
-系统通过显式 `review_intent.objective` 区分 `audit` / `repair`。当 objective 是 `repair` 时，还可以通过 `review_intent.repair_mode` 约束是否允许修改测试。因此 agent 当前是在审计还是修复，不是由模型临场猜测，也不是由输出文本暗示，而是输入契约的一部分。
+系统通过显式 `review_intent.objective` 区分 `audit` / `repair`。`review_intent.test_changes` 还可以独立于 objective 约束最终 mitigation patch 是否允许包含测试改动。因此 agent 当前是在审计还是修复，不是由模型临场猜测，也不是由输出文本暗示，而是输入契约的一部分。
 
 objective 是用户选择的执行目标，不是漏洞一定存在的事实断言。
 

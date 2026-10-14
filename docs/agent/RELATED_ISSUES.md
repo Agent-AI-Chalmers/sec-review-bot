@@ -45,7 +45,7 @@ The current fallback is LangChain `SummarizationMiddleware` with a project-speci
 
 ## Is the Agent Auditing or Repairing?
 
-The system explicitly distinguishes `audit` / `repair` through `review_intent.objective`. When the objective is `repair`, `review_intent.repair_mode` can also constrain whether test changes are allowed. Therefore, whether the agent is currently auditing or repairing is not guessed by the model on the spot, and is not implied by output text; it is part of the input contract.
+The system explicitly distinguishes `audit` / `repair` through `review_intent.objective`. `review_intent.test_changes` can also constrain whether the final mitigation patch may contain test changes, independently of the objective. Therefore, whether the agent is currently auditing or repairing is not guessed by the model on the spot, and is not implied by output text; it is part of the input contract.
 
 The objective is the execution goal chosen by the user, not a factual assertion that a vulnerability definitely exists.
 

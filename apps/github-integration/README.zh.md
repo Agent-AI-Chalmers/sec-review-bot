@@ -156,12 +156,12 @@ issue 与 PR conversation comment 共用同一套命令语法；下面的参数�
 
 ```text
 @<app-slug> review
-@<app-slug> review --repair-mode=no-test-changes
+@<app-slug> review --test-changes deny
 @<app-slug> review --open-pr
 ```
 
 - `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
-- `--repair-mode=no-test-changes`：最终 patch 不应包含测试改动；测试只能作为临时验证手段。（也接受 `--repair-mode=test-changes-allowed`，它等于默认值。）
+- `--test-changes allow|deny`：最终 mitigation patch 是否允许包含测试改动。`deny` 表示不得包含测试改动；测试只能作为临时验证手段。不带该参数时 runner 使用 `allow`。
 - `--open-pr`：仅对 issue review 生效；当 review 产出可用的 patch 时，允许本次运行创建 draft pull request；不带该参数时 patch 只保留在 issue 的 summary comment 中。`issues.opened` 自动触发的 review 永不创建 draft PR。在 PR 评论上该参数无对应动作，会被忽略，因为 PR review 不会创建分支或新的 pull request。
 
 各参数与顺序无关，可组合使用。没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
@@ -183,9 +183,9 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 - `scan_mode`：`full` 或 `incremental`
 - `base_sha`：手动增量扫描必填
 - `head_sha`：手动增量扫描可选，默认当前分支 HEAD
-- `repair_mode`：`test-changes-allowed` 或 `no-test-changes`
+- `test_changes`：`allow` 或 `deny`
 
-`repair_mode=no-test-changes` 表示仓库级扫描生成的最终 patch 不应包含测试改动；测试仍可作为临时验证手段。`schedule` 触发不带手动 input 时使用默认修复模式。
+`test_changes=deny` 表示仓库级扫描生成的最终 mitigation patch 不得包含测试改动；测试仍可作为临时验证手段。`schedule` 触发不带手动 input 时使用默认值（`allow`）。
 
 `schedule` 触发默认按 incremental scan 处理，并由 App 侧根据 cron 推导扫描窗口；手动 incremental 必须显式提供 `base_sha`。
 

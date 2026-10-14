@@ -21,14 +21,14 @@ on:
         required: false
         default: ''
         type: string
-      repair_mode:
-        description: 'Repair mode for generated fixes'
+      test_changes:
+        description: 'Whether the final mitigation patch may contain test changes'
         required: false
-        default: 'test-changes-allowed'
+        default: 'allow'
         type: choice
         options:
-          - test-changes-allowed
-          - no-test-changes
+          - allow
+          - deny
   # Schedule trigger (optional)
   # To enable, uncomment the schedule section below (GitHub Actions uses UTC)
   # schedule:
@@ -49,7 +49,7 @@ jobs:
           INPUT_SCAN_MODE: ${{ github.event.inputs.scan_mode || '' }}
           INPUT_BASE_SHA: ${{ github.event.inputs.base_sha || '' }}
           INPUT_HEAD_SHA: ${{ github.event.inputs.head_sha || '' }}
-          INPUT_REPAIR_MODE: ${{ github.event.inputs.repair_mode || '' }}
+          INPUT_TEST_CHANGES: ${{ github.event.inputs.test_changes || '' }}
         run: |
           set -euo pipefail
           event_type="manual"
@@ -64,7 +64,7 @@ jobs:
             --arg head_sha "$INPUT_HEAD_SHA" \
             --arg event_type "$event_type" \
             --arg schedule "$EVENT_SCHEDULE" \
-            --arg repair_mode "$INPUT_REPAIR_MODE" \
+            --arg test_changes "$INPUT_TEST_CHANGES" \
             --arg correlation_id "$GITHUB_RUN_ID" \
             '{
               repo_full_name: $repo,
@@ -74,7 +74,7 @@ jobs:
               head_sha: $head_sha,
               event_type: $event_type,
               schedule: $schedule,
-              repair_mode: $repair_mode,
+              test_changes: $test_changes,
               correlation_id: $correlation_id
             }' > payload.json
 
