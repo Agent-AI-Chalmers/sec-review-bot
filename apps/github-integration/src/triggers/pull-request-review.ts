@@ -40,6 +40,9 @@ interface StartPullRequestReviewCommandArgs {
   pr?: PullRequestContext
   resolve_pr?: () => Promise<PullRequestContext>
   event_type: PullRequestReviewEventType
+  // The PR path's only policy knob. The objective is fixed to `audit`, but an
+  // audit review still reaches mitigation once a defect is confirmed, so the
+  // patch-level test-changes constraint stays meaningful here.
   test_changes?: TestChangesPolicy | null
   delivery_id: string
   on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
