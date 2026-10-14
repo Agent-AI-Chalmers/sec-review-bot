@@ -1,8 +1,8 @@
 import pytest
 
 from sec_review_agents.workflows.review_intent import (
-    TEST_CHANGES_ALLOW,
     REVIEW_OBJECTIVE_AUDIT,
+    TEST_CHANGES_ALLOW,
     require_review_intent,
 )
 

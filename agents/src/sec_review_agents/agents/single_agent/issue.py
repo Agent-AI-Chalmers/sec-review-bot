@@ -27,8 +27,8 @@ from sec_review_agents.utils.structured_renderer import (
 )
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
-    TestChangesPolicy,
     ReviewObjective,
+    TestChangesPolicy,
     test_changes_boundary_prompt_path,
 )
 

@@ -3,7 +3,11 @@ import { prepareRepositoryReviewInput } from './prepare-input.js'
 import { fetchRepositoryTriggerConfig } from '../../github/repo-config-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { logInfo } from '../../utils/logger.js'
-import type { TestChangesPolicy, RepositoryScanTarget, RepositoryReviewInput } from '../../runner/input.js'
+import type {
+  TestChangesPolicy,
+  RepositoryScanTarget,
+  RepositoryReviewInput
+} from '../../runner/input.js'
 
 export interface RepositoryContext {
   owner_login: string

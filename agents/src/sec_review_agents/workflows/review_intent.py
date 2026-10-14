@@ -47,10 +47,10 @@ def test_changes_boundary_prompt_path(value: TestChangesPolicy) -> str:
 
 
 __all__ = [
-    "TEST_CHANGES_ALLOW",
-    "TEST_CHANGES_DENY",
     "REVIEW_OBJECTIVE_AUDIT",
     "REVIEW_OBJECTIVE_REPAIR",
+    "TEST_CHANGES_ALLOW",
+    "TEST_CHANGES_DENY",
     "ReviewIntent",
     "ReviewObjective",
     "TestChangesPolicy",

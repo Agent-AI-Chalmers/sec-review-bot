@@ -22,8 +22,8 @@ from sec_review_agents.workflows.repository_case.verification import (
     verify_repository_case,
 )
 from sec_review_agents.workflows.review_intent import (
-    TEST_CHANGES_DENY,
     TEST_CHANGES_ALLOW,
+    TEST_CHANGES_DENY,
     TestChangesPolicy,
 )
 

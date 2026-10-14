@@ -27,7 +27,8 @@ function issueContext(): IssueContext {
 }
 
 function fakePrepareInput() {
-  const calls: Array<{ review_objective: 'audit' | 'repair'; test_changes?: TestChangesPolicy }> = []
+  const calls: Array<{ review_objective: 'audit' | 'repair'; test_changes?: TestChangesPolicy }> =
+    []
   const prepare_input = (async (args: {
     review_objective?: 'audit' | 'repair'
     test_changes?: TestChangesPolicy
@@ -47,7 +48,10 @@ function fakePrepareInput() {
   return { calls, prepare_input }
 }
 
-async function runWith(review_objective: 'audit' | 'repair', test_changes: TestChangesPolicy | null) {
+async function runWith(
+  review_objective: 'audit' | 'repair',
+  test_changes: TestChangesPolicy | null
+) {
   const { calls, prepare_input } = fakePrepareInput()
   await startIssueReviewRun(
     {

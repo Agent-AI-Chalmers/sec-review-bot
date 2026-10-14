@@ -111,12 +111,9 @@ def test_mitigation_profiles_include_test_change_boundary() -> None:
     ]
 
     for prompt in prompts:
+        assert load_prompt_resource("test-changes-policy/deny-boundary.md") in prompt
         assert (
-            load_prompt_resource("test-changes-policy/deny-boundary.md") in prompt
-        )
-        assert (
-            load_prompt_resource("test-changes-policy/allow-boundary.md")
-            not in prompt
+            load_prompt_resource("test-changes-policy/allow-boundary.md") not in prompt
         )
 
 

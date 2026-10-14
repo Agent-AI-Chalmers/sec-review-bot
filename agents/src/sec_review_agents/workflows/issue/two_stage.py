@@ -19,8 +19,8 @@ from sec_review_agents.workflows.issue.workflow import (
 )
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
-    TestChangesPolicy,
     ReviewObjective,
+    TestChangesPolicy,
     require_review_intent,
 )
 
