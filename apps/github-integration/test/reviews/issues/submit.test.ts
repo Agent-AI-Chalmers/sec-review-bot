@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { startIssueReviewRun } from '../../../src/reviews/issues/submit.js'
 import type { IssueContext } from '../../../src/github/issue-service.js'
-import type { IssueReviewInput, RepairMode } from '../../../src/runner/input.js'
+import type { IssueReviewInput, TestChangesPolicy } from '../../../src/runner/input.js'
 
 function issueContext(): IssueContext {
   return {
@@ -27,14 +27,14 @@ function issueContext(): IssueContext {
 }
 
 function fakePrepareInput() {
-  const calls: Array<{ review_objective: 'audit' | 'repair'; repair_mode?: RepairMode }> = []
+  const calls: Array<{ review_objective: 'audit' | 'repair'; test_changes?: TestChangesPolicy }> = []
   const prepare_input = (async (args: {
     review_objective?: 'audit' | 'repair'
-    repair_mode?: RepairMode
+    test_changes?: TestChangesPolicy
   }) => {
     calls.push({
       review_objective: args.review_objective ?? 'audit',
-      ...(args.repair_mode ? { repair_mode: args.repair_mode } : {})
+      ...(args.test_changes ? { test_changes: args.test_changes } : {})
     })
     return {
       run_id: 'run-issue-1',
@@ -47,7 +47,7 @@ function fakePrepareInput() {
   return { calls, prepare_input }
 }
 
-async function runWith(review_objective: 'audit' | 'repair', repair_mode: RepairMode | null) {
+async function runWith(review_objective: 'audit' | 'repair', test_changes: TestChangesPolicy | null) {
   const { calls, prepare_input } = fakePrepareInput()
   await startIssueReviewRun({
     run_id: 'run-issue-1',
@@ -55,33 +55,32 @@ async function runWith(review_objective: 'audit' | 'repair', repair_mode: Repair
     issue: issueContext(),
     event_type: 'manual_review',
     review_objective,
-    repair_mode,
+    test_changes,
     prepare_input,
     on_prepared: async () => {}
   })
   return calls
 }
 
-test('audit review forwards an explicit repair_mode to the runner input', async () => {
+test('audit review forwards an explicit test_changes to the runner input', async () => {
   // The regression this guards: an issue comment now always audits, but audit can still
-  // reach the repair stage, so a user-chosen repair_mode must not be silently dropped.
-  assert.deepEqual(await runWith('audit', 'no-test-changes'), [
-    { review_objective: 'audit', repair_mode: 'no-test-changes' }
+  // reach the repair stage, so a user-chosen test_changes must not be silently dropped.
+  assert.deepEqual(await runWith('audit', 'deny'), [
+    { review_objective: 'audit', test_changes: 'deny' }
   ])
 })
 
-test('audit review without a repair_mode leaves the field absent', async () => {
+test('audit review without a test_changes leaves the field absent', async () => {
   assert.deepEqual(await runWith('audit', null), [{ review_objective: 'audit' }])
 })
 
-test('repair review keeps its historical default repair_mode', async () => {
-  assert.deepEqual(await runWith('repair', null), [
-    { review_objective: 'repair', repair_mode: 'test-changes-allowed' }
-  ])
+test('repair review without a test_changes leaves the field absent', async () => {
+  // The runner owns the default (`allow`); the GitHub integration never injects one.
+  assert.deepEqual(await runWith('repair', null), [{ review_objective: 'repair' }])
 })
 
-test('repair review forwards an explicit repair_mode', async () => {
-  assert.deepEqual(await runWith('repair', 'no-test-changes'), [
-    { review_objective: 'repair', repair_mode: 'no-test-changes' }
+test('repair review forwards an explicit test_changes', async () => {
+  assert.deepEqual(await runWith('repair', 'deny'), [
+    { review_objective: 'repair', test_changes: 'deny' }
   ])
 })

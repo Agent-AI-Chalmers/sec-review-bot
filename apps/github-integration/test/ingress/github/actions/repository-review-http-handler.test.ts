@@ -75,10 +75,10 @@ function fakeApp(): App {
   })
 }
 
-test('repository dispatch forwards repair_mode to repository review submission', async () => {
+test('repository dispatch forwards test_changes to repository review submission', async () => {
   const { handleRepositoryReviewDispatch } =
     await import('../../../../src/ingress/github/actions/repository-review-http-handler.js')
-  const calls: Array<{ repair_mode: string | null }> = []
+  const calls: Array<{ test_changes: string | null }> = []
   const response = captureResponse()
 
   await handleRepositoryReviewDispatch({
@@ -89,12 +89,12 @@ test('repository dispatch forwards repair_mode to repository review submission',
       correlation_id: 'actions-run-1',
       scan_mode: 'full',
       event_type: 'manual',
-      repair_mode: 'no-test-changes'
+      test_changes: 'deny'
     }),
     response,
     oidcVerifier: oidcVerifier(),
     dispatchReview: async ({ payload }) => {
-      calls.push({ repair_mode: String(payload.repair_mode ?? '') || null })
+      calls.push({ test_changes: String(payload.test_changes ?? '') || null })
       return {
         run_id: 'run-1',
         replayed: false
@@ -103,7 +103,7 @@ test('repository dispatch forwards repair_mode to repository review submission',
   })
 
   assert.equal(response.statusCodeValue, 202)
-  assert.deepEqual(calls, [{ repair_mode: 'no-test-changes' }])
+  assert.deepEqual(calls, [{ test_changes: 'deny' }])
 })
 
 test('repository dispatch returns preparing as soon as durable admission completes', async () => {

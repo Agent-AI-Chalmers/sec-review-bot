@@ -3,7 +3,7 @@ import path from 'path'
 
 import { getRepositoryContext, getRepositoryRefSha } from '../../github/repository-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
-import type { RepairMode, RepositoryReviewInput } from '../../runner/input.js'
+import type { TestChangesPolicy, RepositoryReviewInput } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
@@ -68,7 +68,7 @@ export async function prepareRepositoryReviewInput({
   head_sha = null,
   event_type = 'manual',
   paths_ignore = [],
-  repair_mode = null
+  test_changes = null
 }: {
   run_id: string
   octokit: GitHubAppOctokit
@@ -79,7 +79,7 @@ export async function prepareRepositoryReviewInput({
   head_sha?: string | null
   event_type?: 'manual' | 'scheduled'
   paths_ignore?: string[]
-  repair_mode?: RepairMode | null
+  test_changes?: TestChangesPolicy | null
 }): Promise<{
   run_id: string
   repo: RepositoryContext
@@ -213,7 +213,7 @@ export async function prepareRepositoryReviewInput({
     input_bundle,
     review_intent: {
       objective: 'audit',
-      ...(repair_mode ? { repair_mode } : {})
+      ...(test_changes ? { test_changes } : {})
     },
     scan_target: {
       target_branch: targetBranchForResolution,

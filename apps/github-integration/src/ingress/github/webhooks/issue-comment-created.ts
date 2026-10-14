@@ -105,7 +105,7 @@ export async function handleIssueCommentCreatedWithDeps(
         octokit,
         event_type: 'manual_review',
         delivery_id: id,
-        repair_mode: command.repair_mode,
+        test_changes: command.test_changes,
         // issue_comment only has issue-shaped PR identity. Resolve full refs and
         // SHAs after the delivery has a durable run record.
         resolve_pr: async () =>
@@ -141,7 +141,7 @@ export async function handleIssueCommentCreatedWithDeps(
       // The GitHub integration always audits an issue: it is an unverified claim. `repair` is
       // only reachable from trusted callers (the PatchEval harness), never from a comment.
       review_objective: 'audit',
-      repair_mode: command.repair_mode,
+      test_changes: command.test_changes,
       open_pr: command.open_pr,
       on_admitted: () => {
         resolveAdmission?.()

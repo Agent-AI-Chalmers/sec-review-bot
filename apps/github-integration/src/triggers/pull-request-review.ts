@@ -7,7 +7,7 @@ import {
 import type { PullRequestContext } from '../github/pull-request-service.js'
 import { pullRequestReviewPublishContext } from '../control-plane/publish-context.js'
 import { controlPlaneClient } from '../control-plane/client.js'
-import type { RepairMode } from '../runner/input.js'
+import type { TestChangesPolicy } from '../runner/input.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import {
   startPullRequestReviewRun,
@@ -40,7 +40,7 @@ interface StartPullRequestReviewCommandArgs {
   pr?: PullRequestContext
   resolve_pr?: () => Promise<PullRequestContext>
   event_type: PullRequestReviewEventType
-  repair_mode?: RepairMode | null
+  test_changes?: TestChangesPolicy | null
   delivery_id: string
   on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   deps?: Partial<StartPullRequestReviewCommandDeps>
@@ -55,7 +55,7 @@ export async function startPullRequestReviewCommand({
   pr,
   resolve_pr,
   event_type,
-  repair_mode = null,
+  test_changes = null,
   delivery_id,
   on_admitted,
   deps = {}
@@ -94,7 +94,7 @@ export async function startPullRequestReviewCommand({
       pr: resolvedPr,
       run_id,
       event_type,
-      repair_mode: event_type === 'manual_review' ? repair_mode : null,
+      test_changes: event_type === 'manual_review' ? test_changes : null,
       on_prepared: async (prepared, input) => {
         // Confirm the lease immediately before crossing the durable submission
         // boundary; the submission itself remains token-fenced by Control Plane.

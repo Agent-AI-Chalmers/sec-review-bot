@@ -98,7 +98,7 @@ test('repository dispatch request resolves manual incremental refs from raw payl
       base_sha: 'aaaaaaaa',
       head_sha: 'cccccccc',
       event_type: 'manual',
-      repair_mode: 'no-test-changes',
+      test_changes: 'deny',
       correlation_id: 'manual-run-1'
     }
   })
@@ -107,7 +107,7 @@ test('repository dispatch request resolves manual incremental refs from raw payl
   assert.equal(resolved.event_type, 'manual')
   assert.equal(resolved.base_sha, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
   assert.equal(resolved.head_sha, 'cccccccccccccccccccccccccccccccccccccccc')
-  assert.equal(resolved.repair_mode, 'no-test-changes')
+  assert.equal(resolved.test_changes, 'deny')
 })
 
 test('dispatchRepositoryReview resolves, submits, and persists a queued repository review run', async () => {
@@ -121,7 +121,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
     base_sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     event_type: 'manual' as const,
-    repair_mode: 'no-test-changes' as const,
+    test_changes: 'deny' as const,
     correlation_id: 'actions-run-1'
   }
 
@@ -135,7 +135,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       base_sha: 'aaaaaaaa',
       head_sha: 'bbbbbbbb',
       event_type: 'manual',
-      repair_mode: 'no-test-changes',
+      test_changes: 'deny',
       correlation_id: 'actions-run-1'
     },
     deps: {
@@ -145,7 +145,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       },
       resolve_dispatch: async (args) => {
         assert.equal(args.octokit, octokit)
-        assert.equal(args.payload.repair_mode, 'no-test-changes')
+        assert.equal(args.payload.test_changes, 'deny')
         return resolved
       },
       submit_run: async (args) => {
@@ -205,7 +205,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       base_sha: submitCall.base_sha,
       head_sha: submitCall.head_sha,
       event_type: submitCall.event_type,
-      repair_mode: submitCall.repair_mode,
+      test_changes: submitCall.test_changes,
       correlation_id: submitCall.correlation_id
     },
     {
@@ -264,7 +264,7 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
         base_sha: null,
         head_sha: null,
         event_type: 'manual',
-        repair_mode: null,
+        test_changes: null,
         correlation_id: 'actions-run-replayed'
       }),
       submit_run: async () => {
@@ -385,7 +385,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           base_sha: null,
           head_sha: null,
           event_type: 'manual',
-          repair_mode: 'test-changes-allowed',
+          test_changes: 'allow',
           correlation_id: 'actions-run-failed'
         }),
         submit_run: async ({ run_id }) => {
@@ -453,7 +453,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           base_sha: null,
           head_sha: null,
           event_type: 'manual',
-          repair_mode: null,
+          test_changes: null,
           correlation_id: 'actions-run-uncertain'
         }),
         submit_run: async (args) => {

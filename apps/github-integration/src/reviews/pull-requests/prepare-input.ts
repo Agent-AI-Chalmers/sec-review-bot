@@ -10,7 +10,7 @@ import {
 } from '../../github/pull-request-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { PullRequestReviewInput } from '../../runner/input.js'
-import type { RepairMode } from '../../runner/input.js'
+import type { TestChangesPolicy } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
@@ -288,13 +288,13 @@ export async function preparePullRequestReviewInput({
   octokit,
   pr,
   files,
-  repair_mode = null
+  test_changes = null
 }: {
   run_id: string
   octokit: GitHubAppOctokit
   pr: PullRequestContext
   files: PullRequestFile[]
-  repair_mode?: RepairMode | null
+  test_changes?: TestChangesPolicy | null
 }): Promise<PreparedPullRequestReview> {
   const normalizedFiles = normalizeFiles(files)
   const input_bundle_root = createInputBundleRoot(
@@ -347,7 +347,7 @@ export async function preparePullRequestReviewInput({
     contract_version: 'v5',
     review_intent: {
       objective: 'audit',
-      ...(repair_mode ? { repair_mode } : {})
+      ...(test_changes ? { test_changes } : {})
     },
     pr: pullRequestMetadata,
     input_bundle

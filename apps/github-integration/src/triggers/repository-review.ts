@@ -11,7 +11,7 @@ import {
   startRepositoryReviewRun,
   type SubmittedRepositoryReviewRun
 } from '../reviews/repositories/submit.js'
-import type { RepairMode } from '../runner/input.js'
+import type { TestChangesPolicy } from '../runner/input.js'
 import { repositoryReviewPublishContext } from '../control-plane/publish-context.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
@@ -26,7 +26,7 @@ export interface RepositoryReviewDispatchPayload {
   head_sha?: unknown
   event_type?: unknown
   schedule?: unknown
-  repair_mode?: unknown
+  test_changes?: unknown
   correlation_id?: unknown
   [key: string]: unknown
 }
@@ -38,7 +38,7 @@ export interface ResolvedRepositoryReviewDispatch {
   base_sha: string | null
   head_sha: string | null
   event_type: 'manual' | 'scheduled'
-  repair_mode: RepairMode | null
+  test_changes: TestChangesPolicy | null
   correlation_id: string
 }
 
@@ -47,7 +47,7 @@ interface ValidatedRepositoryReviewDispatch {
   target_branch: string
   scan_mode: 'full' | 'incremental'
   event_type: 'manual' | 'scheduled'
-  repair_mode: RepairMode | null
+  test_changes: TestChangesPolicy | null
   correlation_id: string
   base_sha: string | null
   head_sha: string | null
@@ -70,7 +70,7 @@ export function validateRepositoryReviewDispatchContract(
   const target_branch = requiredString(payload.target_branch, 'target_branch')
   const event_type = normalizeRepositoryEventType(payload.event_type)
   const scan_mode = normalizeScanMode(payload.scan_mode, event_type)
-  const repair_mode = normalizeRepairMode(payload.repair_mode)
+  const test_changes = normalizeTestChanges(payload.test_changes)
   const correlation_id = requiredString(payload.correlation_id, 'correlation_id')
   if (correlation_id.length > 128) {
     throw new Error('correlation_id must not exceed 128 characters.')
@@ -88,7 +88,7 @@ export function validateRepositoryReviewDispatchContract(
     target_branch,
     scan_mode,
     event_type,
-    repair_mode,
+    test_changes,
     correlation_id,
     base_sha,
     head_sha
@@ -103,7 +103,7 @@ export async function resolveRepositoryReviewDispatch({
   payload: RepositoryReviewDispatchPayload
 }): Promise<ResolvedRepositoryReviewDispatch> {
   const validated = validateRepositoryReviewDispatchContract(payload)
-  const { repo_full_name, target_branch, event_type, scan_mode, repair_mode, correlation_id } =
+  const { repo_full_name, target_branch, event_type, scan_mode, test_changes, correlation_id } =
     validated
   const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
 
@@ -115,7 +115,7 @@ export async function resolveRepositoryReviewDispatch({
       base_sha: null,
       head_sha: validated.head_sha,
       event_type,
-      repair_mode,
+      test_changes,
       correlation_id
     }
   }
@@ -154,7 +154,7 @@ export async function resolveRepositoryReviewDispatch({
     base_sha,
     head_sha,
     event_type,
-    repair_mode,
+    test_changes,
     correlation_id
   }
 }
@@ -314,7 +314,7 @@ export async function dispatchRepositoryReview({
     base_sha: resolved.base_sha ?? '(missing)',
     head_sha: resolved.head_sha ?? '(resolved-target-branch)',
     event_type: resolved.event_type,
-    repair_mode: resolved.repair_mode ?? '(default)'
+    test_changes: resolved.test_changes ?? '(default)'
   })
 
   return { run_id: submitted.run_id, replayed: false }
@@ -358,15 +358,15 @@ function normalizeRepositoryEventType(value: unknown): 'manual' | 'scheduled' {
   throw new Error(`Unsupported repository event_type: ${String(value)}`)
 }
 
-function normalizeRepairMode(value: unknown): RepairMode | null {
+function normalizeTestChanges(value: unknown): TestChangesPolicy | null {
   const raw = typeof value === 'string' ? value.trim() : ''
   if (raw === '') {
     return null
   }
-  if (raw === 'test-changes-allowed' || raw === 'no-test-changes') {
+  if (raw === 'allow' || raw === 'deny') {
     return raw
   }
-  throw new Error(`Unsupported repository repair_mode: ${String(value)}`)
+  throw new Error(`Unsupported repository test_changes: ${String(value)}`)
 }
 
 function normalizeOptionalSha(value: unknown, label: string): string | null {

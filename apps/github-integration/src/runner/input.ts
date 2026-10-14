@@ -20,12 +20,12 @@ export interface RepositoryScanScope {
   }>
 }
 
-export type RepairMode = 'test-changes-allowed' | 'no-test-changes'
+export type TestChangesPolicy = 'allow' | 'deny'
 export type ReviewObjective = 'audit' | 'repair'
 
 export interface ReviewIntent {
   objective: ReviewObjective
-  repair_mode?: RepairMode
+  test_changes?: TestChangesPolicy
 }
 
 export const INPUT_BUNDLE_MEDIA_TYPE = 'application/tar+zstd' as const

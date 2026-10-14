@@ -1,4 +1,4 @@
-import type { RepairMode } from '../runner/input.js'
+import type { TestChangesPolicy } from '../runner/input.js'
 import { getGitHubAppMetadata } from './github-app-metadata-service.js'
 
 function escapeRegExp(value: string): string {
@@ -30,50 +30,42 @@ function stripMarkdownQuotedLines(body: string): string {
     .join('\n')
 }
 
-/** The values `--repair-mode` accepts, taken from the runner input contract. */
-const REPAIR_MODES = [
-  'test-changes-allowed',
-  'no-test-changes'
-] as const satisfies readonly RepairMode[]
+/** The default when no `--test-changes` flag is present, taken from the runner input contract. */
+const DEFAULT_TEST_CHANGES: TestChangesPolicy = 'allow'
 
-/** Parse `--name` flags and `--k=v` options after the command. Unknown options fail the whole
- * command, so a typo is not silently ignored. Options are order-independent. */
+/** Parse flags after the command: `--test-changes <allow|deny>` takes a value, `--open-pr` is a
+ * bare flag. Unknown flags or a missing/invalid `--test-changes` value fail the whole command, so
+ * a typo is not silently ignored. Flags are order-independent. */
 function parseOptions(tokens: string[]): {
-  repair_mode: RepairMode | null
+  test_changes: TestChangesPolicy
   open_pr: boolean
 } | null {
-  let repair_mode: RepairMode | null = null
+  let test_changes: TestChangesPolicy = DEFAULT_TEST_CHANGES
   let open_pr = false
-  for (const token of tokens) {
-    const match = /^--([a-z-]+)(?:=(.*))?$/.exec(token)
-    if (match === null) {
-      return null
-    }
-    // The capture groups always exist because the regex matched.
-    const name = match[1]!
-    const value = match[2]
-    if (name === 'repair-mode') {
-      if (value === undefined || !(REPAIR_MODES as readonly string[]).includes(value)) {
-        return null
-      }
-      repair_mode = value as RepairMode
-    } else if (name === 'open-pr') {
-      // A bare boolean flag: its presence opts in, a value is not accepted.
-      if (value !== undefined) {
-        return null
-      }
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]!
+    if (token === '--open-pr') {
       open_pr = true
-    } else {
-      return null
+      continue
     }
+    if (token === '--test-changes') {
+      const value = tokens[index + 1]
+      if (value !== 'allow' && value !== 'deny') {
+        return null
+      }
+      test_changes = value
+      index += 1
+      continue
+    }
+    return null
   }
-  return { repair_mode, open_pr }
+  return { test_changes, open_pr }
 }
 
 export function extractCommentCommand(body: unknown): {
   command: 'review'
   mention: string
-  repair_mode: RepairMode | null
+  test_changes: TestChangesPolicy
   open_pr: boolean
 } | null {
   if (typeof body !== 'string' || body.trim() === '') {
@@ -103,8 +95,8 @@ export function extractCommentCommand(body: unknown): {
       continue
     }
 
-    // A trigger comment is `@<bot> review`, optionally followed by `--repair-mode=<value>`
-    // and/or the bare `--open-pr` flag. The review objective is not part of the command: the
+    // A trigger comment is `@<bot> review`, optionally followed by
+    // `--test-changes <allow|deny>` and/or the bare `--open-pr` flag. The review objective is not part of the command: the
     // GitHub integration always reviews in `audit` mode, because the input is an unverified
     // claim. (`repair` — proceeding as though the report were already confirmed — is reserved
     // for callers that supply a trusted input, such as the PatchEval harness; it is not
@@ -117,7 +109,7 @@ export function extractCommentCommand(body: unknown): {
     return {
       command: 'review',
       mention: candidate,
-      repair_mode: options.repair_mode,
+      test_changes: options.test_changes,
       open_pr: options.open_pr
     }
   }

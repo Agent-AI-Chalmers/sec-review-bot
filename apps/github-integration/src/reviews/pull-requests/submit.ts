@@ -6,7 +6,7 @@ import {
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { preparePullRequestReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
-import type { PullRequestReviewInput, RepairMode } from '../../runner/input.js'
+import type { PullRequestReviewInput, TestChangesPolicy } from '../../runner/input.js'
 
 export interface SubmittedPullRequestReviewRun {
   pr: PullRequestContext
@@ -87,13 +87,13 @@ async function materializePullRequestReviewInput({
   octokit,
   pr,
   event_type,
-  repair_mode = null
+  test_changes = null
 }: {
   run_id: string
   octokit: unknown
   pr: PullRequestContext
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
-  repair_mode?: RepairMode | null
+  test_changes?: TestChangesPolicy | null
 }): Promise<{ run_id: string; input: PullRequestReviewInput; files: unknown[] }> {
   logInfo('pull_request_review_workflow_started', {
     event_type,
@@ -135,7 +135,7 @@ async function materializePullRequestReviewInput({
     octokit: octokit as GitHubAppOctokit,
     pr,
     files,
-    repair_mode
+    test_changes
   })
   const analysisInput = prepared?.input ?? null
   const reviewFiles = prepared?.files ?? files
@@ -173,7 +173,7 @@ export async function startPullRequestReviewRun(args: {
   octokit: unknown
   pr: PullRequestContext
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
-  repair_mode?: RepairMode | null
+  test_changes?: TestChangesPolicy | null
   // The caller hands the prepared input to Control Plane for durable submission.
   on_prepared?: (
     submitted: SubmittedPullRequestReviewRun,
