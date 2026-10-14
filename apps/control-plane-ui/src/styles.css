@@ -1,41 +1,131 @@
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #202124;
-  background: #f7f8fa;
+  /* Mantine derives this from `mantineTheme` (see theme.ts), which is the single
+     source of truth for the font stack. The literal list is only the pre-hydration
+     fallback, kept in sync by the `--mantine-font-family` fallback itself. */
+  font-family: var(
+    --mantine-font-family,
+    Inter,
+    'Inter var',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif
+  );
+  color: #1c1917;
+  background: #fafaf9;
   color-scheme: light;
-  --surface: #fff;
-  --border: #dfe1e5;
-  --muted: #5f6368;
-  --link: #0759b8;
-  --text: #202124;
+  --surface-raised: #fff;
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+  --muted: #78716c;
+  /* Amber accent, reserved for interactive elements only. Status colours below are
+     deliberately independent: a running run must stay the same colour whatever the
+     accent is, or the accent starts carrying semantics it does not own. */
+  --brand: #c97f0d;
+  --brand-soft: #fff8ed;
+  --shadow-sm: 0 1px 2px rgb(28 25 23 / 5%), 0 1px 3px rgb(28 25 23 / 4%);
+  /* Status hues, fixed. */
+  --status-active: #2563eb;
+  --status-complete: #15803d;
+  --status-failed: #dc2626;
 }
+
 [data-theme='dark'] {
-  color: #e8eaed;
-  background: #202124;
+  color: #e7e5e4;
+  background: #1c1917;
   color-scheme: dark;
-  --surface: #292a2d;
-  --border: #4a4d52;
-  --muted: #bdc1c6;
-  --link: #8ab4f8;
-  --text: #e8eaed;
+  --surface-raised: #262220;
+  --border: #3a3532;
+  --border-strong: #4a4441;
+  --muted: #a8a29e;
+  --brand: #f0b429;
+  --brand-soft: #2e2519;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+  --status-active: #60a5fa;
+  --status-complete: #4ade80;
+  --status-failed: #f87171;
 }
+
 body {
   margin: 0;
+  background: #fafaf9;
+  -webkit-font-smoothing: antialiased;
 }
+
+[data-theme='dark'] body {
+  background: #1c1917;
+}
+
+/* ---------------------------------------------------------------- app shell */
+
+.mantine-AppShell-header {
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: saturate(180%) blur(8px);
+}
+
+/* A thin brand-coloured rule under the header: the only decorative chrome, and it
+   gives the otherwise grey console a single deliberate accent. */
+.mantine-AppShell-header::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -1px 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brand) 0%, #f0b429 45%, #e8792b 70%, transparent 100%);
+  opacity: 0.85;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand::before {
+  content: '';
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--brand), #f0b429 55%, #e8792b);
+  box-shadow: 0 2px 6px rgb(201 127 13 / 35%);
+}
+
+.mantine-AppShell-main {
+  background:
+    radial-gradient(1100px 380px at 12% -8%, var(--brand-soft), transparent 62%),
+    radial-gradient(900px 320px at 88% -12%, rgb(232 121 43 / 7%), transparent 60%);
+  min-height: calc(100vh - 58px);
+}
+
+/* -------------------------------------------------------------------- status */
+
 .status-text {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  white-space: nowrap;
 }
+
 .status-dot {
   flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
 }
+
 .status-dot-waiting {
-  background: var(--mantine-color-gray-5);
+  background: var(--border-strong);
 }
+
 @keyframes status-pulse {
   0%,
   100% {
@@ -45,19 +135,26 @@ body {
     opacity: 0.3;
   }
 }
+
+/* Status is carried by the dot alone. The label keeps its natural width, so a row's
+   text stays flush with its neighbours instead of shifting with the word length. */
 .status-dot-active {
-  background: var(--mantine-color-blue-6);
+  background: var(--status-active);
   animation: status-pulse 1.4s ease-in-out infinite;
 }
+
 .status-dot-complete {
-  background: var(--mantine-color-green-6);
+  background: var(--status-complete);
 }
+
 .status-dot-failed {
-  background: var(--mantine-color-red-6);
+  background: var(--status-failed);
 }
+
 .status-dot-neutral {
-  background: var(--mantine-color-gray-4);
+  background: var(--border-strong);
 }
+
 /* Must stay after the .status-dot-* rules above: same specificity, so the
    later declaration wins. */
 @media (prefers-reduced-motion: reduce) {
@@ -65,50 +162,110 @@ body {
     animation: none;
   }
 }
-.brand {
-  color: inherit;
-  font-size: 15px;
-  font-weight: 650;
-  text-decoration: none;
-  white-space: nowrap;
-}
+
+/* ----------------------------------------------------------------- run list */
+
 .run-id {
   overflow-wrap: anywhere;
 }
+
 .run-heading {
   margin-bottom: 32px;
+  padding: 22px 24px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--mantine-radius-lg);
+  box-shadow: var(--shadow-sm);
 }
+
+.workflow-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+[data-theme='dark'] .workflow-chip {
+  color: var(--mantine-color-brand-3);
+  background: rgb(201 127 13 / 16%);
+}
+
 .run-state-summary {
   overflow-wrap: anywhere;
 }
+
 .run-state-summary .status-text {
   font-size: var(--mantine-font-size-sm);
 }
+
+.operations-bar {
+  padding: 16px 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--mantine-radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.refresh-controls .mantine-NativeSelect-root {
+  width: 72px;
+}
+
+a {
+  color: var(--brand);
+}
+
+/* Run ids are the list's primary identity; make them read as data, not prose. */
+.table-wrap table td:first-child a {
+  text-decoration: none;
+}
+
+.table-wrap table td:first-child a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table-wrap table {
+  min-width: 680px;
+}
+
+.table-wrap .mantine-Table-thead th {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table-wrap .mantine-Table-tr:hover td {
+  background: var(--brand-soft);
+}
+
+/* ------------------------------------------------------------- run detail */
+
 /* Neutral rail cue. Mantine paints the rail from the Timeline.Item `::before`
    pseudo-element and couples it to the bullet colour, so this override is the
    only way to decouple them. If Mantine changes that element, the rail silently
    reverts to the status colour. */
 .run-progress-timeline .mantine-Timeline-item::before {
-  border-left-color: var(--mantine-color-gray-4);
+  border-left-color: var(--border-strong);
   border-left-style: dashed;
 }
-.table-wrap {
-  overflow-x: auto;
+
+.run-progress-timeline .mantine-Timeline-itemBullet {
+  box-shadow: 0 0 0 3px var(--surface-raised);
 }
-.table-wrap table {
-  min-width: 680px;
-}
-.operations-bar {
-  padding: 14px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.refresh-controls .mantine-NativeSelect-root {
-  width: 72px;
-}
-a {
-  color: var(--link);
-}
+
 .artifact-section {
   display: grid;
   gap: 6px;
@@ -116,12 +273,15 @@ a {
      publication summary and its rows. */
   padding-top: 10px;
 }
+
 .artifact-panel {
   overflow: hidden;
 }
+
 .artifact-state {
   padding: 8px 0;
 }
+
 /* The artifact reads as one row: its facts together, the download trailing. */
 .artifact-row {
   display: grid;
@@ -129,6 +289,7 @@ a {
   align-items: center;
   gap: 4px 16px;
 }
+
 .artifact-facts {
   display: flex;
   align-items: center;
@@ -136,18 +297,21 @@ a {
   gap: 6px 12px;
   min-width: 0;
 }
+
 .artifact-digest-row {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
+
 .artifact-digest-row code {
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   overflow-wrap: anywhere;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: var(--mantine-font-family-monospace, ui-monospace, SFMono-Regular, monospace);
 }
+
 .artifact-digest-toggle {
   display: inline-flex;
   align-items: center;
@@ -160,18 +324,22 @@ a {
   color: var(--muted);
   cursor: pointer;
 }
+
 .artifact-digest-toggle:hover code {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
 .delivery-list {
   margin-top: 10px;
   overflow: hidden;
 }
+
 .publication-summary {
   display: grid;
   gap: 4px;
 }
+
 .delivery-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -179,16 +347,19 @@ a {
   gap: 8px 16px;
   padding: 4px 0 10px;
 }
+
 .delivery-item + .delivery-item {
   border-top: 1px solid var(--border);
   padding-top: 10px;
 }
+
 .delivery-main {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
+
 .delivery-link,
 .artifact-download {
   display: inline-flex;
@@ -196,15 +367,18 @@ a {
   gap: 6px;
   justify-self: end;
 }
+
 .delivery-error {
   grid-column: 1 / -1;
 }
+
 .delivery-step-key {
   min-width: 0;
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   overflow-wrap: anywhere;
 }
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -216,31 +390,39 @@ a {
   white-space: nowrap;
   border: 0;
 }
+
 .mantine-Paper-root form {
   display: grid;
   gap: 16px;
 }
+
 @media (max-width: 600px) {
   .brand {
     font-size: 13px;
   }
+
   .operations-bar > .mantine-Group-root {
     align-items: stretch;
     flex-direction: column;
   }
+
   .operations-bar [aria-label='Run list controls'] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
+
   .operations-bar [aria-label='Run list controls'] > * {
     min-width: 0;
   }
+
   .refresh-controls {
     align-items: flex-end;
   }
+
   .delivery-item {
     grid-template-columns: minmax(0, 1fr);
   }
+
   .delivery-main {
     align-items: flex-start;
     flex-direction: column;
@@ -252,6 +434,7 @@ a {
   flex: 0 1 320px;
   min-width: 0;
 }
+
 .open-run .mantine-TextInput-root {
   flex: 1;
   min-width: 0;
@@ -263,10 +446,12 @@ tbody tr .row-action {
   opacity: 0;
   transition: opacity 120ms ease;
 }
+
 tbody tr:hover .row-action,
 tbody tr:focus-within .row-action {
   opacity: 1;
 }
+
 /* A touch device never hovers, so the action has to stay visible there or it is lost. */
 @media (hover: none) {
   tbody tr .row-action {

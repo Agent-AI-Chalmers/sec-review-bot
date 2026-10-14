@@ -3,6 +3,7 @@ import { ActionIcon, Group, MantineProvider, Menu, Tooltip } from '@mantine/core
 import { IconLanguage, IconLogout, IconMoon, IconSun } from '@tabler/icons-react'
 import { logout } from './api.js'
 import { useLanguage, useMessages } from './i18n.js'
+import { mantineTheme } from './theme.js'
 
 export type Theme = 'light' | 'dark'
 export type RefreshInterval = 5000 | 15000 | 30000 | 60000
@@ -63,7 +64,9 @@ export function Preferences({ children }: { children: React.ReactNode }): React.
         setRefreshInterval
       }}
     >
-      <MantineProvider forceColorScheme={theme}>{children}</MantineProvider>
+      <MantineProvider theme={mantineTheme} forceColorScheme={theme}>
+        {children}
+      </MantineProvider>
     </PreferencesContext.Provider>
   )
 }
