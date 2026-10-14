@@ -92,6 +92,39 @@ def test_v5_invalid_contract_fixtures_are_rejected_by_json_schemas() -> None:
         assert errors != [], f"{fixture_name} unexpectedly matched {schema_name}"
 
 
+@pytest.mark.parametrize("value", ["allow", "deny"])
+def test_v5_issue_input_schema_accepts_test_changes(value: str) -> None:
+    validator = contract_validator("v5", "issue-review-input.schema.json")
+    payload = contract_fixture("v5", "issue-review-input.json")
+    payload["review_intent"]["test_changes"] = value
+
+    errors = list(validator.iter_errors(payload))
+
+    assert errors == []
+
+
+def test_v5_issue_input_schema_rejects_test_changes_outside_enum() -> None:
+    validator = contract_validator("v5", "issue-review-input.schema.json")
+    payload = contract_fixture("v5", "issue-review-input.json")
+    payload["review_intent"]["test_changes"] = "no-test-changes"
+
+    errors = list(validator.iter_errors(payload))
+
+    assert errors != []
+
+
+def test_v5_issue_input_schema_rejects_renamed_repair_mode_field() -> None:
+    # reviewIntent sets additionalProperties: false, so the field the rename replaced
+    # must not validate under its old name.
+    validator = contract_validator("v5", "issue-review-input.schema.json")
+    payload = contract_fixture("v5", "issue-review-input.json")
+    payload["review_intent"]["repair_mode"] = "no-test-changes"
+
+    errors = list(validator.iter_errors(payload))
+
+    assert errors != []
+
+
 def test_v5_pull_request_input_schema_requires_audit_objective() -> None:
     validator = contract_validator("v5", "pull-request-review-input.schema.json")
     payload = contract_fixture("v5", "pull-request-review-input.json")
