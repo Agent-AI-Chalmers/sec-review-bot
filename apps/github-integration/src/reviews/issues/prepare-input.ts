@@ -139,7 +139,7 @@ export async function prepareIssueReviewInput({
     run_id
   })
   const input: IssueReviewInput = {
-    contract_version: 'v5',
+    contract_version: 'v6',
     review_intent: {
       objective: review_objective,
       ...(test_changes ? { test_changes } : {})

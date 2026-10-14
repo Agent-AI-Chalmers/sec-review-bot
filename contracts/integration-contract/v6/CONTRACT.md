@@ -1,4 +1,4 @@
-# Integration Contract v5
+# Integration Contract v6
 
 Language: English | [中文](CONTRACT.zh.md)
 
@@ -6,7 +6,7 @@ This document defines the workflow `input` submitted through the runner HTTP API
 
 Representative JSON fixtures live under [`fixtures`](fixtures). Python and TypeScript contract tests both read these fixtures.
 
-The v5 public result exposes final results for each workflow instead of internal stage execution details:
+The v6 public result exposes final results for each workflow instead of internal stage execution details:
 
 - issue review and pull request review return one `ReviewRecord`.
 - repository review returns a scan summary, case-level `ReviewRecord` projections, and repository-only delivery results.
@@ -17,7 +17,7 @@ This section defines the workflow `input` object inside the HTTP create-run requ
 
 Every workflow input includes:
 
-- `contract_version: "v5"`
+- `contract_version: "v6"`
 - `input_bundle`
 - `review_intent`
 
@@ -25,7 +25,7 @@ Every workflow input includes:
 
 `input_bundle` is an immutable artifact reference to a complete input bundle archive. The caller prepares and uploads the archive; the runner verifies it and materializes it into a local run-scoped directory before reading the manifest or executing a workflow.
 
-The v5 runner supports local `file:` and durable `s3:` URIs. Storage endpoint, region, and credentials are deployment configuration and never come from workflow input. Presigned HTTP URLs are not durable artifact references.
+The v6 runner supports local `file:` and durable `s3:` URIs. Storage endpoint, region, and credentials are deployment configuration and never come from workflow input. Presigned HTTP URLs are not durable artifact references.
 
 The caller owns the input bundle. The runner/stages own runtime state such as `artifact_paths`, stage artifact roots, writable stage workspaces, retry state, and delivery assignments.
 
@@ -85,7 +85,7 @@ Issue workflows use:
 
 ```ts
 interface IssueReviewInput {
-  contract_version: 'v5'
+  contract_version: 'v6'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   issue: Record<string, unknown>
@@ -96,7 +96,7 @@ Pull request workflows use:
 
 ```ts
 interface PullRequestReviewInput {
-  contract_version: 'v5'
+  contract_version: 'v6'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   pr: Record<string, unknown>
@@ -107,7 +107,7 @@ Repository workflows use:
 
 ```ts
 interface RepositoryReviewInput {
-  contract_version: 'v5'
+  contract_version: 'v6'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   scan_target: RepositoryScanTarget
@@ -238,7 +238,7 @@ Core result shape:
 
 ```ts
 interface IssueWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   review_record: ReviewRecord
 }
 ```
@@ -255,7 +255,7 @@ Core result shape:
 
 ```ts
 interface PullRequestWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   review_record: ReviewRecord
 }
 ```
@@ -276,7 +276,7 @@ Core result shape:
 
 ```ts
 interface RepositoryReviewWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   scan_summary: ScanSummary
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]
@@ -340,7 +340,7 @@ interface RepositoryDelivery {
 
 ### Validation Ownership
 
-JSON Schema owns the transport shape: required fields, JSON types, enums, tagged variants, and additional-field policy. Consumers must validate a complete v5 result before interpreting it; they must not coerce an invalid value into a valid one.
+JSON Schema owns the transport shape: required fields, JSON types, enums, tagged variants, and additional-field policy. Consumers must validate a complete v6 result before interpreting it; they must not coerce an invalid value into a valid one.
 
 Schema does not replace domain code. Cross-field workflow rules remain with the workflow that makes the decision, while consumers remain responsible for side-effect policy such as safe repository paths, GitHub permissions, publication eligibility, and retry behavior.
 

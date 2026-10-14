@@ -21,7 +21,7 @@ export interface RepositoryCaseResult {
 }
 
 export interface RepositoryWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   scan_summary: Record<string, unknown>
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]

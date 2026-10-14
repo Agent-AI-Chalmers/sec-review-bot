@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import WithJsonSchema
 
 from sec_review_agents.artifacts.input_storage import ARTIFACT_S3_BUCKET_ENV
-from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_input
+from sec_review_agents.entrypoints.contract_schema import validate_v6_workflow_input
 from sec_review_agents.entrypoints.input_preparation import INPUT_BUNDLE_ROOT_ENV
 from sec_review_agents.entrypoints.run_protocol import (
     RUN_ID_PATTERN,
@@ -52,7 +52,7 @@ _bearer_scheme = HTTPBearer(
     description="Bearer token configured through RUNNER_SERVICE_TOKEN.",
 )
 
-# Which workflows exist is owned by the v5 input schemas, one per workflow. The path
+# Which workflows exist is owned by the v6 input schemas, one per workflow. The path
 # parameter stays a string because an unknown workflow is a semantic failure with its own
 # error code, not a malformed request; this only publishes the set the runner accepts.
 _WorkflowPath = Annotated[
@@ -183,7 +183,7 @@ def create_app(*, runner_gateway: RunnerWorkflowGateway | None = None) -> FastAP
             )
 
         try:
-            validate_v5_workflow_input(request.input, workflow)
+            validate_v6_workflow_input(request.input, workflow)
         except ValueError as error:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,

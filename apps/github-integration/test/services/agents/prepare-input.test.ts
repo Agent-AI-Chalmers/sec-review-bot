@@ -246,7 +246,7 @@ test(
         octokit,
         issue
       })
-      assert.equal(prepared.input.contract_version, 'v5')
+      assert.equal(prepared.input.contract_version, 'v6')
       assert.deepEqual(prepared.input.review_intent, { objective: 'audit' })
       assert.equal(prepared.input.issue.repo_full_name, 'octo/demo')
       await assertRunnerInputArtifact({
@@ -259,7 +259,7 @@ test(
         await fs.readFile(path.join(prepared.input_bundle_root, 'manifest.json'), 'utf8')
       ) as Record<string, unknown>
       assert.deepEqual(manifest, {
-        contract_version: 'v5',
+        contract_version: 'v6',
         kind: 'runner-input-bundle',
         workspace: { snapshot: WORKSPACE_SNAPSHOT_TAR_NAME },
         history: { path: 'history' }

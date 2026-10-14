@@ -93,7 +93,7 @@ def write_input_bundle_manifest(
     include_incremental_window: bool,
 ) -> None:
     manifest: dict[str, Any] = {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "kind": "runner-input-bundle",
         "workspace": {
             "snapshot": "workspace.snapshot.tar",

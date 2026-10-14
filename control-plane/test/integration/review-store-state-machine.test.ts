@@ -341,7 +341,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
       runId,
       admission.preparation_token,
       {},
-      { contract_version: 'v5' }
+      { contract_version: 'v6' }
     )
     await store.failPreparation(runId, admission.preparation_token, {
       code: 'SUBMISSION_STATE_UNCERTAIN',

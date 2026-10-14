@@ -38,7 +38,7 @@ function issueReviewRunMarker(run_id: string): string {
 }
 
 export interface IssueReviewWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -52,9 +52,9 @@ type CompletedRunnerRun = {
 function issueReviewResultFromWorkflowResult(result: unknown): IssueReviewWorkflowResult | null {
   try {
     assertV5WorkflowResult('issue-review', result)
-    const rawResult = result as { contract_version: 'v5'; review_record: unknown }
+    const rawResult = result as { contract_version: 'v6'; review_record: unknown }
     return {
-      contract_version: 'v5',
+      contract_version: 'v6',
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

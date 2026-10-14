@@ -320,7 +320,7 @@ def build_local_pull_request_bundle(
 
     input_bundle = archive_input_bundle(manifest_paths, include_incremental_window=True)
     input_data = {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "review_intent": {
             "objective": "audit",
             "test_changes": test_changes,

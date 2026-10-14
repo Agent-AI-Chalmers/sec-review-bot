@@ -111,7 +111,7 @@ async function runPublish(open_pr: boolean) {
         open_pr
       }
     },
-    result: { contract_version: 'v5', review_record: issueReviewRecordWithPatch() },
+    result: { contract_version: 'v6', review_record: issueReviewRecordWithPatch() },
     store: harness.store as never,
     claim_token: 'claim',
     assert_publication_claim: async () => {},

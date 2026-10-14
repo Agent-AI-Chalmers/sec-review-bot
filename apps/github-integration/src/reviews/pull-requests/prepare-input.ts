@@ -344,7 +344,7 @@ export async function preparePullRequestReviewInput({
     run_id
   })
   const input: PullRequestReviewInput = {
-    contract_version: 'v5',
+    contract_version: 'v6',
     review_intent: {
       objective: 'audit',
       ...(test_changes ? { test_changes } : {})

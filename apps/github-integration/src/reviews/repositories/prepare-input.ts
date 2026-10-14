@@ -209,7 +209,7 @@ export async function prepareRepositoryReviewInput({
     run_id
   })
   const input: RepositoryReviewInput = {
-    contract_version: 'v5',
+    contract_version: 'v6',
     input_bundle,
     review_intent: {
       objective: 'audit',

@@ -1,17 +1,16 @@
 {
-  "contract_version": "v5",
+  "contract_version": "v6",
   "input_bundle": {
-    "uri": "file:///tmp/sec-review-fixtures/issue-review-repair-mode-field.tar.zst",
+    "uri": "file:///tmp/sec-review-fixtures/issue-review.tar.zst",
     "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
     "media_type": "application/tar+zstd",
     "size_bytes": 0
   },
   "review_intent": {
-    "objective": "repair",
-    "repair_mode": "no-test-changes"
+    "objective": "audit"
   },
   "issue": {
-    "number": 103,
+    "number": 101,
     "title": "Unsafe redirect in callback handler",
     "body": "Please review the callback redirect validation."
   }

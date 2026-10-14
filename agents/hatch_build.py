@@ -6,13 +6,13 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 def _contract_schemas_root(project_root: Path) -> Path:
     candidates = (
-        project_root.parent / "contracts" / "integration-contract" / "v5" / "schemas",
-        project_root / "contracts" / "integration-contract" / "v5" / "schemas",
+        project_root.parent / "contracts" / "integration-contract" / "v6" / "schemas",
+        project_root / "contracts" / "integration-contract" / "v6" / "schemas",
     )
     for candidate in candidates:
         if (candidate / "common.schema.json").is_file():
             return candidate
-    raise RuntimeError("Could not locate canonical contract v5 schemas for packaging.")
+    raise RuntimeError("Could not locate canonical contract v6 schemas for packaging.")
 
 
 class CustomBuildHook(BuildHookInterface):
@@ -23,7 +23,7 @@ class CustomBuildHook(BuildHookInterface):
         force_include = build_data.setdefault("force_include", {})
         if self.target_name == "sdist":
             force_include[str(schema_root)] = (
-                "contracts/integration-contract/v5/schemas"
+                "contracts/integration-contract/v6/schemas"
             )
         elif self.target_name == "wheel":
-            force_include[str(schema_root)] = "sec_review_agents/resources/contracts/v5"
+            force_include[str(schema_root)] = "sec_review_agents/resources/contracts/v6"

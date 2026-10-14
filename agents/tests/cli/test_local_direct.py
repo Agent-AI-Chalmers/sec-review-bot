@@ -54,7 +54,7 @@ def _prepared_issue_bundle(
         workflow="issue-review",
         run_id="run-1",
         input={
-            "contract_version": "v5",
+            "contract_version": "v6",
             "review_intent": review_intent
             or {
                 "objective": "repair",

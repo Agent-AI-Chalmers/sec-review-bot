@@ -171,7 +171,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           workflow: 'repository-review',
           event_type: 'manual'
         }
-        args.on_prepared?.(submitted, { contract_version: 'v5' } as never)
+        args.on_prepared?.(submitted, { contract_version: 'v6' } as never)
         return submitted
       },
       store: {
@@ -222,7 +222,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
   })
   assert.deepEqual(saved_runs[1], {
     run_id: 'run-1',
-    input: { contract_version: 'v5' },
+    input: { contract_version: 'v6' },
     context: {
       repo: {
         owner_login: 'octo',
@@ -479,7 +479,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
               workflow: 'repository-review',
               event_type: 'manual'
             },
-            { contract_version: 'v5' } as never
+            { contract_version: 'v6' } as never
           )
           throw error
         },

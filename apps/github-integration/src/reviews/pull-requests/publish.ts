@@ -59,7 +59,7 @@ interface SuggestionManifestLike {
 }
 
 export interface PullRequestReviewWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -75,9 +75,9 @@ function pullRequestReviewResultFromWorkflowResult(
 ): PullRequestReviewWorkflowResult | null {
   try {
     assertV5WorkflowResult('pull-request-review', result)
-    const rawResult = result as { contract_version: 'v5'; review_record: unknown }
+    const rawResult = result as { contract_version: 'v6'; review_record: unknown }
     return {
-      contract_version: 'v5',
+      contract_version: 'v6',
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

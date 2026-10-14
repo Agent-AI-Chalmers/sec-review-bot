@@ -1,5 +1,5 @@
 {
-  "contract_version": "v5",
+  "contract_version": "v6",
   "input_bundle": {
     "uri": "file:///tmp/sec-review-fixtures/repository-review-full.tar.zst",
     "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
@@ -20,7 +20,7 @@
   },
   "scan_scope": {
     "paths_ignore": [
-      "   "
+      ""
     ],
     "incremental_changed_files": []
   }

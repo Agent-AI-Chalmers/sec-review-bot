@@ -102,7 +102,7 @@ test('repository preparation can replace the admitted empty publish context', as
       },
       event_type: 'manual'
     },
-    { contract_version: 'v5' }
+    { contract_version: 'v6' }
   )
 })
 

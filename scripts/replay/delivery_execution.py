@@ -60,7 +60,7 @@ def _repository_result_from_delivery_replay(
     case_results: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "scan_summary": _previous_scan_summary(previous_result),
         "deliveries": [
             item

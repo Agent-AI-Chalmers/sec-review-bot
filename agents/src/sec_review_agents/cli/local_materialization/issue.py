@@ -120,7 +120,7 @@ def build_local_issue_bundle(
     )
     input_bundle = archive_input_bundle(paths, include_incremental_window=False)
     input_data = {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "review_intent": {
             "objective": review_objective,
             "test_changes": test_changes,

@@ -287,7 +287,7 @@ def build_local_repository_security_bundle(
         include_incremental_window=resolved_scan_mode == "incremental",
     )
     input_data = {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "input_bundle": input_bundle,
         "review_intent": {
             "objective": "audit",

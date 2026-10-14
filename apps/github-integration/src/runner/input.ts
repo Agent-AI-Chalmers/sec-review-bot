@@ -38,7 +38,7 @@ export interface InputBundleArtifactRef {
 }
 
 interface RunnerWorkflowInputBase {
-  contract_version: 'v5'
+  contract_version: 'v6'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
 }

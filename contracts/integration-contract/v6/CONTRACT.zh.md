@@ -1,4 +1,4 @@
-# 集成契约 v5
+# 集成契约 v6
 
 语言：[English](CONTRACT.md) | 中文
 
@@ -8,7 +8,7 @@
 
 本文定义通过 runner HTTP API 提交任务时使用的 workflow `input`，以及任务完成后返回的 `result`。HTTP API 见 [runner 的 OpenAPI 文档](../openapi.json)。
 
-v5 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的运行细节：
+v6 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的运行细节：
 
 - issue review 和 pull request review 返回单个 `ReviewRecord`。
 - repository review 返回 scan 摘要、case-level `ReviewRecord` 投影，以及 repository-only delivery 结果。
@@ -19,7 +19,7 @@ v5 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的
 
 所有 workflow input 都包含：
 
-- `contract_version: "v5"`
+- `contract_version: "v6"`
 - `input_bundle`
 - `review_intent`
 
@@ -27,7 +27,7 @@ v5 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的
 
 `input_bundle` 是指向完整 input bundle archive 的不可变 artifact reference。调用方准备并上传 archive；runner 校验后，将其 materialize 到 run-scoped 本地目录，再读取 manifest 或执行 workflow。
 
-v5 Runner 支持本地 `file:` 和持久的 `s3:` URI。Storage endpoint、region 和 credentials 属于部署配置，绝不能来自 workflow input。带有效期的 HTTP presigned URL 不是持久 artifact reference。
+v6 Runner 支持本地 `file:` 和持久的 `s3:` URI。Storage endpoint、region 和 credentials 属于部署配置，绝不能来自 workflow input。带有效期的 HTTP presigned URL 不是持久 artifact reference。
 
 调用方负责 input bundle；runner / stage 负责 `artifact_paths`、stage artifact roots、writable stage workspaces、retry state 和 delivery assignments 等运行态信息。
 
@@ -87,7 +87,7 @@ Issue workflow 使用：
 
 ```ts
 interface IssueReviewInput {
-  contract_version: 'v5'
+  contract_version: 'v6'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   issue: Record<string, unknown>
@@ -98,7 +98,7 @@ Pull request workflow 使用：
 
 ```ts
 interface PullRequestReviewInput {
-  contract_version: 'v5'
+  contract_version: 'v6'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   pr: Record<string, unknown>
@@ -109,7 +109,7 @@ Repository workflow 使用：
 
 ```ts
 interface RepositoryReviewInput {
-  contract_version: 'v5'
+  contract_version: 'v6'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   scan_target: RepositoryScanTarget
@@ -240,7 +240,7 @@ Workflow：`issue-review`
 
 ```ts
 interface IssueWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   review_record: ReviewRecord
 }
 ```
@@ -257,7 +257,7 @@ Workflow：`pull-request-review`
 
 ```ts
 interface PullRequestWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   review_record: ReviewRecord
 }
 ```
@@ -278,7 +278,7 @@ Repository review 由 `scan -> case review -> delivery` 组成：
 
 ```ts
 interface RepositoryReviewWorkflowResult {
-  contract_version: 'v5'
+  contract_version: 'v6'
   scan_summary: ScanSummary
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]
@@ -342,7 +342,7 @@ interface RepositoryDelivery {
 
 ### 校验责任
 
-JSON Schema 负责传输结构，包括必填字段、JSON type、enum、tagged variant 和额外字段策略。消费方必须先校验完整的 v5 result，再解释其内容；不能通过宽松类型转换（coercion）把非法值变成合法值。
+JSON Schema 负责传输结构，包括必填字段、JSON type、enum、tagged variant 和额外字段策略。消费方必须先校验完整的 v6 result，再解释其内容；不能通过宽松类型转换（coercion）把非法值变成合法值。
 
 Schema 不代替领域代码。跨字段 workflow 规则仍由作出决策的 workflow 负责；消费方继续负责副作用策略，例如安全的 repository path、GitHub 权限、发布条件和重试行为。
 

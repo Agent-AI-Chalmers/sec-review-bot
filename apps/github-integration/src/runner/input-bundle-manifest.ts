@@ -13,7 +13,7 @@ export async function writeInputBundleManifest({
   include_incremental_window: boolean
 }): Promise<void> {
   const manifest: Record<string, unknown> = {
-    contract_version: 'v5',
+    contract_version: 'v6',
     kind: 'runner-input-bundle',
     workspace: {
       snapshot: WORKSPACE_SNAPSHOT_TAR_NAME

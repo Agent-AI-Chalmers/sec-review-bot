@@ -12,9 +12,9 @@ Use these documents:
 
 - [openapi.json](openapi.json): how callers create and poll workflow runs — paths, status
   codes, request and response shapes, and the security scheme.
-- [v5/CONTRACT.md](v5/CONTRACT.md): workflow input and result shapes.
-- [v5/schemas](v5/schemas): JSON Schemas for machine validation.
-- [v5/fixtures](v5/fixtures): executable JSON examples shared by Python and TypeScript
+- [v6/CONTRACT.md](v6/CONTRACT.md): workflow input and result shapes.
+- [v6/schemas](v6/schemas): JSON Schemas for machine validation.
+- [v6/fixtures](v6/fixtures): executable JSON examples shared by Python and TypeScript
   tests.
 
 The HTTP API and the workflow contract are the stable public interface.
@@ -100,6 +100,6 @@ Runtime parsers may also enforce canonical forms that schemas intentionally leav
 
 ## Artifact Boundary
 
-Stage artifacts are runtime diagnostics unless a field is explicitly promoted into the public workflow result. Public results are `review_record`, repository `case_results[]`, repository `deliveries[]`, and the other fields documented in [v5/CONTRACT.md](v5/CONTRACT.md).
+Stage artifacts are runtime diagnostics unless a field is explicitly promoted into the public workflow result. Public results are `review_record`, repository `case_results[]`, repository `deliveries[]`, and the other fields documented in [v6/CONTRACT.md](v6/CONTRACT.md).
 
 Callers should publish from the workflow result, not by reading whole stage artifact packages. If a stage artifact becomes necessary for caller behavior, either promote the required field into this contract or keep the dependency private to a local debugging tool.

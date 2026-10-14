@@ -165,7 +165,7 @@ def build_patcheval_issue_bundle_from_case(
         },
     )
     input_data = {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "review_intent": {
             "objective": "repair",
             "test_changes": "deny",

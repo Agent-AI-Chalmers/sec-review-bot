@@ -54,7 +54,7 @@ def not_run_review_record() -> dict[str, Any]:
 
 def assert_public_workflow_result(result: Mapping[str, Any]) -> None:
     assert FORBIDDEN_INTERNAL_PUBLIC_RESULT_KEYS.intersection(result) == set()
-    assert result.get("contract_version") == "v5"
+    assert result.get("contract_version") == "v6"
 
 
 def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:
@@ -70,8 +70,8 @@ def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:
     assert FORBIDDEN_INTERNAL_MITIGATION_KEYS.intersection(mitigation) == set()
 
 
-def assert_matches_v5_schema(payload: Mapping[str, Any], schema_name: str) -> None:
-    validator = contract_validator("v5", schema_name)
+def assert_matches_v6_schema(payload: Mapping[str, Any], schema_name: str) -> None:
+    validator = contract_validator("v6", schema_name)
     errors = sorted(
         validator.iter_errors(payload),
         key=lambda error: list(error.path),
@@ -84,7 +84,7 @@ def assert_matches_v5_schema(payload: Mapping[str, Any], schema_name: str) -> No
 
 def test_pull_request_result_public_shape() -> None:
     result: dict[str, Any] = {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "review_record": build_review_record(
             analysis_result={
                 "verdict": "no-actionable-finding",
@@ -111,7 +111,7 @@ def test_pull_request_result_public_shape() -> None:
     assert_review_record_shape(result["review_record"])
 
 
-def test_review_record_builder_output_matches_shared_v5_schema() -> None:
+def test_review_record_builder_output_matches_shared_v6_schema() -> None:
     result = build_review_record(
         analysis_result={
             "verdict": "confirmed-vulnerability",
@@ -152,7 +152,7 @@ def test_review_record_builder_output_matches_shared_v5_schema() -> None:
         },
     )
 
-    assert_matches_v5_schema(result, "review-record.schema.json")
+    assert_matches_v6_schema(result, "review-record.schema.json")
 
 
 def test_repository_result_public_shape() -> None:
@@ -199,7 +199,7 @@ def test_repository_result_public_shape() -> None:
     assert_review_record_shape(result["case_results"][0]["review_record"])
 
 
-def test_repository_workflow_result_builder_output_matches_shared_v5_schema() -> None:
+def test_repository_workflow_result_builder_output_matches_shared_v6_schema() -> None:
     result = build_repository_workflow_result(
         discovery_result={
             "counts": {
@@ -275,7 +275,7 @@ def test_repository_workflow_result_builder_output_matches_shared_v5_schema() ->
         ],
     )
 
-    assert_matches_v5_schema(result, "repository-review-result.schema.json")
+    assert_matches_v6_schema(result, "repository-review-result.schema.json")
 
 
 def test_repository_case_results_drop_internal_case_fields() -> None:
@@ -413,7 +413,7 @@ def test_repository_case_result_defaults_missing_review_record_to_not_run() -> N
 
     review_record = result["case_results"][0]["review_record"]
     assert review_record == not_run_review_record()
-    assert_matches_v5_schema(result, "repository-review-result.schema.json")
+    assert_matches_v6_schema(result, "repository-review-result.schema.json")
 
 
 @pytest.mark.parametrize(
@@ -434,7 +434,7 @@ def test_repository_case_result_defaults_missing_review_record_to_not_run() -> N
 def test_repository_case_result_rejects_a_null_public_identity(
     case: dict[str, Any],
 ) -> None:
-    """The v5 schema requires a non-empty case_id and disposition.
+    """The v6 schema requires a non-empty case_id and disposition.
 
     Serializing `null` for either makes the integration parser reject the whole run, so
     the builder must fail instead of emitting an invalid public result.

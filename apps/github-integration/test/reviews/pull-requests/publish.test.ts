@@ -120,7 +120,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
       }
     },
     result: {
-      contract_version: 'v5',
+      contract_version: 'v6',
       review_record: review_record()
     },
     store: store as never,
@@ -192,7 +192,7 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
       }
     },
     result: {
-      contract_version: 'v5',
+      contract_version: 'v6',
       review_record: review_record({
         analysis: {
           verdict: 'plausible-risk',
@@ -259,7 +259,7 @@ test('pull request publish approves when analysis is not confirmed', async () =>
       }
     },
     result: {
-      contract_version: 'v5',
+      contract_version: 'v6',
       review_record: review_record({
         analysis: {
           verdict: 'no-actionable-finding',
@@ -328,7 +328,7 @@ test('pull request publish comments instead of approving a PR authored by the ap
         }
       },
       result: {
-        contract_version: 'v5',
+        contract_version: 'v6',
         review_record: review_record({
           analysis: {
             verdict: 'no-actionable-finding',
@@ -394,7 +394,7 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
       }
     },
     result: {
-      contract_version: 'v5',
+      contract_version: 'v6',
       review_record: review_record({
         analysis: {
           verdict: 'no-actionable-finding',
@@ -458,7 +458,7 @@ test('pull request publish falls back to comment when own PR approval error is i
       }
     },
     result: {
-      contract_version: 'v5',
+      contract_version: 'v6',
       review_record: review_record({
         analysis: {
           verdict: 'no-actionable-finding',
@@ -514,7 +514,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
       }
     },
     result: {
-      contract_version: 'v5',
+      contract_version: 'v6',
       review_record: review_record({
         mitigation: {
           overview: 'Remove the unsafe default.',
@@ -579,7 +579,7 @@ test('pull request publish does not create a fallback review after an uncertain 
         }
       },
       result: {
-        contract_version: 'v5',
+        contract_version: 'v6',
         review_record: review_record({
           mitigation: {
             overview: 'Remove the unsafe default.',

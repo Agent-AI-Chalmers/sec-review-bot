@@ -39,7 +39,11 @@ function fakePrepareInput() {
     })
     return {
       run_id: 'run-issue-1',
-      input: { contract_version: 'v5', review_intent: {}, issue: {} } as IssueReviewInput,
+      input: {
+        contract_version: 'v6',
+        review_intent: {},
+        issue: {}
+      } as IssueReviewInput,
       input_path: '/tmp/issue-review-input.json',
       input_bundle_root: '/tmp/bundle',
       workspace_ref: 'workspace-ref'

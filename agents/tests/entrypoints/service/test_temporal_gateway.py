@@ -109,7 +109,7 @@ class _CompletedInvalidResultHandle:
         return _CompletedDescription()
 
     async def result(self) -> dict:
-        return {"ok": True, "result": {"contract_version": "v5"}}
+        return {"ok": True, "result": {"contract_version": "v6"}}
 
 
 def _valid_workflow_result(workflow: str) -> dict:
@@ -121,7 +121,7 @@ def _valid_workflow_result(workflow: str) -> dict:
     )
     if workflow == "repository-review":
         return {
-            "contract_version": "v5",
+            "contract_version": "v6",
             "scan_summary": {
                 "scannable_file_count": 0,
                 "scanned_file_count": 0,
@@ -133,7 +133,7 @@ def _valid_workflow_result(workflow: str) -> dict:
             "case_results": [],
             "deliveries": [],
         }
-    return {"contract_version": "v5", "review_record": review_record}
+    return {"contract_version": "v6", "review_record": review_record}
 
 
 @activity.defn(name="prepare_runner_run_activity")
@@ -751,7 +751,7 @@ async def test_record_from_handle_rejects_invalid_public_workflow_result() -> No
             "category": "runtime",
             "code": "RUNNER_RESPONSE_INVALID",
             "message": (
-                "Runner result does not match contract v5: "
+                "Runner result does not match contract v6: "
                 "'review_record' is a required property"
             ),
             "retryable": False,
@@ -819,7 +819,7 @@ def test_prepare_runner_run_activity_maps_missing_manifest_to_input_error(
             workflow="issue-review",
             run_id="run-missing-manifest",
             input_data={
-                "contract_version": "v5",
+                "contract_version": "v6",
                 "input_bundle": write_test_input_bundle(
                     tmp_path / "missing-manifest", include_manifest=False
                 ),

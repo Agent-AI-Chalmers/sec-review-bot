@@ -11,7 +11,7 @@ def _issue_input() -> dict:
     local_root = Path("/tmp/local-runtime-config")
     local_root.mkdir(parents=True, exist_ok=True)
     return {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "review_intent": {"objective": "audit"},
         "issue": {"number": 1},
         "input_bundle": write_test_input_bundle(local_root),

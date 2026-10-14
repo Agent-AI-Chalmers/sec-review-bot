@@ -1,32 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sec-review-bot.local/contracts/integration-contract/v5/schemas/pull-request-review-input.schema.json",
-  "title": "Contract v5 pull-request-review input",
+  "$id": "https://sec-review-bot.local/contracts/integration-contract/v6/schemas/issue-review-input.schema.json",
+  "title": "Contract v6 issue-review input",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "contract_version",
     "input_bundle",
     "review_intent",
-    "pr"
-  ],
-  "allOf": [
-    {
-      "properties": {
-        "review_intent": {
-          "type": "object",
-          "properties": {
-            "objective": {
-              "const": "audit"
-            }
-          }
-        }
-      }
-    }
+    "issue"
   ],
   "properties": {
     "contract_version": {
-      "const": "v5"
+      "const": "v6"
     },
     "input_bundle": {
       "$ref": "common.schema.json#/$defs/inputBundleArtifactRef"
@@ -34,7 +20,7 @@
     "review_intent": {
       "$ref": "common.schema.json#/$defs/reviewIntent"
     },
-    "pr": {
+    "issue": {
       "type": "object"
     }
   }

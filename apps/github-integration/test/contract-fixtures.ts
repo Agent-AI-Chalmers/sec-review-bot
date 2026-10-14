@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 export function workspaceRoot(): string {
   let current = path.dirname(fileURLToPath(import.meta.url))
   while (true) {
-    if (existsSync(path.join(current, 'contracts', 'integration-contract', 'v5', 'fixtures'))) {
+    if (existsSync(path.join(current, 'contracts', 'integration-contract', 'v6', 'fixtures'))) {
       return current
     }
 

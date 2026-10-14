@@ -10,7 +10,7 @@ from referencing import Registry, Resource
 def _workspace_root() -> Path:
     for candidate in Path(__file__).resolve().parents:
         if (
-            candidate / "contracts" / "integration-contract" / "v5" / "fixtures"
+            candidate / "contracts" / "integration-contract" / "v6" / "fixtures"
         ).is_dir():
             return candidate
     raise RuntimeError("Could not locate workspace contract fixtures root.")

@@ -96,7 +96,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           event_type: 'opened' as const,
           open_pr: false
         }
-        await on_prepared?.(prepared, { contract_version: 'v5' } as never)
+        await on_prepared?.(prepared, { contract_version: 'v6' } as never)
         return prepared
       },
       store: {
@@ -169,7 +169,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
           workflow: 'pull-request-review',
           event_type: 'manual_review' as const
         }
-        await on_prepared?.(prepared, { contract_version: 'v5' } as never)
+        await on_prepared?.(prepared, { contract_version: 'v6' } as never)
         return prepared
       },
       store: {
@@ -291,7 +291,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               event_type: 'opened',
               open_pr: false
             },
-            { contract_version: 'v5' } as never
+            { contract_version: 'v6' } as never
           )
           throw error
         },
@@ -339,7 +339,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
               workflow: 'pull-request-review',
               event_type: 'opened'
             },
-            { contract_version: 'v5' } as never
+            { contract_version: 'v6' } as never
           )
           throw error
         },

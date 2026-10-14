@@ -24,9 +24,9 @@ RESULT_SCHEMA_BY_WORKFLOW = {
 }
 
 
-# The subtree under a contracts root that holds the canonical v5 schemas. An
+# The subtree under a contracts root that holds the canonical v6 schemas. An
 # operator points `SEC_REVIEW_CONTRACTS_ROOT` at the directory that contains it.
-_CONTRACT_SUBTREE = Path("integration-contract") / "v5" / "schemas"
+_CONTRACT_SUBTREE = Path("integration-contract") / "v6" / "schemas"
 _SCHEMAS_ROOT_ENV = "SEC_REVIEW_CONTRACTS_ROOT"
 
 
@@ -35,7 +35,7 @@ def _has_schemas(root: Path) -> bool:
 
 
 def _schema_root() -> Traversable:
-    """Locate the canonical v5 schemas.
+    """Locate the canonical v6 schemas.
 
     Resolution is explicit and ordered, not a search:
 
@@ -61,7 +61,7 @@ def _schema_root() -> Traversable:
             )
         return root / _CONTRACT_SUBTREE
 
-    packaged = files("sec_review_agents.resources").joinpath("contracts", "v5")
+    packaged = files("sec_review_agents.resources").joinpath("contracts", "v6")
     if packaged.joinpath("common.schema.json").is_file():
         return packaged
 
@@ -71,7 +71,7 @@ def _schema_root() -> Traversable:
             return candidate / _CONTRACT_SUBTREE
 
     raise RuntimeError(
-        "Could not locate contract v5 schemas for Runner validation. Set "
+        "Could not locate contract v6 schemas for Runner validation. Set "
         f"{_SCHEMAS_ROOT_ENV} to the directory containing {_CONTRACT_SUBTREE}."
     )
 
@@ -115,12 +115,12 @@ def _validate_workflow_contract(
     location = ".".join(str(part) for part in error.absolute_path)
     label = f" at {location}" if location else ""
     raise ValueError(
-        f"Runner {value_label} does not match contract v5{label}: {error.message}"
+        f"Runner {value_label} does not match contract v6{label}: {error.message}"
     )
 
 
-def validate_v5_workflow_input(input_data: Any, workflow: str) -> None:
-    """Reject caller input that does not match the workflow's public v5 shape."""
+def validate_v6_workflow_input(input_data: Any, workflow: str) -> None:
+    """Reject caller input that does not match the workflow's public v6 shape."""
     _validate_workflow_contract(
         input_data,
         workflow,
@@ -129,8 +129,8 @@ def validate_v5_workflow_input(input_data: Any, workflow: str) -> None:
     )
 
 
-def validate_v5_workflow_result(result: Any, workflow: str) -> None:
-    """Reject a workflow result that does not match the public v5 shape."""
+def validate_v6_workflow_result(result: Any, workflow: str) -> None:
+    """Reject a workflow result that does not match the public v6 shape."""
     _validate_workflow_contract(
         result,
         workflow,
@@ -142,6 +142,6 @@ def validate_v5_workflow_result(result: Any, workflow: str) -> None:
 __all__ = [
     "INPUT_SCHEMA_BY_WORKFLOW",
     "RESULT_SCHEMA_BY_WORKFLOW",
-    "validate_v5_workflow_input",
-    "validate_v5_workflow_result",
+    "validate_v6_workflow_input",
+    "validate_v6_workflow_result",
 ]

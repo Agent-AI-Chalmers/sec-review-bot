@@ -1,5 +1,5 @@
 {
-  "contract_version": "v5",
+  "contract_version": "v6",
   "review_record": {
     "analysis": {
       "verdict": "confirmed-defect",

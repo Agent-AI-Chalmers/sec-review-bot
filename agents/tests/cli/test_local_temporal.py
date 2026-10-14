@@ -36,7 +36,7 @@ def _prepared_issue_bundle(tmp_path: Path) -> ReviewBundle:
         workflow="issue-review",
         run_id="run-1",
         input={
-            "contract_version": "v5",
+            "contract_version": "v6",
             "review_intent": {
                 "objective": "repair",
                 "test_changes": "allow",

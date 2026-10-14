@@ -1,5 +1,5 @@
 {
-  "contract_version": "v5",
+  "contract_version": "v6",
   "input_bundle": {
     "uri": "file:///tmp/sec-review-fixtures/repository-review-incremental.tar.zst",
     "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
@@ -25,7 +25,9 @@
     "incremental_changed_files": [
       {
         "path": "src/webhook.ts",
-        "status": "modified"
+        "status": "modified",
+        "previous_path": null,
+        "additions": 4
       }
     ]
   }

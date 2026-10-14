@@ -13,7 +13,7 @@ from sec_review_agents.artifacts.input_storage import (
     ARTIFACT_S3_BUCKET_ENV,
     download_s3_input_bundle,
 )
-from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_input
+from sec_review_agents.entrypoints.contract_schema import validate_v6_workflow_input
 from sec_review_agents.entrypoints.run_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
 
@@ -83,7 +83,7 @@ def prepare_workflow_input(
 
     # Validate before adding runner-owned fields, which are not part of the public
     # workflow input contract.
-    validate_v5_workflow_input(input_data, workflow)
+    validate_v6_workflow_input(input_data, workflow)
     prepared = deepcopy(input_data)
 
     # Resolve the caller's bundle URI at the trusted filesystem boundary.
@@ -303,8 +303,8 @@ def _set_bundle_paths_from_manifest(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError("Input bundle manifest must be an object.")
-    if manifest.get("contract_version") != "v5":
-        raise ValueError("Input bundle manifest contract_version must be 'v5'.")
+    if manifest.get("contract_version") != "v6":
+        raise ValueError(f"Input bundle manifest contract_version must be 'v6'.")
     if manifest.get("kind") != "runner-input-bundle":
         raise ValueError("Input bundle manifest kind must be 'runner-input-bundle'.")
 

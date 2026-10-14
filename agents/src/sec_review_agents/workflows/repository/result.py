@@ -49,7 +49,7 @@ class ScanSummary(BaseModel):
 
 
 class RepositoryWorkflowResult(BaseModel):
-    contract_version: str = "v5"
+    contract_version: str = "v6"
     scan_summary: ScanSummary
     deliveries: list[dict[str, Any]] = Field(default_factory=list)
     case_results: list[RepositoryCaseResult] = Field(default_factory=list)
@@ -143,7 +143,7 @@ def build_repository_workflow_result(
     )
     return RepositoryWorkflowResult.model_validate(
         {
-            "contract_version": "v5",
+            "contract_version": "v6",
             "scan_summary": repository_scan_summary,
             "deliveries": _repository_deliveries(delivery_result),
             "case_results": repository_case_results,

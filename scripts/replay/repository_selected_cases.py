@@ -268,7 +268,7 @@ def _repository_result_from_replay(
 ) -> dict[str, Any]:
     scan_summary = result.get("scan_summary")
     return {
-        "contract_version": "v5",
+        "contract_version": "v6",
         "scan_summary": (
             scan_summary
             if isinstance(scan_summary, dict)

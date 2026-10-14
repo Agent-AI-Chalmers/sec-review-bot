@@ -22,7 +22,7 @@ A family may also hold documents that apply to every version, such as a transpor
 ## Families
 
 - [integration-contract](integration-contract/README.md): the public integration point
-  between the Runner and its callers. Current version: [v5](integration-contract/v5/CONTRACT.md).
+  between the Runner and its callers. Current version: [v6](integration-contract/v6/CONTRACT.md).
 - [control-plane-api](control-plane-api/README.md): the shapes Control Plane exchanges
   with its callers. Current version:
   [v1](control-plane-api/README.md).

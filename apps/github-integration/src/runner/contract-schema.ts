@@ -17,16 +17,16 @@ function contractSchemasRoot(): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
   const candidates = [
     ...(configuredRoot
-      ? [path.resolve(configuredRoot, 'integration-contract', 'v5', 'schemas')]
+      ? [path.resolve(configuredRoot, 'integration-contract', 'v6', 'schemas')]
       : []),
-    path.resolve(process.cwd(), 'contracts', 'integration-contract', 'v5', 'schemas'),
-    path.resolve(process.cwd(), '..', '..', 'contracts', 'integration-contract', 'v5', 'schemas')
+    path.resolve(process.cwd(), 'contracts', 'integration-contract', 'v6', 'schemas'),
+    path.resolve(process.cwd(), '..', '..', 'contracts', 'integration-contract', 'v6', 'schemas')
   ]
   const root = candidates.find((candidate) =>
     existsSync(path.join(candidate, 'common.schema.json'))
   )
   if (root === undefined) {
-    throw new Error('Could not locate contract v5 schemas for Runner validation.')
+    throw new Error('Could not locate contract v6 schemas for Runner validation.')
   }
   return root
 }
@@ -64,7 +64,7 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
     const details = validate.errors
       ?.map((error) => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
       .join('; ')
-    throw new Error(`${label} does not match contract v5${details ? `: ${details}` : '.'}`)
+    throw new Error(`${label} does not match contract v6${details ? `: ${details}` : '.'}`)
   }
 }
 
