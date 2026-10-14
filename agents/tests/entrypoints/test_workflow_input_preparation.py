@@ -439,33 +439,33 @@ def test_pull_request_workflow_input_preparation_derives_stage_artifacts() -> No
     ("payload", "workflow", "manifest_incremental"),
     [
         (
-            _issue_input("/tmp/local-issue-repair-mode")
+            _issue_input("/tmp/local-issue-test-changes")
             | {
                 "review_intent": {
                     "objective": "repair",
-                    "repair_mode": "no-test-changes",
+                    "test_changes": "deny",
                 }
             },
             "issue-review",
             False,
         ),
         (
-            _pull_request_input("/tmp/local-pr-repair-mode")
+            _pull_request_input("/tmp/local-pr-test-changes")
             | {
                 "review_intent": {
                     "objective": "audit",
-                    "repair_mode": "no-test-changes",
+                    "test_changes": "deny",
                 }
             },
             "pull-request-review",
             True,
         ),
         (
-            _repository_input("/tmp/local-repository-repair-mode")
+            _repository_input("/tmp/local-repository-test-changes")
             | {
                 "review_intent": {
                     "objective": "audit",
-                    "repair_mode": "no-test-changes",
+                    "test_changes": "deny",
                 }
             },
             "repository-review",
@@ -473,7 +473,7 @@ def test_pull_request_workflow_input_preparation_derives_stage_artifacts() -> No
         ),
     ],
 )
-def test_workflow_input_preparation_accepts_common_repair_mode(
+def test_workflow_input_preparation_accepts_common_test_changes(
     payload: dict,
     workflow: str,
     manifest_incremental: bool,
@@ -484,7 +484,7 @@ def test_workflow_input_preparation_accepts_common_repair_mode(
         artifact_root_path=_bundle_root_from_ref(payload["input_bundle"]) / "artifacts",
     )
 
-    assert prepared["review_intent"]["repair_mode"] == "no-test-changes"
+    assert prepared["review_intent"]["test_changes"] == "deny"
 
 
 def test_repository_workflow_input_preparation_derives_stage_artifacts() -> None:

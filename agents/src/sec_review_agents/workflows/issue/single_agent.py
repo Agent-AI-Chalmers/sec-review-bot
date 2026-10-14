@@ -14,8 +14,8 @@ from sec_review_agents.temporal.support import (
 )
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.review_intent import (
-    RepairMode,
     ReviewObjective,
+    TestChangesPolicy,
     require_review_intent,
 )
 
@@ -56,7 +56,7 @@ async def run_issue_single_agent_activity(
         ),
         system_prompt=issue_single_agent.build_issue_single_agent_system_prompt(
             review_objective=review_intent.objective,
-            repair_mode=review_intent.repair_mode,
+            test_changes=review_intent.test_changes,
         ),
         filesystem_system_prompt=(
             issue_single_agent.build_issue_single_agent_filesystem_system_prompt()
@@ -200,7 +200,7 @@ async def execute_issue_single_agent(
     history_path: Path,
     single_agent_artifacts_path: Path,
     review_objective: ReviewObjective,
-    repair_mode: RepairMode,
+    test_changes: TestChangesPolicy,
     runtime_context: RunnerRuntimeContext | None = None,
 ) -> dict[str, Any]:
     """Run the stage and project it into the public ablation result shape."""
@@ -220,7 +220,7 @@ async def execute_issue_single_agent(
         ),
         system_prompt=issue_single_agent.build_issue_single_agent_system_prompt(
             review_objective=review_objective,
-            repair_mode=repair_mode,
+            test_changes=test_changes,
         ),
         filesystem_system_prompt=(
             issue_single_agent.build_issue_single_agent_filesystem_system_prompt()

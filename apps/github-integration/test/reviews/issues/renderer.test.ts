@@ -57,7 +57,7 @@ test('unpromoted issue comment shares the same status vocabulary and reports the
   const body = renderIssueReviewCommentFromReviewRecord({
     issue: { issue_number: 42 },
     review_record: reviewRecord(),
-    draftPrPlan: { patch_ready: true, recommended_action: 'open-draft-pr' },
+    draftPrPlan: { patch_ready: true },
     draftPullRequest: null
   })
 
@@ -66,5 +66,5 @@ test('unpromoted issue comment shares the same status vocabulary and reports the
   assert.match(body, /- Mitigation: `patch proposed, 1 file changed`/)
   assert.match(body, /- Verification: `full coverage; logic simulation; checks not run`/)
   assert.match(body, /- Patch ready: `yes`/)
-  assert.match(body, /- Next step: `open-draft-pr`/)
+  assert.doesNotMatch(body, /Next step/)
 })

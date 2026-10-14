@@ -1,5 +1,6 @@
 {
   "schema_fixtures": {
+    "issue-review-input-test-changes.json": "issue-review-input.schema.json",
     "issue-review-input.json": "issue-review-input.schema.json",
     "issue-review-result.json": "issue-review-result.schema.json",
     "pull-request-review-input.json": "pull-request-review-input.schema.json",
@@ -13,13 +14,14 @@
     "review-record.json": "review-record.schema.json"
   },
   "invalid_schema_fixtures": {
+    "invalid-issue-review-input-repair-mode-field.json": "issue-review-input.schema.json",
     "invalid-repository-review-input-blank-commit-sha.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-blank-ignore.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-blank-target-branch.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-empty-ignore.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-extra-change-field.json": "repository-review-input.schema.json",
-    "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-max-file-bytes.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
     "invalid-review-record-trailing-slash-path.json": "review-record.schema.json"
   }
 }

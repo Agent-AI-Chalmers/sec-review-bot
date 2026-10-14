@@ -8,7 +8,7 @@ from sec_review_agents.utils.markdown import (
     inline_code,
     markdown_section,
 )
-from sec_review_agents.workflows.review_intent import RepairMode
+from sec_review_agents.workflows.review_intent import TestChangesPolicy
 
 
 class RepositoryCaseExecutionInput(TypedDict):
@@ -18,7 +18,7 @@ class RepositoryCaseExecutionInput(TypedDict):
     history_path: str
     scan_mode: str
     incremental_window_path: str | None
-    repair_mode: RepairMode
+    test_changes: TestChangesPolicy
 
 
 def prepare_case_execution_input(
@@ -28,7 +28,7 @@ def prepare_case_execution_input(
     incremental_window_path: Path | None,
     scan_mode: str,
     case: Mapping[str, Any],
-    repair_mode: RepairMode,
+    test_changes: TestChangesPolicy,
 ) -> RepositoryCaseExecutionInput:
     case_id = str(case.get("case_id") or "").strip()
     if not case_id:
@@ -50,7 +50,7 @@ def prepare_case_execution_input(
             if incremental_window_path is not None
             else None
         ),
-        "repair_mode": repair_mode,
+        "test_changes": test_changes,
     }
     return case_execution_input
 

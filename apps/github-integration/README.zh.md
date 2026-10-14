@@ -150,37 +150,21 @@ sec_review_bot:
 
 ### 手动命令
 
-这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review repair`。
+这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review`。
 
-普通 issue comment 支持：
-
-```text
-@<app-slug> review audit
-@<app-slug> review repair
-@<app-slug> review repair no-test-changes
-```
-
-普通 issue 上单独写 `@<app-slug> review` 不会触发 workflow，因为系统无法判断你想先审计输入，还是直接按修复意图推进。
-
-issue comment 支持三种模式：
-
-- `review audit`：先审计 issue 输入是否对应当前仓库里的可修复安全问题；只有确认可修复目标后才进入修复阶段。
-- `review repair`：用户已经表达修复意图；workflow 在 analyzer 后进入修复阶段，尝试生成 patch；如果修复不适用或覆盖不足，结果会明确说明原因。默认允许最终 patch 包含合理的测试改动。
-- `review repair no-test-changes`：同样表达修复意图，但最终 patch 不应包含测试改动；测试只能作为临时验证手段。
-
-自动 issue 触发使用 `audit`，因为自动触发时还没有人明确做出“请修”的决断。
-
-PR Conversation comment 支持：
+issue 与 PR conversation comment 共用同一套命令语法；下面的参数在两种场景下解析方式一致，对当前目标没有意义的参数会被忽略（每个参数下已注明）：
 
 ```text
 @<app-slug> review
-@<app-slug> review no-test-changes
+@<app-slug> review --test-changes deny
+@<app-slug> review --open-pr
 ```
 
-PR 命令含义：
+- `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
+- `--test-changes allow|deny`：最终 mitigation patch 是否允许包含测试改动。`deny` 表示不得包含测试改动；测试只能作为临时验证手段。不带该参数时 runner 使用 `allow`。
+- `--open-pr`：仅对 issue review 生效；当 review 产出可用的 patch 时，允许本次运行创建 draft pull request；不带该参数时 patch 只保留在 issue 的 summary comment 中。`issues.opened` 自动触发的 review 永不创建 draft PR。在 PR 评论上该参数无对应动作，会被忽略，因为 PR review 不会创建分支或新的 pull request。
 
-- `review`：触发 PR review，默认允许最终 patch 包含合理的测试改动。
-- `review no-test-changes`：同样触发 PR review，但最终 patch 不应包含测试改动；测试只能作为临时验证手段。
+各参数与顺序无关，可组合使用。没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
 
 ### 仓库级 Actions 触发
 
@@ -199,9 +183,9 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 - `scan_mode`：`full` 或 `incremental`
 - `base_sha`：手动增量扫描必填
 - `head_sha`：手动增量扫描可选，默认当前分支 HEAD
-- `repair_mode`：`test-changes-allowed` 或 `no-test-changes`
+- `test_changes`：`allow` 或 `deny`
 
-`repair_mode=no-test-changes` 表示仓库级扫描生成的最终 patch 不应包含测试改动；测试仍可作为临时验证手段。`schedule` 触发不带手动 input 时使用默认修复模式。
+`test_changes=deny` 表示仓库级扫描生成的最终 mitigation patch 不得包含测试改动；测试仍可作为临时验证手段。`schedule` 触发不带手动 input 时使用默认值（`allow`）。
 
 `schedule` 触发默认按 incremental scan 处理，并由 App 侧根据 cron 推导扫描窗口；手动 incremental 必须显式提供 `base_sha`。
 

@@ -21,7 +21,6 @@ interface DraftPullRequestLike {
 }
 
 interface DraftPrPlanLike {
-  recommended_action?: string
   patch_ready?: boolean
   title?: string
   changed_files?: string[]
@@ -393,7 +392,6 @@ export async function buildSuggestedDraftPrPlanFromReviewRecord({
   const title = buildDraftPullRequestTitleFromReviewRecord(issue)
 
   return {
-    recommended_action: patch_ready ? 'open-draft-pr' : 'keep-issue-summary-only',
     patch_ready,
     title,
     changed_files,
@@ -451,7 +449,6 @@ export function renderIssueReviewCommentFromReviewRecord({
     '',
     ...renderReviewStatusLines({ analysis, mitigation, verification }),
     `- Patch ready: ${inlineCode(draftPrPlan?.patch_ready ? 'yes' : 'no')}`,
-    `- Next step: ${inlineCode(draftPrPlan?.recommended_action ?? 'issue-only')}`,
     '',
     String(
       verification.patch_coverage

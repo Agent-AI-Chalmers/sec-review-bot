@@ -7,7 +7,7 @@ import {
 import type { IssueContext } from '../github/issue-service.js'
 import { issueReviewPublishContext } from '../control-plane/publish-context.js'
 import { startIssueReviewRun, type SubmittedIssueReviewRun } from '../reviews/issues/submit.js'
-import type { RepairMode } from '../runner/input.js'
+import type { TestChangesPolicy } from '../runner/input.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 
@@ -36,7 +36,8 @@ interface StartIssueReviewCommandArgs {
   issue: IssueContext
   event_type: IssueReviewEventType
   review_objective?: 'audit' | 'repair' | null
-  repair_mode?: RepairMode | null
+  test_changes?: TestChangesPolicy | null
+  open_pr?: boolean | null
   delivery_id: string
   on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
   deps?: Partial<StartIssueReviewCommandDeps>
@@ -51,7 +52,8 @@ export async function startIssueReviewCommand({
   issue,
   event_type,
   review_objective = 'audit',
-  repair_mode = null,
+  test_changes = null,
+  open_pr = false,
   delivery_id,
   on_admitted,
   deps = {}
@@ -84,7 +86,9 @@ export async function startIssueReviewCommand({
       run_id,
       event_type,
       review_objective: event_type === 'opened' ? 'audit' : review_objective,
-      repair_mode: event_type === 'opened' ? null : repair_mode,
+      test_changes: event_type === 'opened' ? null : test_changes,
+      // Automatic triggers have no per-run comment to opt in, so they never open a PR.
+      open_pr: event_type === 'opened' ? false : open_pr,
       on_prepared: async (prepared, input) => {
         // Confirm the lease immediately before crossing the durable submission
         // boundary; the submission itself remains token-fenced by Control Plane.

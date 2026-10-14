@@ -128,7 +128,7 @@ async def mitigate_issue_activity(
             stage="mitigator",
             attempt=mitigation_attempt_label(retry_context),
         ),
-        repair_mode=review_intent.repair_mode,
+        test_changes=review_intent.test_changes,
         analysis_result=analysis_result,
         retry_context=retry_context,
         runtime_context=runtime_context,

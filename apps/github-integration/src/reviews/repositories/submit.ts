@@ -3,7 +3,11 @@ import { prepareRepositoryReviewInput } from './prepare-input.js'
 import { fetchRepositoryTriggerConfig } from '../../github/repo-config-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { logInfo } from '../../utils/logger.js'
-import type { RepairMode, RepositoryScanTarget, RepositoryReviewInput } from '../../runner/input.js'
+import type {
+  TestChangesPolicy,
+  RepositoryScanTarget,
+  RepositoryReviewInput
+} from '../../runner/input.js'
 
 export interface RepositoryContext {
   owner_login: string
@@ -21,7 +25,7 @@ interface RunRepositoryReviewArgs {
   base_sha?: string | null
   head_sha?: string | null
   event_type?: 'manual' | 'scheduled'
-  repair_mode?: RepairMode | null
+  test_changes?: TestChangesPolicy | null
   // Runs after preparation and before the Runner POST, so callers can durably
   // retain the context needed if the submission response is lost.
   on_prepared?: (
@@ -56,7 +60,7 @@ async function materializeRepositoryReviewInput({
   base_sha = null,
   head_sha = null,
   event_type = 'manual',
-  repair_mode = null
+  test_changes = null
 }: RunRepositoryReviewArgs): Promise<{
   run_id: string
   repo: RepositoryContext
@@ -88,7 +92,7 @@ async function materializeRepositoryReviewInput({
     head_sha,
     event_type,
     paths_ignore: pathConfig.paths_ignore,
-    repair_mode
+    test_changes
   })
   const input = prepared.input
   const repo = prepared.repo
@@ -110,7 +114,7 @@ export async function startRepositoryReviewRun({
   base_sha = null,
   head_sha = null,
   event_type = 'manual',
-  repair_mode = null,
+  test_changes = null,
   on_prepared
 }: RunRepositoryReviewArgs): Promise<SubmittedRepositoryReviewRun> {
   const { input, repo, workspace_ref } = await materializeRepositoryReviewInput({
@@ -122,7 +126,7 @@ export async function startRepositoryReviewRun({
     base_sha,
     head_sha,
     event_type,
-    repair_mode
+    test_changes
   })
 
   assertRepositoryReviewInput(input)

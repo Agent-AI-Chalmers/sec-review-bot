@@ -6,7 +6,7 @@ from sec_review_agents.agents.mitigation import issue as issue_mitigation_agent
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
 from sec_review_agents.workflows.review_intent import (
-    RepairMode,
+    TestChangesPolicy,
 )
 
 
@@ -17,7 +17,7 @@ async def mitigate_issue(
     history_path: Path,
     mitigator_artifacts_path: Path,
     published_transcript_path: Path | None = None,
-    repair_mode: RepairMode,
+    test_changes: TestChangesPolicy,
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None = None,
     runtime_context: RunnerRuntimeContext | None = None,
@@ -34,7 +34,7 @@ async def mitigate_issue(
             runtime_context=runtime_context,
         ),
         system_prompt=issue_mitigation_agent.build_issue_mitigation_system_prompt(
-            repair_mode=repair_mode,
+            test_changes=test_changes,
             is_retry=isinstance(retry_context, Mapping),
         ),
         filesystem_system_prompt=(

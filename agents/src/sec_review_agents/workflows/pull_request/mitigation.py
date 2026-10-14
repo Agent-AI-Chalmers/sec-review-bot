@@ -9,8 +9,8 @@ from sec_review_agents.workflows.pull_request.incremental_window import (
     load_pr_diff_metadata,
 )
 from sec_review_agents.workflows.review_intent import (
-    REPAIR_MODE_TEST_CHANGES_ALLOWED,
-    RepairMode,
+    TEST_CHANGES_ALLOW,
+    TestChangesPolicy,
 )
 
 
@@ -24,7 +24,7 @@ async def mitigate_pull_request(
     published_transcript_path: Path | None = None,
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None = None,
-    repair_mode: RepairMode = REPAIR_MODE_TEST_CHANGES_ALLOWED,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
 ) -> dict[str, Any]:
     diff_metadata = load_pr_diff_metadata(incremental_window_path)
@@ -41,7 +41,7 @@ async def mitigate_pull_request(
             runtime_context=runtime_context,
         ),
         system_prompt=pr_mitigation_agent.build_pr_mitigation_system_prompt(
-            repair_mode=repair_mode, is_retry=isinstance(retry_context, dict)
+            test_changes=test_changes, is_retry=isinstance(retry_context, dict)
         ),
         filesystem_system_prompt=(
             pr_mitigation_agent.build_pr_mitigation_filesystem_system_prompt()

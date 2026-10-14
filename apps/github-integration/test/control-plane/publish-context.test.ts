@@ -31,7 +31,8 @@ test('workflow parsers retain only fields needed to resume publication', () => {
         issue_title: 'Example issue'
       },
       workspace_ref: 'workspace-sha',
-      event_type: 'manual_review'
+      event_type: 'manual_review',
+      open_pr: false
     }
   )
   assert.deepEqual(
@@ -95,6 +96,29 @@ test('publish context rejects repository identity fields that name different rep
       })
     )
   }
+})
+
+test('issue publish context defaults a missing open_pr to false', () => {
+  const context = publishContextForWorkflow('issue-review') as Record<string, unknown>
+  delete context.open_pr
+  assert.equal(parseIssueReviewPublishContext(context).open_pr, false)
+})
+
+test('issue publish context preserves an explicit open_pr opt-in', () => {
+  const parsed = parseIssueReviewPublishContext({
+    ...publishContextForWorkflow('issue-review'),
+    open_pr: true
+  })
+  assert.equal(parsed.open_pr, true)
+})
+
+test('issue publish context rejects a non-boolean open_pr', () => {
+  assertInvalidPublishContext(() =>
+    parseIssueReviewPublishContext({
+      ...publishContextForWorkflow('issue-review'),
+      open_pr: 'yes'
+    })
+  )
 })
 
 test('publish context projects away fields that publication does not own', () => {

@@ -67,6 +67,9 @@ export interface IssueReviewPublishContext extends JsonObject {
   issue: PersistedIssue
   workspace_ref: string
   event_type: 'opened' | 'manual_review'
+  // Whether publication may open a draft PR for a ready patch. Absent on records
+  // persisted before the flag existed; parse defaults it to false (no PR).
+  open_pr: boolean
 }
 
 export interface PullRequestReviewPublishContext extends JsonObject {
@@ -211,7 +214,8 @@ export function issueReviewPublishContext(
   return parseIssueReviewPublishContext({
     issue: submitted.issue,
     workspace_ref: submitted.workspace_ref,
-    event_type: submitted.event_type
+    event_type: submitted.event_type,
+    open_pr: submitted.open_pr
   })
 }
 
@@ -240,10 +244,21 @@ export function repositoryReviewPublishContext(
 // boundaries, and a malformed recovery record must fail before any GitHub call.
 export function parseIssueReviewPublishContext(value: unknown): IssueReviewPublishContext {
   const context = object(value, 'publish_context')
+  // `open_pr` was added after the first persisted issue review records. Treat a
+  // missing value as false so those in-flight runs stay publishable and do not open a PR
+  // without an explicit opt-in.
+  const open_pr = context.open_pr
+  if (open_pr !== undefined && typeof open_pr !== 'boolean') {
+    invalid('publish_context.open_pr', 'a boolean when present')
+  }
   return {
     issue: issue(context.issue),
     workspace_ref: text(context.workspace_ref, 'publish_context.workspace_ref'),
-    event_type: oneOf(context.event_type, 'publish_context.event_type', ['opened', 'manual_review'])
+    event_type: oneOf(context.event_type, 'publish_context.event_type', [
+      'opened',
+      'manual_review'
+    ]),
+    open_pr: open_pr === true
   }
 }
 

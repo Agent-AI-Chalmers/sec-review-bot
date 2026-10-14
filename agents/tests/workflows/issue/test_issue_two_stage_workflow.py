@@ -49,11 +49,11 @@ async def test_two_stage_workflow_runs_internal_self_check_mitigation_without_ve
             analyzer_artifacts_path=input_data["artifact_paths"]["analyzer"],
             mitigator_artifacts_path=input_data["artifact_paths"]["mitigator"],
             review_objective="audit",
-            repair_mode="no-test-changes",
+            test_changes="deny",
         )
 
     mitigate_mock.assert_called_once()
-    assert mitigate_mock.call_args.kwargs["repair_mode"] == "no-test-changes"
+    assert mitigate_mock.call_args.kwargs["test_changes"] == "deny"
     assert set(result) == {"kind", "review_record"}
     assert result["kind"] == "issue-two-stage-strategy-result"
     review_record = result["review_record"]

@@ -8,8 +8,8 @@ from sec_review_agents.review_stages.mitigation.stage import (
 )
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
 from sec_review_agents.workflows.review_intent import (
-    REPAIR_MODE_TEST_CHANGES_ALLOWED,
-    RepairMode,
+    TEST_CHANGES_ALLOW,
+    TestChangesPolicy,
 )
 
 
@@ -21,7 +21,7 @@ async def mitigate_issue_with_self_check(
     mitigator_artifacts_path: Path,
     published_transcript_path: Path | None = None,
     analysis_result: Mapping[str, Any],
-    repair_mode: RepairMode = REPAIR_MODE_TEST_CHANGES_ALLOWED,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
 ) -> dict[str, Any]:
     return await run_mitigation_stage(
@@ -36,7 +36,7 @@ async def mitigate_issue_with_self_check(
             runtime_context=runtime_context,
         ),
         system_prompt=issue_mitigation_agent.build_issue_self_check_mitigation_system_prompt(
-            repair_mode=repair_mode
+            test_changes=test_changes
         ),
         filesystem_system_prompt=(
             issue_mitigation_agent.build_issue_self_check_mitigation_filesystem_system_prompt()

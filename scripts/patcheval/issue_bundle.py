@@ -168,7 +168,7 @@ def build_patcheval_issue_bundle_from_case(
         "contract_version": "v5",
         "review_intent": {
             "objective": "repair",
-            "repair_mode": "no-test-changes",
+            "test_changes": "deny",
         },
         "issue": issue_metadata,
         "input_bundle": archive_input_bundle(paths, include_incremental_window=False),

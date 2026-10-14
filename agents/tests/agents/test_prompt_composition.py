@@ -37,7 +37,7 @@ from sec_review_agents.agents.verification.repository import (
 )
 from sec_review_agents.resources.loader import load_prompt_resource
 from sec_review_agents.resources.paths import AGENT_PROMPTS
-from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
+from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 
 
 def _joined_prompt_resources(*paths: str) -> str:
@@ -102,21 +102,18 @@ def test_initial_mitigation_profiles_do_not_include_retry_delta() -> None:
 
 
 def test_mitigation_profiles_include_test_change_boundary() -> None:
-    """Propagate the caller's no-test-changes policy to every mitigation path."""
+    """Propagate the caller's test-changes policy to every mitigation path."""
     prompts = [
-        build_issue_mitigation_system_prompt(repair_mode="no-test-changes"),
-        build_issue_self_check_mitigation_system_prompt(repair_mode="no-test-changes"),
-        build_pr_mitigation_system_prompt(repair_mode="no-test-changes"),
-        build_repository_mitigation_system_prompt(repair_mode="no-test-changes"),
+        build_issue_mitigation_system_prompt(test_changes="deny"),
+        build_issue_self_check_mitigation_system_prompt(test_changes="deny"),
+        build_pr_mitigation_system_prompt(test_changes="deny"),
+        build_repository_mitigation_system_prompt(test_changes="deny"),
     ]
 
     for prompt in prompts:
+        assert load_prompt_resource("test-changes-policy/deny-boundary.md") in prompt
         assert (
-            load_prompt_resource("repair-modes/no-test-changes-boundary.md") in prompt
-        )
-        assert (
-            load_prompt_resource("repair-modes/test-changes-allowed-boundary.md")
-            not in prompt
+            load_prompt_resource("test-changes-policy/allow-boundary.md") not in prompt
         )
 
 
@@ -129,7 +126,7 @@ def test_repair_capable_prompts_include_git_history_boundary() -> None:
         build_repository_mitigation_system_prompt(),
         build_issue_single_agent_system_prompt(
             review_objective="audit",
-            repair_mode=REPAIR_MODE_TEST_CHANGES_ALLOWED,
+            test_changes=TEST_CHANGES_ALLOW,
         ),
         build_issue_verification_system_prompt(),
         build_pr_verification_system_prompt(),
@@ -176,7 +173,7 @@ def test_review_agent_prompts_end_with_output_formatting() -> None:
         build_repository_verification_system_prompt(),
         build_issue_single_agent_system_prompt(
             review_objective="audit",
-            repair_mode=REPAIR_MODE_TEST_CHANGES_ALLOWED,
+            test_changes=TEST_CHANGES_ALLOW,
         ),
     ]
 

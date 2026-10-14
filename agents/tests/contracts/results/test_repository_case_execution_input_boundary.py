@@ -13,7 +13,7 @@ from sec_review_agents.workflows.repository.workflow import (
     prepare_repository_case_activity,
     prepare_repository_case_review_inputs_activity,
 )
-from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
+from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 
 
 def _prepare_case_execution_input(
@@ -25,8 +25,8 @@ def _prepare_case_execution_input(
         history_path=input_data["history_path"],
         incremental_window_path=input_data.get("incremental_window_path"),
         scan_mode=input_data["scan_mode"],
-        repair_mode=(input_data.get("review_intent") or {}).get("repair_mode")
-        or REPAIR_MODE_TEST_CHANGES_ALLOWED,
+        test_changes=(input_data.get("review_intent") or {}).get("test_changes")
+        or TEST_CHANGES_ALLOW,
         case=case,
     )
 
@@ -54,7 +54,7 @@ def test_repository_case_execution_input_tracks_required_and_optional_fields() -
         "history_path",
         "scan_mode",
         "incremental_window_path",
-        "repair_mode",
+        "test_changes",
     }
     assert RepositoryCaseExecutionInput.__optional_keys__ == set()
 
@@ -83,7 +83,7 @@ def test_repository_case_execution_input_carries_case_id_and_prepared_review_inp
     assert "case" not in case_execution_input
     assert "Demo case" in case_execution_input["review_input"]
     assert case_execution_input["incremental_window_path"] is None
-    assert case_execution_input["repair_mode"] == REPAIR_MODE_TEST_CHANGES_ALLOWED
+    assert case_execution_input["test_changes"] == TEST_CHANGES_ALLOW
 
 
 @pytest.mark.parametrize(
@@ -154,7 +154,7 @@ def test_repository_case_activity_preserves_published_transcripts_path(
                 "history_path": str(tmp_path / "history"),
                 "scan_mode": "full",
                 "incremental_window_path": None,
-                "repair_mode": REPAIR_MODE_TEST_CHANGES_ALLOWED,
+                "test_changes": TEST_CHANGES_ALLOW,
             },
             "cases_artifacts_path": str(tmp_path / "cases"),
             "run_id": "run-repo-case",
@@ -185,7 +185,7 @@ def test_repository_case_transcripts_are_published_under_the_case_root(
             "scan_target": {"scan_mode": "full"},
             "review_intent": {
                 "objective": "audit",
-                "repair_mode": REPAIR_MODE_TEST_CHANGES_ALLOWED,
+                "test_changes": TEST_CHANGES_ALLOW,
             },
         },
         timeout_seconds=30,
@@ -206,14 +206,14 @@ def test_repository_case_transcripts_are_published_under_the_case_root(
     )
 
 
-def test_repository_case_execution_input_flattens_repair_mode_when_set(
+def test_repository_case_execution_input_flattens_test_changes_when_set(
     tmp_path,
 ) -> None:
     input_data = {
         "workspace_snapshot_tar_path": str(tmp_path / "workspace.snapshot.tar"),
         "history_path": str(tmp_path / "history"),
         "scan_mode": "full",
-        "review_intent": {"repair_mode": "no-test-changes"},
+        "review_intent": {"test_changes": "deny"},
         "artifact_paths": {"cases": str(tmp_path / "cases")},
     }
     case = {
@@ -227,7 +227,7 @@ def test_repository_case_execution_input_flattens_repair_mode_when_set(
 
     case_execution_input = _prepare_case_execution_input(input_data, case)
 
-    assert case_execution_input["repair_mode"] == "no-test-changes"
+    assert case_execution_input["test_changes"] == "deny"
 
 
 def test_repository_case_execution_input_rejects_missing_case_id(tmp_path) -> None:
@@ -237,7 +237,7 @@ def test_repository_case_execution_input_rejects_missing_case_id(tmp_path) -> No
             history_path=tmp_path / "history",
             incremental_window_path=None,
             scan_mode="full",
-            repair_mode=REPAIR_MODE_TEST_CHANGES_ALLOWED,
+            test_changes=TEST_CHANGES_ALLOW,
             case={
                 "case_id": " ",
                 "category": "demo",

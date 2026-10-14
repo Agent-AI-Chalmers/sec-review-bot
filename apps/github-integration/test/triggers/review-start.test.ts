@@ -81,19 +81,20 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         run_id,
         event_type,
         review_objective,
-        repair_mode,
+        test_changes,
         on_prepared
       }) => {
         assert.equal(run_id, 'run-issue-1')
         assert.equal(event_type, 'opened')
         assert.equal(review_objective, 'audit')
-        assert.equal(repair_mode, null)
+        assert.equal(test_changes, null)
         const prepared = {
           issue: submittedIssue,
           run_id: 'run-issue-1',
           workspace_ref: 'workspace-ref',
           workflow: 'issue-review',
-          event_type: 'opened' as const
+          event_type: 'opened' as const,
+          open_pr: false
         }
         await on_prepared?.(prepared, { contract_version: 'v5' } as never)
         return prepared
@@ -139,7 +140,8 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           issue_title: 'Example issue'
         },
         workspace_ref: 'workspace-ref',
-        event_type: 'opened'
+        event_type: 'opened',
+        open_pr: false
       }
     ]
   ])
@@ -154,12 +156,12 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
     pr,
     event_type: 'manual_review',
     delivery_id: 'delivery-pr-1',
-    repair_mode: 'no-test-changes',
+    test_changes: 'deny',
     deps: {
-      start_review: async ({ pr: submittedPr, run_id, event_type, repair_mode, on_prepared }) => {
+      start_review: async ({ pr: submittedPr, run_id, event_type, test_changes, on_prepared }) => {
         assert.equal(run_id, 'run-pr-1')
         assert.equal(event_type, 'manual_review')
-        assert.equal(repair_mode, 'no-test-changes')
+        assert.equal(test_changes, 'deny')
         const prepared = {
           pr: submittedPr,
           run_id: 'run-pr-1',
@@ -286,7 +288,8 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               run_id: 'run-uncertain',
               workspace_ref: 'workspace-ref',
               workflow: 'issue-review',
-              event_type: 'opened'
+              event_type: 'opened',
+              open_pr: false
             },
             { contract_version: 'v5' } as never
           )

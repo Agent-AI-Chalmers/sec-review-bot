@@ -70,12 +70,12 @@ def test_build_local_issue_bundle_preserves_review_intent_selection(
         repo_full_name_value=None,
         output_dir=output_dir,
         review_objective="audit",
-        repair_mode="no-test-changes",
+        test_changes="deny",
     )
 
     assert bundle.input["review_intent"] == {
         "objective": "audit",
-        "repair_mode": "no-test-changes",
+        "test_changes": "deny",
     }
 
 

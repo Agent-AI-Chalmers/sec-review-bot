@@ -188,7 +188,7 @@ async def _replay_one_case(
     bundle_paths: dict[str, Path],
     case_index: int,
     case: dict[str, Any],
-    repair_mode: Any,
+    test_changes: Any,
 ) -> dict[str, Any]:
     async with semaphore:
         cases_artifacts_path = replay_input["artifact_paths"]["cases"]
@@ -198,7 +198,7 @@ async def _replay_one_case(
             incremental_window_path=bundle_paths.get("incremental_window_path"),
             scan_mode=replay_input["scan_target"]["scan_mode"],
             case=case,
-            repair_mode=repair_mode,
+            test_changes=test_changes,
         )
         request: RepositoryCaseReviewRequest = {
             "run_id": run_id,
@@ -225,7 +225,7 @@ async def _replay_case_outcome(
     bundle_paths: dict[str, Path],
     case_index: int,
     case: dict[str, Any],
-    repair_mode: Any,
+    test_changes: Any,
 ) -> tuple[str, dict[str, Any] | None, str | None]:
     try:
         result = await _replay_one_case(
@@ -235,7 +235,7 @@ async def _replay_case_outcome(
             bundle_paths=bundle_paths,
             case_index=case_index,
             case=case,
-            repair_mode=repair_mode,
+            test_changes=test_changes,
         )
     # One failed replay must not cancel the other selected cases.
     except Exception as exc:  # noqa: BLE001
@@ -303,7 +303,7 @@ async def main() -> None:
         raise FileNotFoundError(f"Missing triage result: {triage_path}")
 
     replay_input = _prepare_replay_input(read_json(input_path), run_root, run_artifacts)
-    repair_mode = require_review_intent(replay_input.get("review_intent")).repair_mode
+    test_changes = require_review_intent(replay_input.get("review_intent")).test_changes
     bundle_paths = read_replay_bundle_paths(run_root)
     result = read_json(result_paths[0])
     triage_result = read_json(triage_path)
@@ -388,7 +388,7 @@ async def main() -> None:
                 bundle_paths=bundle_paths,
                 case_index=case_index,
                 case=case,
-                repair_mode=repair_mode,
+                test_changes=test_changes,
             )
         )
         tasks.append(task)

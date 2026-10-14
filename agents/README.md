@@ -152,23 +152,23 @@ cp agents/.env.sample agents/.env
 cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 
 # 1) issue
-# Explicitly choose both the review objective and repair mode.
+# Choose the review objective; test_changes defaults to allow.
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
   --output-dir /abs/path/to/local-run \
-  --review-objective repair \
-  --repair-mode test-changes-allowed
+  --review-objective repair
 
 # 1b) issue two-stage ablation
+# --test-changes deny forbids test changes in the final mitigation patch.
 sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
   --strategy two-stage \
   --review-objective audit \
-  --repair-mode no-test-changes
+  --test-changes deny
 
 # 1c) issue single-agent baseline
 sec-review-agents-run-local-issue \
@@ -176,26 +176,24 @@ sec-review-agents-run-local-issue \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
   --strategy single-agent \
-  --review-objective repair \
-  --repair-mode test-changes-allowed
+  --review-objective repair
 
 # 2) pr
-# Pull-request objective is fixed to audit, but repair mode is still required.
+# Pull-request objective is fixed to audit; --test-changes is optional.
 sec-review-agents-run-local-pr \
   --repo /abs/path/to/repo \
   --pr-md /abs/path/to/pr.md \
   --base-sha <base-commit-sha> \
   --head-sha <head-commit-sha> \
-  --repair-mode no-test-changes
+  --test-changes deny
 
 # 3) full repo scan
-# Repository objective is fixed to audit, but repair mode is still required.
+# Repository objective is fixed to audit; test_changes defaults to allow.
 sec-review-agents-run-local-repository \
   --repo /abs/path/to/repo \
   --target-branch main \
   --paths-ignore docs \
-  --paths-ignore '**/*.generated.py' \
-  --repair-mode test-changes-allowed
+  --paths-ignore '**/*.generated.py'
 
 # 4) incremental repo scan
 sec-review-agents-run-local-repository \
@@ -203,8 +201,7 @@ sec-review-agents-run-local-repository \
   --target-branch main \
   --scan-mode incremental \
   --base-sha <base-commit-sha> \
-  --head-sha <head-commit-sha> \
-  --repair-mode test-changes-allowed # optional head; repair-mode is required
+  --head-sha <head-commit-sha> # optional head
 ```
 
 ### Use Temporal with `run-local-*`

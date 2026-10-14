@@ -7,7 +7,7 @@ import sec_review_agents.workflows.repository.workflow as repository_workflow
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
 )
-from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
+from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 
 
 def repository_case_execution_input(case_id: str) -> RepositoryCaseExecutionInput:
@@ -18,7 +18,7 @@ def repository_case_execution_input(case_id: str) -> RepositoryCaseExecutionInpu
         "history_path": "/tmp/history",
         "scan_mode": "full",
         "incremental_window_path": None,
-        "repair_mode": REPAIR_MODE_TEST_CHANGES_ALLOWED,
+        "test_changes": TEST_CHANGES_ALLOW,
     }
 
 

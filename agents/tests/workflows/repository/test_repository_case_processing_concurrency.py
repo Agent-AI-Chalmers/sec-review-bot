@@ -23,7 +23,7 @@ from sec_review_agents.workflows.repository.workflow import (
     resolve_repository_case_processing_max_concurrency,
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
-from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
+from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
 
@@ -42,7 +42,7 @@ def repository_case_execution_input(case_id: str) -> RepositoryCaseExecutionInpu
         "history_path": "/tmp/history",
         "scan_mode": "full",
         "incremental_window_path": None,
-        "repair_mode": REPAIR_MODE_TEST_CHANGES_ALLOWED,
+        "test_changes": TEST_CHANGES_ALLOW,
     }
 
 

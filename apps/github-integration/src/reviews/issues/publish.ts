@@ -96,6 +96,7 @@ export async function handleIssueReviewRun({
     workspace_ref: context.workspace_ref,
     workflow_result,
     event_type: context.event_type,
+    open_pr: context.open_pr,
     store,
     claim_token,
     assert_publication_claim
@@ -109,6 +110,7 @@ async function publishIssueReviewResult({
   workspace_ref,
   workflow_result,
   event_type,
+  open_pr,
   store,
   claim_token,
   assert_publication_claim
@@ -119,6 +121,7 @@ async function publishIssueReviewResult({
   workspace_ref: string
   workflow_result: IssueReviewWorkflowResult
   event_type: 'opened' | 'manual_review'
+  open_pr: boolean
   store: ControlPlaneClient
   claim_token: string
   assert_publication_claim: () => Promise<void>
@@ -135,12 +138,16 @@ async function publishIssueReviewResult({
       })
     : null
 
+  // A ready patch is necessary but not sufficient: the run must also have opted in to
+  // opening a PR. Without the flag the patch stays in the summary comment only.
+  const should_open_pr = draftPrPlan?.patch_ready === true && open_pr
+
   await store.initializePublicationSteps(run_id, claim_token, [
-    ...(draftPrPlan?.patch_ready ? ['issue:draft-pr'] : []),
+    ...(should_open_pr ? ['issue:draft-pr'] : []),
     'issue:summary-comment'
   ])
 
-  if (draftPrPlan?.patch_ready) {
+  if (should_open_pr) {
     logInfo('draft_pr_creation_started', {
       event_type,
       issue: issue.issue_number,

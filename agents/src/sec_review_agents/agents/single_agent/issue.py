@@ -26,10 +26,10 @@ from sec_review_agents.utils.structured_renderer import (
     render_structured_markdown_section,
 )
 from sec_review_agents.workflows.review_intent import (
-    REPAIR_MODE_TEST_CHANGES_ALLOWED,
-    RepairMode,
+    TEST_CHANGES_ALLOW,
     ReviewObjective,
-    repair_mode_boundary_prompt_path,
+    TestChangesPolicy,
+    test_changes_boundary_prompt_path,
 )
 
 ISSUE_SINGLE_AGENT_INITIAL_INTRO = "\n".join(
@@ -75,13 +75,13 @@ def create_issue_single_agent_backend(
 def build_issue_single_agent_system_prompt(
     *,
     review_objective: ReviewObjective,
-    repair_mode: RepairMode = REPAIR_MODE_TEST_CHANGES_ALLOWED,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
 ) -> str:
     paths = [
         "single-agent/system-core.md",
         f"review-objectives/{review_objective}/single-agent-delta.md",
         "scopes/issue/single-agent/system-delta.md",
-        repair_mode_boundary_prompt_path(repair_mode),
+        test_changes_boundary_prompt_path(test_changes),
     ]
     paths.extend(
         [

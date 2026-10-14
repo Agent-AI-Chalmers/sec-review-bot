@@ -1,4 +1,4 @@
-# Repair Mode Delta
+# Repair Objective Delta
 
 ## Product Intent
 

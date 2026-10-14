@@ -187,7 +187,7 @@ async def test_repository_case_registers_memory_only_after_result_is_built(
             "history_path": "/tmp/history",
             "scan_mode": "full",
             "incremental_window_path": None,
-            "repair_mode": "test-changes-allowed",
+            "test_changes": "allow",
         },
         "cases_artifacts_path": "/tmp/run-1/artifacts/cases",
         "published_transcripts_path": "unused",

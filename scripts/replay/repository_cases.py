@@ -137,7 +137,7 @@ def _case_review_request(
     cases_artifacts_path: str,
     case_index: int,
     scan_mode: str,
-    repair_mode: Any,
+    test_changes: Any,
     case: dict[str, Any],
 ) -> RepositoryCaseReviewRequest:
     case_execution_input = prepare_case_execution_input(
@@ -146,7 +146,7 @@ def _case_review_request(
         incremental_window_path=bundle_paths.get("incremental_window_path"),
         scan_mode=scan_mode,
         case=case,
-        repair_mode=repair_mode,
+        test_changes=test_changes,
     )
     return {
         "run_id": run_id,
@@ -171,7 +171,7 @@ async def _run_case_review(
     cases_artifacts_path: str,
     case_index: int,
     scan_mode: str,
-    repair_mode: Any,
+    test_changes: Any,
     case: dict[str, Any],
 ) -> dict[str, Any]:
     async with semaphore:
@@ -181,7 +181,7 @@ async def _run_case_review(
                 cases_artifacts_path=cases_artifacts_path,
                 case_index=case_index,
                 scan_mode=scan_mode,
-                repair_mode=repair_mode,
+                test_changes=test_changes,
                 bundle_paths=bundle_paths,
                 case=case,
             )
@@ -235,7 +235,7 @@ async def main() -> None:
     }
     local_root = Path(replay_input["input_bundle_root_path"])
     bundle_paths = read_replay_bundle_paths(local_root)
-    repair_mode = require_review_intent(replay_input.get("review_intent")).repair_mode
+    test_changes = require_review_intent(replay_input.get("review_intent")).test_changes
 
     cases = [
         case for case in (triage_result.get("cases") or []) if isinstance(case, dict)
@@ -275,7 +275,7 @@ async def main() -> None:
                 cases_artifacts_path=replay_input["artifact_paths"]["cases"],
                 case_index=case_index,
                 scan_mode=replay_input["scan_target"]["scan_mode"],
-                repair_mode=repair_mode,
+                test_changes=test_changes,
                 bundle_paths=bundle_paths,
                 case=case,
             )

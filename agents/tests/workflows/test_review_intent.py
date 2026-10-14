@@ -1,8 +1,8 @@
 import pytest
 
 from sec_review_agents.workflows.review_intent import (
-    REPAIR_MODE_TEST_CHANGES_ALLOWED,
     REVIEW_OBJECTIVE_AUDIT,
+    TEST_CHANGES_ALLOW,
     require_review_intent,
 )
 
@@ -11,7 +11,7 @@ def test_issue_review_accepts_repair_objective() -> None:
     review_intent = require_review_intent({"objective": "repair"})
 
     assert review_intent.objective == "repair"
-    assert review_intent.repair_mode == REPAIR_MODE_TEST_CHANGES_ALLOWED
+    assert review_intent.test_changes == TEST_CHANGES_ALLOW
 
 
 def test_non_issue_workflow_rejects_repair_objective() -> None:
@@ -31,28 +31,28 @@ def test_workflow_review_intent_rejects_non_string_objective(objective: object) 
         require_review_intent({"objective": objective})
 
 
-def test_workflow_review_intent_allows_missing_repair_mode() -> None:
+def test_workflow_review_intent_allows_missing_test_changes() -> None:
     review_intent = require_review_intent({"objective": "audit"})
 
-    assert review_intent.repair_mode == REPAIR_MODE_TEST_CHANGES_ALLOWED
+    assert review_intent.test_changes == TEST_CHANGES_ALLOW
 
 
-def test_workflow_review_intent_accepts_repair_mode() -> None:
+def test_workflow_review_intent_accepts_test_changes() -> None:
     review_intent = require_review_intent(
-        {"objective": "audit", "repair_mode": "no-test-changes"}
+        {"objective": "audit", "test_changes": "deny"}
     )
 
-    assert review_intent.repair_mode == "no-test-changes"
+    assert review_intent.test_changes == "deny"
 
 
-def test_workflow_review_intent_rejects_unknown_repair_mode() -> None:
-    with pytest.raises(ValueError, match="review_intent.repair_mode"):
-        require_review_intent({"objective": "audit", "repair_mode": "fixtures-only"})
+def test_workflow_review_intent_rejects_unknown_test_changes() -> None:
+    with pytest.raises(ValueError, match="review_intent.test_changes"):
+        require_review_intent({"objective": "audit", "test_changes": "fixtures-only"})
 
 
-@pytest.mark.parametrize("repair_mode", [123, True, ["no-test-changes"]])
-def test_workflow_review_intent_rejects_non_string_repair_mode(
-    repair_mode: object,
+@pytest.mark.parametrize("test_changes", [123, True, ["deny"]])
+def test_workflow_review_intent_rejects_non_string_test_changes(
+    test_changes: object,
 ) -> None:
-    with pytest.raises(ValueError, match="review_intent.repair_mode"):
-        require_review_intent({"objective": "audit", "repair_mode": repair_mode})
+    with pytest.raises(ValueError, match="review_intent.test_changes"):
+        require_review_intent({"objective": "audit", "test_changes": test_changes})

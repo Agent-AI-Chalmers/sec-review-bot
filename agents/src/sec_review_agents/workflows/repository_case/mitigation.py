@@ -8,8 +8,8 @@ from sec_review_agents.agents.mitigation import (
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
 from sec_review_agents.workflows.review_intent import (
-    REPAIR_MODE_TEST_CHANGES_ALLOWED,
-    RepairMode,
+    TEST_CHANGES_ALLOW,
+    TestChangesPolicy,
 )
 
 
@@ -24,7 +24,7 @@ async def mitigate_repository_case(
     review_input: str,
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None = None,
-    repair_mode: RepairMode = REPAIR_MODE_TEST_CHANGES_ALLOWED,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
 ) -> dict[str, Any]:
     return await run_mitigation_stage(
@@ -41,7 +41,7 @@ async def mitigate_repository_case(
             runtime_context=runtime_context,
         ),
         system_prompt=repository_mitigation_agent.build_repository_mitigation_system_prompt(
-            repair_mode=repair_mode, is_retry=isinstance(retry_context, Mapping)
+            test_changes=test_changes, is_retry=isinstance(retry_context, Mapping)
         ),
         filesystem_system_prompt=(
             repository_mitigation_agent.build_repository_mitigation_filesystem_system_prompt(

@@ -1,3 +1,4 @@
+import type { TestChangesPolicy } from '../runner/input.js'
 import { getGitHubAppMetadata } from './github-app-metadata-service.js'
 
 function escapeRegExp(value: string): string {
@@ -29,11 +30,43 @@ function stripMarkdownQuotedLines(body: string): string {
     .join('\n')
 }
 
+/** The default when no `--test-changes` flag is present, taken from the runner input contract. */
+const DEFAULT_TEST_CHANGES: TestChangesPolicy = 'allow'
+
+/** Parse flags after the command: `--test-changes <allow|deny>` takes a value, `--open-pr` is a
+ * bare flag. Unknown flags or a missing/invalid `--test-changes` value fail the whole command, so
+ * a typo is not silently ignored. Flags are order-independent. */
+function parseOptions(tokens: string[]): {
+  test_changes: TestChangesPolicy
+  open_pr: boolean
+} | null {
+  let test_changes: TestChangesPolicy = DEFAULT_TEST_CHANGES
+  let open_pr = false
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]!
+    if (token === '--open-pr') {
+      open_pr = true
+      continue
+    }
+    if (token === '--test-changes') {
+      const value = tokens[index + 1]
+      if (value !== 'allow' && value !== 'deny') {
+        return null
+      }
+      test_changes = value
+      index += 1
+      continue
+    }
+    return null
+  }
+  return { test_changes, open_pr }
+}
+
 export function extractCommentCommand(body: unknown): {
   command: 'review'
   mention: string
-  issue_review_objective: 'audit' | 'repair' | null
-  repair_mode: 'test-changes-allowed' | 'no-test-changes' | null
+  test_changes: TestChangesPolicy
+  open_pr: boolean
 } | null {
   if (typeof body !== 'string' || body.trim() === '') {
     return null
@@ -57,52 +90,27 @@ export function extractCommentCommand(body: unknown): {
     const commandText = normalizedBody.slice(startIndex).trim()
     const tokens = commandText.split(/\s+/)
     const command = tokens[0] ?? ''
-    const issueReviewObjectiveToken = tokens[1] ?? ''
-    const issueRepairModeToken = tokens[2] ?? ''
-    const plainReviewRepairModeToken = tokens[1] ?? ''
-    const issue_review_objective =
-      issueReviewObjectiveToken === 'audit' || issueReviewObjectiveToken === 'repair'
-        ? issueReviewObjectiveToken
-        : null
-    const repair_mode =
-      (issue_review_objective === 'repair' && issueRepairModeToken === 'no-test-changes') ||
-      (issue_review_objective === null && plainReviewRepairModeToken === 'no-test-changes')
-        ? 'no-test-changes'
-        : null
 
     if (command !== 'review') {
       continue
     }
 
-    const expectedTokenCount =
-      issue_review_objective === null
-        ? repair_mode === null
-          ? 1
-          : 2
-        : repair_mode === null
-          ? 2
-          : 3
-    if (tokens.length !== expectedTokenCount) {
-      return null
-    }
-
-    if (
-      issueReviewObjectiveToken !== '' &&
-      issue_review_objective === null &&
-      repair_mode === null
-    ) {
-      return null
-    }
-
-    if (issue_review_objective !== 'repair' && issueRepairModeToken !== '') {
+    // A trigger comment is `@<bot> review`, optionally followed by
+    // `--test-changes <allow|deny>` and/or the bare `--open-pr` flag. The review objective is not part of the command: the
+    // GitHub integration always reviews in `audit` mode, because the input is an unverified
+    // claim. (`repair` — proceeding as though the report were already confirmed — is reserved
+    // for callers that supply a trusted input, such as the PatchEval harness; it is not
+    // reachable from a comment.)
+    const options = parseOptions(tokens.slice(1))
+    if (options === null) {
       return null
     }
 
     return {
       command: 'review',
       mention: candidate,
-      issue_review_objective,
-      repair_mode
+      test_changes: options.test_changes,
+      open_pr: options.open_pr
     }
   }
 

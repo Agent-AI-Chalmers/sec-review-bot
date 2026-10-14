@@ -8,7 +8,7 @@ import {
 } from '../../github/issue-service.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
-import type { IssueReviewInput } from '../../runner/input.js'
+import type { IssueReviewInput, TestChangesPolicy } from '../../runner/input.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
   archiveInputBundle,
@@ -91,13 +91,13 @@ export async function prepareIssueReviewInput({
   octokit,
   issue,
   review_objective = 'audit',
-  repair_mode
+  test_changes
 }: {
   run_id: string
   octokit: GitHubAppOctokit
   issue: IssueContext
   review_objective?: 'audit' | 'repair'
-  repair_mode?: 'test-changes-allowed' | 'no-test-changes'
+  test_changes?: TestChangesPolicy
 }): Promise<{
   run_id: string
   input: IssueReviewInput
@@ -139,7 +139,7 @@ export async function prepareIssueReviewInput({
     contract_version: 'v5',
     review_intent: {
       objective: review_objective,
-      ...(repair_mode ? { repair_mode } : {})
+      ...(test_changes ? { test_changes } : {})
     },
     issue: historyArtifacts.issueMetadata,
     input_bundle

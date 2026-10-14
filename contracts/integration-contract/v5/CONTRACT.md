@@ -77,7 +77,7 @@ Review intent:
 ```ts
 interface ReviewIntent {
   objective: 'audit' | 'repair'
-  repair_mode?: 'test-changes-allowed' | 'no-test-changes'
+  test_changes?: 'allow' | 'deny'
 }
 ```
 
@@ -126,12 +126,12 @@ The runner validates input at the process boundary. All workflows require these 
 - `audit`
 - `repair` (`issue-review` only; pull request and repository workflows currently require `audit`)
 
-`review_intent.repair_mode` is optional and constrains later repair stages. If omitted, it defaults to `test-changes-allowed`:
+`review_intent.test_changes` is optional and constrains the final mitigation patch. If omitted, it defaults to `allow`:
 
-- `test-changes-allowed`
-- `no-test-changes`
+- `allow`: the final mitigation patch may contain reasonable test changes.
+- `deny`: the final mitigation patch must not contain test changes; tests may only be used as temporary validation work.
 
-`repair_mode` is a prompt constraint for the agent. It is not mechanical enforcement; the runner does not classify repository paths as tests or reject file changes based on path heuristics.
+`test_changes` is a prompt constraint for the agent. It is not mechanical enforcement; the runner does not classify repository paths as tests or reject file changes based on path heuristics.
 
 Each workflow also requires:
 

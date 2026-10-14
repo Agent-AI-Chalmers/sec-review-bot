@@ -50,7 +50,6 @@ def _render_issue_comment(
         "",
         *render_review_status_lines(analysis, mitigation, verification),
         f"- Patch ready: {inline_code('yes' if draft_pr_ready else 'no')}",
-        f"- Next step: {inline_code('open-draft-pr' if draft_pr_ready else 'issue-only')}",
         "",
         headline,
         "",
