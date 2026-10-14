@@ -16,6 +16,7 @@ from sec_review_agents.workflows.issue.single_agent import IssueSingleAgentWorkf
 from sec_review_agents.workflows.issue.two_stage import IssueTwoStageWorkflow
 from sec_review_agents.workflows.issue.workflow import IssueReviewWorkflow
 from tests.input_bundle import write_test_input_bundle
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def _issue_bundle(strategy: IssueReviewStrategy | None) -> ReviewBundle:
@@ -36,7 +37,7 @@ def _prepared_issue_bundle(tmp_path: Path) -> ReviewBundle:
         workflow="issue-review",
         run_id="run-1",
         input={
-            "contract_version": "v6",
+            "contract_version": CONTRACT_VERSION,
             "review_intent": {
                 "objective": "repair",
                 "test_changes": "allow",

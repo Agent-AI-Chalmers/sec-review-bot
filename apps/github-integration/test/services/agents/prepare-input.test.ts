@@ -12,6 +12,7 @@ import type { GitHubAppOctokit } from '../../../src/github/octokit.js'
 import type { IssueContext } from '../../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../../src/github/pull-request-service.js'
 import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/artifacts/git-workspace.js'
+import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 
 const execFileAsync = promisify(execFile)
 const PRIVATE_RUNNER_INPUT_KEYS = new Set([
@@ -259,7 +260,7 @@ test(
         await fs.readFile(path.join(prepared.input_bundle_root, 'manifest.json'), 'utf8')
       ) as Record<string, unknown>
       assert.deepEqual(manifest, {
-        contract_version: 'v6',
+        contract_version: CONTRACT_VERSION,
         kind: 'runner-input-bundle',
         workspace: { snapshot: WORKSPACE_SNAPSHOT_TAR_NAME },
         history: { path: 'history' }

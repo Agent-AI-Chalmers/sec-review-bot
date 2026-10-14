@@ -1,3 +1,4 @@
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from collections.abc import Mapping
 from typing import Any
 
@@ -212,7 +213,7 @@ def build_issue_review_result_activity(
     from sec_review_agents.review_stages.record import build_review_record
 
     return {
-        "contract_version": "v6",
+        "contract_version": CONTRACT_VERSION,
         "review_record": build_review_record(
             analysis_result=analysis_result,
             mitigation_result=mitigation_result,

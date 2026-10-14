@@ -1,3 +1,4 @@
+import { CONTRACT_VERSION, type ContractVersion } from '../../runner/contract-version.js'
 import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
 import type { PersistedIssue } from '../../control-plane/publish-context.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
@@ -38,7 +39,7 @@ function issueReviewRunMarker(run_id: string): string {
 }
 
 export interface IssueReviewWorkflowResult {
-  contract_version: 'v6'
+  contract_version: ContractVersion
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -52,9 +53,9 @@ type CompletedRunnerRun = {
 function issueReviewResultFromWorkflowResult(result: unknown): IssueReviewWorkflowResult | null {
   try {
     assertV5WorkflowResult('issue-review', result)
-    const rawResult = result as { contract_version: 'v6'; review_record: unknown }
+    const rawResult = result as { contract_version: ContractVersion; review_record: unknown }
     return {
-      contract_version: 'v6',
+      contract_version: CONTRACT_VERSION,
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

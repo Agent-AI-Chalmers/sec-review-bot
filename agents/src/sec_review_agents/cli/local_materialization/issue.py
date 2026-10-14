@@ -1,3 +1,4 @@
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 import shutil
 import subprocess
 from pathlib import Path
@@ -120,7 +121,7 @@ def build_local_issue_bundle(
     )
     input_bundle = archive_input_bundle(paths, include_incremental_window=False)
     input_data = {
-        "contract_version": "v6",
+        "contract_version": CONTRACT_VERSION,
         "review_intent": {
             "objective": review_objective,
             "test_changes": test_changes,

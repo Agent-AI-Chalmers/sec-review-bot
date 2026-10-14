@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { controlPlaneClient, type ReviewRunRecord } from '../../src/control-plane/client.js'
+import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 
 const preparingRun: ReviewRunRecord = {
   run_id: 'run-1',
@@ -102,7 +103,7 @@ test('repository preparation can replace the admitted empty publish context', as
       },
       event_type: 'manual'
     },
-    { contract_version: 'v6' }
+    { contract_version: CONTRACT_VERSION }
   )
 })
 

@@ -1,3 +1,4 @@
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -49,7 +50,7 @@ class ScanSummary(BaseModel):
 
 
 class RepositoryWorkflowResult(BaseModel):
-    contract_version: str = "v6"
+    contract_version: str = CONTRACT_VERSION
     scan_summary: ScanSummary
     deliveries: list[dict[str, Any]] = Field(default_factory=list)
     case_results: list[RepositoryCaseResult] = Field(default_factory=list)
@@ -143,7 +144,7 @@ def build_repository_workflow_result(
     )
     return RepositoryWorkflowResult.model_validate(
         {
-            "contract_version": "v6",
+            "contract_version": CONTRACT_VERSION,
             "scan_summary": repository_scan_summary,
             "deliveries": _repository_deliveries(delivery_result),
             "case_results": repository_case_results,

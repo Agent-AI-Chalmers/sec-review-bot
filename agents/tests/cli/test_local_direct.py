@@ -26,6 +26,7 @@ from sec_review_agents.workflows.repository.direct import (
     run_repository_review_direct,
 )
 from tests.input_bundle import write_test_input_bundle
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def _bundle(
@@ -54,7 +55,7 @@ def _prepared_issue_bundle(
         workflow="issue-review",
         run_id="run-1",
         input={
-            "contract_version": "v6",
+            "contract_version": CONTRACT_VERSION,
             "review_intent": review_intent
             or {
                 "objective": "repair",

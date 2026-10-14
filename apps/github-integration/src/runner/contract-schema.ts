@@ -4,6 +4,7 @@ import path from 'node:path'
 import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
 
 import type { WorkflowName } from './shapes.js'
+import { CONTRACT_VERSION_DIR } from './contract-version.js'
 
 const RESULT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
   'issue-review': 'issue-review-result.schema.json',
@@ -17,16 +18,32 @@ function contractSchemasRoot(): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
   const candidates = [
     ...(configuredRoot
-      ? [path.resolve(configuredRoot, 'integration-contract', 'v6', 'schemas')]
+      ? [path.resolve(configuredRoot, 'integration-contract', CONTRACT_VERSION_DIR, 'schemas')]
       : []),
-    path.resolve(process.cwd(), 'contracts', 'integration-contract', 'v6', 'schemas'),
-    path.resolve(process.cwd(), '..', '..', 'contracts', 'integration-contract', 'v6', 'schemas')
+    path.resolve(
+      process.cwd(),
+      'contracts',
+      'integration-contract',
+      CONTRACT_VERSION_DIR,
+      'schemas'
+    ),
+    path.resolve(
+      process.cwd(),
+      '..',
+      '..',
+      'contracts',
+      'integration-contract',
+      CONTRACT_VERSION_DIR,
+      'schemas'
+    )
   ]
   const root = candidates.find((candidate) =>
     existsSync(path.join(candidate, 'common.schema.json'))
   )
   if (root === undefined) {
-    throw new Error('Could not locate contract v6 schemas for Runner validation.')
+    throw new Error(
+      `Could not locate contract ${CONTRACT_VERSION_DIR} schemas for Runner validation.`
+    )
   }
   return root
 }

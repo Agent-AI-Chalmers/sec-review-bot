@@ -17,20 +17,20 @@ interface FixtureManifest {
 }
 
 function invalidFixtureSchemas(): Array<[string, string]> {
-  const manifest = contractFixtureManifest('v6') as FixtureManifest
+  const manifest = contractFixtureManifest() as FixtureManifest
   assert.equal(typeof manifest.invalid_schema_fixtures, 'object')
   return Object.entries(manifest.invalid_schema_fixtures)
 }
 
 function fixtureSchemas(): Array<[string, string]> {
-  const manifest = contractFixtureManifest('v6') as FixtureManifest
+  const manifest = contractFixtureManifest() as FixtureManifest
   assert.equal(typeof manifest.schema_fixtures, 'object')
   return Object.entries(manifest.schema_fixtures)
 }
 
 function contractAjv(): Ajv2020 {
   const ajv = new Ajv2020({ allErrors: true })
-  const commonSchema = contractSchema('v6', 'common.schema.json') as AnySchemaObject
+  const commonSchema = contractSchema('common.schema.json') as AnySchemaObject
 
   ajv.addSchema(commonSchema)
   ajv.addSchema(commonSchema, 'common.schema.json')
@@ -40,7 +40,7 @@ function contractAjv(): Ajv2020 {
 
 function contractValidator(schemaName: string): ReturnType<Ajv2020['compile']> {
   const ajv = contractAjv()
-  return ajv.compile(contractSchema('v6', schemaName) as AnySchemaObject)
+  return ajv.compile(contractSchema(schemaName) as AnySchemaObject)
 }
 
 test('shared v6 contract fixtures match JSON schemas', () => {
@@ -50,10 +50,10 @@ test('shared v6 contract fixtures match JSON schemas', () => {
   for (const [fixtureName, schemaName] of fixtureSchemas()) {
     let validate = validators.get(schemaName)
     if (validate === undefined) {
-      validate = ajv.compile(contractSchema('v6', schemaName) as AnySchemaObject)
+      validate = ajv.compile(contractSchema(schemaName) as AnySchemaObject)
       validators.set(schemaName, validate)
     }
-    const valid = validate(contractFixture('v6', fixtureName))
+    const valid = validate(contractFixture(fixtureName))
 
     assert.equal(
       valid,
@@ -66,8 +66,8 @@ test('shared v6 contract fixtures match JSON schemas', () => {
 test('shared v6 contract fixture manifest covers fixture and schema files', () => {
   const schemaFixtures = new Map(fixtureSchemas())
   const invalidSchemaFixtures = new Map(invalidFixtureSchemas())
-  const fixtureNames = contractFixtureFiles('v6').filter((name) => name !== 'manifest.json')
-  const schemaNames = new Set(contractSchemaFiles('v6'))
+  const fixtureNames = contractFixtureFiles().filter((name) => name !== 'manifest.json')
+  const schemaNames = new Set(contractSchemaFiles())
 
   assert.deepEqual([...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort(), fixtureNames)
   assert.ok(
@@ -80,13 +80,13 @@ test('shared v6 contract fixture manifest covers fixture and schema files', () =
 test('shared v6 invalid contract fixtures are rejected by JSON schemas', () => {
   for (const [fixtureName, schemaName] of invalidFixtureSchemas()) {
     const validate = contractValidator(schemaName)
-    assert.equal(validate(contractFixture('v6', fixtureName)), false, fixtureName)
+    assert.equal(validate(contractFixture(fixtureName)), false, fixtureName)
   }
 })
 
 test('v6 pull request input schema requires audit objective', () => {
   const validate = contractValidator('pull-request-review-input.schema.json')
-  const payload = contractFixture('v6', 'pull-request-review-input.json') as {
+  const payload = contractFixture('pull-request-review-input.json') as {
     review_intent: { objective: string }
   }
   payload.review_intent.objective = 'repair'
@@ -96,7 +96,7 @@ test('v6 pull request input schema requires audit objective', () => {
 
 test('v6 repository input schema requires audit objective', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = contractFixture('v6', 'repository-review-input-incremental.json') as {
+  const payload = contractFixture('repository-review-input-incremental.json') as {
     review_intent: { objective: string }
   }
   payload.review_intent.objective = 'repair'
@@ -106,7 +106,7 @@ test('v6 repository input schema requires audit objective', () => {
 
 test('v6 repository input schema rejects the removed max_file_bytes field', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = structuredClone(contractFixture('v6', 'repository-review-input-full.json')) as {
+  const payload = structuredClone(contractFixture('repository-review-input-full.json')) as {
     scan_scope: { max_file_bytes?: number }
   }
   payload.scan_scope.max_file_bytes = 200000
@@ -116,7 +116,7 @@ test('v6 repository input schema rejects the removed max_file_bytes field', () =
 
 test('v6 repository full scan schema rejects incremental window fields', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = contractFixture('v6', 'repository-review-input-full.json') as {
+  const payload = contractFixture('repository-review-input-full.json') as {
     scan_target: {
       base_sha: string | null
       commit_shas: string[]
@@ -139,7 +139,7 @@ test('v6 repository incremental schema rejects missing window fields', () => {
 
   for (const scanTargetPatch of [{ base_sha: null }, { commit_shas: [] }]) {
     const payload = structuredClone(
-      contractFixture('v6', 'repository-review-input-incremental.json')
+      contractFixture('repository-review-input-incremental.json')
     ) as {
       scan_target: {
         base_sha: string | null
@@ -154,9 +154,7 @@ test('v6 repository incremental schema rejects missing window fields', () => {
 
 test('v6 repository incremental schema allows empty changed file scope', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = structuredClone(
-    contractFixture('v6', 'repository-review-input-incremental.json')
-  ) as {
+  const payload = structuredClone(contractFixture('repository-review-input-incremental.json')) as {
     scan_scope: {
       incremental_changed_files: Array<Record<string, unknown>>
     }
@@ -179,7 +177,7 @@ test('v6 review record schema rejects unsafe file change paths', () => {
     '.git/config',
     ' src/server.ts '
   ]) {
-    const payload = structuredClone(contractFixture('v6', 'review-record-deleted-file.json')) as {
+    const payload = structuredClone(contractFixture('review-record-deleted-file.json')) as {
       mitigation: {
         file_changes: Array<{ path: string }>
       }

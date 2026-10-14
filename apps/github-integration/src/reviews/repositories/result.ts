@@ -1,3 +1,4 @@
+import { type ContractVersion } from '../../runner/contract-version.js'
 import type { FileChange } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import type { ReviewRecord } from '../review-record.js'
@@ -21,7 +22,7 @@ export interface RepositoryCaseResult {
 }
 
 export interface RepositoryWorkflowResult {
-  contract_version: 'v6'
+  contract_version: ContractVersion
   scan_summary: Record<string, unknown>
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]

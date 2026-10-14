@@ -1,3 +1,4 @@
+import { CONTRACT_VERSION } from '../../runner/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -147,7 +148,7 @@ export async function prepareIssueReviewInput({
     run_id
   })
   const input: IssueReviewInput = {
-    contract_version: 'v6',
+    contract_version: CONTRACT_VERSION,
     review_intent: {
       objective: review_objective,
       ...(test_changes ? { test_changes } : {})

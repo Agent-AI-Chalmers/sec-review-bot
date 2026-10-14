@@ -1,3 +1,4 @@
+import { CONTRACT_VERSION } from '../../runner/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -224,7 +225,7 @@ export async function prepareRepositoryReviewInput({
     run_id
   })
   const input: RepositoryReviewInput = {
-    contract_version: 'v6',
+    contract_version: CONTRACT_VERSION,
     input_bundle,
     review_intent: {
       objective: 'audit',

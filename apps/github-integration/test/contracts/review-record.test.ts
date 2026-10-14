@@ -19,7 +19,7 @@ interface ReviewRecordFixture {
 }
 
 function reviewRecordFixtureNames(): string[] {
-  const manifest = contractFixtureManifest('v6') as FixtureManifest
+  const manifest = contractFixtureManifest() as FixtureManifest
   return Object.entries(manifest.schema_fixtures)
     .filter(([, schemaName]) => schemaName === 'review-record.schema.json')
     .map(([fixtureName]) => fixtureName)
@@ -62,7 +62,7 @@ test('parseReviewRecord accepts a complete v6 review_record', () => {
 })
 
 test('parseReviewRecord accepts the shared v6 review_record fixture', () => {
-  const record = parseReviewRecord(contractFixture('v6', 'review-record.json'))
+  const record = parseReviewRecord(contractFixture('review-record.json'))
 
   assert.equal(record.analysis.verdict, 'confirmed-vulnerability')
   assert.equal(record.verification.patch_coverage, 'full')
@@ -70,7 +70,7 @@ test('parseReviewRecord accepts the shared v6 review_record fixture', () => {
 })
 
 test('parseReviewRecord accepts the shared v6 deleted-file review_record fixture', () => {
-  const record = parseReviewRecord(contractFixture('v6', 'review-record-deleted-file.json'))
+  const record = parseReviewRecord(contractFixture('review-record-deleted-file.json'))
 
   assert.equal(record.analysis.verdict, 'confirmed-defect')
   assert.equal(record.mitigation.file_changes.at(0)?.status, 'deleted')
@@ -79,7 +79,7 @@ test('parseReviewRecord accepts the shared v6 deleted-file review_record fixture
 
 test('parseReviewRecord accepts every shared v6 review_record schema fixture', () => {
   for (const fixtureName of reviewRecordFixtureNames()) {
-    assert.doesNotThrow(() => parseReviewRecord(contractFixture('v6', fixtureName)), fixtureName)
+    assert.doesNotThrow(() => parseReviewRecord(contractFixture(fixtureName)), fixtureName)
   }
 })
 

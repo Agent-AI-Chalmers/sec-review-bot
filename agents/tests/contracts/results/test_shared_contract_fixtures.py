@@ -19,8 +19,8 @@ def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:
 
 
 def test_shared_v6_issue_and_pull_request_result_fixtures_are_public_shape() -> None:
-    issue_result = contract_fixture("v6", "issue-review-result.json")
-    pull_request_result = contract_fixture("v6", "pull-request-review-result.json")
+    issue_result = contract_fixture("issue-review-result.json")
+    pull_request_result = contract_fixture("pull-request-review-result.json")
 
     assert_public_workflow_result(issue_result)
     assert_public_workflow_result(pull_request_result)
@@ -29,7 +29,7 @@ def test_shared_v6_issue_and_pull_request_result_fixtures_are_public_shape() -> 
 
 
 def test_shared_v6_repository_result_fixture_is_public_shape() -> None:
-    result = contract_fixture("v6", "repository-review-result.json")
+    result = contract_fixture("repository-review-result.json")
 
     assert_public_workflow_result(result)
     assert isinstance(result["scan_summary"], Mapping)
@@ -38,7 +38,7 @@ def test_shared_v6_repository_result_fixture_is_public_shape() -> None:
 
 
 def test_shared_v6_repository_blocked_result_fixture_is_public_shape() -> None:
-    result = contract_fixture("v6", "repository-review-result-blocked.json")
+    result = contract_fixture("repository-review-result-blocked.json")
 
     assert_public_workflow_result(result)
     assert result["case_results"][0]["disposition"] == "blocked"

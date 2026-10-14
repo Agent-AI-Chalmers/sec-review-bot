@@ -13,7 +13,10 @@ from sec_review_agents.artifacts.input_storage import (
     ARTIFACT_S3_BUCKET_ENV,
     download_s3_input_bundle,
 )
-from sec_review_agents.entrypoints.contract_schema import validate_v6_workflow_input
+from sec_review_agents.entrypoints.contract_schema import (
+    CONTRACT_VERSION,
+    validate_v6_workflow_input,
+)
 from sec_review_agents.entrypoints.run_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
 
@@ -303,8 +306,10 @@ def _set_bundle_paths_from_manifest(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError("Input bundle manifest must be an object.")
-    if manifest.get("contract_version") != "v6":
-        raise ValueError(f"Input bundle manifest contract_version must be 'v6'.")
+    if manifest.get("contract_version") != CONTRACT_VERSION:
+        raise ValueError(
+            f"Input bundle manifest contract_version must be '{CONTRACT_VERSION}'."
+        )
     if manifest.get("kind") != "runner-input-bundle":
         raise ValueError("Input bundle manifest kind must be 'runner-input-bundle'.")
 

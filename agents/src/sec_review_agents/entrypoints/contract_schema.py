@@ -11,6 +11,15 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from referencing import Registry, Resource
 
+# Single source of truth for the integration contract version.
+#
+# CONTRACT_VERSION is the version this runner produces and expects.
+# CONTRACT_VERSION_DIR is the on-disk directory that holds the schemas; it
+# currently equals the version string, but the two are separate concepts
+# (contract identity vs. file location), so paths reference the *_DIR name.
+CONTRACT_VERSION = "v6"
+CONTRACT_VERSION_DIR = CONTRACT_VERSION
+
 INPUT_SCHEMA_BY_WORKFLOW = {
     "issue-review": "issue-review-input.schema.json",
     "pull-request-review": "pull-request-review-input.schema.json",
@@ -26,7 +35,7 @@ RESULT_SCHEMA_BY_WORKFLOW = {
 
 # The subtree under a contracts root that holds the canonical v6 schemas. An
 # operator points `SEC_REVIEW_CONTRACTS_ROOT` at the directory that contains it.
-_CONTRACT_SUBTREE = Path("integration-contract") / "v6" / "schemas"
+_CONTRACT_SUBTREE = Path("integration-contract") / CONTRACT_VERSION_DIR / "schemas"
 _SCHEMAS_ROOT_ENV = "SEC_REVIEW_CONTRACTS_ROOT"
 
 
@@ -61,7 +70,9 @@ def _schema_root() -> Traversable:
             )
         return root / _CONTRACT_SUBTREE
 
-    packaged = files("sec_review_agents.resources").joinpath("contracts", "v6")
+    packaged = files("sec_review_agents.resources").joinpath(
+        "contracts", CONTRACT_VERSION_DIR
+    )
     if packaged.joinpath("common.schema.json").is_file():
         return packaged
 

@@ -4,6 +4,7 @@ import test from 'node:test'
 import { startIssueReviewRun } from '../../../src/reviews/issues/submit.js'
 import type { IssueContext } from '../../../src/github/issue-service.js'
 import type { IssueReviewInput, TestChangesPolicy } from '../../../src/runner/input.js'
+import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 
 function issueContext(): IssueContext {
   return {
@@ -40,7 +41,7 @@ function fakePrepareInput() {
     return {
       run_id: 'run-issue-1',
       input: {
-        contract_version: 'v6',
+        contract_version: CONTRACT_VERSION,
         review_intent: {},
         issue: {}
       } as IssueReviewInput,

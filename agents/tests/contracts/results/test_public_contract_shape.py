@@ -9,6 +9,7 @@ from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
 from tests.contract_fixtures import contract_validator, format_schema_errors
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 FORBIDDEN_INTERNAL_PUBLIC_RESULT_KEYS = {
     "analysis_result",
@@ -71,7 +72,7 @@ def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:
 
 
 def assert_matches_v6_schema(payload: Mapping[str, Any], schema_name: str) -> None:
-    validator = contract_validator("v6", schema_name)
+    validator = contract_validator(schema_name)
     errors = sorted(
         validator.iter_errors(payload),
         key=lambda error: list(error.path),
@@ -84,7 +85,7 @@ def assert_matches_v6_schema(payload: Mapping[str, Any], schema_name: str) -> No
 
 def test_pull_request_result_public_shape() -> None:
     result: dict[str, Any] = {
-        "contract_version": "v6",
+        "contract_version": CONTRACT_VERSION,
         "review_record": build_review_record(
             analysis_result={
                 "verdict": "no-actionable-finding",

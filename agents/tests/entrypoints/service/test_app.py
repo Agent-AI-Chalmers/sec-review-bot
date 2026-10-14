@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sec_review_agents.entrypoints.service import app as service_app
 from sec_review_agents.entrypoints.service.gateway import RunnerRunConflictError
 from tests.contract_fixtures import contract_fixture
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 class FakeRunnerWorkflowGateway:
@@ -40,7 +41,7 @@ class FakeRunnerWorkflowGateway:
 def _request() -> dict[str, Any]:
     return {
         "run_id": "run-service",
-        "input": contract_fixture("v6", "issue-review-input.json"),
+        "input": contract_fixture("issue-review-input.json"),
     }
 
 
@@ -102,7 +103,7 @@ def test_create_run_rejects_invalid_run_id_before_start(monkeypatch) -> None:
         "/v1/workflows/issue-review/runs",
         json={
             "run_id": "../run-service",
-            "input": contract_fixture("v6", "issue-review-input.json"),
+            "input": contract_fixture("issue-review-input.json"),
         },
     )
 
@@ -123,7 +124,7 @@ def test_create_run_rejects_schema_invalid_input_before_start(monkeypatch) -> No
         json={
             "run_id": "run-service",
             "input": contract_fixture(
-                "v6", "invalid-repository-review-input-max-file-bytes.json"
+                "invalid-repository-review-input-max-file-bytes.json"
             ),
         },
     )
@@ -214,7 +215,7 @@ def test_get_run_returns_worker_result(monkeypatch) -> None:
         "run_id": "run-service",
         "workflow": "issue-review",
         "status": "succeeded",
-        "result": {"contract_version": "v6"},
+        "result": {"contract_version": CONTRACT_VERSION},
     }
     client = TestClient(service_app.create_app(runner_gateway=gateway))
 

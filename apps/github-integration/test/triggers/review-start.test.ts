@@ -6,6 +6,7 @@ import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-r
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
+import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 
 const preparationClaim = {
   renewPreparationClaim: async () => true,
@@ -96,7 +97,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           event_type: 'opened' as const,
           open_pr: false
         }
-        await on_prepared?.(prepared, { contract_version: 'v6' } as never)
+        await on_prepared?.(prepared, { contract_version: CONTRACT_VERSION } as never)
         return prepared
       },
       store: {
@@ -169,7 +170,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
           workflow: 'pull-request-review',
           event_type: 'manual_review' as const
         }
-        await on_prepared?.(prepared, { contract_version: 'v6' } as never)
+        await on_prepared?.(prepared, { contract_version: CONTRACT_VERSION } as never)
         return prepared
       },
       store: {
@@ -291,7 +292,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               event_type: 'opened',
               open_pr: false
             },
-            { contract_version: 'v6' } as never
+            { contract_version: CONTRACT_VERSION } as never
           )
           throw error
         },
@@ -339,7 +340,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
               workflow: 'pull-request-review',
               event_type: 'opened'
             },
-            { contract_version: 'v6' } as never
+            { contract_version: CONTRACT_VERSION } as never
           )
           throw error
         },

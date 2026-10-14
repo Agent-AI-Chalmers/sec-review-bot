@@ -37,6 +37,7 @@ from sec_review_agents.workflows.repository.workflow import (
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from tests.input_bundle import write_test_input_bundle
 from tests.temporal_test_utils import temporal_time_skipping_environment
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def _repository_case_execution_input(case_id: str) -> dict:
@@ -109,7 +110,7 @@ class _CompletedInvalidResultHandle:
         return _CompletedDescription()
 
     async def result(self) -> dict:
-        return {"ok": True, "result": {"contract_version": "v6"}}
+        return {"ok": True, "result": {"contract_version": CONTRACT_VERSION}}
 
 
 def _valid_workflow_result(workflow: str) -> dict:
@@ -121,7 +122,7 @@ def _valid_workflow_result(workflow: str) -> dict:
     )
     if workflow == "repository-review":
         return {
-            "contract_version": "v6",
+            "contract_version": CONTRACT_VERSION,
             "scan_summary": {
                 "scannable_file_count": 0,
                 "scanned_file_count": 0,
@@ -133,7 +134,7 @@ def _valid_workflow_result(workflow: str) -> dict:
             "case_results": [],
             "deliveries": [],
         }
-    return {"contract_version": "v6", "review_record": review_record}
+    return {"contract_version": CONTRACT_VERSION, "review_record": review_record}
 
 
 @activity.defn(name="prepare_runner_run_activity")
@@ -819,7 +820,7 @@ def test_prepare_runner_run_activity_maps_missing_manifest_to_input_error(
             workflow="issue-review",
             run_id="run-missing-manifest",
             input_data={
-                "contract_version": "v6",
+                "contract_version": CONTRACT_VERSION,
                 "input_bundle": write_test_input_bundle(
                     tmp_path / "missing-manifest", include_manifest=False
                 ),

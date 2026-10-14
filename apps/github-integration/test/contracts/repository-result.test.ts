@@ -20,7 +20,7 @@ interface RepositoryResultFixture {
 
 function validRepositoryResult(): RepositoryResultFixture {
   return structuredClone(
-    contractFixture('v6', 'repository-review-result.json')
+    contractFixture('repository-review-result.json')
   ) as RepositoryResultFixture
 }
 
@@ -35,9 +35,7 @@ test('repository result rejects malformed delivery file changes before draft PR 
 })
 
 test('repository result parser accepts the shared v6 repository result fixture', () => {
-  const result = parseRepositoryWorkflowResult(
-    contractFixture('v6', 'repository-review-result.json')
-  )
+  const result = parseRepositoryWorkflowResult(contractFixture('repository-review-result.json'))
 
   assert.equal(result.contract_version, 'v6')
   assert.equal(result.case_results.at(0)?.case_id, 'case-1')
@@ -46,7 +44,7 @@ test('repository result parser accepts the shared v6 repository result fixture',
 
 test('repository result parser accepts the shared v6 blocked result fixture', () => {
   const result = parseRepositoryWorkflowResult(
-    contractFixture('v6', 'repository-review-result-blocked.json')
+    contractFixture('repository-review-result-blocked.json')
   )
 
   assert.equal(result.contract_version, 'v6')

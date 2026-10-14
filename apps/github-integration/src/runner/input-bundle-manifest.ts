@@ -1,3 +1,4 @@
+import { CONTRACT_VERSION } from './contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -20,7 +21,7 @@ export async function writeInputBundleManifest({
   trusted_setup_path?: string
 }): Promise<void> {
   const manifest: Record<string, unknown> = {
-    contract_version: 'v6',
+    contract_version: CONTRACT_VERSION,
     kind: 'runner-input-bundle',
     workspace: {
       snapshot: WORKSPACE_SNAPSHOT_TAR_NAME
