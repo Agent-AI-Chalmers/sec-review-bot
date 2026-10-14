@@ -55,7 +55,7 @@ def build_local_issue_bundle(
     output_dir: Path,
     target_branch: str | None = None,
     review_objective: str = "repair",
-    repair_mode: str = "test-changes-allowed",
+    test_changes: str = "allow",
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     issue_number_value = str(issue_number)
@@ -123,7 +123,7 @@ def build_local_issue_bundle(
         "contract_version": "v5",
         "review_intent": {
             "objective": review_objective,
-            "repair_mode": repair_mode,
+            "test_changes": test_changes,
         },
         "issue": issue_metadata,
         "input_bundle": input_bundle,

@@ -58,7 +58,7 @@ def _prepared_issue_bundle(
             "review_intent": review_intent
             or {
                 "objective": "repair",
-                "repair_mode": "test-changes-allowed",
+                "test_changes": "allow",
             },
             "issue": {"title": "Issue", "body": "Body"},
             "input_bundle": write_test_input_bundle(local_root),
@@ -153,8 +153,8 @@ def test_local_direct_runs_review_only(
         ),
         (
             "two-stage",
-            {"objective": "repair", "repair_mode": "unknown"},
-            "review_intent.repair_mode",
+            {"objective": "repair", "test_changes": "unknown"},
+            "review_intent.test_changes",
         ),
         (
             "single-agent",
@@ -163,8 +163,8 @@ def test_local_direct_runs_review_only(
         ),
         (
             "single-agent",
-            {"objective": "repair", "repair_mode": "unknown"},
-            "review_intent.repair_mode",
+            {"objective": "repair", "test_changes": "unknown"},
+            "review_intent.test_changes",
         ),
     ],
 )

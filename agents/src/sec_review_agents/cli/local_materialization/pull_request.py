@@ -229,7 +229,7 @@ def build_local_pull_request_bundle(
     head_ref: str = "HEAD",
     event_type: str = "local_review",
     is_draft: bool = False,
-    repair_mode: str = "test-changes-allowed",
+    test_changes: str = "allow",
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     pr_number_value = int(pr_number)
@@ -323,7 +323,7 @@ def build_local_pull_request_bundle(
         "contract_version": "v5",
         "review_intent": {
             "objective": "audit",
-            "repair_mode": repair_mode,
+            "test_changes": test_changes,
         },
         "pr": pr_metadata,
         "input_bundle": input_bundle,

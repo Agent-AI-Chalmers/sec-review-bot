@@ -39,10 +39,10 @@ def parse_args() -> argparse.Namespace:
         "--repo", required=True, help="Path to the local repository to analyze."
     )
     parser.add_argument(
-        "--repair-mode",
-        choices=("test-changes-allowed", "no-test-changes"),
-        required=True,
-        help="Repair-stage patch constraint.",
+        "--test-changes",
+        choices=("allow", "deny"),
+        default="allow",
+        help="Whether the final mitigation patch may contain test changes.",
     )
     parser.add_argument(
         "--scan-mode",
@@ -179,7 +179,7 @@ def main() -> None:
         scan_mode=scan_mode,
         baseline_ref=base_sha,
         paths_ignore=args.paths_ignore,
-        repair_mode=args.repair_mode,
+        test_changes=args.test_changes,
     )
 
     print(f"LOCAL_ROOT={bundle.local_root_path}")

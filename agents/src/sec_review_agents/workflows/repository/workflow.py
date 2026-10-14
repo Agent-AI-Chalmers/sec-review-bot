@@ -284,7 +284,7 @@ def prepare_repository_case_review_inputs_activity(
                     incremental_window_path=incremental_window_path,
                     scan_mode=scan_mode,
                     case=case,
-                    repair_mode=review_intent.repair_mode,
+                    test_changes=review_intent.test_changes,
                 ),
                 "cases_artifacts_path": str(cases_artifacts_path),
                 "published_transcripts_path": str(

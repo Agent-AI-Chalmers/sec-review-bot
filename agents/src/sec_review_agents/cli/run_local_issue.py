@@ -58,10 +58,10 @@ def parse_args() -> argparse.Namespace:
         help="Review intent: audit the claim or proceed with repair-oriented review.",
     )
     parser.add_argument(
-        "--repair-mode",
-        choices=("test-changes-allowed", "no-test-changes"),
-        required=True,
-        help="Repair-stage patch constraint.",
+        "--test-changes",
+        choices=("allow", "deny"),
+        default="allow",
+        help="Whether the final mitigation patch may contain test changes.",
     )
     parser.add_argument(
         "--repo", required=True, help="Path to the local repository to analyze."
@@ -150,7 +150,7 @@ def main() -> None:
         output_dir=output_dir,
         target_branch=target_branch,
         review_objective=args.review_objective,
-        repair_mode=args.repair_mode,
+        test_changes=args.test_changes,
     )
     bundle = ReviewBundle(
         workflow="issue-review",

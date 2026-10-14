@@ -22,9 +22,9 @@ from sec_review_agents.workflows.repository_case.verification import (
     verify_repository_case,
 )
 from sec_review_agents.workflows.review_intent import (
-    REPAIR_MODE_NO_TEST_CHANGES,
-    REPAIR_MODE_TEST_CHANGES_ALLOWED,
-    RepairMode,
+    TEST_CHANGES_DENY,
+    TEST_CHANGES_ALLOW,
+    TestChangesPolicy,
 )
 
 MITIGATION_NO_TARGET_REASON = (
@@ -109,13 +109,13 @@ def _case_path(case_execution_input: Mapping[str, Any], key: str) -> Path:
     return required_path(case_execution_input.get(key), label=key)
 
 
-def _case_repair_mode(case_execution_input: Mapping[str, Any]) -> RepairMode:
-    value = case_execution_input.get("repair_mode")
-    if value == REPAIR_MODE_TEST_CHANGES_ALLOWED:
-        return REPAIR_MODE_TEST_CHANGES_ALLOWED
-    if value == REPAIR_MODE_NO_TEST_CHANGES:
-        return REPAIR_MODE_NO_TEST_CHANGES
-    raise ValueError("Repository case execution input is missing valid repair_mode.")
+def _case_test_changes(case_execution_input: Mapping[str, Any]) -> TestChangesPolicy:
+    value = case_execution_input.get("test_changes")
+    if value == TEST_CHANGES_ALLOW:
+        return TEST_CHANGES_ALLOW
+    if value == TEST_CHANGES_DENY:
+        return TEST_CHANGES_DENY
+    raise ValueError("Repository case execution input is missing valid test_changes.")
 
 
 def repository_case_stage_artifact_paths(
@@ -253,7 +253,7 @@ async def run_repository_case_mitigation_stage(
             review_input=case_execution_input["review_input"],
             analysis_result=analyzer_result,
             retry_context=retry_context,
-            repair_mode=_case_repair_mode(case_execution_input),
+            test_changes=_case_test_changes(case_execution_input),
             runtime_context=runtime_context,
         )
 

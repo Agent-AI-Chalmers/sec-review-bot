@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.workflows.issue.single_agent import execute_issue_single_agent
-from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
+from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
@@ -81,7 +81,7 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
             history_path=Path(input_data["input_bundle_root_path"]) / "history",
             single_agent_artifacts_path=single_agent_artifacts,
             review_objective="audit",
-            repair_mode=REPAIR_MODE_TEST_CHANGES_ALLOWED,
+            test_changes=TEST_CHANGES_ALLOW,
         )
 
     assert set(result) == {"kind", "review_record"}
@@ -151,7 +151,7 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
             history_path=Path(input_data["input_bundle_root_path"]) / "history",
             single_agent_artifacts_path=root / "single-agent",
             review_objective="audit",
-            repair_mode=REPAIR_MODE_TEST_CHANGES_ALLOWED,
+            test_changes=TEST_CHANGES_ALLOW,
         )
         default_artifact_result_exists = (
             root / "single-agent" / "single-agent-result.json"

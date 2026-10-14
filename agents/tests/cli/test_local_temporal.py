@@ -39,7 +39,7 @@ def _prepared_issue_bundle(tmp_path: Path) -> ReviewBundle:
             "contract_version": "v5",
             "review_intent": {
                 "objective": "repair",
-                "repair_mode": "test-changes-allowed",
+                "test_changes": "allow",
             },
             "issue": {"title": "Issue", "body": "Body"},
             "input_bundle": write_test_input_bundle(local_root),

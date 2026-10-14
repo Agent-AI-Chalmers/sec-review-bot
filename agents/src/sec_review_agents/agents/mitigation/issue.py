@@ -27,9 +27,9 @@ from sec_review_agents.utils.structured_renderer import (
     render_structured_markdown_section,
 )
 from sec_review_agents.workflows.review_intent import (
-    REPAIR_MODE_TEST_CHANGES_ALLOWED,
-    RepairMode,
-    repair_mode_boundary_prompt_path,
+    TEST_CHANGES_ALLOW,
+    TestChangesPolicy,
+    test_changes_boundary_prompt_path,
 )
 
 ISSUE_MITIGATION_INITIAL_INTRO = "\n".join(
@@ -90,12 +90,12 @@ def create_issue_mitigation_backend(
 
 def build_issue_mitigation_system_prompt(
     *,
-    repair_mode: RepairMode = REPAIR_MODE_TEST_CHANGES_ALLOWED,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     is_retry: bool = False,
 ) -> str:
     paths = [
         "mitigator/system-core.md",
-        repair_mode_boundary_prompt_path(repair_mode),
+        test_changes_boundary_prompt_path(test_changes),
         "shared/no-git-history-remediation-boundary.md",
         "shared/runtime-evidence-discipline.md",
         "shared/input-location-hints-rule.md",
@@ -172,12 +172,12 @@ def build_issue_mitigation_user_prompt(
 
 
 def build_issue_self_check_mitigation_system_prompt(
-    *, repair_mode: RepairMode = REPAIR_MODE_TEST_CHANGES_ALLOWED
+    *, test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW
 ) -> str:
     return join_prompt_sections(
         [
             "mitigator/system-core.md",
-            repair_mode_boundary_prompt_path(repair_mode),
+            test_changes_boundary_prompt_path(test_changes),
             "shared/no-git-history-remediation-boundary.md",
             "mitigator/system-self-check-delta.md",
             "shared/runtime-evidence-discipline.md",

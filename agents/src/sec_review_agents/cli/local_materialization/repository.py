@@ -180,7 +180,7 @@ def build_local_repository_security_bundle(
     baseline_ref: str | None = None,
     paths_ignore: list[str] | None = None,
     default_branch: str | None = None,
-    repair_mode: str = "test-changes-allowed",
+    test_changes: str = "allow",
 ) -> ReviewBundle:
     event_type = "manual"
     resolved_paths_ignore = list(paths_ignore or [])
@@ -291,7 +291,7 @@ def build_local_repository_security_bundle(
         "input_bundle": input_bundle,
         "review_intent": {
             "objective": "audit",
-            "repair_mode": repair_mode,
+            "test_changes": test_changes,
         },
         "scan_target": {
             "target_branch": (target_branch or ref),

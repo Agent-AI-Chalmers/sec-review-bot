@@ -34,7 +34,7 @@ from sec_review_agents.workflows.repository.workflow import (
     RepositoryReviewWorkflow,
     RepositoryScanWorkflow,
 )
-from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
+from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from tests.input_bundle import write_test_input_bundle
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
@@ -47,7 +47,7 @@ def _repository_case_execution_input(case_id: str) -> dict:
         "history_path": "/tmp/history",
         "scan_mode": "full",
         "incremental_window_path": None,
-        "repair_mode": REPAIR_MODE_TEST_CHANGES_ALLOWED,
+        "test_changes": TEST_CHANGES_ALLOW,
     }
 
 

@@ -15,7 +15,7 @@ from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseReviewWorkflow,
 )
 from sec_review_agents.workflows.repository_case import stage as case_workflow
-from sec_review_agents.workflows.review_intent import REPAIR_MODE_TEST_CHANGES_ALLOWED
+from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
@@ -28,7 +28,7 @@ def repository_case_execution_input(case_id: str) -> RepositoryCaseExecutionInpu
         "history_path": "/tmp/history",
         "scan_mode": "full",
         "incremental_window_path": None,
-        "repair_mode": REPAIR_MODE_TEST_CHANGES_ALLOWED,
+        "test_changes": TEST_CHANGES_ALLOW,
     }
 
 

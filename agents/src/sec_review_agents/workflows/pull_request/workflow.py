@@ -142,7 +142,7 @@ async def mitigate_pull_request_activity(
         ),
         analysis_result=analysis_result,
         retry_context=retry_context,
-        repair_mode=review_intent.repair_mode,
+        test_changes=review_intent.test_changes,
         runtime_context=runtime_context,
     )
 

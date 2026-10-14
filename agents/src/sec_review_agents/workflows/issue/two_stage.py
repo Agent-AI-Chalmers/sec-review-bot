@@ -18,8 +18,8 @@ from sec_review_agents.workflows.issue.workflow import (
     should_run_issue_mitigation,
 )
 from sec_review_agents.workflows.review_intent import (
-    REPAIR_MODE_TEST_CHANGES_ALLOWED,
-    RepairMode,
+    TEST_CHANGES_ALLOW,
+    TestChangesPolicy,
     ReviewObjective,
     require_review_intent,
 )
@@ -86,7 +86,7 @@ async def mitigate_issue_self_check_activity(
             attempt=mitigation_attempt_label(None),
         ),
         analysis_result=analysis_result,
-        repair_mode=review_intent.repair_mode,
+        test_changes=review_intent.test_changes,
         runtime_context=runtime_context,
     )
 
@@ -145,7 +145,7 @@ async def run_issue_two_stage(
     analyzer_artifacts_path: Path,
     mitigator_artifacts_path: Path,
     review_objective: ReviewObjective,
-    repair_mode: RepairMode = REPAIR_MODE_TEST_CHANGES_ALLOWED,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
 ) -> dict[str, Any]:
     """Run analyzer plus self-checking mitigation and return raw stage outputs."""
@@ -182,7 +182,7 @@ async def run_issue_two_stage(
             history_path=history_path,
             mitigator_artifacts_path=mitigator_artifacts_path,
             analysis_result=analysis_result,
-            repair_mode=repair_mode,
+            test_changes=test_changes,
             runtime_context=runtime_context,
         )
 
@@ -227,7 +227,7 @@ async def execute_issue_two_stage(
     analyzer_artifacts_path: Path,
     mitigator_artifacts_path: Path,
     review_objective: ReviewObjective,
-    repair_mode: RepairMode = REPAIR_MODE_TEST_CHANGES_ALLOWED,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
 ) -> dict[str, Any]:
     """Run the stages and project them into the public ablation result shape."""
@@ -238,7 +238,7 @@ async def execute_issue_two_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
         mitigator_artifacts_path=mitigator_artifacts_path,
         review_objective=review_objective,
-        repair_mode=repair_mode,
+        test_changes=test_changes,
         runtime_context=runtime_context,
     )
     return build_issue_two_stage_result(
