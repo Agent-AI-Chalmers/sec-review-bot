@@ -405,12 +405,30 @@ export function devFixtures(): Plugin {
   return {
     name: 'control-plane-ui-dev-fixtures',
     configureServer(server): void {
+      // Fixtures have no credential to check, but they do track whether the console is
+      // signed in, so that signing out reaches the sign-in form instead of reloading
+      // straight back into the run list. Starts signed in: `dev:fixtures` exists to show
+      // the console's real screens without an access token.
+      let signedIn = true
       server.middlewares.use((request, response, next) => {
         if (!request.url?.startsWith('/api/')) return next()
         response.setHeader('content-type', 'application/json')
-        if (request.url === '/api/session' && request.method === 'POST') {
+        // Mirrors the BFF's session route: signing in and out are the only two ways the
+        // session changes, and both answer 204.
+        if (
+          request.url === '/api/session' &&
+          (request.method === 'POST' || request.method === 'DELETE')
+        ) {
+          signedIn = request.method === 'POST'
           response.statusCode = 204
           response.end()
+          return
+        }
+        // Matches the BFF: every other API call needs a session, and the console turns a
+        // 401 into the sign-in form.
+        if (!signedIn) {
+          response.statusCode = 401
+          response.end(JSON.stringify({ error: 'unauthorized' }))
           return
         }
         if (request.url.startsWith('/api/runs?')) {

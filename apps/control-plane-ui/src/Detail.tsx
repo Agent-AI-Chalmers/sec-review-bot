@@ -243,9 +243,7 @@ export function Detail(): React.JSX.Element {
               <CopyAction value={run.run_id} name={t('copyRunId')} copiedName={t('runIdCopied')} />
             </Group>
             <Group gap="lg" align="center" mt="md" className="run-state-summary">
-              <Text c="dimmed" size="xs" tt="uppercase">
-                {workflowLabel(run.workflow, t)}
-              </Text>
+              <span className="workflow-chip">{workflowLabel(run.workflow, t)}</span>
               <Group gap={6} align="center">
                 <Text c="dimmed" size="xs">
                   {t('execution')}
