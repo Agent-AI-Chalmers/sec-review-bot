@@ -1,3 +1,88 @@
+/*
+ * Every colour the console owns is a named, *typed* custom property. `@property`
+ * gives each one a syntax, which is what makes them interpolable: a plain custom
+ * property is an unparsed string and snaps, while a `<color>` one animates. That is
+ * the whole reason the light/dark switch can cross-fade at all — see `.theme-transition`
+ * near the bottom, which is the only place a transition is switched on.
+ *
+ * The values themselves live in the two theme blocks below. Nothing outside those two
+ * blocks hard-codes a colour, so a theme change is a change to this palette alone.
+ *
+ * The page canvas and default text are deliberately *not* among them: Mantine owns
+ * `body` through `--mantine-color-body`/`--mantine-color-text`, and a token here that
+ * a later stylesheet overwrites would animate a value nothing paints. Everything this
+ * console draws on top of that canvas is owned here.
+ */
+@property --surface-raised {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #fff;
+}
+@property --border {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #e7e5e4;
+}
+@property --border-strong {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #d6d3d1;
+}
+@property --muted {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #78716c;
+}
+/* Amber accent, reserved for interactive elements only. Status colours below are
+   deliberately independent: a running run must stay the same colour whatever the
+   accent is, or the accent starts carrying semantics it does not own. */
+@property --brand {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #c97f0d;
+}
+@property --brand-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #fff8ed;
+}
+/* The two lighter stops the brand gradients sweep through. They are separate tokens so
+   the gradients animate with the theme instead of keeping a hard-coded hue. */
+@property --brand-2 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #f0b429;
+}
+@property --brand-3 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #e8792b;
+}
+/* Shadow geometry is constant; only its colour changes between themes. Keeping the
+   colour in its own interpolable token lets the shadow fade with everything else — a
+   shorthand `box-shadow` with a colour baked in would not. */
+@property --shadow-color {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgb(28 25 23 / 5%);
+}
+/* Status hues, fixed in meaning, animated in value. */
+@property --status-active {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2563eb;
+}
+@property --status-complete {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #15803d;
+}
+@property --status-failed {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #dc2626;
+}
+
 :root {
   /* Mantine derives this from `mantineTheme` (see theme.ts), which is the single
      source of truth for the font stack. The literal list is only the pre-hydration
@@ -13,9 +98,14 @@
     Roboto,
     sans-serif
   );
-  color: #1c1917;
-  background: #fafaf9;
   color-scheme: light;
+  /* The console's own colour tokens cross-fade at Mantine's pace, not its own: the
+     components it composes swap their theme colours over ~100-150ms with `ease`, and
+     the console must not run at a different tempo or the two visibly disagree. Owning
+     these as one pair here is what keeps `.theme-transition` and the disarm timer
+     aligned without a second hard-coded number in the component. */
+  --theme-transition: 150ms;
+  --theme-ease: ease;
   --surface-raised: #fff;
   --border: #e7e5e4;
   --border-strong: #d6d3d1;
@@ -25,16 +115,16 @@
      accent is, or the accent starts carrying semantics it does not own. */
   --brand: #c97f0d;
   --brand-soft: #fff8ed;
-  --shadow-sm: 0 1px 2px rgb(28 25 23 / 5%), 0 1px 3px rgb(28 25 23 / 4%);
-  /* Status hues, fixed. */
+  --brand-2: #f0b429;
+  --brand-3: #e8792b;
+  --shadow-color: rgb(28 25 23 / 5%);
+  --shadow-sm: 0 1px 2px var(--shadow-color), 0 1px 3px var(--shadow-color);
   --status-active: #2563eb;
   --status-complete: #15803d;
   --status-failed: #dc2626;
 }
 
 [data-theme='dark'] {
-  color: #e7e5e4;
-  background: #1c1917;
   color-scheme: dark;
   --surface-raised: #262220;
   --border: #3a3532;
@@ -42,7 +132,10 @@
   --muted: #a8a29e;
   --brand: #f0b429;
   --brand-soft: #2e2519;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+  --brand-2: #f6c453;
+  --brand-3: #e8792b;
+  --shadow-color: rgb(0 0 0 / 30%);
+  --shadow-sm: 0 1px 2px var(--shadow-color), 0 1px 3px var(--shadow-color);
   --status-active: #60a5fa;
   --status-complete: #4ade80;
   --status-failed: #f87171;
@@ -50,12 +143,44 @@
 
 body {
   margin: 0;
-  background: #fafaf9;
   -webkit-font-smoothing: antialiased;
 }
 
-[data-theme='dark'] body {
-  background: #1c1917;
+/*
+ * A theme switch is a colour change, not a motion effect, so the cross-fade is only
+ * armed while one is actually happening: the console adds `.theme-transition` for the
+ * duration of the change and removes it afterwards. Leaving the transition on `:root`
+ * would also fire on first paint, when the stored theme is applied, and the console
+ * would visibly fade up from the default theme.
+ *
+ * The transition names the *tokens*, not the elements that read them. Because each one
+ * is registered with `@property`, its value is interpolable, and a descendant inherits
+ * the animated value — so every surface, border and glyph cross-fades with no rule per
+ * element. Transitioning `*` instead would clobber the one transition the console
+ * already owns (the row-action fade), which this approach leaves untouched.
+ */
+.theme-transition {
+  transition:
+    --surface-raised var(--theme-transition) var(--theme-ease),
+    --border var(--theme-transition) var(--theme-ease),
+    --border-strong var(--theme-transition) var(--theme-ease),
+    --muted var(--theme-transition) var(--theme-ease),
+    --brand var(--theme-transition) var(--theme-ease),
+    --brand-soft var(--theme-transition) var(--theme-ease),
+    --brand-2 var(--theme-transition) var(--theme-ease),
+    --brand-3 var(--theme-transition) var(--theme-ease),
+    --shadow-color var(--theme-transition) var(--theme-ease),
+    --status-active var(--theme-transition) var(--theme-ease),
+    --status-complete var(--theme-transition) var(--theme-ease),
+    --status-failed var(--theme-transition) var(--theme-ease);
+}
+
+/* Reduced motion means no cross-fade either: the switch is instant, which is the
+   correct rendering of the same preference the status pulse already honours. */
+@media (prefers-reduced-motion: reduce) {
+  .theme-transition {
+    transition: none;
+  }
 }
 
 /* ---------------------------------------------------------------- app shell */
@@ -74,7 +199,13 @@ body {
   position: absolute;
   inset: auto 0 -1px 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--brand) 0%, #f0b429 45%, #e8792b 70%, transparent 100%);
+  background: linear-gradient(
+    90deg,
+    var(--brand) 0%,
+    var(--brand-2) 45%,
+    var(--brand-3) 70%,
+    transparent 100%
+  );
   opacity: 0.85;
 }
 
@@ -95,14 +226,18 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  background: linear-gradient(135deg, var(--brand), #f0b429 55%, #e8792b);
-  box-shadow: 0 2px 6px rgb(201 127 13 / 35%);
+  background: linear-gradient(135deg, var(--brand), var(--brand-2) 55%, var(--brand-3));
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--brand) 35%, transparent);
 }
 
 .mantine-AppShell-main {
   background:
     radial-gradient(1100px 380px at 12% -8%, var(--brand-soft), transparent 62%),
-    radial-gradient(900px 320px at 88% -12%, rgb(232 121 43 / 7%), transparent 60%);
+    radial-gradient(
+      900px 320px at 88% -12%,
+      color-mix(in srgb, var(--brand-3) 7%, transparent),
+      transparent 60%
+    );
   min-height: calc(100vh - 58px);
 }
 
@@ -194,7 +329,7 @@ body {
 
 [data-theme='dark'] .workflow-chip {
   color: var(--mantine-color-brand-3);
-  background: rgb(201 127 13 / 16%);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
 }
 
 .run-state-summary {

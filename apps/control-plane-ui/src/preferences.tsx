@@ -26,9 +26,25 @@ const PreferencesContext = React.createContext<{
 
 const refreshIntervals: RefreshInterval[] = [5000, 15000, 30000, 60000]
 
+/** Fallback only for environments where the custom property cannot be read; the value
+ * normally comes from `--theme-transition` in styles.css so the timer and the CSS stay
+ * in lockstep instead of being kept in sync by hand. */
+const FALLBACK_THEME_TRANSITION_MS = 150
+
+/** Reads `--theme-transition` (e.g. `150ms` / `0.15s`) as milliseconds. The CSS owns the
+ * value; this keeps the console's disarm timer exactly as long as the fade it armed. */
+function readThemeTransitionMs(root: HTMLElement): number {
+  const raw = getComputedStyle(root).getPropertyValue('--theme-transition').trim()
+  const match = /^([\d.]+)(ms|s)$/.exec(raw)
+  if (match === null) return FALLBACK_THEME_TRANSITION_MS
+  const value = Number(match[1])
+  return match[2] === 's' ? value * 1000 : value
+}
+
 export function Preferences({ children }: { children: React.ReactNode }): React.JSX.Element {
   // Keep browser preferences local to this console; they are presentation state,
   // not Control Plane account settings.
+  const hasAppliedTheme = React.useRef(false)
   const [theme, setTheme] = React.useState<Theme>(
     () =>
       (localStorage.getItem('ui-theme') as Theme) ||
@@ -45,7 +61,30 @@ export function Preferences({ children }: { children: React.ReactNode }): React.
   })
   React.useEffect(() => {
     localStorage.setItem('ui-theme', theme)
-    document.documentElement.dataset.theme = theme
+    const root = document.documentElement
+    // The first run is the stored theme being applied on mount, not a switch the reader
+    // made: adding the transition here would fade the console up from the default theme.
+    if (!hasAppliedTheme.current) {
+      hasAppliedTheme.current = true
+      root.dataset.theme = theme
+      return
+    }
+    // Arm the cross-fade only for an actual switch, then disarm so a later, unrelated
+    // paint (a route change, a refetch) cannot catch the transition by accident.
+    root.classList.add('theme-transition')
+    // Force a style flush so the armed transition is in effect *before* the palette
+    // changes. Without this the class and the new theme land in one style recalculation
+    // and the browser sees no from/to pair to interpolate, so the switch would snap.
+    void root.offsetWidth
+    root.dataset.theme = theme
+    const disarm = (): void => {
+      root.classList.remove('theme-transition')
+    }
+    const timeout = window.setTimeout(disarm, readThemeTransitionMs(root))
+    return (): void => {
+      window.clearTimeout(timeout)
+      disarm()
+    }
   }, [theme])
   React.useEffect(() => {
     localStorage.setItem('ui-auto-refresh', String(autoRefresh))
