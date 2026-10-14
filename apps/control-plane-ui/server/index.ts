@@ -1,6 +1,6 @@
 import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
-import { createServer, type Server, type ServerResponse } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -40,6 +40,30 @@ function securityHeaders(response: ServerResponse): void {
   response.setHeader('x-frame-options', 'DENY')
   response.setHeader('referrer-policy', 'no-referrer')
 }
+
+/** A state-changing request may only come from the console's own origin.
+ *
+ * The check is self-referential on purpose: there is nothing to configure. A browser
+ * sets `Origin` to the page a script runs on, and `Host` to the address actually being
+ * dialled, so a same-origin call has matching hosts and a cross-site one does not. The
+ * BFF may be reached as a loopback address, a LAN IP or a domain, so comparing against
+ * the request's own `Host` works in every deployment without hard-coding one.
+ *
+ * `Origin` is absent on some requests; `Referer` is its partial fallback. A request
+ * carrying neither is refused, because an attacker can also omit them.
+ */
+function sameOrigin(request: IncomingMessage): boolean {
+  const source = request.headers.origin ?? request.headers.referer
+  const host = request.headers.host
+  if (source === undefined || host === undefined) return false
+  try {
+    return new URL(source).host === host
+  } catch {
+    // A malformed `Origin`/`Referer` is not a same-origin request.
+    return false
+  }
+}
+
 /**
  * The upstream path a read proxy should request: the BFF path minus its `/api` prefix,
  * with the query reduced to the parameters Control Plane declares (generated from
@@ -196,6 +220,28 @@ export function createControlPlaneUiServer({
       }
       response.writeHead(204, {
         'set-cookie': `control_plane_ui_session=${sessionValue}; HttpOnly; SameSite=Strict; Path=/`
+      })
+      response.end()
+      return
+    }
+    // Signing out can only be done by the server: the session cookie is HttpOnly, so
+    // the console cannot clear it from script. Expiring it here forgets the credential
+    // on this browser. It does not revoke the access token itself, which stays valid
+    // for anyone else who holds it — the BFF keeps no session table to invalidate.
+    //
+    // There is nothing to authenticate: any caller may clear its own cookie, and a
+    // clear is harmless to a caller that was never signed in. The same-origin check
+    // instead keeps another site from reaching in and signing the reader out, which is
+    // the only thing a cross-site DELETE could do. `SameSite=Strict` on the cookie
+    // already stops the browser attaching it; this stops the request being obeyed.
+    if (request.url === '/api/session' && request.method === 'DELETE') {
+      if (!sameOrigin(request)) {
+        response.writeHead(403, { 'content-type': 'application/json' })
+        response.end('{"error":"cross_origin"}')
+        return
+      }
+      response.writeHead(204, {
+        'set-cookie': 'control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'
       })
       response.end()
       return

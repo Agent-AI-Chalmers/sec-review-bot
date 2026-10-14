@@ -31,10 +31,6 @@ function Login(): React.JSX.Element {
   return (
     <Container size="xs" py="15vh">
       <Paper withBorder p="xl" radius="sm">
-        <Title order={1}>Review Control Plane</Title>
-        <Text c="dimmed" mt="xs">
-          {t('signInHint')}
-        </Text>
         <form
           onSubmit={(event) => {
             event.preventDefault()
@@ -204,10 +200,29 @@ export function CopyAction({
   )
 }
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error?: unknown }> {
+class ErrorBoundary extends React.Component<
+  {
+    children: React.ReactNode
+    /** Reports that a 401 has replaced the routes with the sign-in form, so the
+     * shell can stop offering controls that need a session. */
+    onUnauthorized: (unauthorized: boolean) => void
+  },
+  { error?: unknown }
+> {
   state: { error?: unknown } = {}
   static getDerivedStateFromError(error: unknown): { error: unknown } {
     return { error }
+  }
+  componentDidMount(): void {
+    this.report()
+  }
+  componentDidUpdate(): void {
+    this.report()
+  }
+  report(): void {
+    this.props.onUnauthorized(
+      this.state.error instanceof ApiError && this.state.error.status === 401
+    )
   }
   render(): React.ReactNode {
     if (this.state.error instanceof ApiError && this.state.error.status === 401) return <Login />
@@ -234,43 +249,50 @@ export function App(): React.JSX.Element {
   const t = useMessages()
   const navigate = useNavigate()
   const [runIdInput, setRunIdInput] = React.useState('')
+  const [unauthorized, setUnauthorized] = React.useState(false)
   return (
     <>
       <AppShell header={{ height: 58 }}>
         <AppShell.Header>
           <Container size="lg" h="100%" w="100%">
             <Group h="100%" justify="space-between" wrap="nowrap" gap="md">
-              <Link className="brand" to="/runs">
-                Review Control Plane
-              </Link>
-              <form
-                className="open-run"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  const requestedRunId = runIdInput.trim()
-                  if (requestedRunId) navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
-                }}
-              >
-                <Group gap={6} align="center" wrap="nowrap">
-                  <TextInput
-                    aria-label={t('goToRunId')}
-                    placeholder={t('runIdPlaceholder')}
-                    value={runIdInput}
-                    size="sm"
-                    ff="monospace"
-                    onChange={(event) => setRunIdInput(event.currentTarget.value)}
-                  />
-                  <ActionIcon type="submit" aria-label={t('goToRun')} variant="filled" size={36}>
-                    <IconArrowRight size={16} />
-                  </ActionIcon>
-                </Group>
-              </form>
-              <PreferenceControls />
+              <Group gap="md" wrap="nowrap">
+                <Link className="brand" to="/runs">
+                  Review Control Plane
+                </Link>
+              </Group>
+              {/* Without a session every request 401s, so a run-id jump would only
+                  bounce the reader back to the sign-in form. */}
+              {!unauthorized && (
+                <form
+                  className="open-run"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    const requestedRunId = runIdInput.trim()
+                    if (requestedRunId) navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
+                  }}
+                >
+                  <Group gap={6} align="center" wrap="nowrap">
+                    <TextInput
+                      aria-label={t('goToRunId')}
+                      placeholder={t('runIdPlaceholder')}
+                      value={runIdInput}
+                      size="sm"
+                      ff="monospace"
+                      onChange={(event) => setRunIdInput(event.currentTarget.value)}
+                    />
+                    <ActionIcon type="submit" aria-label={t('goToRun')} variant="filled" size={36}>
+                      <IconArrowRight size={16} />
+                    </ActionIcon>
+                  </Group>
+                </form>
+              )}
+              <PreferenceControls signedIn={!unauthorized} />
             </Group>
           </Container>
         </AppShell.Header>
         <AppShell.Main>
-          <ErrorBoundary>
+          <ErrorBoundary onUnauthorized={setUnauthorized}>
             <Routes>
               <Route path="/runs" element={<Runs />} />
               <Route path="/runs/:runId" element={<Detail />} />

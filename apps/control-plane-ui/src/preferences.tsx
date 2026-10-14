@@ -1,6 +1,7 @@
 import React from 'react'
 import { ActionIcon, Group, MantineProvider, Menu, Tooltip } from '@mantine/core'
-import { IconLanguage, IconMoon, IconSun } from '@tabler/icons-react'
+import { IconLanguage, IconLogout, IconMoon, IconSun } from '@tabler/icons-react'
+import { logout } from './api.js'
 import { useLanguage, useMessages } from './i18n.js'
 
 export type Theme = 'light' | 'dark'
@@ -71,10 +72,22 @@ export function usePreferences(): React.ContextType<typeof PreferencesContext> {
   return React.useContext(PreferencesContext)
 }
 
-export function PreferenceControls(): React.JSX.Element {
+/** `signedIn` only gates sign-out: theme and language are presentation state and stay
+ * available on the sign-in form, where they are the reader's only controls. */
+export function PreferenceControls({ signedIn = true }: { signedIn?: boolean }): React.JSX.Element {
   const { theme, setTheme } = usePreferences()
   const { language, setLanguage } = useLanguage()
   const t = useMessages()
+  const [signingOut, setSigningOut] = React.useState(false)
+  const signOut = (): void => {
+    setSigningOut(true)
+    // A full reload drops every cached run in memory. Navigating instead would leave
+    // the previous reader's data on screen until the next request failed.
+    void logout().then(
+      () => window.location.assign('/runs'),
+      () => setSigningOut(false)
+    )
+  }
   return (
     <Group gap={4} wrap="nowrap" aria-label="Preferences">
       <Menu position="bottom-end" withinPortal>
@@ -109,6 +122,19 @@ export function PreferenceControls(): React.JSX.Element {
           )}
         </ActionIcon>
       </Tooltip>
+      {signedIn && (
+        <Tooltip label={t('signOut')}>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            aria-label={t('signOut')}
+            loading={signingOut}
+            onClick={signOut}
+          >
+            <IconLogout size={19} stroke={1.8} />
+          </ActionIcon>
+        </Tooltip>
+      )}
     </Group>
   )
 }
