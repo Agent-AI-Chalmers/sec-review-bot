@@ -1,5 +1,7 @@
 import type { GitHubAppOctokit } from './octokit.js'
 import { isRecord } from '../utils/error-utils.js'
+import { resolveTrustedDefaultBranch, type TrustedDefaultBranch } from './default-branch-service.js'
+import { splitRepoFullName } from './repository-service.js'
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {}
@@ -407,4 +409,34 @@ export async function fetchTimelineLinkedIssues(
     refs,
     issues
   }
+}
+
+/**
+ * Identity rule for the repository under review: prefer `base_repo_full_name`,
+ * fall back to the webhook's top-level `repo_full_name`, and never use the
+ * head/fork repository.
+ */
+export function resolveTrustedRepositoryIdentity(
+  pr: Pick<PullRequestContext, 'repo_full_name' | 'base_repo_full_name'>
+): { owner_login: string; repo_name: string } {
+  const trustedRepoFullName = pr.base_repo_full_name ?? pr.repo_full_name
+  return splitRepoFullName(trustedRepoFullName)
+}
+
+/**
+ * Resolve the default branch for the repository *under review* by a PR.
+ *
+ * Identity rules:
+ *  - prefer `base_repo_full_name` (the repo the PR targets = the repo we review);
+ *  - fall back to `repo_full_name` (the webhook's top-level repository) when the
+ *    base repo name is unavailable;
+ *  - never use the head/fork repository.
+ *
+ * On resolution failure this throws (no payload fallback).
+ */
+export async function resolvePullRequestDefaultBranch(
+  octokit: GitHubAppOctokit,
+  pr: Pick<PullRequestContext, 'repo_full_name' | 'base_repo_full_name'>
+): Promise<TrustedDefaultBranch> {
+  return resolveTrustedDefaultBranch(octokit, resolveTrustedRepositoryIdentity(pr))
 }

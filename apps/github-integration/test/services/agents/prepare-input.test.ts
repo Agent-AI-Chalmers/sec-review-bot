@@ -201,6 +201,11 @@ test(
         }),
         rest: {
           repos: {
+            get: async () => ({
+              data: {
+                default_branch: 'main'
+              }
+            }),
             getBranch: async () => ({
               data: {
                 commit: {

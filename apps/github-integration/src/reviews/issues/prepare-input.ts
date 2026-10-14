@@ -3,7 +3,7 @@ import path from 'path'
 
 import {
   fetchTimelineLinkedPullRequests,
-  getIssueDefaultBranchHeadSha,
+  getIssueDefaultBranch,
   type IssueContext
 } from '../../github/issue-service.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
@@ -41,12 +41,14 @@ async function materializeHistoryArtifacts({
   octokit,
   issue,
   history_path,
-  workspace_ref
+  workspace_ref,
+  default_branch
 }: {
   octokit: GitHubAppOctokit
   issue: IssueContext
   history_path: string
   workspace_ref: string
+  default_branch: string
 }): Promise<{
   issueMetadata: Record<string, unknown>
   linkedPullRequests: Awaited<ReturnType<typeof fetchTimelineLinkedPullRequests>>
@@ -62,7 +64,7 @@ async function materializeHistoryArtifacts({
     body: issue.issue_body,
     author_login: issue.issue_author,
     labels: issue.labels,
-    default_branch: issue.default_branch,
+    default_branch,
     workspace_ref
   }
   const linkedPullRequests = await fetchTimelineLinkedPullRequests(octokit, issue)
@@ -105,7 +107,7 @@ export async function prepareIssueReviewInput({
   input_bundle_root: string
   workspace_ref: string
 }> {
-  const workspace_ref = await getIssueDefaultBranchHeadSha(octokit, issue)
+  const { default_branch, head_sha: workspace_ref } = await getIssueDefaultBranch(octokit, issue)
   const input_bundle_root = createInputBundleRoot(
     issue.repo_full_name,
     `issue-${issue.issue_number}`,
@@ -128,7 +130,8 @@ export async function prepareIssueReviewInput({
     octokit,
     issue,
     history_path,
-    workspace_ref
+    workspace_ref,
+    default_branch
   })
   const input_bundle = await archiveInputBundle({
     input_bundle_root,

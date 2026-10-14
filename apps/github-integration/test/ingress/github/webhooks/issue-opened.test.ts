@@ -25,6 +25,10 @@ function manualOnlyConfig() {
   }
 }
 
+function trusted(config: ReturnType<typeof automaticConfig> | ReturnType<typeof manualOnlyConfig>) {
+  return { config, default_branch: 'main', head_sha: 'main-sha' }
+}
+
 function createIssueOpenedPayload() {
   return {
     action: 'opened',
@@ -65,7 +69,7 @@ test('issue-opened skips automatic workflow when trigger mode is manual_only', a
       payload: createIssueOpenedPayload()
     },
     {
-      fetchRepositoryTriggerConfigFn: async () => manualOnlyConfig(),
+      fetchTrustedRepositoryTriggerConfigFn: async () => trusted(manualOnlyConfig()),
       isAutomaticTriggerModeEnabledFn: () => false,
       startIssueReviewCommandFn: async () => {
         reviewCalled = true
@@ -93,9 +97,9 @@ test('issue-opened skips self-originated payload before issue extraction', async
         }
       },
       {
-        fetchRepositoryTriggerConfigFn: async () => {
+        fetchTrustedRepositoryTriggerConfigFn: async () => {
           configFetched = true
-          return manualOnlyConfig()
+          return trusted(manualOnlyConfig())
         }
       }
     )
@@ -116,7 +120,7 @@ test('issue-opened runs automatic workflow when trigger mode is automatic', asyn
       payload: createIssueOpenedPayload()
     },
     {
-      fetchRepositoryTriggerConfigFn: async () => automaticConfig(),
+      fetchTrustedRepositoryTriggerConfigFn: async () => trusted(automaticConfig()),
       isAutomaticTriggerModeEnabledFn: () => true,
       startIssueReviewCommandFn: async () => {
         reviewCalled = true
@@ -144,7 +148,7 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
         payload: createIssueOpenedPayload()
       },
       {
-        fetchRepositoryTriggerConfigFn: async () => {
+        fetchTrustedRepositoryTriggerConfigFn: async () => {
           throw configError
         },
         isRepositoryTriggerConfigErrorFn: (error): error is RepositoryTriggerConfigError =>

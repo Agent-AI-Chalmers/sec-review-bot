@@ -4,10 +4,11 @@ import { logPullRequestPayload } from '../../../utils/log-pull-request.js'
 import { startPullRequestReviewCommand } from '../../../triggers/pull-request-review.js'
 import {
   extractPullRequestContext,
+  resolveTrustedRepositoryIdentity,
   type PullRequestContext
 } from '../../../github/pull-request-service.js'
 import {
-  fetchRepositoryTriggerConfig,
+  fetchTrustedRepositoryTriggerConfig,
   isAutomaticTriggerModeEnabled,
   isRepositoryTriggerConfigError
 } from '../../../github/repo-config-service.js'
@@ -19,6 +20,7 @@ import {
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
+import { type TriggerConfigHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
 
 type PullRequestOpenedWebhookEvent = Pick<
   EmitterWebhookEvent<'pull_request.opened'>,
@@ -27,16 +29,7 @@ type PullRequestOpenedWebhookEvent = Pick<
   octokit: unknown
 }
 
-interface WebhookHandlerArgs {
-  id: string
-  octokit: unknown
-  payload: unknown
-}
-
-interface HandlerDeps {
-  fetchRepositoryTriggerConfigFn?: typeof fetchRepositoryTriggerConfig
-  isAutomaticTriggerModeEnabledFn?: typeof isAutomaticTriggerModeEnabled
-  isRepositoryTriggerConfigErrorFn?: typeof isRepositoryTriggerConfigError
+interface HandlerDeps extends TriggerConfigHandlerDeps {
   startPullRequestReviewCommandFn?: (args: {
     octokit: WebhookHandlerArgs['octokit']
     pr: PullRequestContext
@@ -57,7 +50,7 @@ export async function handlePullRequestOpened({
 export async function handlePullRequestOpenedWithDeps(
   { id, octokit, payload }: WebhookHandlerArgs,
   {
-    fetchRepositoryTriggerConfigFn = fetchRepositoryTriggerConfig,
+    fetchTrustedRepositoryTriggerConfigFn = fetchTrustedRepositoryTriggerConfig,
     isAutomaticTriggerModeEnabledFn = isAutomaticTriggerModeEnabled,
     isRepositoryTriggerConfigErrorFn = isRepositoryTriggerConfigError,
     startPullRequestReviewCommandFn = startPullRequestReviewCommand
@@ -74,13 +67,27 @@ export async function handlePullRequestOpenedWithDeps(
 
   logPullRequestPayload(payload)
 
+  // External fork code is not part of the trusted repository's controlled
+  // surface. Do not auto-review; wait for an explicit maintainer action
+  // (ready_for_review / comment command).
+  if (pr.from_fork) {
+    logInfo('workflow_skipped', {
+      event: 'pull_request.opened',
+      reason: 'fork_pr_requires_approval',
+      pr: pr.pr_number,
+      repo: pr.repo_full_name,
+      head_repo: pr.head_repo_full_name
+    })
+    return
+  }
+
   let triggerConfig
   try {
-    triggerConfig = await fetchRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, {
-      owner_login: pr.owner_login,
-      repo_name: pr.repo_name,
-      ref: pr.base_ref
-    })
+    // Resolve the trusted default branch via API and read config from it
+    // (never use pr.base_ref, which is payload-derived).
+    const id = resolveTrustedRepositoryIdentity(pr)
+    triggerConfig = (await fetchTrustedRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, id))
+      .config
   } catch (error: unknown) {
     if (isRepositoryTriggerConfigErrorFn(error)) {
       logError('repo_trigger_config_failed', {

@@ -54,7 +54,8 @@ function createOctokitWithContent(contentByPath: Content_by_path = {}): GitHubAp
   } as unknown as GitHubAppOctokit
 }
 
-const CONFIG_PATH = '.github/sec-review-bot.yml'
+const CONFIG_PATH = '.sec-review/config.yml'
+const LEGACY_CONFIG_PATH = '.github/sec-review-bot.yml'
 
 test('fetchRepositoryTriggerConfig falls back to manual_only when config file is missing', async () => {
   const octokit = createOctokitWithContent({})
@@ -216,4 +217,83 @@ test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async
       return true
     }
   )
+})
+
+test('reads the new .sec-review/config.yml path and does not touch legacy', async () => {
+  const readPaths: string[] = []
+  const octokit = createOctokitWithContent({
+    [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic'].join('\n'),
+    [LEGACY_CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: manual_only'].join('\n')
+  })
+  const originalGetContent = (
+    octokit as unknown as {
+      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+    }
+  ).rest.repos.getContent
+  ;(
+    octokit as unknown as {
+      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+    }
+  ).rest.repos.getContent = async (args: { path: string }) => {
+    readPaths.push(args.path)
+    return originalGetContent(args)
+  }
+
+  const config = await fetchRepositoryTriggerConfig(octokit, {
+    owner_login: 'octo',
+    repo_name: 'repo',
+    ref: 'main'
+  })
+
+  assert.equal(config.trigger_mode, 'automatic')
+  assert.equal(config.path, CONFIG_PATH)
+  assert.deepEqual(readPaths, [CONFIG_PATH], 'legacy path must not be read when new path exists')
+})
+
+test('falls back to the legacy .github/sec-review-bot.yml path when the new path is missing', async () => {
+  const octokit = createOctokitWithContent({
+    [LEGACY_CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic'].join('\n')
+  })
+
+  const config = await fetchRepositoryTriggerConfig(octokit, {
+    owner_login: 'octo',
+    repo_name: 'repo',
+    ref: 'main'
+  })
+
+  assert.equal(config.trigger_mode, 'automatic')
+  assert.equal(config.path, LEGACY_CONFIG_PATH)
+  assert.equal(config.source, 'repository-config')
+})
+
+test('invalid YAML in the new path does not fall back to legacy', async () => {
+  let legacyRead = false
+  const octokit = createOctokitWithContent({
+    [CONFIG_PATH]: 'sec_review_bot: [broken',
+    [LEGACY_CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic'].join('\n')
+  })
+  const originalGetContent = (
+    octokit as unknown as {
+      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+    }
+  ).rest.repos.getContent
+  ;(
+    octokit as unknown as {
+      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+    }
+  ).rest.repos.getContent = async (args: { path: string }) => {
+    if (args.path === LEGACY_CONFIG_PATH) legacyRead = true
+    return originalGetContent(args)
+  }
+
+  await assert.rejects(
+    () =>
+      fetchRepositoryTriggerConfig(octokit, {
+        owner_login: 'octo',
+        repo_name: 'repo',
+        ref: 'main'
+      }),
+    (error: unknown) => isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
+  )
+  assert.equal(legacyRead, false, 'invalid new-path config must not fall back to legacy')
 })

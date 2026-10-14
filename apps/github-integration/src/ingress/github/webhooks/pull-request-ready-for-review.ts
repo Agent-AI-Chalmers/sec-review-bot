@@ -2,9 +2,13 @@ import type { EmitterWebhookEvent } from '@octokit/webhooks'
 
 import { logPullRequestPayload } from '../../../utils/log-pull-request.js'
 import { startPullRequestReviewCommand } from '../../../triggers/pull-request-review.js'
-import { extractPullRequestContext } from '../../../github/pull-request-service.js'
 import {
-  fetchRepositoryTriggerConfig,
+  extractPullRequestContext,
+  resolveTrustedRepositoryIdentity,
+  type PullRequestContext
+} from '../../../github/pull-request-service.js'
+import {
+  fetchTrustedRepositoryTriggerConfig,
   isAutomaticTriggerModeEnabled,
   isRepositoryTriggerConfigError
 } from '../../../github/repo-config-service.js'
@@ -16,6 +20,7 @@ import {
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
+import { type TriggerConfigHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
 
 type PullRequestReadyForReviewWebhookEvent = Pick<
   EmitterWebhookEvent<'pull_request.ready_for_review'>,
@@ -24,11 +29,33 @@ type PullRequestReadyForReviewWebhookEvent = Pick<
   octokit: unknown
 }
 
+interface HandlerDeps extends TriggerConfigHandlerDeps {
+  startPullRequestReviewCommandFn?: (args: {
+    octokit: WebhookHandlerArgs['octokit']
+    pr: PullRequestContext
+    event_type: 'synchronize' | 'ready_for_review'
+    delivery_id: string
+    on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
+  }) => Promise<unknown>
+}
+
 export async function handlePullRequestReadyForReview({
   id,
   octokit,
   payload
 }: PullRequestReadyForReviewWebhookEvent): Promise<void> {
+  await handlePullRequestReadyForReviewWithDeps({ id, octokit, payload })
+}
+
+export async function handlePullRequestReadyForReviewWithDeps(
+  { id, octokit, payload }: WebhookHandlerArgs,
+  {
+    fetchTrustedRepositoryTriggerConfigFn = fetchTrustedRepositoryTriggerConfig,
+    isAutomaticTriggerModeEnabledFn = isAutomaticTriggerModeEnabled,
+    isRepositoryTriggerConfigErrorFn = isRepositoryTriggerConfigError,
+    startPullRequestReviewCommandFn = startPullRequestReviewCommand
+  }: HandlerDeps = {}
+): Promise<void> {
   // Self-origin checks only need the webhook envelope, so skip before validating
   // workflow-specific pull request fields (mirrors pull_request.opened). A
   // self-originated payload with missing fields would otherwise throw out of
@@ -42,15 +69,29 @@ export async function handlePullRequestReadyForReview({
 
   logPullRequestPayload(payload)
 
+  // External fork PRs are not auto-reviewed. Approval is an explicit maintainer
+  // comment command; a new push invalidates it, so ready_for_review is not an
+  // approval signal.
+  if (pr.from_fork) {
+    logInfo('workflow_skipped', {
+      event: 'pull_request.ready_for_review',
+      reason: 'fork_pr_requires_approval',
+      pr: pr.pr_number,
+      repo: pr.repo_full_name,
+      head_repo: pr.head_repo_full_name
+    })
+    return
+  }
+
   let triggerConfig
   try {
-    triggerConfig = await fetchRepositoryTriggerConfig(octokit as GitHubAppOctokit, {
-      owner_login: pr.owner_login,
-      repo_name: pr.repo_name,
-      ref: pr.base_ref
-    })
+    // Read config from the API-resolved default branch, via base repo identity
+    // (never use pr.base_ref, which is payload-derived).
+    const id = resolveTrustedRepositoryIdentity(pr)
+    triggerConfig = (await fetchTrustedRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, id))
+      .config
   } catch (error: unknown) {
-    if (isRepositoryTriggerConfigError(error)) {
+    if (isRepositoryTriggerConfigErrorFn(error)) {
       logError('repo_trigger_config_failed', {
         event: 'pull_request.ready_for_review',
         owner: error.owner_login,
@@ -63,7 +104,7 @@ export async function handlePullRequestReadyForReview({
     throw error
   }
 
-  if (!isAutomaticTriggerModeEnabled(triggerConfig)) {
+  if (!isAutomaticTriggerModeEnabledFn(triggerConfig)) {
     logInfo('workflow_skipped', {
       event: 'pull_request.ready_for_review',
       reason: 'trigger_mode_disabled',
@@ -77,7 +118,7 @@ export async function handlePullRequestReadyForReview({
     const admitted = new Promise<void>((resolve) => {
       resolveAdmission = resolve
     })
-    const execution = startPullRequestReviewCommand({
+    const execution = startPullRequestReviewCommandFn({
       octokit,
       pr,
       event_type: 'ready_for_review',

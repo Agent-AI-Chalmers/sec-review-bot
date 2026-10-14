@@ -14,18 +14,13 @@ import {
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
+import { type WebhookHandlerArgs } from './handler-deps.js'
 
 type IssueCommentCreatedWebhookEvent = Pick<
   EmitterWebhookEvent<'issue_comment.created'>,
   'id' | 'payload'
 > & {
   octokit: unknown
-}
-
-interface WebhookHandlerArgs {
-  id: string
-  octokit: unknown
-  payload: unknown
 }
 
 interface HandlerDeps {

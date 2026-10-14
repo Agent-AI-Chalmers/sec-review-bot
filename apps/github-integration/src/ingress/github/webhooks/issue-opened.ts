@@ -3,7 +3,7 @@ import type { EmitterWebhookEvent } from '@octokit/webhooks'
 import { startIssueReviewCommand } from '../../../triggers/issue-review.js'
 import { extractIssueContext, type IssueContext } from '../../../github/issue-service.js'
 import {
-  fetchRepositoryTriggerConfig,
+  fetchTrustedRepositoryTriggerConfig,
   isAutomaticTriggerModeEnabled,
   isRepositoryTriggerConfigError
 } from '../../../github/repo-config-service.js'
@@ -16,21 +16,13 @@ import { logIssuePayload } from '../../../utils/log-issue.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
+import { type TriggerConfigHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
 
 type IssueOpenedWebhookEvent = Pick<EmitterWebhookEvent<'issues.opened'>, 'id' | 'payload'> & {
   octokit: unknown
 }
 
-interface WebhookHandlerArgs {
-  id: string
-  octokit: unknown
-  payload: unknown
-}
-
-interface HandlerDeps {
-  fetchRepositoryTriggerConfigFn?: typeof fetchRepositoryTriggerConfig
-  isAutomaticTriggerModeEnabledFn?: typeof isAutomaticTriggerModeEnabled
-  isRepositoryTriggerConfigErrorFn?: typeof isRepositoryTriggerConfigError
+interface HandlerDeps extends TriggerConfigHandlerDeps {
   startIssueReviewCommandFn?: (args: {
     octokit: WebhookHandlerArgs['octokit']
     issue: IssueContext
@@ -51,7 +43,7 @@ export async function handleIssueOpened({
 export async function handleIssueOpenedWithDeps(
   { id, octokit, payload }: WebhookHandlerArgs,
   {
-    fetchRepositoryTriggerConfigFn = fetchRepositoryTriggerConfig,
+    fetchTrustedRepositoryTriggerConfigFn = fetchTrustedRepositoryTriggerConfig,
     isAutomaticTriggerModeEnabledFn = isAutomaticTriggerModeEnabled,
     isRepositoryTriggerConfigErrorFn = isRepositoryTriggerConfigError,
     startIssueReviewCommandFn = startIssueReviewCommand
@@ -79,11 +71,14 @@ export async function handleIssueOpenedWithDeps(
 
   let triggerConfig
   try {
-    triggerConfig = await fetchRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, {
-      owner_login: issue.owner_login,
-      repo_name: issue.repo_name,
-      ref: issue.default_branch
-    })
+    // Resolve the trusted default branch via API and read config from it
+    // (A1: do not trust the payload's repository.default_branch).
+    triggerConfig = (
+      await fetchTrustedRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, {
+        owner_login: issue.owner_login,
+        repo_name: issue.repo_name
+      })
+    ).config
   } catch (error: unknown) {
     if (isRepositoryTriggerConfigErrorFn(error)) {
       logError('repo_trigger_config_failed', {
