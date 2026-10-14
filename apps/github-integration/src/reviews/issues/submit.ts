@@ -19,9 +19,12 @@ interface RunIssueReviewArgs {
     submitted: SubmittedIssueReviewRun,
     input: IssueReviewInput & Record<string, unknown>
   ) => void | Promise<void>
+}
+
+interface StartIssueReviewRunDeps {
   // Test seam: defaults to the real preparer. Lets a unit test assert what this
   // layer forwards to the runner input without materializing a git workspace.
-  prepare_input?: typeof prepareIssueReviewInput
+  prepare_input: typeof prepareIssueReviewInput
 }
 
 export interface SubmittedIssueReviewRun {
@@ -41,15 +44,17 @@ function assertIssueReviewInput(
   }
 }
 
-async function materializeIssueReviewInput({
-  run_id,
-  octokit,
-  issue,
-  event_type = 'manual_review',
-  review_objective = 'audit',
-  test_changes,
-  prepare_input = prepareIssueReviewInput
-}: RunIssueReviewArgs): Promise<{
+async function materializeIssueReviewInput(
+  {
+    run_id,
+    octokit,
+    issue,
+    event_type = 'manual_review',
+    review_objective = 'audit',
+    test_changes
+  }: RunIssueReviewArgs,
+  prepare_input: typeof prepareIssueReviewInput
+): Promise<{
   run_id: string
   input: IssueReviewInput
   workspace_ref: string
@@ -105,9 +110,11 @@ async function materializeIssueReviewInput({
 }
 
 export async function startIssueReviewRun(
-  args: RunIssueReviewArgs
+  args: RunIssueReviewArgs,
+  deps: Partial<StartIssueReviewRunDeps> = {}
 ): Promise<SubmittedIssueReviewRun> {
-  const prepared = await materializeIssueReviewInput(args)
+  const { prepare_input = prepareIssueReviewInput } = deps
+  const prepared = await materializeIssueReviewInput(args, prepare_input)
   const input = prepared.input
   const event_type = args.event_type ?? 'manual_review'
   assertIssueReviewInput(input)

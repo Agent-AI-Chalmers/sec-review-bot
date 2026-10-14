@@ -49,16 +49,18 @@ function fakePrepareInput() {
 
 async function runWith(review_objective: 'audit' | 'repair', test_changes: TestChangesPolicy | null) {
   const { calls, prepare_input } = fakePrepareInput()
-  await startIssueReviewRun({
-    run_id: 'run-issue-1',
-    octokit: {},
-    issue: issueContext(),
-    event_type: 'manual_review',
-    review_objective,
-    test_changes,
-    prepare_input,
-    on_prepared: async () => {}
-  })
+  await startIssueReviewRun(
+    {
+      run_id: 'run-issue-1',
+      octokit: {},
+      issue: issueContext(),
+      event_type: 'manual_review',
+      review_objective,
+      test_changes,
+      on_prepared: async () => {}
+    },
+    { prepare_input }
+  )
   return calls
 }
 
