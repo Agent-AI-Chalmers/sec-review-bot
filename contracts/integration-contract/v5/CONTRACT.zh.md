@@ -79,7 +79,7 @@ Review intent：
 ```ts
 interface ReviewIntent {
   objective: 'audit' | 'repair'
-  repair_mode?: 'test-changes-allowed' | 'no-test-changes'
+  test_changes?: 'allow' | 'deny'
 }
 ```
 
@@ -128,12 +128,12 @@ runner 会在进程边界校验 input。所有 workflow 都需要这些共同字
 - `audit`
 - `repair`（仅 `issue-review`；pull request 和 repository workflow 当前要求 `audit`）
 
-`review_intent.repair_mode` 是可选字段，用于约束后续修复阶段。省略时默认按 `test-changes-allowed` 处理：
+`review_intent.test_changes` 是可选字段，用于约束最终 mitigation patch。省略时默认按 `allow` 处理：
 
-- `test-changes-allowed`
-- `no-test-changes`
+- `allow`：最终 mitigation patch 可以包含合理的测试改动。
+- `deny`：最终 mitigation patch 不得包含测试改动；测试只能作为临时验证手段。
 
-`repair_mode` 是写给 agent 的 prompt 约束，不是程序层面的强制校验；runner 不会判断哪些仓库路径算测试文件，也不会按路径规则拒绝文件改动。
+`test_changes` 是写给 agent 的 prompt 约束，不是程序层面的强制校验；runner 不会判断哪些仓库路径算测试文件，也不会按路径规则拒绝文件改动。
 
 除这些共同字段外，各 workflow 还需要：
 

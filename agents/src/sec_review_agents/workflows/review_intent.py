@@ -3,19 +3,19 @@ from dataclasses import dataclass
 from typing import Literal
 
 ReviewObjective = Literal["audit", "repair"]
-RepairMode = Literal["test-changes-allowed", "no-test-changes"]
+TestChangesPolicy = Literal["allow", "deny"]
 
 REVIEW_OBJECTIVE_AUDIT: ReviewObjective = "audit"
 REVIEW_OBJECTIVE_REPAIR: ReviewObjective = "repair"
 
-REPAIR_MODE_TEST_CHANGES_ALLOWED: RepairMode = "test-changes-allowed"
-REPAIR_MODE_NO_TEST_CHANGES: RepairMode = "no-test-changes"
+TEST_CHANGES_ALLOW: TestChangesPolicy = "allow"
+TEST_CHANGES_DENY: TestChangesPolicy = "deny"
 
 
 @dataclass(frozen=True)
 class ReviewIntent:
     objective: ReviewObjective
-    repair_mode: RepairMode
+    test_changes: TestChangesPolicy
 
 
 def require_review_intent(value: object) -> ReviewIntent:
@@ -30,32 +30,30 @@ def require_review_intent(value: object) -> ReviewIntent:
     else:
         raise ValueError("review_intent.objective must be 'audit' or 'repair'.")
 
-    raw_repair_mode = value.get("repair_mode")
-    if raw_repair_mode is None or raw_repair_mode == REPAIR_MODE_TEST_CHANGES_ALLOWED:
-        repair_mode = REPAIR_MODE_TEST_CHANGES_ALLOWED
-    elif raw_repair_mode == REPAIR_MODE_NO_TEST_CHANGES:
-        repair_mode = REPAIR_MODE_NO_TEST_CHANGES
+    raw_test_changes = value.get("test_changes")
+    if raw_test_changes is None or raw_test_changes == TEST_CHANGES_ALLOW:
+        test_changes = TEST_CHANGES_ALLOW
+    elif raw_test_changes == TEST_CHANGES_DENY:
+        test_changes = TEST_CHANGES_DENY
     else:
-        raise ValueError(
-            "review_intent.repair_mode must be 'test-changes-allowed' or 'no-test-changes'."
-        )
-    return ReviewIntent(objective=objective, repair_mode=repair_mode)
+        raise ValueError("review_intent.test_changes must be 'allow' or 'deny'.")
+    return ReviewIntent(objective=objective, test_changes=test_changes)
 
 
-def repair_mode_boundary_prompt_path(value: RepairMode) -> str:
-    if value == REPAIR_MODE_NO_TEST_CHANGES:
-        return "repair-modes/no-test-changes-boundary.md"
-    return "repair-modes/test-changes-allowed-boundary.md"
+def test_changes_boundary_prompt_path(value: TestChangesPolicy) -> str:
+    if value == TEST_CHANGES_DENY:
+        return "test-changes-policy/deny-boundary.md"
+    return "test-changes-policy/allow-boundary.md"
 
 
 __all__ = [
-    "REPAIR_MODE_NO_TEST_CHANGES",
-    "REPAIR_MODE_TEST_CHANGES_ALLOWED",
+    "TEST_CHANGES_ALLOW",
+    "TEST_CHANGES_DENY",
     "REVIEW_OBJECTIVE_AUDIT",
     "REVIEW_OBJECTIVE_REPAIR",
-    "RepairMode",
     "ReviewIntent",
     "ReviewObjective",
-    "repair_mode_boundary_prompt_path",
+    "TestChangesPolicy",
     "require_review_intent",
+    "test_changes_boundary_prompt_path",
 ]

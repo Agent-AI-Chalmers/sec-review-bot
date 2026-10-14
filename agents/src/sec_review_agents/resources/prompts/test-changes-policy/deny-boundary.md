@@ -1,4 +1,4 @@
-# No-Test-Changes Boundary
+# Test Changes Denied
 
 - **This run forbids leaving test suite changes in the final workspace.**
 - Temporary local edits for investigation or validation are allowed, but the final workspace must contain only the intended mitigation; any other temporary edits must be reverted before finalizing.

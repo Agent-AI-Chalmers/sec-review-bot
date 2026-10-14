@@ -53,10 +53,10 @@
             "repair"
           ]
         },
-        "repair_mode": {
+        "test_changes": {
           "enum": [
-            "test-changes-allowed",
-            "no-test-changes"
+            "allow",
+            "deny"
           ]
         }
       }
