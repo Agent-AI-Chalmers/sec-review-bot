@@ -83,3 +83,42 @@ test('extractPullRequestContext returns normalized pull request context', () => 
   assert.equal(context.pr_number, 7)
   assert.equal(context.from_fork, false)
 })
+
+test('extractPullRequestContext keeps trusted identity on the base repo for fork PRs', () => {
+  // Fork PR: the top-level `repository` field is the BASE repository (where the
+  // event occurred), while pull_request.head.repo is the contributor's fork.
+  // Trusted setup must be read from the base repo, never the head/fork repo.
+  const context = extractPullRequestContext({
+    action: 'opened',
+    repository: {
+      name: 'example',
+      full_name: 'octo/example',
+      owner: { login: 'octo' }
+    },
+    sender: { login: 'mallory' },
+    pull_request: {
+      number: 9,
+      title: 'Fork PR',
+      body: 'Body',
+      user: { login: 'mallory' },
+      draft: false,
+      base: {
+        ref: 'main',
+        sha: 'base-sha',
+        repo: { full_name: 'octo/example' }
+      },
+      head: {
+        ref: 'feature',
+        sha: 'head-sha',
+        repo: { full_name: 'mallory/example' }
+      }
+    }
+  })
+
+  assert.equal(context.from_fork, true)
+  assert.equal(context.repo_full_name, 'octo/example')
+  assert.equal(context.base_repo_full_name, 'octo/example')
+  assert.equal(context.head_repo_full_name, 'mallory/example')
+  // Trusted ref must resolve from the base repo identity, not the head/fork.
+  assert.notEqual(context.repo_full_name, context.head_repo_full_name)
+})
