@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import yaml
@@ -154,11 +153,12 @@ def _parse_working_directory(value: Any, label: str) -> str | None:
             f"{label}.working-directory must be a non-empty string."
         )
     normalized = value.strip()
-    if normalized.startswith("/") or normalized.split("/")[0] == "..":
+    parts = normalized.split("/")
+    if normalized.startswith("/") or parts[0] == "..":
         raise SetupDeclarationError(
             f"{label}.working-directory must be relative to the repository root: {value!r}"
         )
-    if ".." in Path(normalized).parts:
+    if ".." in parts:
         raise SetupDeclarationError(
             f"{label}.working-directory must not escape the repository root: {value!r}"
         )
