@@ -32,8 +32,6 @@ Best effort stops at the *step* boundary, not the *declaration* boundary:
   unbootstrapped one.
 """
 
-from __future__ import annotations
-
 import shlex
 from collections.abc import Mapping
 from dataclasses import dataclass

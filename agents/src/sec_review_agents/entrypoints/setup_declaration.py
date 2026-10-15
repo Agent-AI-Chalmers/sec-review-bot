@@ -5,8 +5,6 @@ branch. It is therefore parsed strictly against an allow-list: anything the
 schema does not explicitly permit is rejected, never silently ignored.
 """
 
-from __future__ import annotations
-
 import os
 import re
 from dataclasses import dataclass, field

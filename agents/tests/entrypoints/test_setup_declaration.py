@@ -140,9 +140,7 @@ def test_rejects_boolean_like_env_keys(raw: str) -> None:
 
 
 def test_accepts_quoted_boolean_like_env_key() -> None:
-    setup = parse_setup_declaration(
-        'setup:\n  - run: x\n    env:\n      "on": ok\n'
-    )
+    setup = parse_setup_declaration('setup:\n  - run: x\n    env:\n      "on": ok\n')
     assert setup.steps[0].env == {"on": "ok"}
 
 
