@@ -402,21 +402,29 @@ export async function readRepositoryFileAtRef({
       await runGitFetchWithRetry(tempDir, ['fetch', '--depth', '1', 'origin', normalizedSha], {
         ...(auth ? { config: auth.config, env: auth.env } : {})
       })
+
+      // Decide "the file is absent" by exit code, not by matching git's error
+      // wording: the object is already fetched, so `cat-file -e` succeeds exactly
+      // when the path exists at that commit. This keeps a missing
+      // `.sec-review/setup.yml` (the normal case) from depending on a message a
+      // git upgrade could reword -- and, more importantly, from being mistaken
+      // for a transport error and failing the whole input preparation.
+      if (!(await fileExistsAtRef(tempDir, normalizedSha, normalizedPath))) {
+        return null
+      }
+
       const { stdout } = await execFileAsync(
         'git',
         ['show', `${normalizedSha}:${normalizedPath}`],
         {
           cwd: tempDir,
-          env: {
-            ...process.env,
-            GIT_ASKPASS: '',
-            SSH_ASKPASS: '',
-            GIT_TERMINAL_PROMPT: '0'
-          }
+          env: gitNoPromptEnv()
         }
       )
       return stdout
     } catch (error) {
+      // Fallback: if the probe itself failed and the error clearly means "no such
+      // path", treat it as absent; otherwise surface it.
       if (isGitMissingPathError(error)) {
         return null
       }
@@ -428,6 +436,29 @@ export async function readRepositoryFileAtRef({
     }
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true })
+  }
+}
+
+function gitNoPromptEnv(): Record<string, string | undefined> {
+  return {
+    ...process.env,
+    GIT_ASKPASS: '',
+    SSH_ASKPASS: '',
+    GIT_TERMINAL_PROMPT: '0'
+  }
+}
+
+/** True when `path` exists at `sha`. Uses `cat-file -e`, whose exit code (not a
+ * message) reports presence; only the already-fetched commit is queried. */
+async function fileExistsAtRef(cwd: string, sha: string, filePath: string): Promise<boolean> {
+  try {
+    await execFileAsync('git', ['cat-file', '-e', `${sha}:${filePath}`], {
+      cwd,
+      env: gitNoPromptEnv()
+    })
+    return true
+  } catch {
+    return false
   }
 }
 
