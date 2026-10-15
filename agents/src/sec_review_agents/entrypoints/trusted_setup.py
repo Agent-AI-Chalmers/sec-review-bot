@@ -8,6 +8,7 @@ schema does not explicitly permit is rejected, never silently ignored.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,12 @@ MAX_STEP_TIMEOUT_ENV = "SEC_REVIEW_SETUP_STEP_MAX_SECONDS"
 DEFAULT_MAX_STEP_TIMEOUT_SECONDS = 600
 
 _ALLOWED_STEP_KEYS = frozenset({"run", "working-directory", "env", "timeout_seconds"})
+
+# Environment variable names are emitted as `export KEY=...` in a shell command.
+# Restrict them to portable shell identifiers so a declaration cannot smuggle
+# shell syntax through a name (cheap hardening; declarations are trusted, but a
+# malformed name is a clear authoring error worth rejecting at parse time).
+_ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class TrustedSetupError(ValueError):
@@ -142,6 +149,10 @@ def _parse_env(value: Any, label: str) -> dict[str, str]:
         if not isinstance(key, str) or not isinstance(item, str):
             raise TrustedSetupError(
                 f"{label}.env must map string keys to string values."
+            )
+        if not _ENV_NAME_RE.match(key):
+            raise TrustedSetupError(
+                f"{label}.env has an invalid variable name: {key!r}"
             )
         env[key] = item
     return env

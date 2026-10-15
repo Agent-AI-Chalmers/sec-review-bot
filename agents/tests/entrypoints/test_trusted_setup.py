@@ -102,6 +102,24 @@ def test_rejects_non_string_env_values() -> None:
         parse_trusted_setup("setup:\n  - run: x\n    env:\n      NODE_ENV: 1\n")
 
 
+def test_rejects_invalid_env_variable_name() -> None:
+    with pytest.raises(TrustedSetupError, match="invalid variable name"):
+        parse_trusted_setup("setup:\n  - run: x\n    env:\n      'A; rm -rf /': boom\n")
+
+
+def test_accepts_portable_env_variable_names() -> None:
+    setup = parse_trusted_setup("setup:\n  - run: x\n    env:\n      _A1: ok\n")
+    assert setup.steps[0].env == {"_A1": "ok"}
+
+
+@pytest.mark.parametrize("raw", ["false", "123", "on"])
+def test_rejects_non_string_run(raw: str) -> None:
+    # YAML would parse bare false/123/on/null as non-strings; a run must be a
+    # literal command string.
+    with pytest.raises(TrustedSetupError, match="run must be a non-empty string"):
+        parse_trusted_setup(f"setup:\n  - run: {raw}\n")
+
+
 def test_rejects_invalid_yaml() -> None:
     with pytest.raises(TrustedSetupError, match="not valid YAML"):
         parse_trusted_setup("setup: [broken\n")
