@@ -72,6 +72,7 @@
 ### architecture/
 
 - [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体、端到端数据流、跨服务契约、事实来源和凭据所有权。
+- [SETUP_DECLARATIONS.md](architecture/SETUP_DECLARATIONS.md) / [中文](architecture/SETUP_DECLARATIONS.zh.md)：仓库的设置声明——格式、执行语义和信任边界。
 
 ### operations/
 

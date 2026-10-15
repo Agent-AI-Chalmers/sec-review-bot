@@ -141,6 +141,7 @@ sudo systemctl enable --now sec-review-bot.target
 | 开发 GitHub integration         | [GitHub integration 说明](apps/github-integration/README.zh.md)          |
 | 开发 agent 运行后端或做本地运行 | [Agents 本地运行说明](agents/README.zh.md)                               |
 | 把 GitHub 入站请求转发到本地    | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
+| 仓库的设置声明                  | [设置声明](docs/architecture/SETUP_DECLARATIONS.zh.md)                   |
 
 ## 论文
 
