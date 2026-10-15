@@ -23,13 +23,11 @@ export default [
         Request: 'readonly',
         RequestInit: 'readonly',
         Response: 'readonly',
-        ResponseInit: 'readonly',
         AbortController: 'readonly',
         fetch: 'readonly',
         structuredClone: 'readonly',
         clearTimeout: 'readonly',
         setImmediate: 'readonly',
-        clearInterval: 'readonly',
         setInterval: 'readonly',
         setTimeout: 'readonly'
       }
