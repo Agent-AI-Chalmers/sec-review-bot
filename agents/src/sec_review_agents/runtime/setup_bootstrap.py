@@ -23,8 +23,13 @@ can install dependencies in place. Anything that adds a *new* source for
 such a source only with that in mind, and keep the default-branch-only rule on
 the integration side.
 
-Bootstrap is best-effort: a step failure stops the remaining steps and is
-recorded as an incomplete environment, but the review still proceeds.
+Best effort stops at the *step* boundary, not the *declaration* boundary:
+
+- a step that runs and fails stops the remaining steps and records an incomplete
+  environment, but the review still proceeds (a failed install can be transient);
+- a declaration that is present but does not parse raises: the environment it
+  asked for can never be prepared, so the review must not proceed against an
+  unbootstrapped one.
 """
 
 from __future__ import annotations
@@ -38,7 +43,6 @@ from typing import Any, Protocol
 
 from sec_review_agents.entrypoints.setup_declaration import (
     SetupDeclaration,
-    SetupDeclarationError,
     SetupDeclarationStep,
     is_blank_setup_declaration,
     parse_setup_declaration,
@@ -128,15 +132,16 @@ async def bootstrap_environment(
     ):
         return BootstrapResult(status=BootstrapStatus.NOT_DECLARED)
 
-    try:
-        declaration: SetupDeclaration = parse_setup_declaration(
-            setup_declaration_content
-        )
-    except SetupDeclarationError as error:
-        return BootstrapResult(
-            status=BootstrapStatus.INCOMPLETE,
-            reason=f"invalid setup declaration: {error}",
-        )
+    # A declaration that is present but does not parse is a *run-level* failure,
+    # not a best-effort degrade. The environment the declaration asked for can
+    # never be prepared, so proceeding would run the review against an
+    # unbootstrapped environment -- exactly the silent failure the design
+    # forbids. (This is distinct from a step that runs and fails, below: a
+    # failed install may be a transient network problem and the review can still
+    # proceed best-effort.) A parse failure here means the producer and the
+    # runner disagree about the format, or an out-of-band caller supplied
+    # unvalidated text; both should fail loudly.
+    declaration: SetupDeclaration = parse_setup_declaration(setup_declaration_content)
 
     results: list[BootstrapStepResult] = []
     for step in declaration.steps:

@@ -70,9 +70,13 @@ They have different jobs on the same rules:
   and path attached. A broken `.sec-review/setup.yml` on the default branch is a
   maintainer error that fails loudly rather than silently degrading to an
   unbootstrapped environment.
-- The **runner re-validates as defense in depth** before executing, and treats a
-  step failure as a best-effort `incomplete` environment (the review still
-  proceeds).
+- The **runner re-validates as defense in depth** before executing. A *step* that
+  fails is a best-effort `incomplete` environment (the review still proceeds); a
+  declaration that does not *parse* at the runner fails the run, because the
+  environment it asked for can never be prepared. The integration rejecting first
+  is what makes an unparseable declaration at the runner a backstop: it should
+  only happen if the two enforcers disagree (see "Scalars and YAML dialects") or
+  an out-of-band caller supplied unvalidated text.
 
 There is no JSON Schema for this contract. The rules that matter — a
 `working-directory` that cannot escape the root, an `env` name that cannot smuggle

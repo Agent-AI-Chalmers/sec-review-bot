@@ -25,12 +25,12 @@ The declaration is carried as **inline text**, not as a file path:
 2. The runner passes that string down the workflow. There is no declaration file in the input bundle, no manifest field for it, and no mount for it in the container.
 3. Before the agent runs, each stage parses the string and executes its steps inside the sandbox.
 
-Because the contents are inline, there is no "declaration file not found" path; the only declaration-specific failure modes are "rejected as invalid before submission" and "a step fails at execution time".
+Because the contents are inline, there is no "declaration file not found" path. The declaration-specific failure modes are: rejected as invalid before submission; a step fails at execution time (best-effort, the review proceeds); and — as a defense-in-depth backstop — the runner re-parsing the text and rejecting it, which fails the run rather than degrading silently.
 
 ## Execution Semantics
 
 - **Docker only.** Only the Docker backend runs a declaration, because its container is long-lived and one bootstrap is reused for the whole stage. On other backends the declaration has no effect.
-- **Best effort.** A failing step stops the remaining steps and marks the environment incomplete, but the review still proceeds.
+- **Best effort at the step boundary.** A step that runs and fails stops the remaining steps and marks the environment incomplete, but the review still proceeds (a failed install can be transient). A declaration that does not *parse* at the runner is different: the environment can never be prepared, so the run fails rather than proceeding unbootstrapped.
 - **Recorded, not silent.** The stage writes `environment.json` next to its other artifacts with `setup_status` (`not_declared`, `completed`, or `incomplete`), `environment_incomplete`, and each step's exit code and truncated output. Output is truncated, **not redacted**: it is operator-visible and may contain registry URLs or tokens from install commands.
 - **Not given to the agent.** The declaration and its outcome are not placed in the agent's context; the agent reasons from the repository.
 

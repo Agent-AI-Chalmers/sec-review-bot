@@ -2,7 +2,10 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from sec_review_agents.entrypoints.setup_declaration import SetupDeclarationStep
+from sec_review_agents.entrypoints.setup_declaration import (
+    SetupDeclarationError,
+    SetupDeclarationStep,
+)
 from sec_review_agents.runtime.setup_bootstrap import (
     BOOTSTRAP_OUTPUT_MAX_CHARS,
     EXIT_CODE_UNDETERMINED,
@@ -63,13 +66,16 @@ async def test_no_declaration_is_not_declared() -> None:
 
 
 @pytest.mark.asyncio
-async def test_invalid_declaration_is_incomplete() -> None:
+async def test_unparseable_declaration_raises_instead_of_degrading() -> None:
+    # A declaration that is present but does not parse can never prepare the
+    # environment it asked for, so it fails the run loudly rather than silently
+    # degrading to an unbootstrapped one. This case can only come from a
+    # producer/runner format disagreement or an unvalidated out-of-band caller.
     backend = _FakeBackend()
-    result = await bootstrap_environment(
-        backend, setup_declaration_content="setup: [broken\n"
-    )
-    assert result.status is BootstrapStatus.INCOMPLETE
-    assert result.reason is not None and "invalid" in result.reason
+    with pytest.raises(SetupDeclarationError):
+        await bootstrap_environment(
+            backend, setup_declaration_content="setup: [broken\n"
+        )
     assert backend.commands == []
 
 
