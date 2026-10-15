@@ -34,14 +34,15 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /prod ./
 # The service validates runner results against the canonical contract schemas, which it
 # must carry itself (compose supplies `contracts/` only as a build context, not a runtime
-# mount). Copy the whole integration-contract family minus `tools/` (a 90 MB build-only
-# working tree) and let the runtime pick the version directory itself, via
-# `CONTRACT_VERSION_DIR` in `src/runner/contract-version.ts`. Naming the version here
-# instead is what let a v5 -> v6 bump leave the image pointing at stale schemas; the image
-# now carries no version literal to fall out of sync. The path lands on the resolver's
-# primary candidate (`<cwd>/contracts/integration-contract/<version>/schemas`, with cwd
-# `/app`) rather than its `../../` fallback, and startup verifies the schemas load.
-COPY --exclude=**/tools --from=contracts integration-contract /app/contracts/integration-contract
+# mount). Copy the integration-contract family and let the runtime pick the version directory
+# itself, via `CONTRACT_VERSION_DIR` in `src/runner/contract-version.ts`. Naming the version
+# here instead is what let a v5 -> v6 bump leave the image pointing at stale schemas; the image
+# now carries no version literal to fall out of sync. The path lands on the resolver's primary
+# candidate (`<cwd>/contracts/integration-contract/<version>/schemas`, with cwd `/app`) rather
+# than its `../../` fallback, and startup verifies the schemas load. The build-only `tools/`
+# working tree never reaches this COPY because `contracts/.dockerignore` keeps it out of the
+# build context.
+COPY --from=contracts integration-contract /app/contracts/integration-contract
 RUN rm -rf dist/test
 
 CMD ["node", "dist/app.js"]
