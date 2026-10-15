@@ -1,10 +1,23 @@
 setup:
-  # The workspace image ships python3/pip/node/pnpm but not uv, which the
-  # agents package uses for environment and dependency management. Install it,
-  # then sync the locked environment so the agent starts with dependencies
-  # ready and does not spend turns installing them.
+  # Python side (agents/). The workspace image ships python3/pip but not uv,
+  # which the agents package uses for environment and dependency management.
   - run: pip3 install --no-input uv
     timeout_seconds: 300
   - run: uv sync --frozen
     working-directory: agents
+    timeout_seconds: 600
+
+  # TypeScript packages. The image ships node and an older pnpm; every package
+  # declares `packageManager: pnpm@12.10.1`, so activate it through corepack
+  # before installing against the committed lockfiles.
+  - run: corepack enable
+    timeout_seconds: 60
+  - run: pnpm install --frozen-lockfile
+    working-directory: apps/github-integration
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: apps/control-plane-ui
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: control-plane
     timeout_seconds: 600
