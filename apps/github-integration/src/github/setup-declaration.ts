@@ -118,6 +118,75 @@ function rejectNonStringEnvKeys(contents: Node | null): void {
   })
 }
 
+/**
+ * Reject every explicit YAML tag (`!!bool`, `!!str`, `!!seq`, ...).
+ *
+ * The declaration format is the plain YAML 1.2 Core schema, and the two
+ * enforcers disagree about explicit tags: `yaml` silently falls back to the raw
+ * string when a tag's scalar does not match (`!!bool on` -> `"on"`), while the
+ * runner's loader (yamlcore/PyYAML) raises. Rejecting every explicitly tagged
+ * node here — the TS analogue of the runner's event-level check — keeps the two
+ * classifications identical. A plain scalar carries no `tag` in the AST;
+ * `!!str x`, `!!bool on`, and `!!seq [...]` all do.
+ */
+function rejectExplicitTags(node: Node | null): void {
+  if (node === null || node === undefined) {
+    return
+  }
+  if (typeof node.tag === 'string') {
+    throw new SetupDeclarationError(
+      `Setup declaration must not use explicit YAML tags (${node.tag}); the YAML 1.2 Core schema already resolves booleans, numbers, and null.`,
+      { reason: 'explicit-tag' }
+    )
+  }
+  if (isMap(node)) {
+    for (const pair of node.items) {
+      rejectExplicitTags(pair.key as Node)
+      rejectExplicitTags(pair.value as Node)
+    }
+    return
+  }
+  if (isSeq(node)) {
+    for (const item of node.items) {
+      rejectExplicitTags(item as Node)
+    }
+  }
+}
+
+/**
+ * Reject a `timeout_seconds` written in float syntax (e.g. `1.0`, `1e3`).
+ *
+ * `yaml` resolves `1.0`/`1e3` to a JS number whose `Number.isInteger` is true,
+ * so `parseTimeout` would accept them; the runner's loader resolves them to a
+ * Python `float`, which its `isinstance(value, int)` check rejects. Compare the
+ * scalar's *source* text instead of the resolved value so both sides reject
+ * float-syntax timeouts. Hex/octal integers (`0x10`, `0o10`) and signed
+ * decimals stay valid, matching the runner.
+ */
+function rejectNonIntegerTimeoutScalars(contents: Node | null): void {
+  const steps = isMap(contents) ? contents.get('setup') : undefined
+  if (!isSeq(steps)) {
+    return
+  }
+  steps.items.forEach((step, index) => {
+    if (!isMap(step)) {
+      return
+    }
+    const timeout = step.get('timeout_seconds', true)
+    if (!isScalar(timeout) || typeof timeout.value !== 'number') {
+      return
+    }
+    const source = typeof timeout.source === 'string' ? timeout.source : ''
+    // Integer syntax only: no fraction/exponent marker.
+    if (/[.eE]/.test(source)) {
+      throw new SetupDeclarationError(
+        `setup[${index}].timeout_seconds must be an integer.`,
+        { reason: 'invalid-timeout' }
+      )
+    }
+  })
+}
+
 function parseStep(raw: unknown, index: number): SetupDeclarationStep {
   const label = `setup[${index}]`
   if (!isRecord(raw)) {
@@ -255,6 +324,8 @@ export function parseSetupDeclaration(content: string): SetupDeclaration | null 
     })
   }
   rejectNonStringEnvKeys(document.contents)
+  rejectExplicitTags(document.contents)
+  rejectNonIntegerTimeoutScalars(document.contents)
 
   let parsed: unknown
   try {

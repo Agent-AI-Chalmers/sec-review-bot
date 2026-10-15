@@ -1,0 +1,4 @@
+# An explicit `!!int` tag on a non-integer scalar.
+setup:
+  - run: x
+    timeout_seconds: !!int x

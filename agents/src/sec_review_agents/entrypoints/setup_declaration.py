@@ -95,6 +95,27 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
         raise SetupDeclarationError(
             f"Setup declaration exceeds {MAX_SETUP_DECLARATION_BYTES} bytes."
         )
+    # Reject explicit YAML tags (`!!bool`, `!!str`, `!!seq`, ...) before loading.
+    # The declaration format is the plain YAML 1.2 Core schema; a maintainer
+    # never needs an explicit tag, and the two libraries disagree about them:
+    # `yaml` (TS) silently falls back to the raw string when a tag's scalar does
+    # not match, while `yamlcore`/PyYAML raise -- sometimes a raw `KeyError`/
+    # `IndexError` from inside a constructor, not a `YAMLError`. Rejecting every
+    # explicit tag here keeps the two enforcers identical and turns a malformed
+    # tag into a clean declaration error instead of an internal traceback.
+    try:
+        for event in yaml.parse(content, Loader=yamlcore.CCoreLoader):
+            if getattr(event, "tag", None) is not None:
+                raise SetupDeclarationError(
+                    "Setup declaration must not use explicit YAML tags "
+                    f"({event.tag}). Use plain scalars; the YAML 1.2 Core "
+                    "schema already resolves booleans, numbers, and null."
+                )
+    except yaml.YAMLError as error:
+        raise SetupDeclarationError(
+            f"Setup declaration is not valid YAML: {error}"
+        ) from error
+
     try:
         # Parse with the YAML 1.2 Core schema (via yamlcore), the same schema
         # the GitHub integration uses (`yaml` with `schema: 'core'`). The two
@@ -106,6 +127,12 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
     except yaml.YAMLError as error:
         raise SetupDeclarationError(
             f"Setup declaration is not valid YAML: {error}"
+        ) from error
+    except (ValueError, KeyError, TypeError, IndexError) as error:
+        # Defensive: a loader/constructor bug raising a raw Python error is
+        # still a declaration error to the caller, never an internal traceback.
+        raise SetupDeclarationError(
+            f"Setup declaration could not be constructed: {error}"
         ) from error
 
     if not isinstance(parsed, dict):

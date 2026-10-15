@@ -119,6 +119,43 @@ test('rejects non-string env keys', () => {
   }
 })
 
+test('rejects explicit YAML tags', () => {
+  // The format is the plain Core schema. Both enforcers reject every explicit
+  // tag, because `yaml` silently falls back to the raw string for a mismatched
+  // tag (`!!bool on` -> "on") while the runner's loader raises.
+  for (const raw of [
+    '!!bool on',
+    '!!str npm ci',
+    '!!seq [a]',
+    '!!set {a}',
+    '!!int 5'
+  ]) {
+    assert.throws(
+      () => parseSetupDeclaration(`setup:\n  - run: ${raw}\n`),
+      SetupDeclarationError,
+      `explicit tag ${raw} should be rejected`
+    )
+  }
+})
+
+test('rejects a float-syntax timeout', () => {
+  // `1.0`/`1e3` resolve to an integer-valued JS number, but the runner resolves
+  // them to a Python float and rejects them; both sides reject by source text.
+  for (const raw of ['1.0', '1e3', '1.0e2', '10.']) {
+    assert.throws(
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    timeout_seconds: ${raw}\n`),
+      SetupDeclarationError,
+      `timeout ${raw} should be rejected`
+    )
+  }
+  for (const raw of ['100', '0x10', '0o10', '+5']) {
+    assert.doesNotThrow(
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    timeout_seconds: ${raw}\n`),
+      `timeout ${raw} should be accepted`
+    )
+  }
+})
+
 test('rejects an oversized declaration', () => {
   const filler = 'x'.repeat(65536 + 1)
   assert.throws(() => parseSetupDeclaration(`setup:\n  - run: ${filler}\n`), SetupDeclarationError)

@@ -41,7 +41,7 @@ ignored:
 - `run` is required and must be a non-empty string;
 - `working-directory`, when present, must be a non-empty string that is relative and stays inside the repository root (no leading `/`, no `..` segment). Containment is checked lexically on the declared path; it does not resolve symlinks, so a symlink inside the repository is not followed by this rule (the declaration is trusted content, so this is containment, not a sandbox);
 - `env`, when present, must be a mapping of string keys to string values, with keys matching the identifier pattern above. The declaration is parsed with the **YAML 1.2 Core schema**, so a key or value must be a string under that schema: `on`, `yes`, `off`, `no`, `y`, and `n` are plain strings, but `true`, `123`, and `null` are not and are rejected. This applies to `run` and `working-directory` too (see "Scalars and YAML dialects");
-- `timeout_seconds`, when present, must be a positive integer (booleans are not integers).
+- `timeout_seconds`, when present, must be a positive integer (booleans are not integers). It must also be written in integer syntax: a float-syntax value (`1.0`, `1e3`) is rejected by inspecting the scalar's source text, because JS resolves it to an integer-valued number while Python resolves it to a float — without that check the two enforcers would disagree. Hex/octal integers (`0x10`, `0o10`) and signed decimals are accepted by both.
 
 **Blank content is not a declaration.** An empty or whitespace-only file is treated exactly like a missing file: it is valid and means "no declaration". It is not an error.
 
@@ -77,6 +77,8 @@ Both enforcers parse the declaration with the **YAML 1.2 Core schema**:
 - the integration uses the `yaml` library with `schema: 'core'`.
 
 Using one schema on both sides means every scalar resolves identically, so a declaration is accepted or rejected the same way by both. In particular, under the Core schema the words `on`, `yes`, `off`, `no`, `y`, and `n` are **plain strings**, not booleans — so `run: on` is the command string `on`, and `env: { yes: ok }` sets `yes=ok`. Unquoted `true`/`false` are booleans, `123` is a number, and `null`/`~` are null; those are rejected in any string-valued position (`run`, `working-directory`, `env` keys and values) because they are not strings. Quoting always forces a string (`run: "on"`), but it is not required for the Core-schema words.
+
+**Explicit tags are rejected.** Neither side accepts an explicitly tagged node (`!!bool`, `!!int`, `!!str`, `!!seq`, `!!set`, ...). A declaration uses the plain Core schema, which already resolves booleans, numbers, and null; an explicit tag is never needed, and the two libraries disagree about them (`yaml` silently falls back to the raw string when a tag's scalar does not match, e.g. `!!bool on` resolves to `"on"`, while `yamlcore`/PyYAML raise). Rejecting every explicit tag keeps the two enforcers identical and turns a malformed tag into a clean declaration error instead of an internal traceback. Implicit resolution is unaffected: an untagged `on` is still the string `on` and an untagged `true` is still a boolean.
 
 The Core schema is the intersection of what the two libraries agree on, and both were chosen for their 1.2 behavior:
 

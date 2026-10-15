@@ -67,6 +67,40 @@ def test_default_timeout_is_also_capped(monkeypatch: pytest.MonkeyPatch) -> None
     assert setup.steps[0].timeout_seconds == 100
 
 
+def test_rejects_float_syntax_timeout() -> None:
+    for content in (
+        "setup:\n  - run: x\n    timeout_seconds: 1.0\n",
+        "setup:\n  - run: x\n    timeout_seconds: 1e3\n",
+    ):
+        with pytest.raises(SetupDeclarationError, match="must be an integer"):
+            parse_setup_declaration(content)
+
+
+def test_rejects_explicit_yaml_tags() -> None:
+    # The format is the plain Core schema. Explicit tags are rejected on both
+    # sides so the two libraries cannot disagree (`yaml` falls back to the raw
+    # string for a mismatched tag such as `!!bool on`, while yamlcore raises).
+    for content in (
+        "setup:\n  - run: !!bool on\n",
+        "setup:\n  - run: !!str npm ci\n",
+        "setup:\n  - run: x\n    timeout_seconds: !!int x\n",
+        "setup:\n  - run: !!seq [a]\n",
+    ):
+        with pytest.raises(SetupDeclarationError, match="explicit YAML tag"):
+            parse_setup_declaration(content)
+
+
+def test_malformed_tag_is_a_declaration_error_not_an_internal_error() -> None:
+    # `!!bool on` and `!!int x` used to make the loader raise a raw
+    # `KeyError`/`ValueError`. That must surface as a `SetupDeclarationError`.
+    for content in (
+        "setup:\n  - run: !!int ''\n",
+        "setup:\n  - run: !!float ''\n",
+    ):
+        with pytest.raises(SetupDeclarationError):
+            parse_setup_declaration(content)
+
+
 def test_rejects_unknown_top_level_key() -> None:
     with pytest.raises(SetupDeclarationError, match="unsupported top-level key"):
         parse_setup_declaration("setup:\n  - run: x\nuses: actions/checkout\n")
