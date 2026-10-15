@@ -102,3 +102,12 @@ export function assertWorkflowResult(workflow: WorkflowName, value: unknown): vo
 export function assertReviewRecord(value: unknown): void {
   assertSchema('review-record.schema.json', value, 'review_record')
 }
+
+/**
+ * Force-load the contract validators so a missing or unreadable schema set fails
+ * at startup rather than on the first result published. The service packages the
+ * schemas into its image; a build that copied the wrong ones should not start.
+ */
+export function verifyContractSchemasLoadable(): void {
+  resultValidators()
+}
