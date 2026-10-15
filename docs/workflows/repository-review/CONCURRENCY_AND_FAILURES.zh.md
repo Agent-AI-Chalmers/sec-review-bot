@@ -6,9 +6,7 @@
 
 这份文档说明 `repository-review` 如何使用阶段内并发、哪些调参入口影响墙钟时间，以及失败如何被边界收住。
 
-App 提交的 runs、workflow fanout 和 worker activity 容量之间的系统级并发关系，见
-[../CONCURRENCY_MODEL.zh.md](../CONCURRENCY_MODEL.zh.md)。本文只聚焦一个 repository run
-被接收后，repository review workflow 内部的并发与失败边界。
+App 提交的 runs、workflow fanout 和 worker activity 容量之间的系统级并发关系，见 [../CONCURRENCY_MODEL.zh.md](../CONCURRENCY_MODEL.zh.md)。本文只聚焦一个 repository run 被接收后，repository review workflow 内部的并发与失败边界。
 
 ## 总览
 
