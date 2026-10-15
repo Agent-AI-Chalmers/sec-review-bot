@@ -212,7 +212,11 @@ def _parse_env(value: Any, label: str) -> dict[str, str]:
 
 def _parse_timeout(value: Any, label: str, max_timeout: int) -> int:
     if value is None:
-        return DEFAULT_STEP_TIMEOUT_SECONDS
+        # The cap bounds the *effective* timeout, so it also applies to the
+        # default: an operator who lowers SEC_REVIEW_SETUP_STEP_MAX_SECONDS
+        # below the default must still see it enforced on steps that omit
+        # `timeout_seconds`.
+        return min(DEFAULT_STEP_TIMEOUT_SECONDS, max_timeout)
     if isinstance(value, bool) or not isinstance(value, int):
         raise SetupDeclarationError(f"{label}.timeout_seconds must be an integer.")
     if value <= 0:

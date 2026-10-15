@@ -59,6 +59,14 @@ def test_invalid_timeout_limit_falls_back_to_default(
     assert max_step_timeout_seconds() == DEFAULT_MAX_STEP_TIMEOUT_SECONDS
 
 
+def test_default_timeout_is_also_capped(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The cap bounds the *effective* timeout, so an operator who lowers it below
+    # the default must still see it enforced on steps that omit `timeout_seconds`.
+    monkeypatch.setenv(MAX_STEP_TIMEOUT_ENV, "100")
+    setup = parse_setup_declaration("setup:\n  - run: x\n")
+    assert setup.steps[0].timeout_seconds == 100
+
+
 def test_rejects_unknown_top_level_key() -> None:
     with pytest.raises(SetupDeclarationError, match="unsupported top-level key"):
         parse_setup_declaration("setup:\n  - run: x\nuses: actions/checkout\n")
