@@ -35,6 +35,9 @@ async def mitigate_issue_self_check_activity(
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_content_for_backend,
+    )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.issue.mitigation_self_check import (
@@ -88,6 +91,7 @@ async def mitigate_issue_self_check_activity(
         analysis_result=analysis_result,
         test_changes=review_intent.test_changes,
         runtime_context=runtime_context,
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
     )
 
 
@@ -147,6 +151,7 @@ async def run_issue_two_stage(
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run analyzer plus self-checking mitigation and return raw stage outputs."""
     from sec_review_agents.review_stages.mitigation.stage import (
@@ -164,6 +169,7 @@ async def run_issue_two_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
         review_objective=review_objective,
         runtime_context=runtime_context,
+        setup_declaration_content=setup_declaration_content,
     )
 
     if not should_run_issue_mitigation(
@@ -184,6 +190,7 @@ async def run_issue_two_stage(
             analysis_result=analysis_result,
             test_changes=test_changes,
             runtime_context=runtime_context,
+            setup_declaration_content=setup_declaration_content,
         )
 
     return {
@@ -229,6 +236,7 @@ async def execute_issue_two_stage(
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run the stages and project them into the public ablation result shape."""
     two_stage_result = await run_issue_two_stage(
@@ -240,6 +248,7 @@ async def execute_issue_two_stage(
         review_objective=review_objective,
         test_changes=test_changes,
         runtime_context=runtime_context,
+        setup_declaration_content=setup_declaration_content,
     )
     return build_issue_two_stage_result(
         analysis_result=two_stage_result["analysis_result"],
