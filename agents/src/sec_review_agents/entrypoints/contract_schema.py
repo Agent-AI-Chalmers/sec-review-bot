@@ -11,14 +11,10 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from referencing import Registry, Resource
 
-# Single source of truth for the integration contract version.
-#
-# CONTRACT_VERSION is the version this runner produces and expects.
-# CONTRACT_VERSION_DIR is the on-disk directory that holds the schemas; it
-# currently equals the version string, but the two are separate concepts
-# (contract identity vs. file location), so paths reference the *_DIR name.
-CONTRACT_VERSION = "v6"
-CONTRACT_VERSION_DIR = CONTRACT_VERSION
+from sec_review_agents.contract_version import (
+    CONTRACT_VERSION,
+    CONTRACT_VERSION_DIR,
+)
 
 INPUT_SCHEMA_BY_WORKFLOW = {
     "issue-review": "issue-review-input.schema.json",
@@ -151,6 +147,8 @@ def validate_v6_workflow_result(result: Any, workflow: str) -> None:
 
 
 __all__ = [
+    "CONTRACT_VERSION",
+    "CONTRACT_VERSION_DIR",
     "INPUT_SCHEMA_BY_WORKFLOW",
     "RESULT_SCHEMA_BY_WORKFLOW",
     "validate_v6_workflow_input",
