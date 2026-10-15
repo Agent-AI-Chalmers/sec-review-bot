@@ -2,6 +2,11 @@
 
 Runner transport parses these values, then workflows and backends read them
 while building stage runtime resources.
+
+This is the only per-run override channel; everything a deployment sets for all
+runs lives in ``AGENT_*`` environment variables instead. The accepted keys are a
+closed allowlist, so a new override is an explicit change here rather than a new
+field the request can smuggle in.
 """
 
 from typing import Any, TypedDict
