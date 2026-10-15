@@ -56,7 +56,6 @@ def create_repository_verification_backend(
     incremental_window_path: Path | None,
     scan_mode: str,
     runtime_context: RunnerRuntimeContext | None = None,
-    setup_declaration_path: Path | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     if not workspace_root_path.is_dir():
@@ -102,7 +101,6 @@ def create_repository_verification_backend(
         path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
-        setup_declaration_path=setup_declaration_path,
     )
 
 

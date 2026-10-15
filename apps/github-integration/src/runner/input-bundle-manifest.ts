@@ -8,17 +8,10 @@ export const INPUT_BUNDLE_MANIFEST_NAME = 'manifest.json'
 
 export async function writeInputBundleManifest({
   input_bundle_root,
-  include_incremental_window,
-  setup_declaration_path
+  include_incremental_window
 }: {
   input_bundle_root: string
   include_incremental_window: boolean
-  /**
-   * Bundle-relative path to the setup declaration (e.g.
-   * `setup/setup.yml`). Omit when the repository has no declaration;
-   * the field is optional and its absence means "no setup declaration".
-   */
-  setup_declaration_path?: string
 }): Promise<void> {
   const manifest: Record<string, unknown> = {
     contract_version: CONTRACT_VERSION,
@@ -28,11 +21,6 @@ export async function writeInputBundleManifest({
     },
     history: {
       path: 'history'
-    }
-  }
-  if (setup_declaration_path) {
-    manifest.setup_declaration = {
-      path: setup_declaration_path
     }
   }
   if (include_incremental_window) {

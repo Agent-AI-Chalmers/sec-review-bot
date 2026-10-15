@@ -153,7 +153,7 @@ async def run_mitigation_stage(
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
-    setup_declaration_path: Path | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     attempt_label = mitigation_attempt_label(retry_context)
     with tempfile.TemporaryDirectory(prefix="sec-review-mitigation-") as tempdir:
@@ -178,7 +178,7 @@ async def run_mitigation_stage(
             record_bootstrap_result(
                 mitigator_artifacts_path,
                 await bootstrap_environment(
-                    backend, setup_declaration_path=setup_declaration_path
+                    backend, setup_declaration_content=setup_declaration_content
                 ),
             )
             agent = await create_mitigation_agent_graph(

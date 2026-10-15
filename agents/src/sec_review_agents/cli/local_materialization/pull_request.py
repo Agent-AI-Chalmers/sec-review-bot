@@ -231,6 +231,7 @@ def build_local_pull_request_bundle(
     event_type: str = "local_review",
     is_draft: bool = False,
     test_changes: str = "allow",
+    setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     pr_number_value = int(pr_number)
@@ -328,6 +329,11 @@ def build_local_pull_request_bundle(
         },
         "pr": pr_metadata,
         "input_bundle": input_bundle,
+        **(
+            {"setup_declaration": setup_declaration_content}
+            if setup_declaration_content is not None
+            else {}
+        ),
     }
 
     input_path = manifest_paths.local_root_path / "pull-request-review-input.json"

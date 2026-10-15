@@ -121,6 +121,9 @@
     },
     "scan_scope": {
       "$ref": "common.schema.json#/$defs/scanScope"
+    },
+    "setup_declaration": {
+      "$ref": "common.schema.json#/$defs/nonBlankString"
     }
   }
 }

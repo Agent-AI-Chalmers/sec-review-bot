@@ -330,19 +330,6 @@ def _set_bundle_paths_from_manifest(
         ),
     }
 
-    # Optional setup declaration (from the repository default branch).
-    # Absent means "no setup declaration" -- environment stays unbootstrapped.
-    setup_declaration = manifest.get("setup_declaration")
-    if isinstance(setup_declaration, dict):
-        bundle_paths["setup_declaration_path"] = str(
-            _resolve_bundle_path(
-                local_root,
-                _read_required_manifest_path(
-                    setup_declaration, "setup_declaration.path"
-                ),
-            )
-        )
-
     incremental_window = manifest.get("incremental_window")
     if isinstance(incremental_window, dict):
         bundle_paths["incremental_window_path"] = str(

@@ -43,7 +43,7 @@ def _seed(tmp_path: Path) -> Path:
 
 
 async def _run(
-    tmp_path: Path, *, backend: _FakeBackend, setup_declaration_path: Path | None
+    tmp_path: Path, *, backend: _FakeBackend, setup_declaration_content: str | None
 ) -> tuple[dict[str, Any], Path]:
     artifacts = tmp_path / "artifacts" / "analyzer"
     agent_called = {"value": False}
@@ -77,7 +77,7 @@ async def _run(
             system_prompt="system",
             filesystem_system_prompt="filesystem",
             user_prompt="user",
-            setup_declaration_path=setup_declaration_path,
+            setup_declaration_content=setup_declaration_content,
         )
 
     return agent_called, artifacts
@@ -89,7 +89,7 @@ async def test_no_declaration_records_not_declared_and_runs_agent(
 ) -> None:
     backend = _FakeBackend()
     agent_called, artifacts = await _run(
-        tmp_path, backend=backend, setup_declaration_path=None
+        tmp_path, backend=backend, setup_declaration_content=None
     )
     assert agent_called["value"] is True
     assert backend.commands == []
@@ -102,11 +102,11 @@ async def test_no_declaration_records_not_declared_and_runs_agent(
 async def test_declaration_runs_before_agent_and_records_completed(
     tmp_path: Path,
 ) -> None:
-    setup = tmp_path / "setup.yml"
-    setup.write_text("setup:\n  - run: echo one\n  - run: echo two\n", encoding="utf-8")
     backend = _FakeBackend()
     agent_called, artifacts = await _run(
-        tmp_path, backend=backend, setup_declaration_path=setup
+        tmp_path,
+        backend=backend,
+        setup_declaration_content="setup:\n  - run: echo one\n  - run: echo two\n",
     )
     assert agent_called["value"] is True
     assert backend.commands == [
@@ -122,13 +122,11 @@ async def test_declaration_runs_before_agent_and_records_completed(
 async def test_failed_step_marks_incomplete_but_agent_still_runs(
     tmp_path: Path,
 ) -> None:
-    setup = tmp_path / "setup.yml"
-    setup.write_text(
-        "setup:\n  - run: 'false'\n  - run: echo never\n", encoding="utf-8"
-    )
     backend = _FakeBackend(failing=True)
     agent_called, artifacts = await _run(
-        tmp_path, backend=backend, setup_declaration_path=setup
+        tmp_path,
+        backend=backend,
+        setup_declaration_content="setup:\n  - run: 'false'\n  - run: echo never\n",
     )
     assert agent_called["value"] is True
     assert backend.commands == ["cd /workspace && false"]

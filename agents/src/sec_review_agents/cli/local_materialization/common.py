@@ -27,6 +27,24 @@ def create_local_run_id() -> str:
     return f"local-run-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(4)}"
 
 
+def read_setup_declaration_file(path: str | Path | None) -> str | None:
+    """Read a local setup declaration file into its inline text form.
+
+    Returns None when no path is given. Raises ValueError when the path does not
+    point at a readable file, so a typo fails fast instead of silently skipping
+    bootstrap.
+    """
+    if path is None:
+        return None
+    resolved = Path(path).expanduser()
+    try:
+        return resolved.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ValueError(
+            f"Unable to read setup declaration file: {resolved} ({error})"
+        ) from error
+
+
 @dataclass(frozen=True)
 class MaterializedRunPaths:
     local_root_path: Path

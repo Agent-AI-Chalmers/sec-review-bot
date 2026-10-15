@@ -29,7 +29,7 @@ async def run_issue_single_agent(
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy,
     runtime_context: RunnerRuntimeContext | None = None,
-    setup_declaration_path: Path | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run the single-agent stage and return its raw result.
 
@@ -45,12 +45,11 @@ async def run_issue_single_agent(
         agent_name="issue-single-agent",
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         single_agent_artifacts_path=single_agent_artifacts_path,
-        setup_declaration_path=setup_declaration_path,
+        setup_declaration_content=setup_declaration_content,
         build_backend=lambda workspace_root: issue_single_agent.create_issue_single_agent_backend(
             workspace_root=workspace_root,
             history_path=history_path,
             runtime_context=runtime_context,
-            setup_declaration_path=setup_declaration_path,
         ),
         system_prompt=issue_single_agent.build_issue_single_agent_system_prompt(
             review_objective=review_objective,
@@ -74,7 +73,7 @@ async def run_issue_single_agent_activity(
     request: InternalWorkflowRequest,
 ) -> dict[str, Any]:
     from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_path_for_backend,
+        setup_declaration_content_for_backend,
     )
     from sec_review_agents.utils.paths import required_path
 
@@ -101,7 +100,7 @@ async def run_issue_single_agent_activity(
         review_objective=review_intent.objective,
         test_changes=review_intent.test_changes,
         runtime_context=request.runtime_context,
-        setup_declaration_path=setup_declaration_path_for_backend(bundle_paths),
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
     )
 
 
@@ -236,7 +235,7 @@ async def execute_issue_single_agent(
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy,
     runtime_context: RunnerRuntimeContext | None = None,
-    setup_declaration_path: Path | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run the stage and project it into the public ablation result shape."""
     single_agent_result = await run_issue_single_agent(
@@ -247,7 +246,7 @@ async def execute_issue_single_agent(
         review_objective=review_objective,
         test_changes=test_changes,
         runtime_context=runtime_context,
-        setup_declaration_path=setup_declaration_path,
+        setup_declaration_content=setup_declaration_content,
     )
     result = build_issue_single_agent_result(single_agent_result=single_agent_result)
     from sec_review_agents.utils.files import persist_json

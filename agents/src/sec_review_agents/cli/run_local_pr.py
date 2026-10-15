@@ -6,6 +6,7 @@ from sec_review_agents.cli.local_direct import run_local_direct_workflow
 from sec_review_agents.cli.local_git import git_commit_exists, is_likely_git_sha
 from sec_review_agents.cli.local_materialization.common import (
     default_local_output_dir,
+    read_setup_declaration_file,
     result_path_for_bundle,
 )
 from sec_review_agents.cli.local_materialization.pull_request import (
@@ -45,6 +46,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--repo", required=True, help="Path to the local repository to analyze."
+    )
+    parser.add_argument(
+        "--setup-declaration",
+        metavar="PATH",
+        help=(
+            "Path to a setup declaration file to run before the agent starts. "
+            "The file text is passed inline; bootstrap runs only on the docker backend."
+        ),
     )
     parser.add_argument(
         "--test-changes",
@@ -159,6 +168,7 @@ def main() -> None:
         event_type=args.event_type,
         is_draft=args.draft,
         test_changes=args.test_changes,
+        setup_declaration_content=read_setup_declaration_file(args.setup_declaration),
     )
 
     print(f"LOCAL_ROOT={bundle.local_root_path}")

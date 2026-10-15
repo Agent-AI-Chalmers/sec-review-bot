@@ -91,6 +91,7 @@ interface IssueReviewInput {
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   issue: Record<string, unknown>
+  setup_declaration?: string
 }
 ```
 
@@ -102,6 +103,7 @@ interface PullRequestReviewInput {
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   pr: Record<string, unknown>
+  setup_declaration?: string
 }
 ```
 
@@ -114,6 +116,7 @@ interface RepositoryReviewInput {
   review_intent: ReviewIntent
   scan_target: RepositoryScanTarget
   scan_scope: RepositoryScanScope
+  setup_declaration?: string
 }
 ```
 
@@ -134,6 +137,8 @@ runner 会在进程边界校验 input。所有 workflow 都需要这些共同字
 - `deny`：最终 mitigation patch 不得包含测试改动；测试只能作为临时验证手段。
 
 `test_changes` 是写给 agent 的 prompt 约束，不是程序层面的强制校验；runner 不会判断哪些仓库路径算测试文件，也不会按路径规则拒绝文件改动。
+
+`setup_declaration` 是可选字符串，携带仓库的 setup 声明（即 base repo 默认分支上 `.sec-review/setup.yml` 的内容）。它是内联的声明文本，不是路径：调用方读取文件后传入其内容。省略表示环境不做引导。声明会被严格解析，并在 agent 启动前在沙箱内执行。来源可信性由调用方负责：它来自 base repo 默认分支，runner 不会再去核对来源。
 
 除这些共同字段外，各 workflow 还需要：
 

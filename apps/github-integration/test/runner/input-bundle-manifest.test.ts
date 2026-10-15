@@ -13,7 +13,7 @@ async function readManifest(root: string): Promise<Record<string, unknown>> {
   >
 }
 
-test('writes contract v6 manifest without setup_declaration by default', async () => {
+test('writes the contract v6 manifest without a setup declaration field', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'manifest-test-'))
   try {
     await writeInputBundleManifest({
@@ -23,22 +23,8 @@ test('writes contract v6 manifest without setup_declaration by default', async (
     const manifest = await readManifest(root)
     assert.equal(manifest.contract_version, 'v6')
     assert.equal(manifest.kind, 'runner-input-bundle')
+    // The setup declaration travels inline in the workflow input, not the manifest.
     assert.equal('setup_declaration' in manifest, false)
-  } finally {
-    await fs.rm(root, { recursive: true, force: true })
-  }
-})
-
-test('includes setup_declaration path when provided', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'manifest-setup-'))
-  try {
-    await writeInputBundleManifest({
-      input_bundle_root: root,
-      include_incremental_window: false,
-      setup_declaration_path: 'setup/setup.yml'
-    })
-    const manifest = await readManifest(root)
-    assert.deepEqual(manifest.setup_declaration, { path: 'setup/setup.yml' })
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

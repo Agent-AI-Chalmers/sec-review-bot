@@ -21,7 +21,7 @@ import {
   createInputBundleRoot,
   ensureCleanDirectory,
   finalizeInputBundleWorkspace,
-  materializeSetupDeclaration
+  readSetupDeclaration
 } from '../shared/input-bundle.js'
 
 interface NormalizedPullRequestFile {
@@ -330,8 +330,7 @@ export async function preparePullRequestReviewInput({
   })
   const default_sha = trusted_default_branch.head_sha
   const git_auth_token = await getInstallationAccessToken(octokit)
-  const setup_declaration_path = await materializeSetupDeclaration({
-    input_bundle_root,
+  const setup_declaration = await readSetupDeclaration({
     default_sha,
     owner_login: pr.owner_login,
     repo_name: pr.repo_name,
@@ -340,8 +339,7 @@ export async function preparePullRequestReviewInput({
   await finalizeInputBundleWorkspace({
     input_bundle_root,
     workspace_path,
-    include_incremental_window: true,
-    ...(setup_declaration_path ? { setup_declaration_path } : {})
+    include_incremental_window: true
   })
   await materializeIncrementalWindowArtifacts(normalizedFiles, incremental_window_path)
   const historyArtifacts = await materializeHistoryArtifacts({
@@ -365,7 +363,8 @@ export async function preparePullRequestReviewInput({
       ...(test_changes ? { test_changes } : {})
     },
     pr: pullRequestMetadata,
-    input_bundle
+    input_bundle,
+    ...(setup_declaration ? { setup_declaration } : {})
   }
 
   const input_path = path.join(input_bundle_root, 'pull-request-review-input.json')

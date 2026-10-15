@@ -11,7 +11,8 @@
     "repository-review-result.json": "repository-review-result.schema.json",
     "review-record-deleted-file.json": "review-record.schema.json",
     "review-record-no-actionable.json": "review-record.schema.json",
-    "review-record.json": "review-record.schema.json"
+    "review-record.json": "review-record.schema.json",
+    "issue-review-input-setup-declaration.json": "issue-review-input.schema.json"
   },
   "invalid_schema_fixtures": {
     "invalid-issue-review-input-repair-mode-field.json": "issue-review-input.schema.json",
@@ -22,6 +23,7 @@
     "invalid-repository-review-input-extra-change-field.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-max-file-bytes.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
-    "invalid-review-record-trailing-slash-path.json": "review-record.schema.json"
+    "invalid-review-record-trailing-slash-path.json": "review-record.schema.json",
+    "invalid-issue-review-input-blank-setup-declaration.json": "issue-review-input.schema.json"
   }
 }

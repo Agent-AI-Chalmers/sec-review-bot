@@ -1,0 +1,18 @@
+{
+  "contract_version": "v6",
+  "input_bundle": {
+    "uri": "file:///tmp/sec-review-fixtures/issue-review-setup-declaration.tar.zst",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "media_type": "application/tar+zstd",
+    "size_bytes": 0
+  },
+  "review_intent": {
+    "objective": "repair"
+  },
+  "issue": {
+    "number": 103,
+    "title": "Unsafe redirect in callback handler",
+    "body": "Please review the callback redirect validation."
+  },
+  "setup_declaration": "setup:\n  - run: npm ci\n    timeout_seconds: 300\n"
+}

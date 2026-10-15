@@ -22,7 +22,7 @@ async def verify_issue(
     mitigation_result: Mapping[str, Any] | None,
     retry_context: Mapping[str, Any] | None,
     runtime_context: RunnerRuntimeContext | None = None,
-    setup_declaration_path: Path | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     attempt_label = verification_attempt_label(retry_context)
     reset_verification_attempt_artifacts(
@@ -49,12 +49,11 @@ async def verify_issue(
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         workspace_patch=workspace_patch,
         mitigation_result=mitigation_result,
-        setup_declaration_path=setup_declaration_path,
+        setup_declaration_content=setup_declaration_content,
         build_backend=lambda workspace_root_path: issue_verification_agent.create_issue_verification_backend(
             workspace_root_path=workspace_root_path,
             history_path=history_path,
             runtime_context=runtime_context,
-            setup_declaration_path=setup_declaration_path,
         ),
         system_prompt=issue_verification_agent.build_issue_verification_system_prompt(
             is_retry=isinstance(retry_context, Mapping)

@@ -1,7 +1,8 @@
 """Execute the setup declaration inside a stage sandbox.
 
-The declaration is read on the host (from the bundle), parsed strictly, then
-each step is run inside the container through the deepagents sandbox contract:
+The declaration text, carried inline in the workflow input, is parsed strictly,
+then each step is run inside the container through the deepagents sandbox
+contract:
 ``execute(command: str)``. The contract accepts a full shell command string, so
 each step is flattened to::
 
@@ -34,7 +35,6 @@ from sec_review_agents.filesystem.backend_selection import (
 )
 from sec_review_agents.observability.diagnostics import log_diagnostic
 from sec_review_agents.utils.files import persist_json
-from sec_review_agents.utils.paths import optional_path
 
 WORKSPACE_ROOT_IN_CONTAINER = "/workspace"
 
@@ -69,8 +69,10 @@ class BootstrapResult:
     steps: tuple[BootstrapStepResult, ...] = ()
 
 
-def setup_declaration_path_for_backend(bundle_paths: Mapping[str, Any]) -> Path | None:
-    """Resolve the setup declaration path for the active backend.
+def setup_declaration_content_for_backend(
+    prepared_input: Mapping[str, Any],
+) -> str | None:
+    """Resolve the setup declaration text for the active backend.
 
     Only the docker backend surfaces a declaration: its container is long-lived,
     so one bootstrap can be reused for the whole stage. Filtering here rather
@@ -79,7 +81,8 @@ def setup_declaration_path_for_backend(bundle_paths: Mapping[str, Any]) -> Path 
     """
     if selected_sandbox_backend_kind() != "docker":
         return None
-    return optional_path(bundle_paths.get("setup_declaration_path"))
+    value = prepared_input.get("setup_declaration")
+    return value if isinstance(value, str) else None
 
 
 def flatten_step_command(step: SetupDeclarationStep) -> str:
@@ -100,22 +103,16 @@ def flatten_step_command(step: SetupDeclarationStep) -> str:
 async def bootstrap_environment(
     backend: _SandboxLike,
     *,
-    setup_declaration_path: Path | None,
+    setup_declaration_content: str | None,
 ) -> BootstrapResult:
     """Run the setup declaration in `backend`'s container, if any."""
-    if setup_declaration_path is None:
+    if setup_declaration_content is None:
         return BootstrapResult(status=BootstrapStatus.NOT_DECLARED)
 
     try:
-        content = setup_declaration_path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return BootstrapResult(
-            status=BootstrapStatus.INCOMPLETE,
-            reason=f"setup declaration not found: {setup_declaration_path}",
+        declaration: SetupDeclaration = parse_setup_declaration(
+            setup_declaration_content
         )
-
-    try:
-        setup: SetupDeclaration = parse_setup_declaration(content)
     except SetupDeclarationError as error:
         return BootstrapResult(
             status=BootstrapStatus.INCOMPLETE,
@@ -123,7 +120,7 @@ async def bootstrap_environment(
         )
 
     results: list[BootstrapStepResult] = []
-    for step in setup.steps:
+    for step in declaration.steps:
         command = flatten_step_command(step)
         response = await backend.aexecute(command, timeout=step.timeout_seconds)
         exit_code = int(getattr(response, "exit_code", 1))
@@ -194,5 +191,5 @@ __all__ = [
     "bootstrap_environment",
     "flatten_step_command",
     "record_bootstrap_result",
-    "setup_declaration_path_for_backend",
+    "setup_declaration_content_for_backend",
 ]

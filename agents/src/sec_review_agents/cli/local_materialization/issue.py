@@ -57,6 +57,7 @@ def build_local_issue_bundle(
     target_branch: str | None = None,
     review_objective: str = "repair",
     test_changes: str = "allow",
+    setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     issue_number_value = str(issue_number)
@@ -128,6 +129,11 @@ def build_local_issue_bundle(
         },
         "issue": issue_metadata,
         "input_bundle": input_bundle,
+        **(
+            {"setup_declaration": setup_declaration_content}
+            if setup_declaration_content is not None
+            else {}
+        ),
     }
     input_path = paths.local_root_path / "issue-review-input.json"
     write_json(input_path, input_data)

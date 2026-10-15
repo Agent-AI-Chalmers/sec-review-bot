@@ -22,6 +22,9 @@
     },
     "issue": {
       "type": "object"
+    },
+    "setup_declaration": {
+      "$ref": "common.schema.json#/$defs/nonBlankString"
     }
   }
 }

@@ -32,7 +32,7 @@ async def run_analysis_stage(
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
-    setup_declaration_path: Path | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-analyzer-") as tempdir:
         reset_analysis_artifacts(
@@ -52,7 +52,7 @@ async def run_analysis_stage(
             record_bootstrap_result(
                 analyzer_artifacts_path,
                 await bootstrap_environment(
-                    backend, setup_declaration_path=setup_declaration_path
+                    backend, setup_declaration_content=setup_declaration_content
                 ),
             )
             agent_graph = await create_analysis_agent_graph(

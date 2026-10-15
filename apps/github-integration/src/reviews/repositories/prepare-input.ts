@@ -19,7 +19,7 @@ import {
   createInputBundleRoot,
   ensureCleanDirectory,
   finalizeInputBundleWorkspace,
-  materializeSetupDeclaration
+  readSetupDeclaration
 } from '../shared/input-bundle.js'
 
 const MAX_INCREMENTAL_FILES = 5000
@@ -199,8 +199,7 @@ export async function prepareRepositoryReviewInput({
   await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
   // Trusted default branch (not the user-selectable target_branch): its head SHA
   // was resolved once upstream; pull the setup declaration from it.
-  const setup_declaration_path = await materializeSetupDeclaration({
-    input_bundle_root,
+  const setup_declaration = await readSetupDeclaration({
     default_sha: trusted_default_branch.head_sha,
     owner_login: repo.owner_login,
     repo_name: repo.repo_name
@@ -208,8 +207,7 @@ export async function prepareRepositoryReviewInput({
   await finalizeInputBundleWorkspace({
     input_bundle_root,
     workspace_path,
-    include_incremental_window: resolvedScanMode === 'incremental',
-    ...(setup_declaration_path ? { setup_declaration_path } : {})
+    include_incremental_window: resolvedScanMode === 'incremental'
   })
 
   if (resolvedScanMode === 'full') {
@@ -253,7 +251,8 @@ export async function prepareRepositoryReviewInput({
             previous_path: item.previous_path
           }))
         : []
-    }
+    },
+    ...(setup_declaration ? { setup_declaration } : {})
   }
 
   const input_path = path.join(input_bundle_root, 'repository-review-input.json')

@@ -32,7 +32,7 @@ async def analyze_pull_request_activity(
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_path_for_backend,
+        setup_declaration_content_for_backend,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
@@ -75,7 +75,7 @@ async def analyze_pull_request_activity(
             order=1,
             stage="analyzer",
         ),
-        setup_declaration_path=setup_declaration_path_for_backend(bundle_paths),
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
         runtime_context=runtime_context,
     )
 
@@ -93,7 +93,7 @@ async def mitigate_pull_request_activity(
         mitigation_attempt_label,
     )
     from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_path_for_backend,
+        setup_declaration_content_for_backend,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
@@ -157,7 +157,7 @@ async def mitigate_pull_request_activity(
         analysis_result=analysis_result,
         retry_context=retry_context,
         test_changes=review_intent.test_changes,
-        setup_declaration_path=setup_declaration_path_for_backend(bundle_paths),
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
         runtime_context=runtime_context,
     )
 
@@ -175,7 +175,7 @@ async def verify_pull_request_activity(
         verification_attempt_label,
     )
     from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_path_for_backend,
+        setup_declaration_content_for_backend,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
@@ -221,7 +221,7 @@ async def verify_pull_request_activity(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         retry_context=retry_context,
-        setup_declaration_path=setup_declaration_path_for_backend(bundle_paths),
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
         runtime_context=runtime_context,
     )
 

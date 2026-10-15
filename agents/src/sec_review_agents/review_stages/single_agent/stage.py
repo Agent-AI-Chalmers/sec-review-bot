@@ -59,7 +59,7 @@ async def run_single_agent_stage(
     user_prompt: str,
     todo_system_prompt: str,
     todo_tool_description: str,
-    setup_declaration_path: Path | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-single-agent-") as tempdir:
         reset_stage_attempt_artifacts(
@@ -79,7 +79,7 @@ async def run_single_agent_stage(
             record_bootstrap_result(
                 single_agent_artifacts_path,
                 await bootstrap_environment(
-                    backend, setup_declaration_path=setup_declaration_path
+                    backend, setup_declaration_content=setup_declaration_content
                 ),
             )
             agent = await create_single_agent_graph(

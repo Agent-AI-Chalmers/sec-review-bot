@@ -62,7 +62,6 @@ def create_issue_mitigation_backend(
     workspace_root: Path,
     history_path: Path,
     runtime_context: RunnerRuntimeContext | None = None,
-    setup_declaration_path: Path | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
@@ -86,7 +85,6 @@ def create_issue_mitigation_backend(
         path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
-        setup_declaration_path=setup_declaration_path,
     )
 
 

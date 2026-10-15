@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import pytest
 
@@ -10,7 +9,7 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     flatten_step_command,
     record_bootstrap_result,
-    setup_declaration_path_for_backend,
+    setup_declaration_content_for_backend,
 )
 
 
@@ -34,7 +33,7 @@ class _FakeBackend:
         return _Response()
 
 
-def test_flatten_step_command_applies_cwd_and_env(tmp_path: Path) -> None:
+def test_flatten_step_command_applies_cwd_and_env() -> None:
     step = SetupDeclarationStep(
         run="pnpm install",
         working_directory="apps/svc",
@@ -55,43 +54,31 @@ def test_flatten_step_command_without_optional_fields() -> None:
 
 
 @pytest.mark.asyncio
-async def test_no_declaration_is_not_declared(tmp_path: Path) -> None:
+async def test_no_declaration_is_not_declared() -> None:
     backend = _FakeBackend()
-    result = await bootstrap_environment(backend, setup_declaration_path=None)
+    result = await bootstrap_environment(backend, setup_declaration_content=None)
     assert result.status is BootstrapStatus.NOT_DECLARED
     assert backend.commands == []
 
 
 @pytest.mark.asyncio
-async def test_missing_declaration_file_is_incomplete(tmp_path: Path) -> None:
+async def test_invalid_declaration_is_incomplete() -> None:
     backend = _FakeBackend()
     result = await bootstrap_environment(
-        backend, setup_declaration_path=tmp_path / "setup.yml"
+        backend, setup_declaration_content="setup: [broken\n"
     )
-    assert result.status is BootstrapStatus.INCOMPLETE
-    assert result.reason is not None and "not found" in result.reason
-
-
-@pytest.mark.asyncio
-async def test_invalid_declaration_is_incomplete(tmp_path: Path) -> None:
-    path = tmp_path / "setup.yml"
-    path.write_text("setup: [broken\n", encoding="utf-8")
-    backend = _FakeBackend()
-    result = await bootstrap_environment(backend, setup_declaration_path=path)
     assert result.status is BootstrapStatus.INCOMPLETE
     assert result.reason is not None and "invalid" in result.reason
     assert backend.commands == []
 
 
 @pytest.mark.asyncio
-async def test_runs_all_steps_on_success(tmp_path: Path) -> None:
-    path = tmp_path / "setup.yml"
-    path.write_text(
-        "setup:\n  - run: one\n  - run: two\n    timeout_seconds: 42\n",
-        encoding="utf-8",
-    )
+async def test_runs_all_steps_on_success() -> None:
     backend = _FakeBackend()
-    result = await bootstrap_environment(backend, setup_declaration_path=path)
+    result = await bootstrap_environment(
+        backend,
+        setup_declaration_content="setup:\n  - run: one\n  - run: two\n    timeout_seconds: 42\n",
+    )
     assert result.status is BootstrapStatus.COMPLETED
     assert backend.commands == ["cd /workspace && one", "cd /workspace && two"]
     assert backend.timeouts == [300, 42]
@@ -99,11 +86,11 @@ async def test_runs_all_steps_on_success(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_failed_step_stops_and_marks_incomplete(tmp_path: Path) -> None:
-    path = tmp_path / "setup.yml"
-    path.write_text("setup:\n  - run: one\n  - run: two\n", encoding="utf-8")
+async def test_failed_step_stops_and_marks_incomplete() -> None:
     backend = _FakeBackend(responses=[_Response(exit_code=3), _Response()])
-    result = await bootstrap_environment(backend, setup_declaration_path=path)
+    result = await bootstrap_environment(
+        backend, setup_declaration_content="setup:\n  - run: one\n  - run: two\n"
+    )
     assert result.status is BootstrapStatus.INCOMPLETE
     assert result.reason is not None and "exit 3" in result.reason
     # second step must not run
@@ -111,29 +98,28 @@ async def test_failed_step_stops_and_marks_incomplete(tmp_path: Path) -> None:
     assert result.steps[0].exit_code == 3
 
 
-def test_setup_declaration_path_for_backend_docker_only(monkeypatch) -> None:
-    bundle_paths = {
-        "setup_declaration_path": "/some/bundle/setup-declaration/setup.yml"
-    }
+def test_setup_declaration_content_for_backend_docker_only(monkeypatch) -> None:
+    prepared_input = {"setup_declaration": "setup:\n  - run: echo hi\n"}
 
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
-    assert setup_declaration_path_for_backend(bundle_paths) == Path(
-        "/some/bundle/setup-declaration/setup.yml"
+    assert (
+        setup_declaration_content_for_backend(prepared_input)
+        == "setup:\n  - run: echo hi\n"
     )
 
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "bwrap")
-    assert setup_declaration_path_for_backend(bundle_paths) is None
+    assert setup_declaration_content_for_backend(prepared_input) is None
 
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "local")
-    assert setup_declaration_path_for_backend(bundle_paths) is None
+    assert setup_declaration_content_for_backend(prepared_input) is None
 
 
-def test_setup_declaration_path_for_backend_none_when_missing(monkeypatch) -> None:
+def test_setup_declaration_content_for_backend_absent(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
-    assert setup_declaration_path_for_backend({}) is None
+    assert setup_declaration_content_for_backend({}) is None
 
 
-def test_record_bootstrap_result_truncates_large_output(tmp_path: Path) -> None:
+def test_record_bootstrap_result_truncates_large_output(tmp_path) -> None:
     import json
 
     from sec_review_agents.runtime.setup_bootstrap import (

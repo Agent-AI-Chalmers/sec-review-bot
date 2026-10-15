@@ -182,6 +182,7 @@ def build_local_repository_security_bundle(
     paths_ignore: list[str] | None = None,
     default_branch: str | None = None,
     test_changes: str = "allow",
+    setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
     event_type = "manual"
     resolved_paths_ignore = list(paths_ignore or [])
@@ -304,6 +305,11 @@ def build_local_repository_security_bundle(
             "commit_shas": commit_shas_for_scan_target,
         },
         "scan_scope": scan_scope,
+        **(
+            {"setup_declaration": setup_declaration_content}
+            if setup_declaration_content is not None
+            else {}
+        ),
     }
     input_path = paths.local_root_path / "repository-review-input.json"
     write_json(input_path, input_data)

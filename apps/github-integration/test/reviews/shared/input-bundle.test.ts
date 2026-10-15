@@ -13,7 +13,7 @@ async function git(cwd: string, args: string[]): Promise<string> {
   return stdout.trim()
 }
 
-test('materializeSetupDeclaration writes exactly the declaration into the bundle', async () => {
+test('readSetupDeclaration returns the declaration text from the default branch', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'setup-declaration-test-'))
   const previousServer = process.env['GITHUB_SERVER_URL']
   process.env['GITHUB_SERVER_URL'] = `file://${root}`
@@ -21,7 +21,6 @@ test('materializeSetupDeclaration writes exactly the declaration into the bundle
     // A bare remote at <root>/octo/demo.git to mirror buildGitRemoteUrl().
     const remote = path.join(root, 'octo', 'demo.git')
     const source = path.join(root, 'source')
-    const bundle = path.join(root, 'bundle')
     await fs.mkdir(path.dirname(remote), { recursive: true })
     await fs.mkdir(source, { recursive: true })
     await git(root, ['init', '--bare', remote])
@@ -40,37 +39,27 @@ test('materializeSetupDeclaration writes exactly the declaration into the bundle
     await git(source, ['remote', 'add', 'origin', remote])
     await git(source, ['push', 'origin', 'HEAD:refs/heads/main'])
 
-    const { materializeSetupDeclaration } =
-      await import('../../../src/reviews/shared/input-bundle.js')
-    await fs.mkdir(bundle, { recursive: true })
-    const relative = await materializeSetupDeclaration({
-      input_bundle_root: bundle,
+    const { readSetupDeclaration } = await import('../../../src/reviews/shared/input-bundle.js')
+    const declaration = await readSetupDeclaration({
       default_sha: sha,
       owner_login: 'octo',
       repo_name: 'demo'
     })
 
-    assert.equal(relative, 'setup/setup.yml')
-    const entries = await fs.readdir(path.join(bundle, 'setup'))
-    assert.deepEqual(entries, ['setup.yml'])
-    assert.equal(
-      await fs.readFile(path.join(bundle, 'setup', 'setup.yml'), 'utf8'),
-      'setup:\n  - run: echo hi\n'
-    )
+    assert.equal(declaration, 'setup:\n  - run: echo hi\n')
   } finally {
     process.env['GITHUB_SERVER_URL'] = previousServer
     await fs.rm(root, { recursive: true, force: true })
   }
 })
 
-test('materializeSetupDeclaration returns null when the declaration is absent', async () => {
+test('readSetupDeclaration returns null when the declaration is absent', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'setup-declaration-missing-'))
   const previousServer = process.env['GITHUB_SERVER_URL']
   process.env['GITHUB_SERVER_URL'] = `file://${root}`
   try {
     const remote = path.join(root, 'octo', 'demo.git')
     const source = path.join(root, 'source')
-    const bundle = path.join(root, 'bundle')
     await fs.mkdir(path.dirname(remote), { recursive: true })
     await fs.mkdir(source, { recursive: true })
     await git(root, ['init', '--bare', remote])
@@ -84,18 +73,14 @@ test('materializeSetupDeclaration returns null when the declaration is absent', 
     await git(source, ['remote', 'add', 'origin', remote])
     await git(source, ['push', 'origin', 'HEAD:refs/heads/main'])
 
-    const { materializeSetupDeclaration } =
-      await import('../../../src/reviews/shared/input-bundle.js')
-    await fs.mkdir(bundle, { recursive: true })
-    const relative = await materializeSetupDeclaration({
-      input_bundle_root: bundle,
+    const { readSetupDeclaration } = await import('../../../src/reviews/shared/input-bundle.js')
+    const declaration = await readSetupDeclaration({
       default_sha: sha,
       owner_login: 'octo',
       repo_name: 'demo'
     })
 
-    assert.equal(relative, null)
-    await assert.rejects(fs.stat(path.join(bundle, 'setup')))
+    assert.equal(declaration, null)
   } finally {
     process.env['GITHUB_SERVER_URL'] = previousServer
     await fs.rm(root, { recursive: true, force: true })

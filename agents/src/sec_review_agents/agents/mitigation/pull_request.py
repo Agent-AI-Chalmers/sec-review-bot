@@ -54,7 +54,6 @@ def create_pr_mitigation_backend(
     history_path: Path,
     incremental_window_path: Path,
     runtime_context: RunnerRuntimeContext | None = None,
-    setup_declaration_path: Path | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
@@ -82,7 +81,6 @@ def create_pr_mitigation_backend(
         path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
-        setup_declaration_path=setup_declaration_path,
     )
 
 

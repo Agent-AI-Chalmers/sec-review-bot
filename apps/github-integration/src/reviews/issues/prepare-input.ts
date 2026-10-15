@@ -14,7 +14,7 @@ import {
   createInputBundleRoot,
   ensureCleanDirectory,
   finalizeInputBundleWorkspace,
-  materializeSetupDeclaration
+  readSetupDeclaration
 } from '../shared/input-bundle.js'
 
 async function materializeWorkspace(
@@ -122,8 +122,7 @@ export async function prepareIssueReviewInput({
   await fs.mkdir(history_path, { recursive: true })
 
   await materializeWorkspace(octokit, issue, workspace_path, workspace_ref)
-  const setup_declaration_path = await materializeSetupDeclaration({
-    input_bundle_root,
+  const setup_declaration = await readSetupDeclaration({
     default_sha: workspace_ref,
     owner_login: issue.owner_login,
     repo_name: issue.repo_name
@@ -131,8 +130,7 @@ export async function prepareIssueReviewInput({
   await finalizeInputBundleWorkspace({
     input_bundle_root,
     workspace_path,
-    include_incremental_window: false,
-    ...(setup_declaration_path ? { setup_declaration_path } : {})
+    include_incremental_window: false
   })
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,
@@ -153,7 +151,8 @@ export async function prepareIssueReviewInput({
       ...(test_changes ? { test_changes } : {})
     },
     issue: historyArtifacts.issueMetadata,
-    input_bundle
+    input_bundle,
+    ...(setup_declaration ? { setup_declaration } : {})
   }
 
   const input_path = path.join(input_bundle_root, 'issue-review-input.json')

@@ -47,22 +47,20 @@ def _backend(tmp_path: Path, prefix: str) -> DockerSandboxBackend:
     reason="Docker runtime is not available in this environment.",
 )
 async def test_bootstrap_applies_working_directory_and_env(tmp_path: Path) -> None:
-    setup = tmp_path / "setup.yml"
-    setup.write_text(
-        "\n".join(
-            [
-                "setup:",
-                "  - run: pwd && cat marker.txt && printf '%s' \"$NODE_ENV\"",
-                "    working-directory: apps/svc",
-                "    env:",
-                "      NODE_ENV: development",
-            ]
-        ),
-        encoding="utf-8",
-    )
     backend = _backend(tmp_path, "bootstrap-it")
+    setup_declaration = "\n".join(
+        [
+            "setup:",
+            "  - run: pwd && cat marker.txt && printf '%s' \"$NODE_ENV\"",
+            "    working-directory: apps/svc",
+            "    env:",
+            "      NODE_ENV: development",
+        ]
+    )
     try:
-        result = await bootstrap_environment(backend, setup_declaration_path=setup)
+        result = await bootstrap_environment(
+            backend, setup_declaration_content=setup_declaration
+        )
     finally:
         backend.close()
 
@@ -79,13 +77,12 @@ async def test_bootstrap_applies_working_directory_and_env(tmp_path: Path) -> No
     reason="Docker runtime is not available in this environment.",
 )
 async def test_bootstrap_marks_incomplete_on_nonzero_step(tmp_path: Path) -> None:
-    setup = tmp_path / "setup.yml"
-    setup.write_text(
-        "setup:\n  - run: 'exit 7'\n  - run: echo never\n", encoding="utf-8"
-    )
     backend = _backend(tmp_path, "bootstrap-it-fail")
     try:
-        result = await bootstrap_environment(backend, setup_declaration_path=setup)
+        result = await bootstrap_environment(
+            backend,
+            setup_declaration_content="setup:\n  - run: 'exit 7'\n  - run: echo never\n",
+        )
     finally:
         backend.close()
 

@@ -50,18 +50,14 @@ async def test_declaration_installs_dependencies_usable_by_later_commands(
         '{"name":"e2e","version":"1.0.0","dependencies":{"is-odd":"3.0.1"}}',
         encoding="utf-8",
     )
-    setup = tmp_path / "setup.yml"
-    setup.write_text(
-        "\n".join(
-            [
-                "setup:",
-                "  - run: apk add --no-cache nodejs npm",
-                "    timeout_seconds: 240",
-                "  - run: npm install --no-audit --no-fund",
-                "    timeout_seconds: 240",
-            ]
-        ),
-        encoding="utf-8",
+    setup_declaration = "\n".join(
+        [
+            "setup:",
+            "  - run: apk add --no-cache nodejs npm",
+            "    timeout_seconds: 240",
+            "  - run: npm install --no-audit --no-fund",
+            "    timeout_seconds: 240",
+        ]
     )
 
     backend = create_backend_with_path_views(
@@ -75,7 +71,9 @@ async def test_declaration_installs_dependencies_usable_by_later_commands(
         )
         if "NET_OK" not in probe.output:
             pytest.skip("sandbox has no network; bootstrap requires it")
-        result = await bootstrap_environment(backend, setup_declaration_path=setup)
+        result = await bootstrap_environment(
+            backend, setup_declaration_content=setup_declaration
+        )
         assert result.status is BootstrapStatus.COMPLETED, result.reason
         # A later command in the same container can use the installed dependency.
         check = backend.execute(

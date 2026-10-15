@@ -89,6 +89,7 @@ interface IssueReviewInput {
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   issue: Record<string, unknown>
+  setup_declaration?: string
 }
 ```
 
@@ -100,6 +101,7 @@ interface PullRequestReviewInput {
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   pr: Record<string, unknown>
+  setup_declaration?: string
 }
 ```
 
@@ -112,6 +114,7 @@ interface RepositoryReviewInput {
   review_intent: ReviewIntent
   scan_target: RepositoryScanTarget
   scan_scope: RepositoryScanScope
+  setup_declaration?: string
 }
 ```
 
@@ -132,6 +135,8 @@ The runner validates input at the process boundary. All workflows require these 
 - `deny`: the final mitigation patch must not contain test changes; tests may only be used as temporary validation work.
 
 `test_changes` is a prompt constraint for the agent. It is not mechanical enforcement; the runner does not classify repository paths as tests or reject file changes based on path heuristics.
+
+`setup_declaration` is an optional string carrying the repository's setup declaration (the contents of `.sec-review/setup.yml` on the base-repo default branch). It is inline declaration text, not a path: callers fetch the file and pass its contents. Omission means the environment stays unbootstrapped. The declaration is parsed strictly and executed inside the sandbox before the agent starts. Trust in its provenance is the caller's responsibility: it comes from the base-repo default branch, and the runner does not re-verify it against a source.
 
 Each workflow also requires:
 

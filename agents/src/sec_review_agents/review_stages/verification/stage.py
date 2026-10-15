@@ -194,7 +194,7 @@ async def run_verification_stage(
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
-    setup_declaration_path: Path | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir:
         local_transcript_path = (
@@ -221,7 +221,7 @@ async def run_verification_stage(
             record_bootstrap_result(
                 verifier_artifacts_path,
                 await bootstrap_environment(
-                    backend, setup_declaration_path=setup_declaration_path
+                    backend, setup_declaration_content=setup_declaration_content
                 ),
             )
             agent = await create_verification_agent_graph(
