@@ -179,10 +179,9 @@ function rejectNonIntegerTimeoutScalars(contents: Node | null): void {
     const source = typeof timeout.source === 'string' ? timeout.source : ''
     // Integer syntax only: no fraction/exponent marker.
     if (/[.eE]/.test(source)) {
-      throw new SetupDeclarationError(
-        `setup[${index}].timeout_seconds must be an integer.`,
-        { reason: 'invalid-timeout' }
-      )
+      throw new SetupDeclarationError(`setup[${index}].timeout_seconds must be an integer.`, {
+        reason: 'invalid-timeout'
+      })
     }
   })
 }

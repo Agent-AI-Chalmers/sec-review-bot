@@ -123,13 +123,7 @@ test('rejects explicit YAML tags', () => {
   // The format is the plain Core schema. Both enforcers reject every explicit
   // tag, because `yaml` silently falls back to the raw string for a mismatched
   // tag (`!!bool on` -> "on") while the runner's loader raises.
-  for (const raw of [
-    '!!bool on',
-    '!!str npm ci',
-    '!!seq [a]',
-    '!!set {a}',
-    '!!int 5'
-  ]) {
+  for (const raw of ['!!bool on', '!!str npm ci', '!!seq [a]', '!!set {a}', '!!int 5']) {
     assert.throws(
       () => parseSetupDeclaration(`setup:\n  - run: ${raw}\n`),
       SetupDeclarationError,

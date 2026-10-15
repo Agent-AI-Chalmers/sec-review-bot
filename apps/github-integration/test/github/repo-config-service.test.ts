@@ -292,7 +292,6 @@ test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing i
         repo_name: 'repo',
         ref: 'main'
       }),
-    (error: unknown) =>
-      isRepositoryTriggerConfigError(error) && error.reason === 'invalid-content'
+    (error: unknown) => isRepositoryTriggerConfigError(error) && error.reason === 'invalid-content'
   )
 })
