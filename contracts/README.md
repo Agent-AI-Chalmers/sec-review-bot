@@ -19,9 +19,7 @@ contracts/
                        is a format enforced by code rather than a data shape
 ```
 
-Not every family uses every kind of asset. A contract whose rules are decision
-logic rather than a structural shape carries a `corpus/` instead of `schemas/` and
-`fixtures/`, and enforces the format in code. See
+Not every family uses every kind of asset. A contract whose rules are decision logic rather than a structural shape carries a `corpus/` instead of `schemas/` and `fixtures/`, and enforces the format in code. See
 [setup-declaration](setup-declaration/README.md) for that shape.
 
 A family may also hold documents that apply to every version, such as a transport reference.
