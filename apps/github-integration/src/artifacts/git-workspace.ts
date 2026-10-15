@@ -12,7 +12,26 @@ export const WORKSPACE_SNAPSHOT_TAR_NAME = 'workspace.snapshot.tar'
 const SHA_RE = /^[0-9a-fA-F]{7,64}$/
 const GIT_FETCH_MAX_ATTEMPTS = 3
 const GIT_FETCH_INITIAL_RETRY_DELAY_MS = 1_000
+
+// Bound every git subprocess so a hung fetch, checkout, or gc cannot stall
+// input preparation forever. The default is generous: a cold clone of a large
+// repository with a slow proxy can legitimately take minutes. Operators whose
+// repositories exceed it can raise it through the environment.
+const GIT_COMMAND_TIMEOUT_ENV = 'GITHUB_INTEGRATION_GIT_TIMEOUT_MS'
+const DEFAULT_GIT_COMMAND_TIMEOUT_MS = 600_000
 type Sleep = (delay_ms: number) => Promise<void>
+
+/** Resolve the per-command timeout, validating the environment override. */
+export function configuredGitTimeoutMs(configured = process.env[GIT_COMMAND_TIMEOUT_ENV]): number {
+  if (configured === undefined || configured.trim() === '') {
+    return DEFAULT_GIT_COMMAND_TIMEOUT_MS
+  }
+  const parsed = Number.parseInt(configured, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0 || String(parsed) !== configured.trim()) {
+    throw new Error(`${GIT_COMMAND_TIMEOUT_ENV} must be a positive integer.`)
+  }
+  return parsed
+}
 
 // Materialization flow for real-history workspaces:
 // 1. fetch only the requested refs in a temporary git repository;
@@ -24,6 +43,7 @@ type Sleep = (delay_ms: number) => Promise<void>
 interface GitCommandOptions {
   config?: string[]
   env?: Record<string, string | undefined>
+  timeout_ms?: number
 }
 
 interface GitAskPassAuth {
@@ -82,6 +102,7 @@ async function runGitCommand(
   const configArgs = (options.config ?? []).flatMap((item) => ['-c', item])
   await execFileAsync('git', [...configArgs, ...args], {
     cwd: workspace_path,
+    timeout: options.timeout_ms ?? configuredGitTimeoutMs(),
     env: {
       ...process.env,
       GIT_ASKPASS: '',
@@ -334,13 +355,11 @@ export async function createWorkspaceSnapshotTar({
   )
 
   try {
-    await execFileAsync('tar', [
-      '-cf',
-      tempPath,
-      '-C',
-      path.dirname(workspace_path),
-      path.basename(workspace_path)
-    ])
+    await execFileAsync(
+      'tar',
+      ['-cf', tempPath, '-C', path.dirname(workspace_path), path.basename(workspace_path)],
+      { timeout: configuredGitTimeoutMs() }
+    )
     await fs.rename(tempPath, tar_path)
   } catch (error) {
     await fs.rm(tempPath, { force: true }).catch(() => {})
@@ -418,14 +437,16 @@ export async function readRepositoryFileAtRef({
         ['show', `${normalizedSha}:${normalizedPath}`],
         {
           cwd: tempDir,
+          timeout: configuredGitTimeoutMs(),
           env: gitNoPromptEnv()
         }
       )
       return stdout
     } catch (error) {
       // Fallback: if the probe itself failed and the error clearly means "no such
-      // path", treat it as absent; otherwise surface it.
-      if (isGitMissingPathError(error)) {
+      // path", treat it as absent; otherwise surface it. A timed-out/killed
+      // command is never "absent" (see fileExistsAtRef).
+      if (!isKilledProcessError(error) && isGitMissingPathError(error)) {
         return null
       }
       throw error
@@ -454,12 +475,29 @@ async function fileExistsAtRef(cwd: string, sha: string, filePath: string): Prom
   try {
     await execFileAsync('git', ['cat-file', '-e', `${sha}:${filePath}`], {
       cwd,
+      timeout: configuredGitTimeoutMs(),
       env: gitNoPromptEnv()
     })
     return true
-  } catch {
+  } catch (error) {
+    // A non-zero exit means the path is absent. A killed command (the timeout
+    // above) means the probe never completed, which must NOT be read as
+    // "absent": that would silently degrade a declared setup environment to an
+    // unbootstrapped one. Surface it instead.
+    if (isKilledProcessError(error)) {
+      throw error
+    }
     return false
   }
+}
+
+/** True when a subprocess was terminated by a signal rather than exiting. */
+function isKilledProcessError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false
+  }
+  const record = error as { killed?: unknown; signal?: unknown }
+  return record.killed === true || (record.signal !== undefined && record.signal !== null)
 }
 
 function isGitMissingPathError(error: unknown): boolean {

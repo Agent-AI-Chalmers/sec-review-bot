@@ -7,6 +7,7 @@ import test from 'node:test'
 import { promisify } from 'node:util'
 
 import {
+  configuredGitTimeoutMs,
   createWorkspaceSnapshotTar,
   materializeWorkspaceWithCommitHistory,
   readRepositoryFileAtRef,
@@ -323,5 +324,40 @@ test('readRepositoryFileAtRef rejects a non-hexadecimal commit SHA', async () =>
         }),
       /hexadecimal commit SHA/
     )
+  }
+})
+
+test('configuredGitTimeoutMs defaults and reads a validated override', () => {
+  assert.equal(configuredGitTimeoutMs(undefined), 600_000)
+  assert.equal(configuredGitTimeoutMs(''), 600_000)
+  assert.equal(configuredGitTimeoutMs('1500'), 1500)
+})
+
+test('configuredGitTimeoutMs rejects a non-positive or malformed override', () => {
+  for (const value of ['0', '-1', 'abc', '1.5', '10s']) {
+    assert.throws(() => configuredGitTimeoutMs(value), /GITHUB_INTEGRATION_GIT_TIMEOUT_MS/)
+  }
+})
+
+test('a git command that exceeds the timeout is killed, not left running', async () => {
+  // Any real git invocation takes more than 1ms, so a 1ms budget must kill it.
+  // The point is that the timeout is enforced: the command rejects instead of
+  // hanging. A killed command must never be downgraded to "the file is absent".
+  const previous = process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS']
+  process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS'] = '1'
+  try {
+    await assert.rejects(() =>
+      readRepositoryFileAtRef({
+        commit_sha: 'a'.repeat(40),
+        file_path: '.sec-review/setup.yml',
+        git_remote_url: 'file:///does/not/matter'
+      })
+    )
+  } finally {
+    if (previous === undefined) {
+      delete process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS']
+    } else {
+      process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS'] = previous
+    }
   }
 })

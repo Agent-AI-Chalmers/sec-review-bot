@@ -433,6 +433,8 @@ When running GitHub integration without Compose, use an address reachable by the
 GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 ```
 
+Each git and snapshot command is bounded by `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` (default `600000`, i.e. 10 minutes) so a hung remote cannot stall input preparation indefinitely. Raise it for repositories whose cold clone legitimately takes longer.
+
 ## Troubleshooting
 
 - `403 Resource not accessible by integration`: check GitHub App permissions and whether the installation approved changed permissions.
