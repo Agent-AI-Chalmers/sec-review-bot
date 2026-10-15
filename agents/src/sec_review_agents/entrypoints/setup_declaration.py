@@ -18,6 +18,13 @@ DEFAULT_STEP_TIMEOUT_SECONDS = 300
 MAX_STEP_TIMEOUT_ENV = "SEC_REVIEW_SETUP_STEP_MAX_SECONDS"
 DEFAULT_MAX_STEP_TIMEOUT_SECONDS = 600
 
+# Upper bound on the declaration text. It travels inline in the workflow input,
+# so an unbounded default-branch file would grow every submission; the
+# integration enforces the same limit at the producer (see
+# `MAX_SETUP_DECLARATION_BYTES` in `apps/github-integration`), and the contract
+# schema carries it as a third check.
+MAX_SETUP_DECLARATION_BYTES = 65536
+
 _ALLOWED_STEP_KEYS = frozenset({"run", "working-directory", "env", "timeout_seconds"})
 
 # Environment variable names are emitted as `export KEY=...` in a shell command.
@@ -74,6 +81,10 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
     if is_blank_setup_declaration(content):
         raise SetupDeclarationError(
             "Setup declaration is blank; blank content means no declaration."
+        )
+    if len(content.encode("utf-8")) > MAX_SETUP_DECLARATION_BYTES:
+        raise SetupDeclarationError(
+            f"Setup declaration exceeds {MAX_SETUP_DECLARATION_BYTES} bytes."
         )
     try:
         parsed = yaml.safe_load(content)
@@ -197,6 +208,7 @@ def _parse_timeout(value: Any, label: str, max_timeout: int) -> int:
 __all__ = [
     "DEFAULT_MAX_STEP_TIMEOUT_SECONDS",
     "DEFAULT_STEP_TIMEOUT_SECONDS",
+    "MAX_SETUP_DECLARATION_BYTES",
     "MAX_STEP_TIMEOUT_ENV",
     "SetupDeclaration",
     "SetupDeclarationError",

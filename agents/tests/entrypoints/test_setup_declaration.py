@@ -114,12 +114,39 @@ def test_accepts_portable_env_variable_names() -> None:
     assert setup.steps[0].env == {"_A1": "ok"}
 
 
+@pytest.mark.parametrize("raw", ["yes", "on", "off", "no", "true", "false"])
+def test_rejects_boolean_like_env_keys(raw: str) -> None:
+    # In YAML 1.1 these plain keys are booleans, not strings; the `yaml`
+    # library (YAML 1.2) reads them as strings, so the integration rejects them
+    # explicitly to keep both enforcers on the same boundary. Authors must
+    # quote a variable that would otherwise read as a boolean.
+    with pytest.raises(SetupDeclarationError):
+        parse_setup_declaration(f"setup:\n  - run: x\n    env:\n      {raw}: ok\n")
+
+
+def test_accepts_quoted_boolean_like_env_key() -> None:
+    setup = parse_setup_declaration(
+        'setup:\n  - run: x\n    env:\n      "on": ok\n'
+    )
+    assert setup.steps[0].env == {"on": "ok"}
+
+
 @pytest.mark.parametrize("raw", ["false", "123", "on"])
 def test_rejects_non_string_run(raw: str) -> None:
     # YAML would parse bare false/123/on/null as non-strings; a run must be a
     # literal command string.
     with pytest.raises(SetupDeclarationError, match="run must be a non-empty string"):
         parse_setup_declaration(f"setup:\n  - run: {raw}\n")
+
+
+def test_rejects_oversized_declaration() -> None:
+    from sec_review_agents.entrypoints.setup_declaration import (
+        MAX_SETUP_DECLARATION_BYTES,
+    )
+
+    filler = "x" * (MAX_SETUP_DECLARATION_BYTES + 1)
+    with pytest.raises(SetupDeclarationError, match="exceeds"):
+        parse_setup_declaration(f"setup:\n  - run: {filler}\n")
 
 
 def test_rejects_invalid_yaml() -> None:

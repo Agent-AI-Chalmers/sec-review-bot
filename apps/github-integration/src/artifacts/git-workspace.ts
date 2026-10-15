@@ -418,6 +418,9 @@ export async function readRepositoryFileAtRef({
 
     const auth = git_auth_token ? await createGitAskPassAuth(git_auth_token) : null
     try {
+      // Fetch by exact SHA. This relies on the server allowing a wanted-SHA
+      // fetch (GitHub.com does); a server that does not would fail here rather
+      // than let input preparation silently degrade to an unbootstrapped run.
       await runGitFetchWithRetry(tempDir, ['fetch', '--depth', '1', 'origin', normalizedSha], {
         ...(auth ? { config: auth.config, env: auth.env } : {})
       })

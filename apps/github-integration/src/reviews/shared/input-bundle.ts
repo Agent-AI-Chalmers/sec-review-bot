@@ -17,7 +17,12 @@ import {
   readRepositoryFileAtRef
 } from '../../artifacts/git-workspace.js'
 import { writeInputBundleManifest } from '../../runner/input-bundle-manifest.js'
-import { isSetupDeclarationError, parseSetupDeclaration } from '../../github/setup-declaration.js'
+import {
+  MAX_SETUP_DECLARATION_BYTES,
+  SetupDeclarationError,
+  isSetupDeclarationError,
+  parseSetupDeclaration
+} from '../../github/setup-declaration.js'
 import { input_bundle_staging_root } from '../../config.js'
 
 const execFileAsync = promisify(execFile)
@@ -98,6 +103,12 @@ export async function readSetupDeclaration({
   })
   if (declaration === null) {
     return null
+  }
+  if (Buffer.byteLength(declaration, 'utf8') > MAX_SETUP_DECLARATION_BYTES) {
+    throw new SetupDeclarationError(
+      `Setup declaration exceeds ${MAX_SETUP_DECLARATION_BYTES} bytes.`,
+      { reason: 'declaration-too-large', owner_login, repo_name, ref: default_sha, path }
+    )
   }
   try {
     if (parseSetupDeclaration(declaration) === null) {

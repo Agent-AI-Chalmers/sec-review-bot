@@ -1,4 +1,5 @@
-import { parse as parseYaml } from 'yaml'
+import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
+import type { Node, YAMLMap } from 'yaml'
 
 import { isRecord } from '../utils/error-utils.js'
 
@@ -24,12 +25,25 @@ import { isRecord } from '../utils/error-utils.js'
  * absent declaration.
  */
 
+// Upper bound on the declaration text. It travels inline in the workflow input,
+// so an unbounded default-branch file would grow every submission; the runner's
+// parser and the contract schema carry the same limit.
+export const MAX_SETUP_DECLARATION_BYTES = 65536
+
 const ALLOWED_STEP_KEYS = new Set(['run', 'working-directory', 'env', 'timeout_seconds'])
 const ALLOWED_TOP_LEVEL_KEYS = new Set(['setup'])
 
 // Emitted as `export KEY=...`; restrict to portable shell identifiers so a
 // declaration cannot smuggle shell syntax through a name.
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+// An unquoted scalar with one of these texts is a boolean in YAML 1.1 (PyYAML,
+// the runner's library) but a plain string in YAML 1.2 (the `yaml` library used
+// here). For `env` *keys* we require exactly the runner's reading: a key that
+// the runner would see as a boolean is rejected here too, so the two enforcers
+// classify the same document the same way. Authors who really want a variable
+// named `yes` must quote it (`"yes"`), which both dialects read as a string.
+const YAML_1_1_BOOLEAN_LIKE_KEYS = new Set(['true', 'false', 'yes', 'no', 'on', 'off'])
 
 export interface SetupDeclarationStep {
   run: string
@@ -76,6 +90,56 @@ export function isSetupDeclarationError(error: unknown): error is SetupDeclarati
       error !== null &&
       (error as { name?: unknown }).name === 'SetupDeclarationError')
   )
+}
+
+/**
+ * Reject `env` keys that the runner's YAML 1.1 parser would read as a boolean.
+ *
+ * Only this narrow class needs special handling: numbers and `null` resolve to
+ * non-strings in both dialects and are already rejected by the value-level
+ * type check, while YAML 1.1's boolean words (`on`, `yes`, ...) are plain
+ * strings in YAML 1.2. A *quoted* `"on"` is a string in both dialects and is
+ * left for the normal key check to accept.
+ */
+function rejectBooleanLikeEnvKeys(contents: Node | null): void {
+  if (!isMap(contents)) {
+    return
+  }
+  const steps = contents.get('setup')
+  if (!isSeq(steps)) {
+    return
+  }
+  steps.items.forEach((step, index) => {
+    if (!isMap(step)) {
+      return
+    }
+    const env = step.get('env')
+    if (!isMap(env)) {
+      return
+    }
+    for (const item of (env as YAMLMap).items) {
+      const key = item.key
+      if (!isScalar(key)) {
+        // Non-scalar keys (e.g. a nested mapping) are rejected by the
+        // value-level check as non-string keys; leave them for that path.
+        continue
+      }
+      if (typeof key.value !== 'string') {
+        // YAML 1.2 already resolved this key to a boolean/number/null; the
+        // runner reads it the same way, so reject with one shared message.
+        throw new SetupDeclarationError(
+          `setup[${index}].env must map string keys to string values.`,
+          { reason: 'invalid-env' }
+        )
+      }
+      if (key.type === 'PLAIN' && YAML_1_1_BOOLEAN_LIKE_KEYS.has(key.value.toLowerCase())) {
+        throw new SetupDeclarationError(
+          `setup[${index}].env has a boolean-like key that must be quoted: ${JSON.stringify(key.value)}`,
+          { reason: 'invalid-env-name' }
+        )
+      }
+    }
+  })
 }
 
 function parseStep(raw: unknown, index: number): SetupDeclarationStep {
@@ -194,10 +258,34 @@ export function parseSetupDeclaration(content: string): SetupDeclaration | null 
   if (content.trim() === '') {
     return null
   }
+  if (Buffer.byteLength(content, 'utf8') > MAX_SETUP_DECLARATION_BYTES) {
+    throw new SetupDeclarationError(
+      `Setup declaration exceeds ${MAX_SETUP_DECLARATION_BYTES} bytes.`,
+      { reason: 'declaration-too-large' }
+    )
+  }
+
+  // Parse to a document (not plain JS) so `env` *keys* can be inspected with
+  // their scalar type and quoting preserved. The `yaml` library reads an
+  // unquoted `on` as the string `"on"` (YAML 1.2) while the runner's PyYAML
+  // reads it as a boolean (YAML 1.1); a plain key-level pre-pass keeps both
+  // enforcers on the same boundary for keys, without disturbing the value-level
+  // dialect divergence the SPEC documents for `run`.
+  const document = parseDocument(content)
+  if (document.errors.length > 0) {
+    throw new SetupDeclarationError('Setup declaration is not valid YAML.', {
+      reason: 'invalid-yaml',
+      cause: document.errors[0]
+    })
+  }
+  rejectBooleanLikeEnvKeys(document.contents)
 
   let parsed: unknown
   try {
-    parsed = parseYaml(content)
+    // Resolving aliases/anchors happens here, not in parseDocument; bound it
+    // against alias-expansion bombs and surface any failure as a declaration
+    // error rather than a raw library exception.
+    parsed = document.toJS({ maxAliasCount: 100 })
   } catch (error) {
     throw new SetupDeclarationError('Setup declaration is not valid YAML.', {
       reason: 'invalid-yaml',

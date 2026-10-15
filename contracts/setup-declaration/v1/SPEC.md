@@ -4,8 +4,7 @@ Language: English | [中文](SPEC.zh.md)
 
 A setup declaration tells a review sandbox how to prepare itself before the agent starts. It is a small YAML file that a repository keeps at `.sec-review/setup.yml` on its **default branch**. When a review runs, the declaration is executed inside the Docker sandbox before the agent starts, so the agent begins in an environment with its dependencies installed.
 
-The declaration is optional. A repository without one is reviewed in a
-declaration-free environment.
+The declaration is optional. A repository without one is reviewed in a declaration-free environment.
 
 ## Format
 
@@ -40,14 +39,13 @@ ignored:
 - `setup` must be a list of mappings (each a step);
 - each step may carry only `run`, `working-directory`, `env`, and `timeout_seconds`;
 - `run` is required and must be a non-empty string;
-- `working-directory`, when present, must be a non-empty string that is relative
-  and stays inside the repository root (no leading `/`, no `..` segment);
-- `env`, when present, must be a mapping of string keys to string values, with
-  keys matching the identifier pattern above;
-- `timeout_seconds`, when present, must be a positive integer (booleans are not
-  integers).
+- `working-directory`, when present, must be a non-empty string that is relative and stays inside the repository root (no leading `/`, no `..` segment). Containment is checked lexically on the declared path; it does not resolve symlinks, so a symlink inside the repository is not followed by this rule (the declaration is trusted content, so this is containment, not a sandbox);
+- `env`, when present, must be a mapping of string keys to string values, with keys matching the identifier pattern above. A key must be a *string in both YAML dialects*: a plain key that YAML 1.1 reads as a boolean (`on`, `yes`, `off`, `no`, ...) is rejected even though YAML 1.2 reads it as a string. Quote such a key (`"on"`) if that is genuinely the variable name;
+- `timeout_seconds`, when present, must be a positive integer (booleans are not integers).
 
 **Blank content is not a declaration.** An empty or whitespace-only file is treated exactly like a missing file: it is valid and means "no declaration". It is not an error.
+
+**The declaration text is bounded.** The validated text travels inline in the workflow input, so it is capped at 64 KiB (UTF-8). The integration rejects an oversized file before submission; the runner and the input schema carry the same limit. A declaration that needs more than that is doing too much.
 
 ## Two Enforcers
 
@@ -65,29 +63,24 @@ There is no JSON Schema for this contract. The rules that matter — a `working-
 
 ## Corpus
 
-[`corpus/`](corpus) holds input files shared by both implementations' tests, with
-[`corpus/manifest.json`](corpus/manifest.json) recording which cases each side
-must accept and which it must reject. Both the Python and TypeScript test suites
-execute the same files, so the two implementations cannot silently drift apart.
+[`corpus/`](corpus) holds input files shared by both implementations' tests, with [`corpus/manifest.json`](corpus/manifest.json) recording which cases each side must accept and which it must reject. Both the Python and TypeScript test suites execute the same files, so the two implementations cannot silently drift apart.
 
 This corpus is the executable boundary of the format. Adding a rule means adding a case here and making both enforcers pass it: a case belongs here only when both implementations are required to classify it the same way.
 
 ### Scalars and YAML dialects
 
-The two enforcers use different YAML libraries, and the libraries implement
-different scalar-resolution rules:
+The two enforcers use different YAML libraries, and the libraries implement different scalar-resolution rules:
 
-- the runner uses PyYAML (YAML 1.1), where `on`, `yes`, `off`, and `no` resolve
-  to booleans;
-- the integration uses the `yaml` library (YAML 1.2), where those same words
-  resolve to strings.
+- the runner uses PyYAML (YAML 1.1), where `on`, `yes`, `off`, and `no` resolve to booleans;
+- the integration uses the `yaml` library (YAML 1.2), where those same words resolve to strings.
 
 The two cannot be made to agree on every ambiguous scalar (each library's "version" option trades one disagreement for another), so the shared corpus does not cover unquoted scalars whose *kind* differs between the dialects. Both implementations do agree on every value the corpus does contain — booleans and numbers (`true`, `false`, `123`) are non-strings in both dialects, and quoted strings are strings in both.
 
 The practical rule for authors is therefore: **quote any value that could be read as a non-string** — `run: "on"`, `working-directory: "no"`. An unquoted boolean-like value is a portability trap: the integration may accept it as a string while the runner, parsing a different dialect, rejects it (or vice versa).
 
-Each implementation pins its own dialect with a test, so a library upgrade that
-changes scalar resolution fails a test rather than silently shifting the boundary.
+`env` *keys* are the one exception: the two implementations cannot leave them dialect-divergent, because a key is not free-form data — it is a variable name that must be a string to be emitted. So the enforcers apply the *stricter* reading to keys and both reject a plain key that YAML 1.1 resolves to a non-string (the boolean-like words above, plus booleans, numbers, and `null`, which are non-strings in both dialects). A quoted key is a string in both dialects and is accepted. This keeps "the integration accepted it" and "the runner can parse it" the same statement for the whole key space.
+
+Each implementation pins its own dialect with a test, so a library upgrade that changes scalar resolution fails a test rather than silently shifting the boundary.
 
 ## Trust
 

@@ -5,12 +5,15 @@
     "valid-large-timeout.yml",
     "valid-minimal.yml",
     "valid-portable-env-names.yml",
+    "valid-quoted-boolean-like-env-key.yml",
     "valid-quoted-boolean-like-values.yml"
   ],
   "invalid": [
     "invalid-blank-run.yml",
     "invalid-boolean-timeout.yml",
+    "invalid-env-boolean-like-key.yml",
     "invalid-env-name.yml",
+    "invalid-env-non-string-key.yml",
     "invalid-env-non-string.yml",
     "invalid-env-value-boolean.yml",
     "invalid-missing-run.yml",

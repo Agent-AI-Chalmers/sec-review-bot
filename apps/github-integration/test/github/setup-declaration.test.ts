@@ -85,3 +85,51 @@ test('unquoted boolean-like runs follow the YAML 1.2 dialect', () => {
     assert.equal(declaration?.steps[0]?.run, raw)
   }
 })
+
+test('rejects plain boolean-like env keys (matches the runner dialect)', () => {
+  // `env` *keys* are kept on the runner's YAML 1.1 reading even though this
+  // validator uses YAML 1.2: an unquoted `on`/`yes`/... would be a boolean for
+  // PyYAML but a string here, so it is rejected here too rather than letting a
+  // declaration through that the runner would then refuse to execute.
+  for (const raw of ['on', 'yes', 'off', 'no', 'true', 'false']) {
+    assert.throws(
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    env:\n      ${raw}: ok\n`),
+      SetupDeclarationError,
+      `env key ${raw} should be rejected`
+    )
+  }
+})
+
+test('accepts a quoted boolean-like env key in both dialects', () => {
+  const declaration = parseSetupDeclaration('setup:\n  - run: x\n    env:\n      "on": ok\n')
+  assert.equal(declaration?.steps[0]?.env['on'], 'ok')
+})
+
+test('rejects non-string env keys', () => {
+  for (const raw of ['true', '123', '1.5', 'null', '~']) {
+    assert.throws(
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    env:\n      ${raw}: ok\n`),
+      SetupDeclarationError,
+      `env key ${raw} should be rejected`
+    )
+  }
+})
+
+test('rejects an oversized declaration', () => {
+  const filler = 'x'.repeat(65536 + 1)
+  assert.throws(() => parseSetupDeclaration(`setup:\n  - run: ${filler}\n`), SetupDeclarationError)
+})
+
+test('rejects an alias-expansion bomb as an invalid declaration', () => {
+  let bomb = 'a: &a ["x","x","x","x","x","x","x","x","x","x"]\n'
+  for (let i = 0; i < 9; i += 1) {
+    const prev = String.fromCharCode(97 + i)
+    const next = String.fromCharCode(98 + i)
+    const refs = Array.from({ length: 9 }, () => `*${prev}`).join(',')
+    bomb += `${next}: &${next} [${refs}]\n`
+  }
+  assert.throws(
+    () => parseSetupDeclaration(`setup:\n  - run: x\n${bomb}`),
+    (error: unknown) => error instanceof SetupDeclarationError && error.reason === 'invalid-yaml'
+  )
+})
