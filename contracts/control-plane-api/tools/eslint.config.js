@@ -1,6 +1,5 @@
 import js from '@eslint/js'
-import tsParser from '@typescript-eslint/parser'
-import tsPlugin from '@typescript-eslint/eslint-plugin'
+import tseslint from 'typescript-eslint'
 
 export default [
   {
@@ -10,7 +9,7 @@ export default [
   {
     files: ['**/*.ts'],
     languageOptions: {
-      parser: tsParser,
+      parser: tseslint.parser,
       parserOptions: {
         sourceType: 'module',
         ecmaVersion: 'latest'
@@ -33,10 +32,10 @@ export default [
       }
     },
     plugins: {
-      '@typescript-eslint': tsPlugin
+      '@typescript-eslint': tseslint.plugin
     },
     rules: {
-      ...tsPlugin.configs.recommended.rules,
+      ...tseslint.plugin.configs.recommended.rules,
       '@typescript-eslint/ban-ts-comment': 'off',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
