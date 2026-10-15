@@ -156,8 +156,8 @@ test('issue-comment-created skips manual command when commenter lacks write perm
     }
   )
 
-  assert.equal(issueReviewCalled, false)
-  assert.equal(pullRequestReviewCalled, false)
+  assert.strictEqual(issueReviewCalled, false)
+  assert.strictEqual(pullRequestReviewCalled, false)
 })
 
 test('issue-comment-created starts an audited issue manual review for write commenter', async () => {
@@ -196,11 +196,11 @@ test('issue-comment-created starts an audited issue manual review for write comm
 
   // An issue is an unverified claim, so a comment can only start an audit; the objective the
   // command path passes is always `audit`, never a user-chosen `repair`.
-  assert.equal(review_objective, 'audit')
+  assert.strictEqual(review_objective, 'audit')
   // A plain comment does not opt in to opening a draft PR.
-  assert.equal(open_pr, false)
+  assert.strictEqual(open_pr, false)
   // The resolved trusted branch reaches the issue command.
-  assert.deepEqual(forwarded_trusted, {
+  assert.deepStrictEqual(forwarded_trusted, {
     default_branch: 'main',
     head_sha: 'default-sha'
   })
@@ -230,7 +230,7 @@ test('issue-comment-created forwards the open-pr opt-in for issue reviews', asyn
     }
   )
 
-  assert.equal(open_pr, true)
+  assert.strictEqual(open_pr, true)
 })
 
 test('issue-comment-created starts pull request manual review for write commenter', async () => {
@@ -267,8 +267,8 @@ test('issue-comment-created starts pull request manual review for write commente
     }
   )
 
-  assert.equal(pullRequestReviewCalled, true)
-  assert.deepEqual(forwarded_trusted, {
+  assert.strictEqual(pullRequestReviewCalled, true)
+  assert.deepStrictEqual(forwarded_trusted, {
     default_branch: 'main',
     head_sha: 'default-sha'
   })
@@ -299,7 +299,7 @@ test('issue-comment-created delegates PR context loading until after command adm
       },
       startPullRequestReviewCommandFn: async ({ resolve_pr, on_admitted }) => {
         commandStarted = true
-        assert.equal(contextLoaded, false)
+        assert.strictEqual(contextLoaded, false)
         assert.ok(resolve_pr)
         on_admitted?.({
           run_id: 'run-pr-context',
@@ -312,6 +312,6 @@ test('issue-comment-created delegates PR context loading until after command adm
     }
   )
 
-  assert.equal(commandStarted, true)
-  assert.equal(contextLoaded, true)
+  assert.strictEqual(commandStarted, true)
+  assert.strictEqual(contextLoaded, true)
 })

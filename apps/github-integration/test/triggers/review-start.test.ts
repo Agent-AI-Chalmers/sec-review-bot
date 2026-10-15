@@ -92,10 +92,10 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         test_changes,
         on_prepared
       }) => {
-        assert.equal(run_id, 'run-issue-1')
-        assert.equal(event_type, 'opened')
-        assert.equal(review_objective, 'audit')
-        assert.equal(test_changes, null)
+        assert.strictEqual(run_id, 'run-issue-1')
+        assert.strictEqual(event_type, 'opened')
+        assert.strictEqual(review_objective, 'audit')
+        assert.strictEqual(test_changes, null)
         const prepared = {
           issue: submittedIssue,
           run_id: 'run-issue-1',
@@ -127,8 +127,8 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
     }
   })
 
-  assert.equal(submitted.run_id, 'run-issue-1')
-  assert.deepEqual(transitions, [
+  assert.strictEqual(submitted.run_id, 'run-issue-1')
+  assert.deepStrictEqual(transitions, [
     [
       'preparing',
       {
@@ -177,9 +177,9 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         test_changes,
         on_prepared
       }) => {
-        assert.equal(run_id, 'run-pr-1')
-        assert.equal(event_type, 'manual_review')
-        assert.equal(test_changes, 'deny')
+        assert.strictEqual(run_id, 'run-pr-1')
+        assert.strictEqual(event_type, 'manual_review')
+        assert.strictEqual(test_changes, 'deny')
         const prepared = {
           pr: submittedPr,
           run_id: 'run-pr-1',
@@ -210,8 +210,8 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
     }
   })
 
-  assert.equal(submitted.run_id, 'run-pr-1')
-  assert.deepEqual(transitions, [
+  assert.strictEqual(submitted.run_id, 'run-pr-1')
+  assert.deepStrictEqual(transitions, [
     [
       'preparing',
       {
@@ -254,7 +254,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
       delivery_id: 'delivery-pr-failed',
       deps: {
         start_review: async ({ run_id }) => {
-          assert.equal(run_id, 'run-pr-failed')
+          assert.strictEqual(run_id, 'run-pr-failed')
           throw new Error('workspace clone failed')
         },
         store: {
@@ -277,7 +277,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
     /workspace clone failed/
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     [
       'preparing',
       {
@@ -346,8 +346,8 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
     error
   )
 
-  assert.equal((transitions[0] as unknown[])[0], 'prepared')
-  assert.equal(transitions.length, 1)
+  assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
+  assert.strictEqual(transitions.length, 1)
 })
 
 test('startPullRequestReviewCommand preserves an uncertain Runner submission for replay', async () => {
@@ -400,8 +400,8 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
     error
   )
 
-  assert.equal((transitions[0] as unknown[])[0], 'prepared')
-  assert.equal(transitions.length, 1)
+  assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
+  assert.strictEqual(transitions.length, 1)
 })
 
 test('startPullRequestReviewCommand admits a comment delivery before loading PR context', async () => {
@@ -444,7 +444,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
     /GitHub PR lookup failed/
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     ['preparing', 'run-context-failure'],
     ['context'],
     [
@@ -483,8 +483,8 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
     }
   })
 
-  assert.equal(submitted.run_id, 'run-original')
-  assert.equal(starts, 0)
+  assert.strictEqual(submitted.run_id, 'run-original')
+  assert.strictEqual(starts, 0)
 })
 
 test('startIssueReviewCommand reuses a webhook delivery without starting another review', async () => {
@@ -515,8 +515,8 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
     }
   })
 
-  assert.equal(submitted.run_id, 'run-original')
-  assert.equal(starts, 0)
+  assert.strictEqual(submitted.run_id, 'run-original')
+  assert.strictEqual(starts, 0)
 })
 
 test('startPullRequestReviewCommand reports an invalid setup declaration distinctly', async () => {
@@ -556,7 +556,7 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
     SetupDeclarationError
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     [
       'failed',
       'run-pr-setup-invalid',
@@ -605,7 +605,7 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
     SetupDeclarationError
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     [
       'failed',
       'run-issue-setup-invalid',

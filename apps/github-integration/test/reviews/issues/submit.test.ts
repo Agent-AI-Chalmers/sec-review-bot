@@ -85,26 +85,26 @@ async function runWith(
 test('audit review forwards an explicit test_changes to the runner input', async () => {
   // The regression this guards: an issue comment now always audits, but audit can still
   // reach the repair stage, so a user-chosen test_changes must not be silently dropped.
-  assert.deepEqual(await runWith('audit', 'deny'), [
+  assert.deepStrictEqual(await runWith('audit', 'deny'), [
     { review_objective: 'audit', test_changes: 'deny' }
   ])
 })
 
 test('audit review without a test_changes leaves the field absent', async () => {
-  assert.deepEqual(await runWith('audit', null), [
+  assert.deepStrictEqual(await runWith('audit', null), [
     { review_objective: 'audit' }
   ])
 })
 
 test('repair review without a test_changes leaves the field absent', async () => {
   // The runner owns the default (`allow`); the GitHub integration never injects one.
-  assert.deepEqual(await runWith('repair', null), [
+  assert.deepStrictEqual(await runWith('repair', null), [
     { review_objective: 'repair' }
   ])
 })
 
 test('repair review forwards an explicit test_changes', async () => {
-  assert.deepEqual(await runWith('repair', 'deny'), [
+  assert.deepStrictEqual(await runWith('repair', 'deny'), [
     { review_objective: 'repair', test_changes: 'deny' }
   ])
 })

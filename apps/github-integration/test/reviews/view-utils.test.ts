@@ -9,18 +9,18 @@ import {
 } from '../../src/reviews/view-utils.js'
 
 test('view utils render missing inline code values with explicit fallback', () => {
-  assert.equal(inlineCode(null), '`unknown`')
-  assert.equal(inlineCode(undefined, 'n/a'), '`n/a`')
+  assert.strictEqual(inlineCode(null), '`unknown`')
+  assert.strictEqual(inlineCode(undefined, 'n/a'), '`n/a`')
 })
 
 test('view utils use a longer code span fence around embedded backticks', () => {
-  assert.equal(inlineCode('user`name'), '``user`name``')
-  assert.equal(inlineCode('user``name'), '```user``name```')
-  assert.equal(inlineCode('`quoted`'), '`` `quoted` ``')
+  assert.strictEqual(inlineCode('user`name'), '``user`name``')
+  assert.strictEqual(inlineCode('user``name'), '```user``name```')
+  assert.strictEqual(inlineCode('`quoted`'), '`` `quoted` ``')
 })
 
 test('view utils render changed files with a safe inline code fence', () => {
-  assert.deepEqual(renderChangedFilesLines(['src/uses`tick.ts']), [
+  assert.deepStrictEqual(renderChangedFilesLines(['src/uses`tick.ts']), [
     'Changed files:',
     '',
     '- ``src/uses`tick.ts``'
@@ -28,7 +28,7 @@ test('view utils render changed files with a safe inline code fence', () => {
 })
 
 test('view utils render verification summary with stable order and finding summaries', () => {
-  assert.deepEqual(
+  assert.deepStrictEqual(
     renderVerificationSummaryLines(
       {
         patch_coverage: 'full',
@@ -65,7 +65,7 @@ test('view utils render verification summary with stable order and finding summa
 })
 
 test('view utils preserve inline code in review prose', () => {
-  assert.deepEqual(
+  assert.deepStrictEqual(
     renderVerificationSummaryLines(
       {
         patch_coverage: 'full',

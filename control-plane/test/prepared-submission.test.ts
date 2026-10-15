@@ -44,11 +44,11 @@ test('prepared submission persists input before crossing the Runner boundary', a
     },
     async (request) => {
       events.push('submit')
-      assert.equal(request.run_id, 'run-1')
+      assert.strictEqual(request.run_id, 'run-1')
     }
   )
-  assert.deepEqual(events, ['persist', 'submit', 'queued'])
-  assert.deepEqual(result, {
+  assert.deepStrictEqual(events, ['persist', 'submit', 'queued'])
+  assert.deepStrictEqual(result, {
     run_id: 'run-1',
     workflow: 'issue-review',
     status: 'queued'
@@ -84,7 +84,7 @@ test('uncertain Runner submission is persisted for recovery', async () => {
     ),
     error
   )
-  assert.deepEqual(failure, {
+  assert.deepStrictEqual(failure, {
     code: 'SUBMISSION_STATE_UNCERTAIN',
     message: 'response lost'
   })
@@ -116,7 +116,7 @@ test('a queued-state write failure after Runner accepts is recoverable uncertain
     ),
     /database unavailable/
   )
-  assert.deepEqual(failure, {
+  assert.deepStrictEqual(failure, {
     code: 'SUBMISSION_STATE_UNCERTAIN',
     message: 'database unavailable'
   })

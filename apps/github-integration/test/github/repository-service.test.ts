@@ -4,7 +4,7 @@ import test from 'node:test'
 import { splitRepoFullName } from '../../src/github/repository-service.js'
 
 test('splitRepoFullName accepts a valid owner and repository pair', () => {
-  assert.deepEqual(splitRepoFullName('octo/example.repo'), {
+  assert.deepStrictEqual(splitRepoFullName('octo/example.repo'), {
     owner_login: 'octo',
     repo_name: 'example.repo'
   })

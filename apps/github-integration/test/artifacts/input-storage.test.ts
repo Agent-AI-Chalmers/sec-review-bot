@@ -46,12 +46,12 @@ test('uploads an immutable input bundle to its deterministic run key', async () 
 
   const published = await publishInputBundle(await reference(), 'run-123')
 
-  assert.equal(
+  assert.strictEqual(
     published.uri,
     's3://sec-review/runs/run-123/input/input-bundle.v1.tar.zst'
   )
-  assert.equal(s3.commandCalls(PutObjectCommand).length, 1)
-  assert.equal(
+  assert.strictEqual(s3.commandCalls(PutObjectCommand).length, 1)
+  assert.strictEqual(
     s3.commandCalls(PutObjectCommand)[0]?.args[0].input.IfNoneMatch,
     '*'
   )
@@ -72,7 +72,7 @@ test('reuses an existing object only when immutable metadata matches', async () 
   const published = await publishInputBundle(input, 'run-123')
 
   assert.match(published.uri, /^s3:/)
-  assert.equal(s3.commandCalls(PutObjectCommand).length, 0)
+  assert.strictEqual(s3.commandCalls(PutObjectCommand).length, 0)
 })
 
 test('rejects conflicting content at the immutable run key', async () => {

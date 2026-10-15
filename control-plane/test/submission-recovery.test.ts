@@ -63,8 +63,8 @@ test('submission recovery replays the persisted input and commits its claim', as
     }
   )
 
-  assert.equal(result.status, 'recovered')
-  assert.deepEqual(events, [
+  assert.strictEqual(result.status, 'recovered')
+  assert.deepStrictEqual(events, [
     [
       'submit',
       {
@@ -100,8 +100,8 @@ test('submission recovery persists uncertainty for a later retry', async () => {
     }
   )
 
-  assert.deepEqual(result, { status: 'deferred', error: transportError })
-  assert.deepEqual(failures, [
+  assert.deepStrictEqual(result, { status: 'deferred', error: transportError })
+  assert.deepStrictEqual(failures, [
     [
       'run-1',
       'claim-1',
@@ -131,7 +131,7 @@ test('submission recovery records missing persisted input without calling Runner
     }
   )
 
-  assert.equal(result.status, 'input_missing')
-  assert.equal(submitted, false)
-  assert.equal(failure?.code, 'SUBMISSION_RECOVERY_INPUT_MISSING')
+  assert.strictEqual(result.status, 'input_missing')
+  assert.strictEqual(submitted, false)
+  assert.strictEqual(failure?.code, 'SUBMISSION_RECOVERY_INPUT_MISSING')
 })

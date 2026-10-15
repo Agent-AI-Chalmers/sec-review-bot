@@ -124,13 +124,13 @@ test('a void operation (empty 200) resolves for the real client against the real
   try {
     // None of these may throw. `initializePublicationSteps` was the first call every
     // publication made, so under the empty-200 bug it looped the runner forever.
-    assert.equal(
+    assert.strictEqual(
       await controlPlaneClient.initializePublicationSteps(RUN_ID, 'claim-1', [
         'pull-request:review'
       ]),
       undefined
     )
-    assert.equal(
+    assert.strictEqual(
       await controlPlaneClient.requirePublicationStepClaim(
         RUN_ID,
         'claim-1',
@@ -138,14 +138,14 @@ test('a void operation (empty 200) resolves for the real client against the real
       ),
       undefined
     )
-    assert.equal(
+    assert.strictEqual(
       await controlPlaneClient.failPreparation(RUN_ID, 'prep-1', {
         code: 'PREPARATION_FAILED',
         message: 'seam test'
       }),
       undefined
     )
-    assert.deepEqual(
+    assert.deepStrictEqual(
       seam.store.calls.map((call) => call.method),
       [
         'initializePublicationSteps',
@@ -163,7 +163,7 @@ test('a JSON-returning operation still parses against the real server', async ()
   try {
     // `renewPreparationClaim` answers a JSON boolean; tolerating an empty body must not have
     // broken the ordinary path.
-    assert.equal(
+    assert.strictEqual(
       await controlPlaneClient.renewPreparationClaim(RUN_ID, 'prep-1'),
       true
     )

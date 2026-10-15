@@ -32,7 +32,7 @@ const ACTUAL_OUTPUTS: Record<string, string[]> = {
 
 test('every committed artifact matches a fresh render', async () => {
   const stale = await staleGeneratedArtifacts()
-  assert.deepEqual(
+  assert.deepStrictEqual(
     stale,
     [],
     `these are stale:\n${stale.map((s) => `  ${s.output} -> ${s.command}`).join('\n')}`
@@ -42,13 +42,13 @@ test('every committed artifact matches a fresh render', async () => {
 test('the manifest lists exactly the artifacts the generators write', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
   const byName = new Map(manifest.generators.map((g) => [g.name, g.outputs]))
-  assert.deepEqual(
+  assert.deepStrictEqual(
     [...byName.keys()].sort(),
     Object.keys(ACTUAL_OUTPUTS).sort(),
     'the manifest lists a different set of generators than the code has'
   )
   for (const [name, outputs] of Object.entries(ACTUAL_OUTPUTS)) {
-    assert.deepEqual(
+    assert.deepStrictEqual(
       [...(byName.get(name) ?? [])].sort(),
       [...outputs].sort(),
       `manifest outputs for ${name} do not match the generator`

@@ -49,9 +49,9 @@ test('readSetupDeclaration returns the declaration text from the default branch 
     repo_name: 'demo'
   })
 
-  assert.equal(declaration, 'setup:\n  - run: echo hi\n')
+  assert.strictEqual(declaration, 'setup:\n  - run: echo hi\n')
   // Reads the exact commit, not a branch name, so a fork cannot change it.
-  assert.deepEqual(requests, [
+  assert.deepStrictEqual(requests, [
     { path: '.sec-review/setup.yml', ref: 'a'.repeat(40) }
   ])
 })
@@ -66,7 +66,7 @@ test('readSetupDeclaration returns null when the declaration is absent', async (
     repo_name: 'demo'
   })
 
-  assert.equal(declaration, null)
+  assert.strictEqual(declaration, null)
 })
 
 test('readSetupDeclaration treats a whitespace-only declaration as absent', async () => {
@@ -83,7 +83,7 @@ test('readSetupDeclaration treats a whitespace-only declaration as absent', asyn
     repo_name: 'demo'
   })
 
-  assert.equal(declaration, null)
+  assert.strictEqual(declaration, null)
 })
 
 test('readSetupDeclaration rejects an invalid declaration with repository context', async () => {
@@ -176,7 +176,7 @@ test('readSetupDeclaration ignores a symlink entry, whose content is the target 
     repo_name: 'demo'
   })
 
-  assert.equal(declaration, null)
+  assert.strictEqual(declaration, null)
 })
 
 test('readSetupDeclaration treats a directory entry as absent', async () => {
@@ -203,5 +203,5 @@ test('readSetupDeclaration treats a directory entry as absent', async () => {
     repo_name: 'demo'
   })
 
-  assert.equal(declaration, null)
+  assert.strictEqual(declaration, null)
 })

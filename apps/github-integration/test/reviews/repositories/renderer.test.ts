@@ -256,7 +256,7 @@ test('repository summary workflow view keeps minimal case fields for rendering',
     { run_id: 'run-1' }
   )
 
-  assert.deepEqual(view, {
+  assert.deepStrictEqual(view, {
     run_id: 'run-1',
     scan_summary: {
       scannable_file_count: 0,

@@ -19,7 +19,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
     runner_input: { secret: 'must-not-leak' },
     publish_context: { repository: 'octo/example' }
   })
-  assert.deepEqual(observed, {
+  assert.deepStrictEqual(observed, {
     run_id: 'run-1',
     workflow: 'issue-review',
     execution_status: 'succeeded',
@@ -43,7 +43,7 @@ test('publication step observation exposes operator outcomes without reconciliat
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
     failure_message: 'GitHub temporarily limited publication.'
   })
-  assert.deepEqual(observed, {
+  assert.deepStrictEqual(observed, {
     step_key: 'issue:draft-pr',
     status: 'failed',
     failure_count: 2,
@@ -51,5 +51,5 @@ test('publication step observation exposes operator outcomes without reconciliat
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
     failure_message: 'GitHub temporarily limited publication.'
   })
-  assert.equal('remote_object_id' in observed, false)
+  assert.strictEqual('remote_object_id' in observed, false)
 })

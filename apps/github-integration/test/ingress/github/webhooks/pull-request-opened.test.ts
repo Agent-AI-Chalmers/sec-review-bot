@@ -104,7 +104,7 @@ test('pull-request-opened skips automatic workflow when trigger mode is manual_o
     }
   )
 
-  assert.equal(reviewCalled, false)
+  assert.strictEqual(reviewCalled, false)
 })
 
 test('pull-request-opened skips self-originated payload before pull request extraction', async () => {
@@ -131,7 +131,7 @@ test('pull-request-opened skips self-originated payload before pull request extr
       }
     )
 
-    assert.equal(configFetched, false)
+    assert.strictEqual(configFetched, false)
   } finally {
     setGitHubAppMetadata()
   }
@@ -158,8 +158,11 @@ test('pull-request-opened runs automatic workflow when trigger mode is automatic
     }
   )
 
-  assert.equal(reviewCalled, true)
-  assert.deepEqual(forwarded, { default_branch: 'main', head_sha: 'main-sha' })
+  assert.strictEqual(reviewCalled, true)
+  assert.deepStrictEqual(forwarded, {
+    default_branch: 'main',
+    head_sha: 'main-sha'
+  })
 })
 
 test('pull-request-opened rethrows invalid repository trigger config error', async () => {
@@ -214,8 +217,8 @@ test('pull-request-opened skips automatic review for fork PRs', async () => {
     }
   )
 
-  assert.equal(reviewCalled, false, 'fork PR must not auto-review')
-  assert.equal(
+  assert.strictEqual(reviewCalled, false, 'fork PR must not auto-review')
+  assert.strictEqual(
     configFetched,
     false,
     'fork PR must be skipped before config fetch'

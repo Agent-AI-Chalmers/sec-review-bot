@@ -67,7 +67,7 @@ test('the shared fixtures match or violate the schema exactly as the manifest cl
   // A fixture that quietly stops matching the schema would teach the console a shape the
   // Control Plane never sends, so both directions are asserted.
   for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
-    assert.equal(
+    assert.strictEqual(
       validate(schemaName, fixture(name)),
       true,
       `${name} must be accepted`
@@ -76,7 +76,7 @@ test('the shared fixtures match or violate the schema exactly as the manifest cl
   for (const [name, schemaName] of Object.entries(
     manifest.invalid_schema_fixtures
   )) {
-    assert.equal(
+    assert.strictEqual(
       validate(schemaName, fixture(name)),
       false,
       `${name} must be rejected`
@@ -108,7 +108,7 @@ test('what observeRun returns validates against the shared schema', () => {
   // The schema is only a contract while the producer's own output satisfies it. This is
   // the check that would catch a status the schema's enum does not list.
   const withoutArtifact = observeRun(recordWith(null))
-  assert.equal(
+  assert.strictEqual(
     validate('observed-run.schema.json', withoutArtifact),
     true,
     `observeRun output must be accepted: ${JSON.stringify(withoutArtifact)}`
@@ -126,7 +126,7 @@ test('what observeRun returns validates against the shared schema', () => {
       }
     } as ReviewRunRecord['artifact_storage'])
   )
-  assert.equal(
+  assert.strictEqual(
     validate('observed-run.schema.json', withArtifact),
     true,
     `observeRun output must be accepted: ${JSON.stringify(withArtifact)}`

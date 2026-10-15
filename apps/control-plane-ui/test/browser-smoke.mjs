@@ -169,14 +169,14 @@ try {
     const rowAction = page.locator('tbody tr:first-child .row-action')
     const rowActionOpacity = () =>
       rowAction.evaluate((element) => getComputedStyle(element).opacity)
-    assert.equal(
+    assert.strictEqual(
       await rowActionOpacity(),
       '0',
       `${name} a row action must rest hidden`
     )
     await page.locator('tbody tr:first-child').hover()
     await page.waitForTimeout(250)
-    assert.equal(
+    assert.strictEqual(
       await rowActionOpacity(),
       '1',
       `${name} hovering a row must reveal its action`
@@ -184,7 +184,7 @@ try {
     await page.mouse.move(2, 2)
     await page.locator('tbody tr:first-child td a').first().focus()
     await page.waitForTimeout(250)
-    assert.equal(
+    assert.strictEqual(
       await rowActionOpacity(),
       '1',
       `${name} focusing a row must reveal its action too`
@@ -200,19 +200,19 @@ try {
 
     // The list separates the two status axes into their own columns, and each
     // status is dot+text rather than a badge.
-    assert.deepEqual(
+    assert.deepStrictEqual(
       await page.$$eval('thead th', (cells) =>
         cells.map((cell) => cell.textContent)
       ),
       EXPECTED_HEADERS,
       `${name} run table headers changed`
     )
-    assert.equal(
+    assert.strictEqual(
       await page.locator('tbody tr:first-child .mantine-Badge-root').count(),
       0,
       `${name} status cells must not render badges`
     )
-    assert.equal(
+    assert.strictEqual(
       await page.locator('tbody tr:first-child .status-text').count(),
       2,
       `${name} expected one dot+text status per axis`
@@ -233,14 +233,14 @@ try {
       const perPage = page.getByLabel('Per page')
       await perPage.selectOption('20')
       await page.waitForTimeout(750)
-      assert.equal(
+      assert.strictEqual(
         (await rows()).length,
         20,
         `${name} selected page size must apply`
       )
       await perPage.selectOption('50')
       await page.waitForTimeout(750)
-      assert.equal(
+      assert.strictEqual(
         (await rows()).length,
         50,
         `${name} default page size must apply`
@@ -266,7 +266,7 @@ try {
       )
       await timeRange.selectOption('')
       await page.waitForTimeout(750)
-      assert.equal(
+      assert.strictEqual(
         (await rows()).length,
         allRows,
         `${name} clearing the range must restore the list`
@@ -286,7 +286,7 @@ try {
       await page.waitForTimeout(750)
       const secondPage = await rows()
       assert.ok(secondPage.length > 0, `${name} next page must return runs`)
-      assert.deepEqual(
+      assert.deepStrictEqual(
         secondPage.filter((runId) => firstPage.includes(runId)),
         [],
         `${name} next page must not repeat the first page`
@@ -300,7 +300,7 @@ try {
       // cursor rather than silently sending the reader back to the first page.
       await previous.click()
       await page.waitForTimeout(750)
-      assert.deepEqual(
+      assert.deepStrictEqual(
         await rows(),
         firstPage,
         `${name} previous page must restore the first page`
@@ -326,7 +326,7 @@ try {
       await jump.fill(knownRunId)
       await page.getByRole('button', { name: 'Go to run' }).click()
       await page.waitForSelector('.run-progress-timeline')
-      assert.equal(
+      assert.strictEqual(
         (await page.locator('.run-id').first().textContent())?.trim(),
         knownRunId,
         `${name} the jump box must open the given run`
@@ -342,17 +342,17 @@ try {
         await page.getByRole('heading', { name: 'Run not found' }).isVisible(),
         `${name} an unknown run id must say the run is missing`
       )
-      assert.equal(
+      assert.strictEqual(
         await page.getByText('Unable to load Control Plane').count(),
         0,
         `${name} an unknown run id must not show the generic error page`
       )
-      assert.equal(
+      assert.strictEqual(
         await page.getByText('Refresh failed').count(),
         0,
         `${name} an unknown run id must not read as a failed refresh`
       )
-      assert.equal(
+      assert.strictEqual(
         await page.locator('.run-id').count(),
         0,
         `${name} an unknown run id must not leave the previous run on screen`
@@ -399,7 +399,7 @@ try {
         }
       })
       assert.ok(artifact.found, `${name} a stored artifact must render`)
-      assert.equal(
+      assert.strictEqual(
         artifact.facts,
         3,
         `${name} the artifact must show size, type and digest`
@@ -418,7 +418,7 @@ try {
       )
       // Both blocks lead with a status badge, and the artifact's own storage state was
       // never shown anywhere before, so losing it would be silent.
-      assert.equal(
+      assert.strictEqual(
         await page.locator('.artifact-row > .mantine-Badge-root').count(),
         1,
         `${name} the artifact row must lead with its status badge`
@@ -454,14 +454,14 @@ try {
 
       // The digest is abbreviated until asked for; nothing covered that toggle before.
       const digest = page.locator('.artifact-digest-toggle')
-      assert.equal(
+      assert.strictEqual(
         await digest.getAttribute('aria-expanded'),
         'false',
         `${name} digest starts short`
       )
       const collapsed = (await digest.textContent()) ?? ''
       await digest.click()
-      assert.equal(
+      assert.strictEqual(
         await digest.getAttribute('aria-expanded'),
         'true',
         `${name} digest must expand`
@@ -545,7 +545,7 @@ try {
       await page.locator('tbody tr:first-child td a').first().click()
       await page.waitForSelector('.delivery-item')
       await page.waitForTimeout(300)
-      assert.equal(
+      assert.strictEqual(
         await page.locator('.publication-summary .delivery-link').count(),
         0,
         `${name} the summary must not carry the exit link`
@@ -597,7 +597,7 @@ try {
               ?.textContent?.trim() ?? ''
         }))
     )
-    assert.deepEqual(
+    assert.deepStrictEqual(
       steps.map((step) => step.title),
       ['Created', 'Execution', 'Publication'],
       `${name} timeline steps changed`
@@ -638,7 +638,7 @@ try {
     )
     await page.getByRole('button', { name: 'Copy run ID' }).click()
     await page.waitForTimeout(300)
-    assert.equal(
+    assert.strictEqual(
       await page.evaluate(() => navigator.clipboard.readText()),
       knownRunIdForCopy,
       `${name} the copy button must put the full run id on the clipboard`
@@ -655,7 +655,7 @@ try {
         `${name} timeline timestamps must not go backwards`
       )
     }
-    assert.equal(
+    assert.strictEqual(
       await page.locator('.run-progress-timeline .status-text').count(),
       0,
       `${name} timeline must not repeat status words`
@@ -679,14 +679,14 @@ try {
           bullet === null ? null : getComputedStyle(bullet).backgroundColor
       }
     })
-    assert.notEqual(rail, null, `${name} timeline item missing`)
+    assert.notStrictEqual(rail, null, `${name} timeline item missing`)
     if (rail !== null && rail.display !== 'none') {
-      assert.equal(
+      assert.strictEqual(
         rail.style,
         'dashed',
         `${name} timeline rail must stay dashed`
       )
-      assert.notEqual(
+      assert.notStrictEqual(
         rail.color,
         rail.bulletColor,
         `${name} timeline rail must not reuse the status colour`
@@ -714,7 +714,7 @@ try {
             item.querySelector('.mantine-Timeline-itemBody')?.textContent ?? ''
         )
     )
-    assert.equal(ruledOut.length, 3, `${name} ruled-out timeline changed`)
+    assert.strictEqual(ruledOut.length, 3, `${name} ruled-out timeline changed`)
     assert.doesNotMatch(
       ruledOut[2],
       TIMESTAMP,
@@ -772,7 +772,7 @@ try {
     await touchPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
     await touchPage.getByRole('heading', { name: 'Runs' }).waitFor()
     await touchPage.waitForTimeout(400)
-    assert.equal(
+    assert.strictEqual(
       await touchPage
         .locator('tbody tr:first-child .row-action')
         .evaluate((element) => getComputedStyle(element).opacity),
@@ -798,7 +798,7 @@ try {
       await themePage.waitForTimeout(500)
       const contrast = await themePage.evaluate(CONTRAST)
       const dark = theme === 'dark'
-      assert.equal(
+      assert.strictEqual(
         contrast.background.r < 128,
         dark,
         `${name} the ${theme} theme must render its own background`
@@ -835,7 +835,7 @@ try {
       `${name} an in-flight phase must read as still running`
     )
     await manualPage.waitForTimeout(13_000)
-    assert.notEqual(
+    assert.notStrictEqual(
       await readElapsed(),
       elapsedBefore,
       `${name} an in-flight elapsed time must keep moving without a refetch`
@@ -866,7 +866,7 @@ try {
       `${name} the zh run must show its publication steps`
     )
     for (const badge of zhBadges) {
-      assert.equal(
+      assert.strictEqual(
         badge,
         '发布成功',
         `${name} a publication step must not be described with execution wording`

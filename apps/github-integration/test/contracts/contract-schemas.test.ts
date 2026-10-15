@@ -18,13 +18,13 @@ interface FixtureManifest {
 
 function invalidFixtureSchemas(): Array<[string, string]> {
   const manifest = contractFixtureManifest() as FixtureManifest
-  assert.equal(typeof manifest.invalid_schema_fixtures, 'object')
+  assert.strictEqual(typeof manifest.invalid_schema_fixtures, 'object')
   return Object.entries(manifest.invalid_schema_fixtures)
 }
 
 function fixtureSchemas(): Array<[string, string]> {
   const manifest = contractFixtureManifest() as FixtureManifest
-  assert.equal(typeof manifest.schema_fixtures, 'object')
+  assert.strictEqual(typeof manifest.schema_fixtures, 'object')
   return Object.entries(manifest.schema_fixtures)
 }
 
@@ -55,7 +55,7 @@ test('shared v6 contract fixtures match JSON schemas', () => {
     }
     const valid = validate(contractFixture(fixtureName))
 
-    assert.equal(
+    assert.strictEqual(
       valid,
       true,
       `${fixtureName} failed ${schemaName}: ${ajv.errorsText(validate.errors)}`
@@ -71,7 +71,7 @@ test('shared v6 contract fixture manifest covers fixture and schema files', () =
   )
   const schemaNames = new Set(contractSchemaFiles())
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     [...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort(),
     fixtureNames
   )
@@ -85,7 +85,11 @@ test('shared v6 contract fixture manifest covers fixture and schema files', () =
 test('shared v6 invalid contract fixtures are rejected by JSON schemas', () => {
   for (const [fixtureName, schemaName] of invalidFixtureSchemas()) {
     const validate = contractValidator(schemaName)
-    assert.equal(validate(contractFixture(fixtureName)), false, fixtureName)
+    assert.strictEqual(
+      validate(contractFixture(fixtureName)),
+      false,
+      fixtureName
+    )
   }
 })
 
@@ -96,7 +100,7 @@ test('v6 pull request input schema requires audit objective', () => {
   }
   payload.review_intent.objective = 'repair'
 
-  assert.equal(validate(payload), false)
+  assert.strictEqual(validate(payload), false)
 })
 
 test('v6 repository input schema requires audit objective', () => {
@@ -108,7 +112,7 @@ test('v6 repository input schema requires audit objective', () => {
   }
   payload.review_intent.objective = 'repair'
 
-  assert.equal(validate(payload), false)
+  assert.strictEqual(validate(payload), false)
 })
 
 test('v6 repository input schema rejects the removed max_file_bytes field', () => {
@@ -120,7 +124,7 @@ test('v6 repository input schema rejects the removed max_file_bytes field', () =
   }
   payload.scan_scope.max_file_bytes = 200000
 
-  assert.equal(validate(payload), false)
+  assert.strictEqual(validate(payload), false)
 })
 
 test('v6 repository full scan schema rejects incremental window fields', () => {
@@ -140,7 +144,7 @@ test('v6 repository full scan schema rejects incremental window fields', () => {
     { path: 'src/webhook.ts', status: 'modified', previous_path: null }
   ]
 
-  assert.equal(validate(payload), false)
+  assert.strictEqual(validate(payload), false)
 })
 
 test('v6 repository incremental schema rejects missing window fields', () => {
@@ -157,7 +161,11 @@ test('v6 repository incremental schema rejects missing window fields', () => {
     }
     Object.assign(payload.scan_target, scanTargetPatch)
 
-    assert.equal(validate(payload), false, JSON.stringify(scanTargetPatch))
+    assert.strictEqual(
+      validate(payload),
+      false,
+      JSON.stringify(scanTargetPatch)
+    )
   }
 })
 
@@ -172,7 +180,7 @@ test('v6 repository incremental schema allows empty changed file scope', () => {
   }
   payload.scan_scope.incremental_changed_files = []
 
-  assert.equal(validate(payload), true)
+  assert.strictEqual(validate(payload), true)
 })
 
 test('v6 review record schema rejects unsafe file change paths', () => {
@@ -199,6 +207,10 @@ test('v6 review record schema rejects unsafe file change paths', () => {
     assert.ok(fileChange)
     fileChange.path = path
 
-    assert.equal(validate(payload), false, `${path} should not be schema-valid`)
+    assert.strictEqual(
+      validate(payload),
+      false,
+      `${path} should not be schema-valid`
+    )
   }
 })

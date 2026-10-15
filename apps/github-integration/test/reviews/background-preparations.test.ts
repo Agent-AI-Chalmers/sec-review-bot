@@ -17,10 +17,10 @@ test('BackgroundPreparations waits for admitted preparation work during shutdown
   })
   await Promise.resolve()
 
-  assert.equal(stopped, false)
+  assert.strictEqual(stopped, false)
   finish?.()
   await stopping
-  assert.equal(stopped, true)
+  assert.strictEqual(stopped, true)
 })
 
 test('BackgroundPreparations logs failures with ingress context', async () => {
@@ -35,9 +35,9 @@ test('BackgroundPreparations logs failures with ingress context', async () => {
   })
   await preparations.stop()
 
-  assert.equal(logs.length, 1)
-  assert.equal(logs[0]?.event, 'review_background_execution_failed')
-  assert.equal(logs[0]?.fields.ingress, 'issues.opened')
-  assert.equal(logs[0]?.fields.repo, 'octo/example')
-  assert.equal(logs[0]?.fields.error_message, 'workspace failed')
+  assert.strictEqual(logs.length, 1)
+  assert.strictEqual(logs[0]?.event, 'review_background_execution_failed')
+  assert.strictEqual(logs[0]?.fields.ingress, 'issues.opened')
+  assert.strictEqual(logs[0]?.fields.repo, 'octo/example')
+  assert.strictEqual(logs[0]?.fields.error_message, 'workspace failed')
 })

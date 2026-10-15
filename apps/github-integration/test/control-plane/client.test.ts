@@ -61,7 +61,7 @@ test('repository preparation can replace the admitted empty publish context', as
         url.endsWith('/v1/runs/run-1/submission') &&
         init?.method === 'POST'
       ) {
-        assert.deepEqual(sentBody(init).publish_context, {
+        assert.deepStrictEqual(sentBody(init).publish_context, {
           repo: {
             owner_login: 'octo',
             repo_name: 'example',
@@ -93,7 +93,7 @@ test('repository preparation can replace the admitted empty publish context', as
     ingress_kind: 'github_actions_dispatch',
     ingress_key: 'octo/example:dispatch-1'
   })
-  assert.equal(admission.record.runner_status, 'preparing')
+  assert.strictEqual(admission.record.runner_status, 'preparing')
 
   await controlPlaneClient.submitPreparedRun(
     'run-1',
@@ -215,16 +215,16 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
     controlPlaneClient.claimNextPublication(),
     /Persisted publish context is invalid/
   )
-  assert.deepEqual(requests[0]?.body, { wait_ms: 0 })
+  assert.deepStrictEqual(requests[0]?.body, { wait_ms: 0 })
   // `run_id` rides the URL path now, not the body: the fail call targets
   // /v1/runs/run-1/publication/fail with token + failure + retry in the body.
-  assert.equal(
+  assert.strictEqual(
     requests[1]?.url.endsWith('/v1/runs/run-1/publication/fail'),
     true
   )
-  assert.equal('run_id' in requests[1]!.body, false)
-  assert.equal(requests[1]?.body.token, 'claim-1')
-  assert.deepEqual(requests[1]?.body.retry, false)
+  assert.strictEqual('run_id' in requests[1]!.body, false)
+  assert.strictEqual(requests[1]?.body.token, 'claim-1')
+  assert.deepStrictEqual(requests[1]?.body.retry, false)
 })
 
 test('void operations accept the empty 200 body the real server sends', async (t) => {
@@ -253,13 +253,13 @@ test('void operations accept the empty 200 body the real server sends', async (t
     async () => new Response('', { status: 200 })
   )
 
-  assert.equal(
+  assert.strictEqual(
     await controlPlaneClient.initializePublicationSteps('run-1', 'claim-1', [
       'a'
     ]),
     undefined
   )
-  assert.equal(
+  assert.strictEqual(
     await controlPlaneClient.requirePublicationStepClaim(
       'run-1',
       'claim-1',
@@ -267,7 +267,7 @@ test('void operations accept the empty 200 body the real server sends', async (t
     ),
     undefined
   )
-  assert.equal(
+  assert.strictEqual(
     await controlPlaneClient.failPreparation('run-1', 'prep-1', {
       message: 'x'
     }),

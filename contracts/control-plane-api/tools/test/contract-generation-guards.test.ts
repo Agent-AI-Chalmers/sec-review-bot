@@ -37,7 +37,7 @@ test('string ErrorResponse.code members are returned sorted', () => {
     }
   } as unknown as OpenAPI3
 
-  assert.deepEqual(errorResponseCodes(spec), ['A', 'B'])
+  assert.deepStrictEqual(errorResponseCodes(spec), ['A', 'B'])
 })
 
 test('a $ref with sibling keywords fails rather than dropping the siblings', () => {
@@ -59,7 +59,7 @@ test('a $ref with sibling keywords fails rather than dropping the siblings', () 
 test('a bare local $ref is inlined, and a dangling one fails', () => {
   const schemas = { Target: { type: 'string' } }
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     inlineLocalRefsForTest({ $ref: '#/components/schemas/Target' }, schemas),
     {
       type: 'string'
@@ -101,7 +101,7 @@ test('the declared form-exploded query object projects to its property names', (
     properties: { limit: { type: 'integer' }, workflow: { type: 'string' } }
   })
 
-  assert.deepEqual(listRunQueryParameters(spec), ['limit', 'workflow'])
+  assert.deepStrictEqual(listRunQueryParameters(spec), ['limit', 'workflow'])
 })
 
 test('dropping additionalProperties: false fails rather than silently relaxing the query', () => {

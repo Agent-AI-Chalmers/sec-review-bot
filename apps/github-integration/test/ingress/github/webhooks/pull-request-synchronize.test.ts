@@ -67,8 +67,8 @@ test('skip automatic review for fork PRs before fetching config or starting a re
     }
   )
 
-  assert.equal(configFetched, false)
-  assert.equal(reviewStarted, false)
+  assert.strictEqual(configFetched, false)
+  assert.strictEqual(reviewStarted, false)
 })
 
 test('reads trigger config from the trusted default branch resolved by the API', async () => {
@@ -99,7 +99,7 @@ test('reads trigger config from the trusted default branch resolved by the API',
     }
   )
 
-  assert.deepEqual(fetchedIdentity, {
+  assert.deepStrictEqual(fetchedIdentity, {
     owner_login: 'octo',
     repo_name: 'example-repo'
   })
@@ -134,5 +134,5 @@ test('starts a review for same-repo PRs when automatic mode is enabled', async (
     }
   )
 
-  assert.equal(reviewStarted, true)
+  assert.strictEqual(reviewStarted, true)
 })

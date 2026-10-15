@@ -190,9 +190,9 @@ test(
         issue: issueContext(),
         trusted_default_branch: { default_branch: 'main', head_sha }
       })
-      assert.equal(prepared.input.setup_declaration, DECLARATION)
+      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
       // Read at the exact default-branch SHA, not a branch name.
-      assert.deepEqual(contentRequests, [
+      assert.deepStrictEqual(contentRequests, [
         {
           owner: 'octo',
           repo: 'demo',
@@ -232,8 +232,8 @@ test(
         trusted_default_branch: { default_branch: 'main', head_sha },
         scan_mode: 'full'
       })
-      assert.equal(prepared.input.setup_declaration, DECLARATION)
-      assert.deepEqual(contentRequests, [
+      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
+      assert.deepStrictEqual(contentRequests, [
         {
           owner: 'octo',
           repo: 'demo',
@@ -312,8 +312,8 @@ test(
         trusted_default_branch: { default_branch: 'main', head_sha },
         files: []
       })
-      assert.equal(prepared.input.setup_declaration, DECLARATION)
-      assert.deepEqual(contentRequests, [
+      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
+      assert.deepStrictEqual(contentRequests, [
         {
           owner: 'mirror',
           repo: 'demo',

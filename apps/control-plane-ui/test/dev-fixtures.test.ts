@@ -88,27 +88,27 @@ test('dev fixtures track sign-out so the console reaches the sign-in form', asyn
   const fixture = await startFixtureServer()
   try {
     const signedIn = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.equal(signedIn.status, 200)
+    assert.strictEqual(signedIn.status, 200)
 
     // Signing out mirrors the BFF: 204, and every later API call is unauthorized so
     // the console switches to its sign-in form rather than reloading the run list.
     const signOut = await fetch(`${fixture.base}/api/session`, {
       method: 'DELETE'
     })
-    assert.equal(signOut.status, 204)
+    assert.strictEqual(signOut.status, 204)
 
     const afterSignOut = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.equal(afterSignOut.status, 401)
-    assert.deepEqual(await afterSignOut.json(), { error: 'unauthorized' })
+    assert.strictEqual(afterSignOut.status, 401)
+    assert.deepStrictEqual(await afterSignOut.json(), { error: 'unauthorized' })
 
     // Signing back in restores the run list: POST is the only way to become signed in.
     const signIn = await fetch(`${fixture.base}/api/session`, {
       method: 'POST'
     })
-    assert.equal(signIn.status, 204)
+    assert.strictEqual(signIn.status, 204)
 
     const afterSignIn = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.equal(afterSignIn.status, 200)
+    assert.strictEqual(afterSignIn.status, 200)
   } finally {
     await fixture.close()
   }
@@ -120,7 +120,7 @@ test('dev fixtures leave non-API requests to the next middleware', async () => {
   const fixture = await startFixtureServer()
   try {
     const asset = await fetch(`${fixture.base}/index.html`)
-    assert.equal(asset.status, 404)
+    assert.strictEqual(asset.status, 404)
   } finally {
     await fixture.close()
   }

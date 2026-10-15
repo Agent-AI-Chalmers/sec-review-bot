@@ -57,7 +57,7 @@ test('every Control Plane publication-step code is known and terminal', () => {
     )
     // A Control Plane deterministic error carries only a `code`; it has no HTTP status, so
     // a missing classification here would resolve to `retry: true`.
-    assert.equal(
+    assert.strictEqual(
       classifyPublicationFailure({ code }).retry,
       false,
       `${code} must be classified as terminal (retry: false)`

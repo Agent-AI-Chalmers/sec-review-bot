@@ -37,12 +37,12 @@ test('every corpus file is classified by the manifest', () => {
   const manifest = corpusManifest()
   const files = corpusFiles()
   assert.ok(files.length > 0, 'expected shared setup-declaration corpus')
-  assert.deepEqual(
+  assert.deepStrictEqual(
     [...manifest.valid, ...manifest.invalid].sort(),
     files,
     'manifest must classify every corpus file and nothing else'
   )
-  assert.equal(
+  assert.strictEqual(
     manifest.valid.some((name) => manifest.invalid.includes(name)),
     false,
     'a case cannot be both valid and invalid'
@@ -53,7 +53,7 @@ test('shared setup-declaration corpus classifies consistently', () => {
   const manifest = corpusManifest()
   for (const name of manifest.valid) {
     const content = readFileSync(path.join(corpusDir, name), 'utf8')
-    assert.notEqual(
+    assert.notStrictEqual(
       parseSetupDeclaration(content),
       null,
       `${name} should parse to a declaration`
@@ -70,8 +70,8 @@ test('shared setup-declaration corpus classifies consistently', () => {
 })
 
 test('blank content means no declaration', () => {
-  assert.equal(parseSetupDeclaration(''), null)
-  assert.equal(parseSetupDeclaration('   \n\n'), null)
+  assert.strictEqual(parseSetupDeclaration(''), null)
+  assert.strictEqual(parseSetupDeclaration('   \n\n'), null)
 })
 
 test('rejects an invalid declaration with a reason', () => {
@@ -91,9 +91,9 @@ test('accepts YAML 1.1 boolean words as plain strings under the Core schema', ()
     const declaration = parseSetupDeclaration(
       `setup:\n  - run: ${word}\n    working-directory: ${word}\n    env:\n      ${word}: ${word}\n`
     )
-    assert.equal(declaration?.steps[0]?.run, word)
-    assert.equal(declaration?.steps[0]?.working_directory, word)
-    assert.equal(declaration?.steps[0]?.env[word], word)
+    assert.strictEqual(declaration?.steps[0]?.run, word)
+    assert.strictEqual(declaration?.steps[0]?.working_directory, word)
+    assert.strictEqual(declaration?.steps[0]?.env[word], word)
   }
 })
 

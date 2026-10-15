@@ -21,7 +21,7 @@ test('the keyed error-code map covers exactly the contract enum', () => {
   const fromKeys = Object.values(PUBLICATION_STEP_ERROR_CODES).sort()
   const fromContract = [...PUBLICATION_STEP_ERROR_CODES_FROM_CONTRACT].sort()
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     fromKeys,
     fromContract,
     'PUBLICATION_STEP_ERROR_CODES and the contract enum have drifted'
@@ -44,7 +44,7 @@ test('the closed error-code set is exactly the contract enum', () => {
   const enumValues =
     spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     [...ERROR_RESPONSE_CODES_FROM_CONTRACT].sort(),
     [...(enumValues as string[])].sort(),
     'ERROR_RESPONSE_CODES_FROM_CONTRACT must list every contract code and nothing else'

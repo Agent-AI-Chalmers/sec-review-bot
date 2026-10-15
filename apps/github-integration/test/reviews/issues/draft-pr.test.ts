@@ -209,9 +209,9 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
     })
   })
 
-  assert.equal(result?.number, 9)
-  assert.equal(octokit.calls.blobs.length, 0)
-  assert.equal(octokit.calls.commits.length, 0)
+  assert.strictEqual(result?.number, 9)
+  assert.strictEqual(octokit.calls.blobs.length, 0)
+  assert.strictEqual(octokit.calls.commits.length, 0)
 })
 
 test('issue draft PR retry updates a branch left by a partial prior attempt', async () => {
@@ -243,8 +243,8 @@ test('issue draft PR retry updates a branch left by a partial prior attempt', as
     review_record
   })
 
-  assert.equal(result?.number, 1)
-  assert.deepEqual(octokit.calls.updatedRefs, [
+  assert.strictEqual(result?.number, 1)
+  assert.deepStrictEqual(octokit.calls.updatedRefs, [
     {
       ref: 'heads/sec-review-bot/issue-42-12345678',
       sha: 'commit-sha',
@@ -286,11 +286,11 @@ test('issue draft PR stops before the next GitHub write after claim loss', async
     PublicationClaimLostError
   )
 
-  assert.equal(octokit.calls.blobs.length, 1)
-  assert.equal(octokit.calls.trees.length, 0)
-  assert.equal(octokit.calls.commits.length, 0)
-  assert.equal(octokit.calls.refs.length, 0)
-  assert.equal(octokit.calls.pulls.length, 0)
+  assert.strictEqual(octokit.calls.blobs.length, 1)
+  assert.strictEqual(octokit.calls.trees.length, 0)
+  assert.strictEqual(octokit.calls.commits.length, 0)
+  assert.strictEqual(octokit.calls.refs.length, 0)
+  assert.strictEqual(octokit.calls.pulls.length, 0)
 })
 
 test('issue draft PR publishes from review_record file_changes without workspace reads', async () => {
@@ -327,14 +327,14 @@ test('issue draft PR publishes from review_record file_changes without workspace
     review_record
   })
 
-  assert.equal(result?.html_url, 'https://example.test/pull/1')
-  assert.deepEqual(octokit.calls.blobs, [
+  assert.strictEqual(result?.html_url, 'https://example.test/pull/1')
+  assert.deepStrictEqual(octokit.calls.blobs, [
     {
       content: 'fixed\n',
       encoding: 'utf-8'
     }
   ])
-  assert.deepEqual(octokit.calls.trees[0], [
+  assert.deepStrictEqual(octokit.calls.trees[0], [
     {
       path: 'src/app.txt',
       mode: '100755',
@@ -348,17 +348,17 @@ test('issue draft PR publishes from review_record file_changes without workspace
       sha: null
     }
   ])
-  assert.deepEqual(octokit.calls.commits, [
+  assert.deepStrictEqual(octokit.calls.commits, [
     {
       message: 'Mitigate issue #42',
       tree: 'tree-sha',
       parents: ['base-sha']
     }
   ])
-  assert.equal(octokit.calls.pulls[0]?.draft, true)
+  assert.strictEqual(octokit.calls.pulls[0]?.draft, true)
   // The PR base is the API-resolved default branch, not the webhook payload's
   // repository.default_branch (which the trusted flow refuses elsewhere too).
-  assert.equal(octokit.calls.pulls[0]?.base, 'main')
+  assert.strictEqual(octokit.calls.pulls[0]?.base, 'main')
   // The opening status lines come from the shared vocabulary, so this body stays
   // comparable with the PR review comment and the repository delivery bodies.
   assert.match(octokit.calls.pulls[0]?.body ?? '', /- Analysis: `unknown`/)
@@ -385,9 +385,9 @@ test('issue draft PR is not promoted when file_changes are absent', async () => 
     })
   })
 
-  assert.equal(result, null)
-  assert.equal(octokit.calls.blobs.length, 0)
-  assert.equal(octokit.calls.trees.length, 0)
+  assert.strictEqual(result, null)
+  assert.strictEqual(octokit.calls.blobs.length, 0)
+  assert.strictEqual(octokit.calls.trees.length, 0)
 })
 
 test('issue draft PR ignores unsafe display changed_files when file_changes are safe', async () => {
@@ -423,8 +423,8 @@ test('issue draft PR ignores unsafe display changed_files when file_changes are 
     review_record
   })
 
-  assert.equal(result?.html_url, 'https://example.test/pull/1')
-  assert.deepEqual(octokit.calls.trees[0], [
+  assert.strictEqual(result?.html_url, 'https://example.test/pull/1')
+  assert.deepStrictEqual(octokit.calls.trees[0], [
     {
       path: 'src/app.txt',
       mode: '100644',
@@ -465,8 +465,8 @@ test('issue draft PR rejects unsupported file modes', async () => {
       }),
     /unsupported file mode/
   )
-  assert.equal(octokit.calls.blobs.length, 0)
-  assert.equal(octokit.calls.trees.length, 0)
+  assert.strictEqual(octokit.calls.blobs.length, 0)
+  assert.strictEqual(octokit.calls.trees.length, 0)
 })
 
 test('issue draft PR rejects deleted file changes with mode', async () => {
@@ -498,8 +498,8 @@ test('issue draft PR rejects deleted file changes with mode', async () => {
       }),
     /deleted but also included a mode/
   )
-  assert.equal(octokit.calls.blobs.length, 0)
-  assert.equal(octokit.calls.trees.length, 0)
+  assert.strictEqual(octokit.calls.blobs.length, 0)
+  assert.strictEqual(octokit.calls.trees.length, 0)
 })
 
 for (const [path, message] of [
@@ -535,7 +535,7 @@ for (const [path, message] of [
         }),
       message
     )
-    assert.equal(octokit.calls.blobs.length, 0)
-    assert.equal(octokit.calls.trees.length, 0)
+    assert.strictEqual(octokit.calls.blobs.length, 0)
+    assert.strictEqual(octokit.calls.trees.length, 0)
   })
 }

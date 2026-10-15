@@ -12,7 +12,7 @@ test('an available artifact storage record keeps its artifact reference', () => 
     size_bytes: 42
   }
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     normalizeArtifactStorage({ status: 'available', artifact }),
     {
       status: 'available',
@@ -55,10 +55,10 @@ test('the normalization context names the offending record', () => {
 })
 
 test('unavailable and failed records carry their reason without an artifact', () => {
-  assert.deepEqual(normalizeArtifactStorage({ status: 'unavailable' }), {
+  assert.deepStrictEqual(normalizeArtifactStorage({ status: 'unavailable' }), {
     status: 'unavailable'
   })
-  assert.deepEqual(
+  assert.deepStrictEqual(
     normalizeArtifactStorage({
       status: 'failed',
       error_code: 'ARTIFACT_UPLOAD_FAILED',
@@ -71,5 +71,5 @@ test('unavailable and failed records carry their reason without an artifact', ()
     }
   )
   // Null storage (the runner never attached metadata) stays null rather than becoming absent.
-  assert.equal(normalizeArtifactStorage(null), null)
+  assert.strictEqual(normalizeArtifactStorage(null), null)
 })

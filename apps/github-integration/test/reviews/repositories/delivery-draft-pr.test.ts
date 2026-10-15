@@ -13,7 +13,7 @@ test('repository delivery branch identity includes both run and delivery', () =>
   const first = buildRepositoryDeliveryBranchName('run/one', delivery)
   const second = buildRepositoryDeliveryBranchName('run/two', delivery)
 
-  assert.notEqual(first, second)
+  assert.notStrictEqual(first, second)
   assert.match(
     first,
     /^sec-review-bot\/repo-scan\/run-one-[a-f0-9]{12}\/case-shared-[a-f0-9]{12}$/
@@ -177,10 +177,10 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
     delivery
   })
 
-  assert.equal(result.reused, false)
-  assert.equal(octokit.calls.blobs.length, 1)
-  assert.equal(octokit.calls.trees.length, 1)
-  assert.deepEqual(octokit.calls.trees[0], [
+  assert.strictEqual(result.reused, false)
+  assert.strictEqual(octokit.calls.blobs.length, 1)
+  assert.strictEqual(octokit.calls.trees.length, 1)
+  assert.deepStrictEqual(octokit.calls.trees[0], [
     {
       path: 'src/app.txt',
       mode: '100755',
@@ -194,9 +194,9 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
       sha: null
     }
   ])
-  assert.equal(octokit.calls.commits.length, 1)
-  assert.equal(octokit.calls.refs.length, 1)
-  assert.equal(octokit.calls.pulls.length, 1)
+  assert.strictEqual(octokit.calls.commits.length, 1)
+  assert.strictEqual(octokit.calls.refs.length, 1)
+  assert.strictEqual(octokit.calls.pulls.length, 1)
 })
 
 test('delivery-draft-pr stops before the next GitHub write after claim loss', async () => {
@@ -235,11 +235,11 @@ test('delivery-draft-pr stops before the next GitHub write after claim loss', as
     PublicationClaimLostError
   )
 
-  assert.equal(octokit.calls.blobs.length, 1)
-  assert.equal(octokit.calls.trees.length, 0)
-  assert.equal(octokit.calls.commits.length, 0)
-  assert.equal(octokit.calls.refs.length, 0)
-  assert.equal(octokit.calls.pulls.length, 0)
+  assert.strictEqual(octokit.calls.blobs.length, 1)
+  assert.strictEqual(octokit.calls.trees.length, 0)
+  assert.strictEqual(octokit.calls.commits.length, 0)
+  assert.strictEqual(octokit.calls.refs.length, 0)
+  assert.strictEqual(octokit.calls.pulls.length, 0)
 })
 
 test('delivery-draft-pr reuses a PR when the create response is lost', async () => {
@@ -288,9 +288,9 @@ test('delivery-draft-pr reuses a PR when the create response is lost', async () 
 
   await assert.rejects(createRepositoryDeliveryDraftPr(args), /response lost/)
   const retry = await createRepositoryDeliveryDraftPr(args)
-  assert.equal(createAttempts, 1)
-  assert.equal(retry.reused, true)
-  assert.equal(retry.number, 42)
+  assert.strictEqual(createAttempts, 1)
+  assert.strictEqual(retry.reused, true)
+  assert.strictEqual(retry.number, 42)
 })
 
 test('delivery-draft-pr uses scan target branch as PR base when provided', async () => {
@@ -328,8 +328,8 @@ test('delivery-draft-pr uses scan target branch as PR base when provided', async
     delivery
   })
 
-  assert.equal(octokit.calls.pulls.length, 1)
-  assert.equal(octokit.calls.pulls[0]?.base, 'release/2026-q2')
+  assert.strictEqual(octokit.calls.pulls.length, 1)
+  assert.strictEqual(octokit.calls.pulls[0]?.base, 'release/2026-q2')
 })
 
 test('delivery-draft-pr rejects unsafe file paths before publishing git objects', async () => {
@@ -367,11 +367,11 @@ test('delivery-draft-pr rejects unsafe file paths before publishing git objects'
     /Sensitive repository file path/
   )
 
-  assert.equal(octokit.calls.blobs.length, 0)
-  assert.equal(octokit.calls.trees.length, 0)
-  assert.equal(octokit.calls.commits.length, 0)
-  assert.equal(octokit.calls.refs.length, 0)
-  assert.equal(octokit.calls.pulls.length, 0)
+  assert.strictEqual(octokit.calls.blobs.length, 0)
+  assert.strictEqual(octokit.calls.trees.length, 0)
+  assert.strictEqual(octokit.calls.commits.length, 0)
+  assert.strictEqual(octokit.calls.refs.length, 0)
+  assert.strictEqual(octokit.calls.pulls.length, 0)
 })
 
 test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR', async () => {
@@ -418,11 +418,11 @@ test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR'
     /Sensitive repository file path/
   )
 
-  assert.equal(octokit.calls.blobs.length, 0)
-  assert.equal(octokit.calls.trees.length, 0)
-  assert.equal(octokit.calls.commits.length, 0)
-  assert.equal(octokit.calls.refs.length, 0)
-  assert.equal(octokit.calls.pulls.length, 0)
+  assert.strictEqual(octokit.calls.blobs.length, 0)
+  assert.strictEqual(octokit.calls.trees.length, 0)
+  assert.strictEqual(octokit.calls.commits.length, 0)
+  assert.strictEqual(octokit.calls.refs.length, 0)
+  assert.strictEqual(octokit.calls.pulls.length, 0)
 })
 
 function minimalDelivery(deliveryId: string): RepositoryDelivery {
@@ -467,7 +467,7 @@ test('delivery-draft-pr force-updates when createRef reports the ref already exi
     delivery: minimalDelivery('delivery-ref-exists')
   })
 
-  assert.equal(updateRefCalls, 1)
+  assert.strictEqual(updateRefCalls, 1)
 })
 
 test('delivery-draft-pr does not force-update a createRef 422 that is not "already exists"', async () => {
@@ -499,5 +499,5 @@ test('delivery-draft-pr does not force-update a createRef 422 that is not "alrea
     (error: unknown) => (error as { status?: unknown }).status === 422
   )
 
-  assert.equal(updateRefCalls, 0)
+  assert.strictEqual(updateRefCalls, 0)
 })

@@ -106,10 +106,10 @@ function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
 
 function assertPathIsWithin(parent: string, candidate: string): void {
   const relative = path.relative(parent, candidate)
-  assert.notEqual(relative, '')
-  assert.notEqual(relative, '..')
-  assert.equal(path.isAbsolute(relative), false)
-  assert.equal(relative.startsWith(`..${path.sep}`), false)
+  assert.notStrictEqual(relative, '')
+  assert.notStrictEqual(relative, '..')
+  assert.strictEqual(path.isAbsolute(relative), false)
+  assert.strictEqual(relative.startsWith(`..${path.sep}`), false)
 }
 
 async function assertRunnerInputArtifact({
@@ -124,12 +124,12 @@ async function assertRunnerInputArtifact({
   runId: string
 }): Promise<void> {
   const inputBundle = input['input_bundle'] as Record<string, unknown>
-  assert.equal(inputBundle['media_type'], 'application/tar+zstd')
+  assert.strictEqual(inputBundle['media_type'], 'application/tar+zstd')
   const archivePath = fileURLToPath(String(inputBundle['uri']))
-  assert.equal(archivePath, `${inputBundleRoot}.tar.zst`)
+  assert.strictEqual(archivePath, `${inputBundleRoot}.tar.zst`)
   const archive = await fs.readFile(archivePath)
-  assert.equal(inputBundle['size_bytes'], archive.byteLength)
-  assert.equal(
+  assert.strictEqual(inputBundle['size_bytes'], archive.byteLength)
+  assert.strictEqual(
     inputBundle['digest'],
     `sha256:${crypto.createHash('sha256').update(archive).digest('hex')}`
   )
@@ -150,9 +150,16 @@ async function assertRunnerInputArtifact({
   assertPathIsWithin(inputBundleRoot, inputPath)
   const keys = collectKeys(input)
   for (const key of PRIVATE_RUNNER_INPUT_KEYS) {
-    assert.equal(keys.has(key), false, `runner input must not expose ${key}`)
+    assert.strictEqual(
+      keys.has(key),
+      false,
+      `runner input must not expose ${key}`
+    )
   }
-  assert.deepEqual(JSON.parse(await fs.readFile(inputPath, 'utf8')), input)
+  assert.deepStrictEqual(
+    JSON.parse(await fs.readFile(inputPath, 'utf8')),
+    input
+  )
 }
 
 function repositoryOctokit(refs: {
@@ -312,9 +319,11 @@ test(
         issue,
         trusted_default_branch: { default_branch: 'main', head_sha }
       })
-      assert.equal(prepared.input.contract_version, 'v6')
-      assert.deepEqual(prepared.input.review_intent, { objective: 'audit' })
-      assert.equal(prepared.input.issue.repo_full_name, 'octo/demo')
+      assert.strictEqual(prepared.input.contract_version, 'v6')
+      assert.deepStrictEqual(prepared.input.review_intent, {
+        objective: 'audit'
+      })
+      assert.strictEqual(prepared.input.issue.repo_full_name, 'octo/demo')
       await assertRunnerInputArtifact({
         input: prepared.input as unknown as Record<string, unknown>,
         inputBundleRoot: prepared.input_bundle_root,
@@ -327,7 +336,7 @@ test(
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.deepEqual(manifest, {
+      assert.deepStrictEqual(manifest, {
         contract_version: CONTRACT_VERSION,
         kind: 'runner-input-bundle',
         workspace: { snapshot: WORKSPACE_SNAPSHOT_TAR_NAME },
@@ -342,7 +351,7 @@ test(
         extractedSnapshot
       ])
 
-      assert.equal(
+      assert.strictEqual(
         await fs.readFile(
           path.join(extractedSnapshot, 'workspace', 'src', 'app.ts'),
           'utf8'
@@ -449,17 +458,17 @@ test(
         inputPath: prepared.input_path,
         runId: prepared.run_id
       })
-      assert.equal(prepared.input.pr.repo_full_name, 'octo/demo')
-      assert.equal('pullRequest' in prepared.input, false)
-      assert.equal('repository' in prepared.input, false)
+      assert.strictEqual(prepared.input.pr.repo_full_name, 'octo/demo')
+      assert.strictEqual('pullRequest' in prepared.input, false)
+      assert.strictEqual('repository' in prepared.input, false)
       const manifest = JSON.parse(
         await fs.readFile(
           path.join(prepared.input_bundle_root, 'manifest.json'),
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.equal('incremental_window' in manifest, true)
-      assert.equal(
+      assert.strictEqual('incremental_window' in manifest, true)
+      assert.strictEqual(
         await fs
           .readFile(
             path.join(
@@ -508,17 +517,17 @@ test(
         inputPath: full.input_path,
         runId: full.run_id
       })
-      assert.equal(full.input.scan_target.scan_mode, 'full')
-      assert.equal('max_file_bytes' in full.input.scan_scope, false)
-      assert.equal('repo_full_name' in full.input.scan_target, false)
-      assert.equal('repository' in full.input, false)
+      assert.strictEqual(full.input.scan_target.scan_mode, 'full')
+      assert.strictEqual('max_file_bytes' in full.input.scan_scope, false)
+      assert.strictEqual('repo_full_name' in full.input.scan_target, false)
+      assert.strictEqual('repository' in full.input, false)
       const fullManifest = JSON.parse(
         await fs.readFile(
           path.join(full.input_bundle_root, 'manifest.json'),
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.equal('incremental_window' in fullManifest, false)
+      assert.strictEqual('incremental_window' in fullManifest, false)
 
       await fs.writeFile(
         path.join(full.input_bundle_root, 'stale-from-failed-attempt.txt'),
@@ -562,9 +571,9 @@ test(
         inputPath: incremental.input_path,
         runId: incremental.run_id
       })
-      assert.equal(incremental.input.scan_target.scan_mode, 'incremental')
-      assert.equal(incremental.input.scan_target.base_sha, refs.base_sha)
-      assert.equal(
+      assert.strictEqual(incremental.input.scan_target.scan_mode, 'incremental')
+      assert.strictEqual(incremental.input.scan_target.base_sha, refs.base_sha)
+      assert.strictEqual(
         incremental.input.scan_scope.incremental_changed_files[0]?.path,
         'src/app.ts'
       )
@@ -574,7 +583,7 @@ test(
           'utf8'
         )
       ) as Record<string, unknown>
-      assert.equal('incremental_window' in incrementalManifest, true)
+      assert.strictEqual('incremental_window' in incrementalManifest, true)
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer

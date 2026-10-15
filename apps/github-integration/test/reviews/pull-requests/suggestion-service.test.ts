@@ -133,8 +133,8 @@ test('suggestion candidates anchor to minimal changed line ranges instead of ent
     review_record: reviewRecordWithPatchDiff(workspacePatchSample())
   })
 
-  assert.equal(manifest.candidates.length, 4)
-  assert.deepEqual(
+  assert.strictEqual(manifest.candidates.length, 4)
+  assert.deepStrictEqual(
     manifest.candidates.map((candidate) => ({
       start_line: candidate.start_line,
       line: candidate.line
@@ -168,7 +168,7 @@ test('suggestion candidates split a hunk into minimal contiguous +/- change bloc
     )
   })
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     manifest.candidates.map((candidate) => ({
       start_line: candidate.start_line,
       line: candidate.line
@@ -196,6 +196,6 @@ test('suggestion candidates accept repository-relative workspace patch paths', a
     )
   })
 
-  assert.equal(manifest.skipped_reason, null)
-  assert.equal(manifest.candidates.length, 4)
+  assert.strictEqual(manifest.skipped_reason, null)
+  assert.strictEqual(manifest.candidates.length, 4)
 })

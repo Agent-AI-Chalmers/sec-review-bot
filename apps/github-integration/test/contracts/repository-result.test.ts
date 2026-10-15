@@ -42,9 +42,9 @@ test('repository result parser accepts the shared v6 repository result fixture',
     contractFixture('repository-review-result.json')
   )
 
-  assert.equal(result.contract_version, 'v6')
-  assert.equal(result.case_results.at(0)?.case_id, 'case-1')
-  assert.equal(result.deliveries.at(0)?.delivery_id, 'delivery-1')
+  assert.strictEqual(result.contract_version, 'v6')
+  assert.strictEqual(result.case_results.at(0)?.case_id, 'case-1')
+  assert.strictEqual(result.deliveries.at(0)?.delivery_id, 'delivery-1')
 })
 
 test('repository result parser accepts the shared v6 blocked result fixture', () => {
@@ -52,9 +52,9 @@ test('repository result parser accepts the shared v6 blocked result fixture', ()
     contractFixture('repository-review-result-blocked.json')
   )
 
-  assert.equal(result.contract_version, 'v6')
-  assert.equal(result.case_results.at(0)?.disposition, 'blocked')
-  assert.deepEqual(result.deliveries, [])
+  assert.strictEqual(result.contract_version, 'v6')
+  assert.strictEqual(result.case_results.at(0)?.disposition, 'blocked')
+  assert.deepStrictEqual(result.deliveries, [])
 })
 
 test('repository result rejects duplicate delivery identities', () => {

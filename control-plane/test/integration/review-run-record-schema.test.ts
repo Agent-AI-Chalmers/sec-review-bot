@@ -77,7 +77,7 @@ test('the record getRun returns validates against the shared schema', async () =
     assert.ok(admission.preparation_token)
 
     const preparing = await store.getRun(runId)
-    assert.equal(
+    assert.strictEqual(
       validate(preparing),
       true,
       `a preparing record must be accepted: ${JSON.stringify(validate.errors)}`
@@ -93,7 +93,7 @@ test('the record getRun returns validates against the shared schema', async () =
     )
 
     const succeeded = await store.getRun(runId)
-    assert.equal(
+    assert.strictEqual(
       validate(succeeded),
       true,
       `a succeeded record must be accepted: ${JSON.stringify(validate.errors)}`

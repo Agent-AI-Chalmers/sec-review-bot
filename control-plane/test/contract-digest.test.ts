@@ -12,12 +12,15 @@ import { renderDigestFile } from '../scripts/copy-contract.js'
 
 test('the same contract contents always produce the same digest', () => {
   const contents = 'openapi: 3.1.0\n'
-  assert.equal(contractDigest(contents), contractDigest(Buffer.from(contents)))
+  assert.strictEqual(
+    contractDigest(contents),
+    contractDigest(Buffer.from(contents))
+  )
   assert.match(contractDigest(contents), /^[0-9a-f]{64}$/)
 })
 
 test('a changed contract produces a different digest', () => {
-  assert.notEqual(
+  assert.notStrictEqual(
     contractDigest('openapi: 3.1.0\n'),
     contractDigest('openapi: 3.1.0\n# x\n')
   )
@@ -25,5 +28,8 @@ test('a changed contract produces a different digest', () => {
 
 test('the digest file is the bare hex digest plus a newline', () => {
   const contents = 'openapi: 3.1.0\n'
-  assert.equal(renderDigestFile(contents), `${contractDigest(contents)}\n`)
+  assert.strictEqual(
+    renderDigestFile(contents),
+    `${contractDigest(contents)}\n`
+  )
 })

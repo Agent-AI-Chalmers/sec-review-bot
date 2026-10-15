@@ -81,12 +81,12 @@ test('skips fork PRs on ready_for_review; approval is an explicit comment comman
     }
   )
 
-  assert.equal(
+  assert.strictEqual(
     reviewStarted,
     false,
     'fork PR must not auto-review on ready_for_review'
   )
-  assert.equal(configFetched, false)
+  assert.strictEqual(configFetched, false)
 })
 
 test('does not start a review when automatic mode is disabled', async () => {
@@ -103,5 +103,5 @@ test('does not start a review when automatic mode is disabled', async () => {
     }
   )
 
-  assert.equal(reviewStarted, false)
+  assert.strictEqual(reviewStarted, false)
 })

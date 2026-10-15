@@ -81,7 +81,7 @@ test('issue-opened skips automatic workflow when trigger mode is manual_only', a
     }
   )
 
-  assert.equal(reviewCalled, false)
+  assert.strictEqual(reviewCalled, false)
 })
 
 test('issue-opened skips self-originated payload before issue extraction', async () => {
@@ -108,7 +108,7 @@ test('issue-opened skips self-originated payload before issue extraction', async
       }
     )
 
-    assert.equal(configFetched, false)
+    assert.strictEqual(configFetched, false)
   } finally {
     setGitHubAppMetadata()
   }
@@ -135,9 +135,12 @@ test('issue-opened runs automatic workflow when trigger mode is automatic', asyn
     }
   )
 
-  assert.equal(reviewCalled, true)
+  assert.strictEqual(reviewCalled, true)
   // The resolved trusted branch is forwarded to the command (wiring pinned).
-  assert.deepEqual(forwarded, { default_branch: 'main', head_sha: 'main-sha' })
+  assert.deepStrictEqual(forwarded, {
+    default_branch: 'main',
+    head_sha: 'main-sha'
+  })
 })
 
 test('issue-opened rethrows invalid repository trigger config error', async () => {

@@ -72,9 +72,12 @@ test('resolveTrustedDefaultBranch resolves the default branch via the API', asyn
       repo_name: 'example'
     }
   )
-  assert.deepEqual(result, { default_branch: 'trunk', head_sha: 'trunk-sha' })
-  assert.deepEqual(calls.repoGet, [{ owner: 'octo', repo: 'example' }])
-  assert.deepEqual(calls.branchGet, [
+  assert.deepStrictEqual(result, {
+    default_branch: 'trunk',
+    head_sha: 'trunk-sha'
+  })
+  assert.deepStrictEqual(calls.repoGet, [{ owner: 'octo', repo: 'example' }])
+  assert.deepStrictEqual(calls.branchGet, [
     { owner: 'octo', repo: 'example', branch: 'trunk' }
   ])
 })
@@ -118,7 +121,7 @@ test('resolveTrustedDefaultBranch rejects an empty default branch', async () => 
 
 // Invariant 2: recipe source repository == base repo; never the head/fork.
 test('resolveTrustedRepositoryIdentity prefers base repo identity over head/fork', () => {
-  assert.deepEqual(
+  assert.deepStrictEqual(
     resolveTrustedRepositoryIdentity({
       repo_full_name: 'octo/example',
       base_repo_full_name: 'octo/example'
@@ -133,11 +136,11 @@ test('resolveTrustedRepositoryIdentity never uses the head repo for a fork PR', 
     repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example'
   })
-  assert.notEqual(identity.owner_login, 'mallory')
+  assert.notStrictEqual(identity.owner_login, 'mallory')
 })
 
 test('resolveTrustedRepositoryIdentity falls back to repo_full_name when base is missing', () => {
-  assert.deepEqual(
+  assert.deepStrictEqual(
     resolveTrustedRepositoryIdentity({
       repo_full_name: 'octo/example',
       base_repo_full_name: null
@@ -165,14 +168,14 @@ test('fetchTrustedRepositoryTriggerConfig resolves against the base repo, not th
   )
 
   for (const call of calls.repoGet) {
-    assert.equal(call.owner, 'octo')
-    assert.equal(call.repo, 'example')
-    assert.notEqual(call.owner, 'mallory')
+    assert.strictEqual(call.owner, 'octo')
+    assert.strictEqual(call.repo, 'example')
+    assert.notStrictEqual(call.owner, 'mallory')
   }
   assert.ok(calls.repoGet.length >= 1)
   assert.ok(calls.branchGet.length >= 1)
   for (const call of calls.branchGet) {
-    assert.equal(call.owner, 'octo')
-    assert.notEqual(call.owner, 'mallory')
+    assert.strictEqual(call.owner, 'octo')
+    assert.notStrictEqual(call.owner, 'mallory')
   }
 })

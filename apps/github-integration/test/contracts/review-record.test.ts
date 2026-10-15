@@ -60,16 +60,16 @@ function validReviewRecord(): ReviewRecordFixture {
 test('parseReviewRecord accepts a complete v6 review_record', () => {
   const record = parseReviewRecord(validReviewRecord())
 
-  assert.equal(record.analysis.verdict, 'confirmed-vulnerability')
-  assert.deepEqual(record.mitigation.changed_files, [])
+  assert.strictEqual(record.analysis.verdict, 'confirmed-vulnerability')
+  assert.deepStrictEqual(record.mitigation.changed_files, [])
 })
 
 test('parseReviewRecord accepts the shared v6 review_record fixture', () => {
   const record = parseReviewRecord(contractFixture('review-record.json'))
 
-  assert.equal(record.analysis.verdict, 'confirmed-vulnerability')
-  assert.equal(record.verification.patch_coverage, 'full')
-  assert.equal(record.cvss?.severity, 'medium')
+  assert.strictEqual(record.analysis.verdict, 'confirmed-vulnerability')
+  assert.strictEqual(record.verification.patch_coverage, 'full')
+  assert.strictEqual(record.cvss?.severity, 'medium')
 })
 
 test('parseReviewRecord accepts the shared v6 deleted-file review_record fixture', () => {
@@ -77,9 +77,9 @@ test('parseReviewRecord accepts the shared v6 deleted-file review_record fixture
     contractFixture('review-record-deleted-file.json')
   )
 
-  assert.equal(record.analysis.verdict, 'confirmed-defect')
-  assert.equal(record.mitigation.file_changes.at(0)?.status, 'deleted')
-  assert.equal(record.cvss?.outcome, 'not-scored')
+  assert.strictEqual(record.analysis.verdict, 'confirmed-defect')
+  assert.strictEqual(record.mitigation.file_changes.at(0)?.status, 'deleted')
+  assert.strictEqual(record.cvss?.outcome, 'not-scored')
 })
 
 test('parseReviewRecord accepts every shared v6 review_record schema fixture', () => {
@@ -103,7 +103,7 @@ test('parseReviewRecord accepts schema-valid upsert file changes', () => {
     }
   ]
 
-  assert.equal(
+  assert.strictEqual(
     parseReviewRecord(record).mitigation.file_changes.at(0)?.status,
     'upsert'
   )

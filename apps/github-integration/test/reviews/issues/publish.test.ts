@@ -147,9 +147,9 @@ async function runPublish(open_pr: boolean) {
 
 test('issue publish opens a draft PR when the run opted in', async () => {
   const harness = await runPublish(true)
-  assert.equal(harness.createdPullRequests.length, 1)
-  assert.equal(harness.createdComments.length, 1)
-  assert.deepEqual(harness.initializedSteps[0], [
+  assert.strictEqual(harness.createdPullRequests.length, 1)
+  assert.strictEqual(harness.createdComments.length, 1)
+  assert.deepStrictEqual(harness.initializedSteps[0], [
     'issue:draft-pr',
     'issue:summary-comment'
   ])
@@ -157,7 +157,7 @@ test('issue publish opens a draft PR when the run opted in', async () => {
 
 test('issue publish keeps the patch in the summary comment when not opted in', async () => {
   const harness = await runPublish(false)
-  assert.equal(harness.createdPullRequests.length, 0)
-  assert.equal(harness.createdComments.length, 1)
-  assert.deepEqual(harness.initializedSteps[0], ['issue:summary-comment'])
+  assert.strictEqual(harness.createdPullRequests.length, 0)
+  assert.strictEqual(harness.createdComments.length, 1)
+  assert.deepStrictEqual(harness.initializedSteps[0], ['issue:summary-comment'])
 })

@@ -112,8 +112,8 @@ test('repository dispatch forwards test_changes to repository review submission'
     }
   })
 
-  assert.equal(response.statusCodeValue, 202)
-  assert.deepEqual(calls, [{ test_changes: 'deny' }])
+  assert.strictEqual(response.statusCodeValue, 202)
+  assert.deepStrictEqual(calls, [{ test_changes: 'deny' }])
 })
 
 test('repository dispatch returns preparing as soon as durable admission completes', async () => {
@@ -144,8 +144,8 @@ test('repository dispatch returns preparing as soon as durable admission complet
     }
   })
 
-  assert.equal(response.statusCodeValue, 202)
-  assert.deepEqual(JSON.parse(response.body ?? '{}'), {
+  assert.strictEqual(response.statusCodeValue, 202)
+  assert.deepStrictEqual(JSON.parse(response.body ?? '{}'), {
     ok: true,
     accepted: true,
     status: 'preparing',
@@ -174,7 +174,7 @@ test('repository dispatch requires a correlation id before starting a review', a
       assert.fail('invalid dispatch must not start a review')
   })
 
-  assert.equal(response.statusCodeValue, 400)
+  assert.strictEqual(response.statusCodeValue, 400)
   assert.match(String(response.body), /correlation_id is required/)
 })
 
@@ -201,7 +201,7 @@ test('repository dispatch rejects manual incremental without base_sha as a bad r
     }
   })
 
-  assert.equal(response.statusCodeValue, 400)
+  assert.strictEqual(response.statusCodeValue, 400)
   assert.match(
     String(response.body),
     /manual incremental scan requires base_sha/
@@ -229,7 +229,7 @@ test('repository dispatch does not echo internal submission errors', async () =>
     }
   })
 
-  assert.equal(response.statusCodeValue, 500)
+  assert.strictEqual(response.statusCodeValue, 500)
   assert.match(String(response.body), /Repository review dispatch failed/)
   assert.doesNotMatch(String(response.body), /sensitive runner failure detail/)
 })
@@ -255,7 +255,7 @@ test('repository dispatch rejects oversized request bodies before authentication
     }
   })
 
-  assert.equal(response.statusCodeValue, 413)
+  assert.strictEqual(response.statusCodeValue, 413)
   assert.match(String(response.body), /too large/)
 })
 
@@ -282,7 +282,7 @@ test('repository dispatch rejects missing OIDC token', async () => {
     }
   })
 
-  assert.equal(response.statusCodeValue, 401)
+  assert.strictEqual(response.statusCodeValue, 401)
   assert.match(String(response.body), /Missing GitHub Actions OIDC token/)
 })
 
@@ -309,7 +309,7 @@ test('repository dispatch rejects OIDC repository mismatch', async () => {
     }
   })
 
-  assert.equal(response.statusCodeValue, 403)
+  assert.strictEqual(response.statusCodeValue, 403)
   assert.match(String(response.body), /repository does not match/)
 })
 
@@ -338,8 +338,8 @@ test('repository dispatch passes the canonical OIDC repository to admission', as
     }
   })
 
-  assert.equal(response.statusCodeValue, 202)
-  assert.equal(verifiedRepository, 'octo/example')
+  assert.strictEqual(response.statusCodeValue, 202)
+  assert.strictEqual(verifiedRepository, 'octo/example')
 })
 
 test('repository dispatch rejects disallowed OIDC event', async () => {
@@ -365,7 +365,7 @@ test('repository dispatch rejects disallowed OIDC event', async () => {
     }
   })
 
-  assert.equal(response.statusCodeValue, 403)
+  assert.strictEqual(response.statusCodeValue, 403)
   assert.match(String(response.body), /event is not allowed/)
 })
 
@@ -392,7 +392,7 @@ test('repository dispatch rejects OIDC ref mismatch', async () => {
     }
   })
 
-  assert.equal(response.statusCodeValue, 403)
+  assert.strictEqual(response.statusCodeValue, 403)
   assert.match(String(response.body), /ref does not match/)
 })
 
@@ -419,7 +419,7 @@ test('repository dispatch rejects disallowed OIDC workflow', async () => {
     }
   })
 
-  assert.equal(response.statusCodeValue, 403)
+  assert.strictEqual(response.statusCodeValue, 403)
   assert.match(String(response.body), /workflow is not allowed/)
 })
 
@@ -448,7 +448,7 @@ test('repository dispatch does not accept job_workflow_ref as the dispatch workf
     }
   })
 
-  assert.equal(response.statusCodeValue, 403)
+  assert.strictEqual(response.statusCodeValue, 403)
   assert.match(String(response.body), /workflow is not allowed/)
 })
 
@@ -476,6 +476,6 @@ test('repository dispatch rejects OIDC workflow from a different branch', async 
     }
   })
 
-  assert.equal(response.statusCodeValue, 403)
+  assert.strictEqual(response.statusCodeValue, 403)
   assert.match(String(response.body), /workflow is not allowed/)
 })

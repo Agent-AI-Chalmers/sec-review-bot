@@ -103,9 +103,9 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
     })
   })
 
-  assert.deepEqual(claimed, ['repository:delivery:delivery-b'])
-  assert.deepEqual(completed, ['repository:delivery:delivery-b'])
-  assert.deepEqual(
+  assert.deepStrictEqual(claimed, ['repository:delivery:delivery-b'])
+  assert.deepStrictEqual(completed, ['repository:delivery:delivery-b'])
+  assert.deepStrictEqual(
     published.map((item) => item.html_url),
     ['https://example.test/pull/11', 'https://example.test/pull/12']
   )
@@ -172,11 +172,11 @@ test('repository delivery continues after a deterministic failure', async () => 
     }
   })
 
-  assert.deepEqual(attempted, ['delivery-a', 'delivery-b'])
-  assert.deepEqual(failures, [
+  assert.deepStrictEqual(attempted, ['delivery-a', 'delivery-b'])
+  assert.deepStrictEqual(failures, [
     { stepKey: 'repository:delivery:delivery-a', retry: false }
   ])
-  assert.deepEqual(
+  assert.deepStrictEqual(
     published.map((item) => item.html_url),
     ['https://example.test/pull/12']
   )
@@ -231,8 +231,8 @@ test('repository delivery recovery skips terminal failures and reaches later wor
     })
   })
 
-  assert.deepEqual(claimed, ['repository:delivery:delivery-b'])
-  assert.deepEqual(
+  assert.deepStrictEqual(claimed, ['repository:delivery:delivery-b'])
+  assert.deepStrictEqual(
     published.map((item) => item.html_url),
     ['https://example.test/pull/12']
   )
@@ -270,6 +270,6 @@ test('summary issue lookup reuses an issue when the create response is lost', as
   const ensure = () =>
     ensureSummaryIssueNumber(octokit as never, repo as never, async () => {})
   await assert.rejects(ensure(), /response lost/)
-  assert.equal(await ensure(), 17)
-  assert.equal(createAttempts, 1)
+  assert.strictEqual(await ensure(), 17)
+  assert.strictEqual(createAttempts, 1)
 })

@@ -72,8 +72,8 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
     (claimWaits[0] ?? 0) > 0,
     'a publication pass must ask for a bounded wait'
   )
-  assert.equal(installationLookups, 0)
-  assert.equal(completionAttempts, 0)
+  assert.strictEqual(installationLookups, 0)
+  assert.strictEqual(completionAttempts, 0)
 })
 
 test('explicit ownership checks share a failing in-flight heartbeat', async () => {
@@ -120,5 +120,5 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
     }),
     PublicationClaimLostError
   )
-  assert.equal(renewals, 2)
+  assert.strictEqual(renewals, 2)
 })

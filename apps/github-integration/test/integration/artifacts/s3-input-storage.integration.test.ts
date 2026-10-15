@@ -38,8 +38,8 @@ test('S3 input upload is immutable and idempotent', async (t) => {
   try {
     const first = await publishInputBundle(reference, runId)
     const retry = await publishInputBundle(reference, runId)
-    assert.equal(first.uri, retry.uri)
-    assert.equal(first.uri, `s3://${bucket}/${key}`)
+    assert.strictEqual(first.uri, retry.uri)
+    assert.strictEqual(first.uri, `s3://${bucket}/${key}`)
 
     await fs.writeFile(source, 'different')
     await assert.rejects(
