@@ -10,22 +10,26 @@ from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION_DIR
 
 
 def _workspace_root() -> Path:
+    """Locate the repository root by the presence of the shared `contracts/` tree.
+
+    The probe is the contracts root's own `README.md`, not any one family inside
+    it: each family derives its own paths from `CONTRACTS_ROOT`, so no family
+    depends on another family's location, and a merely-named `contracts/`
+    directory (such as this package's own `tests/contracts/`) does not match.
+    """
     for candidate in Path(__file__).resolve().parents:
-        if (
-            candidate
-            / "contracts"
-            / "integration-contract"
-            / CONTRACT_VERSION_DIR
-            / "fixtures"
-        ).is_dir():
+        if (candidate / "contracts" / "README.md").is_file():
             return candidate
-    raise RuntimeError("Could not locate workspace contract fixtures root.")
+    raise RuntimeError("Could not locate workspace contracts root.")
 
 
-CONTRACT_ROOT = _workspace_root() / "contracts" / "integration-contract"
+CONTRACTS_ROOT = _workspace_root() / "contracts"
 
-_FIXTURES_ROOT = CONTRACT_ROOT / CONTRACT_VERSION_DIR / "fixtures"
-_SCHEMAS_ROOT = CONTRACT_ROOT / CONTRACT_VERSION_DIR / "schemas"
+# --- integration-contract family ------------------------------------------
+
+INTEGRATION_CONTRACT_ROOT = CONTRACTS_ROOT / "integration-contract"
+_FIXTURES_ROOT = INTEGRATION_CONTRACT_ROOT / CONTRACT_VERSION_DIR / "fixtures"
+_SCHEMAS_ROOT = INTEGRATION_CONTRACT_ROOT / CONTRACT_VERSION_DIR / "schemas"
 
 
 def contract_fixture(name: str) -> dict[str, Any]:
@@ -40,12 +44,13 @@ def contract_fixture_files() -> list[Path]:
     return sorted(_FIXTURES_ROOT.glob("*.json"))
 
 
-# The setup-declaration contract is its own family under contracts/, not part of
-# integration-contract fixtures: its rules are decision logic enforced in code,
-# so it carries a shared corpus rather than JSON Schema fixtures.
-_SETUP_DECLARATION_CORPUS_ROOT = (
-    CONTRACT_ROOT.parent / "setup-declaration" / "v1" / "corpus"
-)
+# --- setup-declaration family ---------------------------------------------
+#
+# A sibling family, not part of integration-contract: its rules are decision
+# logic enforced in code, so it carries a shared corpus rather than JSON Schema
+# fixtures. Derived from CONTRACTS_ROOT directly -- never from another family's
+# location.
+_SETUP_DECLARATION_CORPUS_ROOT = CONTRACTS_ROOT / "setup-declaration" / "v1" / "corpus"
 
 
 def contract_setup_declaration_files() -> list[Path]:

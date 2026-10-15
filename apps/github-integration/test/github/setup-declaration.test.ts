@@ -4,14 +4,14 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { SetupDeclarationError, parseSetupDeclaration } from '../../src/github/setup-declaration.js'
-import { workspaceRoot } from '../contract-fixtures.js'
+import { CONTRACTS_ROOT } from '../contract-fixtures.js'
 
 // Shared corpus of the setup-declaration contract family, also run by the
 // runner's own test suite. Keeping both sides on the same files is what stops
 // the integration validator and the runner parser from drifting apart. The
 // corpus lives under its own family because the declaration format is decision
 // logic enforced in code, not a JSON Schema-shaped contract.
-const corpusDir = path.join(workspaceRoot(), 'contracts', 'setup-declaration', 'v1', 'corpus')
+const corpusDir = path.join(CONTRACTS_ROOT, 'setup-declaration', 'v1', 'corpus')
 
 interface CorpusManifest {
   valid: string[]

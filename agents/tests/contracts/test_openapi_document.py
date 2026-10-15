@@ -11,9 +11,9 @@ import json
 import pytest
 
 from sec_review_agents.entrypoints.service.app import create_app
-from tests.contract_fixtures import CONTRACT_ROOT
+from tests.contract_fixtures import INTEGRATION_CONTRACT_ROOT
 
-OPENAPI_PATH = CONTRACT_ROOT / "openapi.json"
+OPENAPI_PATH = INTEGRATION_CONTRACT_ROOT / "openapi.json"
 
 
 @pytest.fixture(autouse=True)
