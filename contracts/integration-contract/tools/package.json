@@ -20,13 +20,13 @@
   },
   "dependencies": {
     "openapi-typescript": "^7.13.0",
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^24.19.0",
-    "eslint": "^10.11.0",
+    "@types/node": "^24.19.2",
+    "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
