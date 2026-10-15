@@ -145,6 +145,7 @@ Notes:
 - If [`.sec-review/config.yml`](../../.sec-review/config.yml) is missing, the default behavior is `trigger_mode: manual_only`.
 - If the config file exists but the YAML is invalid, `sec_review_bot.trigger_mode` is missing, or the value is not allowed, automatic webhooks fail strictly instead of silently downgrading.
 - `paths_ignore` only affects repository-review discovery file scanning. It does not affect PR/Issue webhook trigger decisions.
+- Config is always read from the **default branch** (resolved via the GitHub API), never from the PR base ref or a repository-review `target_branch`. A non-default branch scan therefore uses the default branch's `trigger_mode` / `paths_ignore`.
 - Repository config does not support selecting a workspace image. The GitHub integration does not parse image configuration fields from `.sec-review/config.yml`.
 
 ### Manual commands

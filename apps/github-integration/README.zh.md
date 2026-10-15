@@ -146,6 +146,7 @@ sec_review_bot:
 - 如果 [`.sec-review/config.yml`](../../.sec-review/config.yml) 文件不存在，默认行为是 `trigger_mode: manual_only`。
 - 如果配置文件存在但 YAML 非法、缺少 `sec_review_bot.trigger_mode` 或值不在允许集合内，自动 webhook 会严格报错并失败（不会静默降级）。
 - `paths_ignore` 仅影响 repository-review 的 discovery 文件扫描；不影响 PR/Issue webhook 触发判定本身。
+- 配置始终从**默认分支**读取（经 GitHub API 解析），绝不来自 PR base ref 或 repository-review 的 `target_branch`。因此扫描非默认分支时，使用的是默认分支的 `trigger_mode` / `paths_ignore`。
 - 仓库配置不支持选择 workspace image。GitHub App 不会从 `.sec-review/config.yml` 解析 image 配置字段。
 
 ### 手动命令
