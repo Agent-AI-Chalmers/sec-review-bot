@@ -38,6 +38,7 @@ def create_pr_analyzer_backend(
     history_path: Path,
     incremental_window_path: Path,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
@@ -65,6 +66,7 @@ def create_pr_analyzer_backend(
         path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
+        trusted_setup_path=trusted_setup_path,
     )
 
 

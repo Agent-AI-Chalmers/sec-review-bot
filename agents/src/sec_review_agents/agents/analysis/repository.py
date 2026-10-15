@@ -37,6 +37,7 @@ def create_repository_analyzer_backend(
     incremental_window_path: Path | None,
     scan_mode: str,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
@@ -76,6 +77,7 @@ def create_repository_analyzer_backend(
         path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
+        trusted_setup_path=trusted_setup_path,
     )
 
 

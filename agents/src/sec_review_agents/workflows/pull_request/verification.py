@@ -26,6 +26,7 @@ async def verify_pull_request(
     mitigation_result: Mapping[str, Any] | None,
     retry_context: Mapping[str, Any] | None,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ) -> dict[str, Any]:
     attempt_label = verification_attempt_label(retry_context)
     reset_verification_attempt_artifacts(
@@ -58,6 +59,7 @@ async def verify_pull_request(
             history_path=history_path,
             incremental_window_path=incremental_window_path,
             runtime_context=runtime_context,
+            trusted_setup_path=trusted_setup_path,
         ),
         system_prompt=pr_verification_agent.build_pr_verification_system_prompt(
             is_retry=isinstance(retry_context, Mapping)

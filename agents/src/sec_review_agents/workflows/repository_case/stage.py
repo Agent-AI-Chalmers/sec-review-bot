@@ -161,6 +161,9 @@ async def analyze_repository_case_stage(
             published_transcript_path=published_transcript_path,
             scan_mode=scan_mode,
             review_input=review_input,
+            trusted_setup_path=_optional_case_path(
+                case_execution_input, "trusted_setup_path"
+            ),
             runtime_context=runtime_context,
         )
 
@@ -254,6 +257,9 @@ async def run_repository_case_mitigation_stage(
             analysis_result=analyzer_result,
             retry_context=retry_context,
             test_changes=_case_test_changes(case_execution_input),
+            trusted_setup_path=_optional_case_path(
+                case_execution_input, "trusted_setup_path"
+            ),
             runtime_context=runtime_context,
         )
 
@@ -307,6 +313,9 @@ async def run_repository_case_verification_stage(
             analysis_result=analyzer_result,
             mitigation_result=mitigator_result,
             retry_context=retry_context,
+            trusted_setup_path=_optional_case_path(
+                case_execution_input, "trusted_setup_path"
+            ),
             runtime_context=runtime_context,
         )
 

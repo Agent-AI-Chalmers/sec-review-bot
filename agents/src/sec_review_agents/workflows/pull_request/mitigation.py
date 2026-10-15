@@ -26,6 +26,7 @@ async def mitigate_pull_request(
     retry_context: Mapping[str, Any] | None = None,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ) -> dict[str, Any]:
     diff_metadata = load_pr_diff_metadata(incremental_window_path)
     return await run_mitigation_stage(
@@ -39,6 +40,7 @@ async def mitigate_pull_request(
             history_path=history_path,
             incremental_window_path=incremental_window_path,
             runtime_context=runtime_context,
+            trusted_setup_path=trusted_setup_path,
         ),
         system_prompt=pr_mitigation_agent.build_pr_mitigation_system_prompt(
             test_changes=test_changes, is_retry=isinstance(retry_context, dict)

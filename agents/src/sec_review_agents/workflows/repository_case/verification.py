@@ -26,6 +26,7 @@ async def verify_repository_case(
     mitigation_result: Mapping[str, Any] | None,
     retry_context: Mapping[str, Any] | None = None,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ) -> dict[str, Any]:
     attempt_label = verification_attempt_label(retry_context)
     reset_verification_attempt_artifacts(
@@ -61,6 +62,7 @@ async def verify_repository_case(
                 incremental_window_path=incremental_window_path,
                 scan_mode=scan_mode,
                 runtime_context=runtime_context,
+                trusted_setup_path=trusted_setup_path,
             )
         ),
         system_prompt=repository_verification_agent.build_repository_verification_system_prompt(

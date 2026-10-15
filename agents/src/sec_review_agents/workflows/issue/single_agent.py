@@ -28,7 +28,7 @@ async def run_issue_single_agent_activity(
     from sec_review_agents.review_stages.single_agent.stage import (
         run_single_agent_stage,
     )
-    from sec_review_agents.utils.paths import required_path
+    from sec_review_agents.utils.paths import optional_path, required_path
 
     prepared_input = request.prepared_input
     run_artifacts_root = required_path(
@@ -53,6 +53,7 @@ async def run_issue_single_agent_activity(
             workspace_root=workspace_root,
             history_path=history_path,
             runtime_context=request.runtime_context,
+            trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
         ),
         system_prompt=issue_single_agent.build_issue_single_agent_system_prompt(
             review_objective=review_intent.objective,

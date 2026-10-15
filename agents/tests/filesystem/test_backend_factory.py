@@ -406,3 +406,70 @@ def test_docker_path_view_rejects_missing_source_directory(tmp_path: Path) -> No
         )
 
     assert not missing_source.exists()
+
+
+def test_docker_backend_mounts_trusted_setup_read_only(tmp_path: Path) -> None:
+    setup_dir = tmp_path / "trusted-setup"
+    setup_dir.mkdir()
+    setup_file = setup_dir / "setup.yml"
+    setup_file.write_text("setup: []\n", encoding="utf-8")
+
+    with patch(
+        "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
+        return_value=object(),
+    ) as docker_backend_cls:
+        create_backend_with_path_views(
+            container_name_prefix="test",
+            path_views=[workspace_view(host_path=tmp_path, writable=True)],
+            backend_kind="docker",
+            trusted_setup_path=setup_file,
+        )
+
+    docker_mounts = docker_backend_cls.call_args.kwargs["container"].mounts
+    setup_mounts = [m for m in docker_mounts if m.container_path == "/setup"]
+    assert len(setup_mounts) == 1
+    assert setup_mounts[0].host_path == str(setup_dir.resolve())
+    assert setup_mounts[0].writable is False
+
+
+def test_docker_backend_without_workspace_gets_no_trusted_setup_mount(
+    tmp_path: Path,
+) -> None:
+    setup_dir = tmp_path / "trusted-setup"
+    setup_dir.mkdir()
+    setup_file = setup_dir / "setup.yml"
+    setup_file.write_text("setup: []\n", encoding="utf-8")
+
+    with patch(
+        "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
+        return_value=object(),
+    ) as docker_backend_cls:
+        create_backend_with_path_views(
+            container_name_prefix="test",
+            path_views=[tmp_view_for_backend("docker")],
+            backend_kind="docker",
+            trusted_setup_path=setup_file,
+        )
+
+    docker_mounts = docker_backend_cls.call_args.kwargs["container"].mounts
+    assert [m for m in docker_mounts if m.container_path == "/setup"] == []
+
+
+def test_non_docker_backend_gets_no_trusted_setup_mount(tmp_path: Path) -> None:
+    setup_dir = tmp_path / "trusted-setup"
+    setup_dir.mkdir()
+    setup_file = setup_dir / "setup.yml"
+    setup_file.write_text("setup: []\n", encoding="utf-8")
+
+    backend = create_backend_with_path_views(
+        container_name_prefix="test",
+        path_views=[workspace_view(host_path=tmp_path, writable=True)],
+        backend_kind="local",
+        trusted_setup_path=setup_file,
+    )
+
+    # Local backend is out of scope for bootstrap: the trusted setup view must
+    # not be added even when the path is supplied.
+    assert isinstance(backend, CompositeBackend)
+    assert "/workspace/" in backend.routes
+    assert "/setup/" not in backend.routes

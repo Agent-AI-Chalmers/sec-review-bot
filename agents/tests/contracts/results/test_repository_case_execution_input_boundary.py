@@ -56,7 +56,7 @@ def test_repository_case_execution_input_tracks_required_and_optional_fields() -
         "incremental_window_path",
         "test_changes",
     }
-    assert RepositoryCaseExecutionInput.__optional_keys__ == set()
+    assert RepositoryCaseExecutionInput.__optional_keys__ == {"trusted_setup_path"}
 
 
 def test_repository_case_execution_input_carries_case_id_and_prepared_review_input(

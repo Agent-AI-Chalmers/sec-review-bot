@@ -32,7 +32,11 @@ async def analyze_pull_request_activity(
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        optional_path,
+        required_path,
+    )
     from sec_review_agents.workflows.pull_request.analysis import (
         analyze_pull_request,
     )
@@ -69,6 +73,7 @@ async def analyze_pull_request_activity(
             order=1,
             stage="analyzer",
         ),
+        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
         runtime_context=runtime_context,
     )
 
@@ -86,7 +91,11 @@ async def mitigate_pull_request_activity(
         mitigation_attempt_label,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        optional_path,
+        required_path,
+    )
     from sec_review_agents.workflows.pull_request.mitigation import (
         mitigate_pull_request,
     )
@@ -144,6 +153,7 @@ async def mitigate_pull_request_activity(
         analysis_result=analysis_result,
         retry_context=retry_context,
         test_changes=review_intent.test_changes,
+        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
         runtime_context=runtime_context,
     )
 
@@ -161,7 +171,11 @@ async def verify_pull_request_activity(
         verification_attempt_label,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        optional_path,
+        required_path,
+    )
     from sec_review_agents.workflows.pull_request.verification import (
         verify_pull_request,
     )
@@ -201,6 +215,7 @@ async def verify_pull_request_activity(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         retry_context=retry_context,
+        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
         runtime_context=runtime_context,
     )
 

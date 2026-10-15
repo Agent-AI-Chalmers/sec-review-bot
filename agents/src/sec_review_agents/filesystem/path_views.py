@@ -69,6 +69,17 @@ def workspace_view(
     )
 
 
+def trusted_setup_view(*, host_path: Path) -> PathView:
+    """Expose the trusted setup declaration directory read-only at ``/setup``.
+
+    The declaration is a single file extracted from the repository default
+    branch; Docker bind mounts require a directory, so we mount the directory
+    that contains it. Agent code can read it but never write it.
+    """
+
+    return read_only_path_view(host_path=host_path, agent_path="/setup")
+
+
 def skill_view(*, host_path: Path) -> PathView:
     return read_only_path_view(host_path=host_path, agent_path="/skills")
 

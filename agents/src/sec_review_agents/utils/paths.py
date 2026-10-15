@@ -15,6 +15,17 @@ def required_path(value: object, *, label: str) -> Path:
     raise KeyError(f"Missing path: {label}")
 
 
+def optional_path(value: object) -> Path | None:
+    """Normalize an optional serialized path at a workflow boundary.
+
+    Returns ``Path`` for a non-empty string, and ``None`` for a missing or blank
+    value. This is the optional counterpart of :func:`required_path`.
+    """
+    if isinstance(value, str) and value.strip():
+        return Path(value)
+    return None
+
+
 def artifact_path(artifact_paths: Mapping[str, Any], key: str) -> Path:
     """Return one stage artifact directory from the serialized path index.
 

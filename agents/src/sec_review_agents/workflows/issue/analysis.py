@@ -17,6 +17,7 @@ async def analyze_issue(
     published_transcript_path: Path | None = None,
     review_objective: ReviewObjective,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ) -> dict[str, Any]:
     return await run_analysis_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
@@ -27,6 +28,7 @@ async def analyze_issue(
             workspace_root_path=stage_workspace_path,
             history_path=history_path,
             runtime_context=runtime_context,
+            trusted_setup_path=trusted_setup_path,
         ),
         system_prompt=issue_analysis_agent.build_issue_analyzer_system_prompt(
             review_objective

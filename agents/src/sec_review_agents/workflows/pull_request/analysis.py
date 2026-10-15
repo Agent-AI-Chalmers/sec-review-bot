@@ -19,6 +19,7 @@ async def analyze_pull_request(
     analyzer_artifacts_path: Path,
     published_transcript_path: Path | None = None,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ) -> dict[str, Any]:
     diff_metadata = load_pr_diff_metadata(incremental_window_path)
     return await run_analysis_stage(
@@ -31,6 +32,7 @@ async def analyze_pull_request(
             history_path=history_path,
             incremental_window_path=incremental_window_path,
             runtime_context=runtime_context,
+            trusted_setup_path=trusted_setup_path,
         ),
         system_prompt=pr_analysis_agent.build_pr_analyzer_system_prompt(),
         filesystem_system_prompt=(

@@ -16,6 +16,7 @@ async def analyze_repository_case(
     scan_mode: str,
     review_input: str,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ) -> dict[str, Any]:
     return await run_analysis_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
@@ -28,6 +29,7 @@ async def analyze_repository_case(
             incremental_window_path=incremental_window_path,
             scan_mode=scan_mode,
             runtime_context=runtime_context,
+            trusted_setup_path=trusted_setup_path,
         ),
         system_prompt=repository_analysis_agent.build_repository_analyzer_system_prompt(),
         filesystem_system_prompt=(

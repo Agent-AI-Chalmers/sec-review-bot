@@ -33,7 +33,11 @@ async def analyze_issue_activity(
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        optional_path,
+        required_path,
+    )
     from sec_review_agents.workflows.issue.analysis import analyze_issue
 
     run_artifacts_root = required_path(
@@ -63,6 +67,7 @@ async def analyze_issue_activity(
             stage="analyzer",
         ),
         review_objective=review_intent.objective,
+        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
         runtime_context=runtime_context,
     )
 
@@ -80,7 +85,11 @@ async def mitigate_issue_activity(
         mitigation_attempt_label,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        optional_path,
+        required_path,
+    )
     from sec_review_agents.workflows.issue.mitigation import mitigate_issue
 
     mitigator_artifacts_path = artifact_path(
@@ -132,6 +141,7 @@ async def mitigate_issue_activity(
         test_changes=review_intent.test_changes,
         analysis_result=analysis_result,
         retry_context=retry_context,
+        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
         runtime_context=runtime_context,
     )
 
@@ -149,7 +159,11 @@ async def verify_issue_activity(
         verification_attempt_label,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        optional_path,
+        required_path,
+    )
     from sec_review_agents.workflows.issue.verification import verify_issue
 
     run_artifacts_root = required_path(
@@ -183,6 +197,7 @@ async def verify_issue_activity(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         retry_context=retry_context,
+        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
         runtime_context=runtime_context,
     )
 

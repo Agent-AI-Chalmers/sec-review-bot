@@ -59,6 +59,7 @@ def create_issue_verification_backend(
     workspace_root_path: Path,
     history_path: Path,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ):
     if not workspace_root_path.is_dir():
         raise FileNotFoundError(
@@ -88,6 +89,7 @@ def create_issue_verification_backend(
         path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
+        trusted_setup_path=trusted_setup_path,
     )
 
 

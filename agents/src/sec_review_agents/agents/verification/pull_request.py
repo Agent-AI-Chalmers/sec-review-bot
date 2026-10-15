@@ -52,6 +52,7 @@ def create_pr_verification_backend(
     history_path: Path,
     incremental_window_path: Path,
     runtime_context: RunnerRuntimeContext | None = None,
+    trusted_setup_path: Path | None = None,
 ):
     if not workspace_root_path.is_dir():
         raise FileNotFoundError(
@@ -85,6 +86,7 @@ def create_pr_verification_backend(
         path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
+        trusted_setup_path=trusted_setup_path,
     )
 
 
