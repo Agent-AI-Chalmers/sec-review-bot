@@ -2,6 +2,7 @@ import hashlib
 import secrets
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 from dataclasses import dataclass
@@ -10,6 +11,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.filesystem.backend_selection import (
+    selected_sandbox_backend_kind,
+)
 from sec_review_agents.utils.env import env_value
 
 IssueReviewStrategy = Literal["default", "two-stage", "single-agent"]
@@ -43,6 +47,29 @@ def read_setup_declaration_file(path: str | Path | None) -> str | None:
         raise ValueError(
             f"Unable to read setup declaration file: {resolved} ({error})"
         ) from error
+
+
+def load_setup_declaration_content(path: str | Path | None) -> str | None:
+    """Resolve the setup declaration text for the selected sandbox backend.
+
+    Only the docker backend runs a setup declaration (its container is
+    long-lived). On any other backend the declaration cannot take effect, so
+    warn once and return None without reading the file -- a missing or
+    unreadable file must not fail a run whose declaration would be ignored
+    anyway. On docker, a path that cannot be read is a real error and raises.
+    """
+    if path is None:
+        return None
+    backend = selected_sandbox_backend_kind()
+    if backend != "docker":
+        print(
+            f"SETUP_DECLARATION_WARNING=--setup-declaration was provided but the "
+            f"selected sandbox backend ({backend!r}) does not run setup "
+            f"declarations; the declaration is ignored.",
+            file=sys.stderr,
+        )
+        return None
+    return read_setup_declaration_file(path)
 
 
 @dataclass(frozen=True)

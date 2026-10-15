@@ -8,7 +8,7 @@ from sec_review_agents.cli.local_materialization.common import (
     IssueReviewStrategy,
     ReviewBundle,
     default_local_output_dir,
-    read_setup_declaration_file,
+    load_setup_declaration_content,
     result_path_for_bundle,
 )
 from sec_review_agents.cli.local_materialization.issue import (
@@ -126,6 +126,8 @@ def main() -> None:
     issue_strategy: IssueReviewStrategy = args.strategy
     repo_path = Path(args.repo).resolve()
 
+    setup_declaration_content = load_setup_declaration_content(args.setup_declaration)
+
     if not repo_path.exists() or not repo_path.is_dir():
         raise SystemExit(f"--repo does not exist or is not a directory: {repo_path}")
 
@@ -160,7 +162,7 @@ def main() -> None:
         target_branch=target_branch,
         review_objective=args.review_objective,
         test_changes=args.test_changes,
-        setup_declaration_content=read_setup_declaration_file(args.setup_declaration),
+        setup_declaration_content=setup_declaration_content,
     )
     bundle = ReviewBundle(
         workflow="issue-review",

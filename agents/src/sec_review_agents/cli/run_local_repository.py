@@ -12,7 +12,7 @@ from sec_review_agents.cli.local_git import (
 )
 from sec_review_agents.cli.local_materialization.common import (
     default_local_output_dir,
-    read_setup_declaration_file,
+    load_setup_declaration_content,
     result_path_for_bundle,
 )
 from sec_review_agents.cli.local_materialization.repository import (
@@ -147,6 +147,8 @@ def main() -> None:
     scan_mode = str(args.scan_mode)
     repo_path = Path(args.repo).resolve()
 
+    setup_declaration_content = load_setup_declaration_content(args.setup_declaration)
+
     if not repo_path.exists() or not repo_path.is_dir():
         raise SystemExit(f"--repo does not exist or is not a directory: {repo_path}")
 
@@ -189,7 +191,7 @@ def main() -> None:
         baseline_ref=base_sha,
         paths_ignore=args.paths_ignore,
         test_changes=args.test_changes,
-        setup_declaration_content=read_setup_declaration_file(args.setup_declaration),
+        setup_declaration_content=setup_declaration_content,
     )
 
     print(f"LOCAL_ROOT={bundle.local_root_path}")
