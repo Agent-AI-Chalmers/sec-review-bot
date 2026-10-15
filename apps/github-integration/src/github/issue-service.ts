@@ -1,6 +1,5 @@
 import type { GitHubAppOctokit } from './octokit.js'
 import { isRecord } from '../utils/error-utils.js'
-import { resolveTrustedDefaultBranch, type TrustedDefaultBranch } from './default-branch-service.js'
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {}
@@ -111,37 +110,6 @@ export function extractIssueContext(payload: unknown): IssueContext {
     comments_url: asString(issue.comments_url),
     is_pull_request: Boolean(issue.pull_request)
   })
-}
-
-/**
- * Resolve the default branch of the repo under review via the API, returning the
- * branch name and its head SHA.
- *
- * `issue.default_branch` comes from the webhook payload and is deliberately
- * ignored here: we resolve the default branch ourselves so the result does not
- * depend on a payload field. On failure this throws (no fallback).
- */
-export async function getIssueDefaultBranch(
-  octokit: GitHubAppOctokit,
-  issue: Pick<IssueContext, 'owner_login' | 'repo_name'>
-): Promise<TrustedDefaultBranch> {
-  return resolveTrustedDefaultBranch(octokit, {
-    owner_login: issue.owner_login,
-    repo_name: issue.repo_name
-  })
-}
-
-/**
- * @deprecated Prefer `getIssueDefaultBranch`. Kept as a thin compatibility
- * wrapper; it no longer accepts the payload-derived branch name and instead
- * resolves the default branch via the API.
- */
-export async function getIssueDefaultBranchHeadSha(
-  octokit: GitHubAppOctokit,
-  issue: Pick<IssueContext, 'owner_login' | 'repo_name'>
-): Promise<string> {
-  const { head_sha } = await getIssueDefaultBranch(octokit, issue)
-  return head_sha
 }
 
 function isSameRepositoryPullRequestSource(

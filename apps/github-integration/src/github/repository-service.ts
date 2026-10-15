@@ -5,13 +5,6 @@ interface RepoParts {
   repo_name: string
 }
 
-interface RepositoryContext extends RepoParts {
-  repo_full_name: string
-  default_branch: string
-  html_url: string
-  private: boolean
-}
-
 interface OpenRepositorySecurityPullRequest {
   number: number
   title: string
@@ -43,26 +36,6 @@ function splitRepoFullName(repo_full_name: string): RepoParts {
   return {
     owner_login,
     repo_name
-  }
-}
-
-export async function getRepositoryContext(
-  octokit: GitHubAppOctokit,
-  repo_full_name: string
-): Promise<RepositoryContext> {
-  const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
-  const response = await octokit.rest.repos.get({
-    owner: owner_login,
-    repo: repo_name
-  })
-
-  return {
-    owner_login,
-    repo_name,
-    repo_full_name: response.data.full_name,
-    default_branch: response.data.default_branch,
-    html_url: response.data.html_url,
-    private: response.data.private
   }
 }
 
