@@ -8,6 +8,7 @@ import {
   isRepositoryTriggerConfigError
 } from '../../../github/repo-config-service.js'
 import type { GitHubAppOctokit } from '../../../github/octokit.js'
+import type { TrustedDefaultBranch } from '../../../github/default-branch-service.js'
 import {
   isSelfOriginatedWebhookEvent,
   logSkippedSelfOriginatedEvent
@@ -26,6 +27,7 @@ interface HandlerDeps extends TriggerConfigHandlerDeps {
   startIssueReviewCommandFn?: (args: {
     octokit: WebhookHandlerArgs['octokit']
     issue: IssueContext
+    trusted_default_branch: { default_branch: string; head_sha: string }
     event_type: 'opened'
     delivery_id: string
     on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
@@ -70,15 +72,19 @@ export async function handleIssueOpenedWithDeps(
   }
 
   let triggerConfig
+  let trusted_default_branch: TrustedDefaultBranch
   try {
-    // Resolve the trusted default branch via API and read config from it
-    // (A1: do not trust the payload's repository.default_branch).
-    triggerConfig = (
-      await fetchTrustedRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, {
-        owner_login: issue.owner_login,
-        repo_name: issue.repo_name
-      })
-    ).config
+    // Resolve the trusted default branch via API, once for this run, and read
+    // config from it (A1: do not trust the payload's repository.default_branch).
+    const resolved = await fetchTrustedRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, {
+      owner_login: issue.owner_login,
+      repo_name: issue.repo_name
+    })
+    triggerConfig = resolved.config
+    trusted_default_branch = {
+      default_branch: resolved.default_branch,
+      head_sha: resolved.head_sha
+    }
   } catch (error: unknown) {
     if (isRepositoryTriggerConfigErrorFn(error)) {
       logError('repo_trigger_config_failed', {
@@ -110,6 +116,7 @@ export async function handleIssueOpenedWithDeps(
     const execution = startIssueReviewCommandFn({
       octokit,
       issue,
+      trusted_default_branch,
       event_type: 'opened',
       delivery_id: id,
       on_admitted: () => {

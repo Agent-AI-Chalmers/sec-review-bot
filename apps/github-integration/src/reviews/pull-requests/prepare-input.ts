@@ -4,12 +4,12 @@ import path from 'path'
 
 import {
   fetchTimelineLinkedIssues,
-  resolvePullRequestDefaultBranch,
   summarizePullRequestFiles,
   type PullRequestContext,
   type PullRequestFile,
   type PullRequestFileSummary
 } from '../../github/pull-request-service.js'
+import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { PullRequestReviewInput } from '../../runner/input.js'
 import type { TestChangesPolicy } from '../../runner/input.js'
@@ -291,12 +291,14 @@ export async function preparePullRequestReviewInput({
   octokit,
   pr,
   files,
+  trusted_default_branch,
   test_changes = null
 }: {
   run_id: string
   octokit: GitHubAppOctokit
   pr: PullRequestContext
   files: PullRequestFile[]
+  trusted_default_branch: TrustedDefaultBranch
   test_changes?: TestChangesPolicy | null
 }): Promise<PreparedPullRequestReview> {
   const normalizedFiles = normalizeFiles(files)
@@ -326,7 +328,7 @@ export async function preparePullRequestReviewInput({
     workspace_path,
     commit_refs: commit_shas
   })
-  const { head_sha: default_sha } = await resolvePullRequestDefaultBranch(octokit, pr)
+  const default_sha = trusted_default_branch.head_sha
   const git_auth_token = await getInstallationAccessToken(octokit)
   const trusted_setup_path = await materializeTrustedSetup({
     input_bundle_root,

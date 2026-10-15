@@ -1,3 +1,4 @@
+import type { resolveTrustedDefaultBranch } from '../../../github/default-branch-service.js'
 import type {
   fetchTrustedRepositoryTriggerConfig,
   isAutomaticTriggerModeEnabled,
@@ -20,4 +21,15 @@ export interface TriggerConfigHandlerDeps {
   fetchTrustedRepositoryTriggerConfigFn?: typeof fetchTrustedRepositoryTriggerConfig
   isAutomaticTriggerModeEnabledFn?: typeof isAutomaticTriggerModeEnabled
   isRepositoryTriggerConfigErrorFn?: typeof isRepositoryTriggerConfigError
+}
+
+/**
+ * Dependencies for resolving the trusted default branch directly.
+ *
+ * Handlers that need a trigger config use `TriggerConfigHandlerDeps` (which
+ * resolves the branch as part of reading the config); handlers that only need
+ * the trusted ref itself use this.
+ */
+export interface TrustedRefHandlerDeps {
+  resolveTrustedDefaultBranchFn?: typeof resolveTrustedDefaultBranch
 }

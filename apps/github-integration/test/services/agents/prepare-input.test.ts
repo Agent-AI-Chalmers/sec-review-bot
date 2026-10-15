@@ -245,7 +245,8 @@ test(
       const prepared = await prepareIssueReviewInput({
         run_id: 'run-issue-fixture',
         octokit,
-        issue
+        issue,
+        trusted_default_branch: { default_branch: 'main', head_sha }
       })
       assert.equal(prepared.input.contract_version, 'v6')
       assert.deepEqual(prepared.input.review_intent, { objective: 'audit' })
@@ -354,6 +355,7 @@ test(
         run_id: 'run-pr-fixture',
         octokit,
         pr,
+        trusted_default_branch: { default_branch: 'main', head_sha: refs.head_sha },
         files: [
           {
             filename: 'src/app.ts',
@@ -411,6 +413,7 @@ test(
         run_id: 'run-repo-full',
         octokit,
         repo_full_name: 'octo/demo',
+        trusted_default_branch: { default_branch: 'main', head_sha: refs.head_sha },
         scan_mode: 'full'
       })
       await assertRunnerInputArtifact({
@@ -436,6 +439,7 @@ test(
         run_id: 'run-repo-full',
         octokit,
         repo_full_name: 'octo/demo',
+        trusted_default_branch: { default_branch: 'main', head_sha: refs.head_sha },
         scan_mode: 'full'
       })
       await assert.rejects(
@@ -447,6 +451,7 @@ test(
         run_id: 'run-repo-incremental',
         octokit,
         repo_full_name: 'octo/demo',
+        trusted_default_branch: { default_branch: 'main', head_sha: refs.head_sha },
         scan_mode: 'incremental',
         base_sha: refs.base_sha,
         head_sha: refs.head_sha

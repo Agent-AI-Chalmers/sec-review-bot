@@ -2,11 +2,8 @@ import { CONTRACT_VERSION } from '../../runner/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
-import {
-  fetchTimelineLinkedPullRequests,
-  getIssueDefaultBranch,
-  type IssueContext
-} from '../../github/issue-service.js'
+import { fetchTimelineLinkedPullRequests, type IssueContext } from '../../github/issue-service.js'
+import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { IssueReviewInput, TestChangesPolicy } from '../../runner/input.js'
@@ -94,12 +91,14 @@ export async function prepareIssueReviewInput({
   run_id,
   octokit,
   issue,
+  trusted_default_branch,
   review_objective = 'audit',
   test_changes
 }: {
   run_id: string
   octokit: GitHubAppOctokit
   issue: IssueContext
+  trusted_default_branch: TrustedDefaultBranch
   review_objective?: 'audit' | 'repair'
   test_changes?: TestChangesPolicy
 }): Promise<{
@@ -109,7 +108,7 @@ export async function prepareIssueReviewInput({
   input_bundle_root: string
   workspace_ref: string
 }> {
-  const { default_branch, head_sha: workspace_ref } = await getIssueDefaultBranch(octokit, issue)
+  const { default_branch, head_sha: workspace_ref } = trusted_default_branch
   const input_bundle_root = createInputBundleRoot(
     issue.repo_full_name,
     `issue-${issue.issue_number}`,

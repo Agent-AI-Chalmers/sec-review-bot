@@ -5,7 +5,7 @@ import {
   resolveTrustedDefaultBranch,
   type TrustedDefaultBranch
 } from '../../src/github/default-branch-service.js'
-import { resolvePullRequestDefaultBranch } from '../../src/github/pull-request-service.js'
+import { resolveTrustedRepositoryIdentity } from '../../src/github/pull-request-service.js'
 import type { GitHubAppOctokit } from '../../src/github/octokit.js'
 
 interface RepoGetCall {
@@ -34,6 +34,13 @@ function makeOctokit(options: {
           if (options.getThrows) throw options.getThrows
           return { data: { default_branch: options.default_branch ?? 'main' } }
         },
+        getContent: async () => ({
+          data: {
+            content: Buffer.from('sec_review_bot:\n  trigger_mode: manual_only\n').toString(
+              'base64'
+            )
+          }
+        }),
         getBranch: async ({ owner, repo, branch }: BranchGetCall) => {
           calls.branchGet.push({ owner, repo, branch })
           options.onBranchGet?.({ owner, repo, branch })
@@ -87,37 +94,57 @@ test('resolveTrustedDefaultBranch rejects an empty default branch', async () => 
 })
 
 // Invariant 2: recipe source repository == base repo; never the head/fork.
-test('resolvePullRequestDefaultBranch prefers base repo identity over head/fork', async () => {
-  const { octokit, calls } = makeOctokit({ default_branch: 'main', head_sha: 'base-head' })
-  const result = await resolvePullRequestDefaultBranch(octokit, {
-    repo_full_name: 'octo/example',
-    base_repo_full_name: 'octo/example'
-  })
-  assert.equal(result.head_sha, 'base-head')
-  // both repo get + branch get target the base repo, not the fork
-  assert.deepEqual(calls.branchGet, [{ owner: 'octo', repo: 'example', branch: 'main' }])
+test('resolveTrustedRepositoryIdentity prefers base repo identity over head/fork', () => {
+  assert.deepEqual(
+    resolveTrustedRepositoryIdentity({
+      repo_full_name: 'octo/example',
+      base_repo_full_name: 'octo/example'
+    }),
+    { owner_login: 'octo', repo_name: 'example' }
+  )
 })
 
-test('resolvePullRequestDefaultBranch never resolves against the head repo for a fork PR', async () => {
-  const { octokit, calls } = makeOctokit({ default_branch: 'main', head_sha: 'base-head' })
+test('resolveTrustedRepositoryIdentity never uses the head repo for a fork PR', () => {
   // top-level repo is the base repo; head/fork is mallory/example
-  await resolvePullRequestDefaultBranch(octokit, {
+  const identity = resolveTrustedRepositoryIdentity({
     repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example'
   })
-  for (const call of calls.repoGet) {
-    assert.notEqual(call.owner, 'mallory')
-  }
-  for (const call of calls.branchGet) {
-    assert.notEqual(call.owner, 'mallory')
-  }
+  assert.notEqual(identity.owner_login, 'mallory')
 })
 
-test('resolvePullRequestDefaultBranch falls back to repo_full_name when base is missing', async () => {
-  const { octokit, calls } = makeOctokit({ default_branch: 'main', head_sha: 'sha' })
-  await resolvePullRequestDefaultBranch(octokit, {
+test('resolveTrustedRepositoryIdentity falls back to repo_full_name when base is missing', () => {
+  assert.deepEqual(
+    resolveTrustedRepositoryIdentity({
+      repo_full_name: 'octo/example',
+      base_repo_full_name: null
+    }),
+    { owner_login: 'octo', repo_name: 'example' }
+  )
+})
+
+// Wiring: a fork PR's trusted identity (base repo) drives which repository the
+// config/declaration resolution actually hits.
+test('fetchTrustedRepositoryTriggerConfig resolves against the base repo, not the fork', async () => {
+  const { octokit, calls } = makeOctokit({ default_branch: 'main', head_sha: 'base-sha' })
+  const { fetchTrustedRepositoryTriggerConfig } =
+    await import('../../src/github/repo-config-service.js')
+
+  const identity = resolveTrustedRepositoryIdentity({
     repo_full_name: 'octo/example',
-    base_repo_full_name: null
+    base_repo_full_name: 'octo/example'
   })
-  assert.deepEqual(calls.repoGet, [{ owner: 'octo', repo: 'example' }])
+  await fetchTrustedRepositoryTriggerConfig(octokit, identity).catch(() => undefined)
+
+  for (const call of calls.repoGet) {
+    assert.equal(call.owner, 'octo')
+    assert.equal(call.repo, 'example')
+    assert.notEqual(call.owner, 'mallory')
+  }
+  assert.ok(calls.repoGet.length >= 1)
+  assert.ok(calls.branchGet.length >= 1)
+  for (const call of calls.branchGet) {
+    assert.equal(call.owner, 'octo')
+    assert.notEqual(call.owner, 'mallory')
+  }
 })

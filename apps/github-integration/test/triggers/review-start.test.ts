@@ -8,6 +8,8 @@ import type { PullRequestContext } from '../../src/github/pull-request-service.j
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 
+const TRUSTED_DEFAULT_BRANCH = { default_branch: 'main', head_sha: 'default-sha' }
+
 const preparationClaim = {
   renewPreparationClaim: async () => true,
   preparationHeartbeatIntervalMs: async () => 60_000
@@ -73,6 +75,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
 
   const submitted = await startIssueReviewCommand({
     octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     issue,
     event_type: 'opened',
     delivery_id: 'delivery-issue-1',
@@ -154,6 +157,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
 
   const submitted = await startPullRequestReviewCommand({
     octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     pr,
     event_type: 'manual_review',
     delivery_id: 'delivery-pr-1',
@@ -228,6 +232,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
   await assert.rejects(
     startPullRequestReviewCommand({
       octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
       delivery_id: 'delivery-pr-failed',
@@ -278,6 +283,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
   await assert.rejects(
     startIssueReviewCommand({
       octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       issue: issueContext(),
       event_type: 'opened',
       delivery_id: 'delivery-uncertain',
@@ -327,6 +333,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
   await assert.rejects(
     startPullRequestReviewCommand({
       octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
       delivery_id: 'delivery-pr-uncertain',
@@ -371,6 +378,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
   await assert.rejects(
     startPullRequestReviewCommand({
       octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',
       delivery_id: 'delivery-context-failure',
       resolve_pr: async () => {
@@ -412,6 +420,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
   let starts = 0
   const submitted = await startPullRequestReviewCommand({
     octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     pr: pullRequestContext(),
     event_type: 'opened',
     delivery_id: 'delivery-1',
@@ -441,6 +450,7 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
   let starts = 0
   const submitted = await startIssueReviewCommand({
     octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     issue: issueContext(),
     event_type: 'opened',
     delivery_id: 'delivery-issue-1',

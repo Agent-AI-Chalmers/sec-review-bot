@@ -78,15 +78,20 @@ async function materializeRepositoryReviewInput({
   const github = octokit as GitHubAppOctokit
   // Read trigger config from the API-resolved default branch, not the
   // user-selectable target_branch.
-  const { config: pathConfig } = await fetchTrustedRepositoryTriggerConfig(github, {
+  const trusted = await fetchTrustedRepositoryTriggerConfig(github, {
     owner_login,
     repo_name
   })
+  const pathConfig = trusted.config
 
   const prepared = await prepareRepositoryReviewInput({
     run_id,
     octokit: github,
     repo_full_name,
+    trusted_default_branch: {
+      default_branch: trusted.default_branch,
+      head_sha: trusted.head_sha
+    },
     target_branch,
     scan_mode,
     base_sha,

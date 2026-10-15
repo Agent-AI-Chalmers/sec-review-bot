@@ -4,6 +4,7 @@ import {
   listPullRequestFiles
 } from '../../github/pull-request-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { preparePullRequestReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
 import type { PullRequestReviewInput, TestChangesPolicy } from '../../runner/input.js'
@@ -86,12 +87,14 @@ async function materializePullRequestReviewInput({
   run_id,
   octokit,
   pr,
+  trusted_default_branch,
   event_type,
   test_changes = null
 }: {
   run_id: string
   octokit: unknown
   pr: PullRequestContext
+  trusted_default_branch: TrustedDefaultBranch
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   test_changes?: TestChangesPolicy | null
 }): Promise<{ run_id: string; input: PullRequestReviewInput; files: unknown[] }> {
@@ -133,6 +136,7 @@ async function materializePullRequestReviewInput({
   const prepared = await preparePullRequestReviewInput({
     run_id,
     octokit: octokit as GitHubAppOctokit,
+    trusted_default_branch,
     pr,
     files,
     test_changes
@@ -172,6 +176,7 @@ export async function startPullRequestReviewRun(args: {
   run_id: string
   octokit: unknown
   pr: PullRequestContext
+  trusted_default_branch: TrustedDefaultBranch
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   test_changes?: TestChangesPolicy | null
   // The caller hands the prepared input to Control Plane for durable submission.

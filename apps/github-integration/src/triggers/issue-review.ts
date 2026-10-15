@@ -7,6 +7,7 @@ import {
 import type { IssueContext } from '../github/issue-service.js'
 import { issueReviewPublishContext } from '../control-plane/publish-context.js'
 import { startIssueReviewRun, type SubmittedIssueReviewRun } from '../reviews/issues/submit.js'
+import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
 import type { TestChangesPolicy } from '../runner/input.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
@@ -34,6 +35,7 @@ interface StartIssueReviewCommandDeps {
 interface StartIssueReviewCommandArgs {
   octokit: unknown
   issue: IssueContext
+  trusted_default_branch: TrustedDefaultBranch
   event_type: IssueReviewEventType
   review_objective?: 'audit' | 'repair' | null
   test_changes?: TestChangesPolicy | null
@@ -50,6 +52,7 @@ interface StartedIssueReview {
 export async function startIssueReviewCommand({
   octokit,
   issue,
+  trusted_default_branch,
   event_type,
   review_objective = 'audit',
   test_changes = null,
@@ -83,6 +86,7 @@ export async function startIssueReviewCommand({
     submitted = await start_review({
       octokit,
       issue,
+      trusted_default_branch,
       run_id,
       event_type,
       review_objective: event_type === 'opened' ? 'audit' : review_objective,

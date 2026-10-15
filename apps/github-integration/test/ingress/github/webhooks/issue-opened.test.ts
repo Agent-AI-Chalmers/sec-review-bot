@@ -112,6 +112,7 @@ test('issue-opened skips self-originated payload before issue extraction', async
 
 test('issue-opened runs automatic workflow when trigger mode is automatic', async () => {
   let reviewCalled = false
+  let forwarded: { default_branch: string; head_sha: string } | null = null
 
   await handleIssueOpenedWithDeps(
     {
@@ -122,13 +123,16 @@ test('issue-opened runs automatic workflow when trigger mode is automatic', asyn
     {
       fetchTrustedRepositoryTriggerConfigFn: async () => trusted(automaticConfig()),
       isAutomaticTriggerModeEnabledFn: () => true,
-      startIssueReviewCommandFn: async () => {
+      startIssueReviewCommandFn: async ({ trusted_default_branch }) => {
         reviewCalled = true
+        forwarded = trusted_default_branch
       }
     }
   )
 
   assert.equal(reviewCalled, true)
+  // The resolved trusted branch is forwarded to the command (wiring pinned).
+  assert.deepEqual(forwarded, { default_branch: 'main', head_sha: 'main-sha' })
 })
 
 test('issue-opened rethrows invalid repository trigger config error', async () => {

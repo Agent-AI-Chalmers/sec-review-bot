@@ -63,6 +63,7 @@ async function runWith(
       run_id: 'run-issue-1',
       octokit: {},
       issue: issueContext(),
+      trusted_default_branch: { default_branch: 'main', head_sha: 'default-sha' },
       event_type: 'manual_review',
       review_objective,
       test_changes,

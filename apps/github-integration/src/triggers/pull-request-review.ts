@@ -5,6 +5,7 @@ import {
 } from '../control-plane/preparation-claim.js'
 
 import type { PullRequestContext } from '../github/pull-request-service.js'
+import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
 import { pullRequestReviewPublishContext } from '../control-plane/publish-context.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import type { TestChangesPolicy } from '../runner/input.js'
@@ -39,6 +40,7 @@ interface StartPullRequestReviewCommandArgs {
   octokit: unknown
   pr?: PullRequestContext
   resolve_pr?: () => Promise<PullRequestContext>
+  trusted_default_branch: TrustedDefaultBranch
   event_type: PullRequestReviewEventType
   // The PR path's only policy knob. The objective is fixed to `audit`, but an
   // audit review still reaches mitigation once a defect is confirmed, so the
@@ -57,6 +59,7 @@ export async function startPullRequestReviewCommand({
   octokit,
   pr,
   resolve_pr,
+  trusted_default_branch,
   event_type,
   test_changes = null,
   delivery_id,
@@ -95,6 +98,7 @@ export async function startPullRequestReviewCommand({
     submitted = await start_review({
       octokit,
       pr: resolvedPr,
+      trusted_default_branch,
       run_id,
       event_type,
       test_changes: event_type === 'manual_review' ? test_changes : null,

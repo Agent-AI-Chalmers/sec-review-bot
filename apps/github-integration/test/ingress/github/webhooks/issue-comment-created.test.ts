@@ -133,6 +133,10 @@ test('issue-comment-created skips manual command when commenter lacks write perm
       payload: createIssueCommentPayload()
     },
     {
+      resolveTrustedDefaultBranchFn: async () => ({
+        default_branch: 'main',
+        head_sha: 'default-sha'
+      }),
       authorizeManualCommentCommandFn: async () =>
         authorizationDecision({
           allowed: false,
@@ -157,6 +161,7 @@ test('issue-comment-created skips manual command when commenter lacks write perm
 test('issue-comment-created starts an audited issue manual review for write commenter', async () => {
   let review_objective: 'audit' | 'repair' | null | undefined = null
   let open_pr: boolean | null | undefined
+  let forwarded_trusted: { default_branch: string; head_sha: string } | null = null
 
   await handleIssueCommentCreatedWithDeps(
     {
@@ -167,14 +172,20 @@ test('issue-comment-created starts an audited issue manual review for write comm
       })
     },
     {
+      resolveTrustedDefaultBranchFn: async () => ({
+        default_branch: 'main',
+        head_sha: 'default-sha'
+      }),
       authorizeManualCommentCommandFn: async () => authorizationDecision(),
       startIssueReviewCommandFn: async ({
         issue,
         review_objective: next_review_objective,
-        open_pr: next_open_pr
+        open_pr: next_open_pr,
+        trusted_default_branch: next_trusted
       }) => {
         review_objective = next_review_objective
         open_pr = next_open_pr
+        forwarded_trusted = next_trusted
         return submittedIssueRun(issue)
       }
     }
@@ -185,6 +196,8 @@ test('issue-comment-created starts an audited issue manual review for write comm
   assert.equal(review_objective, 'audit')
   // A plain comment does not opt in to opening a draft PR.
   assert.equal(open_pr, false)
+  // The resolved trusted branch reaches the issue command.
+  assert.deepEqual(forwarded_trusted, { default_branch: 'main', head_sha: 'default-sha' })
 })
 
 test('issue-comment-created forwards the open-pr opt-in for issue reviews', async () => {
@@ -199,6 +212,10 @@ test('issue-comment-created forwards the open-pr opt-in for issue reviews', asyn
       })
     },
     {
+      resolveTrustedDefaultBranchFn: async () => ({
+        default_branch: 'main',
+        head_sha: 'default-sha'
+      }),
       authorizeManualCommentCommandFn: async () => authorizationDecision(),
       startIssueReviewCommandFn: async ({ issue, open_pr: next_open_pr }) => {
         open_pr = next_open_pr
@@ -212,6 +229,7 @@ test('issue-comment-created forwards the open-pr opt-in for issue reviews', asyn
 
 test('issue-comment-created starts pull request manual review for write commenter', async () => {
   let pullRequestReviewCalled = false
+  let forwarded_trusted: { default_branch: string; head_sha: string } | null = null
 
   await handleIssueCommentCreatedWithDeps(
     {
@@ -223,10 +241,15 @@ test('issue-comment-created starts pull request manual review for write commente
       })
     },
     {
+      resolveTrustedDefaultBranchFn: async () => ({
+        default_branch: 'main',
+        head_sha: 'default-sha'
+      }),
       authorizeManualCommentCommandFn: async () => authorizationDecision(),
       getPullRequestContextFn: async () => pullRequestContext(),
-      startPullRequestReviewCommandFn: async ({ resolve_pr }) => {
+      startPullRequestReviewCommandFn: async ({ resolve_pr, trusted_default_branch }) => {
         pullRequestReviewCalled = true
+        forwarded_trusted = trusted_default_branch
         const pr = await resolve_pr?.()
         assert.ok(pr)
         return submittedPullRequestRun(pr)
@@ -235,6 +258,7 @@ test('issue-comment-created starts pull request manual review for write commente
   )
 
   assert.equal(pullRequestReviewCalled, true)
+  assert.deepEqual(forwarded_trusted, { default_branch: 'main', head_sha: 'default-sha' })
 })
 
 test('issue-comment-created delegates PR context loading until after command admission', async () => {
@@ -248,6 +272,10 @@ test('issue-comment-created delegates PR context loading until after command adm
       payload: createIssueCommentPayload({ body: '@sec-review-bot review', is_pull_request: true })
     },
     {
+      resolveTrustedDefaultBranchFn: async () => ({
+        default_branch: 'main',
+        head_sha: 'default-sha'
+      }),
       authorizeManualCommentCommandFn: async () => authorizationDecision(),
       getPullRequestContextFn: async () => {
         contextLoaded = true
