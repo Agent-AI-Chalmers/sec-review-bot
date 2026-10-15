@@ -34,6 +34,16 @@ _ALLOWED_STEP_KEYS = frozenset({"run", "working-directory", "env", "timeout_seco
 _ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
+def _unknown_keys(keys: set[Any]) -> list[str]:
+    """Render unsupported mapping keys deterministically.
+
+    YAML mapping keys are not necessarily strings (a plain `1:` is an int), so a
+    raw `sorted()` over mixed key types raises TypeError. Sort the rendered form
+    instead so an unsupported key is always reported as a `SetupDeclarationError`.
+    """
+    return sorted(str(key) for key in keys)
+
+
 class SetupDeclarationError(ValueError):
     """Raised when a setup declaration is malformed or not allowed."""
 
@@ -98,11 +108,11 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
             "Setup declaration must be a mapping at the top level."
         )
 
-    unknown_top_level = sorted(set(parsed) - {"setup"})
+    unknown_top_level = _unknown_keys(set(parsed) - {"setup"})
     if unknown_top_level:
         raise SetupDeclarationError(
             "Setup declaration has unsupported top-level key(s): "
-            + ", ".join(str(key) for key in unknown_top_level)
+            + ", ".join(unknown_top_level)
         )
 
     raw_steps = parsed.get("setup")
@@ -128,10 +138,10 @@ def _parse_step(raw_step: Any, index: int, max_timeout: int) -> SetupDeclaration
     if not isinstance(raw_step, dict):
         raise SetupDeclarationError(f"{label} must be a mapping.")
 
-    unknown = sorted(set(raw_step) - _ALLOWED_STEP_KEYS)
+    unknown = _unknown_keys(set(raw_step) - _ALLOWED_STEP_KEYS)
     if unknown:
         raise SetupDeclarationError(
-            f"{label} has unsupported key(s): {', '.join(str(key) for key in unknown)}"
+            f"{label} has unsupported key(s): {', '.join(unknown)}"
         )
 
     run = raw_step.get("run")

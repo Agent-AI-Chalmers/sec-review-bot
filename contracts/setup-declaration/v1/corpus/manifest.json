@@ -18,6 +18,8 @@
     "invalid-env-value-boolean.yml",
     "invalid-missing-run.yml",
     "invalid-missing-setup-key.yml",
+    "invalid-mixed-type-step-keys.yml",
+    "invalid-mixed-type-top-level-keys.yml",
     "invalid-non-mapping-top-level.yml",
     "invalid-non-string-run-number.yml",
     "invalid-non-string-run.yml",

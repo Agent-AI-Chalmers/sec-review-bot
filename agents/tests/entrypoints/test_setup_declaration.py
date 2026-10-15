@@ -74,6 +74,21 @@ def test_rejects_missing_setup_key() -> None:
         parse_setup_declaration("{}\n")
 
 
+def test_rejects_mixed_type_unknown_top_level_keys() -> None:
+    # A YAML mapping key need not be a string (`1:` parses as an int). Reporting
+    # unsupported keys must not depend on their type being homogeneous: a raw
+    # `sorted()` over mixed int/str keys raised TypeError, escaping the
+    # SetupDeclarationError contract. The integration enforcer rejected the same
+    # document, so this also keeps the two enforcers on the same boundary.
+    with pytest.raises(SetupDeclarationError, match="unsupported top-level key"):
+        parse_setup_declaration("setup:\n  - run: x\n1: a\nfoo: b\n")
+
+
+def test_rejects_mixed_type_unknown_step_keys() -> None:
+    with pytest.raises(SetupDeclarationError, match="unsupported key"):
+        parse_setup_declaration("setup:\n  - run: x\n    1: a\n    foo: b\n")
+
+
 def test_rejects_uses_shorthand() -> None:
     with pytest.raises(SetupDeclarationError, match="unsupported key"):
         parse_setup_declaration("setup:\n  - uses: actions/checkout@v4\n")
