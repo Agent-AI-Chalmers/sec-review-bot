@@ -16,9 +16,12 @@ function buildMentionCandidates(): string[] {
       ? metadata.bot_login.trim().toLowerCase()
       : null
 
-  return [slug, bot_login, slug ? `${slug}-bot` : null, slug ? `${slug}-bot[bot]` : null].filter(
-    (item): item is string => Boolean(item)
-  )
+  return [
+    slug,
+    bot_login,
+    slug ? `${slug}-bot` : null,
+    slug ? `${slug}-bot[bot]` : null
+  ].filter((item): item is string => Boolean(item))
 }
 
 function stripMarkdownQuotedLines(body: string): string {
@@ -79,7 +82,10 @@ export function extractCommentCommand(body: unknown): {
   }
 
   for (const candidate of buildMentionCandidates()) {
-    const pattern = new RegExp(`(?:^|\\s)@${escapeRegExp(candidate)}(?:[,:]|\\s|$)`, 'i')
+    const pattern = new RegExp(
+      `(?:^|\\s)@${escapeRegExp(candidate)}(?:[,:]|\\s|$)`,
+      'i'
+    )
     const match = normalizedBody.match(pattern)
 
     if (!match) {

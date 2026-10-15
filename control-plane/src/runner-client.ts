@@ -1,6 +1,9 @@
 import { isIP } from 'node:net'
 
-import type { ControlPlaneWorkflow, RunnerArtifactStorage } from './contracts.js'
+import type {
+  ControlPlaneWorkflow,
+  RunnerArtifactStorage
+} from './contracts.js'
 import type { components } from './runner-api-schema.js'
 
 type JsonObject = Record<string, unknown>
@@ -38,14 +41,26 @@ type UnvalidatedRunnerError = Partial<components['schemas']['RunnerError']>
  * The values are listed once, as data, because the client checks them at runtime; the
  * assertion below ties that list to the contract so the two cannot drift.
  */
-const RUNNER_STATUS_VALUES = ['queued', 'running', 'succeeded', 'failed'] as const
+const RUNNER_STATUS_VALUES = [
+  'queued',
+  'running',
+  'succeeded',
+  'failed'
+] as const
 const RUNNER_STATUSES: ReadonlySet<string> = new Set(RUNNER_STATUS_VALUES)
 
-type SameValues<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
+type SameValues<A, B> = [A] extends [B]
+  ? [B] extends [A]
+    ? true
+    : false
+  : false
 type Expect<T extends true> = T
 /** Fails to compile if the runtime status list and the contract disagree either way. */
 export type StatusesMatchTheContract = Expect<
-  SameValues<(typeof RUNNER_STATUS_VALUES)[number], ContractRunResponse['status']>
+  SameValues<
+    (typeof RUNNER_STATUS_VALUES)[number],
+    ContractRunResponse['status']
+  >
 >
 
 export const RUNNER_RUN_NOT_FOUND = 'RUNNER_RUN_NOT_FOUND'
@@ -105,12 +120,20 @@ function isRecord(value: unknown): value is JsonObject {
 
 function isWorkflow(value: unknown): value is ControlPlaneWorkflow {
   return (
-    value === 'issue-review' || value === 'pull-request-review' || value === 'repository-review'
+    value === 'issue-review' ||
+    value === 'pull-request-review' ||
+    value === 'repository-review'
   )
 }
 
-function parseArtifactStorage(value: unknown, runId: string): RunnerArtifactStorage {
-  if (!isRecord(value) || !['available', 'unavailable', 'failed'].includes(String(value.status)))
+function parseArtifactStorage(
+  value: unknown,
+  runId: string
+): RunnerArtifactStorage {
+  if (
+    !isRecord(value) ||
+    !['available', 'unavailable', 'failed'].includes(String(value.status))
+  )
     throw new RunnerProtocolError(
       'RUNNER_INVALID_ARTIFACT_STORAGE',
       `Runner returned invalid artifact storage metadata for ${runId}.`
@@ -119,8 +142,11 @@ function parseArtifactStorage(value: unknown, runId: string): RunnerArtifactStor
   if (status !== 'available') {
     if (
       Object.hasOwn(value, 'artifact') ||
-      Object.keys(value).some((key) => !['status', 'error_code', 'message'].includes(key)) ||
-      (value.error_code !== undefined && typeof value.error_code !== 'string') ||
+      Object.keys(value).some(
+        (key) => !['status', 'error_code', 'message'].includes(key)
+      ) ||
+      (value.error_code !== undefined &&
+        typeof value.error_code !== 'string') ||
       (value.message !== undefined && typeof value.message !== 'string')
     )
       throw new RunnerProtocolError(
@@ -129,7 +155,9 @@ function parseArtifactStorage(value: unknown, runId: string): RunnerArtifactStor
       )
     return {
       status,
-      ...(typeof value.error_code === 'string' ? { error_code: value.error_code } : {}),
+      ...(typeof value.error_code === 'string'
+        ? { error_code: value.error_code }
+        : {}),
       ...(typeof value.message === 'string' ? { message: value.message } : {})
     }
   }
@@ -139,7 +167,8 @@ function parseArtifactStorage(value: unknown, runId: string): RunnerArtifactStor
     Object.keys(value).some((key) => !['status', 'artifact'].includes(key)) ||
     !isRecord(artifact) ||
     Object.keys(artifact).some(
-      (key) => !['kind', 'uri', 'media_type', 'digest', 'size_bytes'].includes(key)
+      (key) =>
+        !['kind', 'uri', 'media_type', 'digest', 'size_bytes'].includes(key)
     ) ||
     artifact.kind !== 'diagnostic_bundle' ||
     artifact.uri !== expectedUri ||
@@ -177,15 +206,20 @@ function serviceUrl(): string {
 
 function integerEnv(name: string, fallback: number, allowZero = false): number {
   const parsed = Number.parseInt(process.env[name] ?? '', 10)
-  return Number.isFinite(parsed) && (allowZero ? parsed >= 0 : parsed > 0) ? parsed : fallback
+  return Number.isFinite(parsed) && (allowZero ? parsed >= 0 : parsed > 0)
+    ? parsed
+    : fallback
 }
 
 function isLoopback(hostname: string): boolean {
   if (hostname === 'localhost') return true
   const value =
-    hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
+    hostname.startsWith('[') && hostname.endsWith(']')
+      ? hostname.slice(1, -1)
+      : hostname
   return (
-    (isIP(value) === 4 && value.split('.')[0] === '127') || (isIP(value) === 6 && value === '::1')
+    (isIP(value) === 4 && value.split('.')[0] === '127') ||
+    (isIP(value) === 6 && value === '::1')
   )
 }
 
@@ -194,7 +228,9 @@ function serviceHeaders(url: string): Record<string, string> {
   const parsed = new URL(url)
   if (!token && !(parsed.protocol === 'http:' && isLoopback(parsed.hostname))) {
     throw Object.assign(
-      new Error('AGENT_RUNNER_SERVICE_TOKEN is required unless Runner uses loopback HTTP.'),
+      new Error(
+        'AGENT_RUNNER_SERVICE_TOKEN is required unless Runner uses loopback HTTP.'
+      ),
       { code: 'RUNNER_SERVICE_TOKEN_MISSING' }
     )
   }
@@ -206,12 +242,17 @@ function serviceHeaders(url: string): Record<string, string> {
 
 function runnerError(body: unknown, status: number): AgentRunnerServiceError {
   const source =
-    isRecord(body) && isRecord(body.error) ? (body.error as UnvalidatedRunnerError) : {}
-  return Object.assign(new Error(source.message ?? `Runner returned HTTP ${status}.`), {
-    name: 'AgentRunnerServiceError' as const,
-    code: source.code ?? 'RUNNER_SERVICE_ERROR',
-    retryable: source.retryable ?? (status === 429 || status >= 500)
-  })
+    isRecord(body) && isRecord(body.error)
+      ? (body.error as UnvalidatedRunnerError)
+      : {}
+  return Object.assign(
+    new Error(source.message ?? `Runner returned HTTP ${status}.`),
+    {
+      name: 'AgentRunnerServiceError' as const,
+      code: source.code ?? 'RUNNER_SERVICE_ERROR',
+      retryable: source.retryable ?? (status === 429 || status >= 500)
+    }
+  )
 }
 
 function isRetryableStatus(status: number): boolean {
@@ -219,13 +260,20 @@ function isRetryableStatus(status: number): boolean {
 }
 
 function isTransientTransportError(error: unknown): boolean {
-  return error instanceof TypeError || (error instanceof Error && error.name === 'AbortError')
+  return (
+    error instanceof TypeError ||
+    (error instanceof Error && error.name === 'AbortError')
+  )
 }
 
 async function request(
   path: string,
   init: RequestInit
-): Promise<{ response: Response; body: unknown; bodyParseError?: SyntaxError }> {
+): Promise<{
+  response: Response
+  body: unknown
+  bodyParseError?: SyntaxError
+}> {
   const base = serviceUrl()
   const retries = integerEnv('AGENT_RUNNER_SERVICE_REQUEST_RETRIES', 2, true)
   const timeout = integerEnv('AGENT_RUNNER_SERVICE_REQUEST_TIMEOUT_MS', 30_000)
@@ -308,12 +356,19 @@ export async function submitRunnerRun({
   run_id: string
   input: JsonObject
 }): Promise<void> {
-  let result: { response: Response; body: unknown; bodyParseError?: SyntaxError }
+  let result: {
+    response: Response
+    body: unknown
+    bodyParseError?: SyntaxError
+  }
   try {
-    result = await request(`/v1/workflows/${encodeURIComponent(workflow)}/runs`, {
-      method: 'POST',
-      body: JSON.stringify({ run_id, input })
-    })
+    result = await request(
+      `/v1/workflows/${encodeURIComponent(workflow)}/runs`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ run_id, input })
+      }
+    )
   } catch (error) {
     throw new RunnerSubmissionUncertainError(
       `Runner submission state is uncertain for run ${run_id}.`,
@@ -380,7 +435,11 @@ export async function getRunnerRunStatuses(
   const missing: string[] = []
   const byRunId = new Map<string, string>()
 
-  for (let start = 0; start < runIds.length; start += RUNNER_STATUS_QUERY_LIMIT) {
+  for (
+    let start = 0;
+    start < runIds.length;
+    start += RUNNER_STATUS_QUERY_LIMIT
+  ) {
     const batch = await readRunnerRunStatuses(
       runIds.slice(start, start + RUNNER_STATUS_QUERY_LIMIT)
     )
@@ -393,7 +452,9 @@ export async function getRunnerRunStatuses(
 }
 
 /** One status request, within the batch size the runner accepts. */
-async function readRunnerRunStatuses(runIds: readonly string[]): Promise<RunnerRunStatusBatch> {
+async function readRunnerRunStatuses(
+  runIds: readonly string[]
+): Promise<RunnerRunStatusBatch> {
   const { response, body, bodyParseError } = await request('/v1/runs/status', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -407,7 +468,11 @@ async function readRunnerRunStatuses(runIds: readonly string[]): Promise<RunnerR
       { cause: bodyParseError }
     )
   }
-  if (!isRecord(body) || !Array.isArray(body.runs) || !Array.isArray(body.missing)) {
+  if (
+    !isRecord(body) ||
+    !Array.isArray(body.runs) ||
+    !Array.isArray(body.missing)
+  ) {
     throw new RunnerProtocolError(
       'RUNNER_INVALID_RESPONSE',
       'Runner returned an invalid status query response.'
@@ -416,7 +481,11 @@ async function readRunnerRunStatuses(runIds: readonly string[]): Promise<RunnerR
   const runs: RunnerRunStatusToken[] = []
   const byRunId = new Map<string, string>()
   for (const entry of body.runs) {
-    if (!isRecord(entry) || typeof entry.run_id !== 'string' || typeof entry.status !== 'string') {
+    if (
+      !isRecord(entry) ||
+      typeof entry.run_id !== 'string' ||
+      typeof entry.status !== 'string'
+    ) {
       throw new RunnerProtocolError(
         'RUNNER_INVALID_RESPONSE',
         'Runner returned an invalid status entry.'
@@ -431,7 +500,9 @@ async function readRunnerRunStatuses(runIds: readonly string[]): Promise<RunnerR
     runs.push({ run_id: entry.run_id, status: entry.status })
     byRunId.set(entry.run_id, entry.status)
   }
-  const missing = body.missing.filter((value): value is string => typeof value === 'string')
+  const missing = body.missing.filter(
+    (value): value is string => typeof value === 'string'
+  )
   return { runs, missing, byRunId }
 }
 
@@ -457,9 +528,13 @@ export async function getRunnerRunStatus(
     workflow: parsed.workflow as ControlPlaneWorkflow,
     status: parsed.status,
     ...(Object.hasOwn(parsed, 'result') ? { result: parsed.result } : {}),
-    ...(isRecord(parsed.error) ? { error: parsed.error as UnvalidatedRunnerError } : {}),
+    ...(isRecord(parsed.error)
+      ? { error: parsed.error as UnvalidatedRunnerError }
+      : {}),
     ...(parsed.artifact_storage === undefined
       ? {}
-      : { artifact_storage: parseArtifactStorage(parsed.artifact_storage, runId) })
+      : {
+          artifact_storage: parseArtifactStorage(parsed.artifact_storage, runId)
+        })
   }
 }

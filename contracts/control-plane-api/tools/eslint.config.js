@@ -41,7 +41,10 @@ export default [
       ...tsPlugin.configs.recommended.rules,
       '@typescript-eslint/ban-ts-comment': 'off',
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_' }
+      ],
       quotes: ['error', 'single', { avoidEscape: true }],
       semi: ['error', 'never'],
       'comma-dangle': ['error', 'never'],

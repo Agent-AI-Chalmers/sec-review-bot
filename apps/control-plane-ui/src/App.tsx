@@ -16,7 +16,12 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowRight, IconCheck, IconCopy, IconRefresh } from '@tabler/icons-react'
+import {
+  IconArrowRight,
+  IconCheck,
+  IconCopy,
+  IconRefresh
+} from '@tabler/icons-react'
 import { ApiError, login } from './api.js'
 import { formatDate, useLanguage, useMessages } from './i18n.js'
 import { PreferenceControls, usePreferences } from './preferences.js'
@@ -121,13 +126,16 @@ export function RefreshControls({
   autoRefreshEnabled?: boolean
 }): React.JSX.Element {
   const { language } = useLanguage()
-  const { autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } = usePreferences()
+  const { autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } =
+    usePreferences()
   const t = useMessages()
   return (
     <Stack gap={4} align="flex-end" className="refresh-controls">
       <Text c="dimmed" size="xs" ta="right">
         {t('lastChecked')}:{' '}
-        {lastChecked ? formatDate(lastChecked.toISOString(), language) : t('neverChecked')}
+        {lastChecked
+          ? formatDate(lastChecked.toISOString(), language)
+          : t('neverChecked')}
       </Text>
       <Group gap="sm" wrap="nowrap">
         <Switch
@@ -141,7 +149,9 @@ export function RefreshControls({
           value={String(refreshInterval)}
           disabled={!autoRefresh || !autoRefreshEnabled}
           onChange={(event) =>
-            setRefreshInterval(Number(event.currentTarget.value) as 5000 | 15000 | 30000 | 60000)
+            setRefreshInterval(
+              Number(event.currentTarget.value) as 5000 | 15000 | 30000 | 60000
+            )
           }
         >
           <option value="5000">5s</option>
@@ -225,7 +235,8 @@ class ErrorBoundary extends React.Component<
     )
   }
   render(): React.ReactNode {
-    if (this.state.error instanceof ApiError && this.state.error.status === 401) return <Login />
+    if (this.state.error instanceof ApiError && this.state.error.status === 401)
+      return <Login />
     if (this.state.error) return <ErrorFallback error={this.state.error} />
     return this.props.children
   }
@@ -269,7 +280,8 @@ export function App(): React.JSX.Element {
                   onSubmit={(event) => {
                     event.preventDefault()
                     const requestedRunId = runIdInput.trim()
-                    if (requestedRunId) navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
+                    if (requestedRunId)
+                      navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
                   }}
                 >
                   <Group gap={6} align="center" wrap="nowrap">
@@ -279,9 +291,16 @@ export function App(): React.JSX.Element {
                       value={runIdInput}
                       size="sm"
                       ff="monospace"
-                      onChange={(event) => setRunIdInput(event.currentTarget.value)}
+                      onChange={(event) =>
+                        setRunIdInput(event.currentTarget.value)
+                      }
                     />
-                    <ActionIcon type="submit" aria-label={t('goToRun')} variant="filled" size={36}>
+                    <ActionIcon
+                      type="submit"
+                      aria-label={t('goToRun')}
+                      variant="filled"
+                      size={36}
+                    >
                       <IconArrowRight size={16} />
                     </ActionIcon>
                   </Group>

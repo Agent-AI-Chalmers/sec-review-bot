@@ -20,6 +20,9 @@ test('splitRepoFullName rejects ambiguous or malformed repository names', () => 
     'octo-/example',
     'octo/.'
   ]) {
-    assert.throws(() => splitRepoFullName(value), /Invalid repository full name/)
+    assert.throws(
+      () => splitRepoFullName(value),
+      /Invalid repository full name/
+    )
   }
 })

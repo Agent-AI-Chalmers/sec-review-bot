@@ -7,10 +7,9 @@ import test from 'node:test'
 import { writeInputBundleManifest } from '../../src/runner/input-bundle-manifest.js'
 
 async function readManifest(root: string): Promise<Record<string, unknown>> {
-  return JSON.parse(await fs.readFile(path.join(root, 'manifest.json'), 'utf8')) as Record<
-    string,
-    unknown
-  >
+  return JSON.parse(
+    await fs.readFile(path.join(root, 'manifest.json'), 'utf8')
+  ) as Record<string, unknown>
 }
 
 test('writes the contract v6 manifest without a setup declaration field', async () => {

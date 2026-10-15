@@ -1,4 +1,8 @@
-const SENSITIVE_EXACT_PATHS = new Set(['CODEOWNERS', '.github/CODEOWNERS', 'docs/CODEOWNERS'])
+const SENSITIVE_EXACT_PATHS = new Set([
+  'CODEOWNERS',
+  '.github/CODEOWNERS',
+  'docs/CODEOWNERS'
+])
 
 function isSensitivePath(path: string): boolean {
   if (SENSITIVE_EXACT_PATHS.has(path)) {
@@ -32,21 +36,29 @@ export function validateRepoRelativePathShape(value: string): string {
 }
 
 export function validateRepoRelativePath(value: string): string {
-  const normalized = validateRepoRelativePathShape(value.trim().replace(/\\/g, '/'))
+  const normalized = validateRepoRelativePathShape(
+    value.trim().replace(/\\/g, '/')
+  )
 
   // Model-authored PRs must not silently change repository security controls.
   if (isSensitivePath(normalized)) {
-    throw new Error(`Sensitive repository file path requires explicit policy: ${normalized}`)
+    throw new Error(
+      `Sensitive repository file path requires explicit policy: ${normalized}`
+    )
   }
 
   return normalized
 }
 
-export function validateContractPublishableRepoRelativePath(value: string): string {
+export function validateContractPublishableRepoRelativePath(
+  value: string
+): string {
   const normalized = validateRepoRelativePathShape(value)
 
   if (isSensitivePath(normalized)) {
-    throw new Error(`Sensitive repository file path requires explicit policy: ${normalized}`)
+    throw new Error(
+      `Sensitive repository file path requires explicit policy: ${normalized}`
+    )
   }
 
   return normalized

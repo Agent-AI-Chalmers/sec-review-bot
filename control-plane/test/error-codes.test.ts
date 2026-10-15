@@ -35,9 +35,14 @@ test('the closed error-code set is exactly the contract enum', () => {
   // the machine-readable reason. Read the enum from openapi.yaml itself (not from the
   // generator) so this compares the published contract against the emitted array.
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as {
-    components?: { schemas?: { ErrorResponse?: { properties?: { code?: { enum?: unknown[] } } } } }
+    components?: {
+      schemas?: {
+        ErrorResponse?: { properties?: { code?: { enum?: unknown[] } } }
+      }
+    }
   }
-  const enumValues = spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
+  const enumValues =
+    spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
 
   assert.deepEqual(
     [...ERROR_RESPONSE_CODES_FROM_CONTRACT].sort(),

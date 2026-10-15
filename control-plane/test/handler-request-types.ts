@@ -14,7 +14,9 @@ import type { PathParams, RequestBody } from '../src/route-types.js'
 
 type Expect<T extends true> = T
 type Equals<A, B> =
-  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false
 
 /** The body an operation's handler reads is exactly the body the contract declares — so a
  * renamed, added, or removed field in `openapi.yaml` breaks the handler, not the caller. */
@@ -33,7 +35,10 @@ export type PublicationStepsBodyMatchesContract = Expect<
 >
 
 export type PathParamsMatchContract = Expect<
-  Equals<PathParams<'completePublicationStep'>, { runId: string; stepKey: string }>
+  Equals<
+    PathParams<'completePublicationStep'>,
+    { runId: string; stepKey: string }
+  >
 >
 
 /** The handler reads `step_keys`, the name the contract declares. If the contract renames it,

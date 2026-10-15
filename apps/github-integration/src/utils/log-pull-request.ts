@@ -16,7 +16,9 @@ function displayString(value: unknown): string {
 }
 
 function displayNumber(value: unknown): number | string {
-  return typeof value === 'number' && Number.isFinite(value) ? value : '(missing)'
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : '(missing)'
 }
 
 function asBoolean(value: unknown, fallback = false): boolean {
@@ -53,7 +55,8 @@ export function logPullRequestPayload(payload: unknown): void {
   const additions = displayNumber(pullRequest.additions)
   const deletions = displayNumber(pullRequest.deletions)
   const from_fork =
-    asString(pullRequestHeadRepo.full_name) !== asString(pullRequestBaseRepo.full_name)
+    asString(pullRequestHeadRepo.full_name) !==
+    asString(pullRequestBaseRepo.full_name)
 
   logInfo('webhook_received_completed', {
     action,

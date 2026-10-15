@@ -1,4 +1,12 @@
-import { Badge, Button, Card, createTheme, Paper, Table, Timeline } from '@mantine/core'
+import {
+  Badge,
+  Button,
+  Card,
+  createTheme,
+  Paper,
+  Table,
+  Timeline
+} from '@mantine/core'
 
 /**
  * Console-wide design tokens.
@@ -16,7 +24,18 @@ export const MONO_STACK =
 /** Amber accent, deliberately outside the blue-violet range that AI-generated UIs
  * default to, and far enough in hue from the green/red status colours that the two
  * never read as related. Mantine requires a fixed ten-shade tuple, darkest last. */
-const brand: [string, string, string, string, string, string, string, string, string, string] = [
+const brand: [
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string
+] = [
   '#fff8ed',
   '#ffefd4',
   '#ffe0a8',

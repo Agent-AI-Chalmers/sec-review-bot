@@ -14,19 +14,25 @@
 // It checks for the status key, not the response it points at: the shared
 // `components.responses.InternalError` / `PayloadTooLarge` are the ones to reuse, but pinning
 // the `$ref` target here would duplicate that decision rather than leave it to review.
-export default function operationDeclaresServerErrors(operation, _options, context) {
+export default function operationDeclaresServerErrors(
+  operation,
+  _options,
+  context
+) {
   const responses = operation.responses ?? {}
   const problems = []
 
   if (responses['500'] === undefined) {
     problems.push({
-      message: 'operation must declare a `500` response (any internal fault can return it).',
+      message:
+        'operation must declare a `500` response (any internal fault can return it).',
       path: [...context.path, 'responses']
     })
   }
   if (operation.requestBody !== undefined && responses['413'] === undefined) {
     problems.push({
-      message: 'operation reads a request body, so it must declare a `413` response.',
+      message:
+        'operation reads a request body, so it must declare a `413` response.',
       path: [...context.path, 'responses']
     })
   }

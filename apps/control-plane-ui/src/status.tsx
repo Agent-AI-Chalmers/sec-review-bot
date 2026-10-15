@@ -21,7 +21,13 @@ export function statusToneColor(tone: StatusTone): string {
   return 'gray'
 }
 
-function StatusText({ label, tone }: { label: string; tone: StatusTone }): React.JSX.Element {
+function StatusText({
+  label,
+  tone
+}: {
+  label: string
+  tone: StatusTone
+}): React.JSX.Element {
   return (
     <span className="status-text">
       <span className={`status-dot status-dot-${tone}`} aria-hidden="true" />
@@ -51,7 +57,12 @@ export function ExecutionStatus({
   status: Run['execution_status']
 }): React.JSX.Element {
   const t = useMessages()
-  return <StatusText label={executionStatusLabel(status, t)} tone={executionTone(status)} />
+  return (
+    <StatusText
+      label={executionStatusLabel(status, t)}
+      tone={executionTone(status)}
+    />
+  )
 }
 
 export function PublicationStatus({
@@ -60,7 +71,12 @@ export function PublicationStatus({
   status: Run['publication_status']
 }): React.JSX.Element {
   const t = useMessages()
-  return <StatusText label={runPublicationStatusLabel(status, t)} tone={publicationTone(status)} />
+  return (
+    <StatusText
+      label={runPublicationStatusLabel(status, t)}
+      tone={publicationTone(status)}
+    />
+  )
 }
 
 export function statusBullet(tone: StatusTone): React.ReactNode {

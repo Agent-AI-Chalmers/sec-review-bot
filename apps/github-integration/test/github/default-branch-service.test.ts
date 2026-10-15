@@ -24,7 +24,10 @@ function makeOctokit(options: {
   onRepoGet?: (call: RepoGetCall) => void
   onBranchGet?: (call: BranchGetCall) => void
 }) {
-  const calls = { repoGet: [] as RepoGetCall[], branchGet: [] as BranchGetCall[] }
+  const calls = {
+    repoGet: [] as RepoGetCall[],
+    branchGet: [] as BranchGetCall[]
+  }
   const octokit = {
     rest: {
       repos: {
@@ -37,16 +40,18 @@ function makeOctokit(options: {
         getContent: async () => ({
           data: {
             type: 'file',
-            content: Buffer.from('sec_review_bot:\n  trigger_mode: manual_only\n').toString(
-              'base64'
-            )
+            content: Buffer.from(
+              'sec_review_bot:\n  trigger_mode: manual_only\n'
+            ).toString('base64')
           }
         }),
         getBranch: async ({ owner, repo, branch }: BranchGetCall) => {
           calls.branchGet.push({ owner, repo, branch })
           options.onBranchGet?.({ owner, repo, branch })
           if (options.branchThrows) throw options.branchThrows
-          return { data: { commit: { sha: options.head_sha ?? 'default-sha' } } }
+          return {
+            data: { commit: { sha: options.head_sha ?? 'default-sha' } }
+          }
         }
       }
     }
@@ -60,20 +65,29 @@ test('resolveTrustedDefaultBranch resolves the default branch via the API', asyn
     default_branch: 'trunk',
     head_sha: 'trunk-sha'
   })
-  const result: TrustedDefaultBranch = await resolveTrustedDefaultBranch(octokit, {
-    owner_login: 'octo',
-    repo_name: 'example'
-  })
+  const result: TrustedDefaultBranch = await resolveTrustedDefaultBranch(
+    octokit,
+    {
+      owner_login: 'octo',
+      repo_name: 'example'
+    }
+  )
   assert.deepEqual(result, { default_branch: 'trunk', head_sha: 'trunk-sha' })
   assert.deepEqual(calls.repoGet, [{ owner: 'octo', repo: 'example' }])
-  assert.deepEqual(calls.branchGet, [{ owner: 'octo', repo: 'example', branch: 'trunk' }])
+  assert.deepEqual(calls.branchGet, [
+    { owner: 'octo', repo: 'example', branch: 'trunk' }
+  ])
 })
 
 // Invariant 4: API failure -> explicit failure, no fallback.
 test('resolveTrustedDefaultBranch throws when the repository API call fails', async () => {
   const { octokit } = makeOctokit({ getThrows: new Error('403 rate limited') })
   await assert.rejects(
-    () => resolveTrustedDefaultBranch(octokit, { owner_login: 'octo', repo_name: 'example' }),
+    () =>
+      resolveTrustedDefaultBranch(octokit, {
+        owner_login: 'octo',
+        repo_name: 'example'
+      }),
     /403 rate limited/
   )
 })
@@ -81,7 +95,11 @@ test('resolveTrustedDefaultBranch throws when the repository API call fails', as
 test('resolveTrustedDefaultBranch throws when the branch API call fails', async () => {
   const { octokit } = makeOctokit({ branchThrows: new Error('404 not found') })
   await assert.rejects(
-    () => resolveTrustedDefaultBranch(octokit, { owner_login: 'octo', repo_name: 'example' }),
+    () =>
+      resolveTrustedDefaultBranch(octokit, {
+        owner_login: 'octo',
+        repo_name: 'example'
+      }),
     /404 not found/
   )
 })
@@ -89,7 +107,11 @@ test('resolveTrustedDefaultBranch throws when the branch API call fails', async 
 test('resolveTrustedDefaultBranch rejects an empty default branch', async () => {
   const { octokit } = makeOctokit({ default_branch: '' })
   await assert.rejects(
-    () => resolveTrustedDefaultBranch(octokit, { owner_login: 'octo', repo_name: 'example' }),
+    () =>
+      resolveTrustedDefaultBranch(octokit, {
+        owner_login: 'octo',
+        repo_name: 'example'
+      }),
     /empty default branch/
   )
 })
@@ -127,7 +149,10 @@ test('resolveTrustedRepositoryIdentity falls back to repo_full_name when base is
 // Wiring: a fork PR's trusted identity (base repo) drives which repository the
 // config/declaration resolution actually hits.
 test('fetchTrustedRepositoryTriggerConfig resolves against the base repo, not the fork', async () => {
-  const { octokit, calls } = makeOctokit({ default_branch: 'main', head_sha: 'base-sha' })
+  const { octokit, calls } = makeOctokit({
+    default_branch: 'main',
+    head_sha: 'base-sha'
+  })
   const { fetchTrustedRepositoryTriggerConfig } =
     await import('../../src/github/repo-config-service.js')
 
@@ -135,7 +160,9 @@ test('fetchTrustedRepositoryTriggerConfig resolves against the base repo, not th
     repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example'
   })
-  await fetchTrustedRepositoryTriggerConfig(octokit, identity).catch(() => undefined)
+  await fetchTrustedRepositoryTriggerConfig(octokit, identity).catch(
+    () => undefined
+  )
 
   for (const call of calls.repoGet) {
     assert.equal(call.owner, 'octo')

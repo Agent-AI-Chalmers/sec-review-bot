@@ -33,7 +33,9 @@ test('pull request renderer preserves inline code in review prose', () => {
       regression_status: 'not-run',
       resolution_next_step: 'none',
       patch_findings: [],
-      verification_findings: ['`agents/tests/memory/test_memory.py` covers the prompt contract.'],
+      verification_findings: [
+        '`agents/tests/memory/test_memory.py` covers the prompt contract.'
+      ],
       residual_risks: []
     },
     cvss: null
@@ -78,7 +80,10 @@ test('pull request renderer summarizes each review stage without implying PR fil
 
   assert.match(body, /- Analysis: `no actionable security finding`/)
   assert.match(body, /- Mitigation: `not needed`/)
-  assert.match(body, /- Verification: `full coverage; static review; checks not run`/)
+  assert.match(
+    body,
+    /- Verification: `full coverage; static review; checks not run`/
+  )
   assert.doesNotMatch(body, /- Tests:/)
   assert.doesNotMatch(body, /Changed files: `0`/)
   assert.doesNotMatch(body, /Resolution next step: `none`/)

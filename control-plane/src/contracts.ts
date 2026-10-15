@@ -24,4 +24,5 @@ export type ControlPlaneWorkflow =
  * `runner-api-schema.ts` projects here. This name is kept because the rest of the package
  * imports it, but the definition has one home rather than three.
  */
-export type RunnerArtifactStorage = components['schemas']['RunnerArtifactStorage']
+export type RunnerArtifactStorage =
+  components['schemas']['RunnerArtifactStorage']

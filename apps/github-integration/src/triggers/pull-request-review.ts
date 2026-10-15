@@ -16,7 +16,8 @@ import {
   type SubmittedPullRequestReviewRun
 } from '../reviews/pull-requests/submit.js'
 
-type PullRequestReviewEventType = 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
+type PullRequestReviewEventType =
+  'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 type StartPullRequestReview = typeof startPullRequestReviewRun
 type PullRequestReviewControlPlaneClient = {
   admitReviewRun: (
@@ -24,8 +25,12 @@ type PullRequestReviewControlPlaneClient = {
   ) =>
     | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
     | ReturnType<typeof controlPlaneClient.admitReviewRun>
-  failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
-  submitPreparedRun: (...args: Parameters<typeof controlPlaneClient.submitPreparedRun>) => unknown
+  failPreparation: (
+    ...args: Parameters<typeof controlPlaneClient.failPreparation>
+  ) => unknown
+  submitPreparedRun: (
+    ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
+  ) => unknown
   renewPreparationClaim: (
     ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
   ) => Promise<boolean>
@@ -48,7 +53,11 @@ interface StartPullRequestReviewCommandArgs {
   // patch-level test-changes constraint stays meaningful here.
   test_changes?: TestChangesPolicy | null
   delivery_id: string
-  on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
+  on_admitted?: (admission: {
+    run_id: string
+    status: string
+    replayed: boolean
+  }) => void
   deps?: Partial<StartPullRequestReviewCommandDeps>
 }
 
@@ -67,7 +76,10 @@ export async function startPullRequestReviewCommand({
   on_admitted,
   deps = {}
 }: StartPullRequestReviewCommandArgs): Promise<StartedPullRequestReview> {
-  const { start_review = startPullRequestReviewRun, store = controlPlaneClient } = deps
+  const {
+    start_review = startPullRequestReviewRun,
+    store = controlPlaneClient
+  } = deps
   const admission = await admitReviewRun(store, {
     workflow: 'pull-request-review',
     ingress_kind: 'github_webhook',
@@ -84,8 +96,14 @@ export async function startPullRequestReviewCommand({
   const run_id = admission.run_id
   const preparationToken = admission.preparation_token
   if (!preparationToken)
-    throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
-  const heartbeat = await startPreparationClaimHeartbeat(store, run_id, preparationToken)
+    throw new Error(
+      `Newly admitted review run ${run_id} has no preparation claim.`
+    )
+  const heartbeat = await startPreparationClaimHeartbeat(
+    store,
+    run_id,
+    preparationToken
+  )
 
   let submitted: SubmittedPullRequestReviewRun
   try {
@@ -123,7 +141,9 @@ export async function startPullRequestReviewCommand({
       !(error instanceof PreparationClaimLostError)
     ) {
       await store.failPreparation(run_id, preparationToken, {
-        code: isSetupDeclarationError(error) ? 'SETUP_DECLARATION_INVALID' : 'REVIEW_START_FAILED',
+        code: isSetupDeclarationError(error)
+          ? 'SETUP_DECLARATION_INVALID'
+          : 'REVIEW_START_FAILED',
         message: error instanceof Error ? error.message : String(error)
       })
     }

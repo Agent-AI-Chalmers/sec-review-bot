@@ -64,7 +64,8 @@ function asNonEmptyString(value: unknown): string {
 
 function buildVerifierHeadline(verification: unknown): string {
   const safeVerifier = isRecord(verification) ? verification : {}
-  const patch_coverage = asNonEmptyString(safeVerifier.patch_coverage) || 'unknown'
+  const patch_coverage =
+    asNonEmptyString(safeVerifier.patch_coverage) || 'unknown'
 
   return `Verifier assessed patch=${patch_coverage}.`
 }
@@ -94,7 +95,9 @@ function renderIssueMitigationSection(mitigation: unknown): string | null {
 
   const changed_files = asList<string>(safeMitigation.changed_files)
 
-  const lines = [String(safeMitigation.overview ?? 'Issue mitigation completed.')]
+  const lines = [
+    String(safeMitigation.overview ?? 'Issue mitigation completed.')
+  ]
 
   if (changed_files.length > 0) {
     lines.push('', ...renderChangedFilesLines(changed_files))
@@ -119,12 +122,22 @@ function renderIssueVerificationSection(verification: unknown): string | null {
   return lines.join('\n')
 }
 
-function renderFoldedSection(summary: string, body: string | null): string | null {
+function renderFoldedSection(
+  summary: string,
+  body: string | null
+): string | null {
   if (!body) {
     return null
   }
 
-  return ['<details>', `<summary>${summary}</summary>`, '', body, '', '</details>'].join('\n')
+  return [
+    '<details>',
+    `<summary>${summary}</summary>`,
+    '',
+    body,
+    '',
+    '</details>'
+  ].join('\n')
 }
 
 function renderIssueCodeModificationSummary(
@@ -137,7 +150,9 @@ function renderIssueCodeModificationSummary(
     return null
   }
 
-  const changed_files = Array.isArray(draftPrPlan.changed_files) ? draftPrPlan.changed_files : []
+  const changed_files = Array.isArray(draftPrPlan.changed_files)
+    ? draftPrPlan.changed_files
+    : []
   const lines = [
     '## Code Modification Summary',
     '',
@@ -170,7 +185,14 @@ function renderIssueCodeModificationSummary(
   )
 
   if (draftPrPlan.patch_preview) {
-    lines.push('', '### Patch Preview', '', '```diff', draftPrPlan.patch_preview, '```')
+    lines.push(
+      '',
+      '### Patch Preview',
+      '',
+      '```diff',
+      draftPrPlan.patch_preview,
+      '```'
+    )
   }
 
   lines.push(
@@ -192,9 +214,15 @@ function renderSuggestedDraftPrSection(
 
   const sections = draftPrPlan.sections ?? {}
   const summary = Array.isArray(sections.summary) ? sections.summary : []
-  const code_changes = Array.isArray(sections.code_changes) ? sections.code_changes : []
-  const verification = Array.isArray(sections.verification) ? sections.verification : []
-  const residual_risks = Array.isArray(sections.residual_risks) ? sections.residual_risks : []
+  const code_changes = Array.isArray(sections.code_changes)
+    ? sections.code_changes
+    : []
+  const verification = Array.isArray(sections.verification)
+    ? sections.verification
+    : []
+  const residual_risks = Array.isArray(sections.residual_risks)
+    ? sections.residual_risks
+    : []
 
   const lines = [
     '## Suggested Draft PR',
@@ -293,19 +321,31 @@ function renderFoldedBlock(summary: string, bodyLines: unknown): string[] {
   // dropping them glues a label to the text that follows it. Only an entirely
   // blank body means the block has nothing to show.
   const lines = Array.isArray(bodyLines)
-    ? bodyLines.map((line) => (line === null || line === undefined ? '' : String(line)))
+    ? bodyLines.map((line) =>
+        line === null || line === undefined ? '' : String(line)
+      )
     : []
 
   if (lines.every((line) => line.trim() === '')) {
     return []
   }
 
-  return ['<details>', `<summary>${summary}</summary>`, '', ...lines, '', '</details>']
+  return [
+    '<details>',
+    `<summary>${summary}</summary>`,
+    '',
+    ...lines,
+    '',
+    '</details>'
+  ]
 }
 
-export function buildDraftPullRequestTitleFromReviewRecord(issue: IssueLike): string {
+export function buildDraftPullRequestTitleFromReviewRecord(
+  issue: IssueLike
+): string {
   const shortTitle =
-    asNonEmptyString(issue.issue_title) || `Mitigate security issue #${issue.issue_number}`
+    asNonEmptyString(issue.issue_title) ||
+    `Mitigate security issue #${issue.issue_number}`
 
   return `[sec] ${shortTitle}`
 }
@@ -385,9 +425,13 @@ export async function buildSuggestedDraftPrPlanFromReviewRecord({
   issue: IssueLike
   review_record: ReviewRecord | null | undefined
 }): Promise<DraftPrPlanLike> {
-  const changed_files = normalizeDisplayFiles(review_record?.mitigation?.changed_files)
+  const changed_files = normalizeDisplayFiles(
+    review_record?.mitigation?.changed_files
+  )
   const patch_ready = hasReviewRecordPatchReadyForPromotion(review_record)
-  const patch_preview = patch_ready ? buildPatchPreviewFromReviewRecord(review_record) : null
+  const patch_preview = patch_ready
+    ? buildPatchPreviewFromReviewRecord(review_record)
+    : null
   const verification = review_record?.verification ?? EMPTY_VERIFICATION
   const title = buildDraftPullRequestTitleFromReviewRecord(issue)
 
@@ -453,7 +497,8 @@ export function renderIssueReviewCommentFromReviewRecord({
     String(
       verification.patch_coverage
         ? buildVerifierHeadline(verification)
-        : (analysis.overview ?? `Security review completed for issue #${issue.issue_number}.`)
+        : (analysis.overview ??
+            `Security review completed for issue #${issue.issue_number}.`)
     )
   ].join('\n')
 
@@ -461,16 +506,26 @@ export function renderIssueReviewCommentFromReviewRecord({
     promotionComment ?? securitySummary,
     draftPullRequest?.html_url
       ? null
-      : renderIssueCodeModificationSummary(mitigation, draftPrPlan, draftPullRequest),
+      : renderIssueCodeModificationSummary(
+          mitigation,
+          draftPrPlan,
+          draftPullRequest
+        ),
     draftPullRequest?.html_url
       ? null
       : renderFoldedSection(
           'Suggested Draft PR',
           renderSuggestedDraftPrSection(issue, draftPrPlan, draftPullRequest)
         ),
-    draftPullRequest?.html_url ? null : renderFoldedSection('Analysis', analysisSection),
-    draftPullRequest?.html_url ? null : renderFoldedSection('Mitigation', mitigationSection),
-    draftPullRequest?.html_url ? null : renderFoldedSection('Verification', verificationSection)
+    draftPullRequest?.html_url
+      ? null
+      : renderFoldedSection('Analysis', analysisSection),
+    draftPullRequest?.html_url
+      ? null
+      : renderFoldedSection('Mitigation', mitigationSection),
+    draftPullRequest?.html_url
+      ? null
+      : renderFoldedSection('Verification', verificationSection)
   ]
     .filter((item): item is string => Boolean(item))
     .join('\n\n')

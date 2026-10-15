@@ -25,23 +25,33 @@ export type {
   ReviewRunRecord
 }
 
-export type WorkflowName = 'issue-review' | 'pull-request-review' | 'repository-review'
+export type WorkflowName =
+  'issue-review' | 'pull-request-review' | 'repository-review'
 export type IngressKind = 'github_webhook' | 'github_actions_dispatch'
 export type RunnerStatus =
   'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-export type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+export type PublicationStatus =
+  'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
 export type JsonObject = Record<string, unknown>
 
 /** The durable record's artifact storage, narrowed from the runner's loose type. */
 export type ArtifactStorage = ReviewRunRecord['artifact_storage']
 
 /** The observed step summary is the step record minus the reconciliation id. */
-export type PublicationStepSummary = Omit<PublicationStepRecord, 'remote_object_id'>
+export type PublicationStepSummary = Omit<
+  PublicationStepRecord,
+  'remote_object_id'
+>
 
 /** The arguments the store accepts for a new run. */
 export type CreateReviewRunArgs = Pick<
   ReviewRunRecord,
-  'run_id' | 'workflow' | 'publish_context' | 'runner_input' | 'ingress_kind' | 'ingress_key'
+  | 'run_id'
+  | 'workflow'
+  | 'publish_context'
+  | 'runner_input'
+  | 'ingress_kind'
+  | 'ingress_key'
 >
 
 /** Narrow the runner's loose artifact-storage type into the status-discriminated contract
@@ -78,7 +88,9 @@ export function normalizeArtifactStorage(
     }
     return {
       status: 'available',
-      artifact: artifact as NonNullable<Extract<ArtifactStorage, { artifact: unknown }>>['artifact']
+      artifact: artifact as NonNullable<
+        Extract<ArtifactStorage, { artifact: unknown }>
+      >['artifact']
     }
   }
   return {

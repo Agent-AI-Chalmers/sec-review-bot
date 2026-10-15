@@ -8,7 +8,10 @@ export class BackgroundPreparations {
 
   constructor(private readonly log_failure: FailureLogger = logError) {}
 
-  start(execution: Promise<unknown>, context: Record<string, unknown> = {}): void {
+  start(
+    execution: Promise<unknown>,
+    context: Record<string, unknown> = {}
+  ): void {
     this.active.add(execution)
     void execution
       .catch((error: unknown) => {

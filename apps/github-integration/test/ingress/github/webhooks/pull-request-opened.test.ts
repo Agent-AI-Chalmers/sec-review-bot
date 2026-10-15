@@ -25,11 +25,17 @@ function manualOnlyConfig() {
   }
 }
 
-function trusted(config: ReturnType<typeof automaticConfig> | ReturnType<typeof manualOnlyConfig>) {
+function trusted(
+  config:
+    ReturnType<typeof automaticConfig> | ReturnType<typeof manualOnlyConfig>
+) {
   return { config, default_branch: 'main', head_sha: 'main-sha' }
 }
 
-function createPullRequestOpenedPayload({ draft = false, fromFork = false } = {}) {
+function createPullRequestOpenedPayload({
+  draft = false,
+  fromFork = false
+} = {}) {
   return {
     action: 'opened',
     before: null,
@@ -89,7 +95,8 @@ test('pull-request-opened skips automatic workflow when trigger mode is manual_o
       payload: createPullRequestOpenedPayload()
     },
     {
-      fetchTrustedRepositoryTriggerConfigFn: async () => trusted(manualOnlyConfig()),
+      fetchTrustedRepositoryTriggerConfigFn: async () =>
+        trusted(manualOnlyConfig()),
       isAutomaticTriggerModeEnabledFn: () => false,
       startPullRequestReviewCommandFn: async () => {
         reviewCalled = true
@@ -141,7 +148,8 @@ test('pull-request-opened runs automatic workflow when trigger mode is automatic
       payload: createPullRequestOpenedPayload()
     },
     {
-      fetchTrustedRepositoryTriggerConfigFn: async () => trusted(automaticConfig()),
+      fetchTrustedRepositoryTriggerConfigFn: async () =>
+        trusted(automaticConfig()),
       isAutomaticTriggerModeEnabledFn: () => true,
       startPullRequestReviewCommandFn: async ({ trusted_default_branch }) => {
         reviewCalled = true
@@ -174,8 +182,9 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
         fetchTrustedRepositoryTriggerConfigFn: async () => {
           throw configError
         },
-        isRepositoryTriggerConfigErrorFn: (error): error is RepositoryTriggerConfigError =>
-          Boolean(error)
+        isRepositoryTriggerConfigErrorFn: (
+          error
+        ): error is RepositoryTriggerConfigError => Boolean(error)
       }
     ),
     configError
@@ -206,5 +215,9 @@ test('pull-request-opened skips automatic review for fork PRs', async () => {
   )
 
   assert.equal(reviewCalled, false, 'fork PR must not auto-review')
-  assert.equal(configFetched, false, 'fork PR must be skipped before config fetch')
+  assert.equal(
+    configFetched,
+    false,
+    'fork PR must be skipped before config fetch'
+  )
 })

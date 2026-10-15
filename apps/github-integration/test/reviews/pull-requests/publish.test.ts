@@ -7,13 +7,17 @@ import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 
 const stepStore = {
   initializePublicationSteps: async () => {},
-  listPublicationSteps: async () => [{ step_key: 'pull-request:review', status: 'pending' }],
+  listPublicationSteps: async () => [
+    { step_key: 'pull-request:review', status: 'pending' }
+  ],
   requirePublicationStepClaim: async () => {},
   completePublicationStep: async () => true,
   failPublicationStep: async () => true
 }
 
-function pullRequestContext(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function pullRequestContext(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
   return {
     action: 'opened',
     previous_head_sha: null,
@@ -37,8 +41,10 @@ function pullRequestContext(overrides: Record<string, unknown> = {}): Record<str
     html_url: 'https://example.test/octo/example/pull/7',
     api_url: 'https://api.example.test/repos/octo/example/pulls/7',
     commits_url: 'https://api.example.test/repos/octo/example/pulls/7/commits',
-    review_comments_url: 'https://api.example.test/repos/octo/example/pulls/7/comments',
-    comments_url: 'https://api.example.test/repos/octo/example/issues/7/comments',
+    review_comments_url:
+      'https://api.example.test/repos/octo/example/pulls/7/comments',
+    comments_url:
+      'https://api.example.test/repos/octo/example/issues/7/comments',
     issue_url: 'https://api.example.test/repos/octo/example/issues/7',
     head_repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example',
@@ -47,7 +53,9 @@ function pullRequestContext(overrides: Record<string, unknown> = {}): Record<str
   }
 }
 
-function review_record(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function review_record(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
   return {
     analysis: {
       verdict: 'confirmed-vulnerability',
@@ -156,10 +164,18 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
       comments: []
     }
   )
-  assert.match(reviewArgs.body, /<!-- sec-review-bot:pull-request-review-run:run-1 -->/)
+  assert.match(
+    reviewArgs.body,
+    /<!-- sec-review-bot:pull-request-review-run:run-1 -->/
+  )
   assert.match(reviewArgs.body, /## PR Security Review/)
   assert.deepEqual(completed, [
-    ['run-1', 'test-claim', 'pull-request:review', { id: 2, url: 'https://example.test/review/2' }]
+    [
+      'run-1',
+      'test-claim',
+      'pull-request:review',
+      { id: 2, url: 'https://example.test/review/2' }
+    ]
   ])
 })
 

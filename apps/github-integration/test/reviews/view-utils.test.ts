@@ -114,7 +114,10 @@ test('view utils keep narrative scope decisions visible', () => {
         scope_analysis: 'Only this route builds an export path.'
       },
       related_paths: [
-        { label: 'src/server.ts route mounting', relationship: 'different-semantics' }
+        {
+          label: 'src/server.ts route mounting',
+          relationship: 'different-semantics'
+        }
       ]
     }
   ])

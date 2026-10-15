@@ -17,7 +17,11 @@
 // was unnecessary. It returns result objects rather than calling `context.report`, which is
 // how Spectral 6's plain function form communicates findings.
 
-export default function operationRequiresSecurity(operation, _options, context) {
+export default function operationRequiresSecurity(
+  operation,
+  _options,
+  context
+) {
   if (Array.isArray(operation.security)) return
 
   // `context.path` is [...pathSegments, method, ...]; the path string is two up from here

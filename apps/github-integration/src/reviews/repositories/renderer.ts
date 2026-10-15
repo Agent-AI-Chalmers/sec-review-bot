@@ -78,11 +78,20 @@ function caseResultsById(case_results: unknown[]): Map<string, AnyRecord> {
 }
 
 function renderFoldedBlock(summary: string, bodyLines: string[]): string[] {
-  const lines = asList<string>(bodyLines).filter((line) => line !== null && line !== undefined)
+  const lines = asList<string>(bodyLines).filter(
+    (line) => line !== null && line !== undefined
+  )
   if (!lines.some((line) => nonEmptyText(line).length > 0)) {
     return []
   }
-  return ['<details>', `<summary>${summary}</summary>`, '', ...lines, '', '</details>']
+  return [
+    '<details>',
+    `<summary>${summary}</summary>`,
+    '',
+    ...lines,
+    '',
+    '</details>'
+  ]
 }
 
 function parseCvssBaseVector(vector: unknown): Record<string, string> {
@@ -115,7 +124,9 @@ function numericField(value: unknown): number {
   return parsed ?? 0
 }
 
-function buildScanSummaryView(value: unknown): NonNullable<WorkflowResultLike['scan_summary']> {
+function buildScanSummaryView(
+  value: unknown
+): NonNullable<WorkflowResultLike['scan_summary']> {
   const summary = isRecord(value) ? value : {}
   return {
     scannable_file_count: numericField(summary.scannable_file_count),
@@ -192,14 +203,19 @@ export function buildRepositorySummaryWorkflowView(
 
 function renderCvssScoringSection(cvss: AnyRecord): string[] {
   const outcome = nonEmptyText(cvss.outcome)
-  const overview = String(cvss.overview ?? 'No CVSS scoring overview was recorded.')
+  const overview = String(
+    cvss.overview ?? 'No CVSS scoring overview was recorded.'
+  )
   if (outcome === 'not-scored') {
     return [
       '#### CVSS',
       '',
       '- Outcome: `not-scored`',
       '',
-      String(cvss.not_scored_reason ?? 'Current case is not independently CVSS-scoreable.'),
+      String(
+        cvss.not_scored_reason ??
+          'Current case is not independently CVSS-scoreable.'
+      ),
       ''
     ]
   }
@@ -305,8 +321,8 @@ function coordinationNotesForDeliveries(deliveries: DeliveryLike[]): string[] {
   }
 
   const notes: string[] = []
-  for (const [filePath, items] of [...byFile.entries()].sort(([left], [right]) =>
-    left.localeCompare(right)
+  for (const [filePath, items] of [...byFile.entries()].sort(
+    ([left], [right]) => left.localeCompare(right)
   )) {
     if (items.length < 2) {
       continue
@@ -318,7 +334,9 @@ function coordinationNotesForDeliveries(deliveries: DeliveryLike[]): string[] {
       .map((item) => {
         const label = deliveryIdForDelivery(item)
         const html_url = nonEmptyText(item.html_url)
-        return html_url ? `[${inlineCode(label)}](${html_url})` : inlineCode(label)
+        return html_url
+          ? `[${inlineCode(label)}](${html_url})`
+          : inlineCode(label)
       })
       .join(', ')
     notes.push(
@@ -335,7 +353,9 @@ function renderMitigationSummaryLines(
 ): string[] {
   return [
     nonEmptyText(mitigation.overview) || fallback,
-    ...(options.includeReferencePatch ? renderReferencePatch(mitigation.patch_diff) : [])
+    ...(options.includeReferencePatch
+      ? renderReferencePatch(mitigation.patch_diff)
+      : [])
   ]
 }
 
@@ -351,7 +371,11 @@ function blockedConfirmedCaseId(caseResult: AnyRecord): string {
   return nonEmptyText(caseResult.case_id) || 'unknown'
 }
 
-function blockedConfirmedCaseTitle(case_id: string, analysis: AnyRecord, cvss: AnyRecord): string {
+function blockedConfirmedCaseTitle(
+  case_id: string,
+  analysis: AnyRecord,
+  cvss: AnyRecord
+): string {
   const severity = nonEmptyText(cvss.severity) || 'unscored'
   const overview = compactText(analysis.overview, 96)
   const suffix = overview || 'confirmed but not fully verified'
@@ -385,27 +409,42 @@ function isBlockedConfirmedCase(caseResult: AnyRecord): boolean {
   if (nonEmptyText(caseResult.disposition) === 'keep') {
     return false
   }
-  const review_record = isRecord(caseResult.review_record) ? caseResult.review_record : {}
-  const analysis = isRecord(review_record.analysis) ? review_record.analysis : {}
-  return ['confirmed-defect', 'confirmed-vulnerability', 'plausible-risk'].includes(
-    nonEmptyText(analysis.verdict) ?? ''
-  )
+  const review_record = isRecord(caseResult.review_record)
+    ? caseResult.review_record
+    : {}
+  const analysis = isRecord(review_record.analysis)
+    ? review_record.analysis
+    : {}
+  return [
+    'confirmed-defect',
+    'confirmed-vulnerability',
+    'plausible-risk'
+  ].includes(nonEmptyText(analysis.verdict) ?? '')
 }
 
 function renderBlockedConfirmedCases(case_results: AnyRecord[]): string[] {
   const blocks: string[] = []
   for (const caseResult of case_results) {
-    const review_record = isRecord(caseResult.review_record) ? caseResult.review_record : {}
-    const analysis = isRecord(review_record.analysis) ? review_record.analysis : {}
+    const review_record = isRecord(caseResult.review_record)
+      ? caseResult.review_record
+      : {}
+    const analysis = isRecord(review_record.analysis)
+      ? review_record.analysis
+      : {}
     if (!isBlockedConfirmedCase(caseResult)) {
       continue
     }
 
-    const mitigation = isRecord(review_record.mitigation) ? review_record.mitigation : {}
-    const verification = isRecord(review_record.verification) ? review_record.verification : {}
+    const mitigation = isRecord(review_record.mitigation)
+      ? review_record.mitigation
+      : {}
+    const verification = isRecord(review_record.verification)
+      ? review_record.verification
+      : {}
     const cvss = isRecord(review_record.cvss) ? review_record.cvss : {}
     const case_id = blockedConfirmedCaseId(caseResult)
-    const dispositionReason = nonEmptyText(caseResult.reason) || 'No verified fix was produced.'
+    const dispositionReason =
+      nonEmptyText(caseResult.reason) || 'No verified fix was produced.'
 
     const body = [
       // The status lines belong in the card body so the title only carries case
@@ -421,22 +460,37 @@ function renderBlockedConfirmedCases(case_results: AnyRecord[]): string[] {
       ...renderFoldedBlock('CVSS', renderCvssScoringBody(cvss)),
       ...renderFoldedBlock(
         'Mitigation',
-        renderMitigationSummaryLines(mitigation, dispositionReason, { includeReferencePatch: true })
+        renderMitigationSummaryLines(mitigation, dispositionReason, {
+          includeReferencePatch: true
+        })
       ),
       ...renderFoldedBlock(
         'Verification',
-        renderVerificationSummaryLines(verification, { fallback: dispositionReason })
+        renderVerificationSummaryLines(verification, {
+          fallback: dispositionReason
+        })
       )
     ]
 
-    blocks.push(...renderFoldedBlock(blockedConfirmedCaseTitle(case_id, analysis, cvss), body))
+    blocks.push(
+      ...renderFoldedBlock(
+        blockedConfirmedCaseTitle(case_id, analysis, cvss),
+        body
+      )
+    )
   }
   return blocks
 }
 
-export function buildRepoReviewSummaryBody({ repo }: { repo: RepoLike }): string {
+export function buildRepoReviewSummaryBody({
+  repo
+}: {
+  repo: RepoLike
+}): string {
   const repo_full_name =
-    typeof repo.repo_full_name === 'string' ? repo.repo_full_name : 'unknown/unknown'
+    typeof repo.repo_full_name === 'string'
+      ? repo.repo_full_name
+      : 'unknown/unknown'
   return [
     '# Repository Security Review Summary',
     '',
@@ -465,10 +519,13 @@ export function renderRepositorySecuritySummaryComment({
   scan_target?: RepositoryScanTargetLike
 }): string {
   const case_results = asList<AnyRecord>(workflow_result?.case_results)
-  const cvss_summary = workflow_result?.cvss_summary ?? buildCvssSummaryFromCases(case_results)
+  const cvss_summary =
+    workflow_result?.cvss_summary ?? buildCvssSummaryFromCases(case_results)
   const cvss_severity_counts = cvss_summary.severity_counts ?? {}
   const blockedConfirmedCaseBlocks = renderBlockedConfirmedCases(case_results)
-  const blockedConfirmedCaseCount = case_results.filter(isBlockedConfirmedCase).length
+  const blockedConfirmedCaseCount = case_results.filter(
+    isBlockedConfirmedCase
+  ).length
   const keep_case_count = case_results.filter(
     (item) => String(item?.disposition ?? '') === 'keep'
   ).length
@@ -520,13 +577,23 @@ export function renderRepositorySecuritySummaryComment({
 
   lines.push(...renderFoldedBlock('Scan summary details', scanSummaryLines))
 
-  const normalizedDeliveryEntries = asList<PublishedDeliveryEntryLike>(published_delivery_entries)
+  const normalizedDeliveryEntries = asList<PublishedDeliveryEntryLike>(
+    published_delivery_entries
+  )
 
   if (normalizedDeliveryEntries.length > 0) {
     lines.push('', '### Published Delivery PRs', '')
-    lines.push("_Grouped by each delivery PR's highest case CVSS severity._", '')
-    const sortedDeliveryEntries = sortDeliveriesByRisk(normalizedDeliveryEntries)
-    const deliveryEntriesBySeverity = new Map<string, PublishedDeliveryEntryLike[]>()
+    lines.push(
+      "_Grouped by each delivery PR's highest case CVSS severity._",
+      ''
+    )
+    const sortedDeliveryEntries = sortDeliveriesByRisk(
+      normalizedDeliveryEntries
+    )
+    const deliveryEntriesBySeverity = new Map<
+      string,
+      PublishedDeliveryEntryLike[]
+    >()
 
     for (const item of sortedDeliveryEntries) {
       const severityKey = deliverySeverityKey(item)
@@ -536,7 +603,9 @@ export function renderRepositorySecuritySummaryComment({
       deliveryEntriesBySeverity.get(severityKey)?.push(item)
     }
 
-    for (const severityKey of sortSeverityKeys([...deliveryEntriesBySeverity.keys()])) {
+    for (const severityKey of sortSeverityKeys([
+      ...deliveryEntriesBySeverity.keys()
+    ])) {
       const group = deliveryEntriesBySeverity.get(severityKey) ?? []
       lines.push(`#### ${severityKey} (${group.length})`, '')
       for (const [index, item] of group.entries()) {
@@ -547,14 +616,26 @@ export function renderRepositorySecuritySummaryComment({
       }
       lines.push('')
     }
-    const coordinationNotes = coordinationNotesForDeliveries(normalizedDeliveryEntries)
+    const coordinationNotes = coordinationNotesForDeliveries(
+      normalizedDeliveryEntries
+    )
     if (coordinationNotes.length > 0) {
-      lines.push('### Coordination Notes', '', ...coordinationNotes.map((item) => `- ${item}`), '')
+      lines.push(
+        '### Coordination Notes',
+        '',
+        ...coordinationNotes.map((item) => `- ${item}`),
+        ''
+      )
     }
   }
 
   if (blockedConfirmedCaseBlocks.length > 0) {
-    lines.push('', '### Blocked Confirmed Cases', '', ...blockedConfirmedCaseBlocks)
+    lines.push(
+      '',
+      '### Blocked Confirmed Cases',
+      '',
+      ...blockedConfirmedCaseBlocks
+    )
   }
 
   return lines.join('\n')
@@ -571,12 +652,15 @@ export function buildDeliveryDraftPrBody({
 }): string {
   const normalizedDelivery = (delivery ?? {}) as DeliveryLike
   const repo_full_name =
-    typeof repo.repo_full_name === 'string' ? repo.repo_full_name : 'unknown/unknown'
+    typeof repo.repo_full_name === 'string'
+      ? repo.repo_full_name
+      : 'unknown/unknown'
   const changed_files = fileChangePaths(normalizedDelivery.file_changes)
   const case_ids = asList(normalizedDelivery.case_ids)
     .map(nonEmptyText)
     .filter((item) => item.length > 0)
-  const case_count = optionalNumber(normalizedDelivery.case_count) ?? case_ids.length
+  const case_count =
+    optionalNumber(normalizedDelivery.case_count) ?? case_ids.length
   const primaryCaseId = case_ids[0] ?? 'unknown'
   const casesById = caseResultsById(case_results)
 
@@ -602,10 +686,18 @@ export function buildDeliveryDraftPrBody({
     if (!caseResult) {
       return []
     }
-    const review_record = isRecord(caseResult.review_record) ? caseResult.review_record : {}
-    const analysis = isRecord(review_record.analysis) ? review_record.analysis : {}
-    const mitigation = isRecord(review_record.mitigation) ? review_record.mitigation : {}
-    const verification = isRecord(review_record.verification) ? review_record.verification : {}
+    const review_record = isRecord(caseResult.review_record)
+      ? caseResult.review_record
+      : {}
+    const analysis = isRecord(review_record.analysis)
+      ? review_record.analysis
+      : {}
+    const mitigation = isRecord(review_record.mitigation)
+      ? review_record.mitigation
+      : {}
+    const verification = isRecord(review_record.verification)
+      ? review_record.verification
+      : {}
     const cvss = isRecord(review_record.cvss) ? review_record.cvss : {}
     const body = [
       `### Case ${inlineCode(case_id)}`,
@@ -623,7 +715,10 @@ export function buildDeliveryDraftPrBody({
       ...renderFoldedBlock('CVSS', renderCvssScoringBody(cvss)),
       ...renderFoldedBlock(
         'Mitigation',
-        renderMitigationSummaryLines(mitigation, 'No mitigation overview was recorded.')
+        renderMitigationSummaryLines(
+          mitigation,
+          'No mitigation overview was recorded.'
+        )
       ),
       ...renderFoldedBlock(
         'Verification',

@@ -67,7 +67,9 @@ function isOwnPullRequestApprovalError(error: unknown): boolean {
           return String(item)
         })
       : [String(responseErrors ?? '')])
-  ].filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+  ].filter(
+    (item): item is string => typeof item === 'string' && item.trim() !== ''
+  )
 
   return errorTexts.some((item) => {
     const text = item.toLowerCase()
@@ -98,7 +100,10 @@ async function findIssueCommentByMarker(
     repo_name,
     issue_number,
     marker
-  }: Omit<CreateIssueCommentUnlessMarkerExistsArgs, 'body' | 'assert_publication_claim'>
+  }: Omit<
+    CreateIssueCommentUnlessMarkerExistsArgs,
+    'body' | 'assert_publication_claim'
+  >
 ): Promise<IssueCommentSummary | null> {
   let page = 1
 
@@ -181,7 +186,9 @@ async function createPullRequestReview(
     event = 'COMMENT',
     comments,
     assert_publication_claim
-  }: CreatePullRequestReviewArgs & { assert_publication_claim: () => Promise<void> }
+  }: CreatePullRequestReviewArgs & {
+    assert_publication_claim: () => Promise<void>
+  }
 ): Promise<{ id: number; html_url: string; state: string }> {
   const request = {
     owner: owner_login,
@@ -193,7 +200,9 @@ async function createPullRequestReview(
     comments
   }
 
-  let response: Awaited<ReturnType<GitHubAppOctokit['rest']['pulls']['createReview']>>
+  let response: Awaited<
+    ReturnType<GitHubAppOctokit['rest']['pulls']['createReview']>
+  >
   try {
     await assert_publication_claim()
     response = await octokit.rest.pulls.createReview(request)

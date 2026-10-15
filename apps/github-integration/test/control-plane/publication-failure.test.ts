@@ -35,13 +35,23 @@ test('Control Plane publication faults that cannot be repaired fail rather than 
       'control-plane-deterministic-publication-fault'
     ]
   ] as const) {
-    const error = Object.assign(new Error('Publication step set is not usable.'), { code })
-    assert.deepEqual(classifyPublicationFailure(error), { retry: false, code, reason })
+    const error = Object.assign(
+      new Error('Publication step set is not usable.'),
+      { code }
+    )
+    assert.deepEqual(classifyPublicationFailure(error), {
+      retry: false,
+      code,
+      reason
+    })
   }
 
-  assert.deepEqual(classifyPublicationFailure(new Error('Publication step set changed.')), {
-    retry: true,
-    code: null,
-    reason: 'unknown-publish-error'
-  })
+  assert.deepEqual(
+    classifyPublicationFailure(new Error('Publication step set changed.')),
+    {
+      retry: true,
+      code: null,
+      reason: 'unknown-publish-error'
+    }
+  )
 })

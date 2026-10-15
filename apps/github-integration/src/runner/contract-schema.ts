@@ -1,7 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
+import {
+  Ajv2020,
+  type AnySchemaObject,
+  type ValidateFunction
+} from 'ajv/dist/2020.js'
 
 import type { WorkflowName } from './shapes.js'
 import { CONTRACT_VERSION_DIR } from './contract-version.js'
@@ -18,7 +22,14 @@ function contractSchemasRoot(): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
   const candidates = [
     ...(configuredRoot
-      ? [path.resolve(configuredRoot, 'integration-contract', CONTRACT_VERSION_DIR, 'schemas')]
+      ? [
+          path.resolve(
+            configuredRoot,
+            'integration-contract',
+            CONTRACT_VERSION_DIR,
+            'schemas'
+          )
+        ]
       : []),
     path.resolve(
       process.cwd(),
@@ -49,7 +60,9 @@ function contractSchemasRoot(): string {
 }
 
 function readSchema(root: string, name: string): AnySchemaObject {
-  return JSON.parse(readFileSync(path.join(root, name), 'utf8')) as AnySchemaObject
+  return JSON.parse(
+    readFileSync(path.join(root, name), 'utf8')
+  ) as AnySchemaObject
 }
 
 function resultValidators(): Map<string, ValidateFunction> {
@@ -63,11 +76,16 @@ function resultValidators(): Map<string, ValidateFunction> {
   ajv.addSchema(commonSchema)
 
   validators = new Map<string, ValidateFunction>([
-    ['review-record.schema.json', ajv.compile(readSchema(root, 'review-record.schema.json'))],
-    ...Object.values(RESULT_SCHEMA_BY_WORKFLOW).map((name): [string, ValidateFunction] => [
-      name,
-      ajv.compile(readSchema(root, name))
-    ])
+    [
+      'review-record.schema.json',
+      ajv.compile(readSchema(root, 'review-record.schema.json'))
+    ],
+    ...Object.values(RESULT_SCHEMA_BY_WORKFLOW).map(
+      (name): [string, ValidateFunction] => [
+        name,
+        ajv.compile(readSchema(root, name))
+      ]
+    )
   ])
   return validators
 }
@@ -79,7 +97,10 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
   }
   if (!validate(value)) {
     const details = validate.errors
-      ?.map((error) => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
+      ?.map(
+        (error) =>
+          `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`
+      )
       .join('; ')
     throw new Error(
       `${label} does not match contract ${CONTRACT_VERSION_DIR}${details ? `: ${details}` : '.'}`
@@ -94,7 +115,10 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
  * `CONTRACT_VERSION_DIR` (the single source of truth for the on-disk contract
  * version), so this function tracks contract bumps without a rename.
  */
-export function assertWorkflowResult(workflow: WorkflowName, value: unknown): void {
+export function assertWorkflowResult(
+  workflow: WorkflowName,
+  value: unknown
+): void {
   assertSchema(RESULT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} result`)
 }
 

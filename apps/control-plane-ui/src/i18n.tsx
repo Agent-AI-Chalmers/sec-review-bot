@@ -184,7 +184,11 @@ const LanguageContext = React.createContext<{
   setLanguage: () => {}
 })
 
-export function LanguageProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+export function LanguageProvider({
+  children
+}: {
+  children: React.ReactNode
+}): React.JSX.Element {
   // Keep the selected UI language local to this console; it is presentation
   // state, not Control Plane account settings.
   const [language, setLanguage] = React.useState<Language>(

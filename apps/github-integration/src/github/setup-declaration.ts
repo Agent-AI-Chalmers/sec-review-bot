@@ -30,7 +30,12 @@ import { isRecord } from '../utils/error-utils.js'
 // parser and the contract schema carry the same limit.
 export const MAX_SETUP_DECLARATION_BYTES = 65536
 
-const ALLOWED_STEP_KEYS = new Set(['run', 'working-directory', 'env', 'timeout_seconds'])
+const ALLOWED_STEP_KEYS = new Set([
+  'run',
+  'working-directory',
+  'env',
+  'timeout_seconds'
+])
 const ALLOWED_TOP_LEVEL_KEYS = new Set(['setup'])
 
 // Emitted as `export KEY=...`; restrict to portable shell identifiers so a
@@ -75,7 +80,9 @@ export class SetupDeclarationError extends Error {
   }
 }
 
-export function isSetupDeclarationError(error: unknown): error is SetupDeclarationError {
+export function isSetupDeclarationError(
+  error: unknown
+): error is SetupDeclarationError {
   return (
     error instanceof SetupDeclarationError ||
     (typeof error === 'object' &&
@@ -179,9 +186,12 @@ function rejectNonIntegerTimeoutScalars(contents: Node | null): void {
     const source = typeof timeout.source === 'string' ? timeout.source : ''
     // Integer syntax only: no fraction/exponent marker.
     if (/[.eE]/.test(source)) {
-      throw new SetupDeclarationError(`setup[${index}].timeout_seconds must be an integer.`, {
-        reason: 'invalid-timeout'
-      })
+      throw new SetupDeclarationError(
+        `setup[${index}].timeout_seconds must be an integer.`,
+        {
+          reason: 'invalid-timeout'
+        }
+      )
     }
   })
 }
@@ -189,28 +199,39 @@ function rejectNonIntegerTimeoutScalars(contents: Node | null): void {
 function parseStep(raw: unknown, index: number): SetupDeclarationStep {
   const label = `setup[${index}]`
   if (!isRecord(raw)) {
-    throw new SetupDeclarationError(`${label} must be a mapping.`, { reason: 'step-not-a-mapping' })
+    throw new SetupDeclarationError(`${label} must be a mapping.`, {
+      reason: 'step-not-a-mapping'
+    })
   }
 
   const unknownKeys = Object.keys(raw)
     .filter((key) => !ALLOWED_STEP_KEYS.has(key))
     .sort()
   if (unknownKeys.length > 0) {
-    throw new SetupDeclarationError(`${label} has unsupported key(s): ${unknownKeys.join(', ')}`, {
-      reason: 'unsupported-step-key'
-    })
+    throw new SetupDeclarationError(
+      `${label} has unsupported key(s): ${unknownKeys.join(', ')}`,
+      {
+        reason: 'unsupported-step-key'
+      }
+    )
   }
 
   const run = raw['run']
   if (run === undefined || run === null) {
-    throw new SetupDeclarationError(`${label} is missing the required 'run' key.`, {
-      reason: 'missing-run'
-    })
+    throw new SetupDeclarationError(
+      `${label} is missing the required 'run' key.`,
+      {
+        reason: 'missing-run'
+      }
+    )
   }
   if (typeof run !== 'string' || run.trim() === '') {
-    throw new SetupDeclarationError(`${label}.run must be a non-empty string.`, {
-      reason: 'invalid-run'
-    })
+    throw new SetupDeclarationError(
+      `${label}.run must be a non-empty string.`,
+      {
+        reason: 'invalid-run'
+      }
+    )
   }
 
   return {
@@ -226,9 +247,12 @@ function parseWorkingDirectory(value: unknown, label: string): string | null {
     return null
   }
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new SetupDeclarationError(`${label}.working-directory must be a non-empty string.`, {
-      reason: 'invalid-working-directory'
-    })
+    throw new SetupDeclarationError(
+      `${label}.working-directory must be a non-empty string.`,
+      {
+        reason: 'invalid-working-directory'
+      }
+    )
   }
   const normalized = value.trim()
   const parts = normalized.split('/')
@@ -252,16 +276,22 @@ function parseEnv(value: unknown, label: string): Record<string, string> {
     return {}
   }
   if (!isRecord(value)) {
-    throw new SetupDeclarationError(`${label}.env must be a mapping of strings.`, {
-      reason: 'invalid-env'
-    })
+    throw new SetupDeclarationError(
+      `${label}.env must be a mapping of strings.`,
+      {
+        reason: 'invalid-env'
+      }
+    )
   }
   const env: Record<string, string> = {}
   for (const [key, item] of Object.entries(value)) {
     if (typeof item !== 'string') {
-      throw new SetupDeclarationError(`${label}.env must map string keys to string values.`, {
-        reason: 'invalid-env'
-      })
+      throw new SetupDeclarationError(
+        `${label}.env must map string keys to string values.`,
+        {
+          reason: 'invalid-env'
+        }
+      )
     }
     if (!ENV_NAME_RE.test(key)) {
       throw new SetupDeclarationError(
@@ -279,14 +309,20 @@ function parseTimeout(value: unknown, label: string): number {
     return 300
   }
   if (typeof value !== 'number' || !Number.isInteger(value)) {
-    throw new SetupDeclarationError(`${label}.timeout_seconds must be an integer.`, {
-      reason: 'invalid-timeout'
-    })
+    throw new SetupDeclarationError(
+      `${label}.timeout_seconds must be an integer.`,
+      {
+        reason: 'invalid-timeout'
+      }
+    )
   }
   if (value <= 0) {
-    throw new SetupDeclarationError(`${label}.timeout_seconds must be positive.`, {
-      reason: 'invalid-timeout'
-    })
+    throw new SetupDeclarationError(
+      `${label}.timeout_seconds must be positive.`,
+      {
+        reason: 'invalid-timeout'
+      }
+    )
   }
   // The effective cap is enforced by the runner at execution time (it caps to
   // SEC_REVIEW_SETUP_STEP_MAX_SECONDS); the integration only validates shape.
@@ -298,7 +334,9 @@ function parseTimeout(value: unknown, label: string): number {
  * declaration), otherwise the parsed steps. Throws `SetupDeclarationError` for
  * any content that is not a valid declaration.
  */
-export function parseSetupDeclaration(content: string): SetupDeclaration | null {
+export function parseSetupDeclaration(
+  content: string
+): SetupDeclaration | null {
   if (content.trim() === '') {
     return null
   }
@@ -340,9 +378,12 @@ export function parseSetupDeclaration(content: string): SetupDeclaration | null 
   }
 
   if (!isRecord(parsed)) {
-    throw new SetupDeclarationError('Setup declaration must be a mapping at the top level.', {
-      reason: 'not-a-mapping'
-    })
+    throw new SetupDeclarationError(
+      'Setup declaration must be a mapping at the top level.',
+      {
+        reason: 'not-a-mapping'
+      }
+    )
   }
 
   const unknownTopLevel = Object.keys(parsed)
@@ -357,14 +398,20 @@ export function parseSetupDeclaration(content: string): SetupDeclaration | null 
 
   const rawSteps = parsed['setup']
   if (rawSteps === undefined || rawSteps === null) {
-    throw new SetupDeclarationError("Setup declaration is missing the required 'setup' key.", {
-      reason: 'missing-setup-key'
-    })
+    throw new SetupDeclarationError(
+      "Setup declaration is missing the required 'setup' key.",
+      {
+        reason: 'missing-setup-key'
+      }
+    )
   }
   if (!Array.isArray(rawSteps)) {
-    throw new SetupDeclarationError("Setup declaration 'setup' must be a list of steps.", {
-      reason: 'setup-not-a-list'
-    })
+    throw new SetupDeclarationError(
+      "Setup declaration 'setup' must be a list of steps.",
+      {
+        reason: 'setup-not-a-list'
+      }
+    )
   }
 
   return { steps: rawSteps.map((rawStep, index) => parseStep(rawStep, index)) }

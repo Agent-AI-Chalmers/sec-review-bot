@@ -9,8 +9,15 @@ import { handleRepositoryReviewRun } from '../reviews/repositories/publish.js'
 import { logError, logInfo, logWarn } from '../utils/logger.js'
 import { asErrorMessage, errorCode } from '../utils/error-utils.js'
 import { classifyPublicationFailure } from './publication-failure.js'
-import { isPublicationClaimLostError, PublicationClaimLostError } from './publication-claim.js'
-import { controlPlaneClient, type ControlPlaneClient, type PublicationWork } from './client.js'
+import {
+  isPublicationClaimLostError,
+  PublicationClaimLostError
+} from './publication-claim.js'
+import {
+  controlPlaneClient,
+  type ControlPlaneClient,
+  type PublicationWork
+} from './client.js'
 
 export interface PublicationCoordinator {
   stop: () => Promise<void>
@@ -29,7 +36,10 @@ function pollIntervalMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 15_000
 }
 
-async function installationOctokitForRepo(app: App, repoFullName: string): Promise<unknown> {
+async function installationOctokitForRepo(
+  app: App,
+  repoFullName: string
+): Promise<unknown> {
   const { owner_login, repo_name } = splitRepoFullName(repoFullName)
   const installation = await app.octokit.rest.apps.getRepoInstallation({
     owner: owner_login,
@@ -54,7 +64,8 @@ async function publishWork(
       await installationOctokitForRepo(app, repo)
   }
   if (work.workflow === 'issue-review') await handleIssueReviewRun(common)
-  else if (work.workflow === 'pull-request-review') await handlePullRequestReviewRun(common)
+  else if (work.workflow === 'pull-request-review')
+    await handlePullRequestReviewRun(common)
   else await handleRepositoryReviewRun(common)
 }
 
@@ -73,7 +84,10 @@ export async function withPublicationHeartbeat(
       }
     } catch (error) {
       lost = true
-      logWarn('review_publication_heartbeat_failed', { error, run_id: work.run_id })
+      logWarn('review_publication_heartbeat_failed', {
+        error,
+        run_id: work.run_id
+      })
       throw error instanceof PublicationClaimLostError
         ? error
         : new PublicationClaimLostError(work.run_id, { cause: error })
@@ -126,7 +140,9 @@ export async function publishReviewRunsOnce({
   // publishable mid-interval is picked up as soon as it does, and the poll timer above
   // stays as the backstop. The wait stays comfortably inside the client's request
   // timeout.
-  const work = await store.claimNextPublication(Math.min(pollIntervalMs(), 10_000))
+  const work = await store.claimNextPublication(
+    Math.min(pollIntervalMs(), 10_000)
+  )
   if (work === null) return
   try {
     const ownsClaim = await withPublicationHeartbeat(
@@ -135,7 +151,10 @@ export async function publishReviewRunsOnce({
       async (assertOwned) => await publishWork(app, store, work, assertOwned)
     )
     if (!ownsClaim) {
-      logWarn('review_publication_claim_lost', { run_id: work.run_id, workflow: work.workflow })
+      logWarn('review_publication_claim_lost', {
+        run_id: work.run_id,
+        workflow: work.workflow
+      })
       return
     }
     if (!(await store.completePublication(work.run_id, work.claim_token))) {
@@ -144,7 +163,8 @@ export async function publishReviewRunsOnce({
         work.claim_token,
         {
           code: 'PUBLICATION_STEPS_INCOMPLETE',
-          message: 'Publication completed without all required steps succeeding.'
+          message:
+            'Publication completed without all required steps succeeding.'
         },
         { retry: false }
       )
@@ -162,12 +182,18 @@ export async function publishReviewRunsOnce({
         })
       return
     }
-    logInfo('review_publication_completed', { run_id: work.run_id, workflow: work.workflow })
+    logInfo('review_publication_completed', {
+      run_id: work.run_id,
+      workflow: work.workflow
+    })
   } catch (error) {
     if (isPublicationClaimLostError(error)) {
       // Ownership is unknown, so neither success nor failure may be committed.
       // The lease timeout is the only authority allowed to hand work to a new owner.
-      logWarn('review_publication_claim_lost', { run_id: work.run_id, workflow: work.workflow })
+      logWarn('review_publication_claim_lost', {
+        run_id: work.run_id,
+        workflow: work.workflow
+      })
       return
     }
     const classification = classifyPublicationFailure(error)

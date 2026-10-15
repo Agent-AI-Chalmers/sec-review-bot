@@ -25,7 +25,9 @@ test('BackgroundPreparations waits for admitted preparation work during shutdown
 
 test('BackgroundPreparations logs failures with ingress context', async () => {
   const logs: Array<{ event: string; fields: Record<string, unknown> }> = []
-  const preparations = new BackgroundPreparations((event, fields) => logs.push({ event, fields }))
+  const preparations = new BackgroundPreparations((event, fields) =>
+    logs.push({ event, fields })
+  )
 
   preparations.start(Promise.reject(new Error('workspace failed')), {
     ingress: 'issues.opened',

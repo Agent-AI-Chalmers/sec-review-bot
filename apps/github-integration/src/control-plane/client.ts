@@ -1,11 +1,15 @@
 import { operationRoutes } from './control-plane-api.js'
 import type { components, operations } from './control-plane-api.js'
-import { parsePublishContextForWorkflow, type PublishContext } from './publish-context.js'
+import {
+  parsePublishContextForWorkflow,
+  type PublishContext
+} from './publish-context.js'
 
 export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
 export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
 export type PublicationWork = components['schemas']['PublicationWork']
-export type PublicationStepRecord = components['schemas']['PublicationStepRecord']
+export type PublicationStepRecord =
+  components['schemas']['PublicationStepRecord']
 
 type JsonObject = Record<string, unknown>
 
@@ -22,9 +26,8 @@ type PathOf<Id extends OperationId> = (typeof operationRoutes)[Id]['path']
 type MethodOf<Id extends OperationId> = (typeof operationRoutes)[Id]['method']
 
 /** The `{param}` names a path template declares, as a union. */
-type PathParam<T extends string> = T extends `${string}{${infer P}}${infer Rest}`
-  ? P | PathParam<Rest>
-  : never
+type PathParam<T extends string> =
+  T extends `${string}{${infer P}}${infer Rest}` ? P | PathParam<Rest> : never
 
 /** Build a request URL from an operation's *own* contract path. The operation is the only
  * routing input: the path is looked up in the generated map rather than passed in, so a call
@@ -37,15 +40,20 @@ function contractPath<Id extends OperationId>(
   const template = operationRoutes[operation].path
   return template.replace(/\{(\w+)\}/g, (_match, name: string) => {
     const value = (params as Record<string, string | undefined>)[name]
-    if (value === undefined) throw new Error(`Missing path parameter ${name} for ${operation}`)
+    if (value === undefined)
+      throw new Error(`Missing path parameter ${name} for ${operation}`)
     return encodeURIComponent(value)
   })
 }
 
 /** The HTTP method the contract serves an operation with, uppercased for `fetch`, from the
  * same generated map — so the method cannot drift from the operation either. */
-function contractMethod<Id extends OperationId>(operation: Id): Uppercase<MethodOf<Id> & string> {
-  return operationRoutes[operation].method.toUpperCase() as Uppercase<MethodOf<Id> & string>
+function contractMethod<Id extends OperationId>(
+  operation: Id
+): Uppercase<MethodOf<Id> & string> {
+  return operationRoutes[operation].method.toUpperCase() as Uppercase<
+    MethodOf<Id> & string
+  >
 }
 
 export class ControlPlaneSubmissionError extends Error {
@@ -71,7 +79,10 @@ function serviceToken(): string {
 }
 
 function requestTimeoutMs(): number {
-  const parsed = Number.parseInt(process.env.CONTROL_PLANE_REQUEST_TIMEOUT_MS ?? '', 10)
+  const parsed = Number.parseInt(
+    process.env.CONTROL_PLANE_REQUEST_TIMEOUT_MS ?? '',
+    10
+  )
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 30_000
 }
 
@@ -87,7 +98,9 @@ type Operation<Id extends OperationId> = operations[Id]
  * this, so a field renamed in `openapi.yaml` fails the client's typecheck instead of being
  * accepted here and silently stripped or ignored by the service. */
 type RequestBody<Id extends OperationId> =
-  Operation<Id> extends { requestBody: { content: { 'application/json': infer Body } } }
+  Operation<Id> extends {
+    requestBody: { content: { 'application/json': infer Body } }
+  }
     ? Body
     : never
 
@@ -100,7 +113,8 @@ type SuccessBody<Id extends OperationId> =
     : void
 
 class HttpControlPlaneClient {
-  readonly connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
+  readonly connectorId =
+    process.env.CONNECTOR_ID?.trim() || 'github-app:default'
 
   // One HTTP request with auth, timeout, and error/status handling. `nullOn404` maps a 404
   // to `null` for reads that distinguish "absent" from "error".
@@ -131,9 +145,13 @@ class HttpControlPlaneClient {
       })
       if (!response.ok) {
         if (nullOn404 && response.status === 404) return null as SuccessBody<Id>
-        const parsed = (await response.json().catch(() => ({}))) as HttpErrorBody
+        const parsed = (await response
+          .json()
+          .catch(() => ({}))) as HttpErrorBody
         throw Object.assign(
-          new Error(parsed.error ?? `Control Plane returned HTTP ${response.status}.`),
+          new Error(
+            parsed.error ?? `Control Plane returned HTTP ${response.status}.`
+          ),
           { code: parsed.code ?? null }
         )
       }
@@ -149,10 +167,13 @@ class HttpControlPlaneClient {
       return (text === '' ? undefined : JSON.parse(text)) as SuccessBody<Id>
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw Object.assign(new Error(`Control Plane ${operation} request timed out.`), {
-          code: 'CONTROL_PLANE_REQUEST_TIMEOUT',
-          cause: error
-        })
+        throw Object.assign(
+          new Error(`Control Plane ${operation} request timed out.`),
+          {
+            code: 'CONTROL_PLANE_REQUEST_TIMEOUT',
+            cause: error
+          }
+        )
       }
       throw error
     } finally {
@@ -160,9 +181,13 @@ class HttpControlPlaneClient {
     }
   }
 
-  private async validateContext(runId: string, context: PublishContext): Promise<PublishContext> {
+  private async validateContext(
+    runId: string,
+    context: PublishContext
+  ): Promise<PublishContext> {
     const run = await this.getRun(runId)
-    if (run === null) throw new Error(`Control Plane run does not exist: ${runId}`)
+    if (run === null)
+      throw new Error(`Control Plane run does not exist: ${runId}`)
     return parsePublishContextForWorkflow(run.workflow, context)
   }
 
@@ -198,7 +223,9 @@ class HttpControlPlaneClient {
       )
     } catch (error) {
       const code =
-        error instanceof Error && 'code' in error && typeof error.code === 'string'
+        error instanceof Error &&
+        'code' in error &&
+        typeof error.code === 'string'
           ? error.code
           : null
       throw new ControlPlaneSubmissionError(
@@ -239,7 +266,10 @@ class HttpControlPlaneClient {
     try {
       return {
         ...work,
-        publish_context: parsePublishContextForWorkflow(work.workflow, work.publish_context)
+        publish_context: parsePublishContextForWorkflow(
+          work.workflow,
+          work.publish_context
+        )
       }
     } catch (error) {
       // Validation happens after the durable claim because connector-specific context does
@@ -250,7 +280,9 @@ class HttpControlPlaneClient {
         work.claim_token,
         {
           code:
-            error instanceof Error && 'code' in error && typeof error.code === 'string'
+            error instanceof Error &&
+            'code' in error &&
+            typeof error.code === 'string'
               ? error.code
               : 'PUBLISH_CONTEXT_INVALID',
           message: error instanceof Error ? error.message : String(error)
@@ -288,8 +320,16 @@ class HttpControlPlaneClient {
     return await this.request('listInternalPublicationSteps', { runId })
   }
 
-  async requirePublicationStepClaim(runId: string, token: string, stepKey: string): Promise<void> {
-    await this.request('requirePublicationStepClaim', { runId, stepKey }, { token })
+  async requirePublicationStepClaim(
+    runId: string,
+    token: string,
+    stepKey: string
+  ): Promise<void> {
+    await this.request(
+      'requirePublicationStepClaim',
+      { runId, stepKey },
+      { token }
+    )
   }
 
   async completePublicationStep(
@@ -303,7 +343,9 @@ class HttpControlPlaneClient {
     // ids arrive as numbers, so normalize here; Control Plane validates bodies without
     // coercion, so a raw number would be rejected rather than silently converted.
     const remoteObject = {
-      ...(remote.id === undefined ? {} : { id: remote.id === null ? null : String(remote.id) }),
+      ...(remote.id === undefined
+        ? {}
+        : { id: remote.id === null ? null : String(remote.id) }),
       url: remote.url ?? null
     }
     return await this.request(
@@ -326,7 +368,11 @@ class HttpControlPlaneClient {
     return await this.request(
       'failPublicationStep',
       { runId, stepKey },
-      { token, failure, ...(options.retry === undefined ? {} : { retry: options.retry }) }
+      {
+        token,
+        failure,
+        ...(options.retry === undefined ? {} : { retry: options.retry })
+      }
     )
   }
 
@@ -394,4 +440,5 @@ export type ControlPlaneClient = Pick<
   | 'failPreparation'
 >
 
-export const controlPlaneClient: ControlPlaneClient = new HttpControlPlaneClient()
+export const controlPlaneClient: ControlPlaneClient =
+  new HttpControlPlaneClient()

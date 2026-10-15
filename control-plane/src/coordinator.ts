@@ -1,6 +1,10 @@
 import { clearImmediate, clearInterval } from 'node:timers'
 
-import type { DroppedRunRow, ReviewRunRecord, ReviewRunStore } from './review-store.js'
+import type {
+  DroppedRunRow,
+  ReviewRunRecord,
+  ReviewRunStore
+} from './review-store.js'
 import type { RunnerRunStatusBatch } from './runner-client.js'
 
 type CoordinationStore = Pick<
@@ -11,8 +15,13 @@ type CoordinationStore = Pick<
 export interface ReviewRunCoordinationHandlers {
   recoverSubmission: (run: ReviewRunRecord) => Promise<void>
   /** Read the whole pass's runner statuses in one request. */
-  readRunnerStatuses: (runs: readonly ReviewRunRecord[]) => Promise<RunnerRunStatusBatch>
-  observeActiveRun: (run: ReviewRunRecord, statuses: RunnerRunStatusBatch) => Promise<void>
+  readRunnerStatuses: (
+    runs: readonly ReviewRunRecord[]
+  ) => Promise<RunnerRunStatusBatch>
+  observeActiveRun: (
+    run: ReviewRunRecord,
+    statuses: RunnerRunStatusBatch
+  ) => Promise<void>
   /** Report a stored row the contract cannot represent. The pass continues without it, so a
    * single corrupt row degrades one run's coordination instead of stopping the whole pass. */
   onDroppedRunRow: (dropped: DroppedRunRow) => void

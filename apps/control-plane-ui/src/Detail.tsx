@@ -72,7 +72,11 @@ function Artifact({
       <div className="artifact-state">
         {storage.message && <Text size="sm">{storage.message}</Text>}
         {storage.error_code && (
-          <Text c={storage.status === 'failed' ? 'red' : 'dimmed'} size="xs" ff="monospace">
+          <Text
+            c={storage.status === 'failed' ? 'red' : 'dimmed'}
+            size="xs"
+            ff="monospace"
+          >
             {storage.error_code}
           </Text>
         )}
@@ -105,7 +109,11 @@ function Artifact({
               onClick={() => setExpanded((value) => !value)}
             >
               <code>{expanded ? hex : abbreviateDigest(hex)}</code>
-              {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+              {expanded ? (
+                <IconChevronUp size={14} />
+              ) : (
+                <IconChevronDown size={14} />
+              )}
             </button>
             <CopyAction
               value={artifact.digest}
@@ -137,13 +145,21 @@ export function Detail(): React.JSX.Element {
   const location = useLocation()
   // Restore the list's filters and cursor when the reader came from it. A reload or
   // a deep link has no such state, so fall back to an unfiltered first page.
-  const listSearch = (location.state as { listSearch?: string } | null)?.listSearch
+  const listSearch = (location.state as { listSearch?: string } | null)
+    ?.listSearch
   const backTo = listSearch ? `/runs?${listSearch}` : '/runs'
   // Both are keyed by run id. React Router keeps this component mounted when only the
   // id changes, so unkeyed state would keep rendering the previous run — and a 404 for
   // the new id would then be reported as a failed refresh of the old one.
-  const [loaded, setLoaded] = React.useState<{ runId: string; run: Run; steps: Step[] }>()
-  const [failure, setFailure] = React.useState<{ runId: string; error: unknown }>()
+  const [loaded, setLoaded] = React.useState<{
+    runId: string
+    run: Run
+    steps: Step[]
+  }>()
+  const [failure, setFailure] = React.useState<{
+    runId: string
+    error: unknown
+  }>()
   const run = loaded?.runId === runId ? loaded.run : undefined
   const steps = loaded?.runId === runId ? loaded.steps : []
   const error = failure?.runId === runId ? failure.error : undefined
@@ -151,9 +167,15 @@ export function Detail(): React.JSX.Element {
     try {
       const [runValue, stepValue] = await Promise.all([
         api<{ run: Run }>(`/runs/${encodeURIComponent(runId)}`),
-        api<{ publication_steps: Step[] }>(`/runs/${encodeURIComponent(runId)}/publication-steps`)
+        api<{ publication_steps: Step[] }>(
+          `/runs/${encodeURIComponent(runId)}/publication-steps`
+        )
       ])
-      setLoaded({ runId, run: runValue.run, steps: stepValue.publication_steps })
+      setLoaded({
+        runId,
+        run: runValue.run,
+        steps: stepValue.publication_steps
+      })
       setFailure(undefined)
     } catch (value) {
       setFailure({ runId, error: value })
@@ -166,7 +188,10 @@ export function Detail(): React.JSX.Element {
   const [, setClockTick] = React.useState(0)
   React.useEffect(() => {
     if (terminal) return
-    const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 10_000)
+    const timer = window.setInterval(
+      () => setClockTick((tick) => tick + 1),
+      10_000
+    )
     return (): void => window.clearInterval(timer)
   }, [terminal])
   const titleRunId = run?.run_id
@@ -208,17 +233,22 @@ export function Detail(): React.JSX.Element {
     throw error
   }
   const publicationOutcomes = steps.filter(
-    (step) => step.status !== 'succeeded' || safeExternalUrl(step.remote_object_url) !== undefined
+    (step) =>
+      step.status !== 'succeeded' ||
+      safeExternalUrl(step.remote_object_url) !== undefined
   )
   const publicationIndex = 2 + (run?.artifact_storage === null ? 0 : 1)
   const timelineActive =
-    run?.publication_status === 'pending' ? publicationIndex - 1 : publicationIndex
+    run?.publication_status === 'pending'
+      ? publicationIndex - 1
+      : publicationIndex
   // `publication_updated_at` is the publication row's `updated_at`, and that row is
   // written when the run is admitted. It only means "the publication happened" once
   // the publication has actually started, so never present it before then — a run
   // that is still `pending`, or whose publication was ruled out, has no such moment.
   const publicationStarted =
-    run !== undefined && ['publishing', 'published', 'failed'].includes(run.publication_status)
+    run !== undefined &&
+    ['publishing', 'published', 'failed'].includes(run.publication_status)
   return (
     <Container size="lg" py="xl">
       <Button
@@ -240,10 +270,21 @@ export function Detail(): React.JSX.Element {
               <Title order={1} className="run-id">
                 {run.run_id}
               </Title>
-              <CopyAction value={run.run_id} name={t('copyRunId')} copiedName={t('runIdCopied')} />
+              <CopyAction
+                value={run.run_id}
+                name={t('copyRunId')}
+                copiedName={t('runIdCopied')}
+              />
             </Group>
-            <Group gap="lg" align="center" mt="md" className="run-state-summary">
-              <span className="workflow-chip">{workflowLabel(run.workflow, t)}</span>
+            <Group
+              gap="lg"
+              align="center"
+              mt="md"
+              className="run-state-summary"
+            >
+              <span className="workflow-chip">
+                {workflowLabel(run.workflow, t)}
+              </span>
               <Group gap={6} align="center">
                 <Text c="dimmed" size="xs">
                   {t('execution')}
@@ -285,7 +326,10 @@ export function Detail(): React.JSX.Element {
                 lineWidth={2}
                 className="run-progress-timeline"
               >
-                <Timeline.Item bullet={<IconClock size={14} />} title={t('created')}>
+                <Timeline.Item
+                  bullet={<IconClock size={14} />}
+                  title={t('created')}
+                >
                   <Text c="dimmed" size="sm">
                     {formatDate(run.created_at, language)}
                   </Text>
@@ -306,23 +350,34 @@ export function Detail(): React.JSX.Element {
                   </Text>
                   {run.artifact_storage !== null && (
                     <div className="artifact-section">
-                      <Artifact storage={run.artifact_storage} runId={run.run_id} />
+                      <Artifact
+                        storage={run.artifact_storage}
+                        runId={run.run_id}
+                      />
                     </div>
                   )}
                 </Timeline.Item>
                 <Timeline.Item
                   bullet={statusBullet(publicationTone(run.publication_status))}
-                  color={statusToneColor(publicationTone(run.publication_status))}
+                  color={statusToneColor(
+                    publicationTone(run.publication_status)
+                  )}
                   title={<Text fw={500}>{t('publication')}</Text>}
                 >
                   <div className="publication-summary">
                     {publicationStarted && (
                       <Text c="dimmed" size="sm">
-                        {formatDate(run.published_at ?? run.publication_updated_at, language)} ·{' '}
+                        {formatDate(
+                          run.published_at ?? run.publication_updated_at,
+                          language
+                        )}{' '}
+                        ·{' '}
                         {phaseElapsed(
                           run.published_at ?? run.publication_updated_at,
                           run.created_at,
-                          ['published', 'failed'].includes(run.publication_status),
+                          ['published', 'failed'].includes(
+                            run.publication_status
+                          ),
                           t
                         )}
                       </Text>
@@ -331,17 +386,24 @@ export function Detail(): React.JSX.Element {
                   {publicationOutcomes.length > 0 && (
                     <div className="delivery-list">
                       {publicationOutcomes.map((step) => {
-                        const externalUrl = safeExternalUrl(step.remote_object_url)
+                        const externalUrl = safeExternalUrl(
+                          step.remote_object_url
+                        )
                         const succeeded = step.status === 'succeeded'
                         return (
                           <div className="delivery-item" key={step.step_key}>
                             {/* Identity on one line: the step's own key belongs beside its
                                 status, not stranded on a line of its own. */}
                             <div className="delivery-main">
-                              <Badge variant="light" color={publicationStatusColor(step.status)}>
+                              <Badge
+                                variant="light"
+                                color={publicationStatusColor(step.status)}
+                              >
                                 {publicationStatusLabel(step.status, t)}
                               </Badge>
-                              <code className="delivery-step-key">{step.step_key}</code>
+                              <code className="delivery-step-key">
+                                {step.step_key}
+                              </code>
                             </div>
                             {externalUrl && (
                               <Anchor
@@ -353,7 +415,10 @@ export function Detail(): React.JSX.Element {
                                 className="delivery-link"
                               >
                                 {t('openExternalLink')}
-                                <IconArrowUpRight size={14} aria-hidden="true" />
+                                <IconArrowUpRight
+                                  size={14}
+                                  aria-hidden="true"
+                                />
                               </Anchor>
                             )}
                             {!succeeded &&
@@ -362,7 +427,9 @@ export function Detail(): React.JSX.Element {
                                 step.failure_count > 0) && (
                                 <div className="delivery-error">
                                   {step.failure_message && (
-                                    <Text size="sm">{step.failure_message}</Text>
+                                    <Text size="sm">
+                                      {step.failure_message}
+                                    </Text>
                                   )}
                                   <Group gap="sm">
                                     {step.failure_code && (
@@ -372,7 +439,8 @@ export function Detail(): React.JSX.Element {
                                     )}
                                     {step.failure_count > 0 && (
                                       <Text c="dimmed" size="xs">
-                                        {t('failedAttempts')}: {step.failure_count}
+                                        {t('failedAttempts')}:{' '}
+                                        {step.failure_count}
                                       </Text>
                                     )}
                                   </Group>

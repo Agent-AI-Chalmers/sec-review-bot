@@ -6,7 +6,10 @@ import {
   buildDeliveryDraftPrBody,
   renderRepositorySecuritySummaryComment
 } from '../../../src/reviews/repositories/renderer.js'
-import { coverageHeadline, renderReviewStatusLines } from '../../../src/reviews/view-utils.js'
+import {
+  coverageHeadline,
+  renderReviewStatusLines
+} from '../../../src/reviews/view-utils.js'
 
 test('repository renderer derives blocked confirmed case cards from case results', () => {
   const review_record = {
@@ -22,7 +25,8 @@ test('repository renderer derives blocked confirmed case cards from case results
     },
     mitigation: {
       overview: 'The attempted patch covers direct webhook requests only.',
-      patch_diff: 'diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()'
+      patch_diff:
+        'diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()'
     },
     verification: {
       patch_coverage: 'partial',
@@ -64,10 +68,17 @@ test('repository renderer derives blocked confirmed case cards from case results
   assert.match(body, /<summary>Reference patch<\/summary>/)
   assert.match(body, /```diff\n(?:.|\n)*verifyRetrySignature/)
   assert.match(body, /<summary>Verification<\/summary>/)
-  assert.ok(body.indexOf('<summary>Analysis</summary>') < body.indexOf('<summary>CVSS</summary>'))
-  assert.ok(body.indexOf('<summary>CVSS</summary>') < body.indexOf('<summary>Mitigation</summary>'))
   assert.ok(
-    body.indexOf('<summary>Mitigation</summary>') < body.indexOf('<summary>Verification</summary>')
+    body.indexOf('<summary>Analysis</summary>') <
+      body.indexOf('<summary>CVSS</summary>')
+  )
+  assert.ok(
+    body.indexOf('<summary>CVSS</summary>') <
+      body.indexOf('<summary>Mitigation</summary>')
+  )
+  assert.ok(
+    body.indexOf('<summary>Mitigation</summary>') <
+      body.indexOf('<summary>Verification</summary>')
   )
 
   // The card reuses the shared status vocabulary instead of restating it, and the
@@ -81,9 +92,15 @@ test('repository renderer derives blocked confirmed case cards from case results
       }).join('\n')
     )
   )
-  const titleLine = body.split('\n').find((line) => line.startsWith('<summary>[medium] case-1'))
+  const titleLine = body
+    .split('\n')
+    .find((line) => line.startsWith('<summary>[medium] case-1'))
   assert.ok(titleLine)
-  assert.ok(!titleLine.includes(coverageHeadline(review_record.verification.patch_coverage)))
+  assert.ok(
+    !titleLine.includes(
+      coverageHeadline(review_record.verification.patch_coverage)
+    )
+  )
 })
 
 test('repository blocked confirmed case uses disposition reason as mitigation and verification fallback', () => {
@@ -115,8 +132,14 @@ test('repository blocked confirmed case uses disposition reason as mitigation an
     target_branch: 'main'
   })
 
-  assert.match(body, /<summary>Mitigation<\/summary>\n\nVerifier rejected the incomplete patch\./)
-  assert.match(body, /<summary>Verification<\/summary>\n\nVerifier rejected the incomplete patch\./)
+  assert.match(
+    body,
+    /<summary>Mitigation<\/summary>\n\nVerifier rejected the incomplete patch\./
+  )
+  assert.match(
+    body,
+    /<summary>Verification<\/summary>\n\nVerifier rejected the incomplete patch\./
+  )
   assert.doesNotMatch(body, /No mitigation overview was recorded\./)
   assert.doesNotMatch(body, /No verification overview was recorded\./)
 })
@@ -160,7 +183,10 @@ test('repository renderer preserves CVSS not-scored state', () => {
   assert.match(summary, /CVSS scored cases: `1`/)
   assert.match(summary, /CVSS not-scored cases: `1`/)
   assert.match(summary, /Case CVSS severities: `critical=0`, `high=1`/)
-  assert.match(summary, /Grouped by each delivery PR's highest case CVSS severity\./)
+  assert.match(
+    summary,
+    /Grouped by each delivery PR's highest case CVSS severity\./
+  )
   assert.match(summary, /#### not-scored \(1\)/)
   assert.match(summary, /\[CVSS not-scored\] \[sec\] container-runs-as-root/)
   assert.doesNotMatch(summary, /\[CVSS 0\.0\]/)
@@ -205,7 +231,10 @@ test('repository renderer preserves CVSS not-scored state', () => {
   assert.doesNotMatch(body, /#### Analyzer Result/)
   assert.doesNotMatch(body, /#### CVSS Scoring/)
   assert.doesNotMatch(body, /<summary>Audit metadata<\/summary>/)
-  assert.doesNotMatch(body, /This is hardening, not an independent vulnerability\./)
+  assert.doesNotMatch(
+    body,
+    /This is hardening, not an independent vulnerability\./
+  )
   assert.doesNotMatch(body, /CVSS v4 base score: `n\/a` \(`unknown`\)/)
   assert.doesNotMatch(body, /Review target claim: \(none\)/)
 })
@@ -355,8 +384,14 @@ test('repository draft PR case details use delivery fallback text', () => {
     ]
   })
 
-  assert.match(body, /<summary>Mitigation<\/summary>\n\nNo mitigation overview was recorded\./)
-  assert.match(body, /<summary>Verification<\/summary>\n\nNo verification overview was recorded\./)
+  assert.match(
+    body,
+    /<summary>Mitigation<\/summary>\n\nNo mitigation overview was recorded\./
+  )
+  assert.match(
+    body,
+    /<summary>Verification<\/summary>\n\nNo verification overview was recorded\./
+  )
   assert.doesNotMatch(body, /Verifier rejected the incomplete patch\./)
 })
 

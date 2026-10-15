@@ -9,10 +9,18 @@ type AnalysisVerdict =
   | 'plausible-risk'
   | 'confirmed-defect'
   | 'confirmed-vulnerability'
-type ValidationLevel = 'static' | 'logic-simulated' | 'runtime-partial' | 'runtime-endpoint'
+type ValidationLevel =
+  'static' | 'logic-simulated' | 'runtime-partial' | 'runtime-endpoint'
 type PatchCoverage =
-  'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | 'no-patch' | 'not-applicable'
-type RegressionStatus = 'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved'
+  | 'full'
+  | 'partial'
+  | 'local-only'
+  | 'unresolved'
+  | 'misaligned'
+  | 'no-patch'
+  | 'not-applicable'
+type RegressionStatus =
+  'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved'
 type ResolutionNextStep = 'none' | 'retry-ai' | 'manual-review'
 type CvssOutcome = 'scored' | 'not-scored' | 'skipped'
 

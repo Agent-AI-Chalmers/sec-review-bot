@@ -99,12 +99,16 @@ async function waitForServer(url) {
     } catch {
       // Not listening yet.
     }
-    if (Date.now() > deadline) throw new Error(`dev server at ${url} never became ready.`)
+    if (Date.now() > deadline)
+      throw new Error(`dev server at ${url} never became ready.`)
     await delay(250)
   }
 }
 
-const browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true })
+const browser = await chromium.launch({
+  executablePath: CHROME_PATH,
+  headless: true
+})
 try {
   for (const [name, viewport] of [
     ['desktop', { width: 1440, height: 900 }],
@@ -125,7 +129,10 @@ try {
       await page.waitForURL('**/runs')
     }
     await page.getByRole('heading', { name: 'Runs' }).waitFor()
-    await page.screenshot({ path: `/tmp/control-plane-ui-${name}.png`, fullPage: true })
+    await page.screenshot({
+      path: `/tmp/control-plane-ui-${name}.png`,
+      fullPage: true
+    })
 
     // Layout invariant: nothing may overflow the viewport horizontally.
     const body = await page.locator('body').boundingBox()
@@ -143,13 +150,17 @@ try {
     // The header is a fixed height and must not grow over the page: expanding content
     // once pushed the "Open" control on top of the content and swallowed its clicks.
     const headerBox = await page.locator('header').boundingBox()
-    const titleBox = await page.getByRole('heading', { name: 'Runs' }).boundingBox()
+    const titleBox = await page
+      .getByRole('heading', { name: 'Runs' })
+      .boundingBox()
     assert.ok(
       headerBox !== null && headerBox.height <= 58,
       `${name} the header must keep its height (saw ${headerBox?.height})`
     )
     assert.ok(
-      headerBox !== null && titleBox !== null && titleBox.y >= headerBox.y + headerBox.height - 1,
+      headerBox !== null &&
+        titleBox !== null &&
+        titleBox.y >= headerBox.y + headerBox.height - 1,
       `${name} the header must not overlap the page content`
     )
 
@@ -158,18 +169,31 @@ try {
     const rowAction = page.locator('tbody tr:first-child .row-action')
     const rowActionOpacity = () =>
       rowAction.evaluate((element) => getComputedStyle(element).opacity)
-    assert.equal(await rowActionOpacity(), '0', `${name} a row action must rest hidden`)
+    assert.equal(
+      await rowActionOpacity(),
+      '0',
+      `${name} a row action must rest hidden`
+    )
     await page.locator('tbody tr:first-child').hover()
     await page.waitForTimeout(250)
-    assert.equal(await rowActionOpacity(), '1', `${name} hovering a row must reveal its action`)
+    assert.equal(
+      await rowActionOpacity(),
+      '1',
+      `${name} hovering a row must reveal its action`
+    )
     await page.mouse.move(2, 2)
     await page.locator('tbody tr:first-child td a').first().focus()
     await page.waitForTimeout(250)
-    assert.equal(await rowActionOpacity(), '1', `${name} focusing a row must reveal its action too`)
+    assert.equal(
+      await rowActionOpacity(),
+      '1',
+      `${name} focusing a row must reveal its action too`
+    )
 
     // The recency column leads with how long ago, so the feed can be scanned by eye.
     assert.match(
-      (await page.locator('tbody tr:first-child td').nth(4).textContent()) ?? '',
+      (await page.locator('tbody tr:first-child td').nth(4).textContent()) ??
+        '',
       /\d+[dhms]\s+ago/,
       `${name} last activity must read as elapsed time`
     )
@@ -177,7 +201,9 @@ try {
     // The list separates the two status axes into their own columns, and each
     // status is dot+text rather than a badge.
     assert.deepEqual(
-      await page.$$eval('thead th', (cells) => cells.map((cell) => cell.textContent)),
+      await page.$$eval('thead th', (cells) =>
+        cells.map((cell) => cell.textContent)
+      ),
       EXPECTED_HEADERS,
       `${name} run table headers changed`
     )
@@ -197,7 +223,8 @@ try {
       // when the response carries a cursor. Do not let the fixtures regress to a
       // single page, or this whole affordance silently stops being reachable.
       const firstCell = 'tbody tr td:first-child'
-      const rows = () => page.$$eval(firstCell, (cells) => cells.map((cell) => cell.textContent))
+      const rows = () =>
+        page.$$eval(firstCell, (cells) => cells.map((cell) => cell.textContent))
       const previous = page.getByRole('button', { name: 'Previous page' })
       const next = page.getByRole('button', { name: 'Next page' })
 
@@ -206,10 +233,18 @@ try {
       const perPage = page.getByLabel('Per page')
       await perPage.selectOption('20')
       await page.waitForTimeout(750)
-      assert.equal((await rows()).length, 20, `${name} selected page size must apply`)
+      assert.equal(
+        (await rows()).length,
+        20,
+        `${name} selected page size must apply`
+      )
       await perPage.selectOption('50')
       await page.waitForTimeout(750)
-      assert.equal((await rows()).length, 50, `${name} default page size must apply`)
+      assert.equal(
+        (await rows()).length,
+        50,
+        `${name} default page size must apply`
+      )
 
       // The fixture spreads its runs over more than a week, so each range preset must
       // narrow the list by a distinct amount rather than silently filtering nothing.
@@ -218,7 +253,10 @@ try {
       await timeRange.selectOption('1h')
       await page.waitForTimeout(750)
       const hourRows = (await rows()).length
-      assert.ok(hourRows < allRows, `${name} a one-hour range must narrow the list`)
+      assert.ok(
+        hourRows < allRows,
+        `${name} a one-hour range must narrow the list`
+      )
       await timeRange.selectOption('24h')
       await page.waitForTimeout(750)
       const dayRows = (await rows()).length
@@ -235,8 +273,14 @@ try {
       )
 
       const firstPage = await rows()
-      assert.ok(await previous.isDisabled(), `${name} first page must disable the previous control`)
-      assert.ok(!(await next.isDisabled()), `${name} first page must offer a next page`)
+      assert.ok(
+        await previous.isDisabled(),
+        `${name} first page must disable the previous control`
+      )
+      assert.ok(
+        !(await next.isDisabled()),
+        `${name} first page must offer a next page`
+      )
 
       await next.click()
       await page.waitForTimeout(750)
@@ -256,7 +300,11 @@ try {
       // cursor rather than silently sending the reader back to the first page.
       await previous.click()
       await page.waitForTimeout(750)
-      assert.deepEqual(await rows(), firstPage, `${name} previous page must restore the first page`)
+      assert.deepEqual(
+        await rows(),
+        firstPage,
+        `${name} previous page must restore the first page`
+      )
 
       await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
       await page.getByRole('heading', { name: 'Runs' }).waitFor()
@@ -265,8 +313,12 @@ try {
       // filter by run id, and the list shows only an abbreviation of it.
       await page.locator('tbody tr:first-child td a').first().click()
       await page.waitForSelector('.run-progress-timeline')
-      const knownRunId = (await page.locator('.run-id').first().textContent())?.trim() ?? ''
-      assert.ok(knownRunId.length > 0, `${name} the detail page must show the full run id`)
+      const knownRunId =
+        (await page.locator('.run-id').first().textContent())?.trim() ?? ''
+      assert.ok(
+        knownRunId.length > 0,
+        `${name} the detail page must show the full run id`
+      )
       await page.getByRole('link', { name: 'Back to runs' }).click()
       await page.getByRole('heading', { name: 'Runs' }).waitFor()
 
@@ -330,8 +382,8 @@ try {
         const row = document.querySelector('.artifact-row')
         if (row === null) return { found: false }
         const download = row.querySelector('a[download]')
-        const facts = [...row.querySelectorAll('.artifact-facts > *')].map((element) =>
-          element.getBoundingClientRect()
+        const facts = [...row.querySelectorAll('.artifact-facts > *')].map(
+          (element) => element.getBoundingClientRect()
         )
         const centres = facts.map((box) => Math.round(box.y + box.height / 2))
         return {
@@ -340,17 +392,30 @@ try {
           sameLine: new Set(centres).size === 1,
           downloadTrails:
             download !== null &&
-            Math.abs(download.getBoundingClientRect().right - row.getBoundingClientRect().right) < 2
+            Math.abs(
+              download.getBoundingClientRect().right -
+                row.getBoundingClientRect().right
+            ) < 2
         }
       })
       assert.ok(artifact.found, `${name} a stored artifact must render`)
-      assert.equal(artifact.facts, 3, `${name} the artifact must show size, type and digest`)
+      assert.equal(
+        artifact.facts,
+        3,
+        `${name} the artifact must show size, type and digest`
+      )
       // The facts wrap on a narrow screen by design, so only the wide layout promises
       // a single line; the trailing download is promised everywhere.
       if (viewport.width >= 768) {
-        assert.ok(artifact.sameLine, `${name} the artifact facts must share one line`)
+        assert.ok(
+          artifact.sameLine,
+          `${name} the artifact facts must share one line`
+        )
       }
-      assert.ok(artifact.downloadTrails, `${name} the download must trail the artifact row`)
+      assert.ok(
+        artifact.downloadTrails,
+        `${name} the download must trail the artifact row`
+      )
       // Both blocks lead with a status badge, and the artifact's own storage state was
       // never shown anywhere before, so losing it would be silent.
       assert.equal(
@@ -362,16 +427,19 @@ try {
       // Content must not touch the line above it. Both the execution timestamp and the
       // publication summary have crowded their block before, so measure the gap.
       const breathing = await page.evaluate(() => {
-        const stamp = [...document.querySelectorAll('.mantine-Timeline-itemBody p')].find((p) =>
-          p.textContent.includes('\u00b7 took')
-        )
+        const stamp = [
+          ...document.querySelectorAll('.mantine-Timeline-itemBody p')
+        ].find((p) => p.textContent.includes('\u00b7 took'))
         const row = document.querySelector('.artifact-row')
         const summary = document.querySelector('.publication-summary p')
         const firstStep = document.querySelector('.delivery-item')
         const gap = (above, below) =>
           above === null || below === null
             ? null
-            : Math.round(below.getBoundingClientRect().top - above.getBoundingClientRect().bottom)
+            : Math.round(
+                below.getBoundingClientRect().top -
+                  above.getBoundingClientRect().bottom
+              )
         return {
           artifact: gap(stamp ?? null, row),
           publication: gap(summary ?? null, firstStep)
@@ -393,7 +461,11 @@ try {
       )
       const collapsed = (await digest.textContent()) ?? ''
       await digest.click()
-      assert.equal(await digest.getAttribute('aria-expanded'), 'true', `${name} digest must expand`)
+      assert.equal(
+        await digest.getAttribute('aria-expanded'),
+        'true',
+        `${name} digest must expand`
+      )
       assert.ok(
         ((await digest.textContent()) ?? '').length > collapsed.length,
         `${name} expanding the digest must reveal more of it`
@@ -409,9 +481,15 @@ try {
       )
       const stepLayout = await page.$$eval('.delivery-item', (items) =>
         items.map((item) => {
-          const badge = item.querySelector('.mantine-Badge-root')?.getBoundingClientRect()
-          const key = item.querySelector('.delivery-step-key')?.getBoundingClientRect()
-          const link = item.querySelector('.delivery-link')?.getBoundingClientRect()
+          const badge = item
+            .querySelector('.mantine-Badge-root')
+            ?.getBoundingClientRect()
+          const key = item
+            .querySelector('.delivery-step-key')
+            ?.getBoundingClientRect()
+          const link = item
+            .querySelector('.delivery-link')
+            ?.getBoundingClientRect()
           return {
             badgeY: badge?.y ?? null,
             keyY: key?.y ?? null,
@@ -420,11 +498,17 @@ try {
           }
         })
       )
-      assert.ok(stepLayout.length > 0, `${name} the published run must list its steps`)
+      assert.ok(
+        stepLayout.length > 0,
+        `${name} the published run must list its steps`
+      )
       for (const step of stepLayout) {
         if (step.badgeY !== null && step.keyY !== null) {
           if (stacked) {
-            assert.ok(step.keyY > step.badgeY, `${name} a stacked step must read status then key`)
+            assert.ok(
+              step.keyY > step.badgeY,
+              `${name} a stacked step must read status then key`
+            )
           } else {
             assert.ok(
               Math.abs(step.badgeY - step.keyY) < 6,
@@ -433,7 +517,10 @@ try {
           }
         }
         if (!stacked && step.linkLeft !== null && step.keyRight !== null) {
-          assert.ok(step.linkLeft > step.keyRight, `${name} a step link must trail its row`)
+          assert.ok(
+            step.linkLeft > step.keyRight,
+            `${name} a step link must trail its row`
+          )
         }
       }
 
@@ -447,9 +534,12 @@ try {
       // on the left, exit trailing. Sharing the timestamp's line was the thing to avoid.
       // Both filters are set in one navigation: the selects drive the URL, so driving them
       // back to back can drop one and quietly select a different run.
-      await page.goto(`${base}/runs?workflow=issue-review&publication_status=published`, {
-        waitUntil: 'networkidle'
-      })
+      await page.goto(
+        `${base}/runs?workflow=issue-review&publication_status=published`,
+        {
+          waitUntil: 'networkidle'
+        }
+      )
       await page.getByRole('heading', { name: 'Runs' }).waitFor()
       await page.waitForTimeout(600)
       await page.locator('tbody tr:first-child td a').first().click()
@@ -463,29 +553,49 @@ try {
       const single = await page.evaluate(() => {
         const item = document.querySelector('.delivery-item')
         if (item === null) return { found: false }
-        const key = item.querySelector('.delivery-step-key')?.getBoundingClientRect()
-        const link = item.querySelector('.delivery-link')?.getBoundingClientRect()
+        const key = item
+          .querySelector('.delivery-step-key')
+          ?.getBoundingClientRect()
+        const link = item
+          .querySelector('.delivery-link')
+          ?.getBoundingClientRect()
         return {
           found: true,
           badge: item.querySelector('.mantine-Badge-root') !== null,
           key: item.querySelector('.delivery-step-key') !== null,
-          trailing: link !== undefined && key !== undefined && link.left > key.right
+          trailing:
+            link !== undefined && key !== undefined && link.left > key.right
         }
       })
-      assert.ok(single.found && single.badge && single.key, `${name} a single result needs its row`)
-      assert.ok(single.found && single.trailing, `${name} a single exit must trail its row`)
+      assert.ok(
+        single.found && single.badge && single.key,
+        `${name} a single result needs its row`
+      )
+      assert.ok(
+        single.found && single.trailing,
+        `${name} a single exit must trail its row`
+      )
       await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
       await page.getByRole('heading', { name: 'Runs' }).waitFor()
     }
 
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
-    const knownRunIdForCopy = (await page.locator('.run-id').first().textContent())?.trim() ?? ''
-    const steps = await page.$$eval('.run-progress-timeline .mantine-Timeline-item', (items) =>
-      items.map((item) => ({
-        title: item.querySelector('.mantine-Timeline-itemTitle')?.textContent?.trim() ?? '',
-        body: item.querySelector('.mantine-Timeline-itemBody')?.textContent?.trim() ?? ''
-      }))
+    const knownRunIdForCopy =
+      (await page.locator('.run-id').first().textContent())?.trim() ?? ''
+    const steps = await page.$$eval(
+      '.run-progress-timeline .mantine-Timeline-item',
+      (items) =>
+        items.map((item) => ({
+          title:
+            item
+              .querySelector('.mantine-Timeline-itemTitle')
+              ?.textContent?.trim() ?? '',
+          body:
+            item
+              .querySelector('.mantine-Timeline-itemBody')
+              ?.textContent?.trim() ?? ''
+        }))
     )
     assert.deepEqual(
       steps.map((step) => step.title),
@@ -498,8 +608,16 @@ try {
     // `pending` run used to render a publication timestamp earlier than Execution.
     const TIMESTAMP = /\d{1,2}\/\d{1,2}\/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M/
     const [created, execution, publication] = steps
-    assert.match(created.body, TIMESTAMP, `${name} "Created" must show a timestamp`)
-    assert.match(execution.body, TIMESTAMP, `${name} "Execution" must show a timestamp`)
+    assert.match(
+      created.body,
+      TIMESTAMP,
+      `${name} "Created" must show a timestamp`
+    )
+    assert.match(
+      execution.body,
+      TIMESTAMP,
+      `${name} "Execution" must show a timestamp`
+    )
     assert.doesNotMatch(
       publication.body,
       TIMESTAMP,
@@ -513,7 +631,11 @@ try {
       /\d+[dhms]/,
       `${name} the execution phase must report its elapsed time`
     )
-    assert.match(execution.body, /so far/, `${name} an in-flight phase must read as still running`)
+    assert.match(
+      execution.body,
+      /so far/,
+      `${name} an in-flight phase must read as still running`
+    )
     await page.getByRole('button', { name: 'Copy run ID' }).click()
     await page.waitForTimeout(300)
     assert.equal(
@@ -543,7 +665,9 @@ try {
     // from Timeline.Item::before and inherits the bullet colour, so a Mantine change
     // would silently revert it to the status colour or a solid line.
     const rail = await page.evaluate(() => {
-      const item = document.querySelector('.run-progress-timeline .mantine-Timeline-item')
+      const item = document.querySelector(
+        '.run-progress-timeline .mantine-Timeline-item'
+      )
       if (item === null) return null
       const before = getComputedStyle(item, '::before')
       const bullet = item.querySelector('.mantine-Timeline-itemBullet')
@@ -551,12 +675,17 @@ try {
         display: before.display,
         style: before.borderLeftStyle,
         color: before.borderLeftColor,
-        bulletColor: bullet === null ? null : getComputedStyle(bullet).backgroundColor
+        bulletColor:
+          bullet === null ? null : getComputedStyle(bullet).backgroundColor
       }
     })
     assert.notEqual(rail, null, `${name} timeline item missing`)
     if (rail !== null && rail.display !== 'none') {
-      assert.equal(rail.style, 'dashed', `${name} timeline rail must stay dashed`)
+      assert.equal(
+        rail.style,
+        'dashed',
+        `${name} timeline rail must stay dashed`
+      )
       assert.notEqual(
         rail.color,
         rail.bulletColor,
@@ -570,14 +699,20 @@ try {
     await page.getByLabel('Execution').selectOption('failed')
     await page.waitForTimeout(750)
     assert.match(
-      (await page.locator('tbody tr:first-child td').last().textContent()) ?? '',
+      (await page.locator('tbody tr:first-child td').last().textContent()) ??
+        '',
       /[A-Z_]{4,}/,
       `${name} a failed row must show its failure code in the list`
     )
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
-    const ruledOut = await page.$$eval('.run-progress-timeline .mantine-Timeline-item', (items) =>
-      items.map((item) => item.querySelector('.mantine-Timeline-itemBody')?.textContent ?? '')
+    const ruledOut = await page.$$eval(
+      '.run-progress-timeline .mantine-Timeline-item',
+      (items) =>
+        items.map(
+          (item) =>
+            item.querySelector('.mantine-Timeline-itemBody')?.textContent ?? ''
+        )
     )
     assert.equal(ruledOut.length, 3, `${name} ruled-out timeline changed`)
     assert.doesNotMatch(
@@ -628,7 +763,11 @@ try {
     await page.unroute('**/api/runs*')
 
     // A touch device never hovers, so the action has to remain visible there.
-    const touchContext = await browser.newContext({ viewport, locale: 'en-US', hasTouch: true })
+    const touchContext = await browser.newContext({
+      viewport,
+      locale: 'en-US',
+      hasTouch: true
+    })
     const touchPage = await touchContext.newPage()
     await touchPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
     await touchPage.getByRole('heading', { name: 'Runs' }).waitFor()
@@ -645,9 +784,15 @@ try {
     // Both colour schemes must stay readable. Contrast is an invariant; exact pixels
     // are not, so this is the part of the visual layer worth asserting.
     for (const theme of ['light', 'dark']) {
-      const themeContext = await browser.newContext({ viewport, locale: 'en-US' })
+      const themeContext = await browser.newContext({
+        viewport,
+        locale: 'en-US'
+      })
       const themePage = await themeContext.newPage()
-      await themePage.addInitScript((value) => localStorage.setItem('ui-theme', value), theme)
+      await themePage.addInitScript(
+        (value) => localStorage.setItem('ui-theme', value),
+        theme
+      )
       await themePage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
       await themePage.getByRole('heading', { name: 'Runs' }).waitFor()
       await themePage.waitForTimeout(500)
@@ -665,16 +810,24 @@ try {
       await themeContext.close()
     }
 
-    const manualContext = await browser.newContext({ viewport, locale: 'en-US' })
+    const manualContext = await browser.newContext({
+      viewport,
+      locale: 'en-US'
+    })
     const manualPage = await manualContext.newPage()
-    await manualPage.addInitScript(() => localStorage.setItem('ui-auto-refresh', 'false'))
+    await manualPage.addInitScript(() =>
+      localStorage.setItem('ui-auto-refresh', 'false')
+    )
     await manualPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
     await manualPage.getByRole('heading', { name: 'Runs' }).waitFor()
     await manualPage.locator('tbody tr:first-child td a').first().click()
     await manualPage.waitForSelector('.run-progress-timeline')
     await manualPage.waitForTimeout(500)
     const readElapsed = () =>
-      manualPage.locator('.run-progress-timeline .mantine-Timeline-itemBody').nth(1).textContent()
+      manualPage
+        .locator('.run-progress-timeline .mantine-Timeline-itemBody')
+        .nth(1)
+        .textContent()
     const elapsedBefore = await readElapsed()
     assert.match(
       elapsedBefore ?? '',
@@ -694,17 +847,24 @@ try {
     const zhContext = await browser.newContext({ viewport, locale: 'zh-CN' })
     const zhPage = await zhContext.newPage()
     await zhPage.addInitScript(() => localStorage.setItem('ui-language', 'zh'))
-    await zhPage.goto(`${base}/runs?workflow=repository-review&publication_status=published`, {
-      waitUntil: 'networkidle'
-    })
+    await zhPage.goto(
+      `${base}/runs?workflow=repository-review&publication_status=published`,
+      {
+        waitUntil: 'networkidle'
+      }
+    )
     await zhPage.waitForTimeout(700)
     await zhPage.locator('tbody tr:first-child td a').first().click()
     await zhPage.waitForSelector('.run-progress-timeline')
     await zhPage.waitForTimeout(500)
-    const zhBadges = await zhPage.$$eval('.delivery-item .mantine-Badge-root', (items) =>
-      items.map((item) => item.textContent?.trim())
+    const zhBadges = await zhPage.$$eval(
+      '.delivery-item .mantine-Badge-root',
+      (items) => items.map((item) => item.textContent?.trim())
     )
-    assert.ok(zhBadges.length > 0, `${name} the zh run must show its publication steps`)
+    assert.ok(
+      zhBadges.length > 0,
+      `${name} the zh run must show its publication steps`
+    )
     for (const badge of zhBadges) {
       assert.equal(
         badge,

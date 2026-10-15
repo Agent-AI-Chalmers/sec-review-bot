@@ -93,7 +93,11 @@ async function materializeIssueReviewInput(
 
   const analysisInput = prepared?.input ?? null
 
-  if (!analysisInput || typeof analysisInput !== 'object' || Array.isArray(analysisInput)) {
+  if (
+    !analysisInput ||
+    typeof analysisInput !== 'object' ||
+    Array.isArray(analysisInput)
+  ) {
     throw new Error(
       `Issue input materialization returned an invalid value for issue #${issue.issue_number}.`
     )

@@ -115,7 +115,9 @@ function workspacePatchWithInsertionSample(): string {
 }
 
 function workspacePatchWithoutWorkspacePrefixSample(): string {
-  return workspacePatchSample().replaceAll('a/workspace/', 'a/').replaceAll('b/workspace/', 'b/')
+  return workspacePatchSample()
+    .replaceAll('a/workspace/', 'a/')
+    .replaceAll('b/workspace/', 'b/')
 }
 
 test('suggestion candidates anchor to minimal changed line ranges instead of entire hunk ranges', async () => {
@@ -145,7 +147,10 @@ test('suggestion candidates anchor to minimal changed line ranges instead of ent
     ]
   )
   assert.match(manifest.candidates[0]?.body ?? '', /^```suggestion\n/)
-  assert.doesNotMatch(manifest.candidates[0]?.body ?? '', /Mitigation candidate/)
+  assert.doesNotMatch(
+    manifest.candidates[0]?.body ?? '',
+    /Mitigation candidate/
+  )
 })
 
 test('suggestion candidates split a hunk into minimal contiguous +/- change blocks', async () => {
@@ -158,7 +163,9 @@ test('suggestion candidates split a hunk into minimal contiguous +/- change bloc
 
   const manifest = await generateSuggestionCandidatesFromReviewRecord({
     files,
-    review_record: reviewRecordWithPatchDiff(workspacePatchWithInsertionSample())
+    review_record: reviewRecordWithPatchDiff(
+      workspacePatchWithInsertionSample()
+    )
   })
 
   assert.deepEqual(
@@ -184,7 +191,9 @@ test('suggestion candidates accept repository-relative workspace patch paths', a
         patch: ['@@ -1,53 +1,53 @@', '@@ -89,87 +89,87 @@'].join('\n')
       }
     ],
-    review_record: reviewRecordWithPatchDiff(workspacePatchWithoutWorkspacePrefixSample())
+    review_record: reviewRecordWithPatchDiff(
+      workspacePatchWithoutWorkspacePrefixSample()
+    )
   })
 
   assert.equal(manifest.skipped_reason, null)

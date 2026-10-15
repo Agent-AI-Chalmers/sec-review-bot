@@ -20,9 +20,10 @@ interface RepositoryIssue {
 
 function splitRepoFullName(repo_full_name: string): RepoParts {
   const text = String(repo_full_name || '').trim()
-  const match = /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})$/.exec(
-    text
-  )
+  const match =
+    /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})$/.exec(
+      text
+    )
 
   if (!match) {
     throw new Error(`Invalid repository full name: ${repo_full_name}`)

@@ -112,7 +112,9 @@ function submittedIssueRun(issue: IssueContext): SubmittedIssueReviewRun {
   }
 }
 
-function submittedPullRequestRun(pr: PullRequestContext): SubmittedPullRequestReviewRun {
+function submittedPullRequestRun(
+  pr: PullRequestContext
+): SubmittedPullRequestReviewRun {
   return {
     pr,
     run_id: 'run-pr-test',
@@ -161,7 +163,8 @@ test('issue-comment-created skips manual command when commenter lacks write perm
 test('issue-comment-created starts an audited issue manual review for write commenter', async () => {
   let review_objective: 'audit' | 'repair' | null | undefined = null
   let open_pr: boolean | null | undefined
-  let forwarded_trusted: { default_branch: string; head_sha: string } | null = null
+  let forwarded_trusted: { default_branch: string; head_sha: string } | null =
+    null
 
   await handleIssueCommentCreatedWithDeps(
     {
@@ -197,7 +200,10 @@ test('issue-comment-created starts an audited issue manual review for write comm
   // A plain comment does not opt in to opening a draft PR.
   assert.equal(open_pr, false)
   // The resolved trusted branch reaches the issue command.
-  assert.deepEqual(forwarded_trusted, { default_branch: 'main', head_sha: 'default-sha' })
+  assert.deepEqual(forwarded_trusted, {
+    default_branch: 'main',
+    head_sha: 'default-sha'
+  })
 })
 
 test('issue-comment-created forwards the open-pr opt-in for issue reviews', async () => {
@@ -229,7 +235,8 @@ test('issue-comment-created forwards the open-pr opt-in for issue reviews', asyn
 
 test('issue-comment-created starts pull request manual review for write commenter', async () => {
   let pullRequestReviewCalled = false
-  let forwarded_trusted: { default_branch: string; head_sha: string } | null = null
+  let forwarded_trusted: { default_branch: string; head_sha: string } | null =
+    null
 
   await handleIssueCommentCreatedWithDeps(
     {
@@ -247,7 +254,10 @@ test('issue-comment-created starts pull request manual review for write commente
       }),
       authorizeManualCommentCommandFn: async () => authorizationDecision(),
       getPullRequestContextFn: async () => pullRequestContext(),
-      startPullRequestReviewCommandFn: async ({ resolve_pr, trusted_default_branch }) => {
+      startPullRequestReviewCommandFn: async ({
+        resolve_pr,
+        trusted_default_branch
+      }) => {
         pullRequestReviewCalled = true
         forwarded_trusted = trusted_default_branch
         const pr = await resolve_pr?.()
@@ -258,7 +268,10 @@ test('issue-comment-created starts pull request manual review for write commente
   )
 
   assert.equal(pullRequestReviewCalled, true)
-  assert.deepEqual(forwarded_trusted, { default_branch: 'main', head_sha: 'default-sha' })
+  assert.deepEqual(forwarded_trusted, {
+    default_branch: 'main',
+    head_sha: 'default-sha'
+  })
 })
 
 test('issue-comment-created delegates PR context loading until after command admission', async () => {
@@ -269,7 +282,10 @@ test('issue-comment-created delegates PR context loading until after command adm
     {
       id: 'delivery-pr-context',
       octokit: {},
-      payload: createIssueCommentPayload({ body: '@sec-review-bot review', is_pull_request: true })
+      payload: createIssueCommentPayload({
+        body: '@sec-review-bot review',
+        is_pull_request: true
+      })
     },
     {
       resolveTrustedDefaultBranchFn: async () => ({
@@ -285,7 +301,11 @@ test('issue-comment-created delegates PR context loading until after command adm
         commandStarted = true
         assert.equal(contextLoaded, false)
         assert.ok(resolve_pr)
-        on_admitted?.({ run_id: 'run-pr-context', status: 'preparing', replayed: false })
+        on_admitted?.({
+          run_id: 'run-pr-context',
+          status: 'preparing',
+          replayed: false
+        })
         await assert.rejects(resolve_pr(), /GitHub PR lookup failed/)
         return { run_id: 'run-pr-context' }
       }

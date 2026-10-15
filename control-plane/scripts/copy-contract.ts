@@ -34,5 +34,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const contents = readFileSync(SPEC_PATH)
   writeFileSync(BUILT_SPEC_PATH, contents)
   writeFileSync(BUILT_DIGEST_PATH, renderDigestFile(contents))
-  console.log(`Wrote ${path.relative(process.cwd(), BUILT_SPEC_PATH)} and its digest`)
+  console.log(
+    `Wrote ${path.relative(process.cwd(), BUILT_SPEC_PATH)} and its digest`
+  )
 }

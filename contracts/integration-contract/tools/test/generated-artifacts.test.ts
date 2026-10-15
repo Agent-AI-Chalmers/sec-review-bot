@@ -57,8 +57,9 @@ test('the manifest lists exactly the artifacts the generators write', () => {
 })
 
 test('every file the manifest names exists', () => {
-  for (const generator of (JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest)
-    .generators) {
+  for (const generator of (
+    JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
+  ).generators) {
     for (const output of generator.outputs) {
       assert.doesNotThrow(
         () => readFileSync(path.join(REPO_ROOT, output), 'utf8'),
@@ -92,14 +93,17 @@ test('the contract-tools CI filter triggers on every artifact of this family', (
   // by `dorny/paths-filter`; `.github/ci/check-changed-areas.mjs` guards the model itself).
 
   const filters = parse(
-    readFileSync(path.join(REPO_ROOT, '.github', 'ci', 'changed-areas.yml'), 'utf8')
+    readFileSync(
+      path.join(REPO_ROOT, '.github', 'ci', 'changed-areas.yml'),
+      'utf8'
+    )
   ) as Record<string, string[]>
   const patterns = filters['contract-tools'] ?? []
   assert.ok(patterns.length > 0, 'no patterns for the contract-tools area')
 
-  const required = (JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest).generators.flatMap(
-    (generator) => generator.outputs
-  )
+  const required = (
+    JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
+  ).generators.flatMap((generator) => generator.outputs)
   for (const output of required) {
     assert.ok(
       globCovers(patterns, output),

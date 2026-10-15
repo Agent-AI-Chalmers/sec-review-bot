@@ -11,7 +11,10 @@ process.env.APP_ID = process.env.APP_ID || '123456'
 process.env.PRIVATE_KEY_PATH = process.env.PRIVATE_KEY_PATH || '/dev/null'
 process.env.WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'webhook-test-secret'
 
-function oidcRequest(payload: Record<string, unknown>, token = 'test-oidc-token'): IncomingMessage {
+function oidcRequest(
+  payload: Record<string, unknown>,
+  token = 'test-oidc-token'
+): IncomingMessage {
   const body = Buffer.from(JSON.stringify(payload), 'utf8')
   const request = Readable.from([body]) as IncomingMessage
   request.method = 'POST'
@@ -26,12 +29,16 @@ function oidcVerifier(claims: Record<string, unknown> = {}) {
     repository: 'octo/example',
     ref: 'refs/heads/main',
     event_name: 'workflow_dispatch',
-    workflow_ref: 'octo/example/.github/workflows/sec-review-bot.yml@refs/heads/main',
+    workflow_ref:
+      'octo/example/.github/workflows/sec-review-bot.yml@refs/heads/main',
     ...claims
   })
 }
 
-function captureResponse(): ServerResponse & { statusCodeValue?: number; body?: string } {
+function captureResponse(): ServerResponse & {
+  statusCodeValue?: number
+  body?: string
+} {
   const response: {
     statusCodeValue?: number
     body?: string
@@ -47,7 +54,10 @@ function captureResponse(): ServerResponse & { statusCodeValue?: number; body?: 
       return this
     }
   }
-  return response as ServerResponse & { statusCodeValue?: number; body?: string }
+  return response as ServerResponse & {
+    statusCodeValue?: number
+    body?: string
+  }
 }
 
 function fakeApp(): App {
@@ -122,7 +132,11 @@ test('repository dispatch returns preparing as soon as durable admission complet
     response,
     oidcVerifier: oidcVerifier(),
     dispatchReview: async ({ on_admitted: onAdmitted }) => {
-      onAdmitted?.({ run_id: 'run-immediate', status: 'preparing', replayed: false })
+      onAdmitted?.({
+        run_id: 'run-immediate',
+        status: 'preparing',
+        replayed: false
+      })
       await new Promise<void>((resolve) => {
         finishExecution = resolve
       })
@@ -156,7 +170,8 @@ test('repository dispatch requires a correlation id before starting a review', a
     }),
     response,
     oidcVerifier: oidcVerifier(),
-    dispatchReview: async () => assert.fail('invalid dispatch must not start a review')
+    dispatchReview: async () =>
+      assert.fail('invalid dispatch must not start a review')
   })
 
   assert.equal(response.statusCodeValue, 400)
@@ -187,7 +202,10 @@ test('repository dispatch rejects manual incremental without base_sha as a bad r
   })
 
   assert.equal(response.statusCodeValue, 400)
-  assert.match(String(response.body), /manual incremental scan requires base_sha/)
+  assert.match(
+    String(response.body),
+    /manual incremental scan requires base_sha/
+  )
 })
 
 test('repository dispatch does not echo internal submission errors', async () => {
@@ -311,7 +329,8 @@ test('repository dispatch passes the canonical OIDC repository to admission', as
     response,
     oidcVerifier: oidcVerifier({
       repository: 'OCTO/EXAMPLE',
-      workflow_ref: 'OCTO/EXAMPLE/.github/workflows/sec-review-bot.yml@refs/heads/main'
+      workflow_ref:
+        'OCTO/EXAMPLE/.github/workflows/sec-review-bot.yml@refs/heads/main'
     }),
     dispatchReview: async ({ verified_repository: repository }) => {
       verifiedRepository = repository
@@ -421,7 +440,8 @@ test('repository dispatch does not accept job_workflow_ref as the dispatch workf
     response,
     oidcVerifier: oidcVerifier({
       workflow_ref: 'octo/example/.github/workflows/other.yml@refs/heads/main',
-      job_workflow_ref: 'octo/example/.github/workflows/sec-review-bot.yml@refs/heads/main'
+      job_workflow_ref:
+        'octo/example/.github/workflows/sec-review-bot.yml@refs/heads/main'
     }),
     dispatchReview: async () => {
       throw new Error('dispatchReview should not be called')
@@ -448,7 +468,8 @@ test('repository dispatch rejects OIDC workflow from a different branch', async 
     }),
     response,
     oidcVerifier: oidcVerifier({
-      workflow_ref: 'octo/example/.github/workflows/sec-review-bot.yml@refs/heads/dev'
+      workflow_ref:
+        'octo/example/.github/workflows/sec-review-bot.yml@refs/heads/dev'
     }),
     dispatchReview: async () => {
       throw new Error('dispatchReview should not be called')

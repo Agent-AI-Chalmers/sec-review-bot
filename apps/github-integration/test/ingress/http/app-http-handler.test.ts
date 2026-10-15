@@ -62,7 +62,10 @@ test('app HTTP handler routes repository dispatch requests before webhook middle
     }
   })
 
-  await handler(requestFor('/repository-review-dispatch?scan=full'), captureResponse())
+  await handler(
+    requestFor('/repository-review-dispatch?scan=full'),
+    captureResponse()
+  )
 
   assert.deepEqual(calls, ['dispatch'])
 })
@@ -103,6 +106,9 @@ test('app HTTP handler rejects malformed request URLs', async () => {
   await handler(requestFor('/', { host: 'bad host' }), response)
 
   assert.equal(response.statusCodeValue, 400)
-  assert.equal(response.headers['content-type'], 'application/json; charset=utf-8')
+  assert.equal(
+    response.headers['content-type'],
+    'application/json; charset=utf-8'
+  )
   assert.match(String(response.body), /Invalid request URL/)
 })

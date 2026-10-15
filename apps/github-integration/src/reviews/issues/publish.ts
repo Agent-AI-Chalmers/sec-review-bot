@@ -1,4 +1,7 @@
-import { CONTRACT_VERSION, type ContractVersion } from '../../runner/contract-version.js'
+import {
+  CONTRACT_VERSION,
+  type ContractVersion
+} from '../../runner/contract-version.js'
 import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
 import type { PersistedIssue } from '../../control-plane/publish-context.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
@@ -50,10 +53,15 @@ type CompletedRunnerRun = {
   publish_context: Record<string, unknown>
 }
 
-function issueReviewResultFromWorkflowResult(result: unknown): IssueReviewWorkflowResult | null {
+function issueReviewResultFromWorkflowResult(
+  result: unknown
+): IssueReviewWorkflowResult | null {
   try {
     assertWorkflowResult('issue-review', result)
-    const rawResult = result as { contract_version: ContractVersion; review_record: unknown }
+    const rawResult = result as {
+      contract_version: ContractVersion
+      review_record: unknown
+    }
     return {
       contract_version: CONTRACT_VERSION,
       review_record: parseReviewRecord(rawResult.review_record)
@@ -89,7 +97,9 @@ export async function handleIssueReviewRun({
   if (workflow_result === null) {
     throw new Error(`Issue review run ${run.run_id} is not ready to publish.`)
   }
-  const octokit = await installation_octokit_for_repo(context.issue.repo_full_name)
+  const octokit = await installation_octokit_for_repo(
+    context.issue.repo_full_name
+  )
   await publishIssueReviewResult({
     octokit,
     issue: context.issue,
@@ -157,10 +167,21 @@ async function publishIssueReviewResult({
     const step = (await store.listPublicationSteps(run_id)).find(
       (item) => item.step_key === 'issue:draft-pr'
     )
-    if (step?.status === 'succeeded' && step.remote_object_id && step.remote_object_url) {
-      draftPullRequest = { number: Number(step.remote_object_id), html_url: step.remote_object_url }
+    if (
+      step?.status === 'succeeded' &&
+      step.remote_object_id &&
+      step.remote_object_url
+    ) {
+      draftPullRequest = {
+        number: Number(step.remote_object_id),
+        html_url: step.remote_object_url
+      }
     } else {
-      await store.requirePublicationStepClaim(run_id, claim_token, 'issue:draft-pr')
+      await store.requirePublicationStepClaim(
+        run_id,
+        claim_token,
+        'issue:draft-pr'
+      )
       try {
         // A lease is permission to start a side effect, not merely permission
         // to record it afterward. If ownership cannot be proved, fail closed.
@@ -177,7 +198,14 @@ async function publishIssueReviewResult({
           draftPullRequest === null
             ? {}
             : { id: draftPullRequest.number, url: draftPullRequest.html_url }
-        if (!(await store.completePublicationStep(run_id, claim_token, 'issue:draft-pr', remote)))
+        if (
+          !(await store.completePublicationStep(
+            run_id,
+            claim_token,
+            'issue:draft-pr',
+            remote
+          ))
+        )
           throw new PublicationClaimLostError(run_id)
       } catch (error) {
         if (isPublicationClaimLostError(error)) throw error
@@ -226,7 +254,11 @@ async function publishIssueReviewResult({
     (item) => item.step_key === 'issue:summary-comment'
   )
   if (commentStep?.status === 'succeeded') return
-  await store.requirePublicationStepClaim(run_id, claim_token, 'issue:summary-comment')
+  await store.requirePublicationStepClaim(
+    run_id,
+    claim_token,
+    'issue:summary-comment'
+  )
   let comment: IssueReviewComment
   try {
     await assert_publication_claim()
@@ -239,10 +271,15 @@ async function publishIssueReviewResult({
       assert_publication_claim
     })) as IssueReviewComment
     if (
-      !(await store.completePublicationStep(run_id, claim_token, 'issue:summary-comment', {
-        id: comment.id,
-        url: comment.html_url
-      }))
+      !(await store.completePublicationStep(
+        run_id,
+        claim_token,
+        'issue:summary-comment',
+        {
+          id: comment.id,
+          url: comment.html_url
+        }
+      ))
     )
       throw new PublicationClaimLostError(run_id)
   } catch (error) {

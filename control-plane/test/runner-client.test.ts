@@ -31,9 +31,16 @@ test('submission sends authentication and accepts only the expected identity', a
   configureRunner()
   globalThis.fetch = async (input, init) => {
     assert.equal(input, 'https://runner.test/v1/workflows/issue-review/runs')
-    assert.equal((init?.headers as Record<string, string>).authorization, 'Bearer test-token')
+    assert.equal(
+      (init?.headers as Record<string, string>).authorization,
+      'Bearer test-token'
+    )
     return new Response(
-      JSON.stringify({ run_id: 'run-1', workflow: 'issue-review', status: 'queued' }),
+      JSON.stringify({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'queued'
+      }),
       { status: 200 }
     )
   }
@@ -117,7 +124,10 @@ test('status response must match the persisted workflow', async () => {
       { status: 200 }
     )
 
-  await assert.rejects(getRunnerRunStatus('run-1', 'issue-review'), /unexpected workflow/)
+  await assert.rejects(
+    getRunnerRunStatus('run-1', 'issue-review'),
+    /unexpected workflow/
+  )
 })
 
 test('status response preserves a valid terminal result', async () => {
@@ -163,7 +173,10 @@ test('status response validates an available artifact against the run identity',
       })
     )
 
-  assert.deepEqual((await getRunnerRunStatus('run-1')).artifact_storage, artifactStorage)
+  assert.deepEqual(
+    (await getRunnerRunStatus('run-1')).artifact_storage,
+    artifactStorage
+  )
 })
 
 test('status response rejects an artifact reference owned by another run', async () => {
@@ -188,7 +201,10 @@ test('status response rejects an artifact reference owned by another run', async
     )
 
   await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
-    assert.equal((error as { code?: string }).code, 'RUNNER_INVALID_ARTIFACT_STORAGE')
+    assert.equal(
+      (error as { code?: string }).code,
+      'RUNNER_INVALID_ARTIFACT_STORAGE'
+    )
     return true
   })
 })
@@ -197,7 +213,11 @@ test('status response rejects an unknown Runner state', async () => {
   configureRunner()
   globalThis.fetch = async () =>
     new Response(
-      JSON.stringify({ run_id: 'run-1', workflow: 'issue-review', status: 'completed' }),
+      JSON.stringify({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'completed'
+      }),
       { status: 200 }
     )
 
@@ -218,14 +238,20 @@ test('a status query is split into batches the runner accepts', async () => {
     sent.push(body.run_ids)
     return new Response(
       JSON.stringify({
-        runs: body.run_ids.map((runId) => ({ run_id: runId, status: 'running' })),
+        runs: body.run_ids.map((runId) => ({
+          run_id: runId,
+          status: 'running'
+        })),
         missing: []
       }),
       { status: 200 }
     )
   }
 
-  const runIds = Array.from({ length: RUNNER_STATUS_QUERY_LIMIT + 1 }, (_, index) => `run-${index}`)
+  const runIds = Array.from(
+    { length: RUNNER_STATUS_QUERY_LIMIT + 1 },
+    (_, index) => `run-${index}`
+  )
   const batch = await getRunnerRunStatuses(runIds)
 
   assert.equal(sent.length, 2)
@@ -243,7 +269,9 @@ test('a status query is split into batches the runner accepts', async () => {
 test('the status batch size is the limit the contract publishes', () => {
   const spec = JSON.parse(readFileSync(SPEC_PATH, 'utf8')) as {
     components: {
-      schemas: { RunStatusQuery: { properties: { run_ids: { maxItems: number } } } }
+      schemas: {
+        RunStatusQuery: { properties: { run_ids: { maxItems: number } } }
+      }
     }
   }
 

@@ -20,18 +20,24 @@ test('extractCommentCommand parses a plain review command', () => {
 })
 
 test('extractCommentCommand parses the test-changes deny value', () => {
-  assert.deepEqual(extractCommentCommand('@sec-review-bot review --test-changes deny'), {
-    command: 'review',
-    mention: 'sec-review-bot',
-    test_changes: 'deny',
-    open_pr: false
-  })
-  assert.deepEqual(extractCommentCommand('@sec-review-bot review --test-changes allow'), {
-    command: 'review',
-    mention: 'sec-review-bot',
-    test_changes: 'allow',
-    open_pr: false
-  })
+  assert.deepEqual(
+    extractCommentCommand('@sec-review-bot review --test-changes deny'),
+    {
+      command: 'review',
+      mention: 'sec-review-bot',
+      test_changes: 'deny',
+      open_pr: false
+    }
+  )
+  assert.deepEqual(
+    extractCommentCommand('@sec-review-bot review --test-changes allow'),
+    {
+      command: 'review',
+      mention: 'sec-review-bot',
+      test_changes: 'allow',
+      open_pr: false
+    }
+  )
 })
 
 test('extractCommentCommand parses the open-pr flag', () => {
@@ -51,32 +57,59 @@ test('extractCommentCommand parses combined flags in any order', () => {
     open_pr: true
   }
   assert.deepEqual(
-    extractCommentCommand('@sec-review-bot review --open-pr --test-changes deny'),
+    extractCommentCommand(
+      '@sec-review-bot review --open-pr --test-changes deny'
+    ),
     expected
   )
   assert.deepEqual(
-    extractCommentCommand('@sec-review-bot review --test-changes deny --open-pr'),
+    extractCommentCommand(
+      '@sec-review-bot review --test-changes deny --open-pr'
+    ),
     expected
   )
 })
 
 test('extractCommentCommand rejects a bare or invalid test-changes value', () => {
-  assert.equal(extractCommentCommand('@sec-review-bot review --open-pr=true'), null)
-  assert.equal(extractCommentCommand('@sec-review-bot review --test-changes'), null)
-  assert.equal(extractCommentCommand('@sec-review-bot review --test-changes maybe'), null)
-  assert.equal(extractCommentCommand('@sec-review-bot review --test-changes=deny'), null)
+  assert.equal(
+    extractCommentCommand('@sec-review-bot review --open-pr=true'),
+    null
+  )
+  assert.equal(
+    extractCommentCommand('@sec-review-bot review --test-changes'),
+    null
+  )
+  assert.equal(
+    extractCommentCommand('@sec-review-bot review --test-changes maybe'),
+    null
+  )
+  assert.equal(
+    extractCommentCommand('@sec-review-bot review --test-changes=deny'),
+    null
+  )
 })
 
 test('extractCommentCommand rejects unknown flags', () => {
   // A typo must fail the whole command rather than being silently ignored.
-  assert.equal(extractCommentCommand('@sec-review-bot review --repair-mode=no-test-changes'), null)
-  assert.equal(extractCommentCommand('@sec-review-bot review --no-test-changes'), null)
+  assert.equal(
+    extractCommentCommand(
+      '@sec-review-bot review --repair-mode=no-test-changes'
+    ),
+    null
+  )
+  assert.equal(
+    extractCommentCommand('@sec-review-bot review --no-test-changes'),
+    null
+  )
   assert.equal(extractCommentCommand('@sec-review-bot review --bogus=1'), null)
   assert.equal(extractCommentCommand('@sec-review-bot review --bogus'), null)
 })
 
 test('extractCommentCommand rejects the old positional forms and the objective words', () => {
-  assert.equal(extractCommentCommand('@sec-review-bot review no-test-changes'), null)
+  assert.equal(
+    extractCommentCommand('@sec-review-bot review no-test-changes'),
+    null
+  )
   assert.equal(extractCommentCommand('@sec-review-bot review deny'), null)
   assert.equal(extractCommentCommand('@sec-review-bot review audit'), null)
   assert.equal(extractCommentCommand('@sec-review-bot review repair'), null)
@@ -84,12 +117,17 @@ test('extractCommentCommand rejects the old positional forms and the objective w
 })
 
 test('extractCommentCommand ignores quoted commands', () => {
-  assert.equal(extractCommentCommand('> @sec-review-bot review\n\nI meant this earlier.'), null)
+  assert.equal(
+    extractCommentCommand('> @sec-review-bot review\n\nI meant this earlier.'),
+    null
+  )
 })
 
 test('extractCommentCommand parses a command after quoted text', () => {
   assert.deepEqual(
-    extractCommentCommand('> @sec-review-bot review\n\n@sec-review-bot review --test-changes deny'),
+    extractCommentCommand(
+      '> @sec-review-bot review\n\n@sec-review-bot review --test-changes deny'
+    ),
     {
       command: 'review',
       mention: 'sec-review-bot',

@@ -21,12 +21,18 @@ const DEFAULT_GIT_COMMAND_TIMEOUT_MS = 600_000
 type Sleep = (delay_ms: number) => Promise<void>
 
 /** Resolve the per-command timeout, validating the environment override. */
-export function configuredGitTimeoutMs(configured = process.env[GIT_COMMAND_TIMEOUT_ENV]): number {
+export function configuredGitTimeoutMs(
+  configured = process.env[GIT_COMMAND_TIMEOUT_ENV]
+): number {
   if (configured === undefined || configured.trim() === '') {
     return DEFAULT_GIT_COMMAND_TIMEOUT_MS
   }
   const parsed = Number.parseInt(configured, 10)
-  if (!Number.isFinite(parsed) || parsed <= 0 || String(parsed) !== configured.trim()) {
+  if (
+    !Number.isFinite(parsed) ||
+    parsed <= 0 ||
+    String(parsed) !== configured.trim()
+  ) {
     throw new Error(`${GIT_COMMAND_TIMEOUT_ENV} must be a positive integer.`)
   }
   return parsed
@@ -55,9 +61,13 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`
 }
 
-async function createGitAskPassAuth(git_auth_token: string): Promise<GitAskPassAuth> {
+async function createGitAskPassAuth(
+  git_auth_token: string
+): Promise<GitAskPassAuth> {
   // Keep the installation token out of git argv; argv can be visible to other local processes.
-  const authDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-git-auth-'))
+  const authDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'sec-review-git-auth-')
+  )
   await fs.chmod(authDir, 0o700)
   const tokenPath = path.join(authDir, 'token')
   const askPassPath = path.join(authDir, 'askpass.sh')
@@ -171,11 +181,15 @@ export function withConfiguredGitFetchProxy(
   }
 }
 
-async function requireWorkspaceCommand(command: string, args: string[]): Promise<void> {
+async function requireWorkspaceCommand(
+  command: string,
+  args: string[]
+): Promise<void> {
   try {
     await execFileAsync(command, args)
   } catch (error) {
-    const cause = error instanceof Error && error.message ? ` ${error.message}` : ''
+    const cause =
+      error instanceof Error && error.message ? ` ${error.message}` : ''
     throw new Error(
       `GitHub integration workspace preparation requires '${command}' in PATH.${cause}`,
       { cause: error }
@@ -196,20 +210,38 @@ async function initializeWorkspaceGitRepository({
   await fs.mkdir(workspace_path, { recursive: true })
   await runGitCommand(workspace_path, ['init'])
   await runGitCommand(workspace_path, ['config', 'user.name', 'sec-review-bot'])
-  await runGitCommand(workspace_path, ['config', 'user.email', 'sec-review-bot@localhost'])
+  await runGitCommand(workspace_path, [
+    'config',
+    'user.email',
+    'sec-review-bot@localhost'
+  ])
 }
 
-async function sanitizeMaterializedGitWorkspace(workspace_path: string): Promise<void> {
+async function sanitizeMaterializedGitWorkspace(
+  workspace_path: string
+): Promise<void> {
   // The agent needs real git objects for diffs, but not remotes, credentials, or fetch metadata.
-  await runGitCommand(workspace_path, ['remote', 'remove', 'origin']).catch(() => {})
+  await runGitCommand(workspace_path, ['remote', 'remove', 'origin']).catch(
+    () => {}
+  )
   await fs.rm(path.join(workspace_path, '.git', 'FETCH_HEAD'), { force: true })
   await fs.rm(path.join(workspace_path, '.git', 'ORIG_HEAD'), { force: true })
-  await fs.rm(path.join(workspace_path, '.git', 'logs'), { recursive: true, force: true })
-  await runGitCommand(workspace_path, ['reflog', 'expire', '--expire=now', '--all']).catch(() => {})
+  await fs.rm(path.join(workspace_path, '.git', 'logs'), {
+    recursive: true,
+    force: true
+  })
+  await runGitCommand(workspace_path, [
+    'reflog',
+    'expire',
+    '--expire=now',
+    '--all'
+  ]).catch(() => {})
   await runGitCommand(workspace_path, ['gc', '--prune=now'])
 }
 
-async function compactWorkspaceGitObjectsBeforeSnapshot(workspace_path: string): Promise<void> {
+async function compactWorkspaceGitObjectsBeforeSnapshot(
+  workspace_path: string
+): Promise<void> {
   const gitDir = path.join(workspace_path, '.git')
   try {
     const stat = await fs.stat(gitDir)
@@ -257,10 +289,19 @@ async function materializeWorkspaceFromRealGitHistory({
   )
 
   try {
-    await initializeWorkspaceGitRepository({ workspace_path: materialized_path })
-    await runGitCommand(materialized_path, ['remote', 'add', 'origin', git_remote_url])
+    await initializeWorkspaceGitRepository({
+      workspace_path: materialized_path
+    })
+    await runGitCommand(materialized_path, [
+      'remote',
+      'add',
+      'origin',
+      git_remote_url
+    ])
 
-    const auth = git_auth_token ? await createGitAskPassAuth(git_auth_token) : null
+    const auth = git_auth_token
+      ? await createGitAskPassAuth(git_auth_token)
+      : null
     try {
       const fetchArgs = [
         'fetch',
@@ -287,7 +328,9 @@ async function materializeWorkspaceFromRealGitHistory({
 
     const head_ref = refs[refs.length - 1]
     if (!head_ref) {
-      throw new Error('materializeWorkspaceFromRealGitHistory requires at least one ref.')
+      throw new Error(
+        'materializeWorkspaceFromRealGitHistory requires at least one ref.'
+      )
     }
     await runGitCommand(materialized_path, ['checkout', '--detach', head_ref])
     await sanitizeMaterializedGitWorkspace(materialized_path)
@@ -314,20 +357,28 @@ export async function materializeWorkspaceWithCommitHistory({
 }): Promise<void> {
   const normalizedRefs = refs
     .map((item) => String(item).trim())
-    .filter((item, index, array) => item !== '' && array.indexOf(item) === index)
+    .filter(
+      (item, index, array) => item !== '' && array.indexOf(item) === index
+    )
 
   if (normalizedRefs.length === 0) {
-    throw new Error('materializeWorkspaceWithCommitHistory requires at least one ref.')
+    throw new Error(
+      'materializeWorkspaceWithCommitHistory requires at least one ref.'
+    )
   }
 
   for (const ref of normalizedRefs) {
     if (ref.startsWith('-')) {
-      throw new Error('materializeWorkspaceWithCommitHistory refs must not start with "-".')
+      throw new Error(
+        'materializeWorkspaceWithCommitHistory refs must not start with "-".'
+      )
     }
   }
 
   if (!git_remote_url || git_remote_url.trim() === '') {
-    throw new Error('materializeWorkspaceWithCommitHistory requires git_remote_url.')
+    throw new Error(
+      'materializeWorkspaceWithCommitHistory requires git_remote_url.'
+    )
   }
   // PR and repository reviews rely on real commit relationships; snapshot
   // archives must not be silently promoted into synthetic git history.
@@ -356,7 +407,13 @@ export async function createWorkspaceSnapshotTar({
   try {
     await execFileAsync(
       'tar',
-      ['-cf', tempPath, '-C', path.dirname(workspace_path), path.basename(workspace_path)],
+      [
+        '-cf',
+        tempPath,
+        '-C',
+        path.dirname(workspace_path),
+        path.basename(workspace_path)
+      ],
       { timeout: configuredGitTimeoutMs() }
     )
     await fs.rename(tempPath, tar_path)

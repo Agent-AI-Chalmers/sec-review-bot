@@ -44,17 +44,23 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     assert.equal(upstreamPath, '/v1/runs')
     // The BFF forwards only the parameters Control Plane declares: UI state (`range`) and
     // anything else the browser adds (UTM, typos) are dropped rather than passed upstream.
-    await fetch(`${base}/api/runs?range=1h&utm_source=twitter&limit=10`, { headers: { cookie } })
+    await fetch(`${base}/api/runs?range=1h&utm_source=twitter&limit=10`, {
+      headers: { cookie }
+    })
     assert.equal(upstreamPath, '/v1/runs?limit=10')
     await fetch(`${base}/api/runs?workflow=issue-review&range=7d&cursor=abc`, {
       headers: { cookie }
     })
     assert.equal(upstreamPath, '/v1/runs?cursor=abc&workflow=issue-review')
     assert.equal(
-      (await fetch(`${base}/api/runs`, { method: 'POST', headers: { cookie } })).status,
+      (await fetch(`${base}/api/runs`, { method: 'POST', headers: { cookie } }))
+        .status,
       404
     )
-    assert.equal((await fetch(`${base}/api/store`, { headers: { cookie } })).status, 404)
+    assert.equal(
+      (await fetch(`${base}/api/store`, { headers: { cookie } })).status,
+      404
+    )
     const oversizedLogin = await fetch(`${base}/api/session`, {
       method: 'POST',
       body: JSON.stringify({ token: 'x'.repeat(1024 * 1024) })
@@ -104,7 +110,10 @@ test('BFF sign-out expires the session cookie it issued', async () => {
     })
     const cookie = login.headers.get('set-cookie')
     assert(cookie !== null)
-    assert.equal((await fetch(`${base}/api/runs`, { headers: { cookie } })).status, 200)
+    assert.equal(
+      (await fetch(`${base}/api/runs`, { headers: { cookie } })).status,
+      200
+    )
 
     // A browser attaches `Origin` to a non-GET request, even same-origin; sign-out is
     // refused without it (see the cross-site test below).
@@ -120,7 +129,11 @@ test('BFF sign-out expires the session cookie it issued', async () => {
 
     // The cleared value must not authenticate, even if a client replays it verbatim.
     const replayed = cleared ?? ''
-    assert.equal((await fetch(`${base}/api/runs`, { headers: { cookie: replayed } })).status, 401)
+    assert.equal(
+      (await fetch(`${base}/api/runs`, { headers: { cookie: replayed } }))
+        .status,
+      401
+    )
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -159,7 +172,10 @@ test('BFF refuses a cross-site sign-out', async () => {
 
     // A request that carries neither `Origin` nor `Referer` is also refused, since an
     // attacker can omit both.
-    assert.equal((await fetch(`${base}/api/session`, { method: 'DELETE' })).status, 403)
+    assert.equal(
+      (await fetch(`${base}/api/session`, { method: 'DELETE' })).status,
+      403
+    )
 
     // `Referer` alone is enough, so a same-origin caller that could not set `Origin`
     // still signs out.
@@ -242,7 +258,10 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
   assert(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}`
   try {
-    assert.equal((await fetch(`${base}/api/runs/${runId}/artifact`)).status, 401)
+    assert.equal(
+      (await fetch(`${base}/api/runs/${runId}/artifact`)).status,
+      401
+    )
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
       body: JSON.stringify({ token: 'login-secret' })
@@ -254,8 +273,14 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
     })
     assert.equal(download.status, 200)
     assert.equal(await download.text(), 'artifact')
-    assert.equal(requestedKey, `runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`)
-    assert.equal(download.headers.get('content-type'), 'application/octet-stream')
+    assert.equal(
+      requestedKey,
+      `runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
+    )
+    assert.equal(
+      download.headers.get('content-type'),
+      'application/octet-stream'
+    )
     assert.equal(
       download.headers.get('content-disposition'),
       'attachment; filename="diagnostic-tree.v1.tar.zst"'
@@ -317,7 +342,9 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
     })
     const cookie = login.headers.get('set-cookie')
     assert(cookie)
-    const download = await fetch(`${base}/api/runs/run-1/artifact`, { headers: { cookie } })
+    const download = await fetch(`${base}/api/runs/run-1/artifact`, {
+      headers: { cookie }
+    })
     assert.equal(download.status, 409)
     assert.equal(storageCalled, false)
   } finally {
@@ -374,9 +401,13 @@ test('BFF rejects an object whose size does not match the available artifact', a
     })
     const cookie = login.headers.get('set-cookie')
     assert(cookie)
-    const download = await fetch(`${base}/api/runs/${runId}/artifact`, { headers: { cookie } })
+    const download = await fetch(`${base}/api/runs/${runId}/artifact`, {
+      headers: { cookie }
+    })
     assert.equal(download.status, 502)
-    assert.deepEqual(await download.json(), { error: 'artifact_identity_mismatch' })
+    assert.deepEqual(await download.json(), {
+      error: 'artifact_identity_mismatch'
+    })
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -431,9 +462,13 @@ test('BFF rejects same-size artifact content that does not match the stored dige
     })
     const cookie = login.headers.get('set-cookie')
     assert(cookie)
-    const download = await fetch(`${base}/api/runs/${runId}/artifact`, { headers: { cookie } })
+    const download = await fetch(`${base}/api/runs/${runId}/artifact`, {
+      headers: { cookie }
+    })
     assert.equal(download.status, 502)
-    assert.deepEqual(await download.json(), { error: 'artifact_identity_mismatch' })
+    assert.deepEqual(await download.json(), {
+      error: 'artifact_identity_mismatch'
+    })
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -475,7 +510,9 @@ test('BFF times out a stalled artifact download', async () => {
     artifactStore: {
       async getObject(_key, signal): Promise<{ body: Readable }> {
         return await new Promise((_, reject) => {
-          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+          signal.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError'))
+          )
         })
       }
     }
@@ -491,9 +528,13 @@ test('BFF times out a stalled artifact download', async () => {
     })
     const cookie = login.headers.get('set-cookie')
     assert(cookie)
-    const download = await fetch(`${base}/api/runs/${runId}/artifact`, { headers: { cookie } })
+    const download = await fetch(`${base}/api/runs/${runId}/artifact`, {
+      headers: { cookie }
+    })
     assert.equal(download.status, 504)
-    assert.deepEqual(await download.json(), { error: 'artifact_download_timeout' })
+    assert.deepEqual(await download.json(), {
+      error: 'artifact_download_timeout'
+    })
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
@@ -532,7 +573,9 @@ test('BFF reports a Control Plane metadata timeout separately', async () => {
     })
     const cookie = login.headers.get('set-cookie')
     assert(cookie)
-    const download = await fetch(`${base}/api/runs/run-1/artifact`, { headers: { cookie } })
+    const download = await fetch(`${base}/api/runs/run-1/artifact`, {
+      headers: { cookie }
+    })
     assert.equal(download.status, 504)
     assert.deepEqual(await download.json(), { error: 'control_plane_timeout' })
   } finally {

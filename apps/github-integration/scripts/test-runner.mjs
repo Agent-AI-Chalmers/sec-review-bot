@@ -20,7 +20,8 @@ async function collectTests(directory, excludedDirectory = null) {
   return files
 }
 
-const root = mode === 'integration' ? resolve('test/integration') : resolve('test')
+const root =
+  mode === 'integration' ? resolve('test/integration') : resolve('test')
 const excludedDirectory = mode === 'unit' ? resolve('test/integration') : null
 const files = (await collectTests(root, excludedDirectory)).sort()
 if (files.length === 0) throw new Error(`No ${mode} tests found in ${root}`)

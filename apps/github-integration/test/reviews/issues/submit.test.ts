@@ -3,7 +3,10 @@ import test from 'node:test'
 
 import { startIssueReviewRun } from '../../../src/reviews/issues/submit.js'
 import type { IssueContext } from '../../../src/github/issue-service.js'
-import type { IssueReviewInput, TestChangesPolicy } from '../../../src/runner/input.js'
+import type {
+  IssueReviewInput,
+  TestChangesPolicy
+} from '../../../src/runner/input.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 
 function issueContext(): IssueContext {
@@ -28,8 +31,10 @@ function issueContext(): IssueContext {
 }
 
 function fakePrepareInput() {
-  const calls: Array<{ review_objective: 'audit' | 'repair'; test_changes?: TestChangesPolicy }> =
-    []
+  const calls: Array<{
+    review_objective: 'audit' | 'repair'
+    test_changes?: TestChangesPolicy
+  }> = []
   const prepare_input = (async (args: {
     review_objective?: 'audit' | 'repair'
     test_changes?: TestChangesPolicy
@@ -63,7 +68,10 @@ async function runWith(
       run_id: 'run-issue-1',
       octokit: {},
       issue: issueContext(),
-      trusted_default_branch: { default_branch: 'main', head_sha: 'default-sha' },
+      trusted_default_branch: {
+        default_branch: 'main',
+        head_sha: 'default-sha'
+      },
       event_type: 'manual_review',
       review_objective,
       test_changes,
@@ -83,12 +91,16 @@ test('audit review forwards an explicit test_changes to the runner input', async
 })
 
 test('audit review without a test_changes leaves the field absent', async () => {
-  assert.deepEqual(await runWith('audit', null), [{ review_objective: 'audit' }])
+  assert.deepEqual(await runWith('audit', null), [
+    { review_objective: 'audit' }
+  ])
 })
 
 test('repair review without a test_changes leaves the field absent', async () => {
   // The runner owns the default (`allow`); the GitHub integration never injects one.
-  assert.deepEqual(await runWith('repair', null), [{ review_objective: 'repair' }])
+  assert.deepEqual(await runWith('repair', null), [
+    { review_objective: 'repair' }
+  ])
 })
 
 test('repair review forwards an explicit test_changes', async () => {

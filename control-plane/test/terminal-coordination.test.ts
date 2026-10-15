@@ -40,7 +40,11 @@ test('active Runner execution advances without publishing', async () => {
     await observeRunnerRun(
       store(events),
       run,
-      async () => ({ run_id: 'run-1', workflow: 'issue-review', status: 'running' }),
+      async () => ({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'running'
+      }),
       () => false
     ),
     'active'
@@ -87,7 +91,9 @@ test('transient polling failure leaves the run active', async () => {
 
 test('terminal polling failure fails the run without publication', async () => {
   const events: unknown[][] = []
-  const error = Object.assign(new Error('missing'), { code: 'RUNNER_RUN_NOT_FOUND' })
+  const error = Object.assign(new Error('missing'), {
+    code: 'RUNNER_RUN_NOT_FOUND'
+  })
   assert.equal(
     await observeRunnerRun(
       store(events),
@@ -100,7 +106,12 @@ test('terminal polling failure fails the run without publication', async () => {
     'failed'
   )
   assert.deepEqual(events, [
-    ['failed', 'run-1', { code: 'RUNNER_RUN_NOT_FOUND', message: 'missing' }, undefined]
+    [
+      'failed',
+      'run-1',
+      { code: 'RUNNER_RUN_NOT_FOUND', message: 'missing' },
+      undefined
+    ]
   ])
 })
 
@@ -135,7 +146,11 @@ test('a stale running observation does not emit a state-change event', async () 
       markRunning: async () => false
     },
     run,
-    async () => ({ run_id: 'run-1', workflow: 'issue-review', status: 'running' }),
+    async () => ({
+      run_id: 'run-1',
+      workflow: 'issue-review',
+      status: 'running'
+    }),
     () => false,
     (event) => events.push(event)
   )

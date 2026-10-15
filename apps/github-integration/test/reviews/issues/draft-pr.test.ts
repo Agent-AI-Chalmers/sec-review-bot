@@ -9,7 +9,10 @@ import { PublicationClaimLostError } from '../../../src/control-plane/publicatio
 type CreateDraftPrParams = Parameters<typeof createDraftPullRequestWithClaim>[0]
 type CreateDraftPrOctokit = CreateDraftPrParams['octokit']
 type CreateDraftPrIssue = CreateDraftPrParams['issue']
-type TestMitigation = Omit<Partial<ReviewRecord['mitigation']>, 'file_changes'> & {
+type TestMitigation = Omit<
+  Partial<ReviewRecord['mitigation']>,
+  'file_changes'
+> & {
   file_changes?: unknown[]
 }
 
@@ -65,11 +68,19 @@ function createOctokitMock({
 } = {}) {
   const calls = {
     blobs: [] as Array<{ content: string; encoding: 'utf-8' | 'base64' }>,
-    trees: [] as Array<Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>>,
+    trees: [] as Array<
+      Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>
+    >,
     commits: [] as Array<{ message: string; tree: string; parents: string[] }>,
     refs: [] as Array<{ ref: string; sha: string }>,
     updatedRefs: [] as Array<{ ref: string; sha: string; force: boolean }>,
-    pulls: [] as Array<{ title: string; head: string; base: string; body: string; draft: boolean }>
+    pulls: [] as Array<{
+      title: string
+      head: string
+      base: string
+      body: string
+      draft: boolean
+    }>
   }
 
   return {
@@ -90,7 +101,12 @@ function createOctokitMock({
         createTree: async ({
           tree
         }: {
-          tree: Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>
+          tree: Array<{
+            path: string
+            mode: FileMode
+            type: 'blob'
+            sha: string | null
+          }>
         }) => {
           calls.trees.push(tree)
           return { data: { sha: 'tree-sha' } }
@@ -114,14 +130,24 @@ function createOctokitMock({
           }
           return { data: {} }
         },
-        updateRef: async ({ ref, sha, force }: { ref: string; sha: string; force: boolean }) => {
+        updateRef: async ({
+          ref,
+          sha,
+          force
+        }: {
+          ref: string
+          sha: string
+          force: boolean
+        }) => {
           calls.updatedRefs.push({ ref, sha, force })
           return { data: {} }
         }
       },
       repos: {
         get: async () => ({ data: { default_branch: 'main' } }),
-        getBranch: async () => ({ data: { commit: { sha: 'resolved-default-sha' } } })
+        getBranch: async () => ({
+          data: { commit: { sha: 'resolved-default-sha' } }
+        })
       },
       pulls: {
         list: async () => ({ data: existingPullRequests }),
@@ -189,7 +215,9 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
 })
 
 test('issue draft PR retry updates a branch left by a partial prior attempt', async () => {
-  const createRefError = Object.assign(new Error('Reference already exists'), { status: 422 })
+  const createRefError = Object.assign(new Error('Reference already exists'), {
+    status: 422
+  })
   const octokit = createOctokitMock({ createRefError })
   const review_record = reviewRecordWithMitigation({
     file_changes: [
@@ -251,7 +279,8 @@ test('issue draft PR stops before the next GitHub write after claim loss', async
       }),
       assert_publication_claim: async () => {
         ownershipChecks += 1
-        if (ownershipChecks === 2) throw new PublicationClaimLostError('run-12345678')
+        if (ownershipChecks === 2)
+          throw new PublicationClaimLostError('run-12345678')
       }
     }),
     PublicationClaimLostError
@@ -370,7 +399,11 @@ test('issue draft PR ignores unsafe display changed_files when file_changes are 
     repo_name: 'example-repo'
   }
   const review_record = reviewRecordWithMitigation({
-    changed_files: ['workspace/../notes', '.github/workflows/pwn.yml', 'src/app.txt'],
+    changed_files: [
+      'workspace/../notes',
+      '.github/workflows/pwn.yml',
+      'src/app.txt'
+    ],
     file_changes: [
       {
         path: 'src/app.txt',

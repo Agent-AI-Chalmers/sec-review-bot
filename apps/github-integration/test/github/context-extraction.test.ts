@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { extractIssueContext, IssueContextExtractionError } from '../../src/github/issue-service.js'
+import {
+  extractIssueContext,
+  IssueContextExtractionError
+} from '../../src/github/issue-service.js'
 import {
   extractPullRequestContext,
   PullRequestContextExtractionError
@@ -11,7 +14,8 @@ test('extractIssueContext rejects payloads missing required identity fields', ()
   assert.throws(
     () => extractIssueContext({}),
     (error: unknown) =>
-      error instanceof IssueContextExtractionError && /repository\.name/.test(error.message)
+      error instanceof IssueContextExtractionError &&
+      /repository\.name/.test(error.message)
   )
 })
 
@@ -47,7 +51,8 @@ test('extractPullRequestContext rejects payloads missing required identity field
   assert.throws(
     () => extractPullRequestContext({}),
     (error: unknown) =>
-      error instanceof PullRequestContextExtractionError && /repository\.name/.test(error.message)
+      error instanceof PullRequestContextExtractionError &&
+      /repository\.name/.test(error.message)
   )
 })
 

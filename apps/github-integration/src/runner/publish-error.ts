@@ -1,4 +1,7 @@
-import { RUNNER_PUBLISH_ERROR_CODES, type RunnerPublishErrorCode } from './publish-error-code.js'
+import {
+  RUNNER_PUBLISH_ERROR_CODES,
+  type RunnerPublishErrorCode
+} from './publish-error-code.js'
 import { isRecord } from '../utils/error-utils.js'
 
 interface ErrorOptionsWithCause {

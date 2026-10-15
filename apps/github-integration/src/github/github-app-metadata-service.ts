@@ -20,10 +20,17 @@ export function setGitHubAppMetadata(
   } = {}
 ): void {
   const slug =
-    typeof metadata.slug === 'string' && metadata.slug.trim() !== '' ? metadata.slug.trim() : null
+    typeof metadata.slug === 'string' && metadata.slug.trim() !== ''
+      ? metadata.slug.trim()
+      : null
   const name =
-    typeof metadata.name === 'string' && metadata.name.trim() !== '' ? metadata.name.trim() : null
-  const id = typeof metadata.id === 'number' && Number.isInteger(metadata.id) ? metadata.id : null
+    typeof metadata.name === 'string' && metadata.name.trim() !== ''
+      ? metadata.name.trim()
+      : null
+  const id =
+    typeof metadata.id === 'number' && Number.isInteger(metadata.id)
+      ? metadata.id
+      : null
 
   github_app_metadata = {
     id,

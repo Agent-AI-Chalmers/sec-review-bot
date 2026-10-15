@@ -28,7 +28,13 @@ import {
 } from './result.js'
 import type { RepositoryContext } from './submit.js'
 import type { PersistedRepositoryScanTarget } from '../../control-plane/publish-context.js'
-import { asList, isRecord, nonEmptyText, optionalNumber, type AnyRecord } from '../view-utils.js'
+import {
+  asList,
+  isRecord,
+  nonEmptyText,
+  optionalNumber,
+  type AnyRecord
+} from '../view-utils.js'
 
 interface PublishedDeliveryEntry {
   // Publish-time view for the summary renderer. It is not an agent result:
@@ -60,7 +66,9 @@ function repositorySummaryRunMarker(run_id: string): string {
   return `<!-- sec-review-bot:repository-summary-run:${run_id} -->`
 }
 
-function repositoryResultFromWorkflowResult(result: unknown): RepositoryWorkflowResult | null {
+function repositoryResultFromWorkflowResult(
+  result: unknown
+): RepositoryWorkflowResult | null {
   try {
     return parseRepositoryWorkflowResult(result)
   } catch (error) {
@@ -135,7 +143,9 @@ function deliveryCvssFieldsFromCases(
   return {
     case_count,
     cvss_outcome:
-      cvssCount > 0 && notScoredCount === cvssCount ? 'not-scored' : first_non_scored_outcome,
+      cvssCount > 0 && notScoredCount === cvssCount
+        ? 'not-scored'
+        : first_non_scored_outcome,
     cvss_base_score: null,
     cvss_severity: null
   }
@@ -176,7 +186,10 @@ export async function publishDeliveryDraftPrs({
     )
   }
   const persistedSteps = new Map(
-    (await store.listPublicationSteps(run_id)).map((step) => [step.step_key, step])
+    (await store.listPublicationSteps(run_id)).map((step) => [
+      step.step_key,
+      step
+    ])
   )
 
   for (const delivery of deliveries) {
@@ -234,7 +247,9 @@ export async function publishDeliveryDraftPrs({
         cvss_severity: deliveryCvss.cvss_severity,
         title: draftPullRequest.title,
         html_url: draftPullRequest.html_url,
-        file_changes: Array.isArray(delivery.file_changes) ? delivery.file_changes : []
+        file_changes: Array.isArray(delivery.file_changes)
+          ? delivery.file_changes
+          : []
       })
       logInfo('delivery_draft_pr_completed', {
         delivery_id: delivery.delivery_id,
@@ -350,19 +365,37 @@ async function publishRepositoryReviewResult({
   })
 
   const steps = await store.listPublicationSteps(run_id)
-  const summaryIssueStep = steps.find((step) => step.step_key === 'repository:summary-issue')
+  const summaryIssueStep = steps.find(
+    (step) => step.step_key === 'repository:summary-issue'
+  )
   let summaryIssueNumber: number
-  if (summaryIssueStep?.status === 'succeeded' && summaryIssueStep.remote_object_id) {
+  if (
+    summaryIssueStep?.status === 'succeeded' &&
+    summaryIssueStep.remote_object_id
+  ) {
     summaryIssueNumber = Number(summaryIssueStep.remote_object_id)
   } else {
-    await store.requirePublicationStepClaim(run_id, claim_token, 'repository:summary-issue')
+    await store.requirePublicationStepClaim(
+      run_id,
+      claim_token,
+      'repository:summary-issue'
+    )
     try {
       await assert_publication_claim()
-      summaryIssueNumber = await ensureSummaryIssueNumber(github, repo, assert_publication_claim)
+      summaryIssueNumber = await ensureSummaryIssueNumber(
+        github,
+        repo,
+        assert_publication_claim
+      )
       if (
-        !(await store.completePublicationStep(run_id, claim_token, 'repository:summary-issue', {
-          id: summaryIssueNumber
-        }))
+        !(await store.completePublicationStep(
+          run_id,
+          claim_token,
+          'repository:summary-issue',
+          {
+            id: summaryIssueNumber
+          }
+        ))
       )
         throw new PublicationClaimLostError(run_id)
     } catch (error) {
@@ -398,7 +431,11 @@ async function publishRepositoryReviewResult({
     (step) => step.step_key === 'repository:summary-comment'
   )
   if (summaryCommentStep?.status === 'succeeded') return
-  await store.requirePublicationStepClaim(run_id, claim_token, 'repository:summary-comment')
+  await store.requirePublicationStepClaim(
+    run_id,
+    claim_token,
+    'repository:summary-comment'
+  )
   let comment
   try {
     await assert_publication_claim()
@@ -411,10 +448,15 @@ async function publishRepositoryReviewResult({
       assert_publication_claim
     })
     if (
-      !(await store.completePublicationStep(run_id, claim_token, 'repository:summary-comment', {
-        id: comment.id,
-        url: comment.html_url
-      }))
+      !(await store.completePublicationStep(
+        run_id,
+        claim_token,
+        'repository:summary-comment',
+        {
+          id: comment.id,
+          url: comment.html_url
+        }
+      ))
     )
       throw new PublicationClaimLostError(run_id)
   } catch (error) {
@@ -460,9 +502,13 @@ export async function handleRepositoryReviewRun({
   const context = parseRepositoryReviewPublishContext(run.publish_context)
   const workflow_result = repositoryResultFromWorkflowResult(result)
   if (workflow_result === null) {
-    throw new Error(`Repository review run ${run.run_id} is not ready to publish.`)
+    throw new Error(
+      `Repository review run ${run.run_id} is not ready to publish.`
+    )
   }
-  const octokit = await installation_octokit_for_repo(context.repo.repo_full_name)
+  const octokit = await installation_octokit_for_repo(
+    context.repo.repo_full_name
+  )
   await publishRepositoryReviewResult({
     octokit,
     repo: context.repo,

@@ -24,7 +24,10 @@ function octokitForContent(
             throw Object.assign(new Error('Not Found'), { status: 404 })
           }
           return {
-            data: { type: 'file', content: Buffer.from(content, 'utf8').toString('base64') }
+            data: {
+              type: 'file',
+              content: Buffer.from(content, 'utf8').toString('base64')
+            }
           }
         }
       }
@@ -48,7 +51,9 @@ test('readSetupDeclaration returns the declaration text from the default branch 
 
   assert.equal(declaration, 'setup:\n  - run: echo hi\n')
   // Reads the exact commit, not a branch name, so a fork cannot change it.
-  assert.deepEqual(requests, [{ path: '.sec-review/setup.yml', ref: 'a'.repeat(40) }])
+  assert.deepEqual(requests, [
+    { path: '.sec-review/setup.yml', ref: 'a'.repeat(40) }
+  ])
 })
 
 test('readSetupDeclaration returns null when the declaration is absent', async () => {
@@ -92,7 +97,12 @@ test('readSetupDeclaration rejects an invalid declaration with repository contex
 
   await assert.rejects(
     () =>
-      readSetupDeclaration({ octokit, default_sha: sha, owner_login: 'octo', repo_name: 'demo' }),
+      readSetupDeclaration({
+        octokit,
+        default_sha: sha,
+        owner_login: 'octo',
+        repo_name: 'demo'
+      }),
     (error: unknown) => {
       const e = error as {
         name?: string
@@ -150,7 +160,9 @@ test('readSetupDeclaration ignores a symlink entry, whose content is the target 
           data: {
             type: 'symlink',
             target: '../shared/setup.yml',
-            content: Buffer.from('../shared/setup.yml', 'utf8').toString('base64')
+            content: Buffer.from('../shared/setup.yml', 'utf8').toString(
+              'base64'
+            )
           }
         })
       }

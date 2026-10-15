@@ -10,14 +10,21 @@ import test from 'node:test'
 import type { OpenAPI3 } from 'openapi-typescript'
 
 import { inlineLocalRefsForTest } from '../src/generate-schemas.js'
-import { errorResponseCodes, listRunQueryParameters } from '../src/generate-types.js'
+import {
+  errorResponseCodes,
+  listRunQueryParameters
+} from '../src/generate-types.js'
 
 test('a non-string ErrorResponse.code member fails rather than disappearing', () => {
   // The generated array is advertised as every code the contract allows, and the server
   // refuses to emit anything outside it. Dropping a member would make the server strip a
   // legitimate contract code as if it were internal, so a non-string member is an error.
   const spec = {
-    components: { schemas: { ErrorResponse: { properties: { code: { enum: ['VALID', 42] } } } } }
+    components: {
+      schemas: {
+        ErrorResponse: { properties: { code: { enum: ['VALID', 42] } } }
+      }
+    }
   } as unknown as OpenAPI3
 
   assert.throws(() => errorResponseCodes(spec), /must contain only strings/)
@@ -25,7 +32,9 @@ test('a non-string ErrorResponse.code member fails rather than disappearing', ()
 
 test('string ErrorResponse.code members are returned sorted', () => {
   const spec = {
-    components: { schemas: { ErrorResponse: { properties: { code: { enum: ['B', 'A'] } } } } }
+    components: {
+      schemas: { ErrorResponse: { properties: { code: { enum: ['B', 'A'] } } } }
+    }
   } as unknown as OpenAPI3
 
   assert.deepEqual(errorResponseCodes(spec), ['A', 'B'])
@@ -50,11 +59,15 @@ test('a $ref with sibling keywords fails rather than dropping the siblings', () 
 test('a bare local $ref is inlined, and a dangling one fails', () => {
   const schemas = { Target: { type: 'string' } }
 
-  assert.deepEqual(inlineLocalRefsForTest({ $ref: '#/components/schemas/Target' }, schemas), {
-    type: 'string'
-  })
+  assert.deepEqual(
+    inlineLocalRefsForTest({ $ref: '#/components/schemas/Target' }, schemas),
+    {
+      type: 'string'
+    }
+  )
   assert.throws(
-    () => inlineLocalRefsForTest({ $ref: '#/components/schemas/Missing' }, schemas),
+    () =>
+      inlineLocalRefsForTest({ $ref: '#/components/schemas/Missing' }, schemas),
     /dangling \$ref/
   )
 })
@@ -67,7 +80,13 @@ function listRunsSpec(queryObject: Record<string, unknown>): OpenAPI3 {
       '/v1/runs': {
         get: {
           parameters: [
-            { in: 'query', name: 'filter', style: 'form', explode: true, schema: queryObject }
+            {
+              in: 'query',
+              name: 'filter',
+              style: 'form',
+              explode: true,
+              schema: queryObject
+            }
           ]
         }
       }
@@ -104,10 +123,17 @@ test('a conventional per-parameter list fails rather than projecting nothing', (
   const spec = {
     paths: {
       '/v1/runs': {
-        get: { parameters: [{ in: 'query', name: 'limit', schema: { type: 'integer' } }] }
+        get: {
+          parameters: [
+            { in: 'query', name: 'limit', schema: { type: 'integer' } }
+          ]
+        }
       }
     }
   } as unknown as OpenAPI3
 
-  assert.throws(() => listRunQueryParameters(spec), /not the expected form-exploded object/)
+  assert.throws(
+    () => listRunQueryParameters(spec),
+    /not the expected form-exploded object/
+  )
 })

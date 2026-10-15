@@ -15,7 +15,9 @@ interface TestErrorWithStatus extends Error {
 
 type Content_by_path = Record<string, string | Error>
 
-function createOctokitWithContent(contentByPath: Content_by_path = {}): GitHubAppOctokit {
+function createOctokitWithContent(
+  contentByPath: Content_by_path = {}
+): GitHubAppOctokit {
   return {
     auth: async () => ({}),
     graphql: async () => ({}),
@@ -197,9 +199,11 @@ test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', 
 
 test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async () => {
   const octokit = createOctokitWithContent({
-    [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic', '  paths_ignore: invalid'].join(
-      '\n'
-    )
+    [CONFIG_PATH]: [
+      'sec_review_bot:',
+      '  trigger_mode: automatic',
+      '  paths_ignore: invalid'
+    ].join('\n')
   })
 
   await assert.rejects(
@@ -226,12 +230,16 @@ test('reads the .sec-review/config.yml path', async () => {
   })
   const originalGetContent = (
     octokit as unknown as {
-      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+      rest: {
+        repos: { getContent: (args: { path: string }) => Promise<unknown> }
+      }
     }
   ).rest.repos.getContent
   ;(
     octokit as unknown as {
-      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+      rest: {
+        repos: { getContent: (args: { path: string }) => Promise<unknown> }
+      }
     }
   ).rest.repos.getContent = async (args: { path: string }) => {
     readPaths.push(args.path)
@@ -261,7 +269,8 @@ test('invalid YAML in the config path is rejected', async () => {
         repo_name: 'repo',
         ref: 'main'
       }),
-    (error: unknown) => isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
+    (error: unknown) =>
+      isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
   )
 })
 
@@ -278,7 +287,9 @@ test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing i
           data: {
             type: 'symlink',
             target: '.sec-review/other.yml',
-            content: Buffer.from('.sec-review/other.yml', 'utf-8').toString('base64')
+            content: Buffer.from('.sec-review/other.yml', 'utf-8').toString(
+              'base64'
+            )
           }
         })
       }
@@ -292,6 +303,8 @@ test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing i
         repo_name: 'repo',
         ref: 'main'
       }),
-    (error: unknown) => isRepositoryTriggerConfigError(error) && error.reason === 'invalid-content'
+    (error: unknown) =>
+      isRepositoryTriggerConfigError(error) &&
+      error.reason === 'invalid-content'
   )
 })

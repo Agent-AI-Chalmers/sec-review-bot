@@ -14,16 +14,22 @@ test('repository delivery branch identity includes both run and delivery', () =>
   const second = buildRepositoryDeliveryBranchName('run/two', delivery)
 
   assert.notEqual(first, second)
-  assert.match(first, /^sec-review-bot\/repo-scan\/run-one-[a-f0-9]{12}\/case-shared-[a-f0-9]{12}$/)
+  assert.match(
+    first,
+    /^sec-review-bot\/repo-scan\/run-one-[a-f0-9]{12}\/case-shared-[a-f0-9]{12}$/
+  )
 })
 import type { FileMode } from '../../../src/reviews/file-change.js'
 
 type CreateRepositoryDeliveryDraftPrParams = Parameters<
   typeof createRepositoryDeliveryDraftPrWithClaim
 >[0]
-type CreateRepositoryDeliveryDraftPrOctokit = CreateRepositoryDeliveryDraftPrParams['octokit']
-type CreateRepositoryDeliveryDraftPrRepo = CreateRepositoryDeliveryDraftPrParams['repo']
-type CreateRepositoryDeliveryDraftPrInput = CreateRepositoryDeliveryDraftPrParams['input']
+type CreateRepositoryDeliveryDraftPrOctokit =
+  CreateRepositoryDeliveryDraftPrParams['octokit']
+type CreateRepositoryDeliveryDraftPrRepo =
+  CreateRepositoryDeliveryDraftPrParams['repo']
+type CreateRepositoryDeliveryDraftPrInput =
+  CreateRepositoryDeliveryDraftPrParams['input']
 
 async function createRepositoryDeliveryDraftPr(
   args: Omit<CreateRepositoryDeliveryDraftPrParams, 'assert_publication_claim'>
@@ -46,7 +52,9 @@ function createOctokitMock({
 } = {}) {
   const calls = {
     blobs: [] as Array<{ content: string; encoding: 'utf-8' | 'base64' }>,
-    trees: [] as Array<Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>>,
+    trees: [] as Array<
+      Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>
+    >,
     commits: [] as Array<{ message: string; tree: string; parents: string[] }>,
     refs: [] as Array<{ ref: string; sha: string }>,
     pulls: [] as Array<{
@@ -76,7 +84,12 @@ function createOctokitMock({
         createTree: async ({
           tree
         }: {
-          tree: Array<{ path: string; mode: FileMode; type: 'blob'; sha: string | null }>
+          tree: Array<{
+            path: string
+            mode: FileMode
+            type: 'blob'
+            sha: string | null
+          }>
         }) => {
           calls.trees.push(tree)
           return { data: { sha: 'tree-sha' } }
@@ -215,7 +228,8 @@ test('delivery-draft-pr stops before the next GitHub write after claim loss', as
       },
       assert_publication_claim: async () => {
         ownershipChecks += 1
-        if (ownershipChecks === 2) throw new PublicationClaimLostError('run-claim-loss')
+        if (ownershipChecks === 2)
+          throw new PublicationClaimLostError('run-claim-loss')
       }
     }),
     PublicationClaimLostError
@@ -262,7 +276,12 @@ test('delivery-draft-pr reuses a PR when the create response is lost', async () 
       case_ids: ['case-1'],
       case_count: 1,
       file_changes: [
-        { path: 'src/app.txt', status: 'upsert', content: 'fixed\n', content_encoding: 'utf-8' }
+        {
+          path: 'src/app.txt',
+          status: 'upsert',
+          content: 'fixed\n',
+          content_encoding: 'utf-8'
+        }
       ]
     } satisfies RepositoryDelivery
   }
@@ -412,7 +431,12 @@ function minimalDelivery(deliveryId: string): RepositoryDelivery {
     case_ids: ['case-1'],
     case_count: 1,
     file_changes: [
-      { path: 'src/app.txt', status: 'upsert', content: 'fixed\n', content_encoding: 'utf-8' }
+      {
+        path: 'src/app.txt',
+        status: 'upsert',
+        content: 'fixed\n',
+        content_encoding: 'utf-8'
+      }
     ]
   }
 }
@@ -421,7 +445,10 @@ test('delivery-draft-pr force-updates when createRef reports the ref already exi
   const octokit = createOctokitMock()
   let updateRefCalls = 0
   octokit.rest.git.createRef = async () => {
-    throw { status: 422, response: { status: 422, data: { message: 'Reference already exists' } } }
+    throw {
+      status: 422,
+      response: { status: 422, data: { message: 'Reference already exists' } }
+    }
   }
   octokit.rest.git.updateRef = async () => {
     updateRefCalls += 1
@@ -430,7 +457,11 @@ test('delivery-draft-pr force-updates when createRef reports the ref already exi
 
   await createRepositoryDeliveryDraftPr({
     octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
-    repo: { owner_login: 'octo-org', repo_name: 'example-repo', default_branch: 'main' },
+    repo: {
+      owner_login: 'octo-org',
+      repo_name: 'example-repo',
+      default_branch: 'main'
+    },
     run_id: 'run-ref-exists',
     input: { workspace_ref: 'base-sha' },
     delivery: minimalDelivery('delivery-ref-exists')
@@ -443,7 +474,10 @@ test('delivery-draft-pr does not force-update a createRef 422 that is not "alrea
   const octokit = createOctokitMock()
   let updateRefCalls = 0
   octokit.rest.git.createRef = async () => {
-    throw { status: 422, response: { status: 422, data: { message: 'Reference name is invalid' } } }
+    throw {
+      status: 422,
+      response: { status: 422, data: { message: 'Reference name is invalid' } }
+    }
   }
   octokit.rest.git.updateRef = async () => {
     updateRefCalls += 1
@@ -453,7 +487,11 @@ test('delivery-draft-pr does not force-update a createRef 422 that is not "alrea
   await assert.rejects(
     createRepositoryDeliveryDraftPr({
       octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
-      repo: { owner_login: 'octo-org', repo_name: 'example-repo', default_branch: 'main' },
+      repo: {
+        owner_login: 'octo-org',
+        repo_name: 'example-repo',
+        default_branch: 'main'
+      },
       run_id: 'run-invalid-ref',
       input: { workspace_ref: 'base-sha' },
       delivery: minimalDelivery('delivery-invalid-ref')

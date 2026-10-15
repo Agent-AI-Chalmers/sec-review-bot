@@ -47,9 +47,14 @@ function buildHarness() {
   const steps = new Map<string, { step_key: string; status: string }>()
 
   const store = {
-    initializePublicationSteps: async (_runId: string, _token: string, keys: string[]) => {
+    initializePublicationSteps: async (
+      _runId: string,
+      _token: string,
+      keys: string[]
+    ) => {
       initializedSteps.push(keys)
-      for (const key of keys) steps.set(key, { step_key: key, status: 'pending' })
+      for (const key of keys)
+        steps.set(key, { step_key: key, status: 'pending' })
     },
     listPublicationSteps: async () =>
       Array.from(steps.values()).map((item) => ({
@@ -69,13 +74,17 @@ function buildHarness() {
         // The draft-PR base is resolved via API, not from the payload/persisted
         // default_branch; keep the mock's resolved value aligned with the fixture.
         get: async () => ({ data: { default_branch: 'main' } }),
-        getBranch: async () => ({ data: { commit: { sha: 'resolved-default-sha' } } })
+        getBranch: async () => ({
+          data: { commit: { sha: 'resolved-default-sha' } }
+        })
       },
       pulls: {
         list: async () => ({ data: [] }),
         create: async (args: unknown) => {
           createdPullRequests.push(args)
-          return { data: { html_url: 'https://example.test/pull/1', number: 1 } }
+          return {
+            data: { html_url: 'https://example.test/pull/1', number: 1 }
+          }
         }
       },
       git: {
@@ -96,7 +105,13 @@ function buildHarness() {
     }
   }
 
-  return { store, octokit, createdPullRequests, createdComments, initializedSteps }
+  return {
+    store,
+    octokit,
+    createdPullRequests,
+    createdComments,
+    initializedSteps
+  }
 }
 
 async function runPublish(open_pr: boolean) {
@@ -118,7 +133,10 @@ async function runPublish(open_pr: boolean) {
         open_pr
       }
     },
-    result: { contract_version: CONTRACT_VERSION, review_record: issueReviewRecordWithPatch() },
+    result: {
+      contract_version: CONTRACT_VERSION,
+      review_record: issueReviewRecordWithPatch()
+    },
     store: harness.store as never,
     claim_token: 'claim',
     assert_publication_claim: async () => {},
@@ -131,7 +149,10 @@ test('issue publish opens a draft PR when the run opted in', async () => {
   const harness = await runPublish(true)
   assert.equal(harness.createdPullRequests.length, 1)
   assert.equal(harness.createdComments.length, 1)
-  assert.deepEqual(harness.initializedSteps[0], ['issue:draft-pr', 'issue:summary-comment'])
+  assert.deepEqual(harness.initializedSteps[0], [
+    'issue:draft-pr',
+    'issue:summary-comment'
+  ])
 })
 
 test('issue publish keeps the patch in the summary comment when not opted in', async () => {

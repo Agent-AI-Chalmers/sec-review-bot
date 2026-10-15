@@ -5,9 +5,11 @@ type ObservationStore = Pick<
   ReviewRunStore,
   'markRunning' | 'recordRunnerSuccess' | 'failRunnerExecution'
 >
-export type RunnerObservationResult = 'active' | 'succeeded' | 'failed' | 'poll_retry'
+export type RunnerObservationResult =
+  'active' | 'succeeded' | 'failed' | 'poll_retry'
 export interface RunnerObservationEvent {
-  kind: 'runner_poll_retry' | 'runner_state_changed' | 'runner_terminal_recorded'
+  kind:
+    'runner_poll_retry' | 'runner_state_changed' | 'runner_terminal_recorded'
   run_id: string
   workflow: ReviewRunRecord['workflow']
   from: ReviewRunRecord['runner_status']
@@ -17,17 +19,26 @@ export interface RunnerObservationEvent {
 
 function errorInfo(error: unknown): { code: string; message: string } {
   const code =
-    typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
       ? error.code
       : 'RUNNER_EXECUTION_FAILED'
-  return { code, message: error instanceof Error ? error.message : String(error) }
+  return {
+    code,
+    message: error instanceof Error ? error.message : String(error)
+  }
 }
 
 /** Persists Runner state only; connector-specific interpretation and publication happen later. */
 export async function observeRunnerRun(
   store: ObservationStore,
   run: ReviewRunRecord,
-  getStatus: (runId: string, workflow: ReviewRunRecord['workflow']) => Promise<RunnerRunStatus>,
+  getStatus: (
+    runId: string,
+    workflow: ReviewRunRecord['workflow']
+  ) => Promise<RunnerRunStatus>,
   isTerminalPollingError: (error: unknown) => boolean,
   onEvent: (event: RunnerObservationEvent) => void = () => {}
 ): Promise<RunnerObservationResult> {
@@ -67,7 +78,8 @@ export async function observeRunnerRun(
     })
     return 'active'
   }
-  if (status.status !== 'succeeded' && status.status !== 'failed') return 'active'
+  if (status.status !== 'succeeded' && status.status !== 'failed')
+    return 'active'
   if (status.status === 'failed') {
     const recorded = await store.failRunnerExecution(
       run.run_id,
@@ -108,7 +120,13 @@ export async function observeRunnerRun(
     })
     return 'failed'
   }
-  if (!(await store.recordRunnerSuccess(run.run_id, status.result, status.artifact_storage))) {
+  if (
+    !(await store.recordRunnerSuccess(
+      run.run_id,
+      status.result,
+      status.artifact_storage
+    ))
+  ) {
     return 'succeeded'
   }
   onEvent({

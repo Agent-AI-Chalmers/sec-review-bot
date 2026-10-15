@@ -4,7 +4,8 @@ import test from 'node:test'
 
 import { ReviewRunStore } from '../../src/index.js'
 
-const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
+const connectionString =
+  process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
 function requireTestDatabase(): string {
   if (!connectionString)
@@ -32,7 +33,11 @@ async function createPublishableRun(store: ReviewRunStore): Promise<string> {
   assert.ok(admission.preparation_token)
   await store.markQueued(runId, admission.preparation_token, {})
   assert.equal(
-    await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'unavailable' }),
+    await store.recordRunnerSuccess(
+      runId,
+      { run_id: runId },
+      { status: 'unavailable' }
+    ),
     true
   )
   return runId
@@ -54,7 +59,10 @@ test('a waiting claim returns as soon as publishable work appears', async () => 
     const elapsed = Date.now() - started
 
     assert.equal(work?.run_id, runId)
-    assert.ok(elapsed < 5_000, `the claim should have returned early, took ${elapsed}ms`)
+    assert.ok(
+      elapsed < 5_000,
+      `the claim should have returned early, took ${elapsed}ms`
+    )
   } finally {
     await store.close()
   }

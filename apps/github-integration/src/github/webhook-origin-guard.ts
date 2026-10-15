@@ -8,13 +8,18 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function normalizeLogin(login: unknown): string | null {
-  return typeof login === 'string' && login.trim() !== '' ? login.trim().toLowerCase() : null
+  return typeof login === 'string' && login.trim() !== ''
+    ? login.trim().toLowerCase()
+    : null
 }
 
 function getCandidateBotLogins(): string[] {
   const appMetadata = getGitHubAppMetadata()
 
-  return [appMetadata.bot_login, appMetadata.slug ? `${appMetadata.slug}-bot[bot]` : null]
+  return [
+    appMetadata.bot_login,
+    appMetadata.slug ? `${appMetadata.slug}-bot[bot]` : null
+  ]
     .map(normalizeLogin)
     .filter((login): login is string => Boolean(login))
 }
@@ -31,10 +36,14 @@ export function isSelfOriginatedWebhookEvent(payload: unknown): boolean {
   return getCandidateBotLogins().includes(sender_login)
 }
 
-export function logSkippedSelfOriginatedEvent(eventName: string, payload: unknown): void {
+export function logSkippedSelfOriginatedEvent(
+  eventName: string,
+  payload: unknown
+): void {
   const appMetadata = getGitHubAppMetadata()
   const sender = asRecord(asRecord(payload).sender)
-  const sender_login = typeof sender.login === 'string' ? sender.login : '(unknown-sender)'
+  const sender_login =
+    typeof sender.login === 'string' ? sender.login : '(unknown-sender)'
   const knownBotLogin = appMetadata.bot_login ?? '(unknown-app-bot-login)'
 
   logInfo('workflow_skipped', {

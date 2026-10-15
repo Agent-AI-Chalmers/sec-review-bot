@@ -39,7 +39,8 @@ export function abbreviate(value: string, head: number, tail: number): string {
 }
 
 export function lastActivity(run: Run): string {
-  return Date.parse(run.publication_updated_at) > Date.parse(run.execution_updated_at)
+  return Date.parse(run.publication_updated_at) >
+    Date.parse(run.execution_updated_at)
     ? run.publication_updated_at
     : run.execution_updated_at
 }
@@ -48,7 +49,9 @@ export function abbreviateDigest(digest: string): string {
   return abbreviate(digest.replace(/^sha256:/, ''), 12, 12)
 }
 
-export function isDownloadableArtifact(value: ArtifactStorage | null): value is ArtifactStorage & {
+export function isDownloadableArtifact(
+  value: ArtifactStorage | null
+): value is ArtifactStorage & {
   status: 'available'
   artifact: NonNullable<ArtifactStorage['artifact']>
 } {
@@ -57,11 +60,16 @@ export function isDownloadableArtifact(value: ArtifactStorage | null): value is 
 
 /** Names the failure when the backend distinguished it, instead of reporting every
  * failure as one generic sentence. */
-export function failureReason(error: unknown, t: Translator): string | undefined {
+export function failureReason(
+  error: unknown,
+  t: Translator
+): string | undefined {
   if (!(error instanceof ApiError)) return undefined
   if (error.code === 'control_plane_timeout') return t('errorTimeout')
   if (error.code === 'control_plane_unavailable') return t('errorUnreachable')
-  return error.status >= 500 ? `${t('errorUpstream')} (${error.status})` : undefined
+  return error.status >= 500
+    ? `${t('errorUpstream')} (${error.status})`
+    : undefined
 }
 
 /** A finished phase reports how long it took; an in-flight one reports how long it has
@@ -88,6 +96,7 @@ export function formatDuration(milliseconds: number, t: Translator): string {
   if (days > 0) parts.push(`${days}${t('durationDays')}`)
   if (hours > 0) parts.push(`${hours}${t('durationHours')}`)
   if (minutes > 0) parts.push(`${minutes}${t('durationMinutes')}`)
-  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}${t('durationSeconds')}`)
+  if (seconds > 0 || parts.length === 0)
+    parts.push(`${seconds}${t('durationSeconds')}`)
   return parts.slice(0, 2).join(' ')
 }

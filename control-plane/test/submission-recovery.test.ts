@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { recoverReviewRunSubmission, type ReviewRunRecord } from '../src/index.js'
+import {
+  recoverReviewRunSubmission,
+  type ReviewRunRecord
+} from '../src/index.js'
 
-function run(input: Record<string, unknown> | null = { contract_version: 'v6' }): ReviewRunRecord {
+function run(
+  input: Record<string, unknown> | null = { contract_version: 'v6' }
+): ReviewRunRecord {
   return {
     run_id: 'run-1',
     workflow: 'issue-review',
@@ -60,7 +65,14 @@ test('submission recovery replays the persisted input and commits its claim', as
 
   assert.equal(result.status, 'recovered')
   assert.deepEqual(events, [
-    ['submit', { workflow: 'issue-review', run_id: 'run-1', input: { contract_version: 'v6' } }],
+    [
+      'submit',
+      {
+        workflow: 'issue-review',
+        run_id: 'run-1',
+        input: { contract_version: 'v6' }
+      }
+    ],
     ['complete', 'run-1', 'claim-1']
   ])
 })
@@ -90,7 +102,11 @@ test('submission recovery persists uncertainty for a later retry', async () => {
 
   assert.deepEqual(result, { status: 'deferred', error: transportError })
   assert.deepEqual(failures, [
-    ['run-1', 'claim-1', { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' }]
+    [
+      'run-1',
+      'claim-1',
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' }
+    ]
   ])
 })
 

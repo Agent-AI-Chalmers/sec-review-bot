@@ -58,7 +58,10 @@ class DispatchBodyReadError extends Error {
   }
 }
 
-function positiveIntegerOrDefault(value: number, default_value: number): number {
+function positiveIntegerOrDefault(
+  value: number,
+  default_value: number
+): number {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : default_value
 }
 
@@ -67,7 +70,10 @@ async function readBody(request: IncomingMessage): Promise<Buffer> {
     repository_review_dispatch_max_body_bytes,
     1_048_576
   )
-  const readTimeoutMs = positiveIntegerOrDefault(repository_review_dispatch_read_timeout_ms, 10_000)
+  const readTimeoutMs = positiveIntegerOrDefault(
+    repository_review_dispatch_read_timeout_ms,
+    10_000
+  )
 
   // Keep request size and time bounded before parsing or authentication work.
   return await new Promise((resolve, reject) => {
@@ -75,7 +81,9 @@ async function readBody(request: IncomingMessage): Promise<Buffer> {
     let totalBytes = 0
     let done = false
     const timer = setTimeout(() => {
-      fail(new DispatchBodyReadError('Dispatch request body read timed out.', 408))
+      fail(
+        new DispatchBodyReadError('Dispatch request body read timed out.', 408)
+      )
       request.destroy()
     }, readTimeoutMs)
 
@@ -99,7 +107,9 @@ async function readBody(request: IncomingMessage): Promise<Buffer> {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
       totalBytes += buffer.byteLength
       if (totalBytes > maxBodyBytes) {
-        fail(new DispatchBodyReadError('Dispatch request body is too large.', 413))
+        fail(
+          new DispatchBodyReadError('Dispatch request body is too large.', 413)
+        )
         request.destroy()
         return
       }
@@ -155,7 +165,9 @@ export async function handleRepositoryReviewDispatch({
   }
   let payload: RepositoryReviewDispatchPayload
   try {
-    payload = normalizeRepositoryReviewDispatchPayload(JSON.parse(raw_body.toString('utf8')))
+    payload = normalizeRepositoryReviewDispatchPayload(
+      JSON.parse(raw_body.toString('utf8'))
+    )
   } catch {
     writeJson(response, 400, {
       ok: false,
@@ -203,7 +215,9 @@ export async function handleRepositoryReviewDispatch({
     })
     writeJson(response, 400, {
       ok: false,
-      error: asErrorMessage(error) || 'Repository review dispatch request is invalid.'
+      error:
+        asErrorMessage(error) ||
+        'Repository review dispatch request is invalid.'
     })
     return
   }

@@ -10,7 +10,8 @@ const MANUAL_ONLY_TRIGGER_MODE = 'manual_only'
 const AUTOMATIC_TRIGGER_MODE = 'automatic'
 const DEFAULT_TRIGGER_MODE = MANUAL_ONLY_TRIGGER_MODE
 
-type TriggerMode = typeof MANUAL_ONLY_TRIGGER_MODE | typeof AUTOMATIC_TRIGGER_MODE
+type TriggerMode =
+  typeof MANUAL_ONLY_TRIGGER_MODE | typeof AUTOMATIC_TRIGGER_MODE
 
 interface RepositoryTriggerConfig {
   trigger_mode: TriggerMode
@@ -51,16 +52,22 @@ function parseRepositoryConfig(content: string): ParsedSecReviewBotConfig {
     // trigger_mode or a paths_ignore entry written as `on`) are read.
     parsed = parseYaml(content, { schema: 'core' })
   } catch (error) {
-    throw new RepositoryTriggerConfigError('Failed to parse trigger config YAML.', {
-      reason: 'invalid-yaml',
-      cause: error
-    })
+    throw new RepositoryTriggerConfigError(
+      'Failed to parse trigger config YAML.',
+      {
+        reason: 'invalid-yaml',
+        cause: error
+      }
+    )
   }
 
   if (!isRecord(parsed) || !isRecord(parsed.sec_review_bot)) {
-    throw new RepositoryTriggerConfigError('Missing sec_review_bot section in trigger config.', {
-      reason: 'missing-sec-review-bot'
-    })
+    throw new RepositoryTriggerConfigError(
+      'Missing sec_review_bot section in trigger config.',
+      {
+        reason: 'missing-sec-review-bot'
+      }
+    )
   }
 
   return parsed.sec_review_bot as ParsedSecReviewBotConfig
@@ -75,7 +82,14 @@ export class RepositoryTriggerConfigError extends Error {
 
   constructor(
     message: string,
-    { owner_login, repo_name, ref, path, reason, cause }: RepositoryTriggerConfigErrorOptions = {}
+    {
+      owner_login,
+      repo_name,
+      ref,
+      path,
+      reason,
+      cause
+    }: RepositoryTriggerConfigErrorOptions = {}
   ) {
     super(message, { cause })
     this.name = 'RepositoryTriggerConfigError'
@@ -96,7 +110,9 @@ export function isRepositoryTriggerConfigError(
   )
 }
 
-function decodeRepositoryFileContent(data: RepoGetContentResponse['data']): string | null {
+function decodeRepositoryFileContent(
+  data: RepoGetContentResponse['data']
+): string | null {
   if (!isRecord(data) || typeof data.content !== 'string') {
     return null
   }
@@ -135,9 +151,12 @@ function extractTriggerMode(content: string): TriggerMode {
     return MANUAL_ONLY_TRIGGER_MODE
   }
 
-  throw new RepositoryTriggerConfigError('Invalid sec_review_bot.trigger_mode value.', {
-    reason: 'invalid-trigger-mode'
-  })
+  throw new RepositoryTriggerConfigError(
+    'Invalid sec_review_bot.trigger_mode value.',
+    {
+      reason: 'invalid-trigger-mode'
+    }
+  )
 }
 
 function extractPathsIgnore(content: string): string[] {
@@ -186,7 +205,9 @@ function extractPathsIgnore(content: string): string[] {
 export function isAutomaticTriggerModeEnabled(
   config: Partial<RepositoryTriggerConfig> | null | undefined
 ): boolean {
-  return (config?.trigger_mode ?? DEFAULT_TRIGGER_MODE) !== MANUAL_ONLY_TRIGGER_MODE
+  return (
+    (config?.trigger_mode ?? DEFAULT_TRIGGER_MODE) !== MANUAL_ONLY_TRIGGER_MODE
+  )
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -201,7 +222,12 @@ interface FetchRepositoryTriggerConfigArgs {
 
 async function readRepositoryTriggerConfig(
   octokit: GitHubAppOctokit,
-  { owner_login, repo_name, ref, path }: FetchRepositoryTriggerConfigArgs & { path: string }
+  {
+    owner_login,
+    repo_name,
+    ref,
+    path
+  }: FetchRepositoryTriggerConfigArgs & { path: string }
 ): Promise<RepositoryTriggerConfig> {
   const configRef = ref ?? null
   const request = {
@@ -214,13 +240,16 @@ async function readRepositoryTriggerConfig(
 
   const content = decodeRepositoryFileContent(response.data)
   if (typeof content !== 'string') {
-    throw new RepositoryTriggerConfigError('Invalid trigger config file content.', {
-      reason: 'invalid-content',
-      owner_login,
-      repo_name,
-      ...(ref ? { ref } : {}),
-      path
-    })
+    throw new RepositoryTriggerConfigError(
+      'Invalid trigger config file content.',
+      {
+        reason: 'invalid-content',
+        owner_login,
+        repo_name,
+        ...(ref ? { ref } : {}),
+        path
+      }
+    )
   }
 
   try {
@@ -287,10 +316,13 @@ export async function fetchTrustedRepositoryTriggerConfig(
   octokit: GitHubAppOctokit,
   { owner_login, repo_name }: { owner_login: string; repo_name: string }
 ): Promise<TrustedTriggerConfigResolution> {
-  const { default_branch, head_sha } = await resolveTrustedDefaultBranch(octokit, {
-    owner_login,
-    repo_name
-  })
+  const { default_branch, head_sha } = await resolveTrustedDefaultBranch(
+    octokit,
+    {
+      owner_login,
+      repo_name
+    }
+  )
   const config = await fetchRepositoryTriggerConfig(octokit, {
     owner_login,
     repo_name,

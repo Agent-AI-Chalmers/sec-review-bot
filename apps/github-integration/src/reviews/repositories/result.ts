@@ -31,15 +31,21 @@ export interface RepositoryWorkflowResult {
 function requirePublishableFileChanges(file_changes: FileChange[]): void {
   const seen = new Set<string>()
   for (const change of file_changes) {
-    const normalizedPath = validateContractPublishableRepoRelativePath(change.path)
+    const normalizedPath = validateContractPublishableRepoRelativePath(
+      change.path
+    )
     if (seen.has(normalizedPath)) {
-      throw new Error(`Delivery contains duplicate file change entries for ${normalizedPath}.`)
+      throw new Error(
+        `Delivery contains duplicate file change entries for ${normalizedPath}.`
+      )
     }
     seen.add(normalizedPath)
   }
 }
 
-export function parseRepositoryWorkflowResult(value: unknown): RepositoryWorkflowResult {
+export function parseRepositoryWorkflowResult(
+  value: unknown
+): RepositoryWorkflowResult {
   assertWorkflowResult('repository-review', value)
   const result = value as Omit<RepositoryWorkflowResult, 'deliveries'> & {
     deliveries: Array<Omit<RepositoryDelivery, 'case_count'>>
@@ -47,7 +53,9 @@ export function parseRepositoryWorkflowResult(value: unknown): RepositoryWorkflo
   const deliveryIds = new Set<string>()
   for (const delivery of result.deliveries) {
     if (deliveryIds.has(delivery.delivery_id)) {
-      throw new Error(`Repository result contains duplicate delivery_id: ${delivery.delivery_id}.`)
+      throw new Error(
+        `Repository result contains duplicate delivery_id: ${delivery.delivery_id}.`
+      )
     }
     deliveryIds.add(delivery.delivery_id)
     requirePublishableFileChanges(delivery.file_changes)

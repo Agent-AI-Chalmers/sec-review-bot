@@ -88,14 +88,16 @@ function buildPrMetadata(pr: PullRequestContext): Record<string, unknown> {
 }
 
 function normalizeFiles(files: PullRequestFile[]): NormalizedPullRequestFile[] {
-  return summarizePullRequestFiles(files).map((file: PullRequestFileSummary) => ({
-    path: file.filename,
-    status: file.status,
-    additions: file.additions,
-    deletions: file.deletions,
-    changes: file.changes,
-    patch: file.patch
-  }))
+  return summarizePullRequestFiles(files).map(
+    (file: PullRequestFileSummary) => ({
+      path: file.filename,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.changes,
+      patch: file.patch
+    })
+  )
 }
 
 function buildIncrementalPatchText(files: NormalizedPullRequestFile[]): string {
@@ -177,7 +179,9 @@ async function listCommitChainRefsForPullRequest({
     }
   }
 
-  const uniqueRefs = refs.filter((item, index, array) => array.indexOf(item) === index)
+  const uniqueRefs = refs.filter(
+    (item, index, array) => array.indexOf(item) === index
+  )
   if (uniqueRefs.length === 0) {
     return [pr.head_sha]
   }
@@ -310,7 +314,10 @@ export async function preparePullRequestReviewInput({
     run_id
   )
   const workspace_path = path.join(input_bundle_root, 'workspace')
-  const incremental_window_path = path.join(input_bundle_root, 'incremental-window')
+  const incremental_window_path = path.join(
+    input_bundle_root,
+    'incremental-window'
+  )
   const history_path = path.join(input_bundle_root, 'history')
 
   await ensureCleanDirectory(input_bundle_root)
@@ -348,7 +355,10 @@ export async function preparePullRequestReviewInput({
     workspace_path,
     include_incremental_window: true
   })
-  await materializeIncrementalWindowArtifacts(normalizedFiles, incremental_window_path)
+  await materializeIncrementalWindowArtifacts(
+    normalizedFiles,
+    incremental_window_path
+  )
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,
     pr,
@@ -374,7 +384,10 @@ export async function preparePullRequestReviewInput({
     ...(setup_declaration ? { setup_declaration } : {})
   }
 
-  const input_path = path.join(input_bundle_root, 'pull-request-review-input.json')
+  const input_path = path.join(
+    input_bundle_root,
+    'pull-request-review-input.json'
+  )
   await fs.writeFile(input_path, JSON.stringify(input, null, 2), 'utf8')
 
   return {

@@ -54,7 +54,10 @@ export function displayText(value: unknown, fallback = ''): string {
 
 export function inlineCode(value: unknown, fallback = 'unknown'): string {
   const text = displayText(value, fallback)
-  const longestRun = Math.max(0, ...Array.from(text.matchAll(/`+/g), (match) => match[0].length))
+  const longestRun = Math.max(
+    0,
+    ...Array.from(text.matchAll(/`+/g), (match) => match[0].length)
+  )
   const fence = '`'.repeat(longestRun + 1)
   const padding = text.startsWith('`') || text.endsWith('`') ? ' ' : ''
   return `${fence}${padding}${text}${padding}${fence}`
@@ -132,10 +135,14 @@ export function renderVerificationSummaryLines(
 
   const resolutionNextStep = nonEmptyText(verification.resolution_next_step)
   if (resolutionNextStep || options.includeUnknownResolutionNextStep) {
-    lines.push(`- Resolution next step: ${inlineCode(resolutionNextStep || 'unknown')}`)
+    lines.push(
+      `- Resolution next step: ${inlineCode(resolutionNextStep || 'unknown')}`
+    )
   }
 
-  lines.push(`- Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`)
+  lines.push(
+    `- Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`
+  )
 
   if (options.includeReviewTargetClaim !== false) {
     const reviewTargetClaim = nonEmptyText(verification.review_target_claim)
@@ -150,13 +157,21 @@ export function renderVerificationSummaryLines(
   }
 
   lines.push(
-    ...renderLabeledListLines('Patch findings', verification.patch_findings, listItemFormatter),
+    ...renderLabeledListLines(
+      'Patch findings',
+      verification.patch_findings,
+      listItemFormatter
+    ),
     ...renderLabeledListLines(
       'Verification findings',
       verification.verification_findings,
       listItemFormatter
     ),
-    ...renderLabeledListLines('Residual risks', verification.residual_risks, listItemFormatter)
+    ...renderLabeledListLines(
+      'Residual risks',
+      verification.residual_risks,
+      listItemFormatter
+    )
   )
 
   return lines
@@ -226,8 +241,14 @@ function renderControlReview(control_review: unknown): string[] {
   }
 
   const lines = [
-    ...renderStringListSection('Reachable assets', control_review.reachable_assets),
-    ...renderStringListSection('Security controls', control_review.security_controls),
+    ...renderStringListSection(
+      'Reachable assets',
+      control_review.reachable_assets
+    ),
+    ...renderStringListSection(
+      'Security controls',
+      control_review.security_controls
+    ),
     ...renderStringListSection('Control limits', control_review.control_limits)
   ]
 
@@ -238,15 +259,19 @@ function sortedAnalysisNarratives(narratives: unknown): AnyRecord[] {
   return asList<AnyRecord>(narratives)
     .filter(isRecord)
     .sort((left, right) => {
-      const leftPriority = optionalNumber(left.priority) ?? Number.MAX_SAFE_INTEGER
-      const rightPriority = optionalNumber(right.priority) ?? Number.MAX_SAFE_INTEGER
+      const leftPriority =
+        optionalNumber(left.priority) ?? Number.MAX_SAFE_INTEGER
+      const rightPriority =
+        optionalNumber(right.priority) ?? Number.MAX_SAFE_INTEGER
       return leftPriority - rightPriority
     })
 }
 
 function analysisNarrativeBodyLines(item: AnyRecord): string[] {
   const flow_review = isRecord(item.flow_review) ? item.flow_review : {}
-  const support_review = isRecord(item.support_review) ? item.support_review : {}
+  const support_review = isRecord(item.support_review)
+    ? item.support_review
+    : {}
   const scope_review = isRecord(item.scope_review) ? item.scope_review : {}
   const cwe_mapping = isRecord(item.cwe_mapping) ? item.cwe_mapping : {}
   const metaLines = [
@@ -257,7 +282,10 @@ function analysisNarrativeBodyLines(item: AnyRecord): string[] {
     ['Outcome control point', scope_review.outcome_deciding_control_point],
     [
       'CWE',
-      [cwe_mapping.cwe_id, cwe_mapping.cwe_name].map(nonEmptyText).filter(Boolean).join(' - ')
+      [cwe_mapping.cwe_id, cwe_mapping.cwe_name]
+        .map(nonEmptyText)
+        .filter(Boolean)
+        .join(' - ')
     ]
   ]
     .map(([key, value]) => [key, nonEmptyText(value)] as const)
@@ -278,7 +306,10 @@ function analysisNarrativeBodyLines(item: AnyRecord): string[] {
     ...renderLocationList(item.locations),
     ...renderStringListSection('Source facts', flow_review.source_facts),
     ...renderStringListSection('Sink facts', flow_review.sink_facts),
-    ...renderStringListSection('Supported inferences', support_review.supported_inferences),
+    ...renderStringListSection(
+      'Supported inferences',
+      support_review.supported_inferences
+    ),
     ...renderStringListSection('Proof gaps', support_review.proof_gaps),
     ...renderControlReview(item.control_review),
     ...renderScopeAnalysis(scope_review),
@@ -329,11 +360,16 @@ export function analysisHeadline(verdict: unknown): string {
   }
 }
 
-export function mitigationHeadline(verdict: unknown, changedFiles: unknown[]): string {
+export function mitigationHeadline(
+  verdict: unknown,
+  changedFiles: unknown[]
+): string {
   if (changedFiles.length > 0) {
     return `patch proposed, ${changedFiles.length} ${changedFiles.length === 1 ? 'file' : 'files'} changed`
   }
-  return verdict === 'no-actionable-finding' ? 'not needed' : 'no patch proposed'
+  return verdict === 'no-actionable-finding'
+    ? 'not needed'
+    : 'no patch proposed'
 }
 
 export function coverageHeadline(patchCoverage: unknown): string {
@@ -396,7 +432,10 @@ export function renderReviewStatusLines(
   const analysis = isRecord(review.analysis) ? review.analysis : {}
   const mitigation = isRecord(review.mitigation) ? review.mitigation : {}
   const verification = isRecord(review.verification) ? review.verification : {}
-  const resolution_next_step = displayText(verification.resolution_next_step, 'unknown')
+  const resolution_next_step = displayText(
+    verification.resolution_next_step,
+    'unknown'
+  )
 
   return [
     `- Analysis: ${inlineCode(analysisHeadline(analysis.verdict))}`,

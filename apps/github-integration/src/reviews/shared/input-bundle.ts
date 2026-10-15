@@ -8,7 +8,10 @@ import { promisify } from 'util'
 import { pathToFileURL } from 'url'
 import { createZstdCompress } from 'zlib'
 
-import { INPUT_BUNDLE_MEDIA_TYPE, type InputBundleArtifactRef } from '../../runner/input.js'
+import {
+  INPUT_BUNDLE_MEDIA_TYPE,
+  type InputBundleArtifactRef
+} from '../../runner/input.js'
 import { publishInputBundle } from '../../artifacts/input-storage.js'
 
 import {
@@ -37,13 +40,21 @@ export async function ensureCleanDirectory(dir_path: string): Promise<void> {
   await fs.mkdir(dir_path, { recursive: true })
 }
 
-export function buildGitRemoteUrl(owner_login: string, repo_name: string): string {
-  const serverUrl = (process.env.GITHUB_SERVER_URL || 'https://github.com').replace(/\/+$/, '')
+export function buildGitRemoteUrl(
+  owner_login: string,
+  repo_name: string
+): string {
+  const serverUrl = (
+    process.env.GITHUB_SERVER_URL || 'https://github.com'
+  ).replace(/\/+$/, '')
   return `${serverUrl}/${owner_login}/${repo_name}.git`
 }
 
 export function createInputBundleRoot(...segments: string[]): string {
-  return path.resolve(input_bundle_staging_root, ...segments.map(sanitizePathSegment))
+  return path.resolve(
+    input_bundle_staging_root,
+    ...segments.map(sanitizePathSegment)
+  )
 }
 
 export async function finalizeInputBundleWorkspace({
@@ -109,7 +120,13 @@ export async function readSetupDeclaration({
   if (Buffer.byteLength(declaration, 'utf8') > MAX_SETUP_DECLARATION_BYTES) {
     throw new SetupDeclarationError(
       `Setup declaration exceeds ${MAX_SETUP_DECLARATION_BYTES} bytes.`,
-      { reason: 'declaration-too-large', owner_login, repo_name, ref: default_sha, path }
+      {
+        reason: 'declaration-too-large',
+        owner_login,
+        repo_name,
+        ref: default_sha,
+        path
+      }
     )
   }
   try {
@@ -204,8 +221,18 @@ export async function archiveInputBundle({
   // Keep the workspace snapshot as an inner, uncompressed tar: Runner stages
   // reuse it to create isolated workspaces. Only the transport bundle is zstd
   // compressed, and the live staging checkout is deliberately not included.
-  await execFileAsync('tar', ['-cf', tarPath, '-C', input_bundle_root, ...entries])
-  await pipeline(createReadStream(tarPath), createZstdCompress(), createWriteStream(archivePath))
+  await execFileAsync('tar', [
+    '-cf',
+    tarPath,
+    '-C',
+    input_bundle_root,
+    ...entries
+  ])
+  await pipeline(
+    createReadStream(tarPath),
+    createZstdCompress(),
+    createWriteStream(archivePath)
+  )
   await fs.rm(tarPath, { force: true })
   const digest = crypto.createHash('sha256')
   await pipeline(createReadStream(archivePath), digest)
@@ -218,6 +245,9 @@ export async function archiveInputBundle({
   }
   // The snapshot in the archive is now the durable execution input. Removing
   // the live checkout avoids retaining a second repository copy in staging.
-  await fs.rm(path.join(input_bundle_root, 'workspace'), { recursive: true, force: true })
+  await fs.rm(path.join(input_bundle_root, 'workspace'), {
+    recursive: true,
+    force: true
+  })
   return await publishInputBundle(reference, run_id)
 }

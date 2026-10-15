@@ -7,7 +7,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { CONTROL_PLANE_API_TYPES_PATH, RUNNER_API_SCHEMA_PATH } from './generated-paths.js'
+import {
+  CONTROL_PLANE_API_TYPES_PATH,
+  RUNNER_API_SCHEMA_PATH
+} from './generated-paths.js'
 
 test('the control-plane API projection still describes the shapes the client reads', () => {
   const generated = readFileSync(CONTROL_PLANE_API_TYPES_PATH, 'utf8')
@@ -17,13 +20,24 @@ test('the control-plane API projection still describes the shapes the client rea
     'PublicationWork',
     'PublicationStepRecord'
   ]) {
-    assert.ok(generated.includes(name), `${name} is missing from the generated types`)
+    assert.ok(
+      generated.includes(name),
+      `${name} is missing from the generated types`
+    )
   }
 })
 
 test('the runner API projection still describes the shapes the client reads', () => {
   const generated = readFileSync(RUNNER_API_SCHEMA_PATH, 'utf8')
-  for (const name of ['RunResponse', 'RunnerError', 'RunStatusResponse', 'RunStatusToken']) {
-    assert.ok(generated.includes(name), `${name} is missing from the generated types`)
+  for (const name of [
+    'RunResponse',
+    'RunnerError',
+    'RunStatusResponse',
+    'RunStatusToken'
+  ]) {
+    assert.ok(
+      generated.includes(name),
+      `${name} is missing from the generated types`
+    )
   }
 })

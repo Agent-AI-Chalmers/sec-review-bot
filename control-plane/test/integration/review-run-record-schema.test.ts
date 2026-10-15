@@ -4,7 +4,11 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import test from 'node:test'
 
-import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
+import {
+  Ajv2020,
+  type AnySchemaObject,
+  type ValidateFunction
+} from 'ajv/dist/2020.js'
 // Same shape as the unit suite's check: `ajv-formats` is CommonJS with an `export default`
 // declaration, and TypeScript types the module object rather than the plugin under this
 // package's compiler options.
@@ -27,15 +31,21 @@ const root = REPO_ROOT
 
 function readSchema(): ValidateFunction {
   const schema = JSON.parse(
-    readFileSync(path.join(root, CONTRACT_VERSION_DIR, 'review-run-record.schema.json'), 'utf8')
+    readFileSync(
+      path.join(root, CONTRACT_VERSION_DIR, 'review-run-record.schema.json'),
+      'utf8'
+    )
   ) as AnySchemaObject
   const ajv = new Ajv2020({ allErrors: true })
-  const addFormats = ajvFormats.default as unknown as (instance: Ajv2020) => Ajv2020
+  const addFormats = ajvFormats.default as unknown as (
+    instance: Ajv2020
+  ) => Ajv2020
   addFormats(ajv)
   return ajv.compile(schema) as ValidateFunction
 }
 
-const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
+const connectionString =
+  process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
 function requireTestDatabase(): string {
   if (!connectionString)
@@ -73,8 +83,14 @@ test('the record getRun returns validates against the shared schema', async () =
       `a preparing record must be accepted: ${JSON.stringify(validate.errors)}`
     )
 
-    await store.markQueued(runId, admission.preparation_token, { repository: 'octo/example' })
-    await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'unavailable' })
+    await store.markQueued(runId, admission.preparation_token, {
+      repository: 'octo/example'
+    })
+    await store.recordRunnerSuccess(
+      runId,
+      { run_id: runId },
+      { status: 'unavailable' }
+    )
 
     const succeeded = await store.getRun(runId)
     assert.equal(

@@ -22,13 +22,23 @@ import { RUNNER_PUBLISH_ERROR_CODES } from '../../src/runner/publish-error-code.
 function publicationStepCodesFromContract(): string[] {
   const spec = parseYaml(
     readFileSync(
-      path.join(workspaceRoot(), 'contracts', 'control-plane-api', 'openapi.yaml'),
+      path.join(
+        workspaceRoot(),
+        'contracts',
+        'control-plane-api',
+        'openapi.yaml'
+      ),
       'utf8'
     )
   ) as {
-    components?: { schemas?: { ErrorResponse?: { properties?: { code?: { enum?: unknown[] } } } } }
+    components?: {
+      schemas?: {
+        ErrorResponse?: { properties?: { code?: { enum?: unknown[] } } }
+      }
+    }
   }
-  const values = spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
+  const values =
+    spec.components?.schemas?.ErrorResponse?.properties?.code?.enum ?? []
   return values
     .filter((value): value is string => typeof value === 'string')
     .filter((value) => value.startsWith('PUBLICATION_STEP_'))
@@ -41,7 +51,10 @@ test('every Control Plane publication-step code is known and terminal', () => {
 
   const known = new Set<string>(Object.values(RUNNER_PUBLISH_ERROR_CODES))
   for (const code of codes) {
-    assert.ok(known.has(code), `${code} is missing from RUNNER_PUBLISH_ERROR_CODES`)
+    assert.ok(
+      known.has(code),
+      `${code} is missing from RUNNER_PUBLISH_ERROR_CODES`
+    )
     // A Control Plane deterministic error carries only a `code`; it has no HTTP status, so
     // a missing classification here would resolve to `retry: true`.
     assert.equal(

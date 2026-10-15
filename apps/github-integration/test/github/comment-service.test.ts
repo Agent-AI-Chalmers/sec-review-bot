@@ -95,7 +95,9 @@ test('issue comment creation stops after marker lookup when publication claim is
         listComments: async () => ({ data: [] }),
         createComment: async () => {
           createCalls += 1
-          return { data: { id: 456, html_url: 'https://example.test/comment/456' } }
+          return {
+            data: { id: 456, html_url: 'https://example.test/comment/456' }
+          }
         }
       }
     }

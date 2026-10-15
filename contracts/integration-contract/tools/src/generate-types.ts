@@ -23,7 +23,11 @@ export const SPEC_PATH = path.resolve(
   'integration-contract',
   'openapi.json'
 )
-export const OUTPUT_PATH = path.join(CONTROL_PLANE_ROOT, 'src', 'runner-api-schema.ts')
+export const OUTPUT_PATH = path.join(
+  CONTROL_PLANE_ROOT,
+  'src',
+  'runner-api-schema.ts'
+)
 
 const HEADER = `// Generated from ${path.relative(REPO_ROOT, SPEC_PATH)} (path relative to the repository root). Do not edit.
 //

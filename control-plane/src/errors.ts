@@ -24,7 +24,11 @@ export const PUBLICATION_STEP_ERROR_CODES = {
 export class DeterministicControlPlaneError extends Error {
   readonly code: PublicationStepErrorCode
 
-  constructor(message: string, code: PublicationStepErrorCode, options: ErrorOptions = {}) {
+  constructor(
+    message: string,
+    code: PublicationStepErrorCode,
+    options: ErrorOptions = {}
+  ) {
     super(message, options)
     this.name = 'DeterministicControlPlaneError'
     this.code = code

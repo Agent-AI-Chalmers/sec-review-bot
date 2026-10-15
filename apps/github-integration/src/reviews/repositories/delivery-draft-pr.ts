@@ -38,8 +38,13 @@ interface DraftPullRequestSummary {
 
 function stableBranchSegment(value: unknown): string {
   const raw = String(value ?? '').trim() || 'unknown'
-  const readable = sanitizeBranchSegment(raw).replaceAll('/', '-').slice(0, 48) || 'unknown'
-  const digest = crypto.createHash('sha256').update(raw).digest('hex').slice(0, 12)
+  const readable =
+    sanitizeBranchSegment(raw).replaceAll('/', '-').slice(0, 48) || 'unknown'
+  const digest = crypto
+    .createHash('sha256')
+    .update(raw)
+    .digest('hex')
+    .slice(0, 12)
   return `${readable}-${digest}`
 }
 
@@ -58,7 +63,9 @@ function normalizeTargetBranch(value: unknown): string {
   return raw.startsWith('refs/heads/') ? raw.slice('refs/heads/'.length) : raw
 }
 
-function buildRepositorySecurityDeliveryCommitMessage(delivery: RepositoryDelivery): string {
+function buildRepositorySecurityDeliveryCommitMessage(
+  delivery: RepositoryDelivery
+): string {
   const title = String(buildDeliveryDraftPrTitle(delivery) ?? '').trim()
   const normalizedTitle = title
     .replace(/^\[sec\]\s*/i, '')
@@ -76,7 +83,10 @@ function buildRepositorySecurityDeliveryCommitMessage(delivery: RepositoryDelive
   return `sec: ${normalizedTitle}`
 }
 
-function encodeGitFileContent(content_buffer: Buffer): { content: string; encoding: TextEncoding } {
+function encodeGitFileContent(content_buffer: Buffer): {
+  content: string
+  encoding: TextEncoding
+} {
   const isBinary = content_buffer.includes(0)
 
   if (isBinary) {
@@ -204,10 +214,17 @@ export async function createRepositoryDeliveryDraftPr({
     commit_sha: head_sha
   })
   const baseTreeSha = commitResponse.data.tree.sha
-  const tree = await buildTreeElements(octokit, delivery, repo, assert_publication_claim)
+  const tree = await buildTreeElements(
+    octokit,
+    delivery,
+    repo,
+    assert_publication_claim
+  )
 
   if (tree.length === 0) {
-    throw new Error('Repository security delivery requires at least one changed file.')
+    throw new Error(
+      'Repository security delivery requires at least one changed file.'
+    )
   }
 
   await assert_publication_claim()
@@ -245,7 +262,9 @@ export async function createRepositoryDeliveryDraftPr({
     // force-update) and for an invalid ref name (never safe to retry). Only take
     // the force-update path when GitHub reports the ref already exists; an invalid
     // ref is a real error that must surface instead of failing identically again.
-    const message = String(errorInfo.response?.data?.message ?? '').toLowerCase()
+    const message = String(
+      errorInfo.response?.data?.message ?? ''
+    ).toLowerCase()
     if (!message.includes('already exists')) {
       throw error
     }
@@ -266,7 +285,9 @@ export async function createRepositoryDeliveryDraftPr({
     repo: repo.repo_name,
     title,
     head: branch_name,
-    base: normalizeTargetBranch(input.scan_target?.target_branch) || repo.default_branch,
+    base:
+      normalizeTargetBranch(input.scan_target?.target_branch) ||
+      repo.default_branch,
     body,
     draft: true
   })

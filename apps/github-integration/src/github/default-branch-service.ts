@@ -36,7 +36,9 @@ export async function resolveTrustedDefaultBranch(
 
   const default_branch = String(repository.data.default_branch || '').trim()
   if (!default_branch) {
-    throw new Error(`GitHub returned an empty default branch for ${owner_login}/${repo_name}.`)
+    throw new Error(
+      `GitHub returned an empty default branch for ${owner_login}/${repo_name}.`
+    )
   }
 
   const branch = await octokit.rest.repos.getBranch({

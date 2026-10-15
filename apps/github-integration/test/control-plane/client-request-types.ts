@@ -14,7 +14,9 @@ import type { ControlPlaneClient } from '../../src/control-plane/client.js'
 
 type Expect<T extends true> = T
 type Equals<A, B> =
-  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false
 
 /** The submission body the contract declares exposes `preparation_token`, `publish_context`,
  * and `input` — the three fields the client sends. A rename in `openapi.yaml` breaks the
@@ -29,26 +31,37 @@ export type SubmissionBodyFieldsMatchContract = Expect<
 /** The contract declares a request body for these operations, so the client cannot call them
  * without one: the body parameter is required by the derived type. */
 export type PublicationStepsAcceptsStepKeys = Expect<
-  Equals<Parameters<ControlPlaneClient['initializePublicationSteps']>, [string, string, string[]]>
+  Equals<
+    Parameters<ControlPlaneClient['initializePublicationSteps']>,
+    [string, string, string[]]
+  >
 >
 
 /** `getRun` reads the internal record and may report absence, so its type keeps `null`. */
 export type GetRunMayReportAbsence = Expect<
   Equals<
     Awaited<ReturnType<ControlPlaneClient['getRun']>>,
-    operations['getInternalRun']['responses'][200]['content']['application/json'] | null
+    | operations['getInternalRun']['responses'][200]['content']['application/json']
+    | null
   >
 >
 
 /** Every operation the contract declares has a route, so `request()` can look one up for any
  * `operationId` — the map and `operations` stay in step (both are projections of the same
  * document). A new operation without a route fails here. */
-export type EveryOperationHasARoute = Expect<Equals<keyof typeof operationRoutes, keyof operations>>
+export type EveryOperationHasARoute = Expect<
+  Equals<keyof typeof operationRoutes, keyof operations>
+>
 
 /** The route map carries the path and method as literal strings from the document, which is
  * what lets `request()` name only the operation: the URL is looked up, never passed in. A
  * value typed as `string` (a hand-written URL) would not satisfy this. */
 export type RoutesAreLiteral = Expect<
-  Equals<typeof operationRoutes.submitPreparedRun.path, '/v1/runs/{runId}/submission'>
+  Equals<
+    typeof operationRoutes.submitPreparedRun.path,
+    '/v1/runs/{runId}/submission'
+  >
 >
-export type RouteMethodsAreLiteral = Expect<Equals<typeof operationRoutes.admitRun.method, 'post'>>
+export type RouteMethodsAreLiteral = Expect<
+  Equals<typeof operationRoutes.admitRun.method, 'post'>
+>

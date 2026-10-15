@@ -67,7 +67,10 @@ test('Control Plane store fences reads by connector', async () => {
 
 test('run queries survive a fresh store connection and preserve stable pagination', async () => {
   const connectorId = `query-restart:${randomUUID()}`
-  const first = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
+  const first = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId
+  })
   await first.initialize()
   const runIds = [`run-${randomUUID()}`, `run-${randomUUID()}`]
   try {
@@ -83,20 +86,31 @@ test('run queries survive a fresh store connection and preserve stable paginatio
     await first.close()
   }
 
-  const restarted = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
+  const restarted = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId
+  })
   await restarted.initialize()
   try {
-    const { runs: firstPage, next_cursor: cursor } = await restarted.listRunsPage({ limit: 1 })
+    const { runs: firstPage, next_cursor: cursor } =
+      await restarted.listRunsPage({ limit: 1 })
     assert.equal(firstPage.length, 1)
-    assert.ok(cursor, 'a second run remains, so the first page must carry a cursor')
-    const { runs: secondPage, next_cursor: finalCursor } = await restarted.listRunsPage({
-      limit: 1,
-      cursor
-    })
+    assert.ok(
+      cursor,
+      'a second run remains, so the first page must carry a cursor'
+    )
+    const { runs: secondPage, next_cursor: finalCursor } =
+      await restarted.listRunsPage({
+        limit: 1,
+        cursor
+      })
     assert.equal(secondPage.length, 1)
     assert.notEqual(secondPage[0]?.run_id, firstPage[0]?.run_id)
     assert.equal(finalCursor, null)
-    assert.equal((await restarted.getRun(runIds[0] ?? ''))?.runner_input?.secret, true)
+    assert.equal(
+      (await restarted.getRun(runIds[0] ?? ''))?.runner_input?.secret,
+      true
+    )
   } finally {
     await restarted.close()
   }
@@ -129,7 +143,10 @@ test('run queries apply status filters before pagination limits', async () => {
       })
     }
 
-    const { runs: failedRuns } = await store.listRunsPage({ execution_status: 'failed', limit: 1 })
+    const { runs: failedRuns } = await store.listRunsPage({
+      execution_status: 'failed',
+      limit: 1
+    })
     assert.deepEqual(
       failedRuns.map((run) => run.run_id),
       [failedRunId]
@@ -141,7 +158,10 @@ test('run queries apply status filters before pagination limits', async () => {
 
 test('keyset cursors do not skip rows that share a millisecond', async () => {
   const connectorId = `query-same-ms:${randomUUID()}`
-  const store = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId
+  })
   await store.initialize()
   const runIds = [`run-${randomUUID()}`, `run-${randomUUID()}`]
   const observer = new Pool({ connectionString: databaseUrl() })
@@ -165,12 +185,17 @@ test('keyset cursors do not skip rows that share a millisecond', async () => {
       [runIds[0], connectorId]
     )
 
-    const { runs: firstPage, next_cursor: cursor } = await store.listRunsPage({ limit: 1 })
+    const { runs: firstPage, next_cursor: cursor } = await store.listRunsPage({
+      limit: 1
+    })
     assert.equal(firstPage.length, 1)
     assert.ok(cursor)
     const { runs: secondPage } = await store.listRunsPage({ limit: 1, cursor })
     assert.equal(secondPage.length, 1)
-    assert.deepEqual([firstPage[0]?.run_id, secondPage[0]?.run_id].sort(), [...runIds].sort())
+    assert.deepEqual(
+      [firstPage[0]?.run_id, secondPage[0]?.run_id].sort(),
+      [...runIds].sort()
+    )
   } finally {
     await observer.end()
     await store.close()
@@ -184,7 +209,10 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
   // the whole read: a listing should still return its healthy rows, and the coordinator's
   // active-run read must still hand the runs around it to the pass.
   const connectorId = `drop-run-row:${randomUUID()}`
-  const store = new ReviewRunStore({ connectionString: databaseUrl(), connectorId })
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId
+  })
   await store.initialize()
   const healthyId = `run-${randomUUID()}`
   const poisonedId = `run-${randomUUID()}`
@@ -200,10 +228,10 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
     }
 
     const pool = new Pool({ connectionString: databaseUrl() })
-    await pool.query('UPDATE review_runs SET artifact_storage=$2::jsonb WHERE run_id=$1', [
-      poisonedId,
-      JSON.stringify({ status: 'available' })
-    ])
+    await pool.query(
+      'UPDATE review_runs SET artifact_storage=$2::jsonb WHERE run_id=$1',
+      [poisonedId, JSON.stringify({ status: 'available' })]
+    )
     try {
       const page = await store.listRunsPage({ limit: 10 })
       assert.deepEqual(
