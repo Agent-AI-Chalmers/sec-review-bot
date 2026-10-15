@@ -87,7 +87,7 @@ test('extractPullRequestContext returns normalized pull request context', () => 
 test('extractPullRequestContext keeps trusted identity on the base repo for fork PRs', () => {
   // Fork PR: the top-level `repository` field is the BASE repository (where the
   // event occurred), while pull_request.head.repo is the contributor's fork.
-  // Trusted setup must be read from the base repo, never the head/fork repo.
+  // The setup declaration must be read from the base repo, never the head/fork repo.
   const context = extractPullRequestContext({
     action: 'opened',
     repository: {

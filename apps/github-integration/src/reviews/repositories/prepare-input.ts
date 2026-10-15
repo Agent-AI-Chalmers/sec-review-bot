@@ -19,7 +19,7 @@ import {
   createInputBundleRoot,
   ensureCleanDirectory,
   finalizeInputBundleWorkspace,
-  materializeTrustedSetup
+  materializeSetupDeclaration
 } from '../shared/input-bundle.js'
 
 const MAX_INCREMENTAL_FILES = 5000
@@ -199,7 +199,7 @@ export async function prepareRepositoryReviewInput({
   await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
   // Trusted default branch (not the user-selectable target_branch): its head SHA
   // was resolved once upstream; pull the setup declaration from it.
-  const trusted_setup_path = await materializeTrustedSetup({
+  const setup_declaration_path = await materializeSetupDeclaration({
     input_bundle_root,
     default_sha: trusted_default_branch.head_sha,
     owner_login: repo.owner_login,
@@ -209,7 +209,7 @@ export async function prepareRepositoryReviewInput({
     input_bundle_root,
     workspace_path,
     include_incremental_window: resolvedScanMode === 'incremental',
-    ...(trusted_setup_path ? { trusted_setup_path } : {})
+    ...(setup_declaration_path ? { setup_declaration_path } : {})
   })
 
   if (resolvedScanMode === 'full') {

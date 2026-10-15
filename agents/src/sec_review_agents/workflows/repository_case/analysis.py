@@ -16,21 +16,21 @@ async def analyze_repository_case(
     scan_mode: str,
     review_input: str,
     runtime_context: RunnerRuntimeContext | None = None,
-    trusted_setup_path: Path | None = None,
+    setup_declaration_path: Path | None = None,
 ) -> dict[str, Any]:
     return await run_analysis_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
         published_transcript_path=published_transcript_path,
         agent_name="repository-analyzer",
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
-        trusted_setup_path=trusted_setup_path,
+        setup_declaration_path=setup_declaration_path,
         build_backend=lambda stage_workspace_path: repository_analysis_agent.create_repository_analyzer_backend(
             workspace_root_path=stage_workspace_path,
             history_path=history_path,
             incremental_window_path=incremental_window_path,
             scan_mode=scan_mode,
             runtime_context=runtime_context,
-            trusted_setup_path=trusted_setup_path,
+            setup_declaration_path=setup_declaration_path,
         ),
         system_prompt=repository_analysis_agent.build_repository_analyzer_system_prompt(),
         filesystem_system_prompt=(

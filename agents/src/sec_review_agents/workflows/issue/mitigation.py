@@ -21,7 +21,7 @@ async def mitigate_issue(
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None = None,
     runtime_context: RunnerRuntimeContext | None = None,
-    trusted_setup_path: Path | None = None,
+    setup_declaration_path: Path | None = None,
 ) -> dict[str, Any]:
     return await run_mitigation_stage(
         agent_name="issue-mitigator",
@@ -29,12 +29,12 @@ async def mitigate_issue(
         published_transcript_path=published_transcript_path,
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
-        trusted_setup_path=trusted_setup_path,
+        setup_declaration_path=setup_declaration_path,
         build_backend=lambda workspace_root: issue_mitigation_agent.create_issue_mitigation_backend(
             workspace_root=workspace_root,
             history_path=history_path,
             runtime_context=runtime_context,
-            trusted_setup_path=trusted_setup_path,
+            setup_declaration_path=setup_declaration_path,
         ),
         system_prompt=issue_mitigation_agent.build_issue_mitigation_system_prompt(
             test_changes=test_changes,

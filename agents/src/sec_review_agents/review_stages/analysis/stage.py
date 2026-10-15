@@ -11,7 +11,7 @@ from sec_review_agents.agents.analysis.agent import (
 from sec_review_agents.review_stages.analysis.result import build_analysis_stage_result
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from sec_review_agents.runtime.trusted_setup_bootstrap import (
+from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
@@ -32,7 +32,7 @@ async def run_analysis_stage(
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
-    trusted_setup_path: Path | None = None,
+    setup_declaration_path: Path | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-analyzer-") as tempdir:
         reset_analysis_artifacts(
@@ -52,7 +52,7 @@ async def run_analysis_stage(
             record_bootstrap_result(
                 analyzer_artifacts_path,
                 await bootstrap_environment(
-                    backend, trusted_setup_path=trusted_setup_path
+                    backend, setup_declaration_path=setup_declaration_path
                 ),
             )
             agent_graph = await create_analysis_agent_graph(

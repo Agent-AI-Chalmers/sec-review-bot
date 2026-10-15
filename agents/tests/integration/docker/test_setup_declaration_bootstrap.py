@@ -19,7 +19,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     is_docker_runtime_available,
 )
 from sec_review_agents.filesystem.path_views import workspace_view
-from sec_review_agents.runtime.trusted_setup_bootstrap import (
+from sec_review_agents.runtime.setup_bootstrap import (
     BootstrapStatus,
     bootstrap_environment,
 )
@@ -62,7 +62,7 @@ async def test_bootstrap_applies_working_directory_and_env(tmp_path: Path) -> No
     )
     backend = _backend(tmp_path, "bootstrap-it")
     try:
-        result = await bootstrap_environment(backend, trusted_setup_path=setup)
+        result = await bootstrap_environment(backend, setup_declaration_path=setup)
     finally:
         backend.close()
 
@@ -85,7 +85,7 @@ async def test_bootstrap_marks_incomplete_on_nonzero_step(tmp_path: Path) -> Non
     )
     backend = _backend(tmp_path, "bootstrap-it-fail")
     try:
-        result = await bootstrap_environment(backend, trusted_setup_path=setup)
+        result = await bootstrap_environment(backend, setup_declaration_path=setup)
     finally:
         backend.close()
 

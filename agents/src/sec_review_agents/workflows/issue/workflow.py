@@ -32,10 +32,10 @@ async def analyze_issue_activity(
     prepared_input: dict[str, Any],
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.runtime.trusted_setup_bootstrap import (
-        trusted_setup_path_for_backend,
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_path_for_backend,
     )
+    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -69,7 +69,7 @@ async def analyze_issue_activity(
             stage="analyzer",
         ),
         review_objective=review_intent.objective,
-        trusted_setup_path=trusted_setup_path_for_backend(bundle_paths),
+        setup_declaration_path=setup_declaration_path_for_backend(bundle_paths),
         runtime_context=runtime_context,
     )
 
@@ -86,10 +86,10 @@ async def mitigate_issue_activity(
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.runtime.trusted_setup_bootstrap import (
-        trusted_setup_path_for_backend,
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_path_for_backend,
     )
+    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -145,7 +145,7 @@ async def mitigate_issue_activity(
         test_changes=review_intent.test_changes,
         analysis_result=analysis_result,
         retry_context=retry_context,
-        trusted_setup_path=trusted_setup_path_for_backend(bundle_paths),
+        setup_declaration_path=setup_declaration_path_for_backend(bundle_paths),
         runtime_context=runtime_context,
     )
 
@@ -162,10 +162,10 @@ async def verify_issue_activity(
     from sec_review_agents.review_stages.verification.stage import (
         verification_attempt_label,
     )
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.runtime.trusted_setup_bootstrap import (
-        trusted_setup_path_for_backend,
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_path_for_backend,
     )
+    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -203,7 +203,7 @@ async def verify_issue_activity(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         retry_context=retry_context,
-        trusted_setup_path=trusted_setup_path_for_backend(bundle_paths),
+        setup_declaration_path=setup_declaration_path_for_backend(bundle_paths),
         runtime_context=runtime_context,
     )
 

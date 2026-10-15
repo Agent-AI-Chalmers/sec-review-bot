@@ -13,7 +13,7 @@ async function readManifest(root: string): Promise<Record<string, unknown>> {
   >
 }
 
-test('writes contract v6 manifest without trusted_setup by default', async () => {
+test('writes contract v6 manifest without setup_declaration by default', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'manifest-test-'))
   try {
     await writeInputBundleManifest({
@@ -23,22 +23,22 @@ test('writes contract v6 manifest without trusted_setup by default', async () =>
     const manifest = await readManifest(root)
     assert.equal(manifest.contract_version, 'v6')
     assert.equal(manifest.kind, 'runner-input-bundle')
-    assert.equal('trusted_setup' in manifest, false)
+    assert.equal('setup_declaration' in manifest, false)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
 })
 
-test('includes trusted_setup path when provided', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'manifest-trusted-'))
+test('includes setup_declaration path when provided', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'manifest-setup-'))
   try {
     await writeInputBundleManifest({
       input_bundle_root: root,
       include_incremental_window: false,
-      trusted_setup_path: 'trusted-setup/setup.yml'
+      setup_declaration_path: 'setup/setup.yml'
     })
     const manifest = await readManifest(root)
-    assert.deepEqual(manifest.trusted_setup, { path: 'trusted-setup/setup.yml' })
+    assert.deepEqual(manifest.setup_declaration, { path: 'setup/setup.yml' })
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

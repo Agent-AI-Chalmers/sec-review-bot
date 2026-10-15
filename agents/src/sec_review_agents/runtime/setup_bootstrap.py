@@ -1,4 +1,4 @@
-"""Execute the trusted setup declaration inside a stage sandbox.
+"""Execute the setup declaration inside a stage sandbox.
 
 The declaration is read on the host (from the bundle), parsed strictly, then
 each step is run inside the container through the deepagents sandbox contract:
@@ -23,11 +23,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol
 
-from sec_review_agents.entrypoints.trusted_setup import (
-    TrustedSetup,
-    TrustedSetupError,
-    TrustedSetupStep,
-    parse_trusted_setup,
+from sec_review_agents.entrypoints.setup_declaration import (
+    SetupDeclaration,
+    SetupDeclarationError,
+    SetupDeclarationStep,
+    parse_setup_declaration,
 )
 from sec_review_agents.filesystem.backend_selection import (
     selected_sandbox_backend_kind,
@@ -69,8 +69,8 @@ class BootstrapResult:
     steps: tuple[BootstrapStepResult, ...] = ()
 
 
-def trusted_setup_path_for_backend(bundle_paths: Mapping[str, Any]) -> Path | None:
-    """Resolve the trusted setup declaration path for the active backend.
+def setup_declaration_path_for_backend(bundle_paths: Mapping[str, Any]) -> Path | None:
+    """Resolve the setup declaration path for the active backend.
 
     Only the docker backend surfaces a declaration: its container is long-lived,
     so one bootstrap can be reused for the whole stage. Filtering here rather
@@ -79,10 +79,10 @@ def trusted_setup_path_for_backend(bundle_paths: Mapping[str, Any]) -> Path | No
     """
     if selected_sandbox_backend_kind() != "docker":
         return None
-    return optional_path(bundle_paths.get("trusted_setup_path"))
+    return optional_path(bundle_paths.get("setup_declaration_path"))
 
 
-def flatten_step_command(step: TrustedSetupStep) -> str:
+def flatten_step_command(step: SetupDeclarationStep) -> str:
     """Turn one structured declaration step into the shell command to execute."""
     cwd = WORKSPACE_ROOT_IN_CONTAINER
     if step.working_directory:
@@ -100,26 +100,26 @@ def flatten_step_command(step: TrustedSetupStep) -> str:
 async def bootstrap_environment(
     backend: _SandboxLike,
     *,
-    trusted_setup_path: Path | None,
+    setup_declaration_path: Path | None,
 ) -> BootstrapResult:
-    """Run the trusted setup declaration in `backend`'s container, if any."""
-    if trusted_setup_path is None:
+    """Run the setup declaration in `backend`'s container, if any."""
+    if setup_declaration_path is None:
         return BootstrapResult(status=BootstrapStatus.NOT_DECLARED)
 
     try:
-        content = trusted_setup_path.read_text(encoding="utf-8")
+        content = setup_declaration_path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return BootstrapResult(
             status=BootstrapStatus.INCOMPLETE,
-            reason=f"trusted setup declaration not found: {trusted_setup_path}",
+            reason=f"setup declaration not found: {setup_declaration_path}",
         )
 
     try:
-        setup: TrustedSetup = parse_trusted_setup(content)
-    except TrustedSetupError as error:
+        setup: SetupDeclaration = parse_setup_declaration(content)
+    except SetupDeclarationError as error:
         return BootstrapResult(
             status=BootstrapStatus.INCOMPLETE,
-            reason=f"invalid trusted setup declaration: {error}",
+            reason=f"invalid setup declaration: {error}",
         )
 
     results: list[BootstrapStepResult] = []
@@ -162,7 +162,7 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
     contain registry URLs/tokens from install commands.
     """
     log_diagnostic(
-        "trusted_setup_bootstrap",
+        "setup_bootstrap",
         status=result.status.value,
         reason=result.reason,
         steps=len(result.steps),
@@ -172,7 +172,7 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
         "environment.json",
         {
             "environment_incomplete": result.status is BootstrapStatus.INCOMPLETE,
-            "trusted_setup_status": result.status.value,
+            "setup_status": result.status.value,
             "reason": result.reason,
             "steps": [
                 {
@@ -194,5 +194,5 @@ __all__ = [
     "bootstrap_environment",
     "flatten_step_command",
     "record_bootstrap_result",
-    "trusted_setup_path_for_backend",
+    "setup_declaration_path_for_backend",
 ]

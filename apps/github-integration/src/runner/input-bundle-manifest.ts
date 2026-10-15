@@ -9,16 +9,16 @@ export const INPUT_BUNDLE_MANIFEST_NAME = 'manifest.json'
 export async function writeInputBundleManifest({
   input_bundle_root,
   include_incremental_window,
-  trusted_setup_path
+  setup_declaration_path
 }: {
   input_bundle_root: string
   include_incremental_window: boolean
   /**
-   * Bundle-relative path to the trusted setup declaration (e.g.
-   * `trusted-setup/setup.yml`). Omit when the repository has no declaration;
-   * the field is optional and its absence means "no trusted setup".
+   * Bundle-relative path to the setup declaration (e.g.
+   * `setup/setup.yml`). Omit when the repository has no declaration;
+   * the field is optional and its absence means "no setup declaration".
    */
-  trusted_setup_path?: string
+  setup_declaration_path?: string
 }): Promise<void> {
   const manifest: Record<string, unknown> = {
     contract_version: CONTRACT_VERSION,
@@ -30,9 +30,9 @@ export async function writeInputBundleManifest({
       path: 'history'
     }
   }
-  if (trusted_setup_path) {
-    manifest.trusted_setup = {
-      path: trusted_setup_path
+  if (setup_declaration_path) {
+    manifest.setup_declaration = {
+      path: setup_declaration_path
     }
   }
   if (include_incremental_window) {

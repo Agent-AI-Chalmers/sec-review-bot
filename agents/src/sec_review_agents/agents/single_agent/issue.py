@@ -46,7 +46,7 @@ def create_issue_single_agent_backend(
     workspace_root: Path,
     history_path: Path,
     runtime_context: RunnerRuntimeContext | None = None,
-    trusted_setup_path: Path | None = None,
+    setup_declaration_path: Path | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
@@ -70,7 +70,7 @@ def create_issue_single_agent_backend(
         path_views=path_views,
         image=workspace_image,
         backend_kind=backend_kind,
-        trusted_setup_path=trusted_setup_path,
+        setup_declaration_path=setup_declaration_path,
     )
 
 

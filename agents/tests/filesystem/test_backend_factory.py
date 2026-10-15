@@ -408,8 +408,8 @@ def test_docker_path_view_rejects_missing_source_directory(tmp_path: Path) -> No
     assert not missing_source.exists()
 
 
-def test_docker_backend_mounts_trusted_setup_read_only(tmp_path: Path) -> None:
-    setup_dir = tmp_path / "trusted-setup"
+def test_docker_backend_mounts_setup_declaration_read_only(tmp_path: Path) -> None:
+    setup_dir = tmp_path / "setup-declaration"
     setup_dir.mkdir()
     setup_file = setup_dir / "setup.yml"
     setup_file.write_text("setup: []\n", encoding="utf-8")
@@ -422,7 +422,7 @@ def test_docker_backend_mounts_trusted_setup_read_only(tmp_path: Path) -> None:
             container_name_prefix="test",
             path_views=[workspace_view(host_path=tmp_path, writable=True)],
             backend_kind="docker",
-            trusted_setup_path=setup_file,
+            setup_declaration_path=setup_file,
         )
 
     docker_mounts = docker_backend_cls.call_args.kwargs["container"].mounts
@@ -432,10 +432,10 @@ def test_docker_backend_mounts_trusted_setup_read_only(tmp_path: Path) -> None:
     assert setup_mounts[0].writable is False
 
 
-def test_docker_backend_without_workspace_gets_no_trusted_setup_mount(
+def test_docker_backend_without_workspace_gets_no_setup_declaration_mount(
     tmp_path: Path,
 ) -> None:
-    setup_dir = tmp_path / "trusted-setup"
+    setup_dir = tmp_path / "setup-declaration"
     setup_dir.mkdir()
     setup_file = setup_dir / "setup.yml"
     setup_file.write_text("setup: []\n", encoding="utf-8")
@@ -448,15 +448,15 @@ def test_docker_backend_without_workspace_gets_no_trusted_setup_mount(
             container_name_prefix="test",
             path_views=[tmp_view_for_backend("docker")],
             backend_kind="docker",
-            trusted_setup_path=setup_file,
+            setup_declaration_path=setup_file,
         )
 
     docker_mounts = docker_backend_cls.call_args.kwargs["container"].mounts
     assert [m for m in docker_mounts if m.container_path == "/setup"] == []
 
 
-def test_non_docker_backend_gets_no_trusted_setup_mount(tmp_path: Path) -> None:
-    setup_dir = tmp_path / "trusted-setup"
+def test_non_docker_backend_gets_no_setup_declaration_mount(tmp_path: Path) -> None:
+    setup_dir = tmp_path / "setup-declaration"
     setup_dir.mkdir()
     setup_file = setup_dir / "setup.yml"
     setup_file.write_text("setup: []\n", encoding="utf-8")
@@ -465,10 +465,10 @@ def test_non_docker_backend_gets_no_trusted_setup_mount(tmp_path: Path) -> None:
         container_name_prefix="test",
         path_views=[workspace_view(host_path=tmp_path, writable=True)],
         backend_kind="local",
-        trusted_setup_path=setup_file,
+        setup_declaration_path=setup_file,
     )
 
-    # Local backend is out of scope for bootstrap: the trusted setup view must
+    # Local backend is out of scope for bootstrap: the setup declaration view must
     # not be added even when the path is supplied.
     assert isinstance(backend, CompositeBackend)
     assert "/workspace/" in backend.routes

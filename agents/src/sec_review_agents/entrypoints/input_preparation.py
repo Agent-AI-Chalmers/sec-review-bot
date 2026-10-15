@@ -330,14 +330,16 @@ def _set_bundle_paths_from_manifest(
         ),
     }
 
-    # Optional trusted-setup declaration (from the repository default branch).
-    # Absent means "no trusted setup declaration" -- environment stays unbootstrapped.
-    trusted_setup = manifest.get("trusted_setup")
-    if isinstance(trusted_setup, dict):
-        bundle_paths["trusted_setup_path"] = str(
+    # Optional setup declaration (from the repository default branch).
+    # Absent means "no setup declaration" -- environment stays unbootstrapped.
+    setup_declaration = manifest.get("setup_declaration")
+    if isinstance(setup_declaration, dict):
+        bundle_paths["setup_declaration_path"] = str(
             _resolve_bundle_path(
                 local_root,
-                _read_required_manifest_path(trusted_setup, "trusted_setup.path"),
+                _read_required_manifest_path(
+                    setup_declaration, "setup_declaration.path"
+                ),
             )
         )
 

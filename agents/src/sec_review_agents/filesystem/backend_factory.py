@@ -18,7 +18,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     create_docker_container_resource,
 )
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
-from sec_review_agents.filesystem.path_views import PathView, trusted_setup_view
+from sec_review_agents.filesystem.path_views import PathView, setup_declaration_view
 
 _DEEPAGENTS_ARTIFACT_VIEWS = (
     PathView(
@@ -43,21 +43,23 @@ def create_backend_with_path_views(
     working_directory: str = "/workspace",
     image: str | None = None,
     backend_kind: str | None = None,
-    trusted_setup_path: Path | None = None,
+    setup_declaration_path: Path | None = None,
 ):
     if backend_kind is None:
         backend_kind = backend_selection.selected_sandbox_backend_kind()
     backend_kind = backend_kind.strip().lower()
     path_views = list(path_views or [])
-    # The trusted setup declaration is a companion to the workspace: only
+    # The setup declaration is a companion to the workspace: only
     # containers that mount a workspace get it, and only the docker backend
     # mounts host paths (local/bwrap are out of scope for bootstrap).
     if (
-        trusted_setup_path
+        setup_declaration_path
         and backend_kind == "docker"
         and any(_is_workspace_view(view) for view in path_views)
     ):
-        path_views.append(trusted_setup_view(host_path=trusted_setup_path.parent))
+        path_views.append(
+            setup_declaration_view(host_path=setup_declaration_path.parent)
+        )
     if backend_kind == "docker":
         return _create_docker_backend(
             container_name_prefix=container_name_prefix,

@@ -349,7 +349,7 @@ export async function createWorkspaceSnapshotTar({
 
 /**
  * Read a single file at an exact commit from the remote, without checking out a
- * workspace. Used to fetch the trusted setup declaration from the repository's
+ * workspace. Used to fetch the setup declaration from the repository's
  * default-branch SHA (which the PR workspace does not necessarily contain).
  *
  * Returns the file content, or `null` if the file does not exist at that commit.
@@ -377,7 +377,7 @@ export async function readRepositoryFileAtRef({
     throw new Error('readRepositoryFileAtRef requires git_remote_url.')
   }
 
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-trusted-setup-'))
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-setup-declaration-'))
   try {
     await runGitCommand(tempDir, ['init', '--quiet'])
     await runGitCommand(tempDir, ['remote', 'add', 'origin', git_remote_url.trim()])

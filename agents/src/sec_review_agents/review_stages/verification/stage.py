@@ -15,7 +15,7 @@ from sec_review_agents.review_stages.verification.result import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from sec_review_agents.runtime.trusted_setup_bootstrap import (
+from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
@@ -194,7 +194,7 @@ async def run_verification_stage(
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
-    trusted_setup_path: Path | None = None,
+    setup_declaration_path: Path | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir:
         local_transcript_path = (
@@ -221,7 +221,7 @@ async def run_verification_stage(
             record_bootstrap_result(
                 verifier_artifacts_path,
                 await bootstrap_environment(
-                    backend, trusted_setup_path=trusted_setup_path
+                    backend, setup_declaration_path=setup_declaration_path
                 ),
             )
             agent = await create_verification_agent_graph(

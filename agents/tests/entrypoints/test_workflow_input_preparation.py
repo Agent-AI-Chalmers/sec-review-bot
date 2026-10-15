@@ -17,7 +17,7 @@ from tests.contract_fixtures import contract_fixture
 
 
 def _write_bundle_manifest(
-    local_root: str, *, incremental: bool = False, trusted_setup: bool = False
+    local_root: str, *, incremental: bool = False, setup_declaration: bool = False
 ) -> dict[str, object]:
     root = Path(local_root)
     root.mkdir(parents=True, exist_ok=True)
@@ -29,18 +29,16 @@ def _write_bundle_manifest(
     }
     if incremental:
         manifest["incremental_window"] = {"path": "incremental-window"}
-    if trusted_setup:
-        manifest["trusted_setup"] = {"path": "trusted-setup/setup.yml"}
+    if setup_declaration:
+        manifest["setup_declaration"] = {"path": "setup/setup.yml"}
     (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (root / "workspace.snapshot.tar").touch()
     (root / "history").mkdir(exist_ok=True)
     if incremental:
         (root / "incremental-window").mkdir(exist_ok=True)
-    if trusted_setup:
-        (root / "trusted-setup").mkdir(exist_ok=True)
-        (root / "trusted-setup" / "setup.yml").write_text(
-            "setup: []\n", encoding="utf-8"
-        )
+    if setup_declaration:
+        (root / "setup").mkdir(exist_ok=True)
+        (root / "setup" / "setup.yml").write_text("setup: []\n", encoding="utf-8")
     archive_path = root.with_suffix(".tar.zst")
     with tarfile.open(archive_path, mode="w:zst") as archive:
         archive.add(root / "manifest.json", arcname="manifest.json")
@@ -48,8 +46,8 @@ def _write_bundle_manifest(
         archive.add(root / "history", arcname="history")
         if incremental:
             archive.add(root / "incremental-window", arcname="incremental-window")
-        if trusted_setup:
-            archive.add(root / "trusted-setup", arcname="trusted-setup")
+        if setup_declaration:
+            archive.add(root / "setup", arcname="setup")
     content = archive_path.read_bytes()
     return {
         "uri": archive_path.as_uri(),
@@ -103,10 +101,12 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
     }
 
 
-def test_prepare_run_input_resolves_optional_trusted_setup_path(tmp_path: Path) -> None:
-    bundle_root = tmp_path / "bundle-trusted"
-    input_bundle = _write_bundle_manifest(str(bundle_root), trusted_setup=True)
-    run_input_root = tmp_path / "run-inputs" / "run-input-trusted"
+def test_prepare_run_input_resolves_optional_setup_declaration_path(
+    tmp_path: Path,
+) -> None:
+    bundle_root = tmp_path / "bundle-setup"
+    input_bundle = _write_bundle_manifest(str(bundle_root), setup_declaration=True)
+    run_input_root = tmp_path / "run-inputs" / "run-input-setup"
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
     monkeypatch.setenv(
@@ -120,19 +120,21 @@ def test_prepare_run_input_resolves_optional_trusted_setup_path(tmp_path: Path) 
                 "review_intent": {"objective": "audit"},
                 "issue": {"number": 1},
             },
-            run_id="run-input-trusted",
+            run_id="run-input-setup",
             workflow="issue-review",
         )
     finally:
         monkeypatch.undo()
 
-    assert prepared["bundle_paths"]["trusted_setup_path"] == str(
-        run_input_root / "trusted-setup" / "setup.yml"
+    assert prepared["bundle_paths"]["setup_declaration_path"] == str(
+        run_input_root / "setup" / "setup.yml"
     )
 
 
-def test_prepare_run_input_omits_trusted_setup_path_when_absent(tmp_path: Path) -> None:
-    bundle_root = tmp_path / "bundle-no-trusted"
+def test_prepare_run_input_omits_setup_declaration_path_when_absent(
+    tmp_path: Path,
+) -> None:
+    bundle_root = tmp_path / "bundle-no-setup"
     input_bundle = _write_bundle_manifest(str(bundle_root))
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
@@ -147,13 +149,13 @@ def test_prepare_run_input_omits_trusted_setup_path_when_absent(tmp_path: Path) 
                 "review_intent": {"objective": "audit"},
                 "issue": {"number": 1},
             },
-            run_id="run-input-no-trusted",
+            run_id="run-input-no-setup",
             workflow="issue-review",
         )
     finally:
         monkeypatch.undo()
 
-    assert "trusted_setup_path" not in prepared["bundle_paths"]
+    assert "setup_declaration_path" not in prepared["bundle_paths"]
 
 
 def test_prepare_run_input_rejects_unsupported_workflow() -> None:

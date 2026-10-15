@@ -14,7 +14,7 @@ import {
   createInputBundleRoot,
   ensureCleanDirectory,
   finalizeInputBundleWorkspace,
-  materializeTrustedSetup
+  materializeSetupDeclaration
 } from '../shared/input-bundle.js'
 
 async function materializeWorkspace(
@@ -122,7 +122,7 @@ export async function prepareIssueReviewInput({
   await fs.mkdir(history_path, { recursive: true })
 
   await materializeWorkspace(octokit, issue, workspace_path, workspace_ref)
-  const trusted_setup_path = await materializeTrustedSetup({
+  const setup_declaration_path = await materializeSetupDeclaration({
     input_bundle_root,
     default_sha: workspace_ref,
     owner_login: issue.owner_login,
@@ -132,7 +132,7 @@ export async function prepareIssueReviewInput({
     input_bundle_root,
     workspace_path,
     include_incremental_window: false,
-    ...(trusted_setup_path ? { trusted_setup_path } : {})
+    ...(setup_declaration_path ? { setup_declaration_path } : {})
   })
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,

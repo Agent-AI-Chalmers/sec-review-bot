@@ -69,8 +69,8 @@ def workspace_view(
     )
 
 
-def trusted_setup_view(*, host_path: Path) -> PathView:
-    """Expose the trusted setup declaration directory read-only at ``/setup``.
+def setup_declaration_view(*, host_path: Path) -> PathView:
+    """Expose the setup declaration directory read-only at ``/setup``.
 
     The declaration is a single file extracted from the repository default
     branch; Docker bind mounts require a directory, so we mount the directory
