@@ -45,7 +45,10 @@ interface RepoGetContentResponse {
 function parseRepositoryConfig(content: string): ParsedSecReviewBotConfig {
   let parsed: unknown
   try {
-    parsed = parseYaml(content)
+    // Pin the YAML 1.2 Core schema rather than relying on the library default,
+    // so a default change cannot silently alter how config scalars (e.g. a
+    // trigger_mode or a paths_ignore entry written as `on`) are read.
+    parsed = parseYaml(content, { schema: 'core' })
   } catch (error) {
     throw new RepositoryTriggerConfigError('Failed to parse trigger config YAML.', {
       reason: 'invalid-yaml',
