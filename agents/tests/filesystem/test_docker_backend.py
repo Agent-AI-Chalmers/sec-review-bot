@@ -1155,7 +1155,7 @@ def test_container_resource_has_empty_environment_and_unique_name() -> None:
     per-run unique name.
 
     The empty environment is what the sandbox relies on: the setup declaration
-    declaration is the only supported way to influence it, so anything that
+    is the only supported way to influence it, so anything that
     leaks in from the host would be an unintended, untracked dependency.
     """
     first = create_docker_container_resource(
