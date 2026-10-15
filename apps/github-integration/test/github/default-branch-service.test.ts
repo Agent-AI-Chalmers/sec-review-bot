@@ -36,6 +36,7 @@ function makeOctokit(options: {
         },
         getContent: async () => ({
           data: {
+            type: 'file',
             content: Buffer.from('sec_review_bot:\n  trigger_mode: manual_only\n').toString(
               'base64'
             )

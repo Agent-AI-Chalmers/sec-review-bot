@@ -37,6 +37,7 @@ interface RepositoryTriggerConfigErrorOptions {
 interface RepoGetContentResponse {
   data:
     | {
+        type?: string
         content?: string
       }
     | Array<unknown>
@@ -97,6 +98,14 @@ export function isRepositoryTriggerConfigError(
 
 function decodeRepositoryFileContent(data: RepoGetContentResponse['data']): string | null {
   if (!isRecord(data) || typeof data.content !== 'string') {
+    return null
+  }
+  // Only a regular file carries the config body. A symlink is returned as an
+  // object whose `content` is the base64 of the target path, so accepting it
+  // would parse the target string as YAML. Rejecting it here (like a directory
+  // entry) surfaces as `invalid-content`: the path exists but is not a readable
+  // config file, so the read fails strictly rather than silently downgrading.
+  if (data.type !== 'file') {
     return null
   }
 

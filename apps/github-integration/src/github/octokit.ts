@@ -260,7 +260,7 @@ export interface GitHubAppOctokit {
         repo: string
         path: string
         ref?: string
-      }) => Promise<{ data: { content?: string } | Array<unknown> }>
+      }) => Promise<{ data: { type?: string; content?: string } | Array<unknown> }>
     }
   }
 }
