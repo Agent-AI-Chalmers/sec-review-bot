@@ -122,3 +122,33 @@ test('extractPullRequestContext keeps trusted identity on the base repo for fork
   // Trusted ref must resolve from the base repo identity, not the head/fork.
   assert.notEqual(context.repo_full_name, context.head_repo_full_name)
 })
+
+test('extractPullRequestContext treats a missing repo identity as a fork (fail closed)', () => {
+  // `from_fork` is a trust gate: it decides whether the run is auto-skipped for
+  // maintainer approval. If either repository identity is absent we cannot prove
+  // "same repository", so the PR must be treated as a fork rather than silently
+  // auto-reviewed. The old `head !== base` comparison made two nulls equal and
+  // thus reported a same-repo PR.
+  const context = extractPullRequestContext({
+    action: 'opened',
+    repository: {
+      name: 'example',
+      full_name: 'octo/example',
+      owner: { login: 'octo' }
+    },
+    sender: { login: 'alice' },
+    pull_request: {
+      number: 11,
+      title: 'No repo identity',
+      body: '',
+      user: { login: 'alice' },
+      draft: false,
+      base: { ref: 'main', sha: 'base-sha' },
+      head: { ref: 'feature', sha: 'head-sha' }
+    }
+  })
+
+  assert.equal(context.from_fork, true)
+  assert.equal(context.base_repo_full_name, null)
+  assert.equal(context.head_repo_full_name, null)
+})

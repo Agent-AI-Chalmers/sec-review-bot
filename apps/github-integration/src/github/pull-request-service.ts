@@ -141,8 +141,30 @@ function buildPullRequestContextFromRaw(rawPayload: Record<string, unknown>): Pu
 
     head_repo_full_name,
     base_repo_full_name,
-    from_fork: head_repo_full_name !== base_repo_full_name
+    from_fork: isForkPullRequest({ head_repo_full_name, base_repo_full_name })
   })
+}
+
+/**
+ * Decide whether the pull request comes from a foreign repository.
+ *
+ * The value is a trust gate: a fork is auto-skipped and needs an explicit
+ * maintainer command. It must therefore *fail closed* -- when either repository
+ * identity is missing we cannot prove "same repository", so the PR is treated
+ * as a fork (skipped) rather than silently auto-reviewed. Only two present and
+ * equal full names are the same repository.
+ */
+function isForkPullRequest({
+  head_repo_full_name,
+  base_repo_full_name
+}: {
+  head_repo_full_name: string | null
+  base_repo_full_name: string | null
+}): boolean {
+  if (head_repo_full_name === null || base_repo_full_name === null) {
+    return true
+  }
+  return head_repo_full_name !== base_repo_full_name
 }
 
 function requireText(value: string, label: string): void {
