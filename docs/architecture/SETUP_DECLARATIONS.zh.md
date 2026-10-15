@@ -8,39 +8,28 @@
 
 ## 声明格式
 
-```yaml
-setup:
-  - run: pip3 install --no-input uv
-    timeout_seconds: 300
-  - run: uv sync --frozen
-    working-directory: agents
-    timeout_seconds: 600
-```
+该格式由它自己的契约规定：**[contracts/setup-declaration/v1/SPEC.md](../../contracts/setup-declaration/v1/SPEC.zh.md)**。那份规范、它旁边的共享测试语料，以及代码里的两个解析器一起变更。不要在这里重述逐字段的格式——本页讲的是声明如何到达沙箱、如何运行，以及信任与运维边界。
 
-顶层：
+有两个格式层面的要点在架构层面值得说明：
 
-- `setup`：必填；一串按顺序执行的步骤。
+- **空白内容表示"无声明"。** 空文件或只含空白的文件会被完全当作文件不存在；这不是错误。
+- **非法内容会让运行失败。** 一个存在、非空白、且不符合格式的文件，是默认分支上的维护者错误。它会在运行被提交**之前**被拒绝，并附带仓库/ref/路径信息，运行被标记为失败（`SETUP_DECLARATION_INVALID`）。它不会静默降级为未 bootstrap 的环境——那会让 agent 在一个依赖从未安装的仓库上做判断。这与非法 `.sec-review/config.yml` 的处理方式一致。
 
-每个步骤：
+## 规则归谁管
 
-| Key | Required | Meaning |
-| --- | --- | --- |
-| `run` | yes | 在容器中执行的 shell 命令。 |
-| `working-directory` | no | 相对于仓库根的目录。必须留在根内（不得为绝对路径，也不得含 `..`）。默认为仓库根。 |
-| `env` | no | 环境变量名到值的映射，在 `run` 之前导出。变量名必须是合法的 shell 标识符。 |
-| `timeout_seconds` | no | 每步超时。默认 300，并以 `SEC_REVIEW_SETUP_STEP_MAX_SECONDS`（默认 600）为上限。 |
+**GitHub integration 掌管内容规则**，因为它是 runner workflow input 的生产者，必须产出满足 runner 契约的东西。它会用与 runner 相同的 allow-list 校验声明，并以可归因的方式拒绝非法声明。runner 随后会再次解析文本作为纵深防御，并执行它。两端测试都会跑同一份语料（`contracts/setup-declaration/v1/corpus/`），因此两套实现不会悄悄漂移。
 
-解析是严格的：任何超出该 schema 的内容——未知键、非列表的 `setup`、非法的环境变量名、缺失 `run` 的步骤——都会拒绝整份声明，而不是将其忽略。
+本地运行（`run-local-*`）会通过 runner 自己的解析器校验文件，因此本地声明会以与仓库默认分支声明相同的方式失败。
 
 ## 声明如何到达沙箱
 
 声明以 **内联文本** 承载，而不是文件路径：
 
-1. GitHub integration 从 base 仓库的默认分支读取 `.sec-review/setup.yml`，并把它的 **内容** 放进 workflow input 的可选顶层字符串字段 `setup_declaration`。
+1. GitHub integration 从 base 仓库的默认分支读取 `.sec-review/setup.yml`，校验它，并把它的 **内容** 放进 workflow input 的可选顶层字符串字段 `setup_declaration`。
 2. runner 将该字符串沿 workflow 向下传递。input bundle 中没有声明文件，manifest 中没有对应字段，容器中也没有对应挂载。
 3. 在 agent 运行前，每个 stage 解析该字符串并在沙箱内执行其步骤。
 
-由于内容是内联的，唯一的失败模式是解析错误。不存在"声明文件未找到"这一路径。
+由于内容是内联的，不存在"声明文件未找到"这一路径；声明特有的失败模式只有"提交前被判为非法"和"某一步在执行时失败"。
 
 ## 执行语义
 
@@ -50,6 +39,12 @@ setup:
 - **不交给 agent。** 声明及其结果不会放进 agent 的上下文；agent 依据仓库进行推理。
 
 bootstrap 期间可用的网络是部署方的基线（`AGENT_DOCKER_NETWORK_MODE`），仓库无法放宽它。当基线拒绝网络时，需要联网的声明会以环境不完整告终。
+
+### 运维说明
+
+- **隔离。** 声明在与 agent 相同的容器、相同的用户、相同的网络下运行。它可以修改 `/workspace` 以及 agent 之后会读取的任何内容。声明只有能这样做才有用，因此不会再对它加沙箱。为一个新的 `setup_declaration` 来源开口子，等于把在 agent 容器内执行代码的能力交给该来源；请保持"只从默认分支读取"的规则。
+- **输出持久化。** `environment.json`（含每步截断后的输出）写入运维本地的 artifact 目录（`.agent-artifacts` / `SEC_REVIEW_AGENT_ARTIFACT_ROOT`），不会发送到 GitHub。预期的读者是运维，因此输出不做脱敏；一个会把 registry token 回显出来的声明会把它持久化在那里。请把 artifact 目录视为包含凭据的运维数据。
+- **空声明。** 存在但只含空白的 `.sec-review/setup.yml` 会被当作不存在，因此一个装饰性的文件不会让运行失败。
 
 ## 信任边界
 

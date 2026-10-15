@@ -4,39 +4,28 @@ A repository can declare how to prepare the sandbox it is reviewed in. The decla
 
 ## Declaration Format
 
-```yaml
-setup:
-  - run: pip3 install --no-input uv
-    timeout_seconds: 300
-  - run: uv sync --frozen
-    working-directory: agents
-    timeout_seconds: 600
-```
+The format is specified by its own contract: **[contracts/setup-declaration/v1/SPEC.md](../../contracts/setup-declaration/v1/SPEC.md)**. That specification, the shared test corpus next to it, and the two parser implementations in code change together. Do not restate the field-by-field format here — this page covers how a declaration reaches the sandbox, how it runs, and the trust and operational boundaries.
 
-Top level:
+Two format-level points matter at the architecture level:
 
-- `setup`: required; a list of steps executed in order.
+- **Blank content means "no declaration".** An empty or whitespace-only file is treated exactly like a missing file; it is not an error.
+- **Invalid content fails the run.** A file that exists, is not blank, and does not match the format is a maintainer error on the default branch. It is rejected **before** the run is submitted, with the repository/ref/path attached, and the run is marked failed (`SETUP_DECLARATION_INVALID`). It does not silently degrade to an unbootstrapped environment — that would let the agent reason about a repository whose dependencies were never installed. This matches how an invalid `.sec-review/config.yml` is handled.
 
-Each step:
+## Who Owns the Rules
 
-| Key | Required | Meaning |
-| --- | --- | --- |
-| `run` | yes | Shell command to execute in the container. |
-| `working-directory` | no | Directory relative to the repository root. It must stay inside the root (no absolute paths or `..`). Defaults to the repository root. |
-| `env` | no | Mapping of environment variable names to values, exported before `run`. Names must be valid shell identifiers. |
-| `timeout_seconds` | no | Per-step timeout. Defaults to 300 and is capped at `SEC_REVIEW_SETUP_STEP_MAX_SECONDS` (default 600). |
+The **GitHub integration owns the content rules**, because it produces the runner workflow input and must produce something that satisfies the runner contract. It validates the declaration against the same allow-list the runner uses, and rejects an invalid one with attribution. The runner then parses the text again as defense in depth, and executes it. A shared corpus (`contracts/setup-declaration/v1/corpus/`) is run by both sides' tests so the two implementations cannot silently drift.
 
-Parsing is strict: anything outside this schema — an unknown key, a non-list `setup`, an invalid environment-variable name, a step missing `run` — rejects the whole declaration rather than being ignored.
+Local runs (`run-local-*`) validate the file through the runner's own parser, so a local declaration fails the same way a repository's default-branch declaration would.
 
 ## How the Declaration Reaches the Sandbox
 
 The declaration is carried as **inline text**, not as a file path:
 
-1. The GitHub integration reads `.sec-review/setup.yml` from the base repository's default branch and puts its **contents** in the workflow input under the optional top-level string field `setup_declaration`.
+1. The GitHub integration reads `.sec-review/setup.yml` from the base repository's default branch, validates it, and puts its **contents** in the workflow input under the optional top-level string field `setup_declaration`.
 2. The runner passes that string down the workflow. There is no declaration file in the input bundle, no manifest field for it, and no mount for it in the container.
 3. Before the agent runs, each stage parses the string and executes its steps inside the sandbox.
 
-Because the contents are inline, the only failure mode is a parse error. There is no "declaration file not found" path.
+Because the contents are inline, there is no "declaration file not found" path; the only declaration-specific failure modes are "rejected as invalid before submission" and "a step fails at execution time".
 
 ## Execution Semantics
 
@@ -47,9 +36,15 @@ Because the contents are inline, the only failure mode is a parse error. There i
 
 The network available during bootstrap is the deployer's baseline (`AGENT_DOCKER_NETWORK_MODE`), and the repository cannot widen it. A declaration that needs the network fails as an incomplete environment when the baseline denies it.
 
+### Operational notes
+
+- **Isolation.** The declaration runs in the same container, as the same user, with the same network as the agent. It can change `/workspace` and anything else the agent later reads. A declaration is only useful if it can do that, so it is not sandboxed further. Adding a new source for `setup_declaration` therefore means handing that source code execution in the agent's container; keep the default-branch-only rule.
+- **Output persistence.** `environment.json` (including each step's truncated output) is written to the operator-local artifact tree (`.agent-artifacts` / `SEC_REVIEW_AGENT_ARTIFACT_ROOT`). It is not sent to GitHub. The intended reader is the operator, so output is not redacted; a declaration that echoes a registry token will persist it there. Treat the artifact tree as credential-bearing operator data.
+- **Blank declaration.** A `.sec-review/setup.yml` that exists but holds only whitespace is treated as if it did not exist, so a cosmetic file cannot fail the run.
+
 ## Trust Boundary
 
-Trust in the declaration's origin is decided **upstream**, by the GitHub integration: it is read from the base repository's default branch, never from a fork or a payload-supplied ref. The runner does not authenticate the declaration against a source; it parses the text strictly and executes it. Callers that supply a declaration out of band, such as the `run-local-*` commands, own its provenance.
+Trust in the declaration's origin is decided **upstream**, by the GitHub integration: it is read from the base repository's default branch, never from a fork or a payload-supplied ref. The runner does not authenticate the declaration against a source; it parses the text strictly and executes it. Callers that supply a declaration out of band, such as the `run-local-*` commands, own its provenance (they do validate its content, just not where it came from).
 
 ## Local Runs
 

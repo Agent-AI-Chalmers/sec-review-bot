@@ -1,0 +1,2 @@
+setup:
+  - run: pnpm install --frozen-lockfile

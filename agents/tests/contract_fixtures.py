@@ -40,6 +40,24 @@ def contract_fixture_files() -> list[Path]:
     return sorted(_FIXTURES_ROOT.glob("*.json"))
 
 
+# The setup-declaration contract is its own family under contracts/, not part of
+# integration-contract fixtures: its rules are decision logic enforced in code,
+# so it carries a shared corpus rather than JSON Schema fixtures.
+_SETUP_DECLARATION_CORPUS_ROOT = (
+    CONTRACT_ROOT.parent / "setup-declaration" / "v1" / "corpus"
+)
+
+
+def contract_setup_declaration_files() -> list[Path]:
+    return sorted(_SETUP_DECLARATION_CORPUS_ROOT.glob("*.yml"))
+
+
+def contract_setup_declaration_manifest() -> dict[str, Any]:
+    return json.loads(
+        (_SETUP_DECLARATION_CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+
 def contract_schema(name: str) -> dict[str, Any]:
     return json.loads((_SCHEMAS_ROOT / name).read_text(encoding="utf-8"))
 

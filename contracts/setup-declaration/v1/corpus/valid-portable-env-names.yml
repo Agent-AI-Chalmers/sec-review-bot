@@ -1,0 +1,4 @@
+setup:
+  - run: echo ok
+    env:
+      _A1: ok
