@@ -33,12 +33,13 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.1",
-    "typescript-eslint": "^8.71.2",
     "aws-sdk-client-mock": "^4.1.0",
     "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
     "nodemon": "^3.1.14",
     "prettier": "^3.9.9",
     "tsx": "^4.23.15",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2"
   }
 }

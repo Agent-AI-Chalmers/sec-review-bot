@@ -1,5 +1,6 @@
 import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
+import eslintConfigPrettier from 'eslint-config-prettier/flat'
 
 export default [
   {
@@ -40,11 +41,8 @@ export default [
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_' }
-      ],
-      quotes: ['error', 'single', { avoidEscape: true }],
-      semi: ['error', 'never'],
-      'comma-dangle': ['error', 'never'],
-      'eol-last': ['error', 'always']
+      ]
     }
-  }
+  },
+  eslintConfigPrettier
 ]

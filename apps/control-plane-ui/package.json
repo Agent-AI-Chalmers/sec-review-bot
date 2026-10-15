@@ -37,9 +37,10 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
     "playwright-core": "^1.63.0",
     "prettier": "^3.9.9",
     "tsx": "^4.23.15",
-    "typescript-eslint": "latest"
+    "typescript-eslint": "^8.71.2"
   }
 }
