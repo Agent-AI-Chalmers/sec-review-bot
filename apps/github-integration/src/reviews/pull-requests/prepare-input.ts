@@ -4,6 +4,7 @@ import path from 'path'
 
 import {
   fetchTimelineLinkedIssues,
+  resolveTrustedRepositoryIdentity,
   summarizePullRequestFiles,
   type PullRequestContext,
   type PullRequestFile,
@@ -330,12 +331,17 @@ export async function preparePullRequestReviewInput({
   })
   const default_sha = trusted_default_branch.head_sha
   // Read from the exact default-branch commit through the Contents API; the
-  // installation auth rides on `octokit` rather than a git token.
+  // installation auth rides on `octokit` rather than a git token. Resolve the
+  // repository identity the same way the default-branch SHA was resolved
+  // (`resolveTrustedRepositoryIdentity`, which prefers the base repo): reading
+  // the declaration from a *different* repository than the one whose HEAD SHA we
+  // hold would 404 and silently degrade to "no declaration".
+  const repository_identity = resolveTrustedRepositoryIdentity(pr)
   const setup_declaration = await readSetupDeclaration({
     octokit,
     default_sha,
-    owner_login: pr.owner_login,
-    repo_name: pr.repo_name
+    owner_login: repository_identity.owner_login,
+    repo_name: repository_identity.repo_name
   })
   await finalizeInputBundleWorkspace({
     input_bundle_root,
