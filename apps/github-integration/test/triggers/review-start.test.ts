@@ -6,6 +6,10 @@ import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-r
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
+import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
+
+const TRUSTED_DEFAULT_BRANCH = { default_branch: 'main', head_sha: 'default-sha' }
 
 const preparationClaim = {
   renewPreparationClaim: async () => true,
@@ -72,6 +76,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
 
   const submitted = await startIssueReviewCommand({
     octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     issue,
     event_type: 'opened',
     delivery_id: 'delivery-issue-1',
@@ -96,7 +101,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           event_type: 'opened' as const,
           open_pr: false
         }
-        await on_prepared?.(prepared, { contract_version: 'v5' } as never)
+        await on_prepared?.(prepared, { contract_version: CONTRACT_VERSION } as never)
         return prepared
       },
       store: {
@@ -153,6 +158,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
 
   const submitted = await startPullRequestReviewCommand({
     octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     pr,
     event_type: 'manual_review',
     delivery_id: 'delivery-pr-1',
@@ -169,7 +175,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
           workflow: 'pull-request-review',
           event_type: 'manual_review' as const
         }
-        await on_prepared?.(prepared, { contract_version: 'v5' } as never)
+        await on_prepared?.(prepared, { contract_version: CONTRACT_VERSION } as never)
         return prepared
       },
       store: {
@@ -227,6 +233,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
   await assert.rejects(
     startPullRequestReviewCommand({
       octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
       delivery_id: 'delivery-pr-failed',
@@ -277,6 +284,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
   await assert.rejects(
     startIssueReviewCommand({
       octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       issue: issueContext(),
       event_type: 'opened',
       delivery_id: 'delivery-uncertain',
@@ -291,7 +299,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               event_type: 'opened',
               open_pr: false
             },
-            { contract_version: 'v5' } as never
+            { contract_version: CONTRACT_VERSION } as never
           )
           throw error
         },
@@ -326,6 +334,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
   await assert.rejects(
     startPullRequestReviewCommand({
       octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
       delivery_id: 'delivery-pr-uncertain',
@@ -339,7 +348,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
               workflow: 'pull-request-review',
               event_type: 'opened'
             },
-            { contract_version: 'v5' } as never
+            { contract_version: CONTRACT_VERSION } as never
           )
           throw error
         },
@@ -370,6 +379,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
   await assert.rejects(
     startPullRequestReviewCommand({
       octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',
       delivery_id: 'delivery-context-failure',
       resolve_pr: async () => {
@@ -411,6 +421,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
   let starts = 0
   const submitted = await startPullRequestReviewCommand({
     octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     pr: pullRequestContext(),
     event_type: 'opened',
     delivery_id: 'delivery-1',
@@ -440,6 +451,7 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
   let starts = 0
   const submitted = await startIssueReviewCommand({
     octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     issue: issueContext(),
     event_type: 'opened',
     delivery_id: 'delivery-issue-1',
@@ -463,4 +475,92 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
 
   assert.equal(submitted.run_id, 'run-original')
   assert.equal(starts, 0)
+})
+
+test('startPullRequestReviewCommand reports an invalid setup declaration distinctly', async () => {
+  const transitions: unknown[] = []
+
+  await assert.rejects(
+    startPullRequestReviewCommand({
+      octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+      pr: pullRequestContext(),
+      event_type: 'opened',
+      delivery_id: 'delivery-pr-setup-invalid',
+      deps: {
+        start_review: async () => {
+          throw new SetupDeclarationError('setup[0] has unsupported key(s): shell', {
+            reason: 'unsupported-step-key'
+          })
+        },
+        store: {
+          ...preparationClaim,
+          admitReviewRun: (run) =>
+            ({
+              record: { ...run, run_id: 'run-pr-setup-invalid' },
+              created: true,
+              preparation_token: 'claim'
+            }) as never,
+          submitPreparedRun: () => assert.fail('invalid setup must not be queued'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+        }
+      }
+    }),
+    SetupDeclarationError
+  )
+
+  assert.deepEqual(transitions, [
+    [
+      'failed',
+      'run-pr-setup-invalid',
+      {
+        code: 'SETUP_DECLARATION_INVALID',
+        message: 'setup[0] has unsupported key(s): shell'
+      }
+    ]
+  ])
+})
+
+test('startIssueReviewCommand reports an invalid setup declaration distinctly', async () => {
+  const transitions: unknown[] = []
+
+  await assert.rejects(
+    startIssueReviewCommand({
+      octokit: {},
+      issue: issueContext(),
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+      event_type: 'manual_review',
+      delivery_id: 'delivery-issue-setup-invalid',
+      deps: {
+        start_review: async () => {
+          throw new SetupDeclarationError('setup declaration is not valid YAML', {
+            reason: 'invalid-yaml'
+          })
+        },
+        store: {
+          ...preparationClaim,
+          admitReviewRun: (run) =>
+            ({
+              record: { ...run, run_id: 'run-issue-setup-invalid' },
+              created: true,
+              preparation_token: 'claim'
+            }) as never,
+          submitPreparedRun: () => assert.fail('invalid setup must not be queued'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+        }
+      }
+    }),
+    SetupDeclarationError
+  )
+
+  assert.deepEqual(transitions, [
+    [
+      'failed',
+      'run-issue-setup-invalid',
+      {
+        code: 'SETUP_DECLARATION_INVALID',
+        message: 'setup declaration is not valid YAML'
+      }
+    ]
+  ])
 })

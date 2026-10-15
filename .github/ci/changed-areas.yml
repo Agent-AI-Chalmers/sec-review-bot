@@ -55,7 +55,7 @@ control-plane:
 
 github-integration:
   # The repo-level trigger configuration the service reads.
-  - '.github/sec-review-bot.yml'
+  - '.sec-review/**'
   - 'apps/github-integration/**'
   # Its tests validate the shared contract fixtures.
   - 'contracts/**'
@@ -73,6 +73,9 @@ agents:
   - 'agents/**'
   # The wheel packages the canonical contract schemas.
   - 'contracts/**'
+  # `.sec-review/setup.yml` is parsed and executed by the runner, so a change to
+  # it can affect the agents suite's contract (and the repository's own setup).
+  - '.sec-review/**'
   # CI tooling.
   - '.github/workflows/ci.yml'
 

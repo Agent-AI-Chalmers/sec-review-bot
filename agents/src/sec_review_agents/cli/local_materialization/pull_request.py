@@ -16,6 +16,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
@@ -230,6 +231,7 @@ def build_local_pull_request_bundle(
     event_type: str = "local_review",
     is_draft: bool = False,
     test_changes: str = "allow",
+    setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     pr_number_value = int(pr_number)
@@ -320,13 +322,18 @@ def build_local_pull_request_bundle(
 
     input_bundle = archive_input_bundle(manifest_paths, include_incremental_window=True)
     input_data = {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "review_intent": {
             "objective": "audit",
             "test_changes": test_changes,
         },
         "pr": pr_metadata,
         "input_bundle": input_bundle,
+        **(
+            {"setup_declaration": setup_declaration_content}
+            if setup_declaration_content is not None
+            else {}
+        ),
     }
 
     input_path = manifest_paths.local_root_path / "pull-request-review-input.json"

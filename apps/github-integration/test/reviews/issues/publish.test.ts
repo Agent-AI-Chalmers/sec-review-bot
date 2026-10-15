@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
+import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 
 function issueReviewRecordWithPatch(): ReviewRecord {
   return {
@@ -64,6 +65,12 @@ function buildHarness() {
 
   const octokit = {
     rest: {
+      repos: {
+        // The draft-PR base is resolved via API, not from the payload/persisted
+        // default_branch; keep the mock's resolved value aligned with the fixture.
+        get: async () => ({ data: { default_branch: 'main' } }),
+        getBranch: async () => ({ data: { commit: { sha: 'resolved-default-sha' } } })
+      },
       pulls: {
         list: async () => ({ data: [] }),
         create: async (args: unknown) => {
@@ -111,7 +118,7 @@ async function runPublish(open_pr: boolean) {
         open_pr
       }
     },
-    result: { contract_version: 'v5', review_record: issueReviewRecordWithPatch() },
+    result: { contract_version: CONTRACT_VERSION, review_record: issueReviewRecordWithPatch() },
     store: harness.store as never,
     claim_token: 'claim',
     assert_publication_claim: async () => {},

@@ -11,7 +11,26 @@ export const WORKSPACE_SNAPSHOT_TAR_NAME = 'workspace.snapshot.tar'
 
 const GIT_FETCH_MAX_ATTEMPTS = 3
 const GIT_FETCH_INITIAL_RETRY_DELAY_MS = 1_000
+
+// Bound every git subprocess so a hung fetch, checkout, or gc cannot stall
+// input preparation forever. The default is generous: a cold clone of a large
+// repository with a slow proxy can legitimately take minutes. Operators whose
+// repositories exceed it can raise it through the environment.
+const GIT_COMMAND_TIMEOUT_ENV = 'GITHUB_INTEGRATION_GIT_TIMEOUT_MS'
+const DEFAULT_GIT_COMMAND_TIMEOUT_MS = 600_000
 type Sleep = (delay_ms: number) => Promise<void>
+
+/** Resolve the per-command timeout, validating the environment override. */
+export function configuredGitTimeoutMs(configured = process.env[GIT_COMMAND_TIMEOUT_ENV]): number {
+  if (configured === undefined || configured.trim() === '') {
+    return DEFAULT_GIT_COMMAND_TIMEOUT_MS
+  }
+  const parsed = Number.parseInt(configured, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0 || String(parsed) !== configured.trim()) {
+    throw new Error(`${GIT_COMMAND_TIMEOUT_ENV} must be a positive integer.`)
+  }
+  return parsed
+}
 
 // Materialization flow for real-history workspaces:
 // 1. fetch only the requested refs in a temporary git repository;
@@ -23,6 +42,7 @@ type Sleep = (delay_ms: number) => Promise<void>
 interface GitCommandOptions {
   config?: string[]
   env?: Record<string, string | undefined>
+  timeout_ms?: number
 }
 
 interface GitAskPassAuth {
@@ -81,6 +101,7 @@ async function runGitCommand(
   const configArgs = (options.config ?? []).flatMap((item) => ['-c', item])
   await execFileAsync('git', [...configArgs, ...args], {
     cwd: workspace_path,
+    timeout: options.timeout_ms ?? configuredGitTimeoutMs(),
     env: {
       ...process.env,
       GIT_ASKPASS: '',
@@ -333,13 +354,11 @@ export async function createWorkspaceSnapshotTar({
   )
 
   try {
-    await execFileAsync('tar', [
-      '-cf',
-      tempPath,
-      '-C',
-      path.dirname(workspace_path),
-      path.basename(workspace_path)
-    ])
+    await execFileAsync(
+      'tar',
+      ['-cf', tempPath, '-C', path.dirname(workspace_path), path.basename(workspace_path)],
+      { timeout: configuredGitTimeoutMs() }
+    )
     await fs.rename(tempPath, tar_path)
   } catch (error) {
     await fs.rm(tempPath, { force: true }).catch(() => {})

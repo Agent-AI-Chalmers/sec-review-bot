@@ -1,3 +1,4 @@
+import { CONTRACT_VERSION, type ContractVersion } from '../../runner/contract-version.js'
 import {
   createPullRequestReviewUnlessMarkerExists,
   type PullRequestReviewEvent
@@ -19,7 +20,7 @@ import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorWithResponse, asErrorMessage } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { getGitHubAppMetadata } from '../../github/github-app-metadata-service.js'
-import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
+import { assertWorkflowResult } from '../../runner/contract-schema.js'
 import type { ControlPlaneClient } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
@@ -59,7 +60,7 @@ interface SuggestionManifestLike {
 }
 
 export interface PullRequestReviewWorkflowResult {
-  contract_version: 'v5'
+  contract_version: ContractVersion
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -74,10 +75,10 @@ function pullRequestReviewResultFromWorkflowResult(
   result: unknown
 ): PullRequestReviewWorkflowResult | null {
   try {
-    assertV5WorkflowResult('pull-request-review', result)
-    const rawResult = result as { contract_version: 'v5'; review_record: unknown }
+    assertWorkflowResult('pull-request-review', result)
+    const rawResult = result as { contract_version: ContractVersion; review_record: unknown }
     return {
-      contract_version: 'v5',
+      contract_version: CONTRACT_VERSION,
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

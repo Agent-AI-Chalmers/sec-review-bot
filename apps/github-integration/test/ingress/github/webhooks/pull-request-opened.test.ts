@@ -9,7 +9,7 @@ function automaticConfig() {
   return {
     trigger_mode: 'automatic' as const,
     paths_ignore: [],
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     ref: 'main',
     source: 'repository-config' as const
   }
@@ -19,13 +19,17 @@ function manualOnlyConfig() {
   return {
     trigger_mode: 'manual_only' as const,
     paths_ignore: [],
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     ref: 'main',
     source: 'repository-config' as const
   }
 }
 
-function createPullRequestOpenedPayload({ draft = false } = {}) {
+function trusted(config: ReturnType<typeof automaticConfig> | ReturnType<typeof manualOnlyConfig>) {
+  return { config, default_branch: 'main', head_sha: 'main-sha' }
+}
+
+function createPullRequestOpenedPayload({ draft = false, fromFork = false } = {}) {
   return {
     action: 'opened',
     before: null,
@@ -58,7 +62,7 @@ function createPullRequestOpenedPayload({ draft = false } = {}) {
         ref: 'feature',
         sha: 'head-sha',
         repo: {
-          full_name: 'octo/example-repo'
+          full_name: fromFork ? 'mallory/example-repo' : 'octo/example-repo'
         }
       },
       commits: 1,
@@ -85,7 +89,7 @@ test('pull-request-opened skips automatic workflow when trigger mode is manual_o
       payload: createPullRequestOpenedPayload()
     },
     {
-      fetchRepositoryTriggerConfigFn: async () => manualOnlyConfig(),
+      fetchTrustedRepositoryTriggerConfigFn: async () => trusted(manualOnlyConfig()),
       isAutomaticTriggerModeEnabledFn: () => false,
       startPullRequestReviewCommandFn: async () => {
         reviewCalled = true
@@ -113,9 +117,9 @@ test('pull-request-opened skips self-originated payload before pull request extr
         }
       },
       {
-        fetchRepositoryTriggerConfigFn: async () => {
+        fetchTrustedRepositoryTriggerConfigFn: async () => {
           configFetched = true
-          return manualOnlyConfig()
+          return trusted(manualOnlyConfig())
         }
       }
     )
@@ -128,6 +132,7 @@ test('pull-request-opened skips self-originated payload before pull request extr
 
 test('pull-request-opened runs automatic workflow when trigger mode is automatic', async () => {
   let reviewCalled = false
+  let forwarded: { default_branch: string; head_sha: string } | null = null
 
   await handlePullRequestOpenedWithDeps(
     {
@@ -136,15 +141,17 @@ test('pull-request-opened runs automatic workflow when trigger mode is automatic
       payload: createPullRequestOpenedPayload()
     },
     {
-      fetchRepositoryTriggerConfigFn: async () => automaticConfig(),
+      fetchTrustedRepositoryTriggerConfigFn: async () => trusted(automaticConfig()),
       isAutomaticTriggerModeEnabledFn: () => true,
-      startPullRequestReviewCommandFn: async () => {
+      startPullRequestReviewCommandFn: async ({ trusted_default_branch }) => {
         reviewCalled = true
+        forwarded = trusted_default_branch
       }
     }
   )
 
   assert.equal(reviewCalled, true)
+  assert.deepEqual(forwarded, { default_branch: 'main', head_sha: 'main-sha' })
 })
 
 test('pull-request-opened rethrows invalid repository trigger config error', async () => {
@@ -152,7 +159,7 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
     owner_login: 'octo',
     repo_name: 'example-repo',
     ref: 'main',
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     reason: 'invalid-trigger-mode'
   })
 
@@ -164,7 +171,7 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
         payload: createPullRequestOpenedPayload()
       },
       {
-        fetchRepositoryTriggerConfigFn: async () => {
+        fetchTrustedRepositoryTriggerConfigFn: async () => {
           throw configError
         },
         isRepositoryTriggerConfigErrorFn: (error): error is RepositoryTriggerConfigError =>
@@ -173,4 +180,31 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
     ),
     configError
   )
+})
+
+test('pull-request-opened skips automatic review for fork PRs', async () => {
+  setGitHubAppMetadata()
+  let reviewCalled = false
+  let configFetched = false
+
+  await handlePullRequestOpenedWithDeps(
+    {
+      id: 'delivery-fork',
+      octokit: {},
+      payload: createPullRequestOpenedPayload({ fromFork: true })
+    },
+    {
+      fetchTrustedRepositoryTriggerConfigFn: async () => {
+        configFetched = true
+        return trusted(automaticConfig())
+      },
+      isAutomaticTriggerModeEnabledFn: () => true,
+      startPullRequestReviewCommandFn: async () => {
+        reviewCalled = true
+      }
+    }
+  )
+
+  assert.equal(reviewCalled, false, 'fork PR must not auto-review')
+  assert.equal(configFetched, false, 'fork PR must be skipped before config fetch')
 })

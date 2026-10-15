@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from sec_review_agents.utils.markdown import (
     bullet_section,
@@ -19,6 +19,7 @@ class RepositoryCaseExecutionInput(TypedDict):
     scan_mode: str
     incremental_window_path: str | None
     test_changes: TestChangesPolicy
+    setup_declaration_content: NotRequired[str | None]
 
 
 def prepare_case_execution_input(
@@ -29,6 +30,7 @@ def prepare_case_execution_input(
     scan_mode: str,
     case: Mapping[str, Any],
     test_changes: TestChangesPolicy,
+    setup_declaration_content: str | None = None,
 ) -> RepositoryCaseExecutionInput:
     case_id = str(case.get("case_id") or "").strip()
     if not case_id:
@@ -51,6 +53,7 @@ def prepare_case_execution_input(
             else None
         ),
         "test_changes": test_changes,
+        "setup_declaration_content": setup_declaration_content,
     }
     return case_execution_input
 

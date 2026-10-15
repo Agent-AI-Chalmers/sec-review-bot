@@ -7,6 +7,7 @@ import test from 'node:test'
 import { promisify } from 'node:util'
 
 import {
+  configuredGitTimeoutMs,
   createWorkspaceSnapshotTar,
   materializeWorkspaceWithCommitHistory,
   retryGitFetch,
@@ -226,6 +227,43 @@ test('createWorkspaceSnapshotTar restores a self-consistent git workspace from t
       'README.md'
     )
   } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+test('configuredGitTimeoutMs defaults and reads a validated override', () => {
+  assert.equal(configuredGitTimeoutMs(undefined), 600_000)
+  assert.equal(configuredGitTimeoutMs(''), 600_000)
+  assert.equal(configuredGitTimeoutMs('1500'), 1500)
+})
+
+test('configuredGitTimeoutMs rejects a non-positive or malformed override', () => {
+  for (const value of ['0', '-1', 'abc', '1.5', '10s']) {
+    assert.throws(() => configuredGitTimeoutMs(value), /GITHUB_INTEGRATION_GIT_TIMEOUT_MS/)
+  }
+})
+
+test('a git command that exceeds the timeout is killed, not left running', async () => {
+  // Any real git invocation takes more than 1ms, so a 1ms budget must kill it.
+  // The point is that the timeout is enforced: the command rejects instead of
+  // hanging on a remote that never answers.
+  const previous = process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS']
+  process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS'] = '1'
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'git-timeout-test-'))
+  try {
+    await assert.rejects(() =>
+      materializeWorkspaceWithCommitHistory({
+        workspace_path: path.join(root, 'workspace'),
+        refs: ['main'],
+        // An unroutable address: without the timeout this would hang.
+        git_remote_url: 'http://10.255.255.1:9/octo/demo.git'
+      })
+    )
+  } finally {
+    if (previous === undefined) {
+      delete process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS']
+    } else {
+      process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS'] = previous
+    }
     await fs.rm(root, { recursive: true, force: true })
   }
 })

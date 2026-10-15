@@ -12,6 +12,7 @@ from sec_review_agents.cli.local_materialization.common import (
 from sec_review_agents.cli.local_temporal import (
     LocalTemporalConfig,
 )
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.workflows.issue.single_agent import IssueSingleAgentWorkflow
 from sec_review_agents.workflows.issue.two_stage import IssueTwoStageWorkflow
 from sec_review_agents.workflows.issue.workflow import IssueReviewWorkflow
@@ -36,7 +37,7 @@ def _prepared_issue_bundle(tmp_path: Path) -> ReviewBundle:
         workflow="issue-review",
         run_id="run-1",
         input={
-            "contract_version": "v5",
+            "contract_version": CONTRACT_VERSION,
             "review_intent": {
                 "objective": "repair",
                 "test_changes": "allow",

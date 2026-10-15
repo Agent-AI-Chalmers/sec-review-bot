@@ -26,6 +26,7 @@ async def verify_pull_request(
     mitigation_result: Mapping[str, Any] | None,
     retry_context: Mapping[str, Any] | None,
     runtime_context: RunnerRuntimeContext | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     attempt_label = verification_attempt_label(retry_context)
     reset_verification_attempt_artifacts(
@@ -53,6 +54,7 @@ async def verify_pull_request(
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         workspace_patch=workspace_patch,
         mitigation_result=mitigation_result,
+        setup_declaration_content=setup_declaration_content,
         build_backend=lambda workspace_root_path: pr_verification_agent.create_pr_verification_backend(
             workspace_root_path=workspace_root_path,
             history_path=history_path,

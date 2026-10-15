@@ -1,0 +1,4 @@
+setup:
+  - run: echo ok
+    env:
+      "on": ok

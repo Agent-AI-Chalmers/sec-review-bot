@@ -1,6 +1,6 @@
 import { splitRepoFullName } from '../../github/repository-service.js'
 import { prepareRepositoryReviewInput } from './prepare-input.js'
-import { fetchRepositoryTriggerConfig } from '../../github/repo-config-service.js'
+import { fetchTrustedRepositoryTriggerConfig } from '../../github/repo-config-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { logInfo } from '../../utils/logger.js'
 import type {
@@ -76,16 +76,22 @@ async function materializeRepositoryReviewInput({
 
   const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
   const github = octokit as GitHubAppOctokit
-  const pathConfig = await fetchRepositoryTriggerConfig(github, {
+  // Read trigger config from the API-resolved default branch, not the
+  // user-selectable target_branch.
+  const trusted = await fetchTrustedRepositoryTriggerConfig(github, {
     owner_login,
-    repo_name,
-    ...(target_branch ? { ref: target_branch } : {})
+    repo_name
   })
+  const pathConfig = trusted.config
 
   const prepared = await prepareRepositoryReviewInput({
     run_id,
     octokit: github,
     repo_full_name,
+    trusted_default_branch: {
+      default_branch: trusted.default_branch,
+      head_sha: trusted.head_sha
+    },
     target_branch,
     scan_mode,
     base_sha,

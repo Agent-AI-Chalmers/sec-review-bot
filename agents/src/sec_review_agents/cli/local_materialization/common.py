@@ -2,6 +2,7 @@ import hashlib
 import secrets
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 from dataclasses import dataclass
@@ -9,6 +10,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.entrypoints.setup_declaration import (
+    SetupDeclarationError,
+    is_blank_setup_declaration,
+    parse_setup_declaration,
+)
+from sec_review_agents.filesystem.backend_selection import (
+    selected_sandbox_backend_kind,
+)
 from sec_review_agents.utils.env import env_value
 
 IssueReviewStrategy = Literal["default", "two-stage", "single-agent"]
@@ -24,6 +34,59 @@ INPUT_BUNDLE_MEDIA_TYPE = "application/tar+zstd"
 
 def create_local_run_id() -> str:
     return f"local-run-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(4)}"
+
+
+def read_setup_declaration_file(path: str | Path | None) -> str | None:
+    """Read and validate a local setup declaration file into its inline text form.
+
+    Returns None when no path is given, or when the file holds only whitespace
+    (blank content means "no declaration"). Raises ValueError when the path does
+    not point at a readable file, so a typo fails fast instead of silently
+    skipping bootstrap, and when the content is not a valid declaration -- the
+    same content rules the GitHub integration enforces, so a local run fails the
+    same way a repository's default-branch declaration would.
+    """
+    if path is None:
+        return None
+    resolved = Path(path).expanduser()
+    try:
+        content = resolved.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ValueError(
+            f"Unable to read setup declaration file: {resolved} ({error})"
+        ) from error
+    if is_blank_setup_declaration(content):
+        return None
+    try:
+        parse_setup_declaration(content)
+    except SetupDeclarationError as error:
+        raise ValueError(
+            f"Invalid setup declaration file: {resolved} ({error})"
+        ) from error
+    return content
+
+
+def load_setup_declaration_content(path: str | Path | None) -> str | None:
+    """Resolve the setup declaration text for the selected sandbox backend.
+
+    Only the docker backend runs a setup declaration (its container is
+    long-lived). On any other backend the declaration cannot take effect, so
+    warn once and return None without reading the file -- a missing or
+    unreadable file must not fail a run whose declaration would be ignored
+    anyway. On docker, a path that cannot be read is a real error and raises.
+    """
+    if path is None:
+        return None
+    backend = selected_sandbox_backend_kind()
+    if backend != "docker":
+        print(
+            f"SETUP_DECLARATION_WARNING=--setup-declaration was provided but the "
+            f"selected sandbox backend ({backend!r}) does not run setup "
+            f"declarations; the declaration is ignored.",
+            file=sys.stderr,
+        )
+        return None
+    return read_setup_declaration_file(path)
 
 
 @dataclass(frozen=True)
@@ -93,7 +156,7 @@ def write_input_bundle_manifest(
     include_incremental_window: bool,
 ) -> None:
     manifest: dict[str, Any] = {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "kind": "runner-input-bundle",
         "workspace": {
             "snapshot": "workspace.snapshot.tar",

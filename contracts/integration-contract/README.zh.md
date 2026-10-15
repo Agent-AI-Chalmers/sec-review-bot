@@ -12,9 +12,9 @@
 从这些文档开始：
 
 - [openapi.json](openapi.json)：调用方如何创建和轮询 workflow run —— 路径、状态码、请求与响应形状、以及鉴权方案。
-- [v5/CONTRACT.zh.md](v5/CONTRACT.zh.md)：workflow 输入和结果结构。
-- [v5/schemas](v5/schemas)：用于机器校验的 JSON Schema。
-- [v5/fixtures](v5/fixtures)：Python 和 TypeScript 测试共享的可执行 JSON 示例。
+- [v6/CONTRACT.zh.md](v6/CONTRACT.zh.md)：workflow 输入和结果结构。
+- [v6/schemas](v6/schemas)：用于机器校验的 JSON Schema。
+- [v6/fixtures](v6/fixtures)：Python 和 TypeScript 测试共享的可执行 JSON 示例。
 
 HTTP API 和 workflow 契约是稳定的公开接口。
 
@@ -94,6 +94,6 @@ agents wheel 会在构建时把权威 schema 复制为包数据，因此安装�
 
 ## 产物边界
 
-除非某个字段明确提升进公开 workflow 结果，否则 stage 产物属于运行时诊断。公开结果包括 `review_record`、repository `case_results[]`、repository `deliveries[]`，以及 [v5/CONTRACT.zh.md](v5/CONTRACT.zh.md) 中记录的其他字段。
+除非某个字段明确提升进公开 workflow 结果，否则 stage 产物属于运行时诊断。公开结果包括 `review_record`、repository `case_results[]`、repository `deliveries[]`，以及 [v6/CONTRACT.zh.md](v6/CONTRACT.zh.md) 中记录的其他字段。
 
 调用方应当从 workflow 结果发布，而不是读取整个 stage 产物包。如果某个 stage 产物成为调用方行为的必需项，要么把所需字段提升进本契约，要么把该依赖保留在本地调试工具内部。

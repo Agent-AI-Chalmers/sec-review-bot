@@ -26,6 +26,7 @@ async def mitigate_repository_case(
     retry_context: Mapping[str, Any] | None = None,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     return await run_mitigation_stage(
         agent_name="repository-mitigator",
@@ -33,6 +34,7 @@ async def mitigate_repository_case(
         published_transcript_path=published_transcript_path,
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
+        setup_declaration_content=setup_declaration_content,
         build_backend=lambda workspace_root: repository_mitigation_agent.create_repository_mitigation_backend(
             workspace_root=workspace_root,
             history_path=history_path,

@@ -12,6 +12,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
+from sec_review_agents.contract_version import CONTRACT_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
@@ -165,7 +166,7 @@ def build_patcheval_issue_bundle_from_case(
         },
     )
     input_data = {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "review_intent": {
             "objective": "repair",
             "test_changes": "deny",

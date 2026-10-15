@@ -32,7 +32,7 @@ One family covers one boundary:
 
 Read [Contracts README](../contracts/README.md) first: it defines the family layout, the naming rule, what a schema owns, and how fixtures take part in validation. Each family README then states what a consumer may rely on, who owns which side, and what is deliberately not schematized.
 
-- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md): the workflow data contract.
+- [integration-contract/v6/CONTRACT.md](../contracts/integration-contract/v6/CONTRACT.md): the workflow data contract.
 - [integration-contract/openapi.json](../contracts/integration-contract/openapi.json): the Agent Runner HTTP API, generated from the service.
 - [control-plane-api/openapi.yaml](../contracts/control-plane-api/openapi.yaml): the Control Plane HTTP contract — routes, schemas, security, and error codes.
 - [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json): the redacted run a console read returns.
@@ -48,6 +48,7 @@ The main public workflow IDs are `issue-review`, `pull-request-review`, and `rep
 - [NARRATIVE_FIRST_REVIEW.md](workflows/NARRATIVE_FIRST_REVIEW.md): Narrative-first analyzer output discipline.
 - [REVIEW_INTENT.md](workflows/REVIEW_INTENT.md): Review intent and repair-stage constraints.
 - [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md): Bounded verifier feedback retry.
+- [TRUSTED_SETUP.md](workflows/TRUSTED_SETUP.md): Why setup declarations are shaped this way — the trust question, the constraints it yields, the decisions beyond trust, and the invariants.
 
 #### issue-review
 

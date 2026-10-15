@@ -1,0 +1,4 @@
+setup:
+  - run: x
+    env:
+      NODE_ENV: 1

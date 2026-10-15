@@ -20,7 +20,7 @@ interface RepositoryResultFixture {
 
 function validRepositoryResult(): RepositoryResultFixture {
   return structuredClone(
-    contractFixture('v5', 'repository-review-result.json')
+    contractFixture('repository-review-result.json')
   ) as RepositoryResultFixture
 }
 
@@ -34,22 +34,20 @@ test('repository result rejects malformed delivery file changes before draft PR 
   assert.throws(() => parseRepositoryWorkflowResult(result), /duplicate file change entries/)
 })
 
-test('repository result parser accepts the shared v5 repository result fixture', () => {
-  const result = parseRepositoryWorkflowResult(
-    contractFixture('v5', 'repository-review-result.json')
-  )
+test('repository result parser accepts the shared v6 repository result fixture', () => {
+  const result = parseRepositoryWorkflowResult(contractFixture('repository-review-result.json'))
 
-  assert.equal(result.contract_version, 'v5')
+  assert.equal(result.contract_version, 'v6')
   assert.equal(result.case_results.at(0)?.case_id, 'case-1')
   assert.equal(result.deliveries.at(0)?.delivery_id, 'delivery-1')
 })
 
-test('repository result parser accepts the shared v5 blocked result fixture', () => {
+test('repository result parser accepts the shared v6 blocked result fixture', () => {
   const result = parseRepositoryWorkflowResult(
-    contractFixture('v5', 'repository-review-result-blocked.json')
+    contractFixture('repository-review-result-blocked.json')
   )
 
-  assert.equal(result.contract_version, 'v5')
+  assert.equal(result.contract_version, 'v6')
   assert.equal(result.case_results.at(0)?.disposition, 'blocked')
   assert.deepEqual(result.deliveries, [])
 })
@@ -61,7 +59,7 @@ test('repository result rejects duplicate delivery identities', () => {
   assert.throws(() => parseRepositoryWorkflowResult(result), /duplicate delivery_id/)
 })
 
-test('repository result rejects malformed v5 result before draft PR publishing', () => {
+test('repository result rejects malformed v6 result before draft PR publishing', () => {
   assert.throws(
     () =>
       parseRepositoryWorkflowResult({
@@ -69,7 +67,7 @@ test('repository result rejects malformed v5 result before draft PR publishing',
         case_results: [],
         deliveries: []
       }),
-    /repository-review result does not match contract v5/
+    /repository-review result does not match contract v6/
   )
 })
 
@@ -79,7 +77,7 @@ test('repository result rejects additional top-level fields at the production bo
 
   assert.throws(
     () => parseRepositoryWorkflowResult(result),
-    /repository-review result does not match contract v5/
+    /repository-review result does not match contract v6/
   )
 })
 
@@ -89,7 +87,7 @@ test('repository result rejects incomplete scan_summary at the production bounda
 
   assert.throws(
     () => parseRepositoryWorkflowResult(result),
-    /repository-review result does not match contract v5/
+    /repository-review result does not match contract v6/
   )
 })
 
@@ -99,7 +97,7 @@ test('repository result rejects upsert changes without content_encoding', () => 
 
   assert.throws(
     () => parseRepositoryWorkflowResult(result),
-    /repository-review result does not match contract v5/
+    /repository-review result does not match contract v6/
   )
 })
 
@@ -109,18 +107,18 @@ test('repository result rejects unsupported file modes', () => {
 
   assert.throws(
     () => parseRepositoryWorkflowResult(result),
-    /repository-review result does not match contract v5/
+    /repository-review result does not match contract v6/
   )
 })
 
 for (const [path, message] of [
-  ['../x', /repository-review result does not match contract v5/],
-  ['/abs', /repository-review result does not match contract v5/],
-  ['C:src/app.txt', /repository-review result does not match contract v5/],
-  ['C:/src/app.txt', /repository-review result does not match contract v5/],
-  [' src/app.txt ', /repository-review result does not match contract v5/],
-  ['src\\app.txt', /repository-review result does not match contract v5/],
-  ['.git/config', /repository-review result does not match contract v5/],
+  ['../x', /repository-review result does not match contract v6/],
+  ['/abs', /repository-review result does not match contract v6/],
+  ['C:src/app.txt', /repository-review result does not match contract v6/],
+  ['C:/src/app.txt', /repository-review result does not match contract v6/],
+  [' src/app.txt ', /repository-review result does not match contract v6/],
+  ['src\\app.txt', /repository-review result does not match contract v6/],
+  ['.git/config', /repository-review result does not match contract v6/],
   ['.github/workflows/pwn.yml', /Sensitive repository file path/]
 ] as const) {
   test(`repository result rejects unsafe delivery path ${path}`, () => {

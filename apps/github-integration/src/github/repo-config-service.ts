@@ -1,8 +1,10 @@
 import { parse as parseYaml } from 'yaml'
 import type { GitHubAppOctokit } from './octokit.js'
 import { asErrorWithResponse, isRecord } from '../utils/error-utils.js'
+import { resolveTrustedDefaultBranch } from './default-branch-service.js'
 
-const CONFIG_PATH = '.github/sec-review-bot.yml'
+// Repo config lives under `.sec-review/`.
+const CONFIG_PATH = '.sec-review/config.yml'
 
 const MANUAL_ONLY_TRIGGER_MODE = 'manual_only'
 const AUTOMATIC_TRIGGER_MODE = 'automatic'
@@ -35,6 +37,7 @@ interface RepositoryTriggerConfigErrorOptions {
 interface RepoGetContentResponse {
   data:
     | {
+        type?: string
         content?: string
       }
     | Array<unknown>
@@ -43,7 +46,10 @@ interface RepoGetContentResponse {
 function parseRepositoryConfig(content: string): ParsedSecReviewBotConfig {
   let parsed: unknown
   try {
-    parsed = parseYaml(content)
+    // Pin the YAML 1.2 Core schema rather than relying on the library default,
+    // so a default change cannot silently alter how config scalars (e.g. a
+    // trigger_mode or a paths_ignore entry written as `on`) are read.
+    parsed = parseYaml(content, { schema: 'core' })
   } catch (error) {
     throw new RepositoryTriggerConfigError('Failed to parse trigger config YAML.', {
       reason: 'invalid-yaml',
@@ -92,6 +98,14 @@ export function isRepositoryTriggerConfigError(
 
 function decodeRepositoryFileContent(data: RepoGetContentResponse['data']): string | null {
   if (!isRecord(data) || typeof data.content !== 'string') {
+    return null
+  }
+  // Only a regular file carries the config body. A symlink is returned as an
+  // object whose `content` is the base64 of the target path, so accepting it
+  // would parse the target string as YAML. Rejecting it here (like a directory
+  // entry) surfaces as `invalid-content`: the path exists but is not a readable
+  // config file, so the read fails strictly rather than silently downgrading.
+  if (data.type !== 'file') {
     return null
   }
 
@@ -185,59 +199,102 @@ interface FetchRepositoryTriggerConfigArgs {
   ref?: string
 }
 
+async function readRepositoryTriggerConfig(
+  octokit: GitHubAppOctokit,
+  { owner_login, repo_name, ref, path }: FetchRepositoryTriggerConfigArgs & { path: string }
+): Promise<RepositoryTriggerConfig> {
+  const configRef = ref ?? null
+  const request = {
+    owner: owner_login,
+    repo: repo_name,
+    path,
+    ...(ref ? { ref } : {})
+  }
+  const response = await octokit.rest.repos.getContent(request)
+
+  const content = decodeRepositoryFileContent(response.data)
+  if (typeof content !== 'string') {
+    throw new RepositoryTriggerConfigError('Invalid trigger config file content.', {
+      reason: 'invalid-content',
+      owner_login,
+      repo_name,
+      ...(ref ? { ref } : {}),
+      path
+    })
+  }
+
+  try {
+    return {
+      trigger_mode: extractTriggerMode(content),
+      paths_ignore: extractPathsIgnore(content),
+      path,
+      ref: configRef,
+      source: 'repository-config'
+    }
+  } catch (error) {
+    if (isRepositoryTriggerConfigError(error)) {
+      error.owner_login = owner_login
+      error.repo_name = repo_name
+      error.ref = configRef
+      error.path = path
+    }
+    throw error
+  }
+}
+
 export async function fetchRepositoryTriggerConfig(
   octokit: GitHubAppOctokit,
   { owner_login, repo_name, ref }: FetchRepositoryTriggerConfigArgs
 ): Promise<RepositoryTriggerConfig> {
   const configRef = ref ?? null
   try {
-    const request = {
-      owner: owner_login,
-      repo: repo_name,
-      path: CONFIG_PATH,
-      ...(ref ? { ref } : {})
-    }
-    const response = await octokit.rest.repos.getContent(request)
-
-    const content = decodeRepositoryFileContent(response.data)
-    if (typeof content !== 'string') {
-      throw new RepositoryTriggerConfigError('Invalid trigger config file content.', {
-        reason: 'invalid-content',
-        owner_login,
-        repo_name,
-        ...(ref ? { ref } : {}),
-        path: CONFIG_PATH
-      })
-    }
-
-    try {
-      return {
-        trigger_mode: extractTriggerMode(content),
-        paths_ignore: extractPathsIgnore(content),
-        path: CONFIG_PATH,
-        ref: configRef,
-        source: 'repository-config'
-      }
-    } catch (error) {
-      if (isRepositoryTriggerConfigError(error)) {
-        error.owner_login = owner_login
-        error.repo_name = repo_name
-        error.ref = configRef
-        error.path = CONFIG_PATH
-      }
+    return await readRepositoryTriggerConfig(octokit, {
+      owner_login,
+      repo_name,
+      ...(ref ? { ref } : {}),
+      path: CONFIG_PATH
+    })
+  } catch (error) {
+    if (!isNotFoundError(error)) {
       throw error
     }
-  } catch (error) {
-    if (isNotFoundError(error)) {
-      return {
-        trigger_mode: DEFAULT_TRIGGER_MODE,
-        paths_ignore: [],
-        path: null,
-        ref: configRef,
-        source: 'default'
-      }
+    // No config file: fall back to the built-in defaults.
+    return {
+      trigger_mode: DEFAULT_TRIGGER_MODE,
+      paths_ignore: [],
+      path: null,
+      ref: configRef,
+      source: 'default'
     }
-
-    throw error
   }
+}
+
+export interface TrustedTriggerConfigResolution {
+  config: RepositoryTriggerConfig
+  default_branch: string
+  head_sha: string
+}
+
+/**
+ * Resolve the default branch via the API and read the repository trigger config
+ * from that exact ref.
+ *
+ * This is the single entry point for config reads: the ref is always the
+ * API-resolved default branch, never a payload-derived `base_ref` /
+ * `target_branch` / `head_ref`.
+ */
+export async function fetchTrustedRepositoryTriggerConfig(
+  octokit: GitHubAppOctokit,
+  { owner_login, repo_name }: { owner_login: string; repo_name: string }
+): Promise<TrustedTriggerConfigResolution> {
+  const { default_branch, head_sha } = await resolveTrustedDefaultBranch(octokit, {
+    owner_login,
+    repo_name
+  })
+  const config = await fetchRepositoryTriggerConfig(octokit, {
+    owner_login,
+    repo_name,
+    ref: default_branch
+  })
+  return { config, default_branch, head_sha }
 }

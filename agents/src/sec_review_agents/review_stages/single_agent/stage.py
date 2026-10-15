@@ -13,6 +13,10 @@ from sec_review_agents.review_stages.single_agent.result import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from sec_review_agents.runtime.setup_bootstrap import (
+    bootstrap_environment,
+    record_bootstrap_result,
+)
 from sec_review_agents.utils.files import reset_stage_attempt_artifacts
 from sec_review_agents.workspace.patches import (
     normalize_declared_changed_files,
@@ -55,6 +59,7 @@ async def run_single_agent_stage(
     user_prompt: str,
     todo_system_prompt: str,
     todo_tool_description: str,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-single-agent-") as tempdir:
         reset_stage_attempt_artifacts(
@@ -71,6 +76,12 @@ async def run_single_agent_stage(
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
         async with amanaged_backend(backend):
+            record_bootstrap_result(
+                single_agent_artifacts_path,
+                await bootstrap_environment(
+                    backend, setup_declaration_content=setup_declaration_content
+                ),
+            )
             agent = await create_single_agent_graph(
                 agent_name=agent_name,
                 backend=backend,

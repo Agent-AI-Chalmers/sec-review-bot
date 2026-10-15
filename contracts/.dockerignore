@@ -8,3 +8,10 @@
 .env
 *.pem
 *.log
+
+# Each family's `tools/` is a large build-only working tree (`pnpm install`ed, ~90 MB). The
+# images copy the contract tree with `COPY --from=contracts integration-contract ...` and read
+# only `schemas/` (Runner) or just the OpenAPI document (control-plane); `tools/` is never read
+# at build or run time. Excluding it here keeps it out of the build context and the images
+# without the Dockerfile needing the newer `COPY --exclude` flag.
+**/tools

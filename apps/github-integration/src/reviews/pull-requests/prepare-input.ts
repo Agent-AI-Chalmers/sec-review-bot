@@ -1,13 +1,16 @@
+import { CONTRACT_VERSION } from '../../runner/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
 import {
   fetchTimelineLinkedIssues,
+  resolveTrustedRepositoryIdentity,
   summarizePullRequestFiles,
   type PullRequestContext,
   type PullRequestFile,
   type PullRequestFileSummary
 } from '../../github/pull-request-service.js'
+import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { PullRequestReviewInput } from '../../runner/input.js'
 import type { TestChangesPolicy } from '../../runner/input.js'
@@ -18,7 +21,8 @@ import {
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
-  finalizeInputBundleWorkspace
+  finalizeInputBundleWorkspace,
+  readSetupDeclaration
 } from '../shared/input-bundle.js'
 
 interface NormalizedPullRequestFile {
@@ -288,12 +292,14 @@ export async function preparePullRequestReviewInput({
   octokit,
   pr,
   files,
+  trusted_default_branch,
   test_changes = null
 }: {
   run_id: string
   octokit: GitHubAppOctokit
   pr: PullRequestContext
   files: PullRequestFile[]
+  trusted_default_branch: TrustedDefaultBranch
   test_changes?: TestChangesPolicy | null
 }): Promise<PreparedPullRequestReview> {
   const normalizedFiles = normalizeFiles(files)
@@ -323,6 +329,20 @@ export async function preparePullRequestReviewInput({
     workspace_path,
     commit_refs: commit_shas
   })
+  const default_sha = trusted_default_branch.head_sha
+  // Read from the exact default-branch commit through the Contents API; the
+  // installation auth rides on `octokit` rather than a git token. Resolve the
+  // repository identity the same way the default-branch SHA was resolved
+  // (`resolveTrustedRepositoryIdentity`, which prefers the base repo): reading
+  // the declaration from a *different* repository than the one whose HEAD SHA we
+  // hold would 404 and silently degrade to "no declaration".
+  const repository_identity = resolveTrustedRepositoryIdentity(pr)
+  const setup_declaration = await readSetupDeclaration({
+    octokit,
+    default_sha,
+    owner_login: repository_identity.owner_login,
+    repo_name: repository_identity.repo_name
+  })
   await finalizeInputBundleWorkspace({
     input_bundle_root,
     workspace_path,
@@ -344,13 +364,14 @@ export async function preparePullRequestReviewInput({
     run_id
   })
   const input: PullRequestReviewInput = {
-    contract_version: 'v5',
+    contract_version: CONTRACT_VERSION,
     review_intent: {
       objective: 'audit',
       ...(test_changes ? { test_changes } : {})
     },
     pr: pullRequestMetadata,
-    input_bundle
+    input_bundle,
+    ...(setup_declaration ? { setup_declaration } : {})
   }
 
   const input_path = path.join(input_bundle_root, 'pull-request-review-input.json')

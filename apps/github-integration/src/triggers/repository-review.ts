@@ -14,6 +14,7 @@ import {
 import type { TestChangesPolicy } from '../runner/input.js'
 import { repositoryReviewPublishContext } from '../control-plane/publish-context.js'
 import { controlPlaneClient } from '../control-plane/client.js'
+import { isSetupDeclarationError } from '../github/setup-declaration.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import { logInfo } from '../utils/logger.js'
 import { asErrorMessage } from '../utils/error-utils.js'
@@ -296,7 +297,7 @@ export async function dispatchRepositoryReview({
       !(error instanceof PreparationClaimLostError)
     ) {
       await store.failPreparation(run_id, preparationToken, {
-        code: 'REVIEW_START_FAILED',
+        code: isSetupDeclarationError(error) ? 'SETUP_DECLARATION_INVALID' : 'REVIEW_START_FAILED',
         message: asErrorMessage(error) || 'Repository review could not be started.'
       })
     }

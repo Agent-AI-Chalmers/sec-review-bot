@@ -3,6 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.utils.payloads import mapping_payload
 
@@ -49,7 +50,7 @@ class ScanSummary(BaseModel):
 
 
 class RepositoryWorkflowResult(BaseModel):
-    contract_version: str = "v5"
+    contract_version: str = CONTRACT_VERSION
     scan_summary: ScanSummary
     deliveries: list[dict[str, Any]] = Field(default_factory=list)
     case_results: list[RepositoryCaseResult] = Field(default_factory=list)
@@ -143,7 +144,7 @@ def build_repository_workflow_result(
     )
     return RepositoryWorkflowResult.model_validate(
         {
-            "contract_version": "v5",
+            "contract_version": CONTRACT_VERSION,
             "scan_summary": repository_scan_summary,
             "deliveries": _repository_deliveries(delivery_result),
             "case_results": repository_case_results,

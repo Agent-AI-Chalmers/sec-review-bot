@@ -45,6 +45,7 @@ function createOctokitWithContent(contentByPath: Content_by_path = {}): GitHubAp
 
           return {
             data: {
+              type: 'file',
               content: Buffer.from(source, 'utf-8').toString('base64')
             }
           }
@@ -54,7 +55,7 @@ function createOctokitWithContent(contentByPath: Content_by_path = {}): GitHubAp
   } as unknown as GitHubAppOctokit
 }
 
-const CONFIG_PATH = '.github/sec-review-bot.yml'
+const CONFIG_PATH = '.sec-review/config.yml'
 
 test('fetchRepositoryTriggerConfig falls back to manual_only when config file is missing', async () => {
   const octokit = createOctokitWithContent({})
@@ -215,5 +216,82 @@ test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async
       assert.equal(error.reason, 'invalid-paths-ignore')
       return true
     }
+  )
+})
+
+test('reads the .sec-review/config.yml path', async () => {
+  const readPaths: string[] = []
+  const octokit = createOctokitWithContent({
+    [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic'].join('\n')
+  })
+  const originalGetContent = (
+    octokit as unknown as {
+      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+    }
+  ).rest.repos.getContent
+  ;(
+    octokit as unknown as {
+      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+    }
+  ).rest.repos.getContent = async (args: { path: string }) => {
+    readPaths.push(args.path)
+    return originalGetContent(args)
+  }
+
+  const config = await fetchRepositoryTriggerConfig(octokit, {
+    owner_login: 'octo',
+    repo_name: 'repo',
+    ref: 'main'
+  })
+
+  assert.equal(config.trigger_mode, 'automatic')
+  assert.equal(config.path, CONFIG_PATH)
+  assert.deepEqual(readPaths, [CONFIG_PATH])
+})
+
+test('invalid YAML in the config path is rejected', async () => {
+  const octokit = createOctokitWithContent({
+    [CONFIG_PATH]: 'sec_review_bot: [broken'
+  })
+
+  await assert.rejects(
+    () =>
+      fetchRepositoryTriggerConfig(octokit, {
+        owner_login: 'octo',
+        repo_name: 'repo',
+        ref: 'main'
+      }),
+    (error: unknown) => isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
+  )
+})
+
+test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing it', async () => {
+  // A symlinked config resolves to a single object whose `content` is the
+  // target path, not the file body. It must never be parsed as YAML. The entry
+  // exists but is not a regular file, so the config read fails strictly (like a
+  // present-but-invalid config) rather than silently parsing the target path or
+  // falling back to defaults.
+  const octokit = {
+    rest: {
+      repos: {
+        getContent: async () => ({
+          data: {
+            type: 'symlink',
+            target: '.sec-review/other.yml',
+            content: Buffer.from('.sec-review/other.yml', 'utf-8').toString('base64')
+          }
+        })
+      }
+    }
+  } as unknown as GitHubAppOctokit
+
+  await assert.rejects(
+    () =>
+      fetchRepositoryTriggerConfig(octokit, {
+        owner_login: 'octo',
+        repo_name: 'repo',
+        ref: 'main'
+      }),
+    (error: unknown) => isRepositoryTriggerConfigError(error) && error.reason === 'invalid-content'
   )
 })

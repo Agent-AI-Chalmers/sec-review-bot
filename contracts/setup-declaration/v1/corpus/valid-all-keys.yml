@@ -1,0 +1,6 @@
+setup:
+  - run: uv sync --frozen
+    working-directory: apps/github-integration
+    env:
+      NODE_ENV: development
+    timeout_seconds: 120

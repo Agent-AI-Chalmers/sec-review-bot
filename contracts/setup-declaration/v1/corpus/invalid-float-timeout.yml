@@ -1,0 +1,6 @@
+# Float-syntax timeout: `1.0`/`1e3` are floats, not integers. JS resolves them
+# to an integer-valued number, Python to a float, so the format rejects them by
+# inspecting the scalar's source rather than the resolved value.
+setup:
+  - run: x
+    timeout_seconds: 1.0

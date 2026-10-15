@@ -1,0 +1,5 @@
+# An explicit `!!bool` tag whose scalar is not a Core-schema boolean (`on` is a
+# plain string under 1.2). The two libraries disagree about this (yaml falls
+# back to the string, yamlcore raises), so the format rejects every explicit tag.
+setup:
+  - run: !!bool on

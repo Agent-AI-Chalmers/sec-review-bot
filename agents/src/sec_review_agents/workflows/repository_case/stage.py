@@ -105,6 +105,16 @@ def _optional_case_path(
     return None
 
 
+def _optional_case_content(
+    case_execution_input: Mapping[str, Any],
+    key: str,
+) -> str | None:
+    value = case_execution_input.get(key)
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
+
+
 def _case_path(case_execution_input: Mapping[str, Any], key: str) -> Path:
     return required_path(case_execution_input.get(key), label=key)
 
@@ -161,6 +171,9 @@ async def analyze_repository_case_stage(
             published_transcript_path=published_transcript_path,
             scan_mode=scan_mode,
             review_input=review_input,
+            setup_declaration_content=_optional_case_content(
+                case_execution_input, "setup_declaration_content"
+            ),
             runtime_context=runtime_context,
         )
 
@@ -254,6 +267,9 @@ async def run_repository_case_mitigation_stage(
             analysis_result=analyzer_result,
             retry_context=retry_context,
             test_changes=_case_test_changes(case_execution_input),
+            setup_declaration_content=_optional_case_content(
+                case_execution_input, "setup_declaration_content"
+            ),
             runtime_context=runtime_context,
         )
 
@@ -307,6 +323,9 @@ async def run_repository_case_verification_stage(
             analysis_result=analyzer_result,
             mitigation_result=mitigator_result,
             retry_context=retry_context,
+            setup_declaration_content=_optional_case_content(
+                case_execution_input, "setup_declaration_content"
+            ),
             runtime_context=runtime_context,
         )
 

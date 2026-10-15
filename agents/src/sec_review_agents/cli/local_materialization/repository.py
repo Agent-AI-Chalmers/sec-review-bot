@@ -15,6 +15,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
@@ -181,6 +182,7 @@ def build_local_repository_security_bundle(
     paths_ignore: list[str] | None = None,
     default_branch: str | None = None,
     test_changes: str = "allow",
+    setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
     event_type = "manual"
     resolved_paths_ignore = list(paths_ignore or [])
@@ -287,7 +289,7 @@ def build_local_repository_security_bundle(
         include_incremental_window=resolved_scan_mode == "incremental",
     )
     input_data = {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "input_bundle": input_bundle,
         "review_intent": {
             "objective": "audit",
@@ -303,6 +305,11 @@ def build_local_repository_security_bundle(
             "commit_shas": commit_shas_for_scan_target,
         },
         "scan_scope": scan_scope,
+        **(
+            {"setup_declaration": setup_declaration_content}
+            if setup_declaration_content is not None
+            else {}
+        ),
     }
     input_path = paths.local_root_path / "repository-review-input.json"
     write_json(input_path, input_data)

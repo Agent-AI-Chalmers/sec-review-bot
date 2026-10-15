@@ -1148,3 +1148,29 @@ def test_large_edit_cleans_uploaded_temp_files_after_success() -> None:
     assert result.error is None
     assert result.occurrences == 1
     assert any(command.startswith("rm -f ") for command in execute_commands)
+
+
+def test_container_resource_has_empty_environment_and_unique_name() -> None:
+    """Isolation baseline: containers start with no injected environment and a
+    per-run unique name.
+
+    The empty environment is what the sandbox relies on: the setup declaration
+    is the only supported way to influence it, so anything that
+    leaks in from the host would be an unintended, untracked dependency.
+    """
+    first = create_docker_container_resource(
+        container_name_prefix="test",
+        mounts=[],
+        working_directory="/workspace",
+        image="test-image",
+    )
+    second = create_docker_container_resource(
+        container_name_prefix="test",
+        mounts=[],
+        working_directory="/workspace",
+        image="test-image",
+    )
+
+    assert first.environment == {}
+    assert first.container_name.startswith("test-")
+    assert first.container_name != second.container_name

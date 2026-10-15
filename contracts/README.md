@@ -13,19 +13,27 @@ contracts/
   <family>/
     <version>/
       <SPEC>.md        the written contract for that version
-      schemas/*.json   machine-checkable shapes
+      schemas/*.json   machine-checkable shapes (when the contract is shaped as data)
       fixtures/*.json  executable examples, plus the manifest that pairs them
+      corpus/*         shared non-JSON inputs, plus a manifest, when the contract
+                       is a format enforced by code rather than a data shape
 ```
+
+Not every family uses every kind of asset. A contract whose rules are decision logic rather than a structural shape carries a `corpus/` instead of `schemas/` and `fixtures/`, and enforces the format in code. See
+[setup-declaration](setup-declaration/README.md) for that shape.
 
 A family may also hold documents that apply to every version, such as a transport reference.
 
 ## Families
 
 - [integration-contract](integration-contract/README.md): the public integration point
-  between the Runner and its callers. Current version: [v5](integration-contract/v5/CONTRACT.md).
+  between the Runner and its callers. Current version: [v6](integration-contract/v6/CONTRACT.md).
 - [control-plane-api](control-plane-api/README.md): the shapes Control Plane exchanges
   with its callers. Current version:
   [v1](control-plane-api/README.md).
+- [setup-declaration](setup-declaration/README.md): the `.sec-review/setup.yml` format a
+  repository uses to prepare its review sandbox. Current version:
+  [v1](setup-declaration/v1/SPEC.md).
 
 ## Rules For Every Family
 

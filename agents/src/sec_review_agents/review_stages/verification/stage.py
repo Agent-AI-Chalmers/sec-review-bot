@@ -15,6 +15,10 @@ from sec_review_agents.review_stages.verification.result import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from sec_review_agents.runtime.setup_bootstrap import (
+    bootstrap_environment,
+    record_bootstrap_result,
+)
 from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -190,6 +194,7 @@ async def run_verification_stage(
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir:
         local_transcript_path = (
@@ -213,6 +218,12 @@ async def run_verification_stage(
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
         async with amanaged_backend(backend):
+            record_bootstrap_result(
+                verifier_artifacts_path,
+                await bootstrap_environment(
+                    backend, setup_declaration_content=setup_declaration_content
+                ),
+            )
             agent = await create_verification_agent_graph(
                 agent_name=agent_name,
                 backend=backend,

@@ -1,13 +1,18 @@
 import type { EmitterWebhookEvent } from '@octokit/webhooks'
 
 import { startPullRequestReviewCommand } from '../../../triggers/pull-request-review.js'
-import { extractPullRequestContext } from '../../../github/pull-request-service.js'
 import {
-  fetchRepositoryTriggerConfig,
+  extractPullRequestContext,
+  resolveTrustedRepositoryIdentity,
+  type PullRequestContext
+} from '../../../github/pull-request-service.js'
+import {
+  fetchTrustedRepositoryTriggerConfig,
   isAutomaticTriggerModeEnabled,
   isRepositoryTriggerConfigError
 } from '../../../github/repo-config-service.js'
 import type { GitHubAppOctokit } from '../../../github/octokit.js'
+import type { TrustedDefaultBranch } from '../../../github/default-branch-service.js'
 import {
   isSelfOriginatedWebhookEvent,
   logSkippedSelfOriginatedEvent
@@ -16,6 +21,7 @@ import { logPullRequestPayload } from '../../../utils/log-pull-request.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
+import { type TriggerConfigHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
 
 type PullRequestSynchronizeWebhookEvent = Pick<
   EmitterWebhookEvent<'pull_request.synchronize'>,
@@ -24,11 +30,34 @@ type PullRequestSynchronizeWebhookEvent = Pick<
   octokit: unknown
 }
 
+interface HandlerDeps extends TriggerConfigHandlerDeps {
+  startPullRequestReviewCommandFn?: (args: {
+    octokit: WebhookHandlerArgs['octokit']
+    pr: PullRequestContext
+    trusted_default_branch: { default_branch: string; head_sha: string }
+    event_type: 'synchronize' | 'ready_for_review'
+    delivery_id: string
+    on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
+  }) => Promise<unknown>
+}
+
 export async function handlePullRequestSynchronize({
   id,
   octokit,
   payload
 }: PullRequestSynchronizeWebhookEvent): Promise<void> {
+  await handlePullRequestSynchronizeWithDeps({ id, octokit, payload })
+}
+
+export async function handlePullRequestSynchronizeWithDeps(
+  { id, octokit, payload }: WebhookHandlerArgs,
+  {
+    fetchTrustedRepositoryTriggerConfigFn = fetchTrustedRepositoryTriggerConfig,
+    isAutomaticTriggerModeEnabledFn = isAutomaticTriggerModeEnabled,
+    isRepositoryTriggerConfigErrorFn = isRepositoryTriggerConfigError,
+    startPullRequestReviewCommandFn = startPullRequestReviewCommand
+  }: HandlerDeps = {}
+): Promise<void> {
   // Self-origin checks only need the webhook envelope, so skip before validating
   // workflow-specific pull request fields (mirrors pull_request.opened). A
   // self-originated payload with missing fields would otherwise throw out of
@@ -42,15 +71,33 @@ export async function handlePullRequestSynchronize({
 
   logPullRequestPayload(payload)
 
-  let triggerConfig
-  try {
-    triggerConfig = await fetchRepositoryTriggerConfig(octokit as GitHubAppOctokit, {
-      owner_login: pr.owner_login,
-      repo_name: pr.repo_name,
-      ref: pr.base_ref
+  // Synchronize is a push-driven event; do not auto-review fork PRs. An
+  // explicit maintainer action (ready_for_review) is the approval entry point.
+  if (pr.from_fork) {
+    logInfo('workflow_skipped', {
+      event: 'pull_request.synchronize',
+      reason: 'fork_pr_requires_approval',
+      pr: pr.pr_number,
+      repo: pr.repo_full_name,
+      head_repo: pr.head_repo_full_name
     })
+    return
+  }
+
+  let triggerConfig
+  let trusted_default_branch: TrustedDefaultBranch
+  try {
+    // Read config from the API-resolved default branch, via base repo identity
+    // (never use pr.base_ref, which is payload-derived).
+    const id = resolveTrustedRepositoryIdentity(pr)
+    const resolved = await fetchTrustedRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, id)
+    triggerConfig = resolved.config
+    trusted_default_branch = {
+      default_branch: resolved.default_branch,
+      head_sha: resolved.head_sha
+    }
   } catch (error: unknown) {
-    if (isRepositoryTriggerConfigError(error)) {
+    if (isRepositoryTriggerConfigErrorFn(error)) {
       logError('repo_trigger_config_failed', {
         event: 'pull_request.synchronize',
         owner: error.owner_login,
@@ -63,7 +110,7 @@ export async function handlePullRequestSynchronize({
     throw error
   }
 
-  if (!isAutomaticTriggerModeEnabled(triggerConfig)) {
+  if (!isAutomaticTriggerModeEnabledFn(triggerConfig)) {
     logInfo('workflow_skipped', {
       event: 'pull_request.synchronize',
       reason: 'trigger_mode_disabled',
@@ -88,8 +135,9 @@ export async function handlePullRequestSynchronize({
     const admitted = new Promise<void>((resolve) => {
       resolveAdmission = resolve
     })
-    const execution = startPullRequestReviewCommand({
+    const execution = startPullRequestReviewCommandFn({
       octokit,
+      trusted_default_branch,
       pr,
       event_type: 'synchronize',
       delivery_id: id,

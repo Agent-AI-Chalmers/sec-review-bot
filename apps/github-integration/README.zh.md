@@ -113,7 +113,7 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
 
 ### 配置自动触发
 
-触发模式配置在目标仓库的 [`.github/sec-review-bot.yml`](../../.github/sec-review-bot.yml)。
+触发模式配置在目标仓库的 [`.sec-review/config.yml`](../../.sec-review/config.yml)。
 
 配置格式：
 
@@ -142,11 +142,12 @@ sec_review_bot:
 
 说明：
 
-- [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) 只包含 GitHub Actions 调度；bot 运行配置属于 `.sec-review-bot.yml`。
-- 如果 [`.github/sec-review-bot.yml`](../../.github/sec-review-bot.yml) 文件不存在，默认行为是 `trigger_mode: manual_only`。
+- [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) 只包含 GitHub Actions 调度；bot 运行配置属于 `.sec-review/config.yml`。
+- 如果 [`.sec-review/config.yml`](../../.sec-review/config.yml) 文件不存在，默认行为是 `trigger_mode: manual_only`。
 - 如果配置文件存在但 YAML 非法、缺少 `sec_review_bot.trigger_mode` 或值不在允许集合内，自动 webhook 会严格报错并失败（不会静默降级）。
 - `paths_ignore` 仅影响 repository-review 的 discovery 文件扫描；不影响 PR/Issue webhook 触发判定本身。
-- 仓库配置不支持选择 workspace image。GitHub App 不会从 `.github/sec-review-bot.yml` 解析 image 配置字段。
+- 配置始终从**默认分支**读取（经 GitHub API 解析），绝不来自 PR base ref 或 repository-review 的 `target_branch`。因此扫描非默认分支时，使用的是默认分支的 `trigger_mode` / `paths_ignore`。
+- 仓库配置不支持选择 workspace image。GitHub App 不会从 `.sec-review/config.yml` 解析 image 配置字段。
 
 ### 手动命令
 

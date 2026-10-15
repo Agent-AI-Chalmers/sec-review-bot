@@ -8,6 +8,7 @@ from urllib.parse import unquote, urlparse
 import pytest
 
 from sec_review_agents.entrypoints import input_preparation
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.entrypoints.input_preparation import (
     prepare_run_input,
     prepare_workflow_input,
@@ -21,7 +22,7 @@ def _write_bundle_manifest(
     root = Path(local_root)
     root.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "kind": "runner-input-bundle",
         "workspace": {"snapshot": "workspace.snapshot.tar"},
         "history": {"path": "history"},
@@ -69,7 +70,7 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
     try:
         prepared = prepare_run_input(
             {
-                "contract_version": "v5",
+                "contract_version": CONTRACT_VERSION,
                 "input_bundle": input_bundle,
                 "review_intent": {"objective": "audit"},
                 "issue": {"number": 1},
@@ -93,11 +94,65 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
     }
 
 
+def test_prepare_run_input_keeps_inline_setup_declaration(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle-setup"
+    input_bundle = _write_bundle_manifest(str(bundle_root))
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(
+        input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "run-inputs")
+    )
+    try:
+        prepared = prepare_run_input(
+            {
+                "contract_version": CONTRACT_VERSION,
+                "input_bundle": input_bundle,
+                "review_intent": {"objective": "audit"},
+                "issue": {"number": 1},
+                "setup_declaration": "setup:\n  - run: echo hi\n",
+            },
+            run_id="run-input-setup",
+            workflow="issue-review",
+        )
+    finally:
+        monkeypatch.undo()
+
+    # The declaration travels inline in the workflow input, not via bundle_paths.
+    assert prepared["setup_declaration"] == "setup:\n  - run: echo hi\n"
+    assert "setup_declaration_content" not in prepared["bundle_paths"]
+
+
+def test_prepare_run_input_omits_setup_declaration_when_absent(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle-no-setup"
+    input_bundle = _write_bundle_manifest(str(bundle_root))
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(
+        input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "run-inputs")
+    )
+    try:
+        prepared = prepare_run_input(
+            {
+                "contract_version": CONTRACT_VERSION,
+                "input_bundle": input_bundle,
+                "review_intent": {"objective": "audit"},
+                "issue": {"number": 1},
+            },
+            run_id="run-input-no-setup",
+            workflow="issue-review",
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert "setup_declaration" not in prepared
+    assert "setup_declaration_content" not in prepared["bundle_paths"]
+
+
 def test_prepare_run_input_rejects_unsupported_workflow() -> None:
     with pytest.raises(ValueError, match="Unsupported workflow"):
         prepare_run_input(
             {
-                "contract_version": "v5",
+                "contract_version": CONTRACT_VERSION,
                 "input_bundle": {},
             },
             run_id="run-input-preparation",
@@ -130,7 +185,7 @@ def _repository_scan_scope(overrides: dict[str, Any] | None = None) -> dict[str,
 
 def _issue_input(local_root: str = "/tmp/local-issue") -> dict:
     return {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "input_bundle": _write_bundle_manifest(local_root),
         "review_intent": {"objective": "audit"},
         "issue": {"number": 1},
@@ -139,7 +194,7 @@ def _issue_input(local_root: str = "/tmp/local-issue") -> dict:
 
 def _pull_request_input(local_root: str = "/tmp/local-pr") -> dict:
     return {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "input_bundle": _write_bundle_manifest(local_root, incremental=True),
         "review_intent": {"objective": "audit"},
         "pr": {"number": 7, "repo_full_name": "owner/repo"},
@@ -148,7 +203,7 @@ def _pull_request_input(local_root: str = "/tmp/local-pr") -> dict:
 
 def _repository_input(local_root: str = "/tmp/local-repository") -> dict:
     return {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "input_bundle": _write_bundle_manifest(local_root),
         "review_intent": {"objective": "audit"},
         "scan_target": _repository_scan_target(),
@@ -189,8 +244,8 @@ def test_issue_workflow_input_preparation_derives_stage_artifacts() -> None:
     )
 
 
-def test_shared_v5_issue_input_fixture_prepares() -> None:
-    payload = contract_fixture("v5", "issue-review-input.json")
+def test_shared_v6_issue_input_fixture_prepares() -> None:
+    payload = contract_fixture("issue-review-input.json")
     payload["input_bundle"] = _write_bundle_manifest(
         "/tmp/sec-review-fixtures/issue-review"
     )
@@ -201,12 +256,12 @@ def test_shared_v5_issue_input_fixture_prepares() -> None:
         artifact_root_path="/tmp/sec-review-fixtures/issue-review-artifacts",
     )
 
-    assert prepared["contract_version"] == "v5"
+    assert prepared["contract_version"] == "v6"
     assert prepared["review_intent"]["objective"] == "audit"
 
 
-def test_shared_v5_pull_request_input_fixture_prepares() -> None:
-    payload = contract_fixture("v5", "pull-request-review-input.json")
+def test_shared_v6_pull_request_input_fixture_prepares() -> None:
+    payload = contract_fixture("pull-request-review-input.json")
     payload["input_bundle"] = _write_bundle_manifest(
         "/tmp/sec-review-fixtures/pull-request-review", incremental=True
     )
@@ -217,12 +272,12 @@ def test_shared_v5_pull_request_input_fixture_prepares() -> None:
         artifact_root_path="/tmp/sec-review-fixtures/pull-request-review-artifacts",
     )
 
-    assert prepared["contract_version"] == "v5"
+    assert prepared["contract_version"] == "v6"
     assert prepared["pr"]["number"] == 42
 
 
-def test_shared_v5_repository_input_fixtures_prepare() -> None:
-    full_payload = contract_fixture("v5", "repository-review-input-full.json")
+def test_shared_v6_repository_input_fixtures_prepare() -> None:
+    full_payload = contract_fixture("repository-review-input-full.json")
     full_payload["input_bundle"] = _write_bundle_manifest(
         "/tmp/sec-review-fixtures/repository-review-full"
     )
@@ -232,9 +287,7 @@ def test_shared_v5_repository_input_fixtures_prepare() -> None:
         artifact_root_path="/tmp/sec-review-fixtures/repository-review-full-artifacts",
     )
 
-    incremental_payload = contract_fixture(
-        "v5", "repository-review-input-incremental.json"
-    )
+    incremental_payload = contract_fixture("repository-review-input-incremental.json")
     incremental_payload["input_bundle"] = _write_bundle_manifest(
         "/tmp/sec-review-fixtures/repository-review-incremental", incremental=True
     )

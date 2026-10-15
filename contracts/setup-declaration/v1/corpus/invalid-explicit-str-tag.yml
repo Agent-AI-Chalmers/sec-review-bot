@@ -1,0 +1,4 @@
+# Even a well-formed explicit `!!str` tag is rejected: the format is the plain
+# Core schema, and rejecting every explicit tag keeps both enforcers identical.
+setup:
+  - run: !!str npm ci

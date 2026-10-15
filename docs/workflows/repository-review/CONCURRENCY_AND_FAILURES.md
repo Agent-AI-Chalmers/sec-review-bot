@@ -4,10 +4,7 @@ Language: English | [中文](CONCURRENCY_AND_FAILURES.zh.md)
 
 This document explains how `repository-review` uses in-stage concurrency, which knobs affect wall time, and how failures are bounded.
 
-For system-wide concurrency between app-submitted runs, workflow fanout, and worker
-activity capacity, see
-[../CONCURRENCY_MODEL.md](../CONCURRENCY_MODEL.md). This document focuses on the
-repository review workflow after one repository run has been admitted.
+For system-wide concurrency between app-submitted runs, workflow fanout, and worker activity capacity, see [../CONCURRENCY_MODEL.md](../CONCURRENCY_MODEL.md). This document focuses on the repository review workflow after one repository run has been admitted.
 
 ## Overview
 

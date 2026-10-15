@@ -9,7 +9,7 @@ function automaticConfig() {
   return {
     trigger_mode: 'automatic' as const,
     paths_ignore: [],
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     ref: 'main',
     source: 'repository-config' as const
   }
@@ -19,10 +19,14 @@ function manualOnlyConfig() {
   return {
     trigger_mode: 'manual_only' as const,
     paths_ignore: [],
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     ref: 'main',
     source: 'repository-config' as const
   }
+}
+
+function trusted(config: ReturnType<typeof automaticConfig> | ReturnType<typeof manualOnlyConfig>) {
+  return { config, default_branch: 'main', head_sha: 'main-sha' }
 }
 
 function createIssueOpenedPayload() {
@@ -65,7 +69,7 @@ test('issue-opened skips automatic workflow when trigger mode is manual_only', a
       payload: createIssueOpenedPayload()
     },
     {
-      fetchRepositoryTriggerConfigFn: async () => manualOnlyConfig(),
+      fetchTrustedRepositoryTriggerConfigFn: async () => trusted(manualOnlyConfig()),
       isAutomaticTriggerModeEnabledFn: () => false,
       startIssueReviewCommandFn: async () => {
         reviewCalled = true
@@ -93,9 +97,9 @@ test('issue-opened skips self-originated payload before issue extraction', async
         }
       },
       {
-        fetchRepositoryTriggerConfigFn: async () => {
+        fetchTrustedRepositoryTriggerConfigFn: async () => {
           configFetched = true
-          return manualOnlyConfig()
+          return trusted(manualOnlyConfig())
         }
       }
     )
@@ -108,6 +112,7 @@ test('issue-opened skips self-originated payload before issue extraction', async
 
 test('issue-opened runs automatic workflow when trigger mode is automatic', async () => {
   let reviewCalled = false
+  let forwarded: { default_branch: string; head_sha: string } | null = null
 
   await handleIssueOpenedWithDeps(
     {
@@ -116,15 +121,18 @@ test('issue-opened runs automatic workflow when trigger mode is automatic', asyn
       payload: createIssueOpenedPayload()
     },
     {
-      fetchRepositoryTriggerConfigFn: async () => automaticConfig(),
+      fetchTrustedRepositoryTriggerConfigFn: async () => trusted(automaticConfig()),
       isAutomaticTriggerModeEnabledFn: () => true,
-      startIssueReviewCommandFn: async () => {
+      startIssueReviewCommandFn: async ({ trusted_default_branch }) => {
         reviewCalled = true
+        forwarded = trusted_default_branch
       }
     }
   )
 
   assert.equal(reviewCalled, true)
+  // The resolved trusted branch is forwarded to the command (wiring pinned).
+  assert.deepEqual(forwarded, { default_branch: 'main', head_sha: 'main-sha' })
 })
 
 test('issue-opened rethrows invalid repository trigger config error', async () => {
@@ -132,7 +140,7 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
     owner_login: 'octo',
     repo_name: 'example-repo',
     ref: 'main',
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     reason: 'invalid-yaml'
   })
 
@@ -144,7 +152,7 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
         payload: createIssueOpenedPayload()
       },
       {
-        fetchRepositoryTriggerConfigFn: async () => {
+        fetchTrustedRepositoryTriggerConfigFn: async () => {
           throw configError
         },
         isRepositoryTriggerConfigErrorFn: (error): error is RepositoryTriggerConfigError =>

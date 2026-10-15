@@ -3,6 +3,7 @@ from typing import Any
 
 from temporalio import activity, workflow
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionRegistrationRequest,
     register_memory_extraction,
@@ -30,8 +31,14 @@ async def analyze_pull_request_activity(
     prepared_input: dict[str, Any],
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_content_for_backend,
+    )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        required_path,
+    )
     from sec_review_agents.workflows.pull_request.analysis import (
         analyze_pull_request,
     )
@@ -68,6 +75,7 @@ async def analyze_pull_request_activity(
             order=1,
             stage="analyzer",
         ),
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
         runtime_context=runtime_context,
     )
 
@@ -84,8 +92,14 @@ async def mitigate_pull_request_activity(
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_content_for_backend,
+    )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        required_path,
+    )
     from sec_review_agents.workflows.pull_request.mitigation import (
         mitigate_pull_request,
     )
@@ -143,6 +157,7 @@ async def mitigate_pull_request_activity(
         analysis_result=analysis_result,
         retry_context=retry_context,
         test_changes=review_intent.test_changes,
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
         runtime_context=runtime_context,
     )
 
@@ -159,8 +174,14 @@ async def verify_pull_request_activity(
     from sec_review_agents.review_stages.verification.stage import (
         verification_attempt_label,
     )
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_content_for_backend,
+    )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        required_path,
+    )
     from sec_review_agents.workflows.pull_request.verification import (
         verify_pull_request,
     )
@@ -200,6 +221,7 @@ async def verify_pull_request_activity(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         retry_context=retry_context,
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
         runtime_context=runtime_context,
     )
 
@@ -230,7 +252,7 @@ def build_pull_request_review_result_activity(
     from sec_review_agents.review_stages.record import build_review_record
 
     return {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "review_record": build_review_record(
             analysis_result=analysis_result,
             mitigation_result=mitigation_result,

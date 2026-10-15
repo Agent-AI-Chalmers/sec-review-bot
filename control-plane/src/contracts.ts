@@ -11,7 +11,7 @@ import type { components, operations } from './runner-api-schema.js'
  * The workflows this service accepts.
  *
  * Taken from the published contract rather than restated: the Runner derives its set from the
- * v5 schema map, so the OpenAPI enum is a projection of that single source. Restating the
+ * v6 schema map, so the OpenAPI enum is a projection of that single source. Restating the
  * names here is how this package and the Runner came to disagree about what exists.
  */
 export type ControlPlaneWorkflow =

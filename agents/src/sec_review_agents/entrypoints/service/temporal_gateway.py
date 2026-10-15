@@ -16,7 +16,7 @@ from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 
 from sec_review_agents.artifacts.run_storage import store_run_artifacts
-from sec_review_agents.entrypoints.contract_schema import validate_v5_workflow_result
+from sec_review_agents.entrypoints.contract_schema import validate_v6_workflow_result
 from sec_review_agents.entrypoints.input_preparation import workflow_artifact_root
 from sec_review_agents.entrypoints.run_protocol import (
     RUNNER_EXECUTION_FAILED,
@@ -144,7 +144,7 @@ async def _record_from_handle(
 
     The projection combines Temporal status and memo data, stores terminal
     diagnostic artifacts when an artifact root is available, and validates a
-    completed workflow's v5 result before reporting it as successful. Artifact
+    completed workflow's v6 result before reporting it as successful. Artifact
     storage is deliberately recorded separately from the business result,
     so a storage failure cannot be mistaken for a successful publication.
     """
@@ -186,9 +186,9 @@ async def _record_from_handle(
                     # work where the workflow contract allows it. This is the final
                     # public boundary, so it must not guess how to repair identities,
                     # file changes, or other invalid result data. Rejecting here means
-                    # "succeeded" always promises callers a valid v5 workflow result;
+                    # "succeeded" always promises callers a valid v6 workflow result;
                     # Temporal history and stage artifacts remain available for diagnosis.
-                    validate_v5_workflow_result(response["result"], workflow or "")
+                    validate_v6_workflow_result(response["result"], workflow or "")
                 except ValueError as error:
                     record["status"] = "failed"
                     record["error"] = build_runner_error(

@@ -1,3 +1,5 @@
+import { type ContractVersion } from './contract-version.js'
+
 // GitHub integration prepared input shapes. The Python runner normalizer remains the
 // authoritative runtime contract.
 
@@ -38,9 +40,14 @@ export interface InputBundleArtifactRef {
 }
 
 interface RunnerWorkflowInputBase {
-  contract_version: 'v5'
+  contract_version: ContractVersion
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
+  /**
+   * Inline setup declaration text (the contents of `.sec-review/setup.yml` on
+   * the base-repo default branch). Omitted when the repository has none.
+   */
+  setup_declaration?: string
 }
 
 export interface IssueReviewInput extends RunnerWorkflowInputBase {

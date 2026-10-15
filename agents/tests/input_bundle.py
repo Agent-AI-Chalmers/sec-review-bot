@@ -3,6 +3,8 @@ import json
 import tarfile
 from pathlib import Path
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+
 
 def write_test_input_bundle(
     root: Path, *, include_manifest: bool = True
@@ -12,7 +14,7 @@ def write_test_input_bundle(
         (root / "manifest.json").write_text(
             json.dumps(
                 {
-                    "contract_version": "v5",
+                    "contract_version": CONTRACT_VERSION,
                     "kind": "runner-input-bundle",
                     "workspace": {"snapshot": "workspace.snapshot.tar"},
                     "history": {"path": "history"},

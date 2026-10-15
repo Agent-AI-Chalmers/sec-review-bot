@@ -243,8 +243,14 @@ def prepare_repository_case_review_inputs_activity(
     request: InternalWorkflowRequest,
     cases: Sequence[Mapping[str, Any]],
 ) -> RepositoryCaseRequestBatch:
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_content_for_backend,
+    )
     from sec_review_agents.runtime.transcripts import review_transcripts_root
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import (
+        artifact_path,
+        required_path,
+    )
     from sec_review_agents.workflows.repository.case_execution_input import (
         prepare_case_execution_input,
     )
@@ -285,6 +291,9 @@ def prepare_repository_case_review_inputs_activity(
                     scan_mode=scan_mode,
                     case=case,
                     test_changes=review_intent.test_changes,
+                    setup_declaration_content=setup_declaration_content_for_backend(
+                        prepared_input
+                    ),
                 ),
                 "cases_artifacts_path": str(cases_artifacts_path),
                 "published_transcripts_path": str(

@@ -20,13 +20,60 @@ from sec_review_agents.workflows.review_intent import (
 )
 
 
+async def run_issue_single_agent(
+    *,
+    issue: Mapping[str, Any],
+    workspace_snapshot_tar_path: Path,
+    history_path: Path,
+    single_agent_artifacts_path: Path,
+    review_objective: ReviewObjective,
+    test_changes: TestChangesPolicy,
+    runtime_context: RunnerRuntimeContext | None = None,
+    setup_declaration_content: str | None = None,
+) -> dict[str, Any]:
+    """Run the single-agent stage and return its raw result.
+
+    Shared by the Temporal activity and the direct/public entrypoints so the
+    stage wiring lives in one place.
+    """
+    from sec_review_agents.agents.single_agent import issue as issue_single_agent
+    from sec_review_agents.review_stages.single_agent.stage import (
+        run_single_agent_stage,
+    )
+
+    return await run_single_agent_stage(
+        agent_name="issue-single-agent",
+        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        single_agent_artifacts_path=single_agent_artifacts_path,
+        setup_declaration_content=setup_declaration_content,
+        build_backend=lambda workspace_root: issue_single_agent.create_issue_single_agent_backend(
+            workspace_root=workspace_root,
+            history_path=history_path,
+            runtime_context=runtime_context,
+        ),
+        system_prompt=issue_single_agent.build_issue_single_agent_system_prompt(
+            review_objective=review_objective,
+            test_changes=test_changes,
+        ),
+        filesystem_system_prompt=(
+            issue_single_agent.build_issue_single_agent_filesystem_system_prompt()
+        ),
+        user_prompt=issue_single_agent.build_issue_single_agent_user_prompt(
+            issue=issue,
+        ),
+        todo_system_prompt=issue_single_agent.build_issue_single_agent_todo_system_prompt(),
+        todo_tool_description=(
+            issue_single_agent.build_issue_single_agent_todo_tool_description()
+        ),
+    )
+
+
 @activity.defn
 async def run_issue_single_agent_activity(
     request: InternalWorkflowRequest,
 ) -> dict[str, Any]:
-    from sec_review_agents.agents.single_agent import issue as issue_single_agent
-    from sec_review_agents.review_stages.single_agent.stage import (
-        run_single_agent_stage,
+    from sec_review_agents.runtime.setup_bootstrap import (
+        setup_declaration_content_for_backend,
     )
     from sec_review_agents.utils.paths import required_path
 
@@ -45,29 +92,15 @@ async def run_issue_single_agent_activity(
         bundle_paths["history_path"],
         label="bundle_paths.history_path",
     )
-    return await run_single_agent_stage(
-        agent_name="issue-single-agent",
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+    return await run_issue_single_agent(
+        issue=prepared_input["issue"],
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+        history_path=history_path,
         single_agent_artifacts_path=run_artifacts_root / "single-agent",
-        build_backend=lambda workspace_root: issue_single_agent.create_issue_single_agent_backend(
-            workspace_root=workspace_root,
-            history_path=history_path,
-            runtime_context=request.runtime_context,
-        ),
-        system_prompt=issue_single_agent.build_issue_single_agent_system_prompt(
-            review_objective=review_intent.objective,
-            test_changes=review_intent.test_changes,
-        ),
-        filesystem_system_prompt=(
-            issue_single_agent.build_issue_single_agent_filesystem_system_prompt()
-        ),
-        user_prompt=issue_single_agent.build_issue_single_agent_user_prompt(
-            issue=prepared_input["issue"],
-        ),
-        todo_system_prompt=issue_single_agent.build_issue_single_agent_todo_system_prompt(),
-        todo_tool_description=(
-            issue_single_agent.build_issue_single_agent_todo_tool_description()
-        ),
+        review_objective=review_intent.objective,
+        test_changes=review_intent.test_changes,
+        runtime_context=request.runtime_context,
+        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
     )
 
 
@@ -202,36 +235,18 @@ async def execute_issue_single_agent(
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy,
     runtime_context: RunnerRuntimeContext | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run the stage and project it into the public ablation result shape."""
-    from sec_review_agents.agents.single_agent import issue as issue_single_agent
-    from sec_review_agents.review_stages.single_agent.stage import (
-        run_single_agent_stage,
-    )
-
-    single_agent_result = await run_single_agent_stage(
-        agent_name="issue-single-agent",
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+    single_agent_result = await run_issue_single_agent(
+        issue=issue,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+        history_path=history_path,
         single_agent_artifacts_path=single_agent_artifacts_path,
-        build_backend=lambda workspace_root: issue_single_agent.create_issue_single_agent_backend(
-            workspace_root=workspace_root,
-            history_path=history_path,
-            runtime_context=runtime_context,
-        ),
-        system_prompt=issue_single_agent.build_issue_single_agent_system_prompt(
-            review_objective=review_objective,
-            test_changes=test_changes,
-        ),
-        filesystem_system_prompt=(
-            issue_single_agent.build_issue_single_agent_filesystem_system_prompt()
-        ),
-        user_prompt=issue_single_agent.build_issue_single_agent_user_prompt(
-            issue=issue
-        ),
-        todo_system_prompt=issue_single_agent.build_issue_single_agent_todo_system_prompt(),
-        todo_tool_description=(
-            issue_single_agent.build_issue_single_agent_todo_tool_description()
-        ),
+        review_objective=review_objective,
+        test_changes=test_changes,
+        runtime_context=runtime_context,
+        setup_declaration_content=setup_declaration_content,
     )
     result = build_issue_single_agent_result(single_agent_result=single_agent_result)
     from sec_review_agents.utils.files import persist_json

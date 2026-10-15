@@ -1,3 +1,4 @@
+import { CONTRACT_VERSION, type ContractVersion } from '../../runner/contract-version.js'
 import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
 import type { PersistedIssue } from '../../control-plane/publish-context.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
@@ -12,7 +13,7 @@ import {
 import { logInfo } from '../../utils/logger.js'
 import { asErrorMessage } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
+import { assertWorkflowResult } from '../../runner/contract-schema.js'
 import type { ControlPlaneClient } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
@@ -38,7 +39,7 @@ function issueReviewRunMarker(run_id: string): string {
 }
 
 export interface IssueReviewWorkflowResult {
-  contract_version: 'v5'
+  contract_version: ContractVersion
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -51,10 +52,10 @@ type CompletedRunnerRun = {
 
 function issueReviewResultFromWorkflowResult(result: unknown): IssueReviewWorkflowResult | null {
   try {
-    assertV5WorkflowResult('issue-review', result)
-    const rawResult = result as { contract_version: 'v5'; review_record: unknown }
+    assertWorkflowResult('issue-review', result)
+    const rawResult = result as { contract_version: ContractVersion; review_record: unknown }
     return {
-      contract_version: 'v5',
+      contract_version: CONTRACT_VERSION,
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

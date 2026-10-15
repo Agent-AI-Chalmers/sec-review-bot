@@ -4,6 +4,13 @@
 This is intentionally conservative. It skips code fences, headings, lists,
 tables, blockquotes, HTML blocks, and generated/dependency directories. It only
 reports ordinary prose paragraphs that look wrapped to a fixed column width.
+
+Structural lines are matched with their full block syntax rather than a leading
+character, so a prose paragraph that merely *starts* with a structural
+character is not mistaken for structure: a sentence beginning with an inline
+link (`[text](url) ...`) or emphasis (`*word* ...`) is prose, while a reference
+definition (`[label]:`) or a list item (`- item`) is structure. Mistaking prose
+for structure drops it from its paragraph and can hide a real wrap.
 """
 
 import argparse
@@ -18,8 +25,22 @@ SKIPPED_FILES = {
     "LICENSE.md",
 }
 PROSE_BREAK_RE = re.compile(r"[.!?。！？:：;；)]$")
-ORDERED_LIST_RE = re.compile(r"^\s*\d+[.)]\s+")
-HTML_BLOCK_RE = re.compile(r"^\s*</?[A-Za-z][^>]*>\s*$")
+
+# Block-level Markdown that ends a prose paragraph. Each pattern is anchored and
+# requires the full structural syntax, so a prose line that merely starts with a
+# structural character is not mistaken for structure.
+ATX_HEADING_RE = re.compile(r"^#{1,6}(?:\s|$)")
+SETEXT_UNDERLINE_RE = re.compile(r"^(?:=+|-+)\s*$")
+FENCE_RE = re.compile(r"^(?:`{3,}|~{3,})")
+BULLET_RE = re.compile(r"^[-*+]\s+")
+ORDERED_LIST_RE = re.compile(r"^\d+[.)]\s+")
+BLOCKQUOTE_RE = re.compile(r"^>")
+THEMATIC_BREAK_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})\s*$")
+TABLE_ROW_RE = re.compile(r"^\|")
+HTML_BLOCK_RE = re.compile(r"^</?[A-Za-z][^>]*>\s*$")
+HTML_COMMENT_RE = re.compile(r"^<!--")
+# A reference-style link *definition* (`[label]: url`), not an inline link.
+REFERENCE_DEFINITION_RE = re.compile(r"^\[[^\]]+\]:")
 
 
 @dataclass(frozen=True)
@@ -34,11 +55,17 @@ def is_structural_line(line: str) -> bool:
     if not stripped:
         return True
     return (
-        stripped.startswith(
-            ("#", "- ", "* ", "+ ", "> ", "|", "```", "---", "<!--", "[")
-        )
+        ATX_HEADING_RE.match(stripped) is not None
+        or SETEXT_UNDERLINE_RE.match(stripped) is not None
+        or FENCE_RE.match(stripped) is not None
+        or BULLET_RE.match(stripped) is not None
         or ORDERED_LIST_RE.match(stripped) is not None
+        or BLOCKQUOTE_RE.match(stripped) is not None
+        or THEMATIC_BREAK_RE.match(stripped) is not None
+        or TABLE_ROW_RE.match(stripped) is not None
         or HTML_BLOCK_RE.match(stripped) is not None
+        or HTML_COMMENT_RE.match(stripped) is not None
+        or REFERENCE_DEFINITION_RE.match(stripped) is not None
     )
 
 
@@ -58,7 +85,7 @@ def prose_paragraphs(markdown: str) -> list[tuple[int, list[str]]]:
             if stripped == "---":
                 in_frontmatter = False
             continue
-        if stripped.startswith("```"):
+        if FENCE_RE.match(stripped):
             in_fence = not in_fence
             if current:
                 paragraphs.append((start_line, current))

@@ -1,0 +1,29 @@
+{
+  "schema_fixtures": {
+    "issue-review-input-test-changes.json": "issue-review-input.schema.json",
+    "issue-review-input.json": "issue-review-input.schema.json",
+    "issue-review-result.json": "issue-review-result.schema.json",
+    "pull-request-review-input.json": "pull-request-review-input.schema.json",
+    "pull-request-review-result.json": "pull-request-review-result.schema.json",
+    "repository-review-input-full.json": "repository-review-input.schema.json",
+    "repository-review-input-incremental.json": "repository-review-input.schema.json",
+    "repository-review-result-blocked.json": "repository-review-result.schema.json",
+    "repository-review-result.json": "repository-review-result.schema.json",
+    "review-record-deleted-file.json": "review-record.schema.json",
+    "review-record-no-actionable.json": "review-record.schema.json",
+    "review-record.json": "review-record.schema.json",
+    "issue-review-input-setup-declaration.json": "issue-review-input.schema.json"
+  },
+  "invalid_schema_fixtures": {
+    "invalid-issue-review-input-repair-mode-field.json": "issue-review-input.schema.json",
+    "invalid-repository-review-input-blank-commit-sha.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-blank-ignore.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-blank-target-branch.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-empty-ignore.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-extra-change-field.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-max-file-bytes.json": "repository-review-input.schema.json",
+    "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
+    "invalid-review-record-trailing-slash-path.json": "review-record.schema.json",
+    "invalid-issue-review-input-blank-setup-declaration.json": "issue-review-input.schema.json"
+  }
+}

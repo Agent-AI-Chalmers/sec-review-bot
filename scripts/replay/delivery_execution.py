@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from sec_review_agents.contract_version import CONTRACT_VERSION
 from sec_review_agents.delivery_stages.execution import (
     build_delivery_execution_input,
     execute_delivery_entry,
@@ -60,7 +61,7 @@ def _repository_result_from_delivery_replay(
     case_results: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "scan_summary": _previous_scan_summary(previous_result),
         "deliveries": [
             item

@@ -19,6 +19,12 @@ export interface IssueContext {
   repo_full_name: string
   owner_login: string
   sender_login: string | undefined
+  /**
+   * Payload-derived `repository.default_branch`. This is NOT the trusted ref:
+   * trust-relevant flows resolve the default branch via the GitHub API
+   * (`resolveTrustedDefaultBranch`). It is recorded for the persisted publish
+   * context only; do not use it as a base/ref for git or GitHub writes.
+   */
   default_branch: string
   issue_number: number
   issue_title: string
@@ -110,19 +116,6 @@ export function extractIssueContext(payload: unknown): IssueContext {
     comments_url: asString(issue.comments_url),
     is_pull_request: Boolean(issue.pull_request)
   })
-}
-
-export async function getIssueDefaultBranchHeadSha(
-  octokit: GitHubAppOctokit,
-  issue: IssueContext
-): Promise<string> {
-  const response = await octokit.rest.repos.getBranch({
-    owner: issue.owner_login,
-    repo: issue.repo_name,
-    branch: issue.default_branch
-  })
-
-  return response.data.commit.sha
 }
 
 function isSameRepositoryPullRequestSource(

@@ -1,11 +1,9 @@
+import { CONTRACT_VERSION } from '../../runner/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
-import {
-  fetchTimelineLinkedPullRequests,
-  getIssueDefaultBranchHeadSha,
-  type IssueContext
-} from '../../github/issue-service.js'
+import { fetchTimelineLinkedPullRequests, type IssueContext } from '../../github/issue-service.js'
+import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { IssueReviewInput, TestChangesPolicy } from '../../runner/input.js'
@@ -15,7 +13,8 @@ import {
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
-  finalizeInputBundleWorkspace
+  finalizeInputBundleWorkspace,
+  readSetupDeclaration
 } from '../shared/input-bundle.js'
 
 async function materializeWorkspace(
@@ -41,12 +40,14 @@ async function materializeHistoryArtifacts({
   octokit,
   issue,
   history_path,
-  workspace_ref
+  workspace_ref,
+  default_branch
 }: {
   octokit: GitHubAppOctokit
   issue: IssueContext
   history_path: string
   workspace_ref: string
+  default_branch: string
 }): Promise<{
   issueMetadata: Record<string, unknown>
   linkedPullRequests: Awaited<ReturnType<typeof fetchTimelineLinkedPullRequests>>
@@ -62,7 +63,7 @@ async function materializeHistoryArtifacts({
     body: issue.issue_body,
     author_login: issue.issue_author,
     labels: issue.labels,
-    default_branch: issue.default_branch,
+    default_branch,
     workspace_ref
   }
   const linkedPullRequests = await fetchTimelineLinkedPullRequests(octokit, issue)
@@ -90,12 +91,14 @@ export async function prepareIssueReviewInput({
   run_id,
   octokit,
   issue,
+  trusted_default_branch,
   review_objective = 'audit',
   test_changes
 }: {
   run_id: string
   octokit: GitHubAppOctokit
   issue: IssueContext
+  trusted_default_branch: TrustedDefaultBranch
   review_objective?: 'audit' | 'repair'
   test_changes?: TestChangesPolicy
 }): Promise<{
@@ -105,7 +108,7 @@ export async function prepareIssueReviewInput({
   input_bundle_root: string
   workspace_ref: string
 }> {
-  const workspace_ref = await getIssueDefaultBranchHeadSha(octokit, issue)
+  const { default_branch, head_sha: workspace_ref } = trusted_default_branch
   const input_bundle_root = createInputBundleRoot(
     issue.repo_full_name,
     `issue-${issue.issue_number}`,
@@ -119,6 +122,14 @@ export async function prepareIssueReviewInput({
   await fs.mkdir(history_path, { recursive: true })
 
   await materializeWorkspace(octokit, issue, workspace_path, workspace_ref)
+  // The setup declaration is read from the exact default-branch commit through
+  // the Contents API, which carries the installation auth on `octokit` itself.
+  const setup_declaration = await readSetupDeclaration({
+    octokit,
+    default_sha: workspace_ref,
+    owner_login: issue.owner_login,
+    repo_name: issue.repo_name
+  })
   await finalizeInputBundleWorkspace({
     input_bundle_root,
     workspace_path,
@@ -128,7 +139,8 @@ export async function prepareIssueReviewInput({
     octokit,
     issue,
     history_path,
-    workspace_ref
+    workspace_ref,
+    default_branch
   })
   const input_bundle = await archiveInputBundle({
     input_bundle_root,
@@ -136,13 +148,14 @@ export async function prepareIssueReviewInput({
     run_id
   })
   const input: IssueReviewInput = {
-    contract_version: 'v5',
+    contract_version: CONTRACT_VERSION,
     review_intent: {
       objective: review_objective,
       ...(test_changes ? { test_changes } : {})
     },
     issue: historyArtifacts.issueMetadata,
-    input_bundle
+    input_bundle,
+    ...(setup_declaration ? { setup_declaration } : {})
   }
 
   const input_path = path.join(input_bundle_root, 'issue-review-input.json')

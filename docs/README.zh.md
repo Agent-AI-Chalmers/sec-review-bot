@@ -34,7 +34,7 @@
 
 先读 [Contracts README](../contracts/README.zh.md)：它定义了族目录的布局、命名规则、schema 该拥有什么，以及 fixtures 如何参与校验。各族 README 再分别说明消费者可以依赖什么、哪一侧归谁、以及哪些是刻意不做成 schema 的。
 
-- [integration-contract/v5/CONTRACT.md](../contracts/integration-contract/v5/CONTRACT.md) / [中文](../contracts/integration-contract/v5/CONTRACT.zh.md)：workflow 数据契约。
+- [integration-contract/v6/CONTRACT.md](../contracts/integration-contract/v6/CONTRACT.md) / [中文](../contracts/integration-contract/v6/CONTRACT.zh.md)：workflow 数据契约。
 - [integration-contract/openapi.json](../contracts/integration-contract/openapi.json)：Agent Runner HTTP API，由服务代码生成。
 - [control-plane-api/openapi.yaml](../contracts/control-plane-api/openapi.yaml)：Control Plane HTTP 契约——路由、schema、安全方案与错误码。
 - [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json)：控制台读取返回的脱敏运行形状。
@@ -50,6 +50,7 @@
 - [NARRATIVE_FIRST_REVIEW.md](workflows/NARRATIVE_FIRST_REVIEW.md) / [中文](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：Narrative-first analyzer 输出纪律。
 - [REVIEW_INTENT.md](workflows/REVIEW_INTENT.md) / [中文](workflows/REVIEW_INTENT.zh.md)：Review intent 和修复阶段约束。
 - [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md) / [中文](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：Verifier 反馈的有界重试。
+- [TRUSTED_SETUP.md](workflows/TRUSTED_SETUP.md) / [中文](workflows/TRUSTED_SETUP.zh.md)：设置声明为何是这样——信任问题、它推出的约束、与信任无关的决定，以及不变量。
 
 #### issue-review
 

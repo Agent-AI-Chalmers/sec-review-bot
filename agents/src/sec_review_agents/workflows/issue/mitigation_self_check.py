@@ -23,10 +23,12 @@ async def mitigate_issue_with_self_check(
     analysis_result: Mapping[str, Any],
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: RunnerRuntimeContext | None = None,
+    setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     return await run_mitigation_stage(
         agent_name="issue-mitigator-self-check",
         mitigator_artifacts_path=mitigator_artifacts_path,
+        setup_declaration_content=setup_declaration_content,
         published_transcript_path=published_transcript_path,
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=None,

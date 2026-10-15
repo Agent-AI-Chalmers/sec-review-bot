@@ -1,7 +1,9 @@
+import { CONTRACT_VERSION } from '../../runner/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
-import { getRepositoryContext, getRepositoryRefSha } from '../../github/repository-service.js'
+import { getRepositoryRefSha, splitRepoFullName } from '../../github/repository-service.js'
+import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { TestChangesPolicy, RepositoryReviewInput } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
@@ -16,7 +18,8 @@ import {
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
-  finalizeInputBundleWorkspace
+  finalizeInputBundleWorkspace,
+  readSetupDeclaration
 } from '../shared/input-bundle.js'
 
 const MAX_INCREMENTAL_FILES = 5000
@@ -62,6 +65,7 @@ export async function prepareRepositoryReviewInput({
   run_id,
   octokit,
   repo_full_name,
+  trusted_default_branch,
   target_branch = null,
   scan_mode,
   base_sha = null,
@@ -73,6 +77,7 @@ export async function prepareRepositoryReviewInput({
   run_id: string
   octokit: GitHubAppOctokit
   repo_full_name: string
+  trusted_default_branch: TrustedDefaultBranch
   target_branch?: string | null
   scan_mode: RepositoryScanMode
   base_sha?: string | null
@@ -88,8 +93,14 @@ export async function prepareRepositoryReviewInput({
   input_path: string
   input_bundle_root: string
 }> {
-  const repo = await getRepositoryContext(octokit, repo_full_name)
-  const targetBranchForResolution = target_branch || repo.default_branch
+  const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
+  const repo: RepositoryContext = {
+    owner_login,
+    repo_name,
+    repo_full_name,
+    default_branch: trusted_default_branch.default_branch
+  }
+  const targetBranchForResolution = target_branch || trusted_default_branch.default_branch
   const headResolutionTarget = head_sha || targetBranchForResolution
   const resolvedHeadSha = await getRepositoryRefSha(octokit, {
     owner_login: repo.owner_login,
@@ -186,6 +197,15 @@ export async function prepareRepositoryReviewInput({
       ? [resolvedBaseSha, resolvedHeadSha]
       : [resolvedHeadSha]
   await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
+  // Trusted default branch (not the user-selectable target_branch): its head SHA
+  // was resolved once upstream; read the setup declaration from it through the
+  // Contents API, whose auth rides on `octokit`.
+  const setup_declaration = await readSetupDeclaration({
+    octokit,
+    default_sha: trusted_default_branch.head_sha,
+    owner_login: repo.owner_login,
+    repo_name: repo.repo_name
+  })
   await finalizeInputBundleWorkspace({
     input_bundle_root,
     workspace_path,
@@ -209,7 +229,7 @@ export async function prepareRepositoryReviewInput({
     run_id
   })
   const input: RepositoryReviewInput = {
-    contract_version: 'v5',
+    contract_version: CONTRACT_VERSION,
     input_bundle,
     review_intent: {
       objective: 'audit',
@@ -217,7 +237,7 @@ export async function prepareRepositoryReviewInput({
     },
     scan_target: {
       target_branch: targetBranchForResolution,
-      default_branch: repo.default_branch,
+      default_branch: trusted_default_branch.default_branch,
       event_type,
       scan_mode: resolvedScanMode,
       base_sha: resolvedBaseSha,
@@ -233,7 +253,8 @@ export async function prepareRepositoryReviewInput({
             previous_path: item.previous_path
           }))
         : []
-    }
+    },
+    ...(setup_declaration ? { setup_declaration } : {})
   }
 
   const input_path = path.join(input_bundle_root, 'repository-review-input.json')

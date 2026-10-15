@@ -1,5 +1,5 @@
 import type { FileChange } from './file-change.js'
-import { assertV5ReviewRecord } from '../runner/contract-schema.js'
+import { assertReviewRecord } from '../runner/contract-schema.js'
 
 type AnyRecord = Record<string, unknown>
 
@@ -51,6 +51,6 @@ export interface ReviewRecord {
 }
 
 export function parseReviewRecord(value: unknown): ReviewRecord {
-  assertV5ReviewRecord(value)
+  assertReviewRecord(value)
   return value as ReviewRecord
 }

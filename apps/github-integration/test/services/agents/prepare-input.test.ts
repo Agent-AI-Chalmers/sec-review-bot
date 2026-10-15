@@ -12,8 +12,14 @@ import type { GitHubAppOctokit } from '../../../src/github/octokit.js'
 import type { IssueContext } from '../../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../../src/github/pull-request-service.js'
 import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/artifacts/git-workspace.js'
+import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 
 const execFileAsync = promisify(execFile)
+
+/** A Contents API response for "no .sec-review/setup.yml on the default branch". */
+function setupDeclarationNotFound(): never {
+  throw Object.assign(new Error('Not Found'), { status: 404 })
+}
 const PRIVATE_RUNNER_INPUT_KEYS = new Set([
   'runArtifactsPath',
   'analyzer_artifacts_path',
@@ -134,6 +140,7 @@ function repositoryOctokit(refs: { base_sha: string; head_sha: string }): GitHub
           data: { commit: { sha: branch === 'main' ? refs.head_sha : branch } }
         }),
         getCommit: async ({ ref }: { ref: string }) => ({ data: { sha: ref } }),
+        getContent: async () => setupDeclarationNotFound(),
         compareCommitsWithBasehead: async () => ({
           data: {
             status: 'ahead',
@@ -201,13 +208,19 @@ test(
         }),
         rest: {
           repos: {
+            get: async () => ({
+              data: {
+                default_branch: 'main'
+              }
+            }),
             getBranch: async () => ({
               data: {
                 commit: {
                   sha: head_sha
                 }
               }
-            })
+            }),
+            getContent: async () => setupDeclarationNotFound()
           },
           issues: {
             listEventsForTimeline: async () => ({
@@ -239,9 +252,10 @@ test(
       const prepared = await prepareIssueReviewInput({
         run_id: 'run-issue-fixture',
         octokit,
-        issue
+        issue,
+        trusted_default_branch: { default_branch: 'main', head_sha }
       })
-      assert.equal(prepared.input.contract_version, 'v5')
+      assert.equal(prepared.input.contract_version, 'v6')
       assert.deepEqual(prepared.input.review_intent, { objective: 'audit' })
       assert.equal(prepared.input.issue.repo_full_name, 'octo/demo')
       await assertRunnerInputArtifact({
@@ -254,7 +268,7 @@ test(
         await fs.readFile(path.join(prepared.input_bundle_root, 'manifest.json'), 'utf8')
       ) as Record<string, unknown>
       assert.deepEqual(manifest, {
-        contract_version: 'v5',
+        contract_version: CONTRACT_VERSION,
         kind: 'runner-input-bundle',
         workspace: { snapshot: WORKSPACE_SNAPSHOT_TAR_NAME },
         history: { path: 'history' }
@@ -336,12 +350,20 @@ test(
             }
           }
         }),
-        rest: { issues: { listEventsForTimeline: async () => ({ data: [] }) } }
+        rest: {
+          repos: {
+            get: async () => ({ data: { default_branch: 'main' } }),
+            getBranch: async () => ({ data: { commit: { sha: refs.head_sha } } }),
+            getContent: async () => setupDeclarationNotFound()
+          },
+          issues: { listEventsForTimeline: async () => ({ data: [] }) }
+        }
       } as unknown as GitHubAppOctokit
       const prepared = await preparePullRequestReviewInput({
         run_id: 'run-pr-fixture',
         octokit,
         pr,
+        trusted_default_branch: { default_branch: 'main', head_sha: refs.head_sha },
         files: [
           {
             filename: 'src/app.ts',
@@ -399,6 +421,7 @@ test(
         run_id: 'run-repo-full',
         octokit,
         repo_full_name: 'octo/demo',
+        trusted_default_branch: { default_branch: 'main', head_sha: refs.head_sha },
         scan_mode: 'full'
       })
       await assertRunnerInputArtifact({
@@ -424,6 +447,7 @@ test(
         run_id: 'run-repo-full',
         octokit,
         repo_full_name: 'octo/demo',
+        trusted_default_branch: { default_branch: 'main', head_sha: refs.head_sha },
         scan_mode: 'full'
       })
       await assert.rejects(
@@ -435,6 +459,7 @@ test(
         run_id: 'run-repo-incremental',
         octokit,
         repo_full_name: 'octo/demo',
+        trusted_default_branch: { default_branch: 'main', head_sha: refs.head_sha },
         scan_mode: 'incremental',
         base_sha: refs.base_sha,
         head_sha: refs.head_sha

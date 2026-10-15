@@ -6,6 +6,7 @@ import { extractCommentCommand } from '../../../github/comment-command-service.j
 import { authorizeManualCommentCommand } from '../../../github/manual-command-authorization.js'
 import { extractIssueContext } from '../../../github/issue-service.js'
 import { getPullRequestContext } from '../../../github/pull-request-service.js'
+import { resolveTrustedDefaultBranch } from '../../../github/default-branch-service.js'
 import type { GitHubAppOctokit } from '../../../github/octokit.js'
 import {
   isSelfOriginatedWebhookEvent,
@@ -14,6 +15,7 @@ import {
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
+import { type TrustedRefHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
 
 type IssueCommentCreatedWebhookEvent = Pick<
   EmitterWebhookEvent<'issue_comment.created'>,
@@ -22,13 +24,7 @@ type IssueCommentCreatedWebhookEvent = Pick<
   octokit: unknown
 }
 
-interface WebhookHandlerArgs {
-  id: string
-  octokit: unknown
-  payload: unknown
-}
-
-interface HandlerDeps {
+interface HandlerDeps extends TrustedRefHandlerDeps {
   authorizeManualCommentCommandFn?: typeof authorizeManualCommentCommand
   getPullRequestContextFn?: typeof getPullRequestContext
   startIssueReviewCommandFn?: typeof startIssueReviewCommand
@@ -47,6 +43,7 @@ export async function handleIssueCommentCreatedWithDeps(
   { id, octokit, payload }: WebhookHandlerArgs,
   {
     authorizeManualCommentCommandFn = authorizeManualCommentCommand,
+    resolveTrustedDefaultBranchFn = resolveTrustedDefaultBranch,
     getPullRequestContextFn = getPullRequestContext,
     startIssueReviewCommandFn = startIssueReviewCommand,
     startPullRequestReviewCommandFn = startPullRequestReviewCommand
@@ -96,6 +93,13 @@ export async function handleIssueCommentCreatedWithDeps(
       return
     }
 
+    // Resolve the trusted default branch once for this run; both the issue and
+    // PR paths below reuse it instead of re-resolving.
+    const trusted_default_branch = await resolveTrustedDefaultBranchFn(
+      octokit as GitHubAppOctokit,
+      { owner_login: issue.owner_login, repo_name: issue.repo_name }
+    )
+
     if (issue.is_pull_request) {
       let resolveAdmission: (() => void) | undefined
       const admitted = new Promise<void>((resolve) => {
@@ -103,6 +107,7 @@ export async function handleIssueCommentCreatedWithDeps(
       })
       const execution = startPullRequestReviewCommandFn({
         octokit,
+        trusted_default_branch,
         event_type: 'manual_review',
         delivery_id: id,
         test_changes: command.test_changes,
@@ -136,6 +141,7 @@ export async function handleIssueCommentCreatedWithDeps(
     const execution = startIssueReviewCommandFn({
       octokit,
       issue,
+      trusted_default_branch,
       event_type: 'manual_review',
       delivery_id: id,
       // The GitHub integration always audits an issue: it is an unverified claim. `repair` is

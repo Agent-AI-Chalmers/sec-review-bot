@@ -18,6 +18,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
@@ -56,6 +57,7 @@ def build_local_issue_bundle(
     target_branch: str | None = None,
     review_objective: str = "repair",
     test_changes: str = "allow",
+    setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
     run_id = create_local_run_id()
     issue_number_value = str(issue_number)
@@ -120,13 +122,18 @@ def build_local_issue_bundle(
     )
     input_bundle = archive_input_bundle(paths, include_incremental_window=False)
     input_data = {
-        "contract_version": "v5",
+        "contract_version": CONTRACT_VERSION,
         "review_intent": {
             "objective": review_objective,
             "test_changes": test_changes,
         },
         "issue": issue_metadata,
         "input_bundle": input_bundle,
+        **(
+            {"setup_declaration": setup_declaration_content}
+            if setup_declaration_content is not None
+            else {}
+        ),
     }
     input_path = paths.local_root_path / "issue-review-input.json"
     write_json(input_path, input_data)

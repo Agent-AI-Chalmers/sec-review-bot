@@ -15,16 +15,23 @@ contracts/
   <family>/
     <version>/
       <SPEC>.md        该版本的书面契约
-      schemas/*.json   可机器校验的形状
+      schemas/*.json   可机器校验的形状（当契约是数据形状时）
       fixtures/*.json  可执行示例，以及配对它们的 manifest
+      corpus/*         共享的非 JSON 输入，外加 manifest（当契约是由代码强制的格式、
+                       而不是数据形状时）
 ```
+
+并非每个族都使用每一种资产。若契约的规则是决策逻辑而非结构形状，它会携带 `corpus/`
+而不是 `schemas/` 与 `fixtures/`，并在代码中强制该格式。参见
+[setup-declaration](setup-declaration/README.zh.md)。
 
 一个族也可以存放适用于所有版本的文档，例如传输层参考。
 
 ## 契约族
 
-- [integration-contract](integration-contract/README.zh.md)：Runner 与其调用方之间的公开集成点。当前版本：[v5](integration-contract/v5/CONTRACT.zh.md)。
+- [integration-contract](integration-contract/README.zh.md)：Runner 与其调用方之间的公开集成点。当前版本：[v6](integration-contract/v6/CONTRACT.zh.md)。
 - [control-plane-api](control-plane-api/README.zh.md)：Control Plane 与其调用方交换的形状。当前版本：[v1](control-plane-api/README.zh.md)。
+- [setup-declaration](setup-declaration/README.zh.md)：仓库用来准备其审查沙箱的 `.sec-review/setup.yml` 格式。当前版本：[v1](setup-declaration/v1/SPEC.zh.md)。
 
 ## 适用于每个族的规则
 
