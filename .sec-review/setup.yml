@@ -1,0 +1,10 @@
+setup:
+  # The workspace image ships python3/pip/node/pnpm but not uv, which the
+  # agents package uses for environment and dependency management. Install it,
+  # then sync the locked environment so the agent starts with dependencies
+  # ready and does not spend turns installing them.
+  - run: pip3 install --no-input uv
+    timeout_seconds: 300
+  - run: uv sync --frozen
+    working-directory: agents
+    timeout_seconds: 600

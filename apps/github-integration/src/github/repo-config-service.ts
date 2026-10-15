@@ -3,11 +3,8 @@ import type { GitHubAppOctokit } from './octokit.js'
 import { asErrorWithResponse, isRecord } from '../utils/error-utils.js'
 import { resolveTrustedDefaultBranch } from './default-branch-service.js'
 
-// Repo config lives under `.sec-review/`. We prefer the new path and fall back
-// to the legacy `.github/` path during a migration window so existing repos
-// keep working.
+// Repo config lives under `.sec-review/`.
 const CONFIG_PATH = '.sec-review/config.yml'
-const LEGACY_CONFIG_PATH = '.github/sec-review-bot.yml'
 
 const MANUAL_ONLY_TRIGGER_MODE = 'manual_only'
 const AUTOMATIC_TRIGGER_MODE = 'automatic'
@@ -249,25 +246,13 @@ export async function fetchRepositoryTriggerConfig(
     if (!isNotFoundError(error)) {
       throw error
     }
-    // Migration fallback: new path missing -> try the legacy path.
-    try {
-      return await readRepositoryTriggerConfig(octokit, {
-        owner_login,
-        repo_name,
-        ...(ref ? { ref } : {}),
-        path: LEGACY_CONFIG_PATH
-      })
-    } catch (legacyError) {
-      if (!isNotFoundError(legacyError)) {
-        throw legacyError
-      }
-      return {
-        trigger_mode: DEFAULT_TRIGGER_MODE,
-        paths_ignore: [],
-        path: null,
-        ref: configRef,
-        source: 'default'
-      }
+    // No config file: fall back to the built-in defaults.
+    return {
+      trigger_mode: DEFAULT_TRIGGER_MODE,
+      paths_ignore: [],
+      path: null,
+      ref: configRef,
+      source: 'default'
     }
   }
 }

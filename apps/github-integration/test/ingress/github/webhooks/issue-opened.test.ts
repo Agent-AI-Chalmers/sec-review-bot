@@ -9,7 +9,7 @@ function automaticConfig() {
   return {
     trigger_mode: 'automatic' as const,
     paths_ignore: [],
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     ref: 'main',
     source: 'repository-config' as const
   }
@@ -19,7 +19,7 @@ function manualOnlyConfig() {
   return {
     trigger_mode: 'manual_only' as const,
     paths_ignore: [],
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     ref: 'main',
     source: 'repository-config' as const
   }
@@ -140,7 +140,7 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
     owner_login: 'octo',
     repo_name: 'example-repo',
     ref: 'main',
-    path: '.github/sec-review-bot.yml',
+    path: '.sec-review/config.yml',
     reason: 'invalid-yaml'
   })
 

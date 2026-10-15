@@ -55,7 +55,7 @@ control-plane:
 
 github-integration:
   # The repo-level trigger configuration the service reads.
-  - '.github/sec-review-bot.yml'
+  - '.sec-review/**'
   - 'apps/github-integration/**'
   # Its tests validate the shared contract fixtures.
   - 'contracts/**'
