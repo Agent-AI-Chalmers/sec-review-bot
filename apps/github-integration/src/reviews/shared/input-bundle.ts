@@ -13,9 +13,9 @@ import { publishInputBundle } from '../../artifacts/input-storage.js'
 
 import {
   WORKSPACE_SNAPSHOT_TAR_NAME,
-  createWorkspaceSnapshotTar,
-  readRepositoryFileAtRef
+  createWorkspaceSnapshotTar
 } from '../../artifacts/git-workspace.js'
+import type { GitHubAppOctokit } from '../../github/octokit.js'
 import { writeInputBundleManifest } from '../../runner/input-bundle-manifest.js'
 import {
   MAX_SETUP_DECLARATION_BYTES,
@@ -23,6 +23,7 @@ import {
   isSetupDeclarationError,
   parseSetupDeclaration
 } from '../../github/setup-declaration.js'
+import { asErrorWithResponse, isRecord } from '../../utils/error-utils.js'
 import { input_bundle_staging_root } from '../../config.js'
 
 const execFileAsync = promisify(execFile)
@@ -84,22 +85,23 @@ export const SETUP_DECLARATION_FILE_NAME = 'setup.yml'
  * to the bundle.
  */
 export async function readSetupDeclaration({
+  octokit,
   default_sha,
   owner_login,
-  repo_name,
-  git_auth_token
+  repo_name
 }: {
+  octokit: GitHubAppOctokit
   default_sha: string
   owner_login: string
   repo_name: string
-  git_auth_token?: string
 }): Promise<string | null> {
   const path = `.sec-review/${SETUP_DECLARATION_FILE_NAME}`
-  const declaration = await readRepositoryFileAtRef({
-    commit_sha: default_sha,
-    file_path: path,
-    git_remote_url: buildGitRemoteUrl(owner_login, repo_name),
-    ...(git_auth_token ? { git_auth_token } : {})
+  const declaration = await readRepositoryFileAtSha({
+    octokit,
+    owner_login,
+    repo_name,
+    sha: default_sha,
+    path
   })
   if (declaration === null) {
     return null
@@ -124,6 +126,53 @@ export async function readSetupDeclaration({
     throw error
   }
   return declaration
+}
+
+/**
+ * Read a single file at an exact commit through the Contents API.
+ *
+ * Reading by API at the already-resolved SHA avoids a second git clone, and
+ * avoids relying on the server allowing a wanted-SHA fetch. A missing file is
+ * `404` -> `null` (the normal "no declaration" case); any other failure
+ * propagates so input preparation fails loudly rather than silently skipping a
+ * declaration the default branch actually has.
+ */
+async function readRepositoryFileAtSha({
+  octokit,
+  owner_login,
+  repo_name,
+  sha,
+  path
+}: {
+  octokit: GitHubAppOctokit
+  owner_login: string
+  repo_name: string
+  sha: string
+  path: string
+}): Promise<string | null> {
+  let response: { data: unknown }
+  try {
+    response = await octokit.rest.repos.getContent({
+      owner: owner_login,
+      repo: repo_name,
+      path,
+      ref: sha
+    })
+  } catch (error) {
+    if (asErrorWithResponse(error).status === 404) {
+      return null
+    }
+    throw error
+  }
+  // A file path returns a single content object; an array means the path
+  // resolved to a directory (or a symlink target), which is not a declaration.
+  if (Array.isArray(response.data)) {
+    return null
+  }
+  if (!isRecord(response.data) || typeof response.data.content !== 'string') {
+    return null
+  }
+  return Buffer.from(response.data.content, 'base64').toString('utf-8')
 }
 
 export async function archiveInputBundle({

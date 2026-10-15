@@ -10,7 +10,6 @@ import {
   configuredGitTimeoutMs,
   createWorkspaceSnapshotTar,
   materializeWorkspaceWithCommitHistory,
-  readRepositoryFileAtRef,
   retryGitFetch,
   withConfiguredGitFetchProxy
 } from '../../src/artifacts/git-workspace.js'
@@ -231,102 +230,6 @@ test('createWorkspaceSnapshotTar restores a self-consistent git workspace from t
     await fs.rm(root, { recursive: true, force: true })
   }
 })
-
-test('readRepositoryFileAtRef returns file content at a commit', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-read-file-test-'))
-  try {
-    const source = path.join(root, 'source')
-    await fs.mkdir(path.join(source, '.sec-review'), { recursive: true })
-    await git(source, ['init'])
-    await git(source, ['config', 'user.name', 'Test User'])
-    await git(source, ['config', 'user.email', 'test@example.com'])
-    await fs.writeFile(
-      path.join(source, '.sec-review', 'setup.yml'),
-      'setup:\n  - run: echo hi\n',
-      'utf8'
-    )
-    await git(source, ['add', '.'])
-    await git(source, ['commit', '-m', 'add setup'])
-    const sha = await git(source, ['rev-parse', 'HEAD'])
-
-    const content = await readRepositoryFileAtRef({
-      commit_sha: sha,
-      file_path: '.sec-review/setup.yml',
-      git_remote_url: source
-    })
-    assert.equal(content, 'setup:\n  - run: echo hi\n')
-  } finally {
-    await fs.rm(root, { recursive: true, force: true })
-  }
-})
-
-test('readRepositoryFileAtRef returns null when the file does not exist', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-read-file-missing-'))
-  try {
-    const source = path.join(root, 'source')
-    await fs.mkdir(source, { recursive: true })
-    await git(source, ['init'])
-    await git(source, ['config', 'user.name', 'Test User'])
-    await git(source, ['config', 'user.email', 'test@example.com'])
-    await fs.writeFile(path.join(source, 'README.md'), 'x\n', 'utf8')
-    await git(source, ['add', '.'])
-    await git(source, ['commit', '-m', 'init'])
-    const sha = await git(source, ['rev-parse', 'HEAD'])
-
-    const content = await readRepositoryFileAtRef({
-      commit_sha: sha,
-      file_path: '.sec-review/setup.yml',
-      git_remote_url: source
-    })
-    assert.equal(content, null)
-  } finally {
-    await fs.rm(root, { recursive: true, force: true })
-  }
-})
-
-test('readRepositoryFileAtRef rejects unsafe file paths', async () => {
-  await assert.rejects(
-    () =>
-      readRepositoryFileAtRef({
-        commit_sha: 'deadbeef',
-        file_path: '../escape.yml',
-        git_remote_url: 'file:///does/not/matter'
-      }),
-    /invalid file path/
-  )
-})
-
-test('readRepositoryFileAtRef rejects absolute and option-looking file paths', async () => {
-  for (const file_path of ['/etc/passwd', '--output=/tmp/x', '-p']) {
-    await assert.rejects(
-      () =>
-        readRepositoryFileAtRef({
-          commit_sha: 'deadbeef',
-          file_path,
-          git_remote_url: 'file:///does/not/matter'
-        }),
-      /invalid file path/
-    )
-  }
-})
-
-test('readRepositoryFileAtRef rejects a non-hexadecimal commit SHA', async () => {
-  // A SHA is passed straight to `git fetch` as a ref; reject anything that is
-  // not a plain hex object name so it cannot become a git option or a revision
-  // expression.
-  for (const commit_sha of ['--upload-pack=touch /tmp/pwned', 'HEAD@{0}', 'refs/heads/main', '']) {
-    await assert.rejects(
-      () =>
-        readRepositoryFileAtRef({
-          commit_sha,
-          file_path: '.sec-review/setup.yml',
-          git_remote_url: 'file:///does/not/matter'
-        }),
-      /hexadecimal commit SHA/
-    )
-  }
-})
-
 test('configuredGitTimeoutMs defaults and reads a validated override', () => {
   assert.equal(configuredGitTimeoutMs(undefined), 600_000)
   assert.equal(configuredGitTimeoutMs(''), 600_000)
@@ -342,15 +245,17 @@ test('configuredGitTimeoutMs rejects a non-positive or malformed override', () =
 test('a git command that exceeds the timeout is killed, not left running', async () => {
   // Any real git invocation takes more than 1ms, so a 1ms budget must kill it.
   // The point is that the timeout is enforced: the command rejects instead of
-  // hanging. A killed command must never be downgraded to "the file is absent".
+  // hanging on a remote that never answers.
   const previous = process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS']
   process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS'] = '1'
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'git-timeout-test-'))
   try {
     await assert.rejects(() =>
-      readRepositoryFileAtRef({
-        commit_sha: 'a'.repeat(40),
-        file_path: '.sec-review/setup.yml',
-        git_remote_url: 'file:///does/not/matter'
+      materializeWorkspaceWithCommitHistory({
+        workspace_path: path.join(root, 'workspace'),
+        refs: ['main'],
+        // An unroutable address: without the timeout this would hang.
+        git_remote_url: 'http://10.255.255.1:9/octo/demo.git'
       })
     )
   } finally {
@@ -359,5 +264,6 @@ test('a git command that exceeds the timeout is killed, not left running', async
     } else {
       process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS'] = previous
     }
+    await fs.rm(root, { recursive: true, force: true })
   }
 })

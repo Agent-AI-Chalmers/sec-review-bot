@@ -122,15 +122,13 @@ export async function prepareIssueReviewInput({
   await fs.mkdir(history_path, { recursive: true })
 
   await materializeWorkspace(octokit, issue, workspace_path, workspace_ref)
-  // The setup declaration is read from the default-branch commit with a fresh
-  // fetch; private repositories need the installation token for it, exactly as
-  // the workspace materialization does.
-  const git_auth_token = await getInstallationAccessToken(octokit)
+  // The setup declaration is read from the exact default-branch commit through
+  // the Contents API, which carries the installation auth on `octokit` itself.
   const setup_declaration = await readSetupDeclaration({
+    octokit,
     default_sha: workspace_ref,
     owner_login: issue.owner_login,
-    repo_name: issue.repo_name,
-    git_auth_token
+    repo_name: issue.repo_name
   })
   await finalizeInputBundleWorkspace({
     input_bundle_root,

@@ -15,6 +15,11 @@ import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/artifacts/git-workspac
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 
 const execFileAsync = promisify(execFile)
+
+/** A Contents API response for "no .sec-review/setup.yml on the default branch". */
+function setupDeclarationNotFound(): never {
+  throw Object.assign(new Error('Not Found'), { status: 404 })
+}
 const PRIVATE_RUNNER_INPUT_KEYS = new Set([
   'runArtifactsPath',
   'analyzer_artifacts_path',
@@ -135,6 +140,7 @@ function repositoryOctokit(refs: { base_sha: string; head_sha: string }): GitHub
           data: { commit: { sha: branch === 'main' ? refs.head_sha : branch } }
         }),
         getCommit: async ({ ref }: { ref: string }) => ({ data: { sha: ref } }),
+        getContent: async () => setupDeclarationNotFound(),
         compareCommitsWithBasehead: async () => ({
           data: {
             status: 'ahead',
@@ -213,7 +219,8 @@ test(
                   sha: head_sha
                 }
               }
-            })
+            }),
+            getContent: async () => setupDeclarationNotFound()
           },
           issues: {
             listEventsForTimeline: async () => ({
@@ -346,7 +353,8 @@ test(
         rest: {
           repos: {
             get: async () => ({ data: { default_branch: 'main' } }),
-            getBranch: async () => ({ data: { commit: { sha: refs.head_sha } } })
+            getBranch: async () => ({ data: { commit: { sha: refs.head_sha } } }),
+            getContent: async () => setupDeclarationNotFound()
           },
           issues: { listEventsForTimeline: async () => ({ data: [] }) }
         }

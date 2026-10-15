@@ -329,12 +329,13 @@ export async function preparePullRequestReviewInput({
     commit_refs: commit_shas
   })
   const default_sha = trusted_default_branch.head_sha
-  const git_auth_token = await getInstallationAccessToken(octokit)
+  // Read from the exact default-branch commit through the Contents API; the
+  // installation auth rides on `octokit` rather than a git token.
   const setup_declaration = await readSetupDeclaration({
+    octokit,
     default_sha,
     owner_login: pr.owner_login,
-    repo_name: pr.repo_name,
-    git_auth_token
+    repo_name: pr.repo_name
   })
   await finalizeInputBundleWorkspace({
     input_bundle_root,
