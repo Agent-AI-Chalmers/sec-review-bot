@@ -43,4 +43,12 @@ Codex is a reference for platform-specific sandboxing: it uses [Seatbelt-style A
 
 This package learns from that platform split but currently implements Docker, local, and Linux / WSL2 `bwrap` backends only. It does not implement a native macOS Seatbelt backend or a native Windows sandbox.
 
+### How Each Sandbox Gets Its Runtime And Dependencies
+
+`bwrap` and the Codex Linux sandbox reuse the host filesystem and host tooling instead of supplying their own runtime. The Codex sandbox relies on this directly: it bind-mounts the host root read-only and carves out writable roots, so whatever the host already has installed, at the paths and versions the host has them, is what commands see. These backends therefore do not provide dependencies at all; they only decide which already-present paths stay visible. That is coherent only for a single, trusted host whose preinstalled runtime and dependency layout already match the task, which is the local development case.
+
+The Docker backend takes the opposite responsibility: the image supplies the runtime and dependencies, and each run starts from that image rather than the host rootfs. A directory from the host cannot simply be mounted in to stand in for an installed dependency tree, because Node and Python dependencies are pinned to a runtime version and resolved by location, symlink, and store layout. Reproducible or multi-tenant execution needs the runtime, dependency tree, layout, and environment supplied together as one unit, which is what an image provides and a host bind mount does not.
+
+So the split is a difference in who owns dependency provisioning, not a difference in sandbox strength. `bwrap` keeps the local case honest by never claiming to supply dependencies; the Docker backend is the one that can be reused across machines and tenants.
+
 If a product does not want to implement platform sandbox adapters such as `bwrap` and Seatbelt, it can use [Sandbox Agents in the OpenAI Agents SDK](https://developers.openai.com/api/docs/guides/agents/sandboxes/) and inspect the [openai/openai-agents-python](https://github.com/openai/openai-agents-python) source and examples. Sandbox Agents separate the agent harness from sandbox compute and support hosted sandbox providers as well as Docker and Unix-local clients. The application still owns its workflow and provider choice; this is an architectural alternative, not another backend in this package.

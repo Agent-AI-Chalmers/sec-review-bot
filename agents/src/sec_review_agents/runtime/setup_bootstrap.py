@@ -93,10 +93,15 @@ def setup_declaration_content_for_backend(
 ) -> str | None:
     """Resolve the setup declaration text for the active backend.
 
-    Only the docker backend surfaces a declaration: its container is long-lived,
-    so one bootstrap can be reused for the whole stage. Filtering here rather
-    than branching inside the bootstrap keeps bwrap/local out of scope without
-    asserting they are unsupported -- they simply have no declaration to run.
+    Only the docker backend surfaces a declaration. A docker container is built
+    from an image and persists for the lifetime of the run, so the runtime and
+    dependency tree it bootstraps stay self-consistent and the one bootstrap can
+    be reused afterward. bwrap and local reuse the host environment instead of
+    supplying their own: bwrap clears the worker environment, isolates the
+    network by default, and runs on host tooling, so an install there has no
+    self-contained dependency tree to land in. They are not unsupported; they
+    have no declaration to run. Filtering here rather than branching inside the
+    bootstrap keeps that decision at the backend-to-declaration boundary.
     """
     if selected_sandbox_backend_kind() != "docker":
         return None
