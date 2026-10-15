@@ -43,11 +43,11 @@ This is not an invented rule: GitHub Copilot's own setup steps must likewise com
 
 An automatic review of fork code does not match a trust model built around the trusted repository's controlled surface.
 
-Fork pull request events (`opened`, `ready_for_review`, `synchronize`) are skipped. A maintainer comments `@<bot> review` to approve, reusing the existing write-permission check, and **the approval is per-run and bound to the current head SHA** — a new push invalidates it.
+Fork pull request events (`opened`, `ready_for_review`, `synchronize`) are skipped. A maintainer comments `@<bot> review` to approve, reusing the existing write-permission check. The approval is per-run: each comment starts its own review, and it is not stored or reused, so an earlier approval never authorizes a later review.
 
 GitHub treats a fork's first run as needing approval, but its approval signals are many and semantically different. This system has fewer isolation tools, so it converges on a single, explicit, per-run approval.
 
-Either way, a fork run can only *tighten* the network baseline, and the declaration still comes from the base default branch — so a fork cannot change what runs. Note that `from_fork` does not mean "malicious" (a same-org fork is still a fork), so it is used only to *tighten*, never to relax.
+Either way, the declaration still comes from the base default branch, and the network baseline is the deployer's — a fork cannot change what runs or how far it can reach. Note that `from_fork` does not mean "malicious" (a same-org fork is still a fork), so it is used only to require an explicit approval, never to relax a rule.
 
 ### Because it is not trusted, it is isolated
 
@@ -57,7 +57,7 @@ The rejected alternative is a permanently `--network none` sandbox plus a host-s
 
 ### Network permission belongs to the deployer, not the repository
 
-The online baseline is set by the **deployer** (`AGENT_DOCKER_NETWORK_MODE`, default `none`). A repository or a fork can only *tighten* it, never widen it. The repository is a trust subject, not an authority: it cannot grant itself more reach than the deployment allows.
+The online baseline is set by the **deployer** (`AGENT_DOCKER_NETWORK_MODE`, default `none`). Neither a repository nor a fork can change it. The repository is a trust subject, not an authority: it cannot grant itself more reach than the deployment allows.
 
 ## Other Design Choices
 
@@ -68,5 +68,7 @@ These decisions matter, but they are **not** trust judgments. They are about how
 **Do not run the agent in CI.** A long-running agent runs in its own container, not in GitHub Actions. CI minutes are finite, and a single review with a cold install does not fit. (The *trust* model of hosted CI is reused — see "isolated" above; its *execution* model is not.)
 
 **Use a custom declaration file, not the CI ecosystem's file.** The declaration lives at `.sec-review/setup.yml`. The concrete alternative — and the one worth naming — is to reuse the file the CI ecosystem already has, GitHub Copilot's `.github/workflows/copilot-setup-steps.yml`. It is rejected: the format would not be ours to control, and reading it would mean parsing Actions YAML, extracting only the `run` steps, and deciding what to do with `uses:` — more machinery, for a shape we do not own.
+
+**The declaration runs once per stage, not once per run.** Each review stage gets its own sandbox, so the declaration is executed at the start of every stage that runs (analysis, mitigation, verification), and again for every case in a repository review. This is the price of per-stage container isolation — there is no shared cache across sandboxes, and adding one would re-open the trust and pollution questions the isolation baseline closes. A declaration should therefore be idempotent and reasonably fast; the per-step timeout cap (`SEC_REVIEW_SETUP_STEP_MAX_SECONDS`) bounds a single step, not the number of times it runs.
 
 **Do not guess the install command.** There is no lockfile heuristic and no "detect-only" hint; only an explicit declaration drives the rebuild. Heuristics misfire on multi-language monorepos, private registries, and mixed toolchains (this repository itself is uv + pnpm + npm + cargo), and a convention would auto-execute install scripts from a repository we have not reviewed for that purpose. The rejected alternatives are a convention fallback, on by default, and a detect-and-suggest prompt. The accepted consequence: a repository with no declaration gets an empty environment.

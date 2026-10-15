@@ -43,11 +43,11 @@ agent 在一个 Docker 沙箱里审查仓库，而沙箱镜像**不含**该仓�
 
 对 fork 代码的自动 review，与"围绕受信仓库可控范围构建"的信任模型不符。
 
-fork PR 事件（`opened`、`ready_for_review`、`synchronize`）一律跳过。维护者评论 `@<bot> review` 表示批准，复用现有的 `write` 权限校验，且**批准是按次的、绑定当次 head SHA**——新 push 即失效。
+fork PR 事件（`opened`、`ready_for_review`、`synchronize`）一律跳过。维护者评论 `@<bot> review` 表示批准，复用现有的 `write` 权限校验。批准是按次的：每条评论各自发起一次 review，不会被保存或复用，因此先前的批准永远不会授权后来的 review。
 
 GitHub 对 fork 的首次运行也要批准，但它的批准信号多且语义各异。本系统的隔离手段更少，因此只设一种明确、按次的批准方式。
 
-无论如何，fork 的 run 只能 *收紧* 网络基线，声明仍来自 base 默认分支——所以 fork 改不了将要运行的东西。注意 `from_fork` 不等于"恶意"（同 org 的 fork 仍是 fork），因此它只用于 *收紧*，绝不用于放宽。
+无论如何，声明仍来自 base 默认分支，网络基线也由部署方决定——所以 fork 既改不了将要运行的东西，也改不了它能触达的范围。注意 `from_fork` 不等于"恶意"（同 org 的 fork 仍是 fork），因此它只用于要求一次显式批准，绝不用于放宽任何规则。
 
 ### 因为信不过，所以隔离
 
@@ -57,7 +57,7 @@ GitHub 对 fork 的首次运行也要批准，但它的批准信号多且语义�
 
 ### 网络权限属于部署方，不属于仓库
 
-联网基线由**部署方**设定（`AGENT_DOCKER_NETWORK_MODE`，默认 `none`）。仓库或 fork 只能 *收紧*、不能放宽。仓库是被信任的一方，而不是授予信任的一方：它不能给自己超出部署所允许的网络权限。
+联网基线由**部署方**设定（`AGENT_DOCKER_NETWORK_MODE`，默认 `none`）。仓库和 fork 都无法改变它。仓库是被信任的一方，而不是授予信任的一方：它不能给自己超出部署所允许的网络权限。
 
 ## 其他设计选择
 
@@ -68,5 +68,7 @@ GitHub 对 fork 的首次运行也要批准，但它的批准信号多且语义�
 **不在 CI 里跑 agent。** 长跑 agent 在自己的容器里运行，不进 GitHub Actions。CI 额度有限，一次带冷装的 review 撑不起。（托管 CI 的 *信任* 模型被复用——见上文"隔离"；它的 *执行* 模型没有。）
 
 **用自定义声明文件，不用 CI 生态的文件。** 声明位于 `.sec-review/setup.yml`。具体到最值得点名的那种替代方案，就是复用 CI 生态已有的文件——GitHub Copilot 的 `.github/workflows/copilot-setup-steps.yml`。它被否决：格式不归我们掌控；读它就得解析 Actions YAML、只抽 `run` 步骤、还要处理 `uses:`——为了一个不属于我们的格式，引入更多复杂度。
+
+**声明是每个 stage 各跑一次，而不是每个 run 只跑一次。** 每个 review stage 都有自己的 sandbox，因此声明会在每个实际执行的 stage 开头执行一次（analysis、mitigation、verification），仓库审查下还会为每个 case 再执行一次。这是 per-stage 容器隔离的代价——跨 sandbox 没有共享缓存，而引入共享缓存会重新打开隔离基线已经关上的信任与污染问题。因此声明应当幂等且尽量快；单步 timeout 上限（`SEC_REVIEW_SETUP_STEP_MAX_SECONDS`）约束的是单次执行，而不是执行次数。
 
 **不猜安装命令。** 没有 lockfile 启发式，也没有"仅探测 + 提示"；只有显式声明才驱动重建。启发式在多语言 monorepo、私有 registry、混合工具链上必然误判（本仓库自己就是 uv + pnpm + npm + cargo），而按惯例推断会从一份我们并未为此审查过的仓库里自动执行安装脚本。被否决的替代方案是默认开启的按惯例推断兜底，以及"探测 + 提示"。接受的后果：没有声明的仓库得到空环境。
