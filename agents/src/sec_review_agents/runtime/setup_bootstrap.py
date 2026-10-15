@@ -57,6 +57,10 @@ WORKSPACE_ROOT_IN_CONTAINER = "/workspace"
 # redaction -- artifacts are operator-visible, not secret-free.
 BOOTSTRAP_OUTPUT_MAX_CHARS = 2000
 
+# Reported when a step's exit code could not be determined (the sandbox contract
+# allows ``None``). Non-zero, so an undetermined run is treated as incomplete.
+EXIT_CODE_UNDETERMINED = -1
+
 
 class _SandboxLike(Protocol):
     async def aexecute(self, command: str, *, timeout: int | None = None) -> Any: ...
@@ -137,8 +141,22 @@ async def bootstrap_environment(
     results: list[BootstrapStepResult] = []
     for step in declaration.steps:
         command = flatten_step_command(step)
-        response = await backend.aexecute(command, timeout=step.timeout_seconds)
-        exit_code = int(getattr(response, "exit_code", 1))
+        # Bootstrap is best-effort: the review must still proceed, so a failure
+        # *anywhere* in this loop -- including the sandbox itself raising (a
+        # container that cannot start, a failed exec, a transport error) -- is
+        # recorded as an incomplete environment rather than propagating and
+        # aborting the stage.
+        try:
+            response = await backend.aexecute(command, timeout=step.timeout_seconds)
+        # A backend failure is a bootstrap failure; no narrower type applies across backends.
+        except Exception as error:
+            return BootstrapResult(
+                status=BootstrapStatus.INCOMPLETE,
+                reason=f"setup step could not run ({error!r}): {step.run}",
+                steps=tuple(results),
+            )
+
+        exit_code = _exit_code_from_response(response)
         output = str(getattr(response, "output", ""))
         results.append(
             BootstrapStepResult(run=step.run, exit_code=exit_code, output=output)
@@ -151,6 +169,20 @@ async def bootstrap_environment(
             )
 
     return BootstrapResult(status=BootstrapStatus.COMPLETED, steps=tuple(results))
+
+
+def _exit_code_from_response(response: Any) -> int:
+    """Read a step's exit code, treating an undetermined code as a failure.
+
+    The sandbox contract types ``exit_code`` as ``int | None``: ``None`` means the
+    code could not be determined (e.g. a timeout on a backend that reports it
+    that way). That is not success, so it maps to a non-zero sentinel instead of
+    raising.
+    """
+    exit_code = getattr(response, "exit_code", None)
+    if isinstance(exit_code, bool) or not isinstance(exit_code, int):
+        return EXIT_CODE_UNDETERMINED
+    return exit_code
 
 
 def _summarize_output(output: str) -> str:
@@ -200,6 +232,7 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
 
 __all__ = [
     "BOOTSTRAP_OUTPUT_MAX_CHARS",
+    "EXIT_CODE_UNDETERMINED",
     "BootstrapResult",
     "BootstrapStatus",
     "BootstrapStepResult",

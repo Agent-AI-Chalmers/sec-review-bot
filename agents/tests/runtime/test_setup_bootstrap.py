@@ -5,6 +5,7 @@ import pytest
 from sec_review_agents.entrypoints.setup_declaration import SetupDeclarationStep
 from sec_review_agents.runtime.setup_bootstrap import (
     BOOTSTRAP_OUTPUT_MAX_CHARS,
+    EXIT_CODE_UNDETERMINED,
     BootstrapStatus,
     bootstrap_environment,
     flatten_step_command,
@@ -15,7 +16,7 @@ from sec_review_agents.runtime.setup_bootstrap import (
 
 @dataclass
 class _Response:
-    exit_code: int = 0
+    exit_code: int | None = 0
     output: str = ""
 
 
@@ -138,3 +139,45 @@ def test_record_bootstrap_result_truncates_large_output(tmp_path) -> None:
     assert "chars truncated" in recorded
     assert recorded.endswith("TAIL")
     assert len(recorded) <= BOOTSTRAP_OUTPUT_MAX_CHARS + 200
+
+
+class _ExplodingBackend:
+    """A backend whose execute raises, modeling a container/exec failure."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        self.commands: list[str] = []
+
+    async def aexecute(self, command: str, *, timeout: int | None = None) -> _Response:
+        self.commands.append(command)
+        raise self.error
+
+
+@pytest.mark.asyncio
+async def test_backend_exception_is_incomplete_and_skips_remaining_steps() -> None:
+    # The sandbox itself raising (container cannot start, exec fails, transport
+    # error) must not abort the review: bootstrap is best-effort.
+    backend = _ExplodingBackend(RuntimeError("container failed to start"))
+    result = await bootstrap_environment(
+        backend,
+        setup_declaration_content="setup:\n  - run: one\n  - run: two\n",
+    )
+    assert result.status is BootstrapStatus.INCOMPLETE
+    assert result.reason is not None and "could not run" in result.reason
+    # Only the first step was attempted; the failure stopped the rest.
+    assert backend.commands == ["cd /workspace && one"]
+    assert result.steps == ()
+
+
+@pytest.mark.asyncio
+async def test_undetermined_exit_code_is_treated_as_failure() -> None:
+    # The sandbox contract allows exit_code=None ("could not be determined");
+    # that is not success, so it must mark the environment incomplete rather
+    # than raise.
+    backend = _FakeBackend(responses=[_Response(exit_code=None)])
+    result = await bootstrap_environment(
+        backend, setup_declaration_content="setup:\n  - run: one\n"
+    )
+    assert result.status is BootstrapStatus.INCOMPLETE
+    assert result.steps[0].exit_code == EXIT_CODE_UNDETERMINED
+    assert result.reason is not None and "exit -1" in result.reason
