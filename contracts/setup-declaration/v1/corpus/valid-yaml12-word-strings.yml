@@ -1,0 +1,9 @@
+# Under the YAML 1.2 Core schema these words are plain strings, not booleans,
+# so they are valid commands, paths, env values, and env names.
+setup:
+  - run: on
+    working-directory: no
+    env:
+      FLAG: off
+      yes: ok
+      y: n

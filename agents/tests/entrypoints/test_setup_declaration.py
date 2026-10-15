@@ -129,25 +129,26 @@ def test_accepts_portable_env_variable_names() -> None:
     assert setup.steps[0].env == {"_A1": "ok"}
 
 
-@pytest.mark.parametrize("raw", ["yes", "on", "off", "no", "true", "false"])
-def test_rejects_boolean_like_env_keys(raw: str) -> None:
-    # In YAML 1.1 these plain keys are booleans, not strings; the `yaml`
-    # library (YAML 1.2) reads them as strings, so the integration rejects them
-    # explicitly to keep both enforcers on the same boundary. Authors must
-    # quote a variable that would otherwise read as a boolean.
+@pytest.mark.parametrize("raw", ["yes", "on", "off", "no", "y", "n"])
+def test_accepts_yaml11_boolean_words_as_env_keys(raw: str) -> None:
+    # Under the YAML 1.2 Core schema these are plain strings, so they are valid
+    # variable names on both enforcers.
+    setup = parse_setup_declaration(f"setup:\n  - run: x\n    env:\n      {raw}: ok\n")
+    assert setup.steps[0].env == {raw: "ok"}
+
+
+@pytest.mark.parametrize("raw", ["true", "false", "123", "null"])
+def test_rejects_non_string_env_keys(raw: str) -> None:
+    # Real booleans/numbers/null are non-strings in the Core schema too, so an
+    # env key still has to be a string.
     with pytest.raises(SetupDeclarationError):
         parse_setup_declaration(f"setup:\n  - run: x\n    env:\n      {raw}: ok\n")
 
 
-def test_accepts_quoted_boolean_like_env_key() -> None:
-    setup = parse_setup_declaration('setup:\n  - run: x\n    env:\n      "on": ok\n')
-    assert setup.steps[0].env == {"on": "ok"}
-
-
-@pytest.mark.parametrize("raw", ["false", "123", "on"])
+@pytest.mark.parametrize("raw", ["false", "123"])
 def test_rejects_non_string_run(raw: str) -> None:
-    # YAML would parse bare false/123/on/null as non-strings; a run must be a
-    # literal command string.
+    # Core-schema booleans/numbers are not strings; a run must be a literal
+    # command string.
     with pytest.raises(SetupDeclarationError, match="run must be a non-empty string"):
         parse_setup_declaration(f"setup:\n  - run: {raw}\n")
 
@@ -179,20 +180,11 @@ def test_rejects_boolean_timeout() -> None:
         parse_setup_declaration("setup:\n  - run: x\n    timeout_seconds: true\n")
 
 
-@pytest.mark.parametrize("raw", ["on", "yes", "off", "no"])
-def test_unquoted_yaml11_booleans_are_rejected_as_run(raw: str) -> None:
-    # The runner parses with PyYAML (YAML 1.1), where `on`/`yes`/`off`/`no` are
-    # booleans, so an unquoted `run: on` is not a command string. The integration
-    # validator parses with the `yaml` library (YAML 1.2) and applies the same
-    # stricter reading to `run`, so it rejects this too: the integration cannot
-    # accept a declaration the runner then refuses to execute. The shared corpus
-    # pins both sides (`invalid-boolean-like-run.yml`). Authors must quote such
-    # values. See contracts/setup-declaration/v1/SPEC.md.
-    with pytest.raises(SetupDeclarationError, match="run must be a non-empty string"):
-        parse_setup_declaration(f"setup:\n  - run: {raw}\n")
-
-
-def test_quoted_boolean_like_run_is_accepted() -> None:
-    # Quoting removes the ambiguity: both parsers see a string.
-    setup = parse_setup_declaration('setup:\n  - run: "on"\n')
-    assert setup.steps[0].run == "on"
+@pytest.mark.parametrize("raw", ["on", "yes", "off", "no", "y", "n"])
+def test_unquoted_yaml11_boolean_words_are_strings_as_run(raw: str) -> None:
+    # Both enforcers parse with the YAML 1.2 Core schema, where `on`/`yes`/
+    # `off`/`no`/`y`/`n` are plain strings, so `run: on` is the command string
+    # "on" -- not a boolean. The shared corpus pins this
+    # (`valid-yaml12-word-strings.yml`). See the SPEC's dialect section.
+    setup = parse_setup_declaration(f"setup:\n  - run: {raw}\n")
+    assert setup.steps[0].run == raw

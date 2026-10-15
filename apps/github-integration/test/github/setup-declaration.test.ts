@@ -73,13 +73,24 @@ test('rejects an invalid declaration with a reason', () => {
   )
 })
 
-test('rejects unquoted boolean-like run and working-directory values', () => {
-  // Although this validator parses with the `yaml` library (YAML 1.2), where
-  // `on`/`yes`/`off`/`no` are plain strings, the runner parses with PyYAML
-  // (YAML 1.1), where they are booleans. Every string-valued position is held
-  // to that stricter reading here, so the integration cannot accept a
-  // declaration the runner then refuses to execute.
-  for (const raw of ['on', 'yes', 'off', 'no']) {
+test('accepts YAML 1.1 boolean words as plain strings under the Core schema', () => {
+  // Both enforcers parse with the YAML 1.2 Core schema, where `on`/`yes`/`off`/
+  // `no`/`y`/`n` are ordinary strings. They are therefore valid commands, paths,
+  // env values, and env keys -- not the booleans a YAML 1.1 parser would see.
+  for (const word of ['on', 'yes', 'off', 'no', 'y', 'n', 'Y', 'N']) {
+    const declaration = parseSetupDeclaration(
+      `setup:\n  - run: ${word}\n    working-directory: ${word}\n    env:\n      ${word}: ${word}\n`
+    )
+    assert.equal(declaration?.steps[0]?.run, word)
+    assert.equal(declaration?.steps[0]?.working_directory, word)
+    assert.equal(declaration?.steps[0]?.env[word], word)
+  }
+})
+
+test('rejects unquoted booleans and numbers in string positions', () => {
+  // The words above are strings, but real booleans/numbers are not strings in
+  // either dialect, so a string-valued position still rejects them.
+  for (const raw of ['true', 'false', '123']) {
     assert.throws(
       () => parseSetupDeclaration(`setup:\n  - run: ${raw}\n`),
       SetupDeclarationError,
@@ -90,36 +101,12 @@ test('rejects unquoted boolean-like run and working-directory values', () => {
       SetupDeclarationError,
       `working-directory: ${raw} should be rejected`
     )
-  }
-})
-
-test('rejects unquoted boolean-like env values', () => {
-  for (const raw of ['on', 'yes', 'off', 'no']) {
     assert.throws(
       () => parseSetupDeclaration(`setup:\n  - run: x\n    env:\n      FLAG: ${raw}\n`),
       SetupDeclarationError,
       `env value ${raw} should be rejected`
     )
   }
-})
-
-test('rejects plain boolean-like env keys (matches the runner dialect)', () => {
-  // `env` *keys* are kept on the runner's YAML 1.1 reading even though this
-  // validator uses YAML 1.2: an unquoted `on`/`yes`/... would be a boolean for
-  // PyYAML but a string here, so it is rejected here too rather than letting a
-  // declaration through that the runner would then refuse to execute.
-  for (const raw of ['on', 'yes', 'off', 'no', 'true', 'false']) {
-    assert.throws(
-      () => parseSetupDeclaration(`setup:\n  - run: x\n    env:\n      ${raw}: ok\n`),
-      SetupDeclarationError,
-      `env key ${raw} should be rejected`
-    )
-  }
-})
-
-test('accepts a quoted boolean-like env key in both dialects', () => {
-  const declaration = parseSetupDeclaration('setup:\n  - run: x\n    env:\n      "on": ok\n')
-  assert.equal(declaration?.steps[0]?.env['on'], 'ok')
 })
 
 test('rejects non-string env keys', () => {

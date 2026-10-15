@@ -1,4 +1,0 @@
-setup:
-  - run: x
-    env:
-      yes: ok

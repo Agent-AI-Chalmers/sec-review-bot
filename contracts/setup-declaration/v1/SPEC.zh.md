@@ -41,7 +41,7 @@ setup:
 - 每个 step 只能携带 `run`、`working-directory`、`env`、`timeout_seconds`；
 - `run` 必填且必须是非空字符串；
 - `working-directory` 若存在，必须是非空字符串、相对路径、且留在仓库根内（不得以 `/` 开头，不得含 `..` 片段）。包含性是对声明路径的词法检查，不解析软链接：仓库内部的软链接不会被这条规则跟随（声明是受信内容，因此这是包含性约束，不是沙箱）；
-- `env` 若存在，必须是字符串键到字符串值的映射，键需匹配上面的标识符模式。键和值都必须是*在两种 YAML 方言下都为字符串*：YAML 1.1 会读成布尔值的 plain 标量（`on`、`yes`、`off`、`no` 等）会被拒绝，即便 YAML 1.2 把它读成字符串。如果那确实是想要的名称或值，就要加引号（`"on"`）。同一条更严格的读法也适用于 `run` 与 `working-directory`（见"标量与 YAML 方言"）；
+- `env` 若存在，必须是字符串键到字符串值的映射，键需匹配上面的标识符模式。声明使用 **YAML 1.2 Core schema** 解析，因此键和值必须在该 schema 下是字符串：`on`、`yes`、`off`、`no`、`y`、`n` 都是普通字符串，而 `true`、`123`、`null` 不是字符串，会被拒绝。这条规则同样适用于 `run` 与 `working-directory`（见"标量与 YAML 方言"）；
 - `timeout_seconds` 若存在，必须是正整数（布尔不算整数）。
 
 **空白内容不是声明。** 空文件或只含空白的文件会被完全当作文件不存在：它合法，且表示"无声明"。这不是错误。
@@ -70,24 +70,24 @@ setup:
 
 ### 标量与 YAML 方言
 
-两个执行者使用不同的 YAML 库，而这两个库实现不同的标量解析规则：
+两个执行者都用 **YAML 1.2 Core schema** 解析声明：
 
-- runner 使用 PyYAML（YAML 1.1），其中 `on`、`yes`、`off`、`no` 解析为布尔值；
-- integration 使用 `yaml` 库（YAML 1.2），其中同样的词解析为字符串。
+- runner 在 PyYAML 之上使用 `yamlcore` 的 Core schema loader；
+- integration 使用 `yaml` 库并设置 `schema: 'core'`。
 
-两个库无法在每一个有歧义的标量上达成一致（每个库的"version"选项只是把一个分歧换成另一个），语料也不能收录"类型本身就是被检验对象"的标量——两个执行者会读出不同的类型。因此执行者不依赖两个库达成一致，而是对所有**必须为字符串**的位置，在两侧都采用*更严格*（YAML 1.1）的读法：
+两侧使用同一个 schema，意味着每个标量的解析结果都相同，因此一份声明在两个执行者处会被同样地接受或拒绝。特别地，在 Core schema 下 `on`、`yes`、`off`、`no`、`y`、`n` 都是**普通字符串**，不是布尔值——所以 `run: on` 就是命令字符串 `on`，`env: { yes: ok }` 会设置 `yes=ok`。未加引号的 `true`/`false` 是布尔值，`123` 是数字，`null`/`~` 是 null；它们在任何字符串位置（`run`、`working-directory`、`env` 的键与值）都会被拒绝，因为不是字符串。加引号总能强制成字符串（`run: "on"`），但对 Core schema 的这些词并非必须。
 
-- `env` 的 *键* 与 *值*；
-- `run`；
-- `working-directory`。
+选 Core schema 的理由：
 
-在这些位置，YAML 1.1 会解析成布尔值的 **plain** 标量（`on`、`yes`、`off`、`no` 及其大小写变体）会被**双方**拒绝，即便 integration 所用的 YAML 1.2 库会把它读成字符串。加引号的 `"on"` 在两种方言中都是字符串，会被接受。两种方言下都为非字符串的值——未加引号的布尔（`true`）、数字（`123`）和 `null`——已由值级类型检查拒绝。这样在整个字符串值表面上，"integration 接受了它" 与 "runner 能解析它" 就是同一句话：integration 无法接受一个 runner 随后拒绝执行的声明。
+- 它是现代默认（YAML 1.1 的隐式类型——`on` 当布尔、`1_000` 和 `12:30` 当数字、日期当时间戳——已被有意移除）；
+- 它符合实践（GitHub Actions 的 workflow 就直接写裸 `on:` 键）；
+- 它与 YAMLScript 一致——YAMLScript 是目前唯一"一份实现、多语言 binding"的 YAML 库，其标量解析正是这套 Core schema。
 
-`timeout_seconds` 是唯一的数字位置，不受影响：它必须是正整数，而类布尔词在两种方言中都不是整数。
+唯一不是 schema 差异的规则，是 `env` 的 **键** 解析为非字符串（`true`、`123`、`null`）。integration 的 `toJS()` 会把这种键 stringify 成看起来合法的名字，而 runner 保留其真实类型并拒绝，因此 integration 也在 AST 上（stringify 之前）拒绝它。这样在整个键空间上，"integration 接受了它" 与 "runner 能解析它" 就是同一句话。
 
-因此给作者的实用规则是：**任何可能被读成非字符串的值都要加引号**——`run: "on"`、`working-directory: "no"`、`env: { FLAG: "off" }`。语料同时覆盖边界两侧：未加引号的类布尔标量对应 `invalid-boolean-like-run.yml`、`invalid-boolean-like-working-directory.yml` 与 `invalid-boolean-like-env-value.yml`；类布尔键对应 `invalid-env-boolean-like-key.yml`；加引号形式对应 `valid-quoted-boolean-like-values.yml` 与 `valid-quoted-boolean-like-env-key.yml`。
+语料覆盖这条边界：`valid-yaml12-word-strings.yml` 钉住 Core schema 的词是字符串；`invalid-non-string-run.yml`、`invalid-non-string-working-directory.yml`、`invalid-env-value-boolean.yml`、`invalid-env-non-string-key.yml` 钉住真正的布尔/数字会被拒绝。
 
-每个实现都用一个测试钉住自己的方言，因此升级库若改变了标量解析，会直接让测试失败，而不是悄悄移动这条边界。
+每个实现都用一个测试钉住 schema，因此库若改变了标量解析，会直接让测试失败，而不是悄悄移动这条边界。
 
 ## 信任
 

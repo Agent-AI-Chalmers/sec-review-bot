@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import yaml
+import yamlcore  # type: ignore[import-untyped]
 
 DEFAULT_STEP_TIMEOUT_SECONDS = 300
 MAX_STEP_TIMEOUT_ENV = "SEC_REVIEW_SETUP_STEP_MAX_SECONDS"
@@ -75,7 +76,7 @@ def is_blank_setup_declaration(content: str) -> bool:
 
     Blank content means "no declaration", not a malformed one. Callers short
     circuit on this rather than feeding blank text into the parser, which would
-    otherwise reject `None` (from `yaml.safe_load('')`) as "not a mapping".
+    otherwise reject `None` (from an empty load) as "not a mapping".
     """
     return content.strip() == ""
 
@@ -95,7 +96,13 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
             f"Setup declaration exceeds {MAX_SETUP_DECLARATION_BYTES} bytes."
         )
     try:
-        parsed = yaml.safe_load(content)
+        # Parse with the YAML 1.2 Core schema (via yamlcore), the same schema
+        # the GitHub integration uses (`yaml` with `schema: 'core'`). The two
+        # libraries then resolve every scalar the same way, so a declaration is
+        # accepted or rejected identically on both sides. In particular
+        # `on`/`yes`/`no`/`off`/`y`/`n` are plain strings under 1.2, not
+        # booleans, so a `run: on` is a command string rather than a parse error.
+        parsed: Any = yaml.load(content, Loader=yamlcore.CCoreLoader)
     except yaml.YAMLError as error:
         raise SetupDeclarationError(
             f"Setup declaration is not valid YAML: {error}"

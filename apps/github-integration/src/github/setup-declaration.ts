@@ -84,40 +84,17 @@ export function isSetupDeclarationError(error: unknown): error is SetupDeclarati
   )
 }
 
-// YAML 1.1 boolean words that the `yaml` library (YAML 1.2) reads as plain
-// strings. The runner's PyYAML (1.1) reads them as booleans, so an *unquoted*
-// `run: on` (or `working-directory: no`, or an `env` key/value `yes`) is a
-// boolean for the runner but a string here — enough to let the integration
-// accept a declaration the runner then refuses to execute. `true`/`false` are
-// absent on purpose: both dialects already resolve them to booleans, so the
-// value-level type checks reject them. The two libraries also disagree on
-// single-letter `y`/`n` (1.1 spec says boolean, PyYAML says string); they are
-// deliberately not treated as boolean-like here, matching PyYAML.
-const YAML_1_1_BOOLEAN_WORDS = new Set(['yes', 'no', 'on', 'off'])
-
-/** A plain (unquoted) scalar that this validator reads as a string but the
- * runner reads as a boolean. A quoted `"on"` is a string in both dialects. */
-function isYaml11BooleanWord(node: unknown): boolean {
-  return (
-    isScalar(node) &&
-    node.type === 'PLAIN' &&
-    typeof node.value === 'string' &&
-    YAML_1_1_BOOLEAN_WORDS.has(node.value.toLowerCase())
-  )
-}
-
 /**
- * Reject the scalars where the two YAML dialects disagree, so the integration
- * cannot accept a declaration the runner then refuses to execute.
+ * Reject `env` *keys* that resolve to a non-string.
  *
- * Two checks, both on the AST (the resolved JS value has already lost quoting):
- *
- * - an `env` key that resolves to a non-string (a plain `true`/`123`/`null`) —
- *   PyYAML rejects it, and `toJS()` would stringify it into a valid-looking key;
- * - an unquoted boolean-like scalar in any string position — `run`,
- *   `working-directory`, an `env` key, or an `env` value.
+ * This is not a schema difference: it is that `toJS()` stringifies a non-string
+ * mapping key (`true`/`123`/`null` -- whichever schema -- become `"true"`/`"123"`/
+ * `"null"`), which would then pass the identifier check as a valid-looking name.
+ * The runner's parser keeps the key's real type and rejects it, so this AST
+ * check keeps the two enforcers on the same boundary. A quoted `"123"` stays a
+ * string in both.
  */
-function rejectNonPortableScalars(contents: Node | null): void {
+function rejectNonStringEnvKeys(contents: Node | null): void {
   const steps = isMap(contents) ? contents.get('setup') : undefined
   if (!isSeq(steps)) {
     return
@@ -126,42 +103,16 @@ function rejectNonPortableScalars(contents: Node | null): void {
     if (!isMap(step)) {
       return
     }
-    for (const item of (step as YAMLMap).items) {
-      const key = isScalar(item.key) ? item.key.value : undefined
-      if (key === 'run' || key === 'working-directory') {
-        if (isYaml11BooleanWord(item.value)) {
-          throw new SetupDeclarationError(
-            `setup[${index}].${key} is a boolean-like scalar that must be quoted: ${JSON.stringify(
-              (item.value as { value: string }).value
-            )}`,
-            { reason: key === 'run' ? 'invalid-run' : 'invalid-working-directory' }
-          )
-        }
-      } else if (key === 'env' && isMap(item.value)) {
-        for (const pair of (item.value as YAMLMap).items) {
-          if (isScalar(pair.key) && typeof pair.key.value !== 'string') {
-            throw new SetupDeclarationError(
-              `setup[${index}].env must map string keys to string values.`,
-              { reason: 'invalid-env' }
-            )
-          }
-          if (isYaml11BooleanWord(pair.key)) {
-            throw new SetupDeclarationError(
-              `setup[${index}].env has a boolean-like key that must be quoted: ${JSON.stringify(
-                (pair.key as { value: string }).value
-              )}`,
-              { reason: 'invalid-env-name' }
-            )
-          }
-          if (isYaml11BooleanWord(pair.value)) {
-            throw new SetupDeclarationError(
-              `setup[${index}].env has a boolean-like value that must be quoted: ${JSON.stringify(
-                (pair.value as { value: string }).value
-              )}`,
-              { reason: 'invalid-env' }
-            )
-          }
-        }
+    const env = step.get('env')
+    if (!isMap(env)) {
+      return
+    }
+    for (const item of (env as YAMLMap).items) {
+      if (isScalar(item.key) && typeof item.key.value !== 'string') {
+        throw new SetupDeclarationError(
+          `setup[${index}].env must map string keys to string values.`,
+          { reason: 'invalid-env' }
+        )
       }
     }
   })
@@ -290,20 +241,20 @@ export function parseSetupDeclaration(content: string): SetupDeclaration | null 
     )
   }
 
-  // Parse to a document (not plain JS) so `env` *keys* can be inspected with
-  // their scalar type and quoting preserved. The `yaml` library reads an
-  // unquoted `on` as the string `"on"` (YAML 1.2) while the runner's PyYAML
-  // reads it as a boolean (YAML 1.1); a plain key-level pre-pass keeps both
-  // enforcers on the same boundary for keys, without disturbing the value-level
-  // dialect divergence the SPEC documents for `run`.
-  const document = parseDocument(content)
+  // Parse with the YAML 1.2 Core schema, the same schema the runner uses (its
+  // `yamlcore.CCoreLoader`). With one schema on both sides, every scalar
+  // resolves identically, so no value-level reconciliation is needed: under the
+  // Core schema `on`/`yes`/`no`/`off`/`y`/`n` are plain strings, not booleans.
+  // Parse to a document, not plain JS, so `env` *keys* can still be inspected
+  // before `toJS()` stringifies a non-string key.
+  const document = parseDocument(content, { schema: 'core' })
   if (document.errors.length > 0) {
     throw new SetupDeclarationError('Setup declaration is not valid YAML.', {
       reason: 'invalid-yaml',
       cause: document.errors[0]
     })
   }
-  rejectNonPortableScalars(document.contents)
+  rejectNonStringEnvKeys(document.contents)
 
   let parsed: unknown
   try {

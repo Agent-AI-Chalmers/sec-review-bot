@@ -6,15 +6,12 @@
     "valid-minimal.yml",
     "valid-portable-env-names.yml",
     "valid-quoted-boolean-like-env-key.yml",
-    "valid-quoted-boolean-like-values.yml"
+    "valid-quoted-boolean-like-values.yml",
+    "valid-yaml12-word-strings.yml"
   ],
   "invalid": [
     "invalid-blank-run.yml",
-    "invalid-boolean-like-env-value.yml",
-    "invalid-boolean-like-run.yml",
-    "invalid-boolean-like-working-directory.yml",
     "invalid-boolean-timeout.yml",
-    "invalid-env-boolean-like-key.yml",
     "invalid-env-name.yml",
     "invalid-env-non-string-key.yml",
     "invalid-env-non-string.yml",

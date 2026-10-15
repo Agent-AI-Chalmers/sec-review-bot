@@ -1762,6 +1762,7 @@ dependencies = [
     { name = "structlog" },
     { name = "temporalio" },
     { name = "uvicorn" },
+    { name = "yamlcore" },
 ]
 
 [package.dev-dependencies]
@@ -1812,6 +1813,7 @@ requires-dist = [
     { name = "structlog", specifier = ">=26.1.0" },
     { name = "temporalio", specifier = ">=1.30.0" },
     { name = "uvicorn", specifier = ">=0.52.0" },
+    { name = "yamlcore", specifier = ">=0.0.4" },
 ]
 
 [package.metadata.requires-dev]
@@ -2188,6 +2190,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/12/11/b99949f0ba2b07e9f9ffe83b9c86faa685f9080725dc21a916a607313be5/xxhash-3.8.1-cp314-cp314t-win32.whl", hash = "sha256:c240939e963653054fc7e4a17c382829cda4aa88a7daf0af841715dbded1b497", size = 33150, upload-time = "2026-07-06T10:47:57.274Z" },
     { url = "https://files.pythonhosted.org/packages/54/1c/09703eb341f8416e74e58d6c6732d4b5c46de59c942363203cb237cc95b0/xxhash-3.8.1-cp314-cp314t-win_amd64.whl", hash = "sha256:7258ee276e8772599bc19e14b36f6260306e21b637190cd7cb489a2449d48684", size = 34005, upload-time = "2026-07-06T10:47:59.434Z" },
     { url = "https://files.pythonhosted.org/packages/d6/f9/6ed7251bb6a8af10ac73b1821c60583d2826e5b2064e45a979c935287c98/xxhash-3.8.1-cp314-cp314t-win_arm64.whl", hash = "sha256:8f454166c2ffed45636c8d501741e649851ba2f346c4eb73a64c07ac00428f20", size = 30239, upload-time = "2026-07-06T10:48:01.874Z" },
+]
+
+[[package]]
+name = "yamlcore"
+version = "0.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/eb/d4/113dfc4c85f945de13b045a20eca50be5f6efa33342d9a9bd6162d26b288/yamlcore-0.0.4.tar.gz", hash = "sha256:c2b1a08dd117cf76a70ee124e936b3c568b0b5c4e5131e69b513f4a877a44881", size = 10456, upload-time = "2024-10-09T17:26:02.601Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/47/632498fd9a3fe4f175e5de71162dd8cd9b2141180a98f0bef6af293aeaa6/yamlcore-0.0.4-py3-none-any.whl", hash = "sha256:f82a7f7d16baf6531a8c3266b0b63ece251ee2abaf2b9eee040a2f64c8fc618d", size = 5969, upload-time = "2024-10-09T17:26:01.507Z" },
 ]
 
 [[package]]

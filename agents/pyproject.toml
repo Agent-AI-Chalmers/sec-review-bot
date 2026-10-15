@@ -24,6 +24,7 @@ dependencies = [
   "temporalio>=1.30.0",
   "uvicorn>=0.52.0",
   "boto3>=1.40.0",
+  "yamlcore>=0.0.4",
 ]
 
 [dependency-groups]

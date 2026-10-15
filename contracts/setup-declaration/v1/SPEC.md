@@ -40,7 +40,7 @@ ignored:
 - each step may carry only `run`, `working-directory`, `env`, and `timeout_seconds`;
 - `run` is required and must be a non-empty string;
 - `working-directory`, when present, must be a non-empty string that is relative and stays inside the repository root (no leading `/`, no `..` segment). Containment is checked lexically on the declared path; it does not resolve symlinks, so a symlink inside the repository is not followed by this rule (the declaration is trusted content, so this is containment, not a sandbox);
-- `env`, when present, must be a mapping of string keys to string values, with keys matching the identifier pattern above. Keys and values must be *strings in both YAML dialects*: a plain scalar that YAML 1.1 reads as a boolean (`on`, `yes`, `off`, `no`, ...) is rejected even though YAML 1.2 reads it as a string. Quote such a value (`"on"`) if that is genuinely the name or the value. The same stricter reading applies to `run` and `working-directory` (see "Scalars and YAML dialects");
+- `env`, when present, must be a mapping of string keys to string values, with keys matching the identifier pattern above. The declaration is parsed with the **YAML 1.2 Core schema**, so a key or value must be a string under that schema: `on`, `yes`, `off`, `no`, `y`, and `n` are plain strings, but `true`, `123`, and `null` are not and are rejected. This applies to `run` and `working-directory` too (see "Scalars and YAML dialects");
 - `timeout_seconds`, when present, must be a positive integer (booleans are not integers).
 
 **Blank content is not a declaration.** An empty or whitespace-only file is treated exactly like a missing file: it is valid and means "no declaration". It is not an error.
@@ -69,24 +69,24 @@ This corpus is the executable boundary of the format. Adding a rule means adding
 
 ### Scalars and YAML dialects
 
-The two enforcers use different YAML libraries, and the libraries implement different scalar-resolution rules:
+Both enforcers parse the declaration with the **YAML 1.2 Core schema**:
 
-- the runner uses PyYAML (YAML 1.1), where `on`, `yes`, `off`, and `no` resolve to booleans;
-- the integration uses the `yaml` library (YAML 1.2), where those same words resolve to strings.
+- the runner uses `yamlcore`'s Core-schema loader on top of PyYAML;
+- the integration uses the `yaml` library with `schema: 'core'`.
 
-The libraries cannot be made to agree on every ambiguous scalar (each library's "version" option trades one disagreement for another), and the corpus cannot contain a scalar whose *kind* is the thing being tested — the two enforcers would read it differently. So the enforcers do not rely on the libraries agreeing. Instead, every position that must hold a **string** is held to the *stricter* (YAML 1.1) reading on both sides:
+Using one schema on both sides means every scalar resolves identically, so a declaration is accepted or rejected the same way by both. In particular, under the Core schema the words `on`, `yes`, `off`, `no`, `y`, and `n` are **plain strings**, not booleans — so `run: on` is the command string `on`, and `env: { yes: ok }` sets `yes=ok`. Unquoted `true`/`false` are booleans, `123` is a number, and `null`/`~` are null; those are rejected in any string-valued position (`run`, `working-directory`, `env` keys and values) because they are not strings. Quoting always forces a string (`run: "on"`), but it is not required for the Core-schema words.
 
-- `env` *keys* and `env` *values*;
-- `run`;
-- `working-directory`.
+The Core schema is the intersection of what the two libraries agree on, and both were chosen for their 1.2 behavior:
 
-In each of these positions a **plain** scalar that YAML 1.1 resolves to a boolean (`on`, `yes`, `off`, `no`, and their case variants) is rejected by **both** enforcers, even though the integration's YAML 1.2 library would read it as a string. A quoted `"on"` is a string in both dialects and is accepted. Values that are non-strings in both dialects — unquoted booleans (`true`), numbers (`123`), and `null` — are already rejected by the value-level type checks. This keeps "the integration accepted it" and "the runner can parse it" the same statement for the whole string-valued surface: the integration cannot accept a declaration the runner then refuses to execute.
+- it is the modern default (YAML 1.1's implicit typing — `on` as a boolean, `1_000` and `12:30` as numbers, dates as timestamps — is deliberately gone);
+- it is what GitHub Actions accepts in practice (workflow files use a bare `on:` key);
+- it matches YAMLScript, the only current "one implementation, many language bindings" YAML library, whose scalar resolution is exactly this Core schema.
 
-`timeout_seconds` is the one numeric position and is unaffected: it must be a positive integer, and the boolean-like words are not integers in either dialect.
+The one scalar rule that is *not* a schema difference is an `env` **key** that resolves to a non-string (`true`, `123`, `null`). The integration's `toJS()` stringifies such a key into a valid-looking name, while the runner keeps its type and rejects it, so the integration rejects it too (on the AST, before stringification). This keeps "the integration accepted it" and "the runner can parse it" the same statement for the whole key space.
 
-The practical rule for authors is therefore: **quote any value that could be read as a non-string** — `run: "on"`, `working-directory: "no"`, `env: { FLAG: "off" }`. The corpus covers both sides of the boundary: `invalid-boolean-like-run.yml`, `invalid-boolean-like-working-directory.yml`, and `invalid-boolean-like-env-value.yml` for unquoted boolean-like scalars; `invalid-env-boolean-like-key.yml` for a boolean-like key; and `valid-quoted-boolean-like-values.yml` / `valid-quoted-boolean-like-env-key.yml` for the quoted forms.
+The corpus covers the boundary: `valid-yaml12-word-strings.yml` pins that the Core-schema words are strings; `invalid-non-string-run.yml`, `invalid-non-string-working-directory.yml`, `invalid-env-value-boolean.yml`, and `invalid-env-non-string-key.yml` pin that real booleans/numbers are rejected.
 
-Each implementation pins its own dialect with a test, so a library upgrade that changes scalar resolution fails a test rather than silently shifting the boundary.
+Each implementation pins the schema with a test, so a library change that alters scalar resolution fails a test rather than silently shifting the boundary.
 
 ## Trust
 
