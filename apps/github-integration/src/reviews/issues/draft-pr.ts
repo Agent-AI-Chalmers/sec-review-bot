@@ -9,13 +9,13 @@ import type { ReviewRecord } from '../review-record.js'
 import type { FileChange, FileMode } from '../file-change.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
+import { resolveTrustedDefaultBranch } from '../../github/default-branch-service.js'
 
 interface IssueContext {
   issue_number: number
   issue_title?: string
   owner_login: string
   repo_name: string
-  default_branch: string
 }
 
 function buildDraftBranchName(issue: IssueContext, run_id: string | undefined): string {
@@ -168,7 +168,17 @@ export async function createDraftPullRequestFromIssueReviewRecord({
   const file_changes = normalizePublishableFileChanges(review_record?.mitigation?.file_changes)
   const owner = issue.owner_login
   const repo = issue.repo_name
-  const base = issue.default_branch
+  // Resolve the PR base from the API rather than the webhook payload's
+  // `repository.default_branch`: the base of a bot-opened draft PR is a
+  // trust-relevant ref, and the rest of the flow already refuses payload-derived
+  // refs. `workspace_ref` (the head the commit is based on) is the same
+  // API-resolved default-branch SHA.
+  const base = (
+    await resolveTrustedDefaultBranch(octokit, {
+      owner_login: owner,
+      repo_name: repo
+    })
+  ).default_branch
   const head_sha = workspace_ref
   const branch_name = buildDraftBranchName(issue, run_id)
   const title = buildDraftPullRequestTitleFromReviewRecord(issue)

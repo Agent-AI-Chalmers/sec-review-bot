@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.entrypoints.setup_declaration import (
+    SetupDeclarationError,
+    is_blank_setup_declaration,
+    parse_setup_declaration,
+)
 from sec_review_agents.filesystem.backend_selection import (
     selected_sandbox_backend_kind,
 )
@@ -32,21 +37,33 @@ def create_local_run_id() -> str:
 
 
 def read_setup_declaration_file(path: str | Path | None) -> str | None:
-    """Read a local setup declaration file into its inline text form.
+    """Read and validate a local setup declaration file into its inline text form.
 
-    Returns None when no path is given. Raises ValueError when the path does not
-    point at a readable file, so a typo fails fast instead of silently skipping
-    bootstrap.
+    Returns None when no path is given, or when the file holds only whitespace
+    (blank content means "no declaration"). Raises ValueError when the path does
+    not point at a readable file, so a typo fails fast instead of silently
+    skipping bootstrap, and when the content is not a valid declaration -- the
+    same content rules the GitHub integration enforces, so a local run fails the
+    same way a repository's default-branch declaration would.
     """
     if path is None:
         return None
     resolved = Path(path).expanduser()
     try:
-        return resolved.read_text(encoding="utf-8")
+        content = resolved.read_text(encoding="utf-8")
     except OSError as error:
         raise ValueError(
             f"Unable to read setup declaration file: {resolved} ({error})"
         ) from error
+    if is_blank_setup_declaration(content):
+        return None
+    try:
+        parse_setup_declaration(content)
+    except SetupDeclarationError as error:
+        raise ValueError(
+            f"Invalid setup declaration file: {resolved} ({error})"
+        ) from error
+    return content
 
 
 def load_setup_declaration_content(path: str | Path | None) -> str | None:

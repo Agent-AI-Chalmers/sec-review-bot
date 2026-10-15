@@ -2,7 +2,7 @@ import { type ContractVersion } from '../../runner/contract-version.js'
 import type { FileChange } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import type { ReviewRecord } from '../review-record.js'
-import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
+import { assertWorkflowResult } from '../../runner/contract-schema.js'
 
 // Consumer-side view for repository delivery publishing. Unlike the JSON Schema, this
 // intentionally lists only fields this integration reads; add another public field here
@@ -40,7 +40,7 @@ function requirePublishableFileChanges(file_changes: FileChange[]): void {
 }
 
 export function parseRepositoryWorkflowResult(value: unknown): RepositoryWorkflowResult {
-  assertV5WorkflowResult('repository-review', value)
+  assertWorkflowResult('repository-review', value)
   const result = value as Omit<RepositoryWorkflowResult, 'deliveries'> & {
     deliveries: Array<Omit<RepositoryDelivery, 'case_count'>>
   }

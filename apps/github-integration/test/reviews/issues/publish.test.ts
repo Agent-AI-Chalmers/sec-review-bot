@@ -65,6 +65,12 @@ function buildHarness() {
 
   const octokit = {
     rest: {
+      repos: {
+        // The draft-PR base is resolved via API, not from the payload/persisted
+        // default_branch; keep the mock's resolved value aligned with the fixture.
+        get: async () => ({ data: { default_branch: 'main' } }),
+        getBranch: async () => ({ data: { commit: { sha: 'resolved-default-sha' } } })
+      },
       pulls: {
         list: async () => ({ data: [] }),
         create: async (args: unknown) => {

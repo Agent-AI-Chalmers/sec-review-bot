@@ -46,3 +46,18 @@ def test_non_docker_does_not_read_so_missing_path_does_not_raise(
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", backend)
     assert load_setup_declaration_content(tmp_path / "missing.yml") is None
     assert "SETUP_DECLARATION_WARNING" in capsys.readouterr().err
+
+
+def test_docker_blank_file_means_no_declaration(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
+    path = tmp_path / "setup.yml"
+    path.write_text("   \n\n", encoding="utf-8")
+    assert load_setup_declaration_content(path) is None
+
+
+def test_docker_invalid_declaration_is_an_error(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
+    path = tmp_path / "setup.yml"
+    path.write_text("setup:\n  - uses: actions/checkout@v4\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid setup declaration file"):
+        load_setup_declaration_content(path)

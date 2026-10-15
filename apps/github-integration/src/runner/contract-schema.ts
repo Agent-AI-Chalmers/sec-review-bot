@@ -81,14 +81,24 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
     const details = validate.errors
       ?.map((error) => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
       .join('; ')
-    throw new Error(`${label} does not match contract v6${details ? `: ${details}` : '.'}`)
+    throw new Error(
+      `${label} does not match contract ${CONTRACT_VERSION_DIR}${details ? `: ${details}` : '.'}`
+    )
   }
 }
 
-export function assertV5WorkflowResult(workflow: WorkflowName, value: unknown): void {
+/**
+ * Validate a workflow result against the current contract's result schema.
+ *
+ * Version-independent by name: the schema is selected from
+ * `CONTRACT_VERSION_DIR` (the single source of truth for the on-disk contract
+ * version), so this function tracks contract bumps without a rename.
+ */
+export function assertWorkflowResult(workflow: WorkflowName, value: unknown): void {
   assertSchema(RESULT_SCHEMA_BY_WORKFLOW[workflow], value, `${workflow} result`)
 }
 
-export function assertV5ReviewRecord(value: unknown): void {
+/** Validate a review record against the current contract's review-record schema. */
+export function assertReviewRecord(value: unknown): void {
   assertSchema('review-record.schema.json', value, 'review_record')
 }

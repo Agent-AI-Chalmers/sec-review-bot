@@ -9,6 +9,7 @@ import { logWarn } from '../utils/logger.js'
 const execFileAsync = promisify(execFile)
 export const WORKSPACE_SNAPSHOT_TAR_NAME = 'workspace.snapshot.tar'
 
+const SHA_RE = /^[0-9a-fA-F]{7,64}$/
 const GIT_FETCH_MAX_ATTEMPTS = 3
 const GIT_FETCH_INITIAL_RETRY_DELAY_MS = 1_000
 type Sleep = (delay_ms: number) => Promise<void>
@@ -367,10 +368,24 @@ export async function readRepositoryFileAtRef({
 }): Promise<string | null> {
   const normalizedSha = String(commit_sha).trim()
   const normalizedPath = String(file_path).trim()
-  if (!normalizedSha) {
-    throw new Error('readRepositoryFileAtRef requires a commit SHA.')
+  // The SHA is passed to `git fetch` as a ref and to `git show` as
+  // `<sha>:<path>`. Restrict it to a hexadecimal object name so it cannot be
+  // read as a git option (`--upload-pack=...`) or a revision expression
+  // (`HEAD@{...}`, `refs/...`). The trusted caller always passes the full,
+  // API-resolved default-branch SHA.
+  if (!SHA_RE.test(normalizedSha)) {
+    throw new Error(`readRepositoryFileAtRef requires a hexadecimal commit SHA: ${commit_sha}`)
   }
-  if (!normalizedPath || normalizedPath.startsWith('/') || normalizedPath.includes('..')) {
+  // Reject anything that is not a plain repository-relative path: absolute
+  // paths, `..` traversal, and leading `-` (which `git show` would read as an
+  // option). The caller passes a constant path today; this is defense in depth
+  // for future callers.
+  if (
+    !normalizedPath ||
+    normalizedPath.startsWith('/') ||
+    normalizedPath.startsWith('-') ||
+    normalizedPath.includes('..')
+  ) {
     throw new Error(`readRepositoryFileAtRef received an invalid file path: ${file_path}`)
   }
   if (!git_remote_url || git_remote_url.trim() === '') {

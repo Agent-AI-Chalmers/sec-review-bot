@@ -294,3 +294,34 @@ test('readRepositoryFileAtRef rejects unsafe file paths', async () => {
     /invalid file path/
   )
 })
+
+test('readRepositoryFileAtRef rejects absolute and option-looking file paths', async () => {
+  for (const file_path of ['/etc/passwd', '--output=/tmp/x', '-p']) {
+    await assert.rejects(
+      () =>
+        readRepositoryFileAtRef({
+          commit_sha: 'deadbeef',
+          file_path,
+          git_remote_url: 'file:///does/not/matter'
+        }),
+      /invalid file path/
+    )
+  }
+})
+
+test('readRepositoryFileAtRef rejects a non-hexadecimal commit SHA', async () => {
+  // A SHA is passed straight to `git fetch` as a ref; reject anything that is
+  // not a plain hex object name so it cannot become a git option or a revision
+  // expression.
+  for (const commit_sha of ['--upload-pack=touch /tmp/pwned', 'HEAD@{0}', 'refs/heads/main', '']) {
+    await assert.rejects(
+      () =>
+        readRepositoryFileAtRef({
+          commit_sha,
+          file_path: '.sec-review/setup.yml',
+          git_remote_url: 'file:///does/not/matter'
+        }),
+      /hexadecimal commit SHA/
+    )
+  }
+})

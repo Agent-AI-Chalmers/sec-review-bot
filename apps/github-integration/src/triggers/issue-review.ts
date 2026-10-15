@@ -10,6 +10,7 @@ import { startIssueReviewRun, type SubmittedIssueReviewRun } from '../reviews/is
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
 import type { TestChangesPolicy } from '../runner/input.js'
 import { controlPlaneClient } from '../control-plane/client.js'
+import { isSetupDeclarationError } from '../github/setup-declaration.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 
 type IssueReviewEventType = 'opened' | 'manual_review'
@@ -113,7 +114,7 @@ export async function startIssueReviewCommand({
       !(error instanceof PreparationClaimLostError)
     ) {
       await store.failPreparation(run_id, preparationToken, {
-        code: 'REVIEW_START_FAILED',
+        code: isSetupDeclarationError(error) ? 'SETUP_DECLARATION_INVALID' : 'REVIEW_START_FAILED',
         message: error instanceof Error ? error.message : String(error)
       })
     }

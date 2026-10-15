@@ -13,7 +13,7 @@ import {
 import { logInfo } from '../../utils/logger.js'
 import { asErrorMessage } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { assertV5WorkflowResult } from '../../runner/contract-schema.js'
+import { assertWorkflowResult } from '../../runner/contract-schema.js'
 import type { ControlPlaneClient } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
@@ -52,7 +52,7 @@ type CompletedRunnerRun = {
 
 function issueReviewResultFromWorkflowResult(result: unknown): IssueReviewWorkflowResult | null {
   try {
-    assertV5WorkflowResult('issue-review', result)
+    assertWorkflowResult('issue-review', result)
     const rawResult = result as { contract_version: ContractVersion; review_record: unknown }
     return {
       contract_version: CONTRACT_VERSION,

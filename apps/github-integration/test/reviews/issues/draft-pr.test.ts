@@ -119,6 +119,10 @@ function createOctokitMock({
           return { data: {} }
         }
       },
+      repos: {
+        get: async () => ({ data: { default_branch: 'main' } }),
+        getBranch: async () => ({ data: { commit: { sha: 'resolved-default-sha' } } })
+      },
       pulls: {
         list: async () => ({ data: existingPullRequests }),
         create: async ({
@@ -163,8 +167,7 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
     issue: {
       issue_number: 42,
       owner_login: 'octo-org',
-      repo_name: 'example-repo',
-      default_branch: 'main'
+      repo_name: 'example-repo'
     },
     run_id: 'run-12345678',
     workspace_ref: 'base-sha',
@@ -205,8 +208,7 @@ test('issue draft PR retry updates a branch left by a partial prior attempt', as
     issue: {
       issue_number: 42,
       owner_login: 'octo-org',
-      repo_name: 'example-repo',
-      default_branch: 'main'
+      repo_name: 'example-repo'
     },
     run_id: 'run-12345678',
     workspace_ref: 'base-sha',
@@ -233,8 +235,7 @@ test('issue draft PR stops before the next GitHub write after claim loss', async
       issue: {
         issue_number: 42,
         owner_login: 'octo-org',
-        repo_name: 'example-repo',
-        default_branch: 'main'
+        repo_name: 'example-repo'
       },
       run_id: 'run-12345678',
       workspace_ref: 'base-sha',
@@ -269,8 +270,7 @@ test('issue draft PR publishes from review_record file_changes without workspace
     issue_number: 42,
     issue_title: 'Fix unsafe path',
     owner_login: 'octo-org',
-    repo_name: 'example-repo',
-    default_branch: 'main'
+    repo_name: 'example-repo'
   }
   const review_record = reviewRecordWithMitigation({
     changed_files: ['src/app.txt', 'src/remove.txt'],
@@ -327,6 +327,9 @@ test('issue draft PR publishes from review_record file_changes without workspace
     }
   ])
   assert.equal(octokit.calls.pulls[0]?.draft, true)
+  // The PR base is the API-resolved default branch, not the webhook payload's
+  // repository.default_branch (which the trusted flow refuses elsewhere too).
+  assert.equal(octokit.calls.pulls[0]?.base, 'main')
   // The opening status lines come from the shared vocabulary, so this body stays
   // comparable with the PR review comment and the repository delivery bodies.
   assert.match(octokit.calls.pulls[0]?.body ?? '', /- Analysis: `unknown`/)
@@ -344,8 +347,7 @@ test('issue draft PR is not promoted when file_changes are absent', async () => 
     issue: {
       issue_number: 42,
       owner_login: 'octo-org',
-      repo_name: 'example-repo',
-      default_branch: 'main'
+      repo_name: 'example-repo'
     },
     run_id: 'run-12345678',
     workspace_ref: 'base-sha',
@@ -365,8 +367,7 @@ test('issue draft PR ignores unsafe display changed_files when file_changes are 
     issue_number: 42,
     issue_title: 'Fix unsafe path',
     owner_login: 'octo-org',
-    repo_name: 'example-repo',
-    default_branch: 'main'
+    repo_name: 'example-repo'
   }
   const review_record = reviewRecordWithMitigation({
     changed_files: ['workspace/../notes', '.github/workflows/pwn.yml', 'src/app.txt'],
@@ -423,8 +424,7 @@ test('issue draft PR rejects unsupported file modes', async () => {
         issue: {
           issue_number: 42,
           owner_login: 'octo-org',
-          repo_name: 'example-repo',
-          default_branch: 'main'
+          repo_name: 'example-repo'
         },
         run_id: 'run-12345678',
         workspace_ref: 'base-sha',
@@ -457,8 +457,7 @@ test('issue draft PR rejects deleted file changes with mode', async () => {
         issue: {
           issue_number: 42,
           owner_login: 'octo-org',
-          repo_name: 'example-repo',
-          default_branch: 'main'
+          repo_name: 'example-repo'
         },
         run_id: 'run-12345678',
         workspace_ref: 'base-sha',
@@ -495,8 +494,7 @@ for (const [path, message] of [
           issue: {
             issue_number: 42,
             owner_login: 'octo-org',
-            repo_name: 'example-repo',
-            default_branch: 'main'
+            repo_name: 'example-repo'
           },
           run_id: 'run-12345678',
           workspace_ref: 'base-sha',

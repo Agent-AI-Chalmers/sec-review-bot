@@ -56,8 +56,26 @@ def max_step_timeout_seconds() -> int:
     return value if value > 0 else DEFAULT_MAX_STEP_TIMEOUT_SECONDS
 
 
+def is_blank_setup_declaration(content: str) -> bool:
+    """Return True when content is empty or only whitespace.
+
+    Blank content means "no declaration", not a malformed one. Callers short
+    circuit on this rather than feeding blank text into the parser, which would
+    otherwise reject `None` (from `yaml.safe_load('')`) as "not a mapping".
+    """
+    return content.strip() == ""
+
+
 def parse_setup_declaration(content: str) -> SetupDeclaration:
-    """Parse declaration content. Raises SetupDeclarationError on anything unexpected."""
+    """Parse declaration content. Raises SetupDeclarationError on anything unexpected.
+
+    Blank content is not a valid declaration to *parse*; callers that treat blank
+    as "no declaration" must check :func:`is_blank_setup_declaration` first.
+    """
+    if is_blank_setup_declaration(content):
+        raise SetupDeclarationError(
+            "Setup declaration is blank; blank content means no declaration."
+        )
     try:
         parsed = yaml.safe_load(content)
     except yaml.YAMLError as error:
@@ -183,6 +201,7 @@ __all__ = [
     "SetupDeclaration",
     "SetupDeclarationError",
     "SetupDeclarationStep",
+    "is_blank_setup_declaration",
     "max_step_timeout_seconds",
     "parse_setup_declaration",
 ]

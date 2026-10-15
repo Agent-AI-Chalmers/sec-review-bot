@@ -2,14 +2,26 @@
 
 The declaration text, carried inline in the workflow input, is parsed strictly,
 then each step is run inside the container through the deepagents sandbox
-contract:
-``execute(command: str)``. The contract accepts a full shell command string, so
-each step is flattened to::
+contract ``aexecute(command: str, *, timeout: int | None)``. That contract
+accepts a full shell command string, so each step is flattened to::
 
     cd /workspace/<working-directory> && export KEY='value' && <run>
 
 Data (working-directory, env values) is shell-quoted; `run` is intentionally not
 quoted because it *is* the command to execute.
+
+Trust boundary
+--------------
+The declaration is *executable repository content*. Trust in its provenance is
+decided upstream (the GitHub integration reads it from the base repository's
+default branch, never a fork or payload-supplied ref); this module does not
+authenticate it. It runs in the same container, as the same user, with the same
+network as the agent, and can therefore modify `/workspace` and anything else
+the agent will later read. That is intended: a declaration is only useful if it
+can install dependencies in place. Anything that adds a *new* source for
+``setup_declaration`` is handing arbitrary code execution to that source -- add
+such a source only with that in mind, and keep the default-branch-only rule on
+the integration side.
 
 Bootstrap is best-effort: a step failure stops the remaining steps and is
 recorded as an incomplete environment, but the review still proceeds.
@@ -28,6 +40,7 @@ from sec_review_agents.entrypoints.setup_declaration import (
     SetupDeclaration,
     SetupDeclarationError,
     SetupDeclarationStep,
+    is_blank_setup_declaration,
     parse_setup_declaration,
 )
 from sec_review_agents.filesystem.backend_selection import (
@@ -106,7 +119,9 @@ async def bootstrap_environment(
     setup_declaration_content: str | None,
 ) -> BootstrapResult:
     """Run the setup declaration in `backend`'s container, if any."""
-    if setup_declaration_content is None:
+    if setup_declaration_content is None or is_blank_setup_declaration(
+        setup_declaration_content
+    ):
         return BootstrapResult(status=BootstrapStatus.NOT_DECLARED)
 
     try:

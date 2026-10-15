@@ -17,6 +17,7 @@ import {
   readRepositoryFileAtRef
 } from '../../artifacts/git-workspace.js'
 import { writeInputBundleManifest } from '../../runner/input-bundle-manifest.js'
+import { isSetupDeclarationError, parseSetupDeclaration } from '../../github/setup-declaration.js'
 import { input_bundle_staging_root } from '../../config.js'
 
 const execFileAsync = promisify(execFile)
@@ -61,11 +62,21 @@ export async function finalizeInputBundleWorkspace({
 export const SETUP_DECLARATION_FILE_NAME = 'setup.yml'
 
 /**
- * Read the setup declaration text from an exact default-branch commit.
- * Returns the declaration contents, or null when the repository has none
- * (absence is not an error -- the environment simply stays unbootstrapped).
- * The text is passed inline in the workflow input; it is not written to the
- * bundle.
+ * Read and validate the setup declaration from an exact default-branch commit.
+ *
+ * Returns the declaration text, or null when the repository has none (a missing
+ * file, or a file that holds only whitespace, both mean "no declaration").
+ *
+ * The integration owns the content rules: a declaration that exists but is not
+ * valid is rejected here, before submission, with the repository/ref/path
+ * context attached. A broken `.sec-review/setup.yml` on the default branch is a
+ * maintainer error that should fail loudly rather than silently degrade into an
+ * unbootstrapped environment (which would let the agent reason about a
+ * repository whose dependencies were never installed). This matches how an
+ * invalid `.sec-review/config.yml` is handled.
+ *
+ * The validated text is passed inline in the workflow input; it is not written
+ * to the bundle.
  */
 export async function readSetupDeclaration({
   default_sha,
@@ -78,12 +89,30 @@ export async function readSetupDeclaration({
   repo_name: string
   git_auth_token?: string
 }): Promise<string | null> {
-  return readRepositoryFileAtRef({
+  const path = `.sec-review/${SETUP_DECLARATION_FILE_NAME}`
+  const declaration = await readRepositoryFileAtRef({
     commit_sha: default_sha,
-    file_path: `.sec-review/${SETUP_DECLARATION_FILE_NAME}`,
+    file_path: path,
     git_remote_url: buildGitRemoteUrl(owner_login, repo_name),
     ...(git_auth_token ? { git_auth_token } : {})
   })
+  if (declaration === null) {
+    return null
+  }
+  try {
+    if (parseSetupDeclaration(declaration) === null) {
+      return null
+    }
+  } catch (error) {
+    if (isSetupDeclarationError(error)) {
+      error.owner_login = owner_login
+      error.repo_name = repo_name
+      error.ref = default_sha
+      error.path = path
+    }
+    throw error
+  }
+  return declaration
 }
 
 export async function archiveInputBundle({
