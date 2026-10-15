@@ -145,6 +145,28 @@ def test_record_bootstrap_result_truncates_large_output(tmp_path) -> None:
     assert "chars truncated" in recorded
     assert recorded.endswith("TAIL")
     assert len(recorded) <= BOOTSTRAP_OUTPUT_MAX_CHARS + 200
+    # The artifact must not let a reader assume the output was sanitized.
+    assert payload["output_redacted"] is False
+    assert payload["steps"][0]["output_truncated"] is True
+
+
+def test_record_bootstrap_result_marks_short_output_untruncated(tmp_path) -> None:
+    import json
+
+    from sec_review_agents.runtime.setup_bootstrap import (
+        BootstrapResult,
+        BootstrapStepResult,
+    )
+
+    result = BootstrapResult(
+        status=BootstrapStatus.COMPLETED,
+        steps=(BootstrapStepResult(run="quiet", exit_code=0, output="ok"),),
+    )
+    record_bootstrap_result(tmp_path, result)
+    payload = json.loads((tmp_path / "environment.json").read_text(encoding="utf-8"))
+    assert payload["output_redacted"] is False
+    assert payload["steps"][0]["output_truncated"] is False
+    assert payload["steps"][0]["output"] == "ok"
 
 
 class _ExplodingBackend:

@@ -208,7 +208,9 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
 
     Each step's output is persisted **truncated** to a tail window; this bounds
     volume but is **not redaction** -- artifacts are operator-visible and may
-    contain registry URLs/tokens from install commands.
+    contain registry URLs/tokens from install commands. The artifact says so
+    explicitly (``output_redacted: false``, per-step ``output_truncated``) so a
+    downstream reader is not left to assume the output was sanitized.
     """
     log_diagnostic(
         "setup_bootstrap",
@@ -216,6 +218,15 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
         reason=result.reason,
         steps=len(result.steps),
     )
+    persisted_steps = [
+        {
+            "run": step.run,
+            "exit_code": step.exit_code,
+            "output": _summarize_output(step.output),
+            "output_truncated": len(step.output) > BOOTSTRAP_OUTPUT_MAX_CHARS,
+        }
+        for step in result.steps
+    ]
     persist_json(
         artifacts_path,
         "environment.json",
@@ -223,14 +234,10 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
             "environment_incomplete": result.status is BootstrapStatus.INCOMPLETE,
             "setup_status": result.status.value,
             "reason": result.reason,
-            "steps": [
-                {
-                    "run": step.run,
-                    "exit_code": step.exit_code,
-                    "output": _summarize_output(step.output),
-                }
-                for step in result.steps
-            ],
+            # Bootstrap output is bounded but never sanitized. Keep this flag in
+            # the artifact: a consumer must not treat the output as secret-free.
+            "output_redacted": False,
+            "steps": persisted_steps,
         },
     )
 
