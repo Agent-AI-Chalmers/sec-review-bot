@@ -198,11 +198,14 @@ export async function prepareRepositoryReviewInput({
       : [resolvedHeadSha]
   await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
   // Trusted default branch (not the user-selectable target_branch): its head SHA
-  // was resolved once upstream; pull the setup declaration from it.
+  // was resolved once upstream; pull the setup declaration from it. Private
+  // repositories need the installation token for the fetch that reads it.
+  const git_auth_token = await getInstallationAccessToken(octokit)
   const setup_declaration = await readSetupDeclaration({
     default_sha: trusted_default_branch.head_sha,
     owner_login: repo.owner_login,
-    repo_name: repo.repo_name
+    repo_name: repo.repo_name,
+    git_auth_token
   })
   await finalizeInputBundleWorkspace({
     input_bundle_root,
