@@ -15,6 +15,10 @@ from sec_review_agents.review_stages.mitigation.result import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from sec_review_agents.runtime.trusted_setup_bootstrap import (
+    bootstrap_environment,
+    record_bootstrap_result,
+)
 from sec_review_agents.utils.files import (
     persist_json,
     persist_text_artifact,
@@ -149,6 +153,7 @@ async def run_mitigation_stage(
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
+    trusted_setup_path: Path | None = None,
 ) -> dict[str, Any]:
     attempt_label = mitigation_attempt_label(retry_context)
     with tempfile.TemporaryDirectory(prefix="sec-review-mitigation-") as tempdir:
@@ -170,6 +175,12 @@ async def run_mitigation_stage(
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
         async with amanaged_backend(backend):
+            record_bootstrap_result(
+                mitigator_artifacts_path,
+                await bootstrap_environment(
+                    backend, trusted_setup_path=trusted_setup_path
+                ),
+            )
             agent = await create_mitigation_agent_graph(
                 agent_name=agent_name,
                 backend=backend,

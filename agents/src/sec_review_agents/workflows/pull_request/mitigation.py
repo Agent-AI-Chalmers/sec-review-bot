@@ -35,6 +35,7 @@ async def mitigate_pull_request(
         published_transcript_path=published_transcript_path,
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
+        trusted_setup_path=trusted_setup_path,
         build_backend=lambda workspace_root: pr_mitigation_agent.create_pr_mitigation_backend(
             workspace_root=workspace_root,
             history_path=history_path,

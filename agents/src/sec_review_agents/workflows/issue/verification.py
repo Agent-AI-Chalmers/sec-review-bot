@@ -49,6 +49,7 @@ async def verify_issue(
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         workspace_patch=workspace_patch,
         mitigation_result=mitigation_result,
+        trusted_setup_path=trusted_setup_path,
         build_backend=lambda workspace_root_path: issue_verification_agent.create_issue_verification_backend(
             workspace_root_path=workspace_root_path,
             history_path=history_path,

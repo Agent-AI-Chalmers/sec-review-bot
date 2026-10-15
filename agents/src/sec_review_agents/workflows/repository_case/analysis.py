@@ -23,6 +23,7 @@ async def analyze_repository_case(
         published_transcript_path=published_transcript_path,
         agent_name="repository-analyzer",
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        trusted_setup_path=trusted_setup_path,
         build_backend=lambda stage_workspace_path: repository_analysis_agent.create_repository_analyzer_backend(
             workspace_root_path=stage_workspace_path,
             history_path=history_path,

@@ -55,6 +55,7 @@ async def verify_repository_case(
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         workspace_patch=workspace_patch,
         mitigation_result=mitigation_result,
+        trusted_setup_path=trusted_setup_path,
         build_backend=lambda workspace_root_path: (
             repository_verification_agent.create_repository_verification_backend(
                 workspace_root_path=workspace_root_path,

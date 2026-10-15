@@ -1,9 +1,9 @@
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from collections.abc import Mapping
 from typing import Any
 
 from temporalio import activity, workflow
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionRegistrationRequest,
     register_memory_extraction,
@@ -32,9 +32,11 @@ async def analyze_pull_request_activity(
     runtime_context: RunnerRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
+    from sec_review_agents.runtime.trusted_setup_bootstrap import (
+        trusted_setup_path_for_backend,
+    )
     from sec_review_agents.utils.paths import (
         artifact_path,
-        optional_path,
         required_path,
     )
     from sec_review_agents.workflows.pull_request.analysis import (
@@ -73,7 +75,7 @@ async def analyze_pull_request_activity(
             order=1,
             stage="analyzer",
         ),
-        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
+        trusted_setup_path=trusted_setup_path_for_backend(bundle_paths),
         runtime_context=runtime_context,
     )
 
@@ -91,9 +93,11 @@ async def mitigate_pull_request_activity(
         mitigation_attempt_label,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
+    from sec_review_agents.runtime.trusted_setup_bootstrap import (
+        trusted_setup_path_for_backend,
+    )
     from sec_review_agents.utils.paths import (
         artifact_path,
-        optional_path,
         required_path,
     )
     from sec_review_agents.workflows.pull_request.mitigation import (
@@ -153,7 +157,7 @@ async def mitigate_pull_request_activity(
         analysis_result=analysis_result,
         retry_context=retry_context,
         test_changes=review_intent.test_changes,
-        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
+        trusted_setup_path=trusted_setup_path_for_backend(bundle_paths),
         runtime_context=runtime_context,
     )
 
@@ -171,9 +175,11 @@ async def verify_pull_request_activity(
         verification_attempt_label,
     )
     from sec_review_agents.runtime.transcripts import review_stage_transcript_path
+    from sec_review_agents.runtime.trusted_setup_bootstrap import (
+        trusted_setup_path_for_backend,
+    )
     from sec_review_agents.utils.paths import (
         artifact_path,
-        optional_path,
         required_path,
     )
     from sec_review_agents.workflows.pull_request.verification import (
@@ -215,7 +221,7 @@ async def verify_pull_request_activity(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         retry_context=retry_context,
-        trusted_setup_path=optional_path(bundle_paths.get("trusted_setup_path")),
+        trusted_setup_path=trusted_setup_path_for_backend(bundle_paths),
         runtime_context=runtime_context,
     )
 
