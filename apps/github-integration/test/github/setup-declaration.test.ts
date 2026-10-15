@@ -72,3 +72,16 @@ test('rejects an invalid declaration with a reason', () => {
       error instanceof SetupDeclarationError && error.reason === 'unsupported-step-key'
   )
 })
+
+test('unquoted boolean-like runs follow the YAML 1.2 dialect', () => {
+  // The integration parses with the `yaml` library (YAML 1.2), where
+  // `on`/`yes`/`off`/`no` are plain strings, so `run: on` is a command string.
+  // The runner parses with PyYAML (YAML 1.1), where they are booleans and the
+  // same input is rejected. The dialects cannot be made to agree on every
+  // scalar, so this case is deliberately outside the shared corpus; authors
+  // must quote boolean-like values. See contracts/setup-declaration/v1/SPEC.md.
+  for (const raw of ['on', 'yes', 'off', 'no']) {
+    const declaration = parseSetupDeclaration(`setup:\n  - run: ${raw}\n`)
+    assert.equal(declaration?.steps[0]?.run, raw)
+  }
+})

@@ -1,20 +1,24 @@
 {
   "$comment": "Corpus of setup-declaration inputs shared by the Runner (Python) and the GitHub integration (TypeScript). Each valid case must parse as a declaration; each invalid case must be rejected. The file-name prefix classifies a case, and the manifest records it explicitly so both implementations are checked against the same boundary.",
   "valid": [
-    "valid-minimal.yml",
     "valid-all-keys.yml",
+    "valid-large-timeout.yml",
+    "valid-minimal.yml",
     "valid-portable-env-names.yml",
-    "valid-large-timeout.yml"
+    "valid-quoted-boolean-like-values.yml"
   ],
   "invalid": [
     "invalid-blank-run.yml",
     "invalid-boolean-timeout.yml",
     "invalid-env-name.yml",
     "invalid-env-non-string.yml",
+    "invalid-env-value-boolean.yml",
     "invalid-missing-run.yml",
     "invalid-missing-setup-key.yml",
     "invalid-non-mapping-top-level.yml",
+    "invalid-non-string-run-number.yml",
     "invalid-non-string-run.yml",
+    "invalid-non-string-working-directory.yml",
     "invalid-setup-not-a-list.yml",
     "invalid-step-not-a-mapping.yml",
     "invalid-unknown-step-key.yml",

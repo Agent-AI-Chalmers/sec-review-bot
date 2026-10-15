@@ -1,0 +1,5 @@
+setup:
+  - run: "on"
+    working-directory: "yes"
+    env:
+      FLAG: "off"

@@ -90,7 +90,33 @@ must accept and which it must reject. Both the Python and TypeScript test suites
 execute the same files, so the two implementations cannot silently drift apart.
 
 This corpus is the executable boundary of the format. Adding a rule means adding a
-case here and making both enforcers pass it.
+case here and making both enforcers pass it: a case belongs here only when both
+implementations are required to classify it the same way.
+
+### Scalars and YAML dialects
+
+The two enforcers use different YAML libraries, and the libraries implement
+different scalar-resolution rules:
+
+- the runner uses PyYAML (YAML 1.1), where `on`, `yes`, `off`, and `no` resolve
+  to booleans;
+- the integration uses the `yaml` library (YAML 1.2), where those same words
+  resolve to strings.
+
+The two cannot be made to agree on every ambiguous scalar (each library's
+"version" option trades one disagreement for another), so the shared corpus does
+not cover unquoted scalars whose *kind* differs between the dialects. Both
+implementations do agree on every value the corpus does contain — booleans and
+numbers (`true`, `false`, `123`) are non-strings in both dialects, and quoted
+strings are strings in both.
+
+The practical rule for authors is therefore: **quote any value that could be read
+as a non-string** — `run: "on"`, `working-directory: "no"`. An unquoted
+boolean-like value is a portability trap: the integration may accept it as a
+string while the runner, parsing a different dialect, rejects it (or vice versa).
+
+Each implementation pins its own dialect with a test, so a library upgrade that
+changes scalar resolution fails a test rather than silently shifting the boundary.
 
 ## Trust
 

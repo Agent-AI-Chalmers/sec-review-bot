@@ -137,3 +137,21 @@ def test_rejects_boolean_timeout() -> None:
         SetupDeclarationError, match="timeout_seconds must be an integer"
     ):
         parse_setup_declaration("setup:\n  - run: x\n    timeout_seconds: true\n")
+
+
+@pytest.mark.parametrize("raw", ["on", "yes", "off", "no"])
+def test_unquoted_yaml11_booleans_are_rejected_as_run(raw: str) -> None:
+    # The runner parses with PyYAML (YAML 1.1), where `on`/`yes`/`off`/`no` are
+    # booleans, so an unquoted `run: on` is not a command string. The TypeScript
+    # validator parses with the `yaml` library (YAML 1.2), where these are
+    # strings. The two dialects cannot be made to agree on every scalar, so the
+    # shared corpus deliberately excludes this case; authors must quote such
+    # values. See contracts/setup-declaration/v1/SPEC.md.
+    with pytest.raises(SetupDeclarationError, match="run must be a non-empty string"):
+        parse_setup_declaration(f"setup:\n  - run: {raw}\n")
+
+
+def test_quoted_boolean_like_run_is_accepted() -> None:
+    # Quoting removes the ambiguity: both parsers see a string.
+    setup = parse_setup_declaration('setup:\n  - run: "on"\n')
+    assert setup.steps[0].run == "on"
