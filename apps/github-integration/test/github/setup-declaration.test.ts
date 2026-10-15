@@ -73,16 +73,33 @@ test('rejects an invalid declaration with a reason', () => {
   )
 })
 
-test('unquoted boolean-like runs follow the YAML 1.2 dialect', () => {
-  // The integration parses with the `yaml` library (YAML 1.2), where
-  // `on`/`yes`/`off`/`no` are plain strings, so `run: on` is a command string.
-  // The runner parses with PyYAML (YAML 1.1), where they are booleans and the
-  // same input is rejected. The dialects cannot be made to agree on every
-  // scalar, so this case is deliberately outside the shared corpus; authors
-  // must quote boolean-like values. See contracts/setup-declaration/v1/SPEC.md.
+test('rejects unquoted boolean-like run and working-directory values', () => {
+  // Although this validator parses with the `yaml` library (YAML 1.2), where
+  // `on`/`yes`/`off`/`no` are plain strings, the runner parses with PyYAML
+  // (YAML 1.1), where they are booleans. Every string-valued position is held
+  // to that stricter reading here, so the integration cannot accept a
+  // declaration the runner then refuses to execute.
   for (const raw of ['on', 'yes', 'off', 'no']) {
-    const declaration = parseSetupDeclaration(`setup:\n  - run: ${raw}\n`)
-    assert.equal(declaration?.steps[0]?.run, raw)
+    assert.throws(
+      () => parseSetupDeclaration(`setup:\n  - run: ${raw}\n`),
+      SetupDeclarationError,
+      `run: ${raw} should be rejected`
+    )
+    assert.throws(
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    working-directory: ${raw}\n`),
+      SetupDeclarationError,
+      `working-directory: ${raw} should be rejected`
+    )
+  }
+})
+
+test('rejects unquoted boolean-like env values', () => {
+  for (const raw of ['on', 'yes', 'off', 'no']) {
+    assert.throws(
+      () => parseSetupDeclaration(`setup:\n  - run: x\n    env:\n      FLAG: ${raw}\n`),
+      SetupDeclarationError,
+      `env value ${raw} should be rejected`
+    )
   }
 })
 

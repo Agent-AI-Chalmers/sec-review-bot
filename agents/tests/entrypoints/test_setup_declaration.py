@@ -182,10 +182,11 @@ def test_rejects_boolean_timeout() -> None:
 @pytest.mark.parametrize("raw", ["on", "yes", "off", "no"])
 def test_unquoted_yaml11_booleans_are_rejected_as_run(raw: str) -> None:
     # The runner parses with PyYAML (YAML 1.1), where `on`/`yes`/`off`/`no` are
-    # booleans, so an unquoted `run: on` is not a command string. The TypeScript
-    # validator parses with the `yaml` library (YAML 1.2), where these are
-    # strings. The two dialects cannot be made to agree on every scalar, so the
-    # shared corpus deliberately excludes this case; authors must quote such
+    # booleans, so an unquoted `run: on` is not a command string. The integration
+    # validator parses with the `yaml` library (YAML 1.2) and applies the same
+    # stricter reading to `run`, so it rejects this too: the integration cannot
+    # accept a declaration the runner then refuses to execute. The shared corpus
+    # pins both sides (`invalid-boolean-like-run.yml`). Authors must quote such
     # values. See contracts/setup-declaration/v1/SPEC.md.
     with pytest.raises(SetupDeclarationError, match="run must be a non-empty string"):
         parse_setup_declaration(f"setup:\n  - run: {raw}\n")

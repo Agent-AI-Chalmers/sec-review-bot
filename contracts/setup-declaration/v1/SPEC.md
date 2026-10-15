@@ -40,7 +40,7 @@ ignored:
 - each step may carry only `run`, `working-directory`, `env`, and `timeout_seconds`;
 - `run` is required and must be a non-empty string;
 - `working-directory`, when present, must be a non-empty string that is relative and stays inside the repository root (no leading `/`, no `..` segment). Containment is checked lexically on the declared path; it does not resolve symlinks, so a symlink inside the repository is not followed by this rule (the declaration is trusted content, so this is containment, not a sandbox);
-- `env`, when present, must be a mapping of string keys to string values, with keys matching the identifier pattern above. A key must be a *string in both YAML dialects*: a plain key that YAML 1.1 reads as a boolean (`on`, `yes`, `off`, `no`, ...) is rejected even though YAML 1.2 reads it as a string. Quote such a key (`"on"`) if that is genuinely the variable name;
+- `env`, when present, must be a mapping of string keys to string values, with keys matching the identifier pattern above. Keys and values must be *strings in both YAML dialects*: a plain scalar that YAML 1.1 reads as a boolean (`on`, `yes`, `off`, `no`, ...) is rejected even though YAML 1.2 reads it as a string. Quote such a value (`"on"`) if that is genuinely the name or the value. The same stricter reading applies to `run` and `working-directory` (see "Scalars and YAML dialects");
 - `timeout_seconds`, when present, must be a positive integer (booleans are not integers).
 
 **Blank content is not a declaration.** An empty or whitespace-only file is treated exactly like a missing file: it is valid and means "no declaration". It is not an error.
@@ -74,11 +74,17 @@ The two enforcers use different YAML libraries, and the libraries implement diff
 - the runner uses PyYAML (YAML 1.1), where `on`, `yes`, `off`, and `no` resolve to booleans;
 - the integration uses the `yaml` library (YAML 1.2), where those same words resolve to strings.
 
-The two cannot be made to agree on every ambiguous scalar (each library's "version" option trades one disagreement for another), so the shared corpus does not cover unquoted scalars whose *kind* differs between the dialects. Both implementations do agree on every value the corpus does contain — booleans and numbers (`true`, `false`, `123`) are non-strings in both dialects, and quoted strings are strings in both.
+The libraries cannot be made to agree on every ambiguous scalar (each library's "version" option trades one disagreement for another), and the corpus cannot contain a scalar whose *kind* is the thing being tested — the two enforcers would read it differently. So the enforcers do not rely on the libraries agreeing. Instead, every position that must hold a **string** is held to the *stricter* (YAML 1.1) reading on both sides:
 
-The practical rule for authors is therefore: **quote any value that could be read as a non-string** — `run: "on"`, `working-directory: "no"`. An unquoted boolean-like value is a portability trap: the integration may accept it as a string while the runner, parsing a different dialect, rejects it (or vice versa).
+- `env` *keys* and `env` *values*;
+- `run`;
+- `working-directory`.
 
-`env` *keys* are the one exception: the two implementations cannot leave them dialect-divergent, because a key is not free-form data — it is a variable name that must be a string to be emitted. So the enforcers apply the *stricter* reading to keys and both reject a plain key that YAML 1.1 resolves to a non-string (the boolean-like words above, plus booleans, numbers, and `null`, which are non-strings in both dialects). A quoted key is a string in both dialects and is accepted. This keeps "the integration accepted it" and "the runner can parse it" the same statement for the whole key space.
+In each of these positions a **plain** scalar that YAML 1.1 resolves to a boolean (`on`, `yes`, `off`, `no`, and their case variants) is rejected by **both** enforcers, even though the integration's YAML 1.2 library would read it as a string. A quoted `"on"` is a string in both dialects and is accepted. Values that are non-strings in both dialects — unquoted booleans (`true`), numbers (`123`), and `null` — are already rejected by the value-level type checks. This keeps "the integration accepted it" and "the runner can parse it" the same statement for the whole string-valued surface: the integration cannot accept a declaration the runner then refuses to execute.
+
+`timeout_seconds` is the one numeric position and is unaffected: it must be a positive integer, and the boolean-like words are not integers in either dialect.
+
+The practical rule for authors is therefore: **quote any value that could be read as a non-string** — `run: "on"`, `working-directory: "no"`, `env: { FLAG: "off" }`. The corpus covers both sides of the boundary: `invalid-boolean-like-run.yml`, `invalid-boolean-like-working-directory.yml`, and `invalid-boolean-like-env-value.yml` for unquoted boolean-like scalars; `invalid-env-boolean-like-key.yml` for a boolean-like key; and `valid-quoted-boolean-like-values.yml` / `valid-quoted-boolean-like-env-key.yml` for the quoted forms.
 
 Each implementation pins its own dialect with a test, so a library upgrade that changes scalar resolution fails a test rather than silently shifting the boundary.
 

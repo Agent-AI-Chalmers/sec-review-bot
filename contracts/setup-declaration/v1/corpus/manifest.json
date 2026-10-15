@@ -10,6 +10,9 @@
   ],
   "invalid": [
     "invalid-blank-run.yml",
+    "invalid-boolean-like-env-value.yml",
+    "invalid-boolean-like-run.yml",
+    "invalid-boolean-like-working-directory.yml",
     "invalid-boolean-timeout.yml",
     "invalid-env-boolean-like-key.yml",
     "invalid-env-name.yml",

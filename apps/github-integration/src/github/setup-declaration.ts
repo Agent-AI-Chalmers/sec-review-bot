@@ -37,14 +37,6 @@ const ALLOWED_TOP_LEVEL_KEYS = new Set(['setup'])
 // declaration cannot smuggle shell syntax through a name.
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
 
-// An unquoted scalar with one of these texts is a boolean in YAML 1.1 (PyYAML,
-// the runner's library) but a plain string in YAML 1.2 (the `yaml` library used
-// here). For `env` *keys* we require exactly the runner's reading: a key that
-// the runner would see as a boolean is rejected here too, so the two enforcers
-// classify the same document the same way. Authors who really want a variable
-// named `yes` must quote it (`"yes"`), which both dialects read as a string.
-const YAML_1_1_BOOLEAN_LIKE_KEYS = new Set(['true', 'false', 'yes', 'no', 'on', 'off'])
-
 export interface SetupDeclarationStep {
   run: string
   working_directory: string | null
@@ -92,20 +84,41 @@ export function isSetupDeclarationError(error: unknown): error is SetupDeclarati
   )
 }
 
+// YAML 1.1 boolean words that the `yaml` library (YAML 1.2) reads as plain
+// strings. The runner's PyYAML (1.1) reads them as booleans, so an *unquoted*
+// `run: on` (or `working-directory: no`, or an `env` key/value `yes`) is a
+// boolean for the runner but a string here — enough to let the integration
+// accept a declaration the runner then refuses to execute. `true`/`false` are
+// absent on purpose: both dialects already resolve them to booleans, so the
+// value-level type checks reject them. The two libraries also disagree on
+// single-letter `y`/`n` (1.1 spec says boolean, PyYAML says string); they are
+// deliberately not treated as boolean-like here, matching PyYAML.
+const YAML_1_1_BOOLEAN_WORDS = new Set(['yes', 'no', 'on', 'off'])
+
+/** A plain (unquoted) scalar that this validator reads as a string but the
+ * runner reads as a boolean. A quoted `"on"` is a string in both dialects. */
+function isYaml11BooleanWord(node: unknown): boolean {
+  return (
+    isScalar(node) &&
+    node.type === 'PLAIN' &&
+    typeof node.value === 'string' &&
+    YAML_1_1_BOOLEAN_WORDS.has(node.value.toLowerCase())
+  )
+}
+
 /**
- * Reject `env` keys that the runner's YAML 1.1 parser would read as a boolean.
+ * Reject the scalars where the two YAML dialects disagree, so the integration
+ * cannot accept a declaration the runner then refuses to execute.
  *
- * Only this narrow class needs special handling: numbers and `null` resolve to
- * non-strings in both dialects and are already rejected by the value-level
- * type check, while YAML 1.1's boolean words (`on`, `yes`, ...) are plain
- * strings in YAML 1.2. A *quoted* `"on"` is a string in both dialects and is
- * left for the normal key check to accept.
+ * Two checks, both on the AST (the resolved JS value has already lost quoting):
+ *
+ * - an `env` key that resolves to a non-string (a plain `true`/`123`/`null`) —
+ *   PyYAML rejects it, and `toJS()` would stringify it into a valid-looking key;
+ * - an unquoted boolean-like scalar in any string position — `run`,
+ *   `working-directory`, an `env` key, or an `env` value.
  */
-function rejectBooleanLikeEnvKeys(contents: Node | null): void {
-  if (!isMap(contents)) {
-    return
-  }
-  const steps = contents.get('setup')
+function rejectNonPortableScalars(contents: Node | null): void {
+  const steps = isMap(contents) ? contents.get('setup') : undefined
   if (!isSeq(steps)) {
     return
   }
@@ -113,30 +126,42 @@ function rejectBooleanLikeEnvKeys(contents: Node | null): void {
     if (!isMap(step)) {
       return
     }
-    const env = step.get('env')
-    if (!isMap(env)) {
-      return
-    }
-    for (const item of (env as YAMLMap).items) {
-      const key = item.key
-      if (!isScalar(key)) {
-        // Non-scalar keys (e.g. a nested mapping) are rejected by the
-        // value-level check as non-string keys; leave them for that path.
-        continue
-      }
-      if (typeof key.value !== 'string') {
-        // YAML 1.2 already resolved this key to a boolean/number/null; the
-        // runner reads it the same way, so reject with one shared message.
-        throw new SetupDeclarationError(
-          `setup[${index}].env must map string keys to string values.`,
-          { reason: 'invalid-env' }
-        )
-      }
-      if (key.type === 'PLAIN' && YAML_1_1_BOOLEAN_LIKE_KEYS.has(key.value.toLowerCase())) {
-        throw new SetupDeclarationError(
-          `setup[${index}].env has a boolean-like key that must be quoted: ${JSON.stringify(key.value)}`,
-          { reason: 'invalid-env-name' }
-        )
+    for (const item of (step as YAMLMap).items) {
+      const key = isScalar(item.key) ? item.key.value : undefined
+      if (key === 'run' || key === 'working-directory') {
+        if (isYaml11BooleanWord(item.value)) {
+          throw new SetupDeclarationError(
+            `setup[${index}].${key} is a boolean-like scalar that must be quoted: ${JSON.stringify(
+              (item.value as { value: string }).value
+            )}`,
+            { reason: key === 'run' ? 'invalid-run' : 'invalid-working-directory' }
+          )
+        }
+      } else if (key === 'env' && isMap(item.value)) {
+        for (const pair of (item.value as YAMLMap).items) {
+          if (isScalar(pair.key) && typeof pair.key.value !== 'string') {
+            throw new SetupDeclarationError(
+              `setup[${index}].env must map string keys to string values.`,
+              { reason: 'invalid-env' }
+            )
+          }
+          if (isYaml11BooleanWord(pair.key)) {
+            throw new SetupDeclarationError(
+              `setup[${index}].env has a boolean-like key that must be quoted: ${JSON.stringify(
+                (pair.key as { value: string }).value
+              )}`,
+              { reason: 'invalid-env-name' }
+            )
+          }
+          if (isYaml11BooleanWord(pair.value)) {
+            throw new SetupDeclarationError(
+              `setup[${index}].env has a boolean-like value that must be quoted: ${JSON.stringify(
+                (pair.value as { value: string }).value
+              )}`,
+              { reason: 'invalid-env' }
+            )
+          }
+        }
       }
     }
   })
@@ -278,7 +303,7 @@ export function parseSetupDeclaration(content: string): SetupDeclaration | null 
       cause: document.errors[0]
     })
   }
-  rejectBooleanLikeEnvKeys(document.contents)
+  rejectNonPortableScalars(document.contents)
 
   let parsed: unknown
   try {

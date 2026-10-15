@@ -1,0 +1,3 @@
+setup:
+  - run: echo ok
+    working-directory: no
