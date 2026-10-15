@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.entrypoints.input_preparation import prepare_run_input
 from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 from tests.input_bundle import write_test_input_bundle
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def _issue_input() -> dict:

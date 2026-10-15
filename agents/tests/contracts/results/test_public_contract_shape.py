@@ -4,12 +4,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
 from tests.contract_fixtures import contract_validator, format_schema_errors
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 FORBIDDEN_INTERNAL_PUBLIC_RESULT_KEYS = {
     "analysis_result",

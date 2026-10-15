@@ -2,10 +2,10 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.entrypoints.service import app as service_app
 from sec_review_agents.entrypoints.service.gateway import RunnerRunConflictError
 from tests.contract_fixtures import contract_fixture
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 class FakeRunnerWorkflowGateway:

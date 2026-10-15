@@ -1,5 +1,6 @@
 import pytest
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionRegistrationRequest,
     register_memory_extraction,
@@ -8,7 +9,6 @@ from sec_review_agents.workflows.execution_request import InternalWorkflowReques
 from sec_review_agents.workflows.issue import workflow as issue_workflow
 from sec_review_agents.workflows.pull_request import workflow as pr_workflow
 from sec_review_agents.workflows.repository import workflow as repository_workflow
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def test_internal_workflow_request_enables_memory_extraction_registration_by_default() -> (

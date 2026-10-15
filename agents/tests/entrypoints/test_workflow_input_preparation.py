@@ -8,12 +8,12 @@ from urllib.parse import unquote, urlparse
 import pytest
 
 from sec_review_agents.entrypoints import input_preparation
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.entrypoints.input_preparation import (
     prepare_run_input,
     prepare_workflow_input,
 )
 from tests.contract_fixtures import contract_fixture
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def _write_bundle_manifest(

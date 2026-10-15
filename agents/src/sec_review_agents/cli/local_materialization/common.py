@@ -1,4 +1,3 @@
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 import hashlib
 import secrets
 import shutil
@@ -10,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.utils.env import env_value
 
 IssueReviewStrategy = Literal["default", "two-stage", "single-agent"]

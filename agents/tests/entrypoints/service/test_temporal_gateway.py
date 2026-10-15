@@ -7,6 +7,7 @@ from temporalio.client import WorkflowExecutionStatus
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.entrypoints.service.gateway import RunnerRunConflictError
 from sec_review_agents.entrypoints.service.temporal_gateway import (
     TemporalRunnerWorkflowGateway,
@@ -37,7 +38,6 @@ from sec_review_agents.workflows.repository.workflow import (
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from tests.input_bundle import write_test_input_bundle
 from tests.temporal_test_utils import temporal_time_skipping_environment
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def _repository_case_execution_input(case_id: str) -> dict:

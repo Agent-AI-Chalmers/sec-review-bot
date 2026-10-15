@@ -1,9 +1,9 @@
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.utils.payloads import mapping_payload
 

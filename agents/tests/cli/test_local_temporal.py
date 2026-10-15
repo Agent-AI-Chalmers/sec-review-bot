@@ -12,11 +12,11 @@ from sec_review_agents.cli.local_materialization.common import (
 from sec_review_agents.cli.local_temporal import (
     LocalTemporalConfig,
 )
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.workflows.issue.single_agent import IssueSingleAgentWorkflow
 from sec_review_agents.workflows.issue.two_stage import IssueTwoStageWorkflow
 from sec_review_agents.workflows.issue.workflow import IssueReviewWorkflow
 from tests.input_bundle import write_test_input_bundle
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def _issue_bundle(strategy: IssueReviewStrategy | None) -> ReviewBundle:

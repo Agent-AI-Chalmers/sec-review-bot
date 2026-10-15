@@ -2,6 +2,7 @@ import hashlib
 import json
 import tarfile
 from pathlib import Path
+
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 

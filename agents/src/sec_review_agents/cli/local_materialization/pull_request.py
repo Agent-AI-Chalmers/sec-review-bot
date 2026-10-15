@@ -1,4 +1,3 @@
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 import shutil
 import subprocess
 from pathlib import Path
@@ -17,6 +16,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (

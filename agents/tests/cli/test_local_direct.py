@@ -12,6 +12,7 @@ from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
     ReviewWorkflow,
 )
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.workflows.issue.direct import run_issue_review_direct
 from sec_review_agents.workflows.issue.single_agent import (
     run_issue_single_agent_direct,
@@ -26,7 +27,6 @@ from sec_review_agents.workflows.repository.direct import (
     run_repository_review_direct,
 )
 from tests.input_bundle import write_test_input_bundle
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 
 
 def _bundle(
