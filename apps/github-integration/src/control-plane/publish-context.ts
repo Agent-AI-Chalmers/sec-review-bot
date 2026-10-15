@@ -86,7 +86,9 @@ export interface RepositoryReviewPublishContext extends JsonObject {
 }
 
 export type PublishContext =
-  IssueReviewPublishContext | PullRequestReviewPublishContext | RepositoryReviewPublishContext
+  | IssueReviewPublishContext
+  | PullRequestReviewPublishContext
+  | RepositoryReviewPublishContext
 
 function invalid(path: string, expectation: string): never {
   // Stored corruption cannot be repaired by another publication attempt.
@@ -118,11 +120,16 @@ function positiveInteger(value: unknown, path: string): number {
 }
 
 function nullableText(value: unknown, path: string): string | null {
-  if (value !== null && typeof value !== 'string') invalid(path, 'a string or null')
+  if (value !== null && typeof value !== 'string')
+    invalid(path, 'a string or null')
   return value as string | null
 }
 
-function oneOf<T extends string>(value: unknown, path: string, allowed: readonly T[]): T {
+function oneOf<T extends string>(
+  value: unknown,
+  path: string,
+  allowed: readonly T[]
+): T {
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
     invalid(path, allowed.map((item) => JSON.stringify(item)).join(' or '))
   }
@@ -140,7 +147,10 @@ function repositoryIdentity(
   try {
     fullNameParts = splitRepoFullName(repo_full_name)
   } catch {
-    return invalid(`${path}.repo_full_name`, 'a valid GitHub owner/repository name')
+    return invalid(
+      `${path}.repo_full_name`,
+      'a valid GitHub owner/repository name'
+    )
   }
 
   // GitHub repository identity is case-insensitive. All three stored fields must
@@ -149,7 +159,10 @@ function repositoryIdentity(
     fullNameParts.owner_login.toLowerCase() !== owner_login.toLowerCase() ||
     fullNameParts.repo_name.toLowerCase() !== repo_name.toLowerCase()
   ) {
-    return invalid(`${path}.repo_full_name`, `the same repository as ${owner_login}/${repo_name}`)
+    return invalid(
+      `${path}.repo_full_name`,
+      `the same repository as ${owner_login}/${repo_name}`
+    )
   }
   return { owner_login, repo_name, repo_full_name }
 }
@@ -158,8 +171,14 @@ function issue(value: unknown): PersistedIssue {
   const item = object(value, 'publish_context.issue')
   return {
     ...repositoryIdentity(item, 'publish_context.issue'),
-    default_branch: text(item.default_branch, 'publish_context.issue.default_branch'),
-    issue_number: positiveInteger(item.issue_number, 'publish_context.issue.issue_number'),
+    default_branch: text(
+      item.default_branch,
+      'publish_context.issue.default_branch'
+    ),
+    issue_number: positiveInteger(
+      item.issue_number,
+      'publish_context.issue.issue_number'
+    ),
     issue_title: text(item.issue_title, 'publish_context.issue.issue_title')
   }
 }
@@ -174,7 +193,10 @@ function pullRequest(value: unknown): PersistedPullRequest {
   }
 }
 
-function pullRequestFile(value: unknown, index: number): PersistedPullRequestFile {
+function pullRequestFile(
+  value: unknown,
+  index: number
+): PersistedPullRequestFile {
   const path = `publish_context.files[${index}]`
   const item = object(value, path)
   const patch = item.patch
@@ -191,19 +213,28 @@ function repository(value: unknown): PersistedRepository {
   const item = object(value, 'publish_context.repo')
   return {
     ...repositoryIdentity(item, 'publish_context.repo'),
-    default_branch: text(item.default_branch, 'publish_context.repo.default_branch')
+    default_branch: text(
+      item.default_branch,
+      'publish_context.repo.default_branch'
+    )
   }
 }
 
 function scanTarget(value: unknown): PersistedRepositoryScanTarget {
   const item = object(value, 'publish_context.scan_target')
   return {
-    target_branch: text(item.target_branch, 'publish_context.scan_target.target_branch'),
+    target_branch: text(
+      item.target_branch,
+      'publish_context.scan_target.target_branch'
+    ),
     scan_mode: oneOf(item.scan_mode, 'publish_context.scan_target.scan_mode', [
       'full',
       'incremental'
     ]),
-    base_sha: nullableText(item.base_sha, 'publish_context.scan_target.base_sha'),
+    base_sha: nullableText(
+      item.base_sha,
+      'publish_context.scan_target.base_sha'
+    ),
     head_sha: text(item.head_sha, 'publish_context.scan_target.head_sha')
   }
 }
@@ -242,7 +273,9 @@ export function repositoryReviewPublishContext(
 
 // Parse again after a database read. TypeScript types disappear at persistence
 // boundaries, and a malformed recovery record must fail before any GitHub call.
-export function parseIssueReviewPublishContext(value: unknown): IssueReviewPublishContext {
+export function parseIssueReviewPublishContext(
+  value: unknown
+): IssueReviewPublishContext {
   const context = object(value, 'publish_context')
   // `open_pr` was added after the first persisted issue review records. Treat a
   // missing value as false so those in-flight runs stay publishable and do not open a PR
@@ -266,7 +299,8 @@ export function parsePullRequestReviewPublishContext(
   value: unknown
 ): PullRequestReviewPublishContext {
   const context = object(value, 'publish_context')
-  if (!Array.isArray(context.files)) invalid('publish_context.files', 'an array')
+  if (!Array.isArray(context.files))
+    invalid('publish_context.files', 'an array')
   return {
     pr: pullRequest(context.pr),
     files: context.files.map(pullRequestFile),
@@ -287,13 +321,21 @@ export function parseRepositoryReviewPublishContext(
     repo: repository(context.repo),
     workspace_ref: text(context.workspace_ref, 'publish_context.workspace_ref'),
     scan_target: scanTarget(context.scan_target),
-    event_type: oneOf(context.event_type, 'publish_context.event_type', ['manual', 'scheduled'])
+    event_type: oneOf(context.event_type, 'publish_context.event_type', [
+      'manual',
+      'scheduled'
+    ])
   }
 }
 
-export function parsePublishContextForWorkflow(workflow: string, value: unknown): PublishContext {
+export function parsePublishContextForWorkflow(
+  workflow: string,
+  value: unknown
+): PublishContext {
   if (workflow === 'issue-review') return parseIssueReviewPublishContext(value)
-  if (workflow === 'pull-request-review') return parsePullRequestReviewPublishContext(value)
-  if (workflow === 'repository-review') return parseRepositoryReviewPublishContext(value)
+  if (workflow === 'pull-request-review')
+    return parsePullRequestReviewPublishContext(value)
+  if (workflow === 'repository-review')
+    return parseRepositoryReviewPublishContext(value)
   return invalid('workflow', 'a supported review workflow')
 }

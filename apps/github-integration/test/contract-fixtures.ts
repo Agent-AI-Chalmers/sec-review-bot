@@ -27,16 +27,29 @@ export function workspaceRoot(): string {
 
 export const CONTRACTS_ROOT = path.join(workspaceRoot(), 'contracts')
 
-const integrationContractRoot = path.join(CONTRACTS_ROOT, 'integration-contract')
-const contractFixturesRoot = path.join(integrationContractRoot, CONTRACT_VERSION_DIR, 'fixtures')
-const contractSchemasRoot = path.join(integrationContractRoot, CONTRACT_VERSION_DIR, 'schemas')
+const integrationContractRoot = path.join(
+  CONTRACTS_ROOT,
+  'integration-contract'
+)
+const contractFixturesRoot = path.join(
+  integrationContractRoot,
+  CONTRACT_VERSION_DIR,
+  'fixtures'
+)
+const contractSchemasRoot = path.join(
+  integrationContractRoot,
+  CONTRACT_VERSION_DIR,
+  'schemas'
+)
 
 export function contractFixture(name: string): unknown {
   return JSON.parse(readFileSync(path.join(contractFixturesRoot, name), 'utf8'))
 }
 
 export function contractFixtureManifest(): unknown {
-  return JSON.parse(readFileSync(path.join(contractFixturesRoot, 'manifest.json'), 'utf8'))
+  return JSON.parse(
+    readFileSync(path.join(contractFixturesRoot, 'manifest.json'), 'utf8')
+  )
 }
 
 export function contractFixtureFiles(): string[] {

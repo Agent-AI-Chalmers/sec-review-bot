@@ -1,6 +1,6 @@
 import js from '@eslint/js'
-import tsParser from '@typescript-eslint/parser'
-import tsPlugin from '@typescript-eslint/eslint-plugin'
+import tseslint from 'typescript-eslint'
+import eslintConfigPrettier from 'eslint-config-prettier/flat'
 
 export default [
   {
@@ -10,7 +10,7 @@ export default [
   {
     files: ['**/*.ts'],
     languageOptions: {
-      parser: tsParser,
+      parser: tseslint.parser,
       parserOptions: {
         sourceType: 'module',
         ecmaVersion: 'latest'
@@ -23,7 +23,6 @@ export default [
         Request: 'readonly',
         RequestInit: 'readonly',
         Response: 'readonly',
-        ResponseInit: 'readonly',
         AbortController: 'readonly',
         fetch: 'readonly',
         structuredClone: 'readonly',
@@ -34,17 +33,16 @@ export default [
       }
     },
     plugins: {
-      '@typescript-eslint': tsPlugin
+      '@typescript-eslint': tseslint.plugin
     },
     rules: {
-      ...tsPlugin.configs.recommended.rules,
-      '@typescript-eslint/ban-ts-comment': 'off',
+      ...tseslint.plugin.configs.recommended.rules,
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      quotes: ['error', 'single', { avoidEscape: true }],
-      semi: ['error', 'never'],
-      'comma-dangle': ['error', 'never'],
-      'eol-last': ['error', 'always']
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_' }
+      ]
     }
-  }
+  },
+  eslintConfigPrettier
 ]

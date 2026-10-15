@@ -63,6 +63,9 @@ testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py314"
+# Explicit wrap width. 88 is Black's (and Ruff's) default; writing it here makes
+# the choice visible and prevents a tool default change from silently moving it.
+line-length = 88
 
 [tool.ruff.lint]
 extend-select = ["I"]
@@ -77,6 +80,8 @@ ignore = [
 
 [tool.black]
 target-version = ["py314"]
+# Keep Black and Ruff on the same width (see [tool.ruff] above).
+line-length = 88
 
 [tool.pyright]
 pythonVersion = "3.14"

@@ -9,7 +9,11 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
-import { Ajv2020, type AnySchemaObject, type ValidateFunction } from 'ajv/dist/2020.js'
+import {
+  Ajv2020,
+  type AnySchemaObject,
+  type ValidateFunction
+} from 'ajv/dist/2020.js'
 import * as ajvFormats from 'ajv-formats'
 
 import { REPO_ROOT } from './generated-paths.js'
@@ -22,7 +26,9 @@ const FIXTURES = path.join(CONTRACT_VERSION_DIR, 'fixtures')
 const root = REPO_ROOT
 // One contract version can hold several schemas, so each fixture is validated against the schema the
 // manifest names for it rather than against whichever schema was loaded first.
-const manifest = JSON.parse(readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')) as {
+const manifest = JSON.parse(
+  readFileSync(path.join(root, FIXTURES, 'manifest.json'), 'utf8')
+) as {
   schema_fixtures: Record<string, string>
   invalid_schema_fixtures: Record<string, string>
 }
@@ -48,7 +54,9 @@ function validate(schemaName: string, value: unknown): boolean {
   // import, a namespace import's `.default`, and `import ... = require(...)`, with and
   // without `esModuleInterop`. The plugin really is on `default` at runtime, which the
   // assertions below prove the moment they run — a wrong cast makes them fail, not pass.
-  const addFormats = ajvFormats.default as unknown as (instance: Ajv2020) => Ajv2020
+  const addFormats = ajvFormats.default as unknown as (
+    instance: Ajv2020
+  ) => Ajv2020
   addFormats(ajv)
   const validator = ajv.compile(schema) as ValidateFunction
   validators.set(schemaName, validator)
@@ -59,14 +67,26 @@ test('the shared fixtures match or violate the schema exactly as the manifest cl
   // A fixture that quietly stops matching the schema would teach the console a shape the
   // Control Plane never sends, so both directions are asserted.
   for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
-    assert.equal(validate(schemaName, fixture(name)), true, `${name} must be accepted`)
+    assert.strictEqual(
+      validate(schemaName, fixture(name)),
+      true,
+      `${name} must be accepted`
+    )
   }
-  for (const [name, schemaName] of Object.entries(manifest.invalid_schema_fixtures)) {
-    assert.equal(validate(schemaName, fixture(name)), false, `${name} must be rejected`)
+  for (const [name, schemaName] of Object.entries(
+    manifest.invalid_schema_fixtures
+  )) {
+    assert.strictEqual(
+      validate(schemaName, fixture(name)),
+      false,
+      `${name} must be rejected`
+    )
   }
 })
 
-function recordWith(artifactStorage: ReviewRunRecord['artifact_storage']): ReviewRunRecord {
+function recordWith(
+  artifactStorage: ReviewRunRecord['artifact_storage']
+): ReviewRunRecord {
   return {
     run_id: 'run-contract',
     workflow: 'repository-review',
@@ -88,7 +108,7 @@ test('what observeRun returns validates against the shared schema', () => {
   // The schema is only a contract while the producer's own output satisfies it. This is
   // the check that would catch a status the schema's enum does not list.
   const withoutArtifact = observeRun(recordWith(null))
-  assert.equal(
+  assert.strictEqual(
     validate('observed-run.schema.json', withoutArtifact),
     true,
     `observeRun output must be accepted: ${JSON.stringify(withoutArtifact)}`
@@ -106,7 +126,7 @@ test('what observeRun returns validates against the shared schema', () => {
       }
     } as ReviewRunRecord['artifact_storage'])
   )
-  assert.equal(
+  assert.strictEqual(
     validate('observed-run.schema.json', withArtifact),
     true,
     `observeRun output must be accepted: ${JSON.stringify(withArtifact)}`

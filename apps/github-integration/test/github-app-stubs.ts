@@ -17,7 +17,13 @@ export function appWithInstallationOctokit({
     octokit: {
       rest: {
         apps: {
-          getRepoInstallation: async ({ owner, repo }: { owner: string; repo: string }) => {
+          getRepoInstallation: async ({
+            owner,
+            repo
+          }: {
+            owner: string
+            repo: string
+          }) => {
             if (expected_owner !== undefined && owner !== expected_owner) {
               throw new Error(`Unexpected installation owner: ${owner}`)
             }
@@ -35,7 +41,9 @@ export function appWithInstallationOctokit({
     },
     getInstallationOctokit: async (requested_installation_id: number) => {
       if (requested_installation_id !== installation_id) {
-        throw new Error(`Unexpected installation id: ${requested_installation_id}`)
+        throw new Error(
+          `Unexpected installation id: ${requested_installation_id}`
+        )
       }
       return installation_octokit
     }

@@ -10,12 +10,20 @@ interface DeliveryTitleSource {
 
 function isDocumentationPath(value: string): boolean {
   const lower = value.toLowerCase()
-  return lower === 'readme.md' || lower.endsWith('/readme.md') || lower.endsWith('.md')
+  return (
+    lower === 'readme.md' ||
+    lower.endsWith('/readme.md') ||
+    lower.endsWith('.md')
+  )
 }
 
 function primaryFileForDeliveryTitle(delivery: DeliveryTitleSource): string {
   const changed_files = fileChangePaths(delivery.file_changes)
-  return changed_files.find((item) => !isDocumentationPath(item)) ?? changed_files[0] ?? ''
+  return (
+    changed_files.find((item) => !isDocumentationPath(item)) ??
+    changed_files[0] ??
+    ''
+  )
 }
 
 function titleDisambiguator(delivery: DeliveryTitleSource): string {
@@ -27,7 +35,8 @@ function titleDisambiguator(delivery: DeliveryTitleSource): string {
 }
 
 function deliveryTitleSuffix(delivery: DeliveryTitleSource): string {
-  const case_count = optionalNumber(delivery.case_count) ?? asList(delivery.case_ids).length
+  const case_count =
+    optionalNumber(delivery.case_count) ?? asList(delivery.case_ids).length
   const disambiguator = titleDisambiguator(delivery)
   if (case_count <= 1) {
     return disambiguator ? ` (${disambiguator})` : ''

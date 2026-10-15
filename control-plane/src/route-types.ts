@@ -18,7 +18,9 @@ type Operation<Id extends OperationId> = operations[Id]
 
 /** The JSON request body the contract declares for an operation. */
 export type RequestBody<Id extends OperationId> =
-  Operation<Id> extends { requestBody: { content: { 'application/json': infer Body } } }
+  Operation<Id> extends {
+    requestBody: { content: { 'application/json': infer Body } }
+  }
     ? Body
     : never
 

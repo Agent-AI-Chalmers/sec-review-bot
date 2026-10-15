@@ -37,22 +37,39 @@ async function createGitFixture(root: string): Promise<GitFixture> {
   await fs.mkdir(path.dirname(remote), { recursive: true })
   await execFileAsync('git', ['init', '--bare', remote])
   await execFileAsync('git', ['init', source])
-  await execFileAsync('git', ['config', 'user.name', 'Test User'], { cwd: source })
-  await execFileAsync('git', ['config', 'user.email', 'test@example.com'], { cwd: source })
+  await execFileAsync('git', ['config', 'user.name', 'Test User'], {
+    cwd: source
+  })
+  await execFileAsync('git', ['config', 'user.email', 'test@example.com'], {
+    cwd: source
+  })
   await fs.mkdir(path.join(source, 'src'), { recursive: true })
-  await fs.writeFile(path.join(source, 'src', 'app.ts'), 'export const value = 1\n', 'utf8')
+  await fs.writeFile(
+    path.join(source, 'src', 'app.ts'),
+    'export const value = 1\n',
+    'utf8'
+  )
   await execFileAsync('git', ['add', '.'], { cwd: source })
   await execFileAsync('git', ['commit', '-m', 'base'], { cwd: source })
   await execFileAsync('git', ['branch', '-M', 'main'], { cwd: source })
-  await execFileAsync('git', ['remote', 'add', 'origin', remote], { cwd: source })
+  await execFileAsync('git', ['remote', 'add', 'origin', remote], {
+    cwd: source
+  })
   await execFileAsync('git', ['push', 'origin', 'main'], { cwd: source })
-  const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: source })
+  const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+    cwd: source
+  })
   return { head_sha: stdout.trim() }
 }
 
 interface OctokitRecording {
   octokit: GitHubAppOctokit
-  contentRequests: Array<{ owner?: string; repo?: string; path: string; ref?: string }>
+  contentRequests: Array<{
+    owner?: string
+    repo?: string
+    path: string
+    ref?: string
+  }>
 }
 
 /** An octokit whose Contents API serves `files` and records each request. */
@@ -60,7 +77,12 @@ function octokitWithSetupDeclaration(
   sha: string,
   files: Record<string, string> = { '.sec-review/setup.yml': DECLARATION }
 ): OctokitRecording {
-  const contentRequests: Array<{ owner?: string; repo?: string; path: string; ref?: string }> = []
+  const contentRequests: Array<{
+    owner?: string
+    repo?: string
+    path: string
+    ref?: string
+  }> = []
   const octokit = {
     auth: async () => ({ token: 'test-installation-token' }),
     request: async () => ({ data: '' }),
@@ -77,7 +99,12 @@ function octokitWithSetupDeclaration(
     rest: {
       repos: {
         get: async () => ({
-          data: { full_name: 'octo/demo', default_branch: 'main', html_url: '', private: true }
+          data: {
+            full_name: 'octo/demo',
+            default_branch: 'main',
+            html_url: '',
+            private: true
+          }
         }),
         getBranch: async () => ({ data: { commit: { sha } } }),
         getCommit: async ({ ref }: { ref: string }) => ({ data: { sha: ref } }),
@@ -103,7 +130,10 @@ function octokitWithSetupDeclaration(
             throw Object.assign(new Error('Not Found'), { status: 404 })
           }
           return {
-            data: { type: 'file', content: Buffer.from(content, 'utf8').toString('base64') }
+            data: {
+              type: 'file',
+              content: Buffer.from(content, 'utf8').toString('base64')
+            }
           }
         },
         compareCommitsWithBasehead: async () => ({
@@ -152,22 +182,29 @@ test(
       const { head_sha } = await createGitFixture(root)
       process.env['GITHUB_SERVER_URL'] = `file://${root}`
       const { octokit, contentRequests } = octokitWithSetupDeclaration(head_sha)
-      const { prepareIssueReviewInput } = await import('../../src/reviews/issues/prepare-input.js')
+      const { prepareIssueReviewInput } =
+        await import('../../src/reviews/issues/prepare-input.js')
       const prepared = await prepareIssueReviewInput({
         run_id: 'run-issue-auth',
         octokit,
         issue: issueContext(),
         trusted_default_branch: { default_branch: 'main', head_sha }
       })
-      assert.equal(prepared.input.setup_declaration, DECLARATION)
+      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
       // Read at the exact default-branch SHA, not a branch name.
-      assert.deepEqual(contentRequests, [
-        { owner: 'octo', repo: 'demo', path: '.sec-review/setup.yml', ref: head_sha }
+      assert.deepStrictEqual(contentRequests, [
+        {
+          owner: 'octo',
+          repo: 'demo',
+          path: '.sec-review/setup.yml',
+          ref: head_sha
+        }
       ])
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      if (previousBundleRoot === undefined)
+        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
       else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
       await fs.rm(root, { recursive: true, force: true })
     }
@@ -195,14 +232,20 @@ test(
         trusted_default_branch: { default_branch: 'main', head_sha },
         scan_mode: 'full'
       })
-      assert.equal(prepared.input.setup_declaration, DECLARATION)
-      assert.deepEqual(contentRequests, [
-        { owner: 'octo', repo: 'demo', path: '.sec-review/setup.yml', ref: head_sha }
+      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
+      assert.deepStrictEqual(contentRequests, [
+        {
+          owner: 'octo',
+          repo: 'demo',
+          path: '.sec-review/setup.yml',
+          ref: head_sha
+        }
       ])
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      if (previousBundleRoot === undefined)
+        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
       else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
       await fs.rm(root, { recursive: true, force: true })
     }
@@ -269,14 +312,20 @@ test(
         trusted_default_branch: { default_branch: 'main', head_sha },
         files: []
       })
-      assert.equal(prepared.input.setup_declaration, DECLARATION)
-      assert.deepEqual(contentRequests, [
-        { owner: 'mirror', repo: 'demo', path: '.sec-review/setup.yml', ref: head_sha }
+      assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
+      assert.deepStrictEqual(contentRequests, [
+        {
+          owner: 'mirror',
+          repo: 'demo',
+          path: '.sec-review/setup.yml',
+          ref: head_sha
+        }
       ])
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer
-      if (previousBundleRoot === undefined) delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
+      if (previousBundleRoot === undefined)
+        delete process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT']
       else process.env['SEC_REVIEW_INPUT_BUNDLE_ROOT'] = previousBundleRoot
       await fs.rm(root, { recursive: true, force: true })
     }

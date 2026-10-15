@@ -24,7 +24,10 @@ test('authenticated run queries are redacted, paginated, and survive a server re
   })
   const { startControlPlaneServer } = await import('../../src/server.js')
   const base = `http://127.0.0.1:${port}`
-  const readAuth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+  const readAuth = {
+    authorization: `Bearer ${token}`,
+    'content-type': 'application/json'
+  }
   const mutationAuth = {
     authorization: `Bearer mutation-${token}`,
     'content-type': 'application/json'
@@ -32,36 +35,60 @@ test('authenticated run queries are redacted, paginated, and survive a server re
   let server = await startControlPlaneServer()
   try {
     const unauthorized = await fetch(`${base}/v1/runs?limit=1`)
-    assert.equal(unauthorized.status, 401)
+    assert.strictEqual(unauthorized.status, 401)
     const unfiltered = await fetch(`${base}/v1/runs`, { headers: readAuth })
-    assert.equal(unfiltered.status, 200)
-    assert.deepEqual(await unfiltered.json(), { runs: [], next_cursor: null })
+    assert.strictEqual(unfiltered.status, 200)
+    assert.deepStrictEqual(await unfiltered.json(), {
+      runs: [],
+      next_cursor: null
+    })
     // The query filters are validated by the contract (glue mounts it as the route schema),
     // so the envelope's stable part is the status and code; the message comes from the schema
     // validator and is deliberately not pinned here.
-    const invalidExecutionStatus = await fetch(`${base}/v1/runs?execution_status=typo`, {
-      headers: readAuth
-    })
-    assert.equal(invalidExecutionStatus.status, 400)
-    assert.equal(((await invalidExecutionStatus.json()) as { code?: string }).code, 'INVALID_QUERY')
-    const invalidPublicationStatus = await fetch(`${base}/v1/runs?publication_status=typo`, {
-      headers: readAuth
-    })
-    assert.equal(invalidPublicationStatus.status, 400)
-    assert.equal(
+    const invalidExecutionStatus = await fetch(
+      `${base}/v1/runs?execution_status=typo`,
+      {
+        headers: readAuth
+      }
+    )
+    assert.strictEqual(invalidExecutionStatus.status, 400)
+    assert.strictEqual(
+      ((await invalidExecutionStatus.json()) as { code?: string }).code,
+      'INVALID_QUERY'
+    )
+    const invalidPublicationStatus = await fetch(
+      `${base}/v1/runs?publication_status=typo`,
+      {
+        headers: readAuth
+      }
+    )
+    assert.strictEqual(invalidPublicationStatus.status, 400)
+    assert.strictEqual(
       ((await invalidPublicationStatus.json()) as { code?: string }).code,
       'INVALID_QUERY'
     )
-    const invalidWorkflow = await fetch(`${base}/v1/runs?workflow=typo`, { headers: readAuth })
-    assert.equal(invalidWorkflow.status, 400)
-    assert.equal(((await invalidWorkflow.json()) as { code?: string }).code, 'INVALID_QUERY')
-    const invalidLimit = await fetch(`${base}/v1/runs?limit=10junk`, { headers: readAuth })
-    assert.equal(invalidLimit.status, 400)
+    const invalidWorkflow = await fetch(`${base}/v1/runs?workflow=typo`, {
+      headers: readAuth
+    })
+    assert.strictEqual(invalidWorkflow.status, 400)
+    assert.strictEqual(
+      ((await invalidWorkflow.json()) as { code?: string }).code,
+      'INVALID_QUERY'
+    )
+    const invalidLimit = await fetch(`${base}/v1/runs?limit=10junk`, {
+      headers: readAuth
+    })
+    assert.strictEqual(invalidLimit.status, 400)
     // An undeclared query parameter is rejected, matching the request bodies' refusal of
     // undeclared fields: the query is one `additionalProperties: false` object.
-    const unknownParameter = await fetch(`${base}/v1/runs?bogus=1`, { headers: readAuth })
-    assert.equal(unknownParameter.status, 400)
-    assert.equal(((await unknownParameter.json()) as { code?: string }).code, 'INVALID_QUERY')
+    const unknownParameter = await fetch(`${base}/v1/runs?bogus=1`, {
+      headers: readAuth
+    })
+    assert.strictEqual(unknownParameter.status, 400)
+    assert.strictEqual(
+      ((await unknownParameter.json()) as { code?: string }).code,
+      'INVALID_QUERY'
+    )
 
     // A write request whose body the contract rejects — here an admission missing its required
     // `workflow` — is a 400 from the route's own schema, the same `InvalidRequest` envelope the
@@ -75,10 +102,13 @@ test('authenticated run queries are redacted, paginated, and survive a server re
         ingress_key: 'delivery:missing-workflow'
       })
     })
-    assert.equal(missingWorkflow.status, 400)
+    assert.strictEqual(missingWorkflow.status, 400)
 
     const runIds: string[] = []
-    for (const ingressKey of [`delivery:${randomUUID()}`, `delivery:${randomUUID()}`]) {
+    for (const ingressKey of [
+      `delivery:${randomUUID()}`,
+      `delivery:${randomUUID()}`
+    ]) {
       const admitted = await fetch(`${base}/v1/runs`, {
         method: 'POST',
         headers: mutationAuth,
@@ -89,50 +119,75 @@ test('authenticated run queries are redacted, paginated, and survive a server re
           publish_context: { secret: 'must-not-leak' }
         })
       })
-      assert.equal(admitted.status, 200)
+      assert.strictEqual(admitted.status, 200)
       const body = (await admitted.json()) as { record: { run_id: string } }
       runIds.push(body.record.run_id)
     }
 
-    const detail = await fetch(`${base}/v1/runs/${runIds[0]}`, { headers: readAuth })
+    const detail = await fetch(`${base}/v1/runs/${runIds[0]}`, {
+      headers: readAuth
+    })
     const detailText = await detail.text()
-    assert.equal(detail.status, 200)
-    assert.equal(detailText.includes('must-not-leak'), false)
-    assert.equal(detailText.includes('publish_context'), false)
+    assert.strictEqual(detail.status, 200)
+    assert.strictEqual(detailText.includes('must-not-leak'), false)
+    assert.strictEqual(detailText.includes('publish_context'), false)
 
-    const firstPage = await fetch(`${base}/v1/runs?limit=1`, { headers: readAuth })
+    const firstPage = await fetch(`${base}/v1/runs?limit=1`, {
+      headers: readAuth
+    })
     const firstBody = (await firstPage.json()) as {
       runs: Array<{ run_id: string }>
       next_cursor: string | null
     }
-    assert.equal(firstBody.runs.length, 1)
-    assert.notEqual(firstBody.next_cursor, null)
+    assert.strictEqual(firstBody.runs.length, 1)
+    assert.notStrictEqual(firstBody.next_cursor, null)
     const secondPage = await fetch(
       `${base}/v1/runs?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor ?? '')}`,
       { headers: readAuth }
     )
-    const secondBody = (await secondPage.json()) as { runs: Array<{ run_id: string }> }
-    assert.equal(secondBody.runs.length, 1)
-    assert.notEqual(secondBody.runs[0]?.run_id, firstBody.runs[0]?.run_id)
+    const secondBody = (await secondPage.json()) as {
+      runs: Array<{ run_id: string }>
+    }
+    assert.strictEqual(secondBody.runs.length, 1)
+    assert.notStrictEqual(secondBody.runs[0]?.run_id, firstBody.runs[0]?.run_id)
 
     // The created-at range was accepted by the API but never covered, so a broken
     // bound would have filtered silently.
     const past = encodeURIComponent('2000-01-01T00:00:00.000Z')
     const future = encodeURIComponent('2100-01-01T00:00:00.000Z')
-    const boundedAbove = await fetch(`${base}/v1/runs?from=${past}`, { headers: readAuth })
-    assert.equal(((await boundedAbove.json()) as { runs: unknown[] }).runs.length, 2)
-    const notYet = await fetch(`${base}/v1/runs?from=${future}`, { headers: readAuth })
-    assert.deepEqual(await notYet.json(), { runs: [], next_cursor: null })
-    const beforeEverything = await fetch(`${base}/v1/runs?to=${past}`, { headers: readAuth })
-    assert.deepEqual(await beforeEverything.json(), { runs: [], next_cursor: null })
-    const invalidFrom = await fetch(`${base}/v1/runs?from=not-a-date`, { headers: readAuth })
-    assert.equal(invalidFrom.status, 400)
-    assert.equal(((await invalidFrom.json()) as { code?: string }).code, 'INVALID_QUERY')
+    const boundedAbove = await fetch(`${base}/v1/runs?from=${past}`, {
+      headers: readAuth
+    })
+    assert.strictEqual(
+      ((await boundedAbove.json()) as { runs: unknown[] }).runs.length,
+      2
+    )
+    const notYet = await fetch(`${base}/v1/runs?from=${future}`, {
+      headers: readAuth
+    })
+    assert.deepStrictEqual(await notYet.json(), { runs: [], next_cursor: null })
+    const beforeEverything = await fetch(`${base}/v1/runs?to=${past}`, {
+      headers: readAuth
+    })
+    assert.deepStrictEqual(await beforeEverything.json(), {
+      runs: [],
+      next_cursor: null
+    })
+    const invalidFrom = await fetch(`${base}/v1/runs?from=not-a-date`, {
+      headers: readAuth
+    })
+    assert.strictEqual(invalidFrom.status, 400)
+    assert.strictEqual(
+      ((await invalidFrom.json()) as { code?: string }).code,
+      'INVALID_QUERY'
+    )
 
     await server.close()
     server = await startControlPlaneServer()
-    const afterRestart = await fetch(`${base}/v1/runs/${runIds[0]}`, { headers: readAuth })
-    assert.equal(afterRestart.status, 200)
+    const afterRestart = await fetch(`${base}/v1/runs/${runIds[0]}`, {
+      headers: readAuth
+    })
+    assert.strictEqual(afterRestart.status, 200)
   } finally {
     await server.close()
   }

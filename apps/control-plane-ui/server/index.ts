@@ -1,6 +1,11 @@
 import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse
+} from 'node:http'
 import { tmpdir } from 'node:os'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -82,9 +87,14 @@ function forwardedPath(bffUrl: string): string {
   return `${url.pathname.slice('/api'.length)}${query === '' ? '' : `?${query}`}`
 }
 
-const allowed = /^\/api\/runs(?:\?.*)?$|^\/api\/runs\/[^/?]+(?:\/publication-steps)?$/
+const allowed =
+  /^\/api\/runs(?:\?.*)?$|^\/api\/runs\/[^/?]+(?:\/publication-steps)?$/
 
-function sendJson(response: ServerResponse, status: number, body: object): void {
+function sendJson(
+  response: ServerResponse,
+  status: number,
+  body: object
+): void {
   response.writeHead(status, { 'content-type': 'application/json' })
   response.end(JSON.stringify(body))
 }
@@ -94,7 +104,8 @@ function availableArtifact(
   runId: string,
   bucket: string
 ): AvailableArtifact | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return null
   const storage = value as Record<string, unknown>
   if (storage.status !== 'available') return null
   if (
@@ -116,7 +127,11 @@ function availableArtifact(
   )
     return null
   const key = expectedUri.slice(`s3://${bucket}/`.length)
-  return { digest: artifact.digest, key, sizeBytes: artifact.size_bytes as number }
+  return {
+    digest: artifact.digest,
+    key,
+    sizeBytes: artifact.size_bytes as number
+  }
 }
 
 function artifactStoreFromEnvironment(): ArtifactStore | undefined {
@@ -125,8 +140,15 @@ function artifactStoreFromEnvironment(): ArtifactStore | undefined {
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim()
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim()
   if (!endpoint && !bucket) return undefined
-  if (!endpoint || bucket !== ARTIFACT_BUCKET || !accessKeyId || !secretAccessKey)
-    throw new Error('Control Plane UI artifact storage configuration is invalid.')
+  if (
+    !endpoint ||
+    bucket !== ARTIFACT_BUCKET ||
+    !accessKeyId ||
+    !secretAccessKey
+  )
+    throw new Error(
+      'Control Plane UI artifact storage configuration is invalid.'
+    )
   const client = new S3Client({
     endpoint,
     region: process.env.AWS_REGION ?? 'us-east-1',
@@ -139,10 +161,13 @@ function artifactStoreFromEnvironment(): ArtifactStore | undefined {
         new GetObjectCommand({ Bucket: ARTIFACT_BUCKET, Key: key }),
         { abortSignal: signal }
       )
-      if (!(object.Body instanceof Readable)) throw new Error('RustFS returned no readable body.')
+      if (!(object.Body instanceof Readable))
+        throw new Error('RustFS returned no readable body.')
       return {
         body: object.Body,
-        ...(object.ContentLength === undefined ? {} : { contentLength: object.ContentLength })
+        ...(object.ContentLength === undefined
+          ? {}
+          : { contentLength: object.ContentLength })
       }
     }
   }
@@ -151,9 +176,15 @@ function artifactStoreFromEnvironment(): ArtifactStore | undefined {
 function storageStatus(error: unknown): number | undefined {
   if (typeof error !== 'object' || error === null) return undefined
   const metadata = '$metadata' in error ? error.$metadata : undefined
-  if (typeof metadata !== 'object' || metadata === null || !('httpStatusCode' in metadata))
+  if (
+    typeof metadata !== 'object' ||
+    metadata === null ||
+    !('httpStatusCode' in metadata)
+  )
     return undefined
-  return typeof metadata.httpStatusCode === 'number' ? metadata.httpStatusCode : undefined
+  return typeof metadata.httpStatusCode === 'number'
+    ? metadata.httpStatusCode
+    : undefined
 }
 
 export function createControlPlaneUiServer({
@@ -173,7 +204,10 @@ export function createControlPlaneUiServer({
   controlPlaneRequestTimeoutMs?: number
   assets?: string
 }): Server {
-  const sessionValue = crypto.createHash('sha256').update(accessToken).digest('base64url')
+  const sessionValue = crypto
+    .createHash('sha256')
+    .update(accessToken)
+    .digest('base64url')
   const authenticated = (cookie: string | undefined): boolean =>
     cookie
       ?.split(';')
@@ -202,7 +236,11 @@ export function createControlPlaneUiServer({
       const supplied = ((): string => {
         try {
           return (
-            (JSON.parse(Buffer.concat(chunks).toString('utf8')) as { token?: string }).token ?? ''
+            (
+              JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+                token?: string
+              }
+            ).token ?? ''
           )
         } catch {
           return ''
@@ -241,7 +279,8 @@ export function createControlPlaneUiServer({
         return
       }
       response.writeHead(204, {
-        'set-cookie': 'control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'
+        'set-cookie':
+          'control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'
       })
       response.end()
       return
@@ -252,7 +291,9 @@ export function createControlPlaneUiServer({
         response.end('{"error":"unauthorized"}')
         return
       }
-      const artifactMatch = /^\/api\/runs\/([^/?]+)\/artifact$/.exec(request.url)
+      const artifactMatch = /^\/api\/runs\/([^/?]+)\/artifact$/.exec(
+        request.url
+      )
       if (request.method === 'GET' && artifactMatch !== null) {
         if (artifactStore === undefined) {
           sendJson(response, 503, { error: 'artifact_download_unavailable' })
@@ -292,10 +333,13 @@ export function createControlPlaneUiServer({
         }
         let temporaryDirectory: string | undefined
         try {
-          const upstream = await fetch(`${controlPlaneUrl}/v1/runs/${encodeURIComponent(runId)}`, {
-            headers: { authorization: `Bearer ${controlPlaneToken}` },
-            signal: metadataController.signal
-          })
+          const upstream = await fetch(
+            `${controlPlaneUrl}/v1/runs/${encodeURIComponent(runId)}`,
+            {
+              headers: { authorization: `Bearer ${controlPlaneToken}` },
+              signal: metadataController.signal
+            }
+          )
           if (upstream.status === 404) {
             sendJson(response, 404, { error: 'artifact_not_found' })
             return
@@ -310,21 +354,36 @@ export function createControlPlaneUiServer({
           clearTimeout(metadataTimeout)
           const artifact =
             body.run?.run_id === runId
-              ? availableArtifact(body.run.artifact_storage, runId, ARTIFACT_BUCKET)
+              ? availableArtifact(
+                  body.run.artifact_storage,
+                  runId,
+                  ARTIFACT_BUCKET
+                )
               : null
           if (artifact === null) {
             sendJson(response, 409, { error: 'artifact_unavailable' })
             return
           }
           resetDownloadIdleTimeout()
-          const object = await artifactStore.getObject(artifact.key, downloadController.signal)
-          if (object.contentLength !== undefined && object.contentLength !== artifact.sizeBytes) {
+          const object = await artifactStore.getObject(
+            artifact.key,
+            downloadController.signal
+          )
+          if (
+            object.contentLength !== undefined &&
+            object.contentLength !== artifact.sizeBytes
+          ) {
             object.body.destroy()
             sendJson(response, 502, { error: 'artifact_identity_mismatch' })
             return
           }
-          temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'sec-review-artifact-'))
-          const temporaryArtifact = path.join(temporaryDirectory, 'diagnostic-tree.v1.tar.zst')
+          temporaryDirectory = await mkdtemp(
+            path.join(tmpdir(), 'sec-review-artifact-')
+          )
+          const temporaryArtifact = path.join(
+            temporaryDirectory,
+            'diagnostic-tree.v1.tar.zst'
+          )
           const digest = crypto.createHash('sha256')
           let sizeBytes = 0
           const verify = new Transform({
@@ -339,18 +398,27 @@ export function createControlPlaneUiServer({
               callback(null, chunk)
             }
           })
-          await pipeline(object.body, verify, createWriteStream(temporaryArtifact), {
-            signal: downloadController.signal
-          })
+          await pipeline(
+            object.body,
+            verify,
+            createWriteStream(temporaryArtifact),
+            {
+              signal: downloadController.signal
+            }
+          )
           clearTimeout(downloadIdleTimeout)
           const actualDigest = `sha256:${digest.digest('hex')}`
-          if (sizeBytes !== artifact.sizeBytes || actualDigest !== artifact.digest) {
+          if (
+            sizeBytes !== artifact.sizeBytes ||
+            actualDigest !== artifact.digest
+          ) {
             sendJson(response, 502, { error: 'artifact_identity_mismatch' })
             return
           }
           response.writeHead(200, {
             'content-type': 'application/octet-stream',
-            'content-disposition': 'attachment; filename="diagnostic-tree.v1.tar.zst"',
+            'content-disposition':
+              'attachment; filename="diagnostic-tree.v1.tar.zst"',
             'cache-control': 'private, no-store',
             'content-length': String(sizeBytes)
           })
@@ -361,10 +429,15 @@ export function createControlPlaneUiServer({
           if (response.headersSent || response.destroyed) return
           const status = storageStatus(error)
           const identityMismatch =
-            error instanceof Error && error.message === 'artifact_identity_mismatch'
+            error instanceof Error &&
+            error.message === 'artifact_identity_mismatch'
           sendJson(
             response,
-            status === 404 ? 404 : metadataTimedOut || downloadTimedOut ? 504 : 502,
+            status === 404
+              ? 404
+              : metadataTimedOut || downloadTimedOut
+                ? 504
+                : 502,
             {
               error:
                 status === 404
@@ -392,22 +465,33 @@ export function createControlPlaneUiServer({
         return
       }
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), CONTROL_PLANE_REQUEST_TIMEOUT_MS)
+      const timeout = setTimeout(
+        () => controller.abort(),
+        CONTROL_PLANE_REQUEST_TIMEOUT_MS
+      )
       try {
-        const upstream = await fetch(`${controlPlaneUrl}/v1${forwardedPath(request.url ?? '/')}`, {
-          headers: { authorization: `Bearer ${controlPlaneToken}` },
-          signal: controller.signal
-        })
+        const upstream = await fetch(
+          `${controlPlaneUrl}/v1${forwardedPath(request.url ?? '/')}`,
+          {
+            headers: { authorization: `Bearer ${controlPlaneToken}` },
+            signal: controller.signal
+          }
+        )
         response.writeHead(upstream.status, {
-          'content-type': upstream.headers.get('content-type') ?? 'application/json'
+          'content-type':
+            upstream.headers.get('content-type') ?? 'application/json'
         })
         response.end(Buffer.from(await upstream.arrayBuffer()))
       } catch (error) {
         const timedOut = error instanceof Error && error.name === 'AbortError'
-        response.writeHead(timedOut ? 504 : 502, { 'content-type': 'application/json' })
+        response.writeHead(timedOut ? 504 : 502, {
+          'content-type': 'application/json'
+        })
         response.end(
           JSON.stringify({
-            error: timedOut ? 'control_plane_timeout' : 'control_plane_unavailable'
+            error: timedOut
+              ? 'control_plane_timeout'
+              : 'control_plane_unavailable'
           })
         )
       } finally {
@@ -415,7 +499,10 @@ export function createControlPlaneUiServer({
       }
       return
     }
-    const requested = request.url === '/' ? 'index.html' : (request.url?.slice(1) ?? 'index.html')
+    const requested =
+      request.url === '/'
+        ? 'index.html'
+        : (request.url?.slice(1) ?? 'index.html')
     let file = path.resolve(assets, requested)
     if (!file.startsWith(`${assets}${path.sep}`)) {
       response.writeHead(404)
@@ -438,15 +525,23 @@ export function createControlPlaneUiServer({
   })
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const controlPlaneToken = process.env.CONTROL_PLANE_READ_TOKEN
   const accessToken = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
-  if (!controlPlaneToken) throw new Error('CONTROL_PLANE_READ_TOKEN is required.')
-  if (!accessToken) throw new Error('CONTROL_PLANE_UI_ACCESS_TOKEN is required.')
+  if (!controlPlaneToken)
+    throw new Error('CONTROL_PLANE_READ_TOKEN is required.')
+  if (!accessToken)
+    throw new Error('CONTROL_PLANE_UI_ACCESS_TOKEN is required.')
   createControlPlaneUiServer({
     controlPlaneUrl: process.env.CONTROL_PLANE_URL ?? 'http://127.0.0.1:8090',
     controlPlaneToken,
     accessToken,
     artifactStore: artifactStoreFromEnvironment()
-  }).listen(Number.parseInt(process.env.CONTROL_PLANE_UI_PORT ?? '8091', 10), '0.0.0.0')
+  }).listen(
+    Number.parseInt(process.env.CONTROL_PLANE_UI_PORT ?? '8091', 10),
+    '0.0.0.0'
+  )
 }

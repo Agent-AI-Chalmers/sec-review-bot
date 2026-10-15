@@ -7,7 +7,10 @@ import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { preparePullRequestReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
-import type { PullRequestReviewInput, TestChangesPolicy } from '../../runner/input.js'
+import type {
+  PullRequestReviewInput,
+  TestChangesPolicy
+} from '../../runner/input.js'
 
 export interface SubmittedPullRequestReviewRun {
   pr: PullRequestContext
@@ -21,7 +24,9 @@ function assertPullRequestReviewInput(
   input: PullRequestReviewInput
 ): asserts input is PullRequestReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error('Pull request review input is missing before runner invocation.')
+    throw new Error(
+      'Pull request review input is missing before runner invocation.'
+    )
   }
 }
 
@@ -97,7 +102,11 @@ async function materializePullRequestReviewInput({
   trusted_default_branch: TrustedDefaultBranch
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   test_changes?: TestChangesPolicy | null
-}): Promise<{ run_id: string; input: PullRequestReviewInput; files: unknown[] }> {
+}): Promise<{
+  run_id: string
+  input: PullRequestReviewInput
+  files: unknown[]
+}> {
   logInfo('pull_request_review_workflow_started', {
     event_type,
     pr: pr.pr_number,
@@ -128,7 +137,10 @@ async function materializePullRequestReviewInput({
   logInfo('pull_request_review_files_fetch_completed', {
     event_type,
     file_count: files.length,
-    mode: event_type === 'synchronize' ? 'synchronize_scope_completed' : 'pull_request_scope',
+    mode:
+      event_type === 'synchronize'
+        ? 'synchronize_scope_completed'
+        : 'pull_request_scope',
     note: describeFetchedFiles(event_type, files),
     pr: pr.pr_number
   })
@@ -144,7 +156,11 @@ async function materializePullRequestReviewInput({
   const analysisInput = prepared?.input ?? null
   const reviewFiles = prepared?.files ?? files
 
-  if (!analysisInput || typeof analysisInput !== 'object' || Array.isArray(analysisInput)) {
+  if (
+    !analysisInput ||
+    typeof analysisInput !== 'object' ||
+    Array.isArray(analysisInput)
+  ) {
     throw new Error(
       `Pull request input materialization returned an invalid value for PR #${pr.pr_number}.`
     )

@@ -18,11 +18,16 @@ interface IssueContext {
   repo_name: string
 }
 
-function buildDraftBranchName(issue: IssueContext, run_id: string | undefined): string {
+function buildDraftBranchName(
+  issue: IssueContext,
+  run_id: string | undefined
+): string {
   // Control Plane assigns a UUID run id, so the last 8 characters are stable, unique enough
   // for a branch segment, and already hyphen-free at that offset.
   const shortRunId = String(run_id ?? 'manual').slice(-8)
-  return sanitizeBranchSegment(`sec-review-bot/issue-${issue.issue_number}-${shortRunId}`)
+  return sanitizeBranchSegment(
+    `sec-review-bot/issue-${issue.issue_number}-${shortRunId}`
+  )
 }
 
 function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
@@ -58,7 +63,8 @@ function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
       continue
     }
 
-    const content = typeof rawChange.content === 'string' ? rawChange.content : null
+    const content =
+      typeof rawChange.content === 'string' ? rawChange.content : null
     const content_encoding =
       rawChange.content_encoding === 'base64'
         ? 'base64'
@@ -66,7 +72,8 @@ function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
           ? 'utf-8'
           : null
     const rawMode = String(rawChange.mode ?? '').trim()
-    const mode: FileMode | null = rawMode === '100644' || rawMode === '100755' ? rawMode : null
+    const mode: FileMode | null =
+      rawMode === '100644' || rawMode === '100755' ? rawMode : null
 
     if (rawMode && mode === null) {
       throw new Error(
@@ -165,7 +172,9 @@ export async function createDraftPullRequestFromIssueReviewRecord({
     return null
   }
 
-  const file_changes = normalizePublishableFileChanges(review_record?.mitigation?.file_changes)
+  const file_changes = normalizePublishableFileChanges(
+    review_record?.mitigation?.file_changes
+  )
   const owner = issue.owner_login
   const repo = issue.repo_name
   // Resolve the PR base from the API rather than the webhook payload's
@@ -182,7 +191,10 @@ export async function createDraftPullRequestFromIssueReviewRecord({
   const head_sha = workspace_ref
   const branch_name = buildDraftBranchName(issue, run_id)
   const title = buildDraftPullRequestTitleFromReviewRecord(issue)
-  const body = buildDraftPullRequestBodyFromReviewRecord({ issue, review_record })
+  const body = buildDraftPullRequestBodyFromReviewRecord({
+    issue,
+    review_record
+  })
 
   // The run-specific branch is the publish idempotency key. Reuse its open PR
   // before creating git objects so a retried publish cannot create another PR.

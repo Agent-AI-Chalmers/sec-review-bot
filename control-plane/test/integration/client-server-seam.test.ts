@@ -28,9 +28,8 @@ process.env.NODE_ENV = 'test'
 // so a literal `'../../dist/server.js'` would be unresolvable there (`TS2307`). The URL form is
 // the same file at runtime, but it is not a static module reference, so typechecking stays
 // independent of the build.
-const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } = await import(
-  new URL('../../dist/server.js', import.meta.url).href
-)
+const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } =
+  await import(new URL('../../dist/server.js', import.meta.url).href)
 
 // Load the client through `createRequire`, not a static import: it lives in another package
 // whose `rootDir` is the repository root, and importing its TypeScript directly would pull that
@@ -39,8 +38,16 @@ const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } = await impo
 // exercises, so the small interface below is enough.
 const require = createRequire(import.meta.url)
 interface ControlPlaneClientUnderTest {
-  initializePublicationSteps: (runId: string, token: string, stepKeys: string[]) => Promise<void>
-  requirePublicationStepClaim: (runId: string, token: string, stepKey: string) => Promise<void>
+  initializePublicationSteps: (
+    runId: string,
+    token: string,
+    stepKeys: string[]
+  ) => Promise<void>
+  requirePublicationStepClaim: (
+    runId: string,
+    token: string,
+    stepKey: string
+  ) => Promise<void>
   failPreparation: (
     runId: string,
     token: string,
@@ -89,7 +96,10 @@ async function startSeam() {
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
   const address = app.server.address()
-  assert.ok(address !== null && typeof address === 'object', 'server did not bind a TCP port')
+  assert.ok(
+    address !== null && typeof address === 'object',
+    'server did not bind a TCP port'
+  )
 
   const previousUrl = process.env.CONTROL_PLANE_SERVICE_URL
   const previousToken = process.env.CONTROL_PLANE_SERVICE_TOKEN
@@ -99,9 +109,11 @@ async function startSeam() {
     store,
     close: async () => {
       await app.close()
-      if (previousUrl === undefined) delete process.env.CONTROL_PLANE_SERVICE_URL
+      if (previousUrl === undefined)
+        delete process.env.CONTROL_PLANE_SERVICE_URL
       else process.env.CONTROL_PLANE_SERVICE_URL = previousUrl
-      if (previousToken === undefined) delete process.env.CONTROL_PLANE_SERVICE_TOKEN
+      if (previousToken === undefined)
+        delete process.env.CONTROL_PLANE_SERVICE_TOKEN
       else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
     }
   }
@@ -112,13 +124,13 @@ test('a void operation (empty 200) resolves for the real client against the real
   try {
     // None of these may throw. `initializePublicationSteps` was the first call every
     // publication made, so under the empty-200 bug it looped the runner forever.
-    assert.equal(
+    assert.strictEqual(
       await controlPlaneClient.initializePublicationSteps(RUN_ID, 'claim-1', [
         'pull-request:review'
       ]),
       undefined
     )
-    assert.equal(
+    assert.strictEqual(
       await controlPlaneClient.requirePublicationStepClaim(
         RUN_ID,
         'claim-1',
@@ -126,16 +138,20 @@ test('a void operation (empty 200) resolves for the real client against the real
       ),
       undefined
     )
-    assert.equal(
+    assert.strictEqual(
       await controlPlaneClient.failPreparation(RUN_ID, 'prep-1', {
         code: 'PREPARATION_FAILED',
         message: 'seam test'
       }),
       undefined
     )
-    assert.deepEqual(
+    assert.deepStrictEqual(
       seam.store.calls.map((call) => call.method),
-      ['initializePublicationSteps', 'requirePublicationStepClaim', 'failPreparation']
+      [
+        'initializePublicationSteps',
+        'requirePublicationStepClaim',
+        'failPreparation'
+      ]
     )
   } finally {
     await seam.close()
@@ -147,7 +163,10 @@ test('a JSON-returning operation still parses against the real server', async ()
   try {
     // `renewPreparationClaim` answers a JSON boolean; tolerating an empty body must not have
     // broken the ordinary path.
-    assert.equal(await controlPlaneClient.renewPreparationClaim(RUN_ID, 'prep-1'), true)
+    assert.strictEqual(
+      await controlPlaneClient.renewPreparationClaim(RUN_ID, 'prep-1'),
+      true
+    )
   } finally {
     await seam.close()
   }

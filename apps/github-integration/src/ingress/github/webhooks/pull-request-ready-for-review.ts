@@ -21,7 +21,10 @@ import {
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
-import { type TriggerConfigHandlerDeps, type WebhookHandlerArgs } from './handler-deps.js'
+import {
+  type TriggerConfigHandlerDeps,
+  type WebhookHandlerArgs
+} from './handler-deps.js'
 
 type PullRequestReadyForReviewWebhookEvent = Pick<
   EmitterWebhookEvent<'pull_request.ready_for_review'>,
@@ -37,7 +40,11 @@ interface HandlerDeps extends TriggerConfigHandlerDeps {
     trusted_default_branch: { default_branch: string; head_sha: string }
     event_type: 'synchronize' | 'ready_for_review'
     delivery_id: string
-    on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
+    on_admitted?: (admission: {
+      run_id: string
+      status: string
+      replayed: boolean
+    }) => void
   }) => Promise<unknown>
 }
 
@@ -91,7 +98,10 @@ export async function handlePullRequestReadyForReviewWithDeps(
     // Read config from the API-resolved default branch, via base repo identity
     // (never use pr.base_ref, which is payload-derived).
     const id = resolveTrustedRepositoryIdentity(pr)
-    const resolved = await fetchTrustedRepositoryTriggerConfigFn(octokit as GitHubAppOctokit, id)
+    const resolved = await fetchTrustedRepositoryTriggerConfigFn(
+      octokit as GitHubAppOctokit,
+      id
+    )
     triggerConfig = resolved.config
     trusted_default_branch = {
       default_branch: resolved.default_branch,

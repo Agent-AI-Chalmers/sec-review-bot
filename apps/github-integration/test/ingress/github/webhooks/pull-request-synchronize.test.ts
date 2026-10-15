@@ -28,7 +28,9 @@ function createPayload({ fromFork = false, draft = false } = {}) {
       head: {
         ref: 'feature',
         sha: 'head-sha',
-        repo: { full_name: fromFork ? 'mallory/example-repo' : 'octo/example-repo' }
+        repo: {
+          full_name: fromFork ? 'mallory/example-repo' : 'octo/example-repo'
+        }
       },
       commits: 1,
       changed_files: 1,
@@ -49,7 +51,11 @@ test('skip automatic review for fork PRs before fetching config or starting a re
   let reviewStarted = false
 
   await handlePullRequestSynchronizeWithDeps(
-    { id: 'delivery-fork-sync', octokit: {}, payload: createPayload({ fromFork: true }) },
+    {
+      id: 'delivery-fork-sync',
+      octokit: {},
+      payload: createPayload({ fromFork: true })
+    },
     {
       fetchTrustedRepositoryTriggerConfigFn: async () => {
         configFetched = true
@@ -61,15 +67,19 @@ test('skip automatic review for fork PRs before fetching config or starting a re
     }
   )
 
-  assert.equal(configFetched, false)
-  assert.equal(reviewStarted, false)
+  assert.strictEqual(configFetched, false)
+  assert.strictEqual(reviewStarted, false)
 })
 
 test('reads trigger config from the trusted default branch resolved by the API', async () => {
   let fetchedIdentity: { owner_login: string; repo_name: string } | null = null
 
   await handlePullRequestSynchronizeWithDeps(
-    { id: 'delivery-same-repo', octokit: {}, payload: createPayload({ fromFork: false }) },
+    {
+      id: 'delivery-same-repo',
+      octokit: {},
+      payload: createPayload({ fromFork: false })
+    },
     {
       fetchTrustedRepositoryTriggerConfigFn: async (_octokit, identity) => {
         fetchedIdentity = identity
@@ -89,14 +99,21 @@ test('reads trigger config from the trusted default branch resolved by the API',
     }
   )
 
-  assert.deepEqual(fetchedIdentity, { owner_login: 'octo', repo_name: 'example-repo' })
+  assert.deepStrictEqual(fetchedIdentity, {
+    owner_login: 'octo',
+    repo_name: 'example-repo'
+  })
 })
 
 test('starts a review for same-repo PRs when automatic mode is enabled', async () => {
   let reviewStarted = false
 
   await handlePullRequestSynchronizeWithDeps(
-    { id: 'delivery-auto', octokit: {}, payload: createPayload({ fromFork: false }) },
+    {
+      id: 'delivery-auto',
+      octokit: {},
+      payload: createPayload({ fromFork: false })
+    },
     {
       fetchTrustedRepositoryTriggerConfigFn: async () => ({
         config: {
@@ -117,5 +134,5 @@ test('starts a review for same-repo PRs when automatic mode is enabled', async (
     }
   )
 
-  assert.equal(reviewStarted, true)
+  assert.strictEqual(reviewStarted, true)
 })

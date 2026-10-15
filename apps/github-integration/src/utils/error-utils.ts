@@ -28,7 +28,9 @@ export function asErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-function toGitHubErrorResponse(value: unknown): GitHubErrorResponse | undefined {
+function toGitHubErrorResponse(
+  value: unknown
+): GitHubErrorResponse | undefined {
   if (!isRecord(value)) {
     return undefined
   }
@@ -40,7 +42,10 @@ function toGitHubErrorResponse(value: unknown): GitHubErrorResponse | undefined 
     headers: isRecord(value.headers) ? value.headers : undefined,
     data: dataRecord
       ? {
-          message: typeof dataRecord.message === 'string' ? dataRecord.message : undefined,
+          message:
+            typeof dataRecord.message === 'string'
+              ? dataRecord.message
+              : undefined,
           errors: dataRecord.errors
         }
       : undefined
@@ -49,7 +54,10 @@ function toGitHubErrorResponse(value: unknown): GitHubErrorResponse | undefined 
 
 export function asErrorWithResponse(error: unknown): ErrorWithResponse {
   if (error instanceof Error) {
-    const withMaybeGitHubFields = error as Error & { response?: unknown; status?: unknown }
+    const withMaybeGitHubFields = error as Error & {
+      response?: unknown
+      status?: unknown
+    }
     const response = toGitHubErrorResponse(withMaybeGitHubFields.response)
     return {
       message: error.message,
@@ -67,7 +75,8 @@ export function asErrorWithResponse(error: unknown): ErrorWithResponse {
     return {
       message: typeof error.message === 'string' ? error.message : undefined,
       name: typeof error.name === 'string' ? error.name : undefined,
-      status: typeof error.status === 'number' ? error.status : response?.status,
+      status:
+        typeof error.status === 'number' ? error.status : response?.status,
       response
     }
   }

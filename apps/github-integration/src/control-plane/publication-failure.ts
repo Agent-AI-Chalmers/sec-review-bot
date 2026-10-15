@@ -21,8 +21,11 @@ function isRateLimitOrAbuseLimit(error: unknown): boolean {
   const errorInfo = asErrorWithResponse(error)
   const headers = errorInfo.response?.headers ?? {}
   const retryAfter = headers['retry-after'] ?? headers['Retry-After']
-  const rateRemaining = headers['x-ratelimit-remaining'] ?? headers['X-RateLimit-Remaining']
-  const message = [errorInfo.message, errorInfo.response?.data?.message].join(' ').toLowerCase()
+  const rateRemaining =
+    headers['x-ratelimit-remaining'] ?? headers['X-RateLimit-Remaining']
+  const message = [errorInfo.message, errorInfo.response?.data?.message]
+    .join(' ')
+    .toLowerCase()
   return (
     retryAfter !== undefined ||
     rateRemaining === '0' ||
@@ -31,14 +34,23 @@ function isRateLimitOrAbuseLimit(error: unknown): boolean {
   )
 }
 
-export function classifyPublicationFailure(error: unknown): PublishFailureClassification {
+export function classifyPublicationFailure(
+  error: unknown
+): PublishFailureClassification {
   if (isDeterministicRunnerPublishError(error)) {
-    return { retry: false, code: errorCode(error), reason: 'deterministic-publish-result' }
+    return {
+      retry: false,
+      code: errorCode(error),
+      reason: 'deterministic-publish-result'
+    }
   }
   // A publication step that exhausted its retry budget is terminal. Retrying the
   // whole publication re-claims the same terminal_failed step and fails the same
   // way, so it must fail rather than loop.
-  if (errorCode(error) === RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted) {
+  if (
+    errorCode(error) ===
+    RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+  ) {
     return {
       retry: false,
       code: errorCode(error),
@@ -59,17 +71,29 @@ export function classifyPublicationFailure(error: unknown): PublishFailureClassi
 
   const responseStatus = asErrorWithResponse(error).status
   if (responseStatus === undefined)
-    return { retry: true, code: errorCode(error), reason: 'unknown-publish-error' }
+    return {
+      retry: true,
+      code: errorCode(error),
+      reason: 'unknown-publish-error'
+    }
   if (
     responseStatus >= 500 ||
     responseStatus === 408 ||
     responseStatus === 409 ||
     responseStatus === 429
   ) {
-    return { retry: true, code: errorCode(error), reason: 'github-transient-response' }
+    return {
+      retry: true,
+      code: errorCode(error),
+      reason: 'github-transient-response'
+    }
   }
   if (responseStatus === 403 && isRateLimitOrAbuseLimit(error)) {
-    return { retry: true, code: errorCode(error), reason: 'github-rate-limited' }
+    return {
+      retry: true,
+      code: errorCode(error),
+      reason: 'github-rate-limited'
+    }
   }
   if (responseStatus === 401 || responseStatus === 403) {
     return {
@@ -88,16 +112,23 @@ export function classifyPublicationFailure(error: unknown): PublishFailureClassi
   if (responseStatus === 422) {
     return {
       retry: false,
-      code: errorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_validation_rejected,
+      code:
+        errorCode(error) ??
+        RUNNER_PUBLISH_ERROR_CODES.github_validation_rejected,
       reason: 'github-validation-rejected'
     }
   }
   if (responseStatus >= 400 && responseStatus < 500) {
     return {
       retry: false,
-      code: errorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_publish_rejected,
+      code:
+        errorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_publish_rejected,
       reason: 'github-deterministic-response'
     }
   }
-  return { retry: true, code: errorCode(error), reason: 'github-unclassified-response' }
+  return {
+    retry: true,
+    code: errorCode(error),
+    reason: 'github-unclassified-response'
+  }
 }

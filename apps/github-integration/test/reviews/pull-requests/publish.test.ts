@@ -7,13 +7,17 @@ import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 
 const stepStore = {
   initializePublicationSteps: async () => {},
-  listPublicationSteps: async () => [{ step_key: 'pull-request:review', status: 'pending' }],
+  listPublicationSteps: async () => [
+    { step_key: 'pull-request:review', status: 'pending' }
+  ],
   requirePublicationStepClaim: async () => {},
   completePublicationStep: async () => true,
   failPublicationStep: async () => true
 }
 
-function pullRequestContext(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function pullRequestContext(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
   return {
     action: 'opened',
     previous_head_sha: null,
@@ -37,8 +41,10 @@ function pullRequestContext(overrides: Record<string, unknown> = {}): Record<str
     html_url: 'https://example.test/octo/example/pull/7',
     api_url: 'https://api.example.test/repos/octo/example/pulls/7',
     commits_url: 'https://api.example.test/repos/octo/example/pulls/7/commits',
-    review_comments_url: 'https://api.example.test/repos/octo/example/pulls/7/comments',
-    comments_url: 'https://api.example.test/repos/octo/example/issues/7/comments',
+    review_comments_url:
+      'https://api.example.test/repos/octo/example/pulls/7/comments',
+    comments_url:
+      'https://api.example.test/repos/octo/example/issues/7/comments',
     issue_url: 'https://api.example.test/repos/octo/example/issues/7',
     head_repo_full_name: 'octo/example',
     base_repo_full_name: 'octo/example',
@@ -47,7 +53,9 @@ function pullRequestContext(overrides: Record<string, unknown> = {}): Record<str
   }
 }
 
-function review_record(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function review_record(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
   return {
     analysis: {
       verdict: 'confirmed-vulnerability',
@@ -130,8 +138,8 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.equal(issueComments.length, 0)
-  assert.equal(pullReviews.length, 1)
+  assert.strictEqual(issueComments.length, 0)
+  assert.strictEqual(pullReviews.length, 1)
   const reviewArgs = pullReviews[0] as {
     body: string
     comments: unknown[]
@@ -141,7 +149,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
     pull_number: number
     repo: string
   }
-  assert.deepEqual(
+  assert.deepStrictEqual(
     {
       ...reviewArgs,
       body: '<body>'
@@ -156,10 +164,18 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
       comments: []
     }
   )
-  assert.match(reviewArgs.body, /<!-- sec-review-bot:pull-request-review-run:run-1 -->/)
+  assert.match(
+    reviewArgs.body,
+    /<!-- sec-review-bot:pull-request-review-run:run-1 -->/
+  )
   assert.match(reviewArgs.body, /## PR Security Review/)
-  assert.deepEqual(completed, [
-    ['run-1', 'test-claim', 'pull-request:review', { id: 2, url: 'https://example.test/review/2' }]
+  assert.deepStrictEqual(completed, [
+    [
+      'run-1',
+      'test-claim',
+      'pull-request:review',
+      { id: 2, url: 'https://example.test/review/2' }
+    ]
   ])
 })
 
@@ -219,8 +235,8 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.equal(pullReviews.length, 1)
-  assert.equal((pullReviews[0] as { event: string }).event, 'COMMENT')
+  assert.strictEqual(pullReviews.length, 1)
+  assert.strictEqual((pullReviews[0] as { event: string }).event, 'COMMENT')
 })
 
 test('pull request publish approves when analysis is not confirmed', async () => {
@@ -292,9 +308,9 @@ test('pull request publish approves when analysis is not confirmed', async () =>
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.equal(issueComments.length, 0)
-  assert.equal(pullReviews.length, 1)
-  assert.equal((pullReviews[0] as { event: string }).event, 'APPROVE')
+  assert.strictEqual(issueComments.length, 0)
+  assert.strictEqual(pullReviews.length, 1)
+  assert.strictEqual((pullReviews[0] as { event: string }).event, 'APPROVE')
 })
 
 test('pull request publish comments instead of approving a PR authored by the app bot', async () => {
@@ -347,7 +363,7 @@ test('pull request publish comments instead of approving a PR authored by the ap
     setGitHubAppMetadata()
   }
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     pullReviews.map((item) => (item as { event: string }).event),
     ['COMMENT']
   )
@@ -410,7 +426,7 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     pullReviews.map((item) => (item as { event: string }).event),
     ['APPROVE', 'COMMENT']
   )
@@ -474,7 +490,7 @@ test('pull request publish falls back to comment when own PR approval error is i
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     pullReviews.map((item) => (item as { event: string }).event),
     ['APPROVE', 'COMMENT']
   )
@@ -550,9 +566,12 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
     installation_octokit_for_repo: async () => octokit
   })
 
-  assert.equal(pullReviews.length, 1)
-  assert.equal((pullReviews[0] as { event: string }).event, 'COMMENT')
-  assert.equal((pullReviews[0] as { comments: unknown[] }).comments.length, 1)
+  assert.strictEqual(pullReviews.length, 1)
+  assert.strictEqual((pullReviews[0] as { event: string }).event, 'COMMENT')
+  assert.strictEqual(
+    (pullReviews[0] as { comments: unknown[] }).comments.length,
+    1
+  )
 })
 
 test('pull request publish does not create a fallback review after an uncertain suggestion submission', async () => {
@@ -606,5 +625,5 @@ test('pull request publish does not create a fallback review after an uncertain 
     /connection reset/
   )
 
-  assert.equal(createCalls, 1)
+  assert.strictEqual(createCalls, 1)
 })

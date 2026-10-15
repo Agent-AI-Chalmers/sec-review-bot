@@ -4,7 +4,8 @@ import test from 'node:test'
 
 import { ReviewRunStore } from '../../src/index.js'
 
-const connectionString = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
+const connectionString =
+  process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
 
 function requireTestDatabase(): string {
   if (!connectionString)
@@ -31,8 +32,12 @@ async function createPublishableRun(store: ReviewRunStore): Promise<string> {
   })
   assert.ok(admission.preparation_token)
   await store.markQueued(runId, admission.preparation_token, {})
-  assert.equal(
-    await store.recordRunnerSuccess(runId, { run_id: runId }, { status: 'unavailable' }),
+  assert.strictEqual(
+    await store.recordRunnerSuccess(
+      runId,
+      { run_id: runId },
+      { status: 'unavailable' }
+    ),
     true
   )
   return runId
@@ -53,8 +58,11 @@ test('a waiting claim returns as soon as publishable work appears', async () => 
     const work = await pending
     const elapsed = Date.now() - started
 
-    assert.equal(work?.run_id, runId)
-    assert.ok(elapsed < 5_000, `the claim should have returned early, took ${elapsed}ms`)
+    assert.strictEqual(work?.run_id, runId)
+    assert.ok(
+      elapsed < 5_000,
+      `the claim should have returned early, took ${elapsed}ms`
+    )
   } finally {
     await store.close()
   }
@@ -69,7 +77,7 @@ test('a waiting claim gives up when its wait elapses', async () => {
     const work = await store.claimNextPublication(800)
     const elapsed = Date.now() - started
 
-    assert.equal(work, null)
+    assert.strictEqual(work, null)
     assert.ok(elapsed >= 700, `the claim should have waited, took ${elapsed}ms`)
   } finally {
     await store.close()

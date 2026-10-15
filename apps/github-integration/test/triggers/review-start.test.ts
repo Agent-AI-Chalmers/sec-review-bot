@@ -9,7 +9,10 @@ import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
 
-const TRUSTED_DEFAULT_BRANCH = { default_branch: 'main', head_sha: 'default-sha' }
+const TRUSTED_DEFAULT_BRANCH = {
+  default_branch: 'main',
+  head_sha: 'default-sha'
+}
 
 const preparationClaim = {
   renewPreparationClaim: async () => true,
@@ -89,10 +92,10 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         test_changes,
         on_prepared
       }) => {
-        assert.equal(run_id, 'run-issue-1')
-        assert.equal(event_type, 'opened')
-        assert.equal(review_objective, 'audit')
-        assert.equal(test_changes, null)
+        assert.strictEqual(run_id, 'run-issue-1')
+        assert.strictEqual(event_type, 'opened')
+        assert.strictEqual(review_objective, 'audit')
+        assert.strictEqual(test_changes, null)
         const prepared = {
           issue: submittedIssue,
           run_id: 'run-issue-1',
@@ -101,7 +104,9 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           event_type: 'opened' as const,
           open_pr: false
         }
-        await on_prepared?.(prepared, { contract_version: CONTRACT_VERSION } as never)
+        await on_prepared?.(prepared, {
+          contract_version: CONTRACT_VERSION
+        } as never)
         return prepared
       },
       store: {
@@ -116,13 +121,14 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
-        failPreparation: () => assert.fail('successful review must not be marked failed')
+        failPreparation: () =>
+          assert.fail('successful review must not be marked failed')
       }
     }
   })
 
-  assert.equal(submitted.run_id, 'run-issue-1')
-  assert.deepEqual(transitions, [
+  assert.strictEqual(submitted.run_id, 'run-issue-1')
+  assert.deepStrictEqual(transitions, [
     [
       'preparing',
       {
@@ -164,10 +170,16 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
     delivery_id: 'delivery-pr-1',
     test_changes: 'deny',
     deps: {
-      start_review: async ({ pr: submittedPr, run_id, event_type, test_changes, on_prepared }) => {
-        assert.equal(run_id, 'run-pr-1')
-        assert.equal(event_type, 'manual_review')
-        assert.equal(test_changes, 'deny')
+      start_review: async ({
+        pr: submittedPr,
+        run_id,
+        event_type,
+        test_changes,
+        on_prepared
+      }) => {
+        assert.strictEqual(run_id, 'run-pr-1')
+        assert.strictEqual(event_type, 'manual_review')
+        assert.strictEqual(test_changes, 'deny')
         const prepared = {
           pr: submittedPr,
           run_id: 'run-pr-1',
@@ -175,7 +187,9 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
           workflow: 'pull-request-review',
           event_type: 'manual_review' as const
         }
-        await on_prepared?.(prepared, { contract_version: CONTRACT_VERSION } as never)
+        await on_prepared?.(prepared, {
+          contract_version: CONTRACT_VERSION
+        } as never)
         return prepared
       },
       store: {
@@ -190,13 +204,14 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
-        failPreparation: () => assert.fail('successful review must not be marked failed')
+        failPreparation: () =>
+          assert.fail('successful review must not be marked failed')
       }
     }
   })
 
-  assert.equal(submitted.run_id, 'run-pr-1')
-  assert.deepEqual(transitions, [
+  assert.strictEqual(submitted.run_id, 'run-pr-1')
+  assert.deepStrictEqual(transitions, [
     [
       'preparing',
       {
@@ -239,7 +254,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
       delivery_id: 'delivery-pr-failed',
       deps: {
         start_review: async ({ run_id }) => {
-          assert.equal(run_id, 'run-pr-failed')
+          assert.strictEqual(run_id, 'run-pr-failed')
           throw new Error('workspace clone failed')
         },
         store: {
@@ -252,15 +267,17 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
               preparation_token: 'claim'
             } as never
           },
-          submitPreparedRun: () => assert.fail('failed review must not be queued'),
-          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+          submitPreparedRun: () =>
+            assert.fail('failed review must not be queued'),
+          failPreparation: (run_id, _token, error) =>
+            transitions.push(['failed', run_id, error])
         }
       }
     }),
     /workspace clone failed/
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     [
       'preparing',
       {
@@ -270,7 +287,11 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
         ingress_key: 'delivery-pr-failed'
       }
     ],
-    ['failed', 'run-pr-failed', { code: 'REVIEW_START_FAILED', message: 'workspace clone failed' }]
+    [
+      'failed',
+      'run-pr-failed',
+      { code: 'REVIEW_START_FAILED', message: 'workspace clone failed' }
+    ]
   ])
 })
 
@@ -307,21 +328,26 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, run_id: 'run-uncertain', runner_status: 'preparing' },
+              record: {
+                ...run,
+                run_id: 'run-uncertain',
+                runner_status: 'preparing'
+              },
               created: true,
               preparation_token: 'claim'
             }) as never,
           submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
-          failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
+          failPreparation: (run_id, _token, failure) =>
+            transitions.push([run_id, failure])
         }
       }
     }),
     error
   )
 
-  assert.equal((transitions[0] as unknown[])[0], 'prepared')
-  assert.equal(transitions.length, 1)
+  assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
+  assert.strictEqual(transitions.length, 1)
 })
 
 test('startPullRequestReviewCommand preserves an uncertain Runner submission for replay', async () => {
@@ -356,21 +382,26 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, run_id: 'run-pr-uncertain', runner_status: 'preparing' },
+              record: {
+                ...run,
+                run_id: 'run-pr-uncertain',
+                runner_status: 'preparing'
+              },
               created: true,
               preparation_token: 'claim'
             }) as never,
           submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
-          failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
+          failPreparation: (run_id, _token, failure) =>
+            transitions.push([run_id, failure])
         }
       }
     }),
     error
   )
 
-  assert.equal((transitions[0] as unknown[])[0], 'prepared')
-  assert.equal(transitions.length, 1)
+  assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
+  assert.strictEqual(transitions.length, 1)
 })
 
 test('startPullRequestReviewCommand admits a comment delivery before loading PR context', async () => {
@@ -387,26 +418,33 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
         throw new Error('GitHub PR lookup failed')
       },
       deps: {
-        start_review: async () => assert.fail('review must not start without PR context'),
+        start_review: async () =>
+          assert.fail('review must not start without PR context'),
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
             transitions.push(['preparing', 'run-context-failure'])
             return {
-              record: { ...run, run_id: 'run-context-failure', runner_status: 'preparing' },
+              record: {
+                ...run,
+                run_id: 'run-context-failure',
+                runner_status: 'preparing'
+              },
               created: true,
               preparation_token: 'claim'
             } as never
           },
-          submitPreparedRun: () => assert.fail('failed context lookup must not queue'),
-          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+          submitPreparedRun: () =>
+            assert.fail('failed context lookup must not queue'),
+          failPreparation: (run_id, _token, error) =>
+            transitions.push(['failed', run_id, error])
         }
       }
     }),
     /GitHub PR lookup failed/
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     ['preparing', 'run-context-failure'],
     ['context'],
     [
@@ -437,14 +475,16 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
           preparation_token: null,
           record: { run_id: 'run-original', runner_status: 'queued' } as never
         }),
-        submitPreparedRun: () => assert.fail('replayed delivery must not queue again'),
-        failPreparation: () => assert.fail('replayed delivery must not change the original run')
+        submitPreparedRun: () =>
+          assert.fail('replayed delivery must not queue again'),
+        failPreparation: () =>
+          assert.fail('replayed delivery must not change the original run')
       }
     }
   })
 
-  assert.equal(submitted.run_id, 'run-original')
-  assert.equal(starts, 0)
+  assert.strictEqual(submitted.run_id, 'run-original')
+  assert.strictEqual(starts, 0)
 })
 
 test('startIssueReviewCommand reuses a webhook delivery without starting another review', async () => {
@@ -467,14 +507,16 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
           preparation_token: null,
           record: { run_id: 'run-original', runner_status: 'queued' } as never
         }),
-        submitPreparedRun: () => assert.fail('replayed delivery must not queue again'),
-        failPreparation: () => assert.fail('replayed delivery must not change the original run')
+        submitPreparedRun: () =>
+          assert.fail('replayed delivery must not queue again'),
+        failPreparation: () =>
+          assert.fail('replayed delivery must not change the original run')
       }
     }
   })
 
-  assert.equal(submitted.run_id, 'run-original')
-  assert.equal(starts, 0)
+  assert.strictEqual(submitted.run_id, 'run-original')
+  assert.strictEqual(starts, 0)
 })
 
 test('startPullRequestReviewCommand reports an invalid setup declaration distinctly', async () => {
@@ -489,9 +531,12 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
       delivery_id: 'delivery-pr-setup-invalid',
       deps: {
         start_review: async () => {
-          throw new SetupDeclarationError('setup[0] has unsupported key(s): shell', {
-            reason: 'unsupported-step-key'
-          })
+          throw new SetupDeclarationError(
+            'setup[0] has unsupported key(s): shell',
+            {
+              reason: 'unsupported-step-key'
+            }
+          )
         },
         store: {
           ...preparationClaim,
@@ -501,15 +546,17 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
               created: true,
               preparation_token: 'claim'
             }) as never,
-          submitPreparedRun: () => assert.fail('invalid setup must not be queued'),
-          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+          submitPreparedRun: () =>
+            assert.fail('invalid setup must not be queued'),
+          failPreparation: (run_id, _token, error) =>
+            transitions.push(['failed', run_id, error])
         }
       }
     }),
     SetupDeclarationError
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     [
       'failed',
       'run-pr-setup-invalid',
@@ -533,9 +580,12 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
       delivery_id: 'delivery-issue-setup-invalid',
       deps: {
         start_review: async () => {
-          throw new SetupDeclarationError('setup declaration is not valid YAML', {
-            reason: 'invalid-yaml'
-          })
+          throw new SetupDeclarationError(
+            'setup declaration is not valid YAML',
+            {
+              reason: 'invalid-yaml'
+            }
+          )
         },
         store: {
           ...preparationClaim,
@@ -545,15 +595,17 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
               created: true,
               preparation_token: 'claim'
             }) as never,
-          submitPreparedRun: () => assert.fail('invalid setup must not be queued'),
-          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+          submitPreparedRun: () =>
+            assert.fail('invalid setup must not be queued'),
+          failPreparation: (run_id, _token, error) =>
+            transitions.push(['failed', run_id, error])
         }
       }
     }),
     SetupDeclarationError
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     [
       'failed',
       'run-issue-setup-invalid',

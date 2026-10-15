@@ -12,10 +12,13 @@ test('an available artifact storage record keeps its artifact reference', () => 
     size_bytes: 42
   }
 
-  assert.deepEqual(normalizeArtifactStorage({ status: 'available', artifact }), {
-    status: 'available',
-    artifact
-  })
+  assert.deepStrictEqual(
+    normalizeArtifactStorage({ status: 'available', artifact }),
+    {
+      status: 'available',
+      artifact
+    }
+  )
 })
 
 test('normalizeArtifactStorage rejects an available record with no artifact', () => {
@@ -40,7 +43,10 @@ test('normalizeArtifactStorage rejects an available record with no artifact', ()
 test('the normalization context names the offending record', () => {
   // The message has to identify *which* record is corrupt, or the resulting 500 is
   // undiagnosable. `rowToRecord` passes the run id, so assert the label shows up.
-  assert.throws(() => normalizeArtifactStorage({ status: 'available' }, 'run 8c1f'), /run 8c1f/)
+  assert.throws(
+    () => normalizeArtifactStorage({ status: 'available' }, 'run 8c1f'),
+    /run 8c1f/
+  )
   assert.throws(
     () => normalizeArtifactStorage({ status: 'available' }),
     /artifact_storage/,
@@ -49,8 +55,10 @@ test('the normalization context names the offending record', () => {
 })
 
 test('unavailable and failed records carry their reason without an artifact', () => {
-  assert.deepEqual(normalizeArtifactStorage({ status: 'unavailable' }), { status: 'unavailable' })
-  assert.deepEqual(
+  assert.deepStrictEqual(normalizeArtifactStorage({ status: 'unavailable' }), {
+    status: 'unavailable'
+  })
+  assert.deepStrictEqual(
     normalizeArtifactStorage({
       status: 'failed',
       error_code: 'ARTIFACT_UPLOAD_FAILED',
@@ -63,5 +71,5 @@ test('unavailable and failed records carry their reason without an artifact', ()
     }
   )
   // Null storage (the runner never attached metadata) stays null rather than becoming absent.
-  assert.equal(normalizeArtifactStorage(null), null)
+  assert.strictEqual(normalizeArtifactStorage(null), null)
 })

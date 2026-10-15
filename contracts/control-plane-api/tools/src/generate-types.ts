@@ -20,7 +20,12 @@ import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
 export const CONTROL_PLANE_ROOT = path.join(REPO_ROOT, 'control-plane')
-export const SPEC_PATH = path.resolve(REPO_ROOT, 'contracts', 'control-plane-api', 'openapi.yaml')
+export const SPEC_PATH = path.resolve(
+  REPO_ROOT,
+  'contracts',
+  'control-plane-api',
+  'openapi.yaml'
+)
 export const OUTPUT_PATH = path.resolve(
   REPO_ROOT,
   'apps',
@@ -54,9 +59,19 @@ type OpenApiPathItem = Record<string, unknown>
 export function operationRoutes(
   spec: OpenAPI3
 ): Array<{ operationId: string; path: string; method: string }> {
-  const methods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']
+  const methods = [
+    'get',
+    'put',
+    'post',
+    'delete',
+    'options',
+    'head',
+    'patch',
+    'trace'
+  ]
   const paths = (spec.paths ?? {}) as Record<string, OpenApiPathItem>
-  const routes: Array<{ operationId: string; path: string; method: string }> = []
+  const routes: Array<{ operationId: string; path: string; method: string }> =
+    []
   for (const [path, item] of Object.entries(paths)) {
     for (const method of methods) {
       const operation = item[method] as { operationId?: string } | undefined
@@ -91,7 +106,11 @@ ${entries}
 /** The committed content of the github-integration control-plane API types. */
 export async function renderControlPlaneApiTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
-  const rendered = HEADER + astToString(await openapiTS(spec)) + '\n' + renderOperationRoutes(spec)
+  const rendered =
+    HEADER +
+    astToString(await openapiTS(spec)) +
+    '\n' +
+    renderOperationRoutes(spec)
   const options = await prettier.resolveConfig(OUTPUT_PATH)
   return await prettier.format(rendered, { ...options, filepath: OUTPUT_PATH })
 }
@@ -100,7 +119,11 @@ export async function renderControlPlaneApiTypes(): Promise<string> {
 // openapi.yaml owns the strings; this file exposes them as a closed union plus an ordered
 // array so `errors.ts` can keep its semantic keys while its string values are pinned to the
 // contract (and vice-versa) by a compile-time check.
-export const ERROR_CODES_PATH = path.resolve(CONTROL_PLANE_ROOT, 'src', 'error-codes-generated.ts')
+export const ERROR_CODES_PATH = path.resolve(
+  CONTROL_PLANE_ROOT,
+  'src',
+  'error-codes-generated.ts'
+)
 
 /** Every member of the contract's ErrorResponse.code enum.
  *
@@ -123,7 +146,9 @@ export function errorResponseCodes(spec: OpenAPI3): string[] {
 
 /** Pull the `PUBLICATION_STEP_*` members out of the contract's ErrorResponse.code enum. */
 export function publicationStepCodes(spec: OpenAPI3): string[] {
-  return errorResponseCodes(spec).filter((value) => value.startsWith('PUBLICATION_STEP_'))
+  return errorResponseCodes(spec).filter((value) =>
+    value.startsWith('PUBLICATION_STEP_')
+  )
 }
 
 /** The committed content of `control-plane/src/error-codes-generated.ts`. */
@@ -177,7 +202,8 @@ type ContractAst = Awaited<ReturnType<typeof openapiTS>>
  * projection. */
 function interfaceNode(ast: ContractAst, name: string): ContractAst[number] {
   const node = ast.find(
-    (candidate) => (candidate as { name?: { text?: string } }).name?.text === name
+    (candidate) =>
+      (candidate as { name?: { text?: string } }).name?.text === name
   )
   if (node === undefined) {
     throw new Error(`openapi-typescript produced no ${name} interface`)
@@ -195,7 +221,8 @@ export async function renderContractTypes(): Promise<string> {
   // (`route-types.ts`) instead of a hand-written cast that no schema checks.
   const operations = astToString(interfaceNode(ast, 'operations'))
   const lines = SHAPE_ALIASES.map(
-    ([alias, schema]) => `export type ${alias} = components['schemas']['${schema}']`
+    ([alias, schema]) =>
+      `export type ${alias} = components['schemas']['${schema}']`
   )
   const body =
     headerComment() +
@@ -211,7 +238,10 @@ ${operations}
 ${lines.join('\n')}
 `
   const options = await prettier.resolveConfig(CONTRACT_TYPES_PATH)
-  return await prettier.format(body, { ...options, filepath: CONTRACT_TYPES_PATH })
+  return await prettier.format(body, {
+    ...options,
+    filepath: CONTRACT_TYPES_PATH
+  })
 }
 
 // The console's projection of the parameters `listRuns` accepts. The document models the
@@ -234,7 +264,9 @@ export const LIST_RUN_QUERY_PARAMS_PATH = path.resolve(
  * than an empty list: an empty allow-list would make the console send no filters at all,
  * which is a silent loss of function, not a change to an empty set. */
 export function listRunQueryParameters(spec: OpenAPI3): string[] {
-  const list = (spec.paths?.['/v1/runs'] as { get?: { parameters?: unknown[] } } | undefined)?.get
+  const list = (
+    spec.paths?.['/v1/runs'] as { get?: { parameters?: unknown[] } } | undefined
+  )?.get
   const parameters = list?.parameters
   if (!Array.isArray(parameters)) {
     throw new Error("openapi.yaml's listRuns has no parameters to project.")
@@ -275,7 +307,9 @@ export function listRunQueryParameters(spec: OpenAPI3): string[] {
     }
     return Object.keys(candidate.schema.properties)
   }
-  throw new Error("openapi.yaml's listRuns declares no query parameters to project.")
+  throw new Error(
+    "openapi.yaml's listRuns declares no query parameters to project."
+  )
 }
 
 /** The committed content of `apps/control-plane-ui/src/list-run-query-params.ts`. */
@@ -296,7 +330,10 @@ ${entries}
 ] as const
 `
   const options = await prettier.resolveConfig(LIST_RUN_QUERY_PARAMS_PATH)
-  return await prettier.format(body, { ...options, filepath: LIST_RUN_QUERY_PARAMS_PATH })
+  return await prettier.format(body, {
+    ...options,
+    filepath: LIST_RUN_QUERY_PARAMS_PATH
+  })
 }
 
 /** This generator's outputs as the shared descriptor the checker walks. */

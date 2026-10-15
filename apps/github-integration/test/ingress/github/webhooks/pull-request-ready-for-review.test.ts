@@ -26,7 +26,9 @@ function createPayload({ fromFork = false } = {}) {
       head: {
         ref: 'feature',
         sha: 'head-sha',
-        repo: { full_name: fromFork ? 'mallory/example-repo' : 'octo/example-repo' }
+        repo: {
+          full_name: fromFork ? 'mallory/example-repo' : 'octo/example-repo'
+        }
       },
       commits: 1,
       changed_files: 1,
@@ -61,7 +63,11 @@ test('skips fork PRs on ready_for_review; approval is an explicit comment comman
   let configFetched = false
 
   await handlePullRequestReadyForReviewWithDeps(
-    { id: 'delivery-fork-ready', octokit: {}, payload: createPayload({ fromFork: true }) },
+    {
+      id: 'delivery-fork-ready',
+      octokit: {},
+      payload: createPayload({ fromFork: true })
+    },
     {
       fetchTrustedRepositoryTriggerConfigFn: async () => {
         configFetched = true
@@ -75,8 +81,12 @@ test('skips fork PRs on ready_for_review; approval is an explicit comment comman
     }
   )
 
-  assert.equal(reviewStarted, false, 'fork PR must not auto-review on ready_for_review')
-  assert.equal(configFetched, false)
+  assert.strictEqual(
+    reviewStarted,
+    false,
+    'fork PR must not auto-review on ready_for_review'
+  )
+  assert.strictEqual(configFetched, false)
 })
 
 test('does not start a review when automatic mode is disabled', async () => {
@@ -93,5 +103,5 @@ test('does not start a review when automatic mode is disabled', async () => {
     }
   )
 
-  assert.equal(reviewStarted, false)
+  assert.strictEqual(reviewStarted, false)
 })

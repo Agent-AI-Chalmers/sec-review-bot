@@ -2,7 +2,9 @@ import type { ReviewRunRecord, ReviewRunStore } from './review-store.js'
 
 type SubmissionRecoveryStore = Pick<
   ReviewRunStore,
-  'claimSubmissionRecovery' | 'completeSubmissionRecovery' | 'failSubmissionRecovery'
+  | 'claimSubmissionRecovery'
+  | 'completeSubmissionRecovery'
+  | 'failSubmissionRecovery'
 >
 
 type SubmissionError = { code?: string | null; message: string }
@@ -39,7 +41,8 @@ export async function recoverReviewRunSubmission(
   if (run.runner_input === undefined) {
     await store.failSubmissionRecovery(run.run_id, claimToken, {
       code: 'SUBMISSION_RECOVERY_INPUT_MISSING',
-      message: 'The persisted Runner input is missing; this submission cannot be recovered.'
+      message:
+        'The persisted Runner input is missing; this submission cannot be recovered.'
     })
     return { status: 'input_missing' }
   }
@@ -59,6 +62,8 @@ export async function recoverReviewRunSubmission(
       code: classified.code ?? null,
       message: classified.message
     })
-    return classified.uncertain ? { status: 'deferred', error } : { status: 'failed', error }
+    return classified.uncertain
+      ? { status: 'deferred', error }
+      : { status: 'failed', error }
   }
 }

@@ -10,7 +10,7 @@ import { publishContextForWorkflow } from '../publish-context-fixtures.js'
 
 function assertInvalidPublishContext(operation: () => unknown): void {
   assert.throws(operation, (error) => {
-    assert.equal(
+    assert.strictEqual(
       (error as { code?: unknown }).code,
       RUNNER_PUBLISH_ERROR_CODES.publish_context_invalid
     )
@@ -19,8 +19,11 @@ function assertInvalidPublishContext(operation: () => unknown): void {
 }
 
 test('workflow parsers retain only fields needed to resume publication', () => {
-  assert.deepEqual(
-    parsePublishContextForWorkflow('issue-review', publishContextForWorkflow('issue-review')),
+  assert.deepStrictEqual(
+    parsePublishContextForWorkflow(
+      'issue-review',
+      publishContextForWorkflow('issue-review')
+    ),
     {
       issue: {
         owner_login: 'octo',
@@ -35,7 +38,7 @@ test('workflow parsers retain only fields needed to resume publication', () => {
       open_pr: false
     }
   )
-  assert.deepEqual(
+  assert.deepStrictEqual(
     parsePublishContextForWorkflow(
       'pull-request-review',
       publishContextForWorkflow('pull-request-review')
@@ -53,7 +56,7 @@ test('workflow parsers retain only fields needed to resume publication', () => {
       event_type: 'manual_review'
     }
   )
-  assert.deepEqual(
+  assert.deepStrictEqual(
     parsePublishContextForWorkflow(
       'repository-review',
       publishContextForWorkflow('repository-review')
@@ -81,10 +84,18 @@ test('publish context rejects incomplete nested entities', () => {
 })
 
 test('publish context rejects repository identity fields that name different repositories', () => {
-  for (const workflow of ['issue-review', 'pull-request-review', 'repository-review'] as const) {
+  for (const workflow of [
+    'issue-review',
+    'pull-request-review',
+    'repository-review'
+  ] as const) {
     const context = publishContextForWorkflow(workflow)
     const entityKey =
-      workflow === 'issue-review' ? 'issue' : workflow === 'pull-request-review' ? 'pr' : 'repo'
+      workflow === 'issue-review'
+        ? 'issue'
+        : workflow === 'pull-request-review'
+          ? 'pr'
+          : 'repo'
     const entity = context[entityKey] as Record<string, unknown>
     assertInvalidPublishContext(() =>
       parsePublishContextForWorkflow(workflow, {
@@ -99,9 +110,12 @@ test('publish context rejects repository identity fields that name different rep
 })
 
 test('issue publish context defaults a missing open_pr to false', () => {
-  const context = publishContextForWorkflow('issue-review') as Record<string, unknown>
+  const context = publishContextForWorkflow('issue-review') as Record<
+    string,
+    unknown
+  >
   delete context.open_pr
-  assert.equal(parseIssueReviewPublishContext(context).open_pr, false)
+  assert.strictEqual(parseIssueReviewPublishContext(context).open_pr, false)
 })
 
 test('issue publish context preserves an explicit open_pr opt-in', () => {
@@ -109,7 +123,7 @@ test('issue publish context preserves an explicit open_pr opt-in', () => {
     ...publishContextForWorkflow('issue-review'),
     open_pr: true
   })
-  assert.equal(parsed.open_pr, true)
+  assert.strictEqual(parsed.open_pr, true)
 })
 
 test('issue publish context rejects a non-boolean open_pr', () => {
@@ -126,5 +140,5 @@ test('publish context projects away fields that publication does not own', () =>
     ...publishContextForWorkflow('issue-review'),
     request_only_metadata: 'not persisted by the parser'
   })
-  assert.equal('request_only_metadata' in parsed, false)
+  assert.strictEqual('request_only_metadata' in parsed, false)
 })

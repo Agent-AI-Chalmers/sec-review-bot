@@ -21,7 +21,11 @@ export async function submitPreparedRun(
     run_id: string
     input: Record<string, unknown>
   }) => Promise<unknown>
-): Promise<{ run_id: string; workflow: ControlPlaneWorkflow; status: 'queued' }> {
+): Promise<{
+  run_id: string
+  workflow: ControlPlaneWorkflow
+  status: 'queued'
+}> {
   const run = await store.getRun(args.runId)
   if (run === null)
     throw Object.assign(new Error(`Review run does not exist: ${args.runId}`), {
@@ -35,9 +39,17 @@ export async function submitPreparedRun(
       args.publishContext,
       args.input
     )
-    await submit({ workflow: run.workflow, run_id: args.runId, input: args.input })
+    await submit({
+      workflow: run.workflow,
+      run_id: args.runId,
+      input: args.input
+    })
     runnerAccepted = true
-    await store.markQueued(args.runId, args.preparationToken, args.publishContext)
+    await store.markQueued(
+      args.runId,
+      args.preparationToken,
+      args.publishContext
+    )
     return { run_id: args.runId, workflow: run.workflow, status: 'queued' }
   } catch (error) {
     await store
@@ -45,7 +57,9 @@ export async function submitPreparedRun(
         code:
           runnerAccepted || error instanceof RunnerSubmissionUncertainError
             ? 'SUBMISSION_STATE_UNCERTAIN'
-            : error instanceof Error && 'code' in error && typeof error.code === 'string'
+            : error instanceof Error &&
+                'code' in error &&
+                typeof error.code === 'string'
               ? error.code
               : 'REVIEW_START_FAILED',
         message: error instanceof Error ? error.message : String(error)

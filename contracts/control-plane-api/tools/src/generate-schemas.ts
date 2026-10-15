@@ -12,8 +12,18 @@ import type { GeneratedArtifact } from './generated-artifact.js'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
-export const SPEC_PATH = path.resolve(REPO_ROOT, 'contracts', 'control-plane-api', 'openapi.yaml')
-export const SCHEMA_DIR = path.resolve(REPO_ROOT, 'contracts', 'control-plane-api', 'v1')
+export const SPEC_PATH = path.resolve(
+  REPO_ROOT,
+  'contracts',
+  'control-plane-api',
+  'openapi.yaml'
+)
+export const SCHEMA_DIR = path.resolve(
+  REPO_ROOT,
+  'contracts',
+  'control-plane-api',
+  'v1'
+)
 
 const META_SCHEMA = 'https://json-schema.org/draft/2020-12/schema'
 
@@ -22,7 +32,8 @@ function componentSchema(name: string): unknown {
     components?: { schemas?: Record<string, unknown> }
   }
   const schema = spec.components?.schemas?.[name]
-  if (schema === undefined) throw new Error(`openapi.yaml has no component schema ${name}`)
+  if (schema === undefined)
+    throw new Error(`openapi.yaml has no component schema ${name}`)
   return schema
 }
 
@@ -36,11 +47,18 @@ function componentSchema(name: string): unknown {
  * committed schema without a word — the schema would then accept or describe something other
  * than what openapi.yaml says. Nothing in the current contract does this, so failing loudly
  * costs nothing today and prevents a silent mistranslation later. */
-function inlineLocalRefs(node: unknown, schemas: Record<string, unknown>): unknown {
-  if (Array.isArray(node)) return node.map((item) => inlineLocalRefs(item, schemas))
+function inlineLocalRefs(
+  node: unknown,
+  schemas: Record<string, unknown>
+): unknown {
+  if (Array.isArray(node))
+    return node.map((item) => inlineLocalRefs(item, schemas))
   if (typeof node !== 'object' || node === null) return node
   const record = node as Record<string, unknown>
-  if (typeof record.$ref === 'string' && record.$ref.startsWith('#/components/schemas/')) {
+  if (
+    typeof record.$ref === 'string' &&
+    record.$ref.startsWith('#/components/schemas/')
+  ) {
     const siblings = Object.keys(record).filter((key) => key !== '$ref')
     if (siblings.length > 0) {
       throw new Error(
@@ -72,7 +90,10 @@ export function renderObservedRunSchema(): string {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as {
     components?: { schemas?: Record<string, unknown> }
   }
-  const inlined = inlineLocalRefs(componentSchema('ObservedRun'), spec.components?.schemas ?? {})
+  const inlined = inlineLocalRefs(
+    componentSchema('ObservedRun'),
+    spec.components?.schemas ?? {}
+  )
   return renderSchema(
     'https://sec-review-bot.local/contracts/control-plane-api/v1/observed-run.schema.json',
     inlined

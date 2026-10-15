@@ -37,8 +37,8 @@ test('retryGitFetch retries with exponential delays and then succeeds', async ()
     }
   )
 
-  assert.equal(attempts, 3)
-  assert.deepEqual(delays, [1000, 2000])
+  assert.strictEqual(attempts, 3)
+  assert.deepStrictEqual(delays, [1000, 2000])
 })
 
 test('retryGitFetch preserves the final fetch error', async () => {
@@ -56,7 +56,7 @@ test('retryGitFetch preserves the final fetch error', async () => {
     (error) => error === failure
   )
 
-  assert.equal(attempts, 3)
+  assert.strictEqual(attempts, 3)
 })
 
 test('withConfiguredGitFetchProxy leaves fetch options unchanged without a proxy', () => {
@@ -65,8 +65,8 @@ test('withConfiguredGitFetchProxy leaves fetch options unchanged without a proxy
     env: { GIT_TERMINAL_PROMPT: '0' }
   }
 
-  assert.equal(withConfiguredGitFetchProxy(options, ''), options)
-  assert.equal(withConfiguredGitFetchProxy(options, '  '), options)
+  assert.strictEqual(withConfiguredGitFetchProxy(options, ''), options)
+  assert.strictEqual(withConfiguredGitFetchProxy(options, '  '), options)
 })
 
 test('withConfiguredGitFetchProxy adds a fetch-only Git proxy', () => {
@@ -75,18 +75,23 @@ test('withConfiguredGitFetchProxy adds a fetch-only Git proxy', () => {
     env: { GIT_TERMINAL_PROMPT: '0' }
   }
 
-  assert.deepEqual(withConfiguredGitFetchProxy(options, ' http://host.docker.internal:7897 '), {
-    config: ['credential.helper='],
-    env: {
-      GIT_TERMINAL_PROMPT: '0',
-      http_proxy: 'http://host.docker.internal:7897',
-      https_proxy: 'http://host.docker.internal:7897'
+  assert.deepStrictEqual(
+    withConfiguredGitFetchProxy(options, ' http://host.docker.internal:7897 '),
+    {
+      config: ['credential.helper='],
+      env: {
+        GIT_TERMINAL_PROMPT: '0',
+        http_proxy: 'http://host.docker.internal:7897',
+        https_proxy: 'http://host.docker.internal:7897'
+      }
     }
-  })
+  )
 })
 
 test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch metadata', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-git-workspace-test-'))
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'sec-review-git-workspace-test-')
+  )
   try {
     const source = path.join(root, 'source')
     const workspace = path.join(root, 'workspace')
@@ -108,12 +113,12 @@ test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch me
       refs: [base_sha, head_sha]
     })
 
-    assert.equal(await git(workspace, ['rev-parse', 'HEAD']), head_sha)
-    assert.equal(
+    assert.strictEqual(await git(workspace, ['rev-parse', 'HEAD']), head_sha)
+    assert.strictEqual(
       await git(workspace, ['diff', '--name-only', `${base_sha}..${head_sha}`]),
       'README.md'
     )
-    assert.equal(await git(workspace, ['remote']), '')
+    assert.strictEqual(await git(workspace, ['remote']), '')
     await assert.rejects(fs.stat(path.join(workspace, '.git', 'FETCH_HEAD')))
     await assert.rejects(fs.stat(path.join(workspace, '.git', 'logs')))
   } finally {
@@ -122,7 +127,9 @@ test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch me
 })
 
 test('materializeWorkspaceWithCommitHistory uses a shallow workspace for single-ref materialization', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-git-shallow-test-'))
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'sec-review-git-shallow-test-')
+  )
   try {
     const source = path.join(root, 'source')
     const workspace = path.join(root, 'workspace')
@@ -144,10 +151,18 @@ test('materializeWorkspaceWithCommitHistory uses a shallow workspace for single-
       refs: [head_sha]
     })
 
-    assert.equal(await git(workspace, ['rev-parse', 'HEAD']), head_sha)
-    assert.equal(await git(workspace, ['rev-list', '--count', 'HEAD']), '1')
-    assert.equal(await git(workspace, ['rev-parse', '--is-shallow-repository']), 'true')
-    await assert.rejects(git(workspace, ['cat-file', '-e', `${base_sha}^{commit}`]))
+    assert.strictEqual(await git(workspace, ['rev-parse', 'HEAD']), head_sha)
+    assert.strictEqual(
+      await git(workspace, ['rev-list', '--count', 'HEAD']),
+      '1'
+    )
+    assert.strictEqual(
+      await git(workspace, ['rev-parse', '--is-shallow-repository']),
+      'true'
+    )
+    await assert.rejects(
+      git(workspace, ['cat-file', '-e', `${base_sha}^{commit}`])
+    )
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
@@ -165,7 +180,9 @@ test('materializeWorkspaceWithCommitHistory rejects refs that look like git opti
 })
 
 test('createWorkspaceSnapshotTar compacts git objects before archiving', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-git-snapshot-test-'))
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'sec-review-git-snapshot-test-')
+  )
   try {
     const workspace = path.join(root, 'workspace')
     const tar_path = path.join(root, 'workspace.snapshot.tar')
@@ -194,7 +211,9 @@ test('createWorkspaceSnapshotTar compacts git objects before archiving', async (
 })
 
 test('createWorkspaceSnapshotTar restores a self-consistent git workspace from the tarball', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sec-review-git-restore-test-'))
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'sec-review-git-restore-test-')
+  )
   try {
     const workspace = path.join(root, 'workspace')
     const restoredParent = path.join(root, 'restored')
@@ -221,9 +240,16 @@ test('createWorkspaceSnapshotTar restores a self-consistent git workspace from t
     await execFileAsync('tar', ['-xf', tar_path, '-C', restoredParent])
 
     await git(restoredWorkspace, ['fsck', '--strict'])
-    assert.equal(await git(restoredWorkspace, ['rev-parse', 'HEAD']), head_sha)
-    assert.equal(
-      await git(restoredWorkspace, ['diff', '--name-only', `${base_sha}..${head_sha}`]),
+    assert.strictEqual(
+      await git(restoredWorkspace, ['rev-parse', 'HEAD']),
+      head_sha
+    )
+    assert.strictEqual(
+      await git(restoredWorkspace, [
+        'diff',
+        '--name-only',
+        `${base_sha}..${head_sha}`
+      ]),
       'README.md'
     )
   } finally {
@@ -231,14 +257,17 @@ test('createWorkspaceSnapshotTar restores a self-consistent git workspace from t
   }
 })
 test('configuredGitTimeoutMs defaults and reads a validated override', () => {
-  assert.equal(configuredGitTimeoutMs(undefined), 600_000)
-  assert.equal(configuredGitTimeoutMs(''), 600_000)
-  assert.equal(configuredGitTimeoutMs('1500'), 1500)
+  assert.strictEqual(configuredGitTimeoutMs(undefined), 600_000)
+  assert.strictEqual(configuredGitTimeoutMs(''), 600_000)
+  assert.strictEqual(configuredGitTimeoutMs('1500'), 1500)
 })
 
 test('configuredGitTimeoutMs rejects a non-positive or malformed override', () => {
   for (const value of ['0', '-1', 'abc', '1.5', '10s']) {
-    assert.throws(() => configuredGitTimeoutMs(value), /GITHUB_INTEGRATION_GIT_TIMEOUT_MS/)
+    assert.throws(
+      () => configuredGitTimeoutMs(value),
+      /GITHUB_INTEGRATION_GIT_TIMEOUT_MS/
+    )
   }
 })
 

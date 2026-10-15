@@ -31,15 +31,20 @@ test('repository result rejects malformed delivery file changes before draft PR 
     status: 'deleted'
   })
 
-  assert.throws(() => parseRepositoryWorkflowResult(result), /duplicate file change entries/)
+  assert.throws(
+    () => parseRepositoryWorkflowResult(result),
+    /duplicate file change entries/
+  )
 })
 
 test('repository result parser accepts the shared v6 repository result fixture', () => {
-  const result = parseRepositoryWorkflowResult(contractFixture('repository-review-result.json'))
+  const result = parseRepositoryWorkflowResult(
+    contractFixture('repository-review-result.json')
+  )
 
-  assert.equal(result.contract_version, 'v6')
-  assert.equal(result.case_results.at(0)?.case_id, 'case-1')
-  assert.equal(result.deliveries.at(0)?.delivery_id, 'delivery-1')
+  assert.strictEqual(result.contract_version, 'v6')
+  assert.strictEqual(result.case_results.at(0)?.case_id, 'case-1')
+  assert.strictEqual(result.deliveries.at(0)?.delivery_id, 'delivery-1')
 })
 
 test('repository result parser accepts the shared v6 blocked result fixture', () => {
@@ -47,16 +52,19 @@ test('repository result parser accepts the shared v6 blocked result fixture', ()
     contractFixture('repository-review-result-blocked.json')
   )
 
-  assert.equal(result.contract_version, 'v6')
-  assert.equal(result.case_results.at(0)?.disposition, 'blocked')
-  assert.deepEqual(result.deliveries, [])
+  assert.strictEqual(result.contract_version, 'v6')
+  assert.strictEqual(result.case_results.at(0)?.disposition, 'blocked')
+  assert.deepStrictEqual(result.deliveries, [])
 })
 
 test('repository result rejects duplicate delivery identities', () => {
   const result = validRepositoryResult()
   result.deliveries.push(structuredClone(result.deliveries[0]))
 
-  assert.throws(() => parseRepositoryWorkflowResult(result), /duplicate delivery_id/)
+  assert.throws(
+    () => parseRepositoryWorkflowResult(result),
+    /duplicate delivery_id/
+  )
 })
 
 test('repository result rejects malformed v6 result before draft PR publishing', () => {

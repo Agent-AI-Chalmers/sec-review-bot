@@ -1,7 +1,9 @@
 import type { WorkflowName } from '../src/runner/shapes.js'
 import type { PublishContext } from '../src/control-plane/publish-context.js'
 
-export function publishContextForWorkflow(workflow: WorkflowName): PublishContext {
+export function publishContextForWorkflow(
+  workflow: WorkflowName
+): PublishContext {
   if (workflow === 'issue-review') {
     return {
       issue: {
@@ -39,7 +41,12 @@ export function publishContextForWorkflow(workflow: WorkflowName): PublishContex
       default_branch: 'main'
     },
     workspace_ref: 'workspace-sha',
-    scan_target: { target_branch: 'main', scan_mode: 'full', base_sha: null, head_sha: 'head-sha' },
+    scan_target: {
+      target_branch: 'main',
+      scan_mode: 'full',
+      base_sha: null,
+      head_sha: 'head-sha'
+    },
     event_type: 'manual'
   }
 }

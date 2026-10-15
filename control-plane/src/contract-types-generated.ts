@@ -40,9 +40,16 @@ export interface components {
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
       /** @enum {string} */
-      runner_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+      runner_status:
+        | 'preparing'
+        | 'recovering'
+        | 'queued'
+        | 'running'
+        | 'succeeded'
+        | 'failed'
       /** @enum {string} */
-      publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      publication_status:
+        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
       /** Format: date-time */
       created_at: string
       /** Format: date-time */
@@ -74,9 +81,16 @@ export interface components {
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
       /** @enum {string} */
-      runner_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+      runner_status:
+        | 'preparing'
+        | 'recovering'
+        | 'queued'
+        | 'running'
+        | 'succeeded'
+        | 'failed'
       /** @enum {string} */
-      publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      publication_status:
+        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
       /** Format: date-time */
       created_at: string
       /** Format: date-time */
@@ -117,9 +131,16 @@ export interface components {
       /** @enum {string} */
       workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
       /** @enum {string} */
-      execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+      execution_status:
+        | 'preparing'
+        | 'recovering'
+        | 'queued'
+        | 'running'
+        | 'succeeded'
+        | 'failed'
       /** @enum {string} */
-      publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      publication_status:
+        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
       /** Format: date-time */
       created_at: string
       /** Format: date-time */
@@ -248,11 +269,18 @@ export interface operations {
           cursor?: string
           /** @enum {string} */
           execution_status?:
-            'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+            | 'preparing'
+            | 'recovering'
+            | 'queued'
+            | 'running'
+            | 'succeeded'
+            | 'failed'
           /** @enum {string} */
-          publication_status?: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+          publication_status?:
+            'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
           /** @enum {string} */
-          workflow?: 'issue-review' | 'pull-request-review' | 'repository-review'
+          workflow?:
+            'issue-review' | 'pull-request-review' | 'repository-review'
           /** Format: date-time */
           from?: string
           /** Format: date-time */
@@ -414,7 +442,8 @@ export interface operations {
           'application/json': {
             run_id: string
             /** @enum {string} */
-            workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+            workflow:
+              'issue-review' | 'pull-request-review' | 'repository-review'
             /** @enum {string} */
             status: 'queued'
           }
@@ -878,6 +907,7 @@ export interface operations {
 export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
 export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
 export type PublicationWork = components['schemas']['PublicationWork']
-export type PublicationStepRecord = components['schemas']['PublicationStepRecord']
+export type PublicationStepRecord =
+  components['schemas']['PublicationStepRecord']
 export type ObservedStep = components['schemas']['ObservedPublicationStep']
 export type ObservedRun = components['schemas']['ObservedRun']

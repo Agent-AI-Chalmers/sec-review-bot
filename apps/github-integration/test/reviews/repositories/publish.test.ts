@@ -50,16 +50,27 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
       remote_object_id: '11',
       remote_object_url: 'https://example.test/pull/11'
     }),
-    step('repository:delivery:delivery-b', { status: 'failed', failure_count: 1 })
+    step('repository:delivery:delivery-b', {
+      status: 'failed',
+      failure_count: 1
+    })
   ]
   const claimed: string[] = []
   const completed: string[] = []
   const store = {
     listPublicationSteps: async () => steps,
-    requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
+    requirePublicationStepClaim: async (
+      _runId: string,
+      _token: string,
+      stepKey: string
+    ) => {
       claimed.push(stepKey)
     },
-    completePublicationStep: async (_runId: string, _token: string, stepKey: string) => {
+    completePublicationStep: async (
+      _runId: string,
+      _token: string,
+      stepKey: string
+    ) => {
       completed.push(stepKey)
       return true
     },
@@ -92,16 +103,19 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
     })
   })
 
-  assert.deepEqual(claimed, ['repository:delivery:delivery-b'])
-  assert.deepEqual(completed, ['repository:delivery:delivery-b'])
-  assert.deepEqual(
+  assert.deepStrictEqual(claimed, ['repository:delivery:delivery-b'])
+  assert.deepStrictEqual(completed, ['repository:delivery:delivery-b'])
+  assert.deepStrictEqual(
     published.map((item) => item.html_url),
     ['https://example.test/pull/11', 'https://example.test/pull/12']
   )
 })
 
 test('repository delivery continues after a deterministic failure', async () => {
-  const steps = [step('repository:delivery:delivery-a'), step('repository:delivery:delivery-b')]
+  const steps = [
+    step('repository:delivery:delivery-a'),
+    step('repository:delivery:delivery-b')
+  ]
   const failures: Array<{ stepKey: string; retry: boolean | undefined }> = []
   const attempted: string[] = []
   const store = {
@@ -140,7 +154,11 @@ test('repository delivery continues after a deterministic failure', async () => 
       attempted.push(delivery.delivery_id)
       if (delivery.delivery_id === 'delivery-a') {
         throw Object.assign(new Error('Validation failed.'), {
-          response: { status: 422, headers: {}, data: { message: 'Validation failed.' } }
+          response: {
+            status: 422,
+            headers: {},
+            data: { message: 'Validation failed.' }
+          }
         })
       }
       return {
@@ -154,9 +172,11 @@ test('repository delivery continues after a deterministic failure', async () => 
     }
   })
 
-  assert.deepEqual(attempted, ['delivery-a', 'delivery-b'])
-  assert.deepEqual(failures, [{ stepKey: 'repository:delivery:delivery-a', retry: false }])
-  assert.deepEqual(
+  assert.deepStrictEqual(attempted, ['delivery-a', 'delivery-b'])
+  assert.deepStrictEqual(failures, [
+    { stepKey: 'repository:delivery:delivery-a', retry: false }
+  ])
+  assert.deepStrictEqual(
     published.map((item) => item.html_url),
     ['https://example.test/pull/12']
   )
@@ -174,7 +194,11 @@ test('repository delivery recovery skips terminal failures and reaches later wor
   const claimed: string[] = []
   const store = {
     listPublicationSteps: async () => steps,
-    requirePublicationStepClaim: async (_runId: string, _token: string, stepKey: string) => {
+    requirePublicationStepClaim: async (
+      _runId: string,
+      _token: string,
+      stepKey: string
+    ) => {
       claimed.push(stepKey)
     },
     completePublicationStep: async () => true,
@@ -207,8 +231,8 @@ test('repository delivery recovery skips terminal failures and reaches later wor
     })
   })
 
-  assert.deepEqual(claimed, ['repository:delivery:delivery-b'])
-  assert.deepEqual(
+  assert.deepStrictEqual(claimed, ['repository:delivery:delivery-b'])
+  assert.deepStrictEqual(
     published.map((item) => item.html_url),
     ['https://example.test/pull/12']
   )
@@ -238,9 +262,14 @@ test('summary issue lookup reuses an issue when the create response is lost', as
       }
     }
   }
-  const repo = { owner_login: 'octo', repo_name: 'example', default_branch: 'main' }
-  const ensure = () => ensureSummaryIssueNumber(octokit as never, repo as never, async () => {})
+  const repo = {
+    owner_login: 'octo',
+    repo_name: 'example',
+    default_branch: 'main'
+  }
+  const ensure = () =>
+    ensureSummaryIssueNumber(octokit as never, repo as never, async () => {})
   await assert.rejects(ensure(), /response lost/)
-  assert.equal(await ensure(), 17)
-  assert.equal(createAttempts, 1)
+  assert.strictEqual(await ensure(), 17)
+  assert.strictEqual(createAttempts, 1)
 })

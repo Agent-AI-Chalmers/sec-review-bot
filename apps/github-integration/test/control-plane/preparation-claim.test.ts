@@ -24,7 +24,7 @@ test('preparation heartbeat renews the claim while work remains active', async (
   while (renewals < 2 && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 10))
   }
-  assert.equal(await heartbeat.stop(), true)
+  assert.strictEqual(await heartbeat.stop(), true)
   assert.ok(renewals >= 2)
 })
 
@@ -55,5 +55,5 @@ test('preparation heartbeat fences active work when its claim is lost', async ()
 
   current = false
   await assert.rejects(heartbeat.assertOwned(), PreparationClaimLostError)
-  assert.equal(await heartbeat.stop(), false)
+  assert.strictEqual(await heartbeat.stop(), false)
 })

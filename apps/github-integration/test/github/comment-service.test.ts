@@ -47,9 +47,9 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.equal(result.id, 123)
-  assert.equal(result.reused, true)
-  assert.equal(createCalls, 0)
+  assert.strictEqual(result.id, 123)
+  assert.strictEqual(result.reused, true)
+  assert.strictEqual(createCalls, 0)
 })
 
 test('createIssueCommentUnlessMarkerExists creates when marker is absent', async () => {
@@ -82,9 +82,9 @@ test('createIssueCommentUnlessMarkerExists creates when marker is absent', async
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.equal(result.id, 456)
-  assert.equal(result.reused, false)
-  assert.equal(createCalls, 1)
+  assert.strictEqual(result.id, 456)
+  assert.strictEqual(result.reused, false)
+  assert.strictEqual(createCalls, 1)
 })
 
 test('issue comment creation stops after marker lookup when publication claim is lost', async () => {
@@ -95,7 +95,9 @@ test('issue comment creation stops after marker lookup when publication claim is
         listComments: async () => ({ data: [] }),
         createComment: async () => {
           createCalls += 1
-          return { data: { id: 456, html_url: 'https://example.test/comment/456' } }
+          return {
+            data: { id: 456, html_url: 'https://example.test/comment/456' }
+          }
         }
       }
     }
@@ -114,7 +116,7 @@ test('issue comment creation stops after marker lookup when publication claim is
     }),
     PublicationClaimLostError
   )
-  assert.equal(createCalls, 0)
+  assert.strictEqual(createCalls, 0)
 })
 
 test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', async () => {
@@ -154,13 +156,13 @@ test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', asy
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.deepEqual(result, {
+  assert.deepStrictEqual(result, {
     id: 123,
     html_url: 'https://example.test/review/123',
     state: 'CHANGES_REQUESTED',
     reused: true
   })
-  assert.equal(createCalls, 0)
+  assert.strictEqual(createCalls, 0)
 })
 
 test('createPullRequestReviewUnlessMarkerExists creates when marker is absent', async () => {
@@ -196,9 +198,9 @@ test('createPullRequestReviewUnlessMarkerExists creates when marker is absent', 
     assert_publication_claim: assertPublicationClaim
   })
 
-  assert.equal(result.id, 456)
-  assert.equal(result.reused, false)
-  assert.equal(createCalls, 1)
+  assert.strictEqual(result.id, 456)
+  assert.strictEqual(result.reused, false)
+  assert.strictEqual(createCalls, 1)
 })
 
 test('approval fallback rechecks publication ownership before creating a comment review', async () => {
@@ -244,6 +246,6 @@ test('approval fallback rechecks publication ownership before creating a comment
     }
   })
 
-  assert.equal(createCalls, 2)
-  assert.equal(ownershipChecks, 2)
+  assert.strictEqual(createCalls, 2)
+  assert.strictEqual(ownershipChecks, 2)
 })

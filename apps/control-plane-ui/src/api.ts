@@ -14,8 +14,10 @@ export interface ArtifactStorage {
 export interface Run {
   run_id: string
   workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
-  execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-  publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+  execution_status:
+    'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+  publication_status:
+    'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
   created_at: string
   execution_updated_at: string
   publication_updated_at: string
@@ -52,7 +54,8 @@ async function errorCode(response: Response): Promise<string | undefined> {
 
 export async function api<T>(path: string): Promise<T> {
   const response = await fetch(`/api${path}`)
-  if (!response.ok) throw new ApiError(response.status, await errorCode(response))
+  if (!response.ok)
+    throw new ApiError(response.status, await errorCode(response))
   return (await response.json()) as T
 }
 export async function login(token: string): Promise<void> {

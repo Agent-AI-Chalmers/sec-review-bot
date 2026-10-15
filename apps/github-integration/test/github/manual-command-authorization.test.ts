@@ -18,9 +18,9 @@ function octokitWithPermission(permission: string): GitHubAppOctokit {
 }
 
 test('normalizes unknown repository permissions conservatively', () => {
-  assert.equal(normalizeRepositoryPermission('write'), 'write')
-  assert.equal(normalizeRepositoryPermission('owner'), 'unknown')
-  assert.equal(normalizeRepositoryPermission(undefined), 'unknown')
+  assert.strictEqual(normalizeRepositoryPermission('write'), 'write')
+  assert.strictEqual(normalizeRepositoryPermission('owner'), 'unknown')
+  assert.strictEqual(normalizeRepositoryPermission(undefined), 'unknown')
 })
 
 test('manual comment authorization allows write permission', async () => {
@@ -31,9 +31,9 @@ test('manual comment authorization allows write permission', async () => {
     sender_login: 'alice'
   })
 
-  assert.equal(decision.allowed, true)
-  assert.equal(decision.permission, 'write')
-  assert.equal(decision.reason, 'allowed')
+  assert.strictEqual(decision.allowed, true)
+  assert.strictEqual(decision.permission, 'write')
+  assert.strictEqual(decision.reason, 'allowed')
 })
 
 test('manual comment authorization allows maintain and admin permissions', async () => {
@@ -45,9 +45,9 @@ test('manual comment authorization allows maintain and admin permissions', async
       sender_login: 'alice'
     })
 
-    assert.equal(decision.allowed, true)
-    assert.equal(decision.permission, permission)
-    assert.equal(decision.reason, 'allowed')
+    assert.strictEqual(decision.allowed, true)
+    assert.strictEqual(decision.permission, permission)
+    assert.strictEqual(decision.reason, 'allowed')
   }
 })
 
@@ -59,9 +59,9 @@ test('manual comment authorization denies triage permission', async () => {
     sender_login: 'alice'
   })
 
-  assert.equal(decision.allowed, false)
-  assert.equal(decision.permission, 'triage')
-  assert.equal(decision.reason, 'insufficient-permission')
+  assert.strictEqual(decision.allowed, false)
+  assert.strictEqual(decision.permission, 'triage')
+  assert.strictEqual(decision.reason, 'insufficient-permission')
 })
 
 test('manual comment authorization denies missing sender without GitHub lookup', async () => {
@@ -84,10 +84,10 @@ test('manual comment authorization denies missing sender without GitHub lookup',
     sender_login: undefined
   })
 
-  assert.equal(decision.allowed, false)
-  assert.equal(decision.permission, 'unknown')
-  assert.equal(decision.reason, 'missing-sender')
-  assert.equal(lookupCalled, false)
+  assert.strictEqual(decision.allowed, false)
+  assert.strictEqual(decision.permission, 'unknown')
+  assert.strictEqual(decision.reason, 'missing-sender')
+  assert.strictEqual(lookupCalled, false)
 })
 
 test('manual comment authorization denies when permission lookup fails', async () => {
@@ -108,7 +108,7 @@ test('manual comment authorization denies when permission lookup fails', async (
     sender_login: 'alice'
   })
 
-  assert.equal(decision.allowed, false)
-  assert.equal(decision.permission, 'unknown')
-  assert.equal(decision.reason, 'permission-lookup-failed')
+  assert.strictEqual(decision.allowed, false)
+  assert.strictEqual(decision.permission, 'unknown')
+  assert.strictEqual(decision.reason, 'permission-lookup-failed')
 })

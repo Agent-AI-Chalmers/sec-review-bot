@@ -226,13 +226,22 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  background: linear-gradient(135deg, var(--brand), var(--brand-2) 55%, var(--brand-3));
+  background: linear-gradient(
+    135deg,
+    var(--brand),
+    var(--brand-2) 55%,
+    var(--brand-3)
+  );
   box-shadow: 0 2px 6px color-mix(in srgb, var(--brand) 35%, transparent);
 }
 
 .mantine-AppShell-main {
   background:
-    radial-gradient(1100px 380px at 12% -8%, var(--brand-soft), transparent 62%),
+    radial-gradient(
+      1100px 380px at 12% -8%,
+      var(--brand-soft),
+      transparent 62%
+    ),
     radial-gradient(
       900px 320px at 88% -12%,
       color-mix(in srgb, var(--brand-3) 7%, transparent),
@@ -444,7 +453,12 @@ a {
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   overflow-wrap: anywhere;
-  font-family: var(--mantine-font-family-monospace, ui-monospace, SFMono-Regular, monospace);
+  font-family: var(
+    --mantine-font-family-monospace,
+    ui-monospace,
+    SFMono-Regular,
+    monospace
+  );
 }
 
 .artifact-digest-toggle {

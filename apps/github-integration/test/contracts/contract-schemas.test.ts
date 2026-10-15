@@ -18,13 +18,13 @@ interface FixtureManifest {
 
 function invalidFixtureSchemas(): Array<[string, string]> {
   const manifest = contractFixtureManifest() as FixtureManifest
-  assert.equal(typeof manifest.invalid_schema_fixtures, 'object')
+  assert.strictEqual(typeof manifest.invalid_schema_fixtures, 'object')
   return Object.entries(manifest.invalid_schema_fixtures)
 }
 
 function fixtureSchemas(): Array<[string, string]> {
   const manifest = contractFixtureManifest() as FixtureManifest
-  assert.equal(typeof manifest.schema_fixtures, 'object')
+  assert.strictEqual(typeof manifest.schema_fixtures, 'object')
   return Object.entries(manifest.schema_fixtures)
 }
 
@@ -55,7 +55,7 @@ test('shared v6 contract fixtures match JSON schemas', () => {
     }
     const valid = validate(contractFixture(fixtureName))
 
-    assert.equal(
+    assert.strictEqual(
       valid,
       true,
       `${fixtureName} failed ${schemaName}: ${ajv.errorsText(validate.errors)}`
@@ -66,13 +66,18 @@ test('shared v6 contract fixtures match JSON schemas', () => {
 test('shared v6 contract fixture manifest covers fixture and schema files', () => {
   const schemaFixtures = new Map(fixtureSchemas())
   const invalidSchemaFixtures = new Map(invalidFixtureSchemas())
-  const fixtureNames = contractFixtureFiles().filter((name) => name !== 'manifest.json')
+  const fixtureNames = contractFixtureFiles().filter(
+    (name) => name !== 'manifest.json'
+  )
   const schemaNames = new Set(contractSchemaFiles())
 
-  assert.deepEqual([...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort(), fixtureNames)
+  assert.deepStrictEqual(
+    [...schemaFixtures.keys(), ...invalidSchemaFixtures.keys()].sort(),
+    fixtureNames
+  )
   assert.ok(
-    [...schemaFixtures.values(), ...invalidSchemaFixtures.values()].every((schemaName) =>
-      schemaNames.has(schemaName)
+    [...schemaFixtures.values(), ...invalidSchemaFixtures.values()].every(
+      (schemaName) => schemaNames.has(schemaName)
     )
   )
 })
@@ -80,7 +85,11 @@ test('shared v6 contract fixture manifest covers fixture and schema files', () =
 test('shared v6 invalid contract fixtures are rejected by JSON schemas', () => {
   for (const [fixtureName, schemaName] of invalidFixtureSchemas()) {
     const validate = contractValidator(schemaName)
-    assert.equal(validate(contractFixture(fixtureName)), false, fixtureName)
+    assert.strictEqual(
+      validate(contractFixture(fixtureName)),
+      false,
+      fixtureName
+    )
   }
 })
 
@@ -91,27 +100,31 @@ test('v6 pull request input schema requires audit objective', () => {
   }
   payload.review_intent.objective = 'repair'
 
-  assert.equal(validate(payload), false)
+  assert.strictEqual(validate(payload), false)
 })
 
 test('v6 repository input schema requires audit objective', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = contractFixture('repository-review-input-incremental.json') as {
+  const payload = contractFixture(
+    'repository-review-input-incremental.json'
+  ) as {
     review_intent: { objective: string }
   }
   payload.review_intent.objective = 'repair'
 
-  assert.equal(validate(payload), false)
+  assert.strictEqual(validate(payload), false)
 })
 
 test('v6 repository input schema rejects the removed max_file_bytes field', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = structuredClone(contractFixture('repository-review-input-full.json')) as {
+  const payload = structuredClone(
+    contractFixture('repository-review-input-full.json')
+  ) as {
     scan_scope: { max_file_bytes?: number }
   }
   payload.scan_scope.max_file_bytes = 200000
 
-  assert.equal(validate(payload), false)
+  assert.strictEqual(validate(payload), false)
 })
 
 test('v6 repository full scan schema rejects incremental window fields', () => {
@@ -131,7 +144,7 @@ test('v6 repository full scan schema rejects incremental window fields', () => {
     { path: 'src/webhook.ts', status: 'modified', previous_path: null }
   ]
 
-  assert.equal(validate(payload), false)
+  assert.strictEqual(validate(payload), false)
 })
 
 test('v6 repository incremental schema rejects missing window fields', () => {
@@ -148,20 +161,26 @@ test('v6 repository incremental schema rejects missing window fields', () => {
     }
     Object.assign(payload.scan_target, scanTargetPatch)
 
-    assert.equal(validate(payload), false, JSON.stringify(scanTargetPatch))
+    assert.strictEqual(
+      validate(payload),
+      false,
+      JSON.stringify(scanTargetPatch)
+    )
   }
 })
 
 test('v6 repository incremental schema allows empty changed file scope', () => {
   const validate = contractValidator('repository-review-input.schema.json')
-  const payload = structuredClone(contractFixture('repository-review-input-incremental.json')) as {
+  const payload = structuredClone(
+    contractFixture('repository-review-input-incremental.json')
+  ) as {
     scan_scope: {
       incremental_changed_files: Array<Record<string, unknown>>
     }
   }
   payload.scan_scope.incremental_changed_files = []
 
-  assert.equal(validate(payload), true)
+  assert.strictEqual(validate(payload), true)
 })
 
 test('v6 review record schema rejects unsafe file change paths', () => {
@@ -177,7 +196,9 @@ test('v6 review record schema rejects unsafe file change paths', () => {
     '.git/config',
     ' src/server.ts '
   ]) {
-    const payload = structuredClone(contractFixture('review-record-deleted-file.json')) as {
+    const payload = structuredClone(
+      contractFixture('review-record-deleted-file.json')
+    ) as {
       mitigation: {
         file_changes: Array<{ path: string }>
       }
@@ -186,6 +207,10 @@ test('v6 review record schema rejects unsafe file change paths', () => {
     assert.ok(fileChange)
     fileChange.path = path
 
-    assert.equal(validate(payload), false, `${path} should not be schema-valid`)
+    assert.strictEqual(
+      validate(payload),
+      false,
+      `${path} should not be schema-valid`
+    )
   }
 })

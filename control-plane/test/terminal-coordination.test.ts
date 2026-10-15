@@ -36,22 +36,26 @@ function store(events: unknown[][]): Parameters<typeof observeRunnerRun>[0] {
 
 test('active Runner execution advances without publishing', async () => {
   const events: unknown[][] = []
-  assert.equal(
+  assert.strictEqual(
     await observeRunnerRun(
       store(events),
       run,
-      async () => ({ run_id: 'run-1', workflow: 'issue-review', status: 'running' }),
+      async () => ({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'running'
+      }),
       () => false
     ),
     'active'
   )
-  assert.deepEqual(events, [['running', 'run-1']])
+  assert.deepStrictEqual(events, [['running', 'run-1']])
 })
 
 test('successful Runner result is durably recorded for later publication', async () => {
   const events: unknown[][] = []
   const artifact = { status: 'unavailable' as const }
-  assert.equal(
+  assert.strictEqual(
     await observeRunnerRun(
       store(events),
       run,
@@ -66,12 +70,14 @@ test('successful Runner result is durably recorded for later publication', async
     ),
     'succeeded'
   )
-  assert.deepEqual(events, [['succeeded', 'run-1', { answer: 42 }, artifact]])
+  assert.deepStrictEqual(events, [
+    ['succeeded', 'run-1', { answer: 42 }, artifact]
+  ])
 })
 
 test('transient polling failure leaves the run active', async () => {
   const events: unknown[][] = []
-  assert.equal(
+  assert.strictEqual(
     await observeRunnerRun(
       store(events),
       run,
@@ -82,13 +88,15 @@ test('transient polling failure leaves the run active', async () => {
     ),
     'poll_retry'
   )
-  assert.deepEqual(events, [])
+  assert.deepStrictEqual(events, [])
 })
 
 test('terminal polling failure fails the run without publication', async () => {
   const events: unknown[][] = []
-  const error = Object.assign(new Error('missing'), { code: 'RUNNER_RUN_NOT_FOUND' })
-  assert.equal(
+  const error = Object.assign(new Error('missing'), {
+    code: 'RUNNER_RUN_NOT_FOUND'
+  })
+  assert.strictEqual(
     await observeRunnerRun(
       store(events),
       run,
@@ -99,15 +107,20 @@ test('terminal polling failure fails the run without publication', async () => {
     ),
     'failed'
   )
-  assert.deepEqual(events, [
-    ['failed', 'run-1', { code: 'RUNNER_RUN_NOT_FOUND', message: 'missing' }, undefined]
+  assert.deepStrictEqual(events, [
+    [
+      'failed',
+      'run-1',
+      { code: 'RUNNER_RUN_NOT_FOUND', message: 'missing' },
+      undefined
+    ]
   ])
 })
 
 test('Runner failure records its artifact atomically with the terminal failure', async () => {
   const events: unknown[][] = []
   const artifact = { status: 'failed' as const, error: 'upload failed' }
-  assert.equal(
+  assert.strictEqual(
     await observeRunnerRun(
       store(events),
       run,
@@ -122,7 +135,7 @@ test('Runner failure records its artifact atomically with the terminal failure',
     ),
     'failed'
   )
-  assert.deepEqual(events, [
+  assert.deepStrictEqual(events, [
     ['failed', 'run-1', { code: 'RUNNER_FAILED', message: 'failed' }, artifact]
   ])
 })
@@ -135,12 +148,16 @@ test('a stale running observation does not emit a state-change event', async () 
       markRunning: async () => false
     },
     run,
-    async () => ({ run_id: 'run-1', workflow: 'issue-review', status: 'running' }),
+    async () => ({
+      run_id: 'run-1',
+      workflow: 'issue-review',
+      status: 'running'
+    }),
     () => false,
     (event) => events.push(event)
   )
-  assert.equal(result, 'active')
-  assert.deepEqual(events, [])
+  assert.strictEqual(result, 'active')
+  assert.deepStrictEqual(events, [])
 })
 
 test('a stale successful observation does not emit a terminal event', async () => {
@@ -160,6 +177,6 @@ test('a stale successful observation does not emit a terminal event', async () =
     () => false,
     (event) => events.push(event)
   )
-  assert.equal(result, 'succeeded')
-  assert.deepEqual(events, [])
+  assert.strictEqual(result, 'succeeded')
+  assert.deepStrictEqual(events, [])
 })

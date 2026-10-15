@@ -20,26 +20,27 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1146.0",
-    "@mantine/core": "9.7.1",
-    "@mantine/hooks": "9.7.1",
+    "@aws-sdk/client-s3": "3.1152.0",
+    "@mantine/core": "9.7.2",
+    "@mantine/hooks": "9.7.2",
     "@tabler/icons-react": "3.49.0",
-    "@vitejs/plugin-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "react-router-dom": "latest",
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router-dom": "7.18.4",
     "typescript": "^6.0.3",
-    "vite": "latest"
+    "vite": "8.3.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^24.19.0",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "eslint": "^10.11.0",
-    "playwright-core": "^1.63.0",
-    "prettier": "^3.9.9",
+    "@types/node": "^24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "playwright-core": "^1.64.1",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
-    "typescript-eslint": "latest"
+    "typescript-eslint": "^8.71.2"
   }
 }

@@ -59,7 +59,12 @@ test('coordination expires preparations before recovery and active observation',
     }
   })
 
-  assert.deepEqual(events, ['expire', 'recover:recover-1', 'read', 'observe:active-1'])
+  assert.deepStrictEqual(events, [
+    'expire',
+    'recover:recover-1',
+    'read',
+    'observe:active-1'
+  ])
 })
 
 test('one pass reads every active run status in a single request', async () => {
@@ -74,7 +79,9 @@ test('one pass reads every active run status in a single request', async () => {
       return projected([])
     },
     async listActiveRuns() {
-      return projected([1, 2, 3].map((index) => ({ ...run, run_id: `active-${index}` })))
+      return projected(
+        [1, 2, 3].map((index) => ({ ...run, run_id: `active-${index}` }))
+      )
     }
   }
   const reads: string[][] = []
@@ -96,8 +103,8 @@ test('one pass reads every active run status in a single request', async () => {
     }
   })
 
-  assert.deepEqual(reads, [['active-1', 'active-2', 'active-3']])
-  assert.deepEqual(observed, ['active-1', 'active-2', 'active-3'])
+  assert.deepStrictEqual(reads, [['active-1', 'active-2', 'active-3']])
+  assert.deepStrictEqual(observed, ['active-1', 'active-2', 'active-3'])
 })
 
 test('a pass with no active runs asks the Runner nothing', async () => {
@@ -130,7 +137,7 @@ test('a pass with no active runs asks the Runner nothing', async () => {
     }
   })
 
-  assert.deepEqual(reads, [])
+  assert.deepStrictEqual(reads, [])
 })
 
 test('a single row the contract cannot represent degrades that run, not the pass', async () => {
@@ -142,7 +149,10 @@ test('a single row the contract cannot represent degrades that run, not the pass
       return 0
     },
     async listSubmissionRecoveries() {
-      return { runs: [], dropped: [{ run_id: 'recover-bad', error: new Error('poison') }] }
+      return {
+        runs: [],
+        dropped: [{ run_id: 'recover-bad', error: new Error('poison') }]
+      }
     },
     async listActiveRuns() {
       return {
@@ -150,7 +160,9 @@ test('a single row the contract cannot represent degrades that run, not the pass
           { ...run, run_id: 'active-1' },
           { ...run, run_id: 'active-2' }
         ],
-        dropped: [{ run_id: 'active-bad', error: new Error('unrepresentable artifact') }]
+        dropped: [
+          { run_id: 'active-bad', error: new Error('unrepresentable artifact') }
+        ]
       }
     }
   }
@@ -166,12 +178,19 @@ test('a single row the contract cannot represent degrades that run, not the pass
       observed.push(entry.run_id)
     },
     onDroppedRunRow({ run_id, error }) {
-      reported.push({ run_id, message: error instanceof Error ? error.message : String(error) })
+      reported.push({
+        run_id,
+        message: error instanceof Error ? error.message : String(error)
+      })
     }
   })
 
-  assert.deepEqual(observed, ['active-1', 'active-2'], 'the healthy runs are still observed')
-  assert.deepEqual(reported, [
+  assert.deepStrictEqual(
+    observed,
+    ['active-1', 'active-2'],
+    'the healthy runs are still observed'
+  )
+  assert.deepStrictEqual(reported, [
     { run_id: 'recover-bad', message: 'poison' },
     { run_id: 'active-bad', message: 'unrepresentable artifact' }
   ])
@@ -196,7 +215,7 @@ test('coordinator loop does not overlap passes and stop drains the active pass',
 
   await new Promise((resolve) => setTimeout(resolve, 10))
   const stopping = loop.stop()
-  assert.equal(passes, 1)
+  assert.strictEqual(passes, 1)
   release()
   await stopping
 })

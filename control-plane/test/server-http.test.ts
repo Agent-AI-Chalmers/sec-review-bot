@@ -17,9 +17,8 @@ process.env.NODE_ENV = 'test'
 // Each import of a built artifact uses a computed specifier so `tsc` typechecks this file
 // without a prior build: a literal `'../dist/server.js'` is unresolvable when `dist/` is absent
 // (`TS2307`), but the URL form loads the same file at runtime and is not a static reference.
-const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } = await import(
-  new URL('../dist/server.js', import.meta.url).href
-)
+const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } =
+  await import(new URL('../dist/server.js', import.meta.url).href)
 
 const SERVICE_TOKEN = 'service-token'
 const READ_TOKEN = 'read-token'
@@ -45,8 +44,8 @@ test('the compiled server registers the contract from any working directory', as
   const app = await buildApp({})
   try {
     const health = await app.inject({ method: 'GET', url: '/healthz' })
-    assert.equal(health.statusCode, 200)
-    assert.deepEqual(health.json(), { status: 'ok' })
+    assert.strictEqual(health.statusCode, 200)
+    assert.deepStrictEqual(health.json(), { status: 'ok' })
   } finally {
     await app.close()
   }
@@ -56,8 +55,8 @@ test('unknown routes return the not-found envelope', async () => {
   const app = await buildApp({})
   try {
     const response = await app.inject({ method: 'GET', url: '/v1/nope' })
-    assert.equal(response.statusCode, 404)
-    assert.deepEqual(response.json(), { error: 'not_found' })
+    assert.strictEqual(response.statusCode, 404)
+    assert.deepStrictEqual(response.json(), { error: 'not_found' })
   } finally {
     await app.close()
   }
@@ -67,7 +66,7 @@ test('operations reject missing or wrong credentials with 401', async () => {
   const app = await buildApp({})
   try {
     const read = await app.inject({ method: 'GET', url: '/v1/runs' })
-    assert.equal(read.statusCode, 401)
+    assert.strictEqual(read.statusCode, 401)
 
     const write = await app.inject({
       method: 'POST',
@@ -80,13 +79,13 @@ test('operations reject missing or wrong credentials with 401', async () => {
         ingress_key: 'k'
       }
     })
-    assert.equal(write.statusCode, 401)
+    assert.strictEqual(write.statusCode, 401)
 
     // The envelope is the surface's own, not glue's default: glue's message names the
     // security scheme ("None of the security schemes (readToken) ..."), which is not the
     // caller's business and is the only response body outside the `{ error, code? }` shape.
-    assert.deepEqual(read.json(), { error: 'unauthorized' })
-    assert.deepEqual(write.json(), { error: 'unauthorized' })
+    assert.deepStrictEqual(read.json(), { error: 'unauthorized' })
+    assert.deepStrictEqual(write.json(), { error: 'unauthorized' })
   } finally {
     await app.close()
   }
@@ -115,16 +114,18 @@ test('the two bearer tokens are not interchangeable', async () => {
         ingress_key: 'k'
       }
     })
-    assert.equal(readOnWrite.statusCode, 401)
-    assert.deepEqual(readOnWrite.json(), { error: 'unauthorized' })
+    assert.strictEqual(readOnWrite.statusCode, 401)
+    assert.deepStrictEqual(readOnWrite.json(), { error: 'unauthorized' })
 
     const serviceOnRedactedRead = await app.inject({
       method: 'GET',
       url: '/v1/runs',
       headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
     })
-    assert.equal(serviceOnRedactedRead.statusCode, 401)
-    assert.deepEqual(serviceOnRedactedRead.json(), { error: 'unauthorized' })
+    assert.strictEqual(serviceOnRedactedRead.statusCode, 401)
+    assert.deepStrictEqual(serviceOnRedactedRead.json(), {
+      error: 'unauthorized'
+    })
 
     // Each token still authenticates its own surface, so the rejections above are the
     // separation rather than a blanket refusal.
@@ -133,7 +134,7 @@ test('the two bearer tokens are not interchangeable', async () => {
       url: '/v1/runs',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.equal(read.statusCode, 200)
+    assert.strictEqual(read.statusCode, 200)
   } finally {
     await app.close()
   }
@@ -145,7 +146,9 @@ test('an internal fault is logged with its identity but not returned to the call
   // `available` artifact without its reference) surfaces only as a bare "Internal error".
   const app = await buildApp({
     getRun: async () => {
-      throw new Error('available artifact storage record is missing its artifact')
+      throw new Error(
+        'available artifact storage record is missing its artifact'
+      )
     }
   })
   const logged: string[] = []
@@ -159,12 +162,16 @@ test('an internal fault is logged with its identity but not returned to the call
       url: '/v1/internal/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301',
       headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
     })
-    assert.equal(response.statusCode, 500)
-    assert.deepEqual(response.json(), { error: 'Internal error' })
-    assert.equal(logged.length, 1, 'the fault must be logged exactly once')
+    assert.strictEqual(response.statusCode, 500)
+    assert.deepStrictEqual(response.json(), { error: 'Internal error' })
+    assert.strictEqual(
+      logged.length,
+      1,
+      'the fault must be logged exactly once'
+    )
     const record = JSON.parse(logged[0] ?? '') as Record<string, unknown>
-    assert.equal(record.event, 'control_plane_request_failed')
-    assert.equal(record.run_id, '3f2504e0-4f89-41d3-9a0c-0305e82c3301')
+    assert.strictEqual(record.event, 'control_plane_request_failed')
+    assert.strictEqual(record.run_id, '3f2504e0-4f89-41d3-9a0c-0305e82c3301')
     assert.match(String(record.message), /missing its artifact/)
   } finally {
     console.error = originalError
@@ -184,12 +191,23 @@ test('a request body missing a required contract field is rejected before the ha
     const response = await app.inject({
       method: 'POST',
       url: '/v1/runs',
-      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
-      payload: { publish_context: {}, ingress_kind: 'github_webhook', ingress_key: 'k' }
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: {
+        publish_context: {},
+        ingress_kind: 'github_webhook',
+        ingress_key: 'k'
+      }
     })
-    assert.equal(response.statusCode, 400)
-    assert.equal(handlerCalls, 0, 'validation must reject before the handler runs')
-    assert.equal(
+    assert.strictEqual(response.statusCode, 400)
+    assert.strictEqual(
+      handlerCalls,
+      0,
+      'validation must reject before the handler runs'
+    )
+    assert.strictEqual(
       (response.json() as { code?: string }).code,
       'INVALID_BODY',
       'a body that fails the contract is INVALID_BODY, not the query filter code'
@@ -215,8 +233,11 @@ test('schema validation names which part of the request failed', async () => {
       url: '/v1/runs?limit=0',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.equal(query.statusCode, 400)
-    assert.equal((query.json() as { code?: string }).code, 'INVALID_QUERY')
+    assert.strictEqual(query.statusCode, 400)
+    assert.strictEqual(
+      (query.json() as { code?: string }).code,
+      'INVALID_QUERY'
+    )
 
     // The query is one `additionalProperties: false` object, so a parameter the contract
     // does not declare is rejected before the handler runs — not silently ignored, which is
@@ -226,18 +247,31 @@ test('schema validation names which part of the request failed', async () => {
       url: '/v1/runs?bogus=1',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.equal(unknown.statusCode, 400)
-    assert.equal((unknown.json() as { code?: string }).code, 'INVALID_QUERY')
-    assert.equal(listCalls, 0, 'an undeclared query parameter must be rejected before the handler')
+    assert.strictEqual(unknown.statusCode, 400)
+    assert.strictEqual(
+      (unknown.json() as { code?: string }).code,
+      'INVALID_QUERY'
+    )
+    assert.strictEqual(
+      listCalls,
+      0,
+      'an undeclared query parameter must be rejected before the handler'
+    )
 
     const path = await app.inject({
       method: 'POST',
       url: '/v1/runs/not-a-uuid/submission',
-      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
       payload: { preparation_token: 't', publish_context: {}, input: {} }
     })
-    assert.equal(path.statusCode, 400)
-    assert.equal((path.json() as { code?: string }).code, 'INVALID_PATH_PARAMETER')
+    assert.strictEqual(path.statusCode, 400)
+    assert.strictEqual(
+      (path.json() as { code?: string }).code,
+      'INVALID_PATH_PARAMETER'
+    )
   } finally {
     await app.close()
   }
@@ -251,20 +285,22 @@ test('an operation with no response body sends an empty 200, not a null body', a
     const response = await app.inject({
       method: 'POST',
       url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/preparation/failure',
-      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
       payload: { token: 't', failure: { message: 'm' } }
     })
-    assert.equal(response.statusCode, 200)
-    assert.equal(response.body, '')
+    assert.strictEqual(response.statusCode, 200)
+    assert.strictEqual(response.body, '')
   } finally {
     await app.close()
   }
 })
 
 test('a deterministic publication failure maps to 409 with its code', async () => {
-  const { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } = await import(
-    new URL('../dist/errors.js', import.meta.url).href
-  )
+  const { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } =
+    await import(new URL('../dist/errors.js', import.meta.url).href)
   const app = await buildApp({
     renewPreparationClaim: async () => {
       throw new DeterministicControlPlaneError(
@@ -277,11 +313,14 @@ test('a deterministic publication failure maps to 409 with its code', async () =
     const response = await app.inject({
       method: 'POST',
       url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/preparation/claim',
-      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
       payload: { token: 'token-1' }
     })
-    assert.equal(response.statusCode, 409)
-    assert.deepEqual(response.json(), {
+    assert.strictEqual(response.statusCode, 409)
+    assert.deepStrictEqual(response.json(), {
       error: 'duplicate step set',
       code: 'PUBLICATION_STEP_SET_DUPLICATE'
     })
@@ -313,7 +352,10 @@ test('an undeclared body field is rejected, matching the contract', async () => 
     const response = await app.inject({
       method: 'POST',
       url: '/v1/runs',
-      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
       payload: {
         workflow: 'issue-review',
         publish_context: {},
@@ -322,8 +364,12 @@ test('an undeclared body field is rejected, matching the contract', async () => 
         run_id: 'attacker-supplied'
       }
     })
-    assert.equal(response.statusCode, 400)
-    assert.equal(handlerCalls, 0, 'an undeclared field must be rejected before the handler')
+    assert.strictEqual(response.statusCode, 400)
+    assert.strictEqual(
+      handlerCalls,
+      0,
+      'an undeclared field must be rejected before the handler'
+    )
   } finally {
     await app.close()
   }
@@ -352,11 +398,21 @@ test('remote_object.id is accepted only in its canonical string form', async () 
       const response = await app.inject({
         method: 'POST',
         url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/publication/steps/issue:draft-pr/complete',
-        headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
-        payload: { token: 'token-1', remote_object: { id, url: 'https://example.test/1' } }
+        headers: {
+          authorization: `Bearer ${SERVICE_TOKEN}`,
+          'content-type': 'application/json'
+        },
+        payload: {
+          token: 'token-1',
+          remote_object: { id, url: 'https://example.test/1' }
+        }
       })
-      assert.equal(response.statusCode, 200, `id ${JSON.stringify(id)} must validate`)
-      assert.deepEqual(received, { id, url: 'https://example.test/1' })
+      assert.strictEqual(
+        response.statusCode,
+        200,
+        `id ${JSON.stringify(id)} must validate`
+      )
+      assert.deepStrictEqual(received, { id, url: 'https://example.test/1' })
     }
   } finally {
     await app.close()
@@ -385,14 +441,22 @@ test('a remote_object.id the contract does not declare is rejected', async () =>
         },
         payload: { token: 'token-1', remote_object: { id } }
       })
-      assert.equal(response.statusCode, 400, `id ${JSON.stringify(id)} must be rejected`)
-      assert.equal(
+      assert.strictEqual(
+        response.statusCode,
+        400,
+        `id ${JSON.stringify(id)} must be rejected`
+      )
+      assert.strictEqual(
         (response.json() as { code?: string }).code,
         'INVALID_BODY',
         'a body that fails the contract is INVALID_BODY'
       )
     }
-    assert.equal(handlerCalls, 0, 'an invalid id must be rejected before the handler')
+    assert.strictEqual(
+      handlerCalls,
+      0,
+      'an invalid id must be rejected before the handler'
+    )
   } finally {
     await app.close()
   }
@@ -416,8 +480,8 @@ test('the query string is coerced to the declared types, and only there', async 
       url: '/v1/runs?limit=10',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
-    assert.equal(ok.statusCode, 200)
-    assert.equal(calls, 1, 'a coerced integer must reach the handler')
+    assert.strictEqual(ok.statusCode, 200)
+    assert.strictEqual(calls, 1, 'a coerced integer must reach the handler')
 
     for (const bad of ['abc', '10.5', '']) {
       const response = await app.inject({
@@ -425,10 +489,17 @@ test('the query string is coerced to the declared types, and only there', async 
         url: `/v1/runs?limit=${bad}`,
         headers: { authorization: `Bearer ${READ_TOKEN}` }
       })
-      assert.equal(response.statusCode, 400, `limit=${JSON.stringify(bad)} must be rejected`)
-      assert.equal((response.json() as { code?: string }).code, 'INVALID_QUERY')
+      assert.strictEqual(
+        response.statusCode,
+        400,
+        `limit=${JSON.stringify(bad)} must be rejected`
+      )
+      assert.strictEqual(
+        (response.json() as { code?: string }).code,
+        'INVALID_QUERY'
+      )
     }
-    assert.equal(calls, 1, 'a rejected query must not reach the handler')
+    assert.strictEqual(calls, 1, 'a rejected query must not reach the handler')
   } finally {
     await app.close()
   }
@@ -443,11 +514,14 @@ test('a malformed JSON body is a 400 that names the body, like any other bad bod
     const response = await app.inject({
       method: 'POST',
       url: '/v1/runs',
-      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
       payload: '{not json'
     })
-    assert.equal(response.statusCode, 400)
-    assert.deepEqual(response.json(), {
+    assert.strictEqual(response.statusCode, 400)
+    assert.deepStrictEqual(response.json(), {
       error: 'Request body must be valid JSON.',
       code: 'INVALID_BODY'
     })
@@ -461,17 +535,23 @@ test('a request body over the size limit is a 413 with the declared envelope', a
   // (413) response for exactly the operations that read a body, so the wire shape is asserted
   // here rather than left to a Fastify default.
   const app = await buildApp({
-    admitReviewRun: async () => assert.fail('the handler must not run for an oversized body')
+    admitReviewRun: async () =>
+      assert.fail('the handler must not run for an oversized body')
   })
   try {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/runs',
-      headers: { authorization: `Bearer ${SERVICE_TOKEN}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
       payload: JSON.stringify({ padding: 'a'.repeat(1024 * 1024 + 1) })
     })
-    assert.equal(response.statusCode, 413)
-    assert.deepEqual(response.json(), { error: 'Request body is too large.' })
+    assert.strictEqual(response.statusCode, 413)
+    assert.deepStrictEqual(response.json(), {
+      error: 'Request body is too large.'
+    })
   } finally {
     await app.close()
   }

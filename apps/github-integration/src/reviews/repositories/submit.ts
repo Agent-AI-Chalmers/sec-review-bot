@@ -47,7 +47,9 @@ function assertRepositoryReviewInput(
   input: RepositoryReviewInput
 ): asserts input is RepositoryReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error('Repository review input is missing before runner invocation.')
+    throw new Error(
+      'Repository review input is missing before runner invocation.'
+    )
   }
 }
 
@@ -123,17 +125,19 @@ export async function startRepositoryReviewRun({
   test_changes = null,
   on_prepared
 }: RunRepositoryReviewArgs): Promise<SubmittedRepositoryReviewRun> {
-  const { input, repo, workspace_ref } = await materializeRepositoryReviewInput({
-    run_id,
-    octokit,
-    repo_full_name,
-    target_branch,
-    scan_mode,
-    base_sha,
-    head_sha,
-    event_type,
-    test_changes
-  })
+  const { input, repo, workspace_ref } = await materializeRepositoryReviewInput(
+    {
+      run_id,
+      octokit,
+      repo_full_name,
+      target_branch,
+      scan_mode,
+      base_sha,
+      head_sha,
+      event_type,
+      test_changes
+    }
+  )
 
   assertRepositoryReviewInput(input)
   const preparedRun: SubmittedRepositoryReviewRun = {

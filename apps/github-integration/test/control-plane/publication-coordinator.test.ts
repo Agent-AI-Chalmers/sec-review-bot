@@ -6,7 +6,10 @@ import {
   withPublicationHeartbeat
 } from '../../src/control-plane/publication-coordinator.js'
 import { PublicationClaimLostError } from '../../src/control-plane/publication-claim.js'
-import type { ControlPlaneClient, PublicationWork } from '../../src/control-plane/client.js'
+import type {
+  ControlPlaneClient,
+  PublicationWork
+} from '../../src/control-plane/client.js'
 
 test('publisher starts no GitHub work when its initial lease renewal fails', async () => {
   let installationLookups = 0
@@ -42,7 +45,9 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
       return true
     },
     failPublication: async () => {
-      throw new Error('A lease failure must not be converted into publication failure.')
+      throw new Error(
+        'A lease failure must not be converted into publication failure.'
+      )
     },
     connectorId: 'github-app:test'
   } as unknown as ControlPlaneClient
@@ -63,9 +68,12 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
 
   // The pass asks Control Plane to hold the claim, so a run that becomes publishable
   // mid-interval is picked up then instead of at the next poll.
-  assert.ok((claimWaits[0] ?? 0) > 0, 'a publication pass must ask for a bounded wait')
-  assert.equal(installationLookups, 0)
-  assert.equal(completionAttempts, 0)
+  assert.ok(
+    (claimWaits[0] ?? 0) > 0,
+    'a publication pass must ask for a bounded wait'
+  )
+  assert.strictEqual(installationLookups, 0)
+  assert.strictEqual(completionAttempts, 0)
 })
 
 test('explicit ownership checks share a failing in-flight heartbeat', async () => {
@@ -112,5 +120,5 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
     }),
     PublicationClaimLostError
   )
-  assert.equal(renewals, 2)
+  assert.strictEqual(renewals, 2)
 })

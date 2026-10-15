@@ -6,7 +6,10 @@ import {
 
 import type { IssueContext } from '../github/issue-service.js'
 import { issueReviewPublishContext } from '../control-plane/publish-context.js'
-import { startIssueReviewRun, type SubmittedIssueReviewRun } from '../reviews/issues/submit.js'
+import {
+  startIssueReviewRun,
+  type SubmittedIssueReviewRun
+} from '../reviews/issues/submit.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
 import type { TestChangesPolicy } from '../runner/input.js'
 import { controlPlaneClient } from '../control-plane/client.js'
@@ -21,8 +24,12 @@ type IssueReviewControlPlaneClient = {
   ) =>
     | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
     | ReturnType<typeof controlPlaneClient.admitReviewRun>
-  failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
-  submitPreparedRun: (...args: Parameters<typeof controlPlaneClient.submitPreparedRun>) => unknown
+  failPreparation: (
+    ...args: Parameters<typeof controlPlaneClient.failPreparation>
+  ) => unknown
+  submitPreparedRun: (
+    ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
+  ) => unknown
   renewPreparationClaim: (
     ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
   ) => Promise<boolean>
@@ -42,7 +49,11 @@ interface StartIssueReviewCommandArgs {
   test_changes?: TestChangesPolicy | null
   open_pr?: boolean | null
   delivery_id: string
-  on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
+  on_admitted?: (admission: {
+    run_id: string
+    status: string
+    replayed: boolean
+  }) => void
   deps?: Partial<StartIssueReviewCommandDeps>
 }
 
@@ -62,7 +73,8 @@ export async function startIssueReviewCommand({
   on_admitted,
   deps = {}
 }: StartIssueReviewCommandArgs): Promise<StartedIssueReview> {
-  const { start_review = startIssueReviewRun, store = controlPlaneClient } = deps
+  const { start_review = startIssueReviewRun, store = controlPlaneClient } =
+    deps
   const admission = await admitReviewRun(store, {
     workflow: 'issue-review',
     ingress_kind: 'github_webhook',
@@ -79,8 +91,14 @@ export async function startIssueReviewCommand({
   const run_id = admission.run_id
   const preparationToken = admission.preparation_token
   if (!preparationToken)
-    throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
-  const heartbeat = await startPreparationClaimHeartbeat(store, run_id, preparationToken)
+    throw new Error(
+      `Newly admitted review run ${run_id} has no preparation claim.`
+    )
+  const heartbeat = await startPreparationClaimHeartbeat(
+    store,
+    run_id,
+    preparationToken
+  )
 
   let submitted: SubmittedIssueReviewRun
   try {
@@ -114,7 +132,9 @@ export async function startIssueReviewCommand({
       !(error instanceof PreparationClaimLostError)
     ) {
       await store.failPreparation(run_id, preparationToken, {
-        code: isSetupDeclarationError(error) ? 'SETUP_DECLARATION_INVALID' : 'REVIEW_START_FAILED',
+        code: isSetupDeclarationError(error)
+          ? 'SETUP_DECLARATION_INVALID'
+          : 'REVIEW_START_FAILED',
         message: error instanceof Error ? error.message : String(error)
       })
     }

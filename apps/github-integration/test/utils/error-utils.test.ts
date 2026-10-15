@@ -6,7 +6,7 @@ import { asErrorWithResponse } from '../../src/utils/error-utils.js'
 test('asErrorWithResponse reads an Octokit top-level status', () => {
   const error = Object.assign(new Error('Not Found'), { status: 404 })
 
-  assert.equal(asErrorWithResponse(error).status, 404)
+  assert.strictEqual(asErrorWithResponse(error).status, 404)
 })
 
 test('asErrorWithResponse falls back to a response status', () => {
@@ -18,5 +18,5 @@ test('asErrorWithResponse falls back to a response status', () => {
     }
   })
 
-  assert.equal(asErrorWithResponse(error).status, 422)
+  assert.strictEqual(asErrorWithResponse(error).status, 422)
 })

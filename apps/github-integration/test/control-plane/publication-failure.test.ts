@@ -13,7 +13,7 @@ test('a publication step that exhausted its retry budget fails rather than retri
     new Error('Publication step exhausted its retry budget: issue:draft-pr'),
     { code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted }
   )
-  assert.deepEqual(classifyPublicationFailure(error), {
+  assert.deepStrictEqual(classifyPublicationFailure(error), {
     retry: false,
     code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
     reason: 'publication-step-retry-exhausted'
@@ -35,13 +35,23 @@ test('Control Plane publication faults that cannot be repaired fail rather than 
       'control-plane-deterministic-publication-fault'
     ]
   ] as const) {
-    const error = Object.assign(new Error('Publication step set is not usable.'), { code })
-    assert.deepEqual(classifyPublicationFailure(error), { retry: false, code, reason })
+    const error = Object.assign(
+      new Error('Publication step set is not usable.'),
+      { code }
+    )
+    assert.deepStrictEqual(classifyPublicationFailure(error), {
+      retry: false,
+      code,
+      reason
+    })
   }
 
-  assert.deepEqual(classifyPublicationFailure(new Error('Publication step set changed.')), {
-    retry: true,
-    code: null,
-    reason: 'unknown-publish-error'
-  })
+  assert.deepStrictEqual(
+    classifyPublicationFailure(new Error('Publication step set changed.')),
+    {
+      retry: true,
+      code: null,
+      reason: 'unknown-publish-error'
+    }
+  )
 })

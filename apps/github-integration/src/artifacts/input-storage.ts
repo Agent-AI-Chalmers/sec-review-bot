@@ -1,4 +1,8 @@
-import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client
+} from '@aws-sdk/client-s3'
 import { createReadStream } from 'fs'
 import { fileURLToPath } from 'url'
 
@@ -17,7 +21,9 @@ function inputObjectKey(runId: string): string {
 function configuredClient(): S3Client {
   return new S3Client({
     region: artifact_s3_region,
-    ...(artifact_s3_endpoint ? { endpoint: artifact_s3_endpoint, forcePathStyle: true } : {})
+    ...(artifact_s3_endpoint
+      ? { endpoint: artifact_s3_endpoint, forcePathStyle: true }
+      : {})
   })
 }
 
@@ -30,7 +36,8 @@ function matchesReference(
 ): boolean {
   return (
     response.ContentLength === reference.size_bytes &&
-    response.Metadata?.['sha256'] === reference.digest.replace(/^sha256:/, '') &&
+    response.Metadata?.['sha256'] ===
+      reference.digest.replace(/^sha256:/, '') &&
     response.Metadata?.['media-type'] === reference.media_type
   )
 }
@@ -42,12 +49,15 @@ async function existingObjectMatches(
   reference: InputBundleArtifactRef
 ): Promise<boolean | undefined> {
   try {
-    const response = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
+    const response = await client.send(
+      new HeadObjectCommand({ Bucket: bucket, Key: key })
+    )
     return matchesReference(response, reference)
   } catch (error) {
     const status =
       typeof error === 'object' && error !== null && '$metadata' in error
-        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+            ?.httpStatusCode
         : undefined
     if (status === 404) return undefined
     throw error
@@ -60,7 +70,9 @@ export async function publishInputBundle(
 ): Promise<InputBundleArtifactRef> {
   if (artifact_store === 'file') return reference
   if (!artifact_s3_bucket) {
-    throw new Error('SEC_REVIEW_ARTIFACT_S3_BUCKET is required for the S3 artifact store.')
+    throw new Error(
+      'SEC_REVIEW_ARTIFACT_S3_BUCKET is required for the S3 artifact store.'
+    )
   }
 
   const source = new URL(reference.uri)
@@ -69,12 +81,19 @@ export async function publishInputBundle(
   }
   const key = inputObjectKey(runId)
   const client = configuredClient()
-  const existing = await existingObjectMatches(client, artifact_s3_bucket, key, reference)
+  const existing = await existingObjectMatches(
+    client,
+    artifact_s3_bucket,
+    key,
+    reference
+  )
   if (existing === true) {
     return { ...reference, uri: `s3://${artifact_s3_bucket}/${key}` }
   }
   if (existing === false) {
-    throw new Error(`Immutable input bundle object conflicts with existing content: ${key}`)
+    throw new Error(
+      `Immutable input bundle object conflicts with existing content: ${key}`
+    )
   }
 
   try {
@@ -95,11 +114,17 @@ export async function publishInputBundle(
   } catch (error) {
     const status =
       typeof error === 'object' && error !== null && '$metadata' in error
-        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+        ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+            ?.httpStatusCode
         : undefined
     if (
       status !== 412 ||
-      (await existingObjectMatches(client, artifact_s3_bucket, key, reference)) !== true
+      (await existingObjectMatches(
+        client,
+        artifact_s3_bucket,
+        key,
+        reference
+      )) !== true
     ) {
       throw error
     }

@@ -2,7 +2,11 @@ import http from 'http'
 import { createNodeMiddleware } from '@octokit/webhooks'
 
 import { createGitHubApp } from './github-app.js'
-import { port, repository_review_dispatch_path, webhook_path } from './config.js'
+import {
+  port,
+  repository_review_dispatch_path,
+  webhook_path
+} from './config.js'
 import { setGitHubAppMetadata } from './github/github-app-metadata-service.js'
 import { createAppHttpHandler } from './ingress/http/app-http-handler.js'
 import { handleRepositoryReviewDispatch } from './ingress/github/actions/repository-review-http-handler.js'
@@ -33,7 +37,10 @@ app.octokit.log.debug(`Authenticated as '${data.name}'`)
 app.webhooks.on('issue_comment.created', handleIssueCommentCreated)
 app.webhooks.on('issues.opened', handleIssueOpened)
 app.webhooks.on('pull_request.opened', handlePullRequestOpened)
-app.webhooks.on('pull_request.ready_for_review', handlePullRequestReadyForReview)
+app.webhooks.on(
+  'pull_request.ready_for_review',
+  handlePullRequestReadyForReview
+)
 app.webhooks.on('pull_request.synchronize', handlePullRequestSynchronize)
 const publicationCoordinator = startPublicationCoordinator({ app })
 
@@ -98,7 +105,10 @@ async function shutdown(signal: ShutdownSignal): Promise<void> {
   const serverResult = await Promise.allSettled([closeServer()])
   const results = [
     ...serverResult,
-    ...(await Promise.allSettled([publicationCoordinator.stop(), backgroundPreparations.stop()]))
+    ...(await Promise.allSettled([
+      publicationCoordinator.stop(),
+      backgroundPreparations.stop()
+    ]))
   ]
   const shutdownError = results.find(
     (result): result is PromiseRejectedResult => result.status === 'rejected'

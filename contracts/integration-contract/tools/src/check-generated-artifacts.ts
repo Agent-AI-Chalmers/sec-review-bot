@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { generatedArtifacts } from './generate-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
-const REGENERATE_COMMAND = 'pnpm --dir contracts/integration-contract/tools run generate'
+const REGENERATE_COMMAND =
+  'pnpm --dir contracts/integration-contract/tools run generate'
 
 export interface StaleArtifact {
   output: string

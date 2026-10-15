@@ -3,13 +3,20 @@ import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest
+} from 'fastify'
 
 import { contractDigest } from './contract-digest.js'
 import { ReviewRunStore } from './review-store.js'
 import type { PublicationStatus, RunnerStatus } from './review-store.js'
 import { type ControlPlaneWorkflow } from './contracts.js'
-import { coordinateReviewRunsOnce, startReviewRunCoordinatorLoop } from './coordinator.js'
+import {
+  coordinateReviewRunsOnce,
+  startReviewRunCoordinatorLoop
+} from './coordinator.js'
 import { observeRunnerRun } from './terminal-coordination.js'
 import {
   getRunnerRunStatus,
@@ -52,7 +59,13 @@ const MAX_BODY_BYTES = 1024 * 1024
  * *validation* rather than silently emitting a warning nobody reads. */
 export const CONTROL_PLANE_FASTIFY_OPTIONS = {
   bodyLimit: MAX_BODY_BYTES,
-  ajv: { customOptions: { removeAdditional: false, coerceTypes: false, allowUnionTypes: true } }
+  ajv: {
+    customOptions: {
+      removeAdditional: false,
+      coerceTypes: false,
+      allowUnionTypes: true
+    }
+  }
 } as const
 
 /** The scalar JSON types the query string can declare, and how a raw string becomes one. */
@@ -70,10 +83,12 @@ type QueryScalarType = 'integer' | 'number' | 'boolean'
  * does not parse is left untouched and rejected by the schema, not guessed at.
  */
 function coerceQueryStrings(request: FastifyRequest): void {
-  const querystring = (request.routeOptions?.schema as { querystring?: unknown } | undefined)
-    ?.querystring
+  const querystring = (
+    request.routeOptions?.schema as { querystring?: unknown } | undefined
+  )?.querystring
   const properties = (
-    querystring as { properties?: Record<string, { type?: QueryScalarType }> } | undefined
+    querystring as
+      { properties?: Record<string, { type?: QueryScalarType }> } | undefined
   )?.properties
   if (properties === undefined) return
   const query = request.query as Record<string, unknown> | null
@@ -121,7 +136,9 @@ function runnerStatusFromBatch(
 // ErrorResponse.code enum so the surface cannot advertise a code the contract omits. Typed as
 // string[] because the membership check guards an arbitrary thrown error's `code`.
 const errorCodeEnum: readonly string[] = [...ERROR_RESPONSE_CODES_FROM_CONTRACT]
-type ListQueryOptions = NonNullable<Parameters<ReviewRunStore['listRunsPage']>[0]>
+type ListQueryOptions = NonNullable<
+  Parameters<ReviewRunStore['listRunsPage']>[0]
+>
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
@@ -130,7 +147,10 @@ function requiredEnv(name: string): string {
 }
 
 function invalidQuery(message: string): Error {
-  return Object.assign(new Error(message), { statusCode: 400, code: 'INVALID_QUERY' })
+  return Object.assign(new Error(message), {
+    statusCode: 400,
+    code: 'INVALID_QUERY'
+  })
 }
 
 // The list-query filters are validated by the contract's query schema (glue mounts it on the
@@ -148,13 +168,19 @@ function parseListQuery(url: URL): ListQueryOptions {
     // it can and drops the rest — so the validity check is the structure below, not a catch.
     const decoded = Buffer.from(cursor, 'base64url').toString('utf8')
     const [createdAt, runId, extra] = decoded.split('|')
-    if (!createdAt || !runId || extra !== undefined || Number.isNaN(Date.parse(createdAt))) {
+    if (
+      !createdAt ||
+      !runId ||
+      extra !== undefined ||
+      Number.isNaN(Date.parse(createdAt))
+    ) {
       throw invalidQuery('cursor must be a valid run list cursor.')
     }
     options.cursor = cursor
   }
   const executionStatus = url.searchParams.get('execution_status')
-  if (executionStatus !== null) options.execution_status = executionStatus as RunnerStatus
+  if (executionStatus !== null)
+    options.execution_status = executionStatus as RunnerStatus
   const publicationStatus = url.searchParams.get('publication_status')
   if (publicationStatus !== null)
     options.publication_status = publicationStatus as PublicationStatus
@@ -179,11 +205,17 @@ function logEvent(event: string, fields: Record<string, unknown> = {}): void {
 /** Report a stored row the contract cannot represent, with the identity and fault needed to
  * find it. The reads that can hit one skip and report it rather than failing the whole read,
  * so this is the only record that the row was dropped. */
-function logDroppedRunRow(connectorId: string, dropped: { run_id: string; error: unknown }): void {
+function logDroppedRunRow(
+  connectorId: string,
+  dropped: { run_id: string; error: unknown }
+): void {
   logEvent('control_plane_run_row_dropped', {
     connector_id: connectorId,
     run_id: dropped.run_id,
-    error: dropped.error instanceof Error ? dropped.error.message : String(dropped.error)
+    error:
+      dropped.error instanceof Error
+        ? dropped.error.message
+        : String(dropped.error)
   })
 }
 
@@ -193,7 +225,10 @@ function logDroppedRunRow(connectorId: string, dropped: { run_id: string; error:
  * byte by byte from the response-time difference. `timingSafeEqual` throws when the buffers
  * differ in length, which is why the length is compared first: the length of the expected
  * token is not the secret, and a mismatch is a plain rejection. */
-function bearerTokenMatches(header: string | undefined, expected: string): boolean {
+function bearerTokenMatches(
+  header: string | undefined,
+  expected: string
+): boolean {
   if (header === undefined) return false
   const provided = Buffer.from(header)
   const want = Buffer.from(`Bearer ${expected}`)
@@ -221,7 +256,9 @@ function resolveSpecPath(): string {
     const builtPath = fileURLToPath(built)
     const digestPath = `${builtPath}.sha256`
     if (!existsSync(digestPath)) {
-      throw new Error(`${builtPath} has no ${digestPath}; the build must produce both.`)
+      throw new Error(
+        `${builtPath} has no ${digestPath}; the build must produce both.`
+      )
     }
     const expected = readFileSync(digestPath, 'utf8').trim()
     const actual = contractDigest(readFileSync(builtPath))
@@ -263,13 +300,17 @@ export async function registerControlPlaneRoutes(
   // spec via fastify-openapi-glue, so nothing here re-states a schema. Each handler's body
   // and params types come from its own operation in the contract (`route-types.ts`), so a
   // field renamed in `openapi.yaml` breaks the handler that reads it at compile time.
-  const handlers: Record<string, (request: FastifyRequest, reply: FastifyReply) => unknown> = {
+  const handlers: Record<
+    string,
+    (request: FastifyRequest, reply: FastifyReply) => unknown
+  > = {
     getHealth: async () => ({ status: 'ok' }),
 
     listRuns: async (request) => {
       const url = new URL(request.url ?? '/', 'http://control-plane.local')
       const listOptions = parseListQuery(url)
-      const { runs, next_cursor, dropped } = await store.listRunsPage(listOptions)
+      const { runs, next_cursor, dropped } =
+        await store.listRunsPage(listOptions)
       // A single stored row the contract cannot represent is reported and omitted rather
       // than failing the whole page; the caller still gets a usable listing.
       for (const droppedRow of dropped) {
@@ -290,7 +331,10 @@ export async function registerControlPlaneRoutes(
       const run = await store.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
       const steps = await store.listPublicationSteps(run.run_id)
-      return { run_id: run.run_id, publication_steps: steps.map(observePublicationStep) }
+      return {
+        run_id: run.run_id,
+        publication_steps: steps.map(observePublicationStep)
+      }
     },
 
     admitRun: async (request) => {
@@ -306,7 +350,12 @@ export async function registerControlPlaneRoutes(
         request.body as RequestBody<'submitPreparedRun'>
       return await submitPreparedRun(
         store,
-        { runId, preparationToken: preparation_token, publishContext: publish_context, input },
+        {
+          runId,
+          preparationToken: preparation_token,
+          publishContext: publish_context,
+          input
+        },
         submitRunnerRun
       )
     },
@@ -337,28 +386,41 @@ export async function registerControlPlaneRoutes(
     },
 
     initializePublicationSteps: async (request, reply) => {
-      const { runId } = request.params as PathParams<'initializePublicationSteps'>
-      const { token, step_keys } = request.body as RequestBody<'initializePublicationSteps'>
+      const { runId } =
+        request.params as PathParams<'initializePublicationSteps'>
+      const { token, step_keys } =
+        request.body as RequestBody<'initializePublicationSteps'>
       await store.initializePublicationSteps(runId, token, step_keys)
       return reply.code(200).send()
     },
 
     requirePublicationStepClaim: async (request, reply) => {
-      const { runId, stepKey } = request.params as PathParams<'requirePublicationStepClaim'>
-      const { token } = request.body as RequestBody<'requirePublicationStepClaim'>
+      const { runId, stepKey } =
+        request.params as PathParams<'requirePublicationStepClaim'>
+      const { token } =
+        request.body as RequestBody<'requirePublicationStepClaim'>
       await store.requirePublicationStepClaim(runId, token, stepKey)
       return reply.code(200).send()
     },
 
     completePublicationStep: async (request) => {
-      const { runId, stepKey } = request.params as PathParams<'completePublicationStep'>
-      const { token, remote_object } = request.body as RequestBody<'completePublicationStep'>
-      return await store.completePublicationStep(runId, token, stepKey, remote_object ?? {})
+      const { runId, stepKey } =
+        request.params as PathParams<'completePublicationStep'>
+      const { token, remote_object } =
+        request.body as RequestBody<'completePublicationStep'>
+      return await store.completePublicationStep(
+        runId,
+        token,
+        stepKey,
+        remote_object ?? {}
+      )
     },
 
     failPublicationStep: async (request) => {
-      const { runId, stepKey } = request.params as PathParams<'failPublicationStep'>
-      const { token, failure, retry } = request.body as RequestBody<'failPublicationStep'>
+      const { runId, stepKey } =
+        request.params as PathParams<'failPublicationStep'>
+      const { token, failure, retry } =
+        request.body as RequestBody<'failPublicationStep'>
       return await store.failPublicationStep(
         runId,
         token,
@@ -376,7 +438,8 @@ export async function registerControlPlaneRoutes(
 
     failPublication: async (request) => {
       const { runId } = request.params as PathParams<'failPublication'>
-      const { token, failure, retry } = request.body as RequestBody<'failPublication'>
+      const { token, failure, retry } =
+        request.body as RequestBody<'failPublication'>
       return await store.failPublication(runId, token, failure, { retry })
     },
 
@@ -388,15 +451,18 @@ export async function registerControlPlaneRoutes(
     },
 
     listInternalPublicationSteps: async (request, reply) => {
-      const { runId } = request.params as PathParams<'listInternalPublicationSteps'>
+      const { runId } =
+        request.params as PathParams<'listInternalPublicationSteps'>
       const run = await store.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
       return reply.send(await store.listPublicationSteps(run.run_id))
     },
 
-    getPreparationHeartbeatInterval: async () => store.preparationHeartbeatIntervalMs(),
+    getPreparationHeartbeatInterval: async () =>
+      store.preparationHeartbeatIntervalMs(),
 
-    getPublicationHeartbeatInterval: async () => store.publicationHeartbeatIntervalMs()
+    getPublicationHeartbeatInterval: async () =>
+      store.publicationHeartbeatIntervalMs()
   }
 
   // Error/not-found handlers belong to this HTTP surface, so they are registered here (and
@@ -433,7 +499,9 @@ export async function registerControlPlaneRoutes(
     // Defense in depth: a Postgres datetime parse error (22007/22008) can only
     // originate from a bad `from`/`to` filter.
     if (errorCode === '22007' || errorCode === '22008') {
-      return reply.code(400).send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
+      return reply
+        .code(400)
+        .send({ error: 'from/to must be a valid date.', code: 'INVALID_QUERY' })
     }
     if (errorCode === 'FST_ERR_CTP_BODY_TOO_LARGE') {
       return reply.code(413).send({ error: 'Request body is too large.' })
@@ -443,9 +511,10 @@ export async function registerControlPlaneRoutes(
       // `INVALID_BODY` code the contract promises every 400 names which part with — rather
       // than a code-less 400, which the contract's `InvalidRequest` description would
       // overstate.
-      return reply
-        .code(400)
-        .send({ error: 'Request body must be valid JSON.', code: 'INVALID_BODY' })
+      return reply.code(400).send({
+        error: 'Request body must be valid JSON.',
+        code: 'INVALID_BODY'
+      })
     }
     // A request rejected by the contract's own schema (glue mounts it as the route's query,
     // body, and params schema) names which part failed, so a caller classifying by `code`
@@ -453,7 +522,9 @@ export async function registerControlPlaneRoutes(
     if (errorCode === 'FST_ERR_VALIDATION') {
       const detail = error instanceof Error ? error.message : String(error)
       const context =
-        typeof error === 'object' && error !== null && 'validationContext' in error
+        typeof error === 'object' &&
+        error !== null &&
+        'validationContext' in error
           ? (error as { validationContext?: string }).validationContext
           : undefined
       const code =
@@ -473,7 +544,10 @@ export async function registerControlPlaneRoutes(
         : 500
     // Only surface codes in the closed set; internal codes (e.g. Postgres SQLSTATE)
     // must not leak into the envelope, which would also break the OpenAPI enum.
-    const code = errorCode !== null && errorCodeEnum.includes(errorCode) ? errorCode : undefined
+    const code =
+      errorCode !== null && errorCodeEnum.includes(errorCode)
+        ? errorCode
+        : undefined
     // An unexpected internal fault (5xx) must not leak its message (which may carry SQLSTATE
     // or connection details); the caller only learns that the request failed. Known 4xx
     // results keep their message, since those are the caller's own input being rejected.
@@ -496,7 +570,11 @@ export async function registerControlPlaneRoutes(
       )
     }
     const message =
-      status >= 500 ? 'Internal error' : error instanceof Error ? error.message : String(error)
+      status >= 500
+        ? 'Internal error'
+        : error instanceof Error
+          ? error.message
+          : String(error)
     return reply.code(status).send({
       error: message,
       ...(code === undefined ? {} : { code })
@@ -559,7 +637,9 @@ export async function registerControlPlaneRoutes(
   })
 }
 
-export async function startControlPlaneServer(): Promise<{ close: () => Promise<void> }> {
+export async function startControlPlaneServer(): Promise<{
+  close: () => Promise<void>
+}> {
   const token = requiredEnv('CONTROL_PLANE_SERVICE_TOKEN')
   const readToken = requiredEnv('CONTROL_PLANE_READ_TOKEN')
   const store = new ReviewRunStore({
@@ -592,7 +672,9 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
               code:
                 error instanceof RunnerSubmissionUncertainError
                   ? 'SUBMISSION_STATE_UNCERTAIN'
-                  : error instanceof Error && 'code' in error && typeof error.code === 'string'
+                  : error instanceof Error &&
+                      'code' in error &&
+                      typeof error.code === 'string'
                     ? error.code
                     : 'REVIEW_START_FAILED',
               message: error instanceof Error ? error.message : String(error)
@@ -604,7 +686,8 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
             workflow: run.workflow
           })
         },
-        readRunnerStatuses: (runs) => getRunnerRunStatuses(runs.map((run) => run.run_id)),
+        readRunnerStatuses: (runs) =>
+          getRunnerRunStatuses(runs.map((run) => run.run_id)),
         // A row the contract cannot represent is reported and skipped rather than aborting
         // the pass, so one corrupt row cannot stop coordination for every other run. The log
         // carries the run id and the underlying fault, which is the diagnosis the opaque
@@ -620,7 +703,11 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
             isTerminalRunnerPollingError,
             (event) => {
               console.info(
-                JSON.stringify({ event: event.kind, connector_id: store.connectorId, ...event })
+                JSON.stringify({
+                  event: event.kind,
+                  connector_id: store.connectorId,
+                  ...event
+                })
               )
             }
           )
@@ -632,7 +719,11 @@ export async function startControlPlaneServer(): Promise<{ close: () => Promise<
   })
   const app = Fastify(CONTROL_PLANE_FASTIFY_OPTIONS)
 
-  await registerControlPlaneRoutes(app, { store, serviceToken: token, readToken })
+  await registerControlPlaneRoutes(app, {
+    store,
+    serviceToken: token,
+    readToken
+  })
 
   const port = Number.parseInt(process.env.CONTROL_PLANE_PORT || '8090', 10)
   await app.listen({ port, host: '0.0.0.0' })

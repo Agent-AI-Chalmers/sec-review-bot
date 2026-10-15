@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { extractIssueContext, IssueContextExtractionError } from '../../src/github/issue-service.js'
+import {
+  extractIssueContext,
+  IssueContextExtractionError
+} from '../../src/github/issue-service.js'
 import {
   extractPullRequestContext,
   PullRequestContextExtractionError
@@ -11,7 +14,8 @@ test('extractIssueContext rejects payloads missing required identity fields', ()
   assert.throws(
     () => extractIssueContext({}),
     (error: unknown) =>
-      error instanceof IssueContextExtractionError && /repository\.name/.test(error.message)
+      error instanceof IssueContextExtractionError &&
+      /repository\.name/.test(error.message)
   )
 })
 
@@ -38,16 +42,17 @@ test('extractIssueContext returns normalized issue context', () => {
     }
   })
 
-  assert.equal(context.repo_full_name, 'octo/example')
-  assert.equal(context.issue_number, 12)
-  assert.deepEqual(context.labels, ['security'])
+  assert.strictEqual(context.repo_full_name, 'octo/example')
+  assert.strictEqual(context.issue_number, 12)
+  assert.deepStrictEqual(context.labels, ['security'])
 })
 
 test('extractPullRequestContext rejects payloads missing required identity fields', () => {
   assert.throws(
     () => extractPullRequestContext({}),
     (error: unknown) =>
-      error instanceof PullRequestContextExtractionError && /repository\.name/.test(error.message)
+      error instanceof PullRequestContextExtractionError &&
+      /repository\.name/.test(error.message)
   )
 })
 
@@ -79,9 +84,9 @@ test('extractPullRequestContext returns normalized pull request context', () => 
     }
   })
 
-  assert.equal(context.repo_full_name, 'octo/example')
-  assert.equal(context.pr_number, 7)
-  assert.equal(context.from_fork, false)
+  assert.strictEqual(context.repo_full_name, 'octo/example')
+  assert.strictEqual(context.pr_number, 7)
+  assert.strictEqual(context.from_fork, false)
 })
 
 test('extractPullRequestContext keeps trusted identity on the base repo for fork PRs', () => {
@@ -115,12 +120,12 @@ test('extractPullRequestContext keeps trusted identity on the base repo for fork
     }
   })
 
-  assert.equal(context.from_fork, true)
-  assert.equal(context.repo_full_name, 'octo/example')
-  assert.equal(context.base_repo_full_name, 'octo/example')
-  assert.equal(context.head_repo_full_name, 'mallory/example')
+  assert.strictEqual(context.from_fork, true)
+  assert.strictEqual(context.repo_full_name, 'octo/example')
+  assert.strictEqual(context.base_repo_full_name, 'octo/example')
+  assert.strictEqual(context.head_repo_full_name, 'mallory/example')
   // Trusted ref must resolve from the base repo identity, not the head/fork.
-  assert.notEqual(context.repo_full_name, context.head_repo_full_name)
+  assert.notStrictEqual(context.repo_full_name, context.head_repo_full_name)
 })
 
 test('extractPullRequestContext treats a missing repo identity as a fork (fail closed)', () => {
@@ -148,7 +153,7 @@ test('extractPullRequestContext treats a missing repo identity as a fork (fail c
     }
   })
 
-  assert.equal(context.from_fork, true)
-  assert.equal(context.base_repo_full_name, null)
-  assert.equal(context.head_repo_full_name, null)
+  assert.strictEqual(context.from_fork, true)
+  assert.strictEqual(context.base_repo_full_name, null)
+  assert.strictEqual(context.head_repo_full_name, null)
 })

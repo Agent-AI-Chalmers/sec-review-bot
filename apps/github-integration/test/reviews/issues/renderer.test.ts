@@ -47,7 +47,10 @@ test('promoted issue comment uses the shared status vocabulary and keeps the ove
   assert.match(body, /^## Issue Security Review$/m)
   assert.match(body, /- Analysis: `confirmed security defect`/)
   assert.match(body, /- Mitigation: `patch proposed, 1 file changed`/)
-  assert.match(body, /- Verification: `full coverage; logic simulation; checks not run`/)
+  assert.match(
+    body,
+    /- Verification: `full coverage; logic simulation; checks not run`/
+  )
   assert.match(body, /Analyzer overview text\./)
   assert.match(body, /PR: #97 \(https:\/\/example\.test\/pull\/97\)/)
   assert.doesNotMatch(body, /\*\*Verification:\*\*/)
@@ -64,7 +67,10 @@ test('unpromoted issue comment shares the same status vocabulary and reports the
   assert.match(body, /^## Security Review$/m)
   assert.match(body, /- Analysis: `confirmed security defect`/)
   assert.match(body, /- Mitigation: `patch proposed, 1 file changed`/)
-  assert.match(body, /- Verification: `full coverage; logic simulation; checks not run`/)
+  assert.match(
+    body,
+    /- Verification: `full coverage; logic simulation; checks not run`/
+  )
   assert.match(body, /- Patch ready: `yes`/)
   assert.doesNotMatch(body, /Next step/)
 })

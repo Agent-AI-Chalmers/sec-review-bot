@@ -1,6 +1,17 @@
 import React from 'react'
-import { ActionIcon, Group, MantineProvider, Menu, Tooltip } from '@mantine/core'
-import { IconLanguage, IconLogout, IconMoon, IconSun } from '@tabler/icons-react'
+import {
+  ActionIcon,
+  Group,
+  MantineProvider,
+  Menu,
+  Tooltip
+} from '@mantine/core'
+import {
+  IconLanguage,
+  IconLogout,
+  IconMoon,
+  IconSun
+} from '@tabler/icons-react'
 import { logout } from './api.js'
 import { useLanguage, useMessages } from './i18n.js'
 import { mantineTheme } from './theme.js'
@@ -34,14 +45,20 @@ const FALLBACK_THEME_TRANSITION_MS = 150
 /** Reads `--theme-transition` (e.g. `150ms` / `0.15s`) as milliseconds. The CSS owns the
  * value; this keeps the console's disarm timer exactly as long as the fade it armed. */
 function readThemeTransitionMs(root: HTMLElement): number {
-  const raw = getComputedStyle(root).getPropertyValue('--theme-transition').trim()
+  const raw = getComputedStyle(root)
+    .getPropertyValue('--theme-transition')
+    .trim()
   const match = /^([\d.]+)(ms|s)$/.exec(raw)
   if (match === null) return FALLBACK_THEME_TRANSITION_MS
   const value = Number(match[1])
   return match[2] === 's' ? value * 1000 : value
 }
 
-export function Preferences({ children }: { children: React.ReactNode }): React.JSX.Element {
+export function Preferences({
+  children
+}: {
+  children: React.ReactNode
+}): React.JSX.Element {
   // Keep browser preferences local to this console; they are presentation state,
   // not Control Plane account settings.
   const hasAppliedTheme = React.useRef(false)
@@ -53,12 +70,14 @@ export function Preferences({ children }: { children: React.ReactNode }): React.
   const [autoRefresh, setAutoRefresh] = React.useState(
     () => localStorage.getItem('ui-auto-refresh') !== 'false'
   )
-  const [refreshInterval, setRefreshInterval] = React.useState<RefreshInterval>(() => {
-    const stored = Number(localStorage.getItem('ui-refresh-interval'))
-    return refreshIntervals.includes(stored as RefreshInterval)
-      ? (stored as RefreshInterval)
-      : 15000
-  })
+  const [refreshInterval, setRefreshInterval] = React.useState<RefreshInterval>(
+    () => {
+      const stored = Number(localStorage.getItem('ui-refresh-interval'))
+      return refreshIntervals.includes(stored as RefreshInterval)
+        ? (stored as RefreshInterval)
+        : 15000
+    }
+  )
   React.useEffect(() => {
     localStorage.setItem('ui-theme', theme)
     const root = document.documentElement
@@ -116,7 +135,11 @@ export function usePreferences(): React.ContextType<typeof PreferencesContext> {
 
 /** `signedIn` only gates sign-out: theme and language are presentation state and stay
  * available on the sign-in form, where they are the reader's only controls. */
-export function PreferenceControls({ signedIn = true }: { signedIn?: boolean }): React.JSX.Element {
+export function PreferenceControls({
+  signedIn = true
+}: {
+  signedIn?: boolean
+}): React.JSX.Element {
   const { theme, setTheme } = usePreferences()
   const { language, setLanguage } = useLanguage()
   const t = useMessages()
@@ -135,17 +158,27 @@ export function PreferenceControls({ signedIn = true }: { signedIn?: boolean }):
       <Menu position="bottom-end" withinPortal>
         <Menu.Target>
           <Tooltip label={t('language')}>
-            <ActionIcon variant="subtle" color="gray" aria-label={t('language')}>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              aria-label={t('language')}
+            >
               <IconLanguage size={19} stroke={1.8} />
             </ActionIcon>
           </Tooltip>
         </Menu.Target>
         <Menu.Dropdown>
           <Menu.Label>{t('language')}</Menu.Label>
-          <Menu.Item onClick={() => setLanguage('en')} fw={language === 'en' ? 600 : undefined}>
+          <Menu.Item
+            onClick={() => setLanguage('en')}
+            fw={language === 'en' ? 600 : undefined}
+          >
             English
           </Menu.Item>
-          <Menu.Item onClick={() => setLanguage('zh')} fw={language === 'zh' ? 600 : undefined}>
+          <Menu.Item
+            onClick={() => setLanguage('zh')}
+            fw={language === 'zh' ? 600 : undefined}
+          >
             中文
           </Menu.Item>
         </Menu.Dropdown>

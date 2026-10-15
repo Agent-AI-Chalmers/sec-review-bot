@@ -67,8 +67,14 @@ export interface GitHubPullRequestReview {
 
 export interface GitHubAppOctokit {
   auth: (options?: unknown) => Promise<unknown>
-  graphql: <T = unknown>(query: string, variables?: Record<string, unknown>) => Promise<T>
-  request: (route: string, parameters?: Record<string, unknown>) => Promise<{ data: unknown }>
+  graphql: <T = unknown>(
+    query: string,
+    variables?: Record<string, unknown>
+  ) => Promise<T>
+  request: (
+    route: string,
+    parameters?: Record<string, unknown>
+  ) => Promise<{ data: unknown }>
   rest: {
     git: {
       createBlob: (args: {
@@ -260,7 +266,9 @@ export interface GitHubAppOctokit {
         repo: string
         path: string
         ref?: string
-      }) => Promise<{ data: { type?: string; content?: string } | Array<unknown> }>
+      }) => Promise<{
+        data: { type?: string; content?: string } | Array<unknown>
+      }>
     }
   }
 }

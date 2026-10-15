@@ -1,7 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'http'
 import type { App } from 'octokit'
 
-export type NodeHttpMiddleware = (request: IncomingMessage, response: ServerResponse) => void
+export type NodeHttpMiddleware = (
+  request: IncomingMessage,
+  response: ServerResponse
+) => void
 
 export type RepositoryReviewDispatchHandler = (args: {
   app: App
@@ -27,11 +30,18 @@ function writeJson(
   response.end(JSON.stringify(value))
 }
 
-function requestUrlFromNodeRequest(request: IncomingMessage, port: string | number): URL | null {
-  const requestPath = typeof request.url === 'string' && request.url.length > 0 ? request.url : '/'
+function requestUrlFromNodeRequest(
+  request: IncomingMessage,
+  port: string | number
+): URL | null {
+  const requestPath =
+    typeof request.url === 'string' && request.url.length > 0
+      ? request.url
+      : '/'
   // Some probes/proxies send an empty Host header; treat that as missing and use a safe local fallback.
   const requestHost =
-    typeof request.headers.host === 'string' && request.headers.host.trim().length > 0
+    typeof request.headers.host === 'string' &&
+    request.headers.host.trim().length > 0
       ? request.headers.host.trim()
       : `localhost:${port}`
 
@@ -48,7 +58,10 @@ export function createAppHttpHandler({
   repository_review_dispatch_path,
   repository_review_dispatch_handler,
   webhook_middleware
-}: AppHttpHandlerOptions): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
+}: AppHttpHandlerOptions): (
+  request: IncomingMessage,
+  response: ServerResponse
+) => Promise<void> {
   return async (request, response) => {
     const requestUrl = requestUrlFromNodeRequest(request, port)
     if (requestUrl === null) {

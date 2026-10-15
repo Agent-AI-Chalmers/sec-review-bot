@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse
+} from 'node:http'
 import type { Plugin } from 'vite'
 
 import { devFixtures } from '../dev-fixtures.js'
@@ -19,11 +23,20 @@ function captureMiddleware(): (
   const configureServer = plugin.configureServer
   assert(typeof configureServer === 'function')
   let middleware:
-    ((request: IncomingMessage, response: ServerResponse, next: () => void) => void) | undefined
+    | ((
+        request: IncomingMessage,
+        response: ServerResponse,
+        next: () => void
+      ) => void)
+    | undefined
   const fakeServer = {
     middlewares: {
       use(
-        handler: (request: IncomingMessage, response: ServerResponse, next: () => void) => void
+        handler: (
+          request: IncomingMessage,
+          response: ServerResponse,
+          next: () => void
+        ) => void
       ): void {
         middleware = handler
       }
@@ -31,14 +44,19 @@ function captureMiddleware(): (
   }
   // `devFixtures` never reads `this`, so invoking the hook with the fake server alone is
   // faithful; the cast only satisfies Vite's `this: MinimalPluginContext` signature.
-  const runConfigureServer = configureServer as (server: typeof fakeServer) => void
+  const runConfigureServer = configureServer as (
+    server: typeof fakeServer
+  ) => void
   runConfigureServer(fakeServer)
   assert(middleware !== undefined)
   return middleware
 }
 
 /** Starts the fixture middleware behind a real server and returns a close helper. */
-async function startFixtureServer(): Promise<{ base: string; close: () => Promise<void> }> {
+async function startFixtureServer(): Promise<{
+  base: string
+  close: () => Promise<void>
+}> {
   const middleware = captureMiddleware()
   const server = createServer((request, response) => {
     middleware(request, response, () => {
@@ -70,23 +88,27 @@ test('dev fixtures track sign-out so the console reaches the sign-in form', asyn
   const fixture = await startFixtureServer()
   try {
     const signedIn = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.equal(signedIn.status, 200)
+    assert.strictEqual(signedIn.status, 200)
 
     // Signing out mirrors the BFF: 204, and every later API call is unauthorized so
     // the console switches to its sign-in form rather than reloading the run list.
-    const signOut = await fetch(`${fixture.base}/api/session`, { method: 'DELETE' })
-    assert.equal(signOut.status, 204)
+    const signOut = await fetch(`${fixture.base}/api/session`, {
+      method: 'DELETE'
+    })
+    assert.strictEqual(signOut.status, 204)
 
     const afterSignOut = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.equal(afterSignOut.status, 401)
-    assert.deepEqual(await afterSignOut.json(), { error: 'unauthorized' })
+    assert.strictEqual(afterSignOut.status, 401)
+    assert.deepStrictEqual(await afterSignOut.json(), { error: 'unauthorized' })
 
     // Signing back in restores the run list: POST is the only way to become signed in.
-    const signIn = await fetch(`${fixture.base}/api/session`, { method: 'POST' })
-    assert.equal(signIn.status, 204)
+    const signIn = await fetch(`${fixture.base}/api/session`, {
+      method: 'POST'
+    })
+    assert.strictEqual(signIn.status, 204)
 
     const afterSignIn = await fetch(`${fixture.base}/api/runs?limit=1`)
-    assert.equal(afterSignIn.status, 200)
+    assert.strictEqual(afterSignIn.status, 200)
   } finally {
     await fixture.close()
   }
@@ -98,7 +120,7 @@ test('dev fixtures leave non-API requests to the next middleware', async () => {
   const fixture = await startFixtureServer()
   try {
     const asset = await fetch(`${fixture.base}/index.html`)
-    assert.equal(asset.status, 404)
+    assert.strictEqual(asset.status, 404)
   } finally {
     await fixture.close()
   }

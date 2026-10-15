@@ -23,10 +23,20 @@ import {
   executionStatusLabel,
   runPublicationStatusLabel
 } from './status.js'
-import { abbreviate, failureReason, formatDuration, lastActivity, workflowLabel } from './format.js'
+import {
+  abbreviate,
+  failureReason,
+  formatDuration,
+  lastActivity,
+  workflowLabel
+} from './format.js'
 import { LIST_RUN_QUERY_PARAMS } from './list-run-query-params.js'
 
-const RANGE_MINUTES: Record<string, number> = { '1h': 60, '24h': 1_440, '7d': 10_080 }
+const RANGE_MINUTES: Record<string, number> = {
+  '1h': 60,
+  '24h': 1_440,
+  '7d': 10_080
+}
 const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
 /** Mirrors the Control Plane's own default, so an unadorned `/runs` asks for what
  * the server would have returned anyway. */
@@ -45,23 +55,35 @@ export function Runs(): React.JSX.Element {
   // Persisted in sessionStorage because navigating to a run detail unmounts this
   // component; without it, returning would reset the trail and strand the reader
   // with no Previous control (the Detail "Back to runs" link restores only the URL).
-  const [cursorParents, setCursorParents] = React.useState<Record<string, string>>(() => {
+  const [cursorParents, setCursorParents] = React.useState<
+    Record<string, string>
+  >(() => {
     try {
-      return JSON.parse(window.sessionStorage.getItem(CURSOR_PARENTS_KEY) ?? '{}')
+      return JSON.parse(
+        window.sessionStorage.getItem(CURSOR_PARENTS_KEY) ?? '{}'
+      )
     } catch {
       return {}
     }
   })
-  const [data, setData] = React.useState<{ runs: Run[]; next_cursor: string | null }>()
+  const [data, setData] = React.useState<{
+    runs: Run[]
+    next_cursor: string | null
+  }>()
   const [error, setError] = React.useState<unknown>()
   React.useEffect(() => {
-    window.sessionStorage.setItem(CURSOR_PARENTS_KEY, JSON.stringify(cursorParents))
+    window.sessionStorage.setItem(
+      CURSOR_PARENTS_KEY,
+      JSON.stringify(cursorParents)
+    )
   }, [cursorParents])
   const cursor = search.get('cursor') ?? ''
   const previousCursor = cursorParents[cursor]
   const requestedPageSize = Number(search.get('limit') ?? DEFAULT_PAGE_SIZE)
   const pageSize =
-    Number.isSafeInteger(requestedPageSize) && requestedPageSize >= 1 && requestedPageSize <= 100
+    Number.isSafeInteger(requestedPageSize) &&
+    requestedPageSize >= 1 &&
+    requestedPageSize <= 100
       ? requestedPageSize
       : DEFAULT_PAGE_SIZE
   // State the page size on every request, so the console never depends on the
@@ -93,7 +115,9 @@ export function Runs(): React.JSX.Element {
     : [...PAGE_SIZES, pageSize].sort((left, right) => left - right)
   const load = React.useCallback(async (): Promise<void> => {
     try {
-      setData(await api<{ runs: Run[]; next_cursor: string | null }>(`/runs?${query}`))
+      setData(
+        await api<{ runs: Run[]; next_cursor: string | null }>(`/runs?${query}`)
+      )
       setError(undefined)
     } catch (value) {
       setError(value)
@@ -163,20 +187,31 @@ export function Runs(): React.JSX.Element {
               onChange={(event) => update('workflow', event.target.value)}
             >
               <option value="">{t('all')}</option>
-              {['issue-review', 'pull-request-review', 'repository-review'].map((value) => (
-                <option key={value} value={value}>
-                  {workflowLabel(value, t)}
-                </option>
-              ))}
+              {['issue-review', 'pull-request-review', 'repository-review'].map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {workflowLabel(value, t)}
+                  </option>
+                )
+              )}
             </NativeSelect>
             <NativeSelect
               label={t('execution')}
               value={search.get('execution_status') ?? ''}
-              onChange={(event) => update('execution_status', event.target.value)}
+              onChange={(event) =>
+                update('execution_status', event.target.value)
+              }
             >
               <option value="">{t('all')}</option>
               {(
-                ['preparing', 'recovering', 'queued', 'running', 'succeeded', 'failed'] as const
+                [
+                  'preparing',
+                  'recovering',
+                  'queued',
+                  'running',
+                  'succeeded',
+                  'failed'
+                ] as const
               ).map((value) => (
                 <option key={value} value={value}>
                   {executionStatusLabel(value, t)}
@@ -186,16 +221,24 @@ export function Runs(): React.JSX.Element {
             <NativeSelect
               label={t('publication')}
               value={search.get('publication_status') ?? ''}
-              onChange={(event) => update('publication_status', event.target.value)}
+              onChange={(event) =>
+                update('publication_status', event.target.value)
+              }
             >
               <option value="">{t('all')}</option>
-              {(['pending', 'publishing', 'published', 'failed', 'skipped'] as const).map(
-                (value) => (
-                  <option key={value} value={value}>
-                    {runPublicationStatusLabel(value, t)}
-                  </option>
-                )
-              )}
+              {(
+                [
+                  'pending',
+                  'publishing',
+                  'published',
+                  'failed',
+                  'skipped'
+                ] as const
+              ).map((value) => (
+                <option key={value} value={value}>
+                  {runPublicationStatusLabel(value, t)}
+                </option>
+              ))}
             </NativeSelect>
             <NativeSelect
               label={t('timeRange')}
@@ -215,7 +258,9 @@ export function Runs(): React.JSX.Element {
                 // the cursor and the visited-page trail.
                 update(
                   'limit',
-                  event.target.value === String(DEFAULT_PAGE_SIZE) ? '' : event.target.value
+                  event.target.value === String(DEFAULT_PAGE_SIZE)
+                    ? ''
+                    : event.target.value
                 )
               }
             >
@@ -226,14 +271,22 @@ export function Runs(): React.JSX.Element {
               ))}
             </NativeSelect>
           </Group>
-          <RefreshControls refresh={refresh} refreshing={refreshing} lastChecked={lastChecked} />
+          <RefreshControls
+            refresh={refresh}
+            refreshing={refreshing}
+            lastChecked={lastChecked}
+          />
         </Group>
       </Box>
       {data === undefined ? (
         <p>{t('loadingRuns')}</p>
       ) : data.runs.length === 0 ? (
         <Stack align="center" gap="xs" py="xl">
-          <IconInbox size={40} stroke={1.2} style={{ color: 'var(--mantine-color-dimmed)' }} />
+          <IconInbox
+            size={40}
+            stroke={1.2}
+            style={{ color: 'var(--mantine-color-dimmed)' }}
+          />
           <Text c="dimmed">{t('emptyRuns')}</Text>
         </Stack>
       ) : (
@@ -282,7 +335,11 @@ export function Runs(): React.JSX.Element {
                     <Table.Td>
                       <Tooltip label={formatDate(lastActivity(run), language)}>
                         <span>
-                          {formatDuration(Date.now() - Date.parse(lastActivity(run)), t)} {t('ago')}
+                          {formatDuration(
+                            Date.now() - Date.parse(lastActivity(run)),
+                            t
+                          )}{' '}
+                          {t('ago')}
                         </span>
                       </Tooltip>
                     </Table.Td>

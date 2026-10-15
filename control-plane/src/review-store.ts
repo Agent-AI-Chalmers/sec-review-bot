@@ -1,9 +1,15 @@
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
-import type { ControlPlaneWorkflow as WorkflowName, RunnerArtifactStorage } from './contracts.js'
+import type {
+  ControlPlaneWorkflow as WorkflowName,
+  RunnerArtifactStorage
+} from './contracts.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
-import { DeterministicControlPlaneError, PUBLICATION_STEP_ERROR_CODES } from './errors.js'
+import {
+  DeterministicControlPlaneError,
+  PUBLICATION_STEP_ERROR_CODES
+} from './errors.js'
 import {
   normalizeArtifactStorage,
   type CreateReviewRunArgs,
@@ -73,7 +79,9 @@ const RUN_SELECT = `
 `
 
 function iso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value).toISOString()
 }
 function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
   const publicationFailure = row.publication_status === 'failed'
@@ -88,11 +96,16 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     execution_updated_at: iso(row.runner_updated_at),
     publication_updated_at: iso(row.publication_updated_at),
     published_at: row.published_at === null ? null : iso(row.published_at),
-    failure_code: publicationFailure ? row.publication_failure_code : row.runner_failure_code,
+    failure_code: publicationFailure
+      ? row.publication_failure_code
+      : row.runner_failure_code,
     failure_message: publicationFailure
       ? row.publication_failure_message
       : row.runner_failure_message,
-    artifact_storage: normalizeArtifactStorage(row.artifact_storage, `run ${row.run_id}`),
+    artifact_storage: normalizeArtifactStorage(
+      row.artifact_storage,
+      `run ${row.run_id}`
+    ),
     ...(row.ingress_kind ? { ingress_kind: row.ingress_kind } : {}),
     ...(row.ingress_key ? { ingress_key: row.ingress_key } : {})
   }
@@ -174,10 +187,14 @@ export class ReviewRunStore {
     this.initialized = true
   }
   private ready(): void {
-    if (!this.initialized) throw new Error('ReviewRunStore.initialize() must complete before use.')
+    if (!this.initialized)
+      throw new Error('ReviewRunStore.initialize() must complete before use.')
   }
 
-  private async getWith(client: PoolClient, runId: string): Promise<ReviewRunRecord | null> {
+  private async getWith(
+    client: PoolClient,
+    runId: string
+  ): Promise<ReviewRunRecord | null> {
     const result = await client.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE r.run_id=$1 AND r.connector_id=$2`,
@@ -199,7 +216,9 @@ export class ReviewRunStore {
         this.connectorId,
         run.workflow,
         JSON.stringify(run.publish_context),
-        run.runner_input === undefined ? null : JSON.stringify(run.runner_input),
+        run.runner_input === undefined
+          ? null
+          : JSON.stringify(run.runner_input),
         preparationToken,
         run.ingress_kind ?? null,
         run.ingress_key ?? null
@@ -213,15 +232,22 @@ export class ReviewRunStore {
       [run.run_id, this.connectorId]
     )
     const record = await this.getWith(client, run.run_id)
-    if (record === null) throw new Error(`Runner run was not persisted: ${run.run_id}`)
+    if (record === null)
+      throw new Error(`Runner run was not persisted: ${run.run_id}`)
     return { record, created: true, preparation_token: preparationToken }
   }
-  async createPreparingReviewRun(run: CreateReviewRunArgs): Promise<ReviewRunAdmission> {
+  async createPreparingReviewRun(
+    run: CreateReviewRunArgs
+  ): Promise<ReviewRunAdmission> {
     this.ready()
-    return await transaction(this.pool, async (client) => await this.insertWith(client, run))
+    return await transaction(
+      this.pool,
+      async (client) => await this.insertWith(client, run)
+    )
   }
   async admitReviewRun(
-    run: CreateReviewRunArgs & Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
+    run: CreateReviewRunArgs &
+      Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
   ): Promise<ReviewRunAdmission> {
     this.ready()
     try {
@@ -236,7 +262,8 @@ export class ReviewRunStore {
         if (row === undefined) return await this.insertWith(client, run)
         if (
           row.runner_status === 'preparing' ||
-          (row.runner_status === 'failed' && row.runner_failure_code === 'PREPARATION_INTERRUPTED')
+          (row.runner_status === 'failed' &&
+            row.runner_failure_code === 'PREPARATION_INTERRUPTED')
         ) {
           const token = crypto.randomUUID()
           const reclaimed = await client.query(
@@ -255,7 +282,11 @@ export class ReviewRunStore {
             [row.run_id, token, this.claimTimeoutMs]
           )
           if (reclaimed.rowCount !== 1)
-            return { record: rowToRecord(row), created: false, preparation_token: null }
+            return {
+              record: rowToRecord(row),
+              created: false,
+              preparation_token: null
+            }
           await client.query(
             `
             UPDATE publications
@@ -266,10 +297,15 @@ export class ReviewRunStore {
             [row.run_id, this.connectorId]
           )
           const record = await this.getWith(client, row.run_id)
-          if (record === null) throw new Error(`Reclaimed review run was not found: ${row.run_id}`)
+          if (record === null)
+            throw new Error(`Reclaimed review run was not found: ${row.run_id}`)
           return { record, created: true, preparation_token: token }
         }
-        return { record: rowToRecord(row), created: false, preparation_token: null }
+        return {
+          record: rowToRecord(row),
+          created: false,
+          preparation_token: null
+        }
       })
     } catch (error: unknown) {
       if (!(
@@ -287,7 +323,11 @@ export class ReviewRunStore {
         [this.connectorId, run.ingress_kind, run.ingress_key]
       )
       if (existing.rows[0] === undefined) throw error
-      return { record: rowToRecord(existing.rows[0]), created: false, preparation_token: null }
+      return {
+        record: rowToRecord(existing.rows[0]),
+        created: false,
+        preparation_token: null
+      }
     }
   }
   async savePreparedSubmission(
@@ -306,10 +346,19 @@ export class ReviewRunStore {
         AND runner_status='preparing' AND preparation_claim_token=$2
         AND workflow=$6
     `,
-      [runId, token, JSON.stringify(context), JSON.stringify(input), this.connectorId, run.workflow]
+      [
+        runId,
+        token,
+        JSON.stringify(context),
+        JSON.stringify(input),
+        this.connectorId,
+        run.workflow
+      ]
     )
     if (result.rowCount !== 1)
-      throw new Error(`Review run ${runId} cannot save prepared submission outside preparing.`)
+      throw new Error(
+        `Review run ${runId} cannot save prepared submission outside preparing.`
+      )
   }
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
     this.ready()
@@ -331,7 +380,11 @@ export class ReviewRunStore {
     // beyond a deployment-specific preparation timeout.
     return Math.max(1, Math.min(60_000, Math.floor(this.claimTimeoutMs / 3)))
   }
-  async markQueued(runId: string, token: string, context: PublishContext): Promise<void> {
+  async markQueued(
+    runId: string,
+    token: string,
+    context: PublishContext
+  ): Promise<void> {
     const run = await this.getRun(runId)
     if (run === null) throw new Error(`Review run does not exist: ${runId}`)
     const result = await this.pool.query(
@@ -348,7 +401,9 @@ export class ReviewRunStore {
       [runId, token, JSON.stringify(context), this.connectorId, run.workflow]
     )
     if (result.rowCount !== 1)
-      throw new Error(`Review run ${runId} cannot transition from preparing to queued.`)
+      throw new Error(
+        `Review run ${runId} cannot transition from preparing to queued.`
+      )
   }
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
     this.ready()
@@ -379,21 +434,26 @@ export class ReviewRunStore {
       values.push(value)
       return `$${values.length}`
     }
-    if (options.workflow !== undefined) clauses.push(`r.workflow=${add(options.workflow)}`)
+    if (options.workflow !== undefined)
+      clauses.push(`r.workflow=${add(options.workflow)}`)
     if (options.execution_status !== undefined) {
       clauses.push(`r.runner_status=${add(options.execution_status)}`)
     }
     if (options.publication_status !== undefined) {
       clauses.push(`p.status=${add(options.publication_status)}`)
     }
-    if (options.from !== undefined) clauses.push(`r.created_at>=${add(options.from)}`)
-    if (options.to !== undefined) clauses.push(`r.created_at<${add(options.to)}`)
+    if (options.from !== undefined)
+      clauses.push(`r.created_at>=${add(options.from)}`)
+    if (options.to !== undefined)
+      clauses.push(`r.created_at<${add(options.to)}`)
     if (options.cursor !== undefined) {
       const [createdAt, runId] = Buffer.from(options.cursor, 'base64url')
         .toString('utf8')
         .split('|')
       if (!createdAt || !runId) throw new Error('Invalid run list cursor.')
-      clauses.push(`(r.created_at, r.run_id)<(${add(createdAt)}, ${add(runId)})`)
+      clauses.push(
+        `(r.created_at, r.run_id)<(${add(createdAt)}, ${add(runId)})`
+      )
     }
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
@@ -428,15 +488,24 @@ export class ReviewRunStore {
       from?: string
       to?: string
     } = {}
-  ): Promise<{ runs: ReviewRunRecord[]; next_cursor: string | null; dropped: DroppedRunRow[] }> {
-    const boundedLimit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 100)
+  ): Promise<{
+    runs: ReviewRunRecord[]
+    next_cursor: string | null
+    dropped: DroppedRunRow[]
+  }> {
+    const boundedLimit = Math.min(
+      Math.max(Math.trunc(options.limit ?? 50), 1),
+      100
+    )
     const rows = await this.listRunRows(options, boundedLimit + 1)
     const hasMore = rows.length > boundedLimit
     const page = rows.slice(0, boundedLimit)
     const last = page.at(-1)
     const next_cursor =
       hasMore && last !== undefined
-        ? Buffer.from(`${last.created_at_cursor}|${last.run_id}`).toString('base64url')
+        ? Buffer.from(`${last.created_at_cursor}|${last.run_id}`).toString(
+            'base64url'
+          )
         : null
     const { runs, dropped } = projectRunRows(page)
     return { runs, next_cursor, dropped }
@@ -502,7 +571,10 @@ export class ReviewRunStore {
     )
     return result.rows[0]?.recovery_claim_token ?? null
   }
-  async completeSubmissionRecovery(runId: string, token: string): Promise<boolean> {
+  async completeSubmissionRecovery(
+    runId: string,
+    token: string
+  ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
         `
@@ -590,7 +662,11 @@ export class ReviewRunStore {
       SET artifact_storage=$3::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$2
     `,
-      [runId, this.connectorId, JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))]
+      [
+        runId,
+        this.connectorId,
+        JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
+      ]
     )
   }
   async recordRunnerSuccess(
@@ -694,12 +770,15 @@ export class ReviewRunStore {
     // schema already bounded below. Clamp it here anyway: the cap keeps one request from holding
     // a connection longer than intended, and a store method should not assume its caller
     // validated on its behalf.
-    const boundedWaitMs = Number.isFinite(waitMs) && waitMs > 0 ? Math.min(waitMs, 30_000) : 0
+    const boundedWaitMs =
+      Number.isFinite(waitMs) && waitMs > 0 ? Math.min(waitMs, 30_000) : 0
     const deadline = Date.now() + boundedWaitMs
     for (;;) {
       const work = await this.claimNextPublicationOnce()
       if (work !== null || Date.now() >= deadline) return work
-      await new Promise((resolve) => setTimeout(resolve, CLAIM_WAIT_INTERVAL_MS))
+      await new Promise((resolve) =>
+        setTimeout(resolve, CLAIM_WAIT_INTERVAL_MS)
+      )
     }
   }
 
@@ -742,7 +821,11 @@ export class ReviewRunStore {
       const row = result.rows[0]
       if (row === undefined || row.workflow_result === null)
         throw new Error(`Claimed publication work is incomplete: ${runId}`)
-      return { ...rowToRecord(row), workflow_result: row.workflow_result, claim_token: token }
+      return {
+        ...rowToRecord(row),
+        workflow_result: row.workflow_result,
+        claim_token: token
+      }
     })
   }
   publicationHeartbeatIntervalMs(): number {
@@ -782,7 +865,9 @@ export class ReviewRunStore {
         [runId, this.connectorId, token]
       )
       if (owner.rowCount !== 1)
-        throw new Error(`Publication claim was lost before steps were initialized: ${runId}`)
+        throw new Error(
+          `Publication claim was lost before steps were initialized: ${runId}`
+        )
       const existing = await client.query<{ step_key: string }>(
         `
         SELECT step_key FROM publication_steps
@@ -847,7 +932,11 @@ export class ReviewRunStore {
     )
     return result.rowCount === 1
   }
-  async requirePublicationStepClaim(runId: string, token: string, stepKey: string): Promise<void> {
+  async requirePublicationStepClaim(
+    runId: string,
+    token: string,
+    stepKey: string
+  ): Promise<void> {
     if (await this.claimPublicationStep(runId, token, stepKey)) return
 
     // Retry exhaustion is a persisted step outcome, not merely an exception
@@ -864,7 +953,9 @@ export class ReviewRunStore {
     `,
       [runId, this.connectorId, stepKey, token, MAX_PUBLICATION_STEP_FAILURES]
     )
-    const step = (await this.listPublicationSteps(runId)).find((item) => item.step_key === stepKey)
+    const step = (await this.listPublicationSteps(runId)).find(
+      (item) => item.step_key === stepKey
+    )
     if (step?.status === 'terminal_failed') {
       throw new DeterministicControlPlaneError(
         `Publication step exhausted its retry budget: ${stepKey}`,
@@ -894,7 +985,14 @@ export class ReviewRunStore {
         AND p.run_id=s.run_id AND p.connector_id=s.connector_id
         AND p.status='publishing' AND p.claim_token=$4
     `,
-      [runId, this.connectorId, stepKey, token, remote.id ?? null, remote.url ?? null]
+      [
+        runId,
+        this.connectorId,
+        stepKey,
+        token,
+        remote.id ?? null,
+        remote.url ?? null
+      ]
     )
     return result.rowCount === 1
   }
@@ -989,7 +1087,9 @@ export class ReviewRunStore {
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
       if (result.rowCount !== 1)
-        throw new Error(`Preparation claim was lost before failing review run ${runId}.`)
+        throw new Error(
+          `Preparation claim was lost before failing review run ${runId}.`
+        )
       await client.query(
         `
         UPDATE publications

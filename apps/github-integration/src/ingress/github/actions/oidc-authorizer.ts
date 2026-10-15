@@ -1,9 +1,14 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
 const GITHUB_ACTIONS_OIDC_ISSUER = 'https://token.actions.githubusercontent.com'
-const GITHUB_ACTIONS_OIDC_JWKS_URL = new URL(`${GITHUB_ACTIONS_OIDC_ISSUER}/.well-known/jwks`)
+const GITHUB_ACTIONS_OIDC_JWKS_URL = new URL(
+  `${GITHUB_ACTIONS_OIDC_ISSUER}/.well-known/jwks`
+)
 const REPOSITORY_REVIEW_OIDC_AUDIENCE = 'sec-review-bot'
-const ALLOWED_REPOSITORY_REVIEW_EVENTS = new Set(['workflow_dispatch', 'schedule'])
+const ALLOWED_REPOSITORY_REVIEW_EVENTS = new Set([
+  'workflow_dispatch',
+  'schedule'
+])
 const REPOSITORY_REVIEW_WORKFLOW_PATH = '.github/workflows/sec-review-bot.yml'
 
 const githubActionsJwks = createRemoteJWKSet(GITHUB_ACTIONS_OIDC_JWKS_URL)
@@ -20,7 +25,9 @@ export interface AuthorizedRepositoryReviewOidcClaims extends GitHubActionsOidcC
   repository: string
 }
 
-export type GitHubActionsOidcVerifier = (token: string) => Promise<GitHubActionsOidcClaims>
+export type GitHubActionsOidcVerifier = (
+  token: string
+) => Promise<GitHubActionsOidcClaims>
 
 export class RepositoryReviewOidcError extends Error {
   constructor(
@@ -43,7 +50,9 @@ export async function verifyGitHubActionsOidcToken(
   return payload as GitHubActionsOidcClaims
 }
 
-function normalizeHeaderValue(value: string | string[] | undefined): string | null {
+function normalizeHeaderValue(
+  value: string | string[] | undefined
+): string | null {
   if (Array.isArray(value)) {
     return null
   }
@@ -89,7 +98,10 @@ export async function authorizeRepositoryReviewDispatchOidc({
 }): Promise<AuthorizedRepositoryReviewOidcClaims> {
   const token = normalizeHeaderValue(headers['x-sec-review-bot-oidc-token'])
   if (token === null) {
-    throw new RepositoryReviewOidcError('Missing GitHub Actions OIDC token.', 401)
+    throw new RepositoryReviewOidcError(
+      'Missing GitHub Actions OIDC token.',
+      401
+    )
   }
 
   let claims: GitHubActionsOidcClaims
@@ -105,16 +117,22 @@ export async function authorizeRepositoryReviewDispatchOidc({
   const verified_repository = canonicalRepository(claims.repository)
   const requested_repository = canonicalRepository(payload_repo_full_name)
   if (!verified_repository || verified_repository !== requested_repository) {
-    throw new RepositoryReviewOidcError('OIDC repository does not match repo_full_name.')
+    throw new RepositoryReviewOidcError(
+      'OIDC repository does not match repo_full_name.'
+    )
   }
 
   if (!ALLOWED_REPOSITORY_REVIEW_EVENTS.has(String(claims.event_name ?? ''))) {
-    throw new RepositoryReviewOidcError('OIDC event is not allowed for repository review dispatch.')
+    throw new RepositoryReviewOidcError(
+      'OIDC event is not allowed for repository review dispatch.'
+    )
   }
 
   const refBranch = branchNameFromRef(claims.ref)
   if (refBranch === null || refBranch !== payload_target_branch) {
-    throw new RepositoryReviewOidcError('OIDC ref does not match target_branch.')
+    throw new RepositoryReviewOidcError(
+      'OIDC ref does not match target_branch.'
+    )
   }
 
   if (

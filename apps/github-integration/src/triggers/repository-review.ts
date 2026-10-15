@@ -6,7 +6,10 @@ import {
 } from '../control-plane/preparation-claim.js'
 
 import type { GitHubAppOctokit } from '../github/octokit.js'
-import { getRepositoryRefSha, splitRepoFullName } from '../github/repository-service.js'
+import {
+  getRepositoryRefSha,
+  splitRepoFullName
+} from '../github/repository-service.js'
 import {
   startRepositoryReviewRun,
   type SubmittedRepositoryReviewRun
@@ -66,19 +69,29 @@ export function normalizeRepositoryReviewDispatchPayload(
 export function validateRepositoryReviewDispatchContract(
   payload: RepositoryReviewDispatchPayload
 ): ValidatedRepositoryReviewDispatch {
-  const repo_full_name = requiredString(payload.repo_full_name, 'repo_full_name')
+  const repo_full_name = requiredString(
+    payload.repo_full_name,
+    'repo_full_name'
+  )
   splitRepoFullName(repo_full_name)
   const target_branch = requiredString(payload.target_branch, 'target_branch')
   const event_type = normalizeRepositoryEventType(payload.event_type)
   const scan_mode = normalizeScanMode(payload.scan_mode, event_type)
   const test_changes = normalizeTestChanges(payload.test_changes)
-  const correlation_id = requiredString(payload.correlation_id, 'correlation_id')
+  const correlation_id = requiredString(
+    payload.correlation_id,
+    'correlation_id'
+  )
   if (correlation_id.length > 128) {
     throw new Error('correlation_id must not exceed 128 characters.')
   }
   const head_sha = normalizeOptionalSha(payload.head_sha, 'head_sha')
   const base_sha = normalizeOptionalSha(payload.base_sha, 'base_sha')
-  if (scan_mode === 'incremental' && event_type === 'manual' && base_sha === null) {
+  if (
+    scan_mode === 'incremental' &&
+    event_type === 'manual' &&
+    base_sha === null
+  ) {
     throw new Error('manual incremental scan requires base_sha.')
   }
   if (base_sha !== null && head_sha !== null && base_sha === head_sha) {
@@ -104,8 +117,14 @@ export async function resolveRepositoryReviewDispatch({
   payload: RepositoryReviewDispatchPayload
 }): Promise<ResolvedRepositoryReviewDispatch> {
   const validated = validateRepositoryReviewDispatchContract(payload)
-  const { repo_full_name, target_branch, event_type, scan_mode, test_changes, correlation_id } =
-    validated
+  const {
+    repo_full_name,
+    target_branch,
+    event_type,
+    scan_mode,
+    test_changes,
+    correlation_id
+  } = validated
   const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
 
   if (scan_mode !== 'incremental') {
@@ -171,7 +190,11 @@ export interface DispatchRepositoryReviewCommandArgs {
   app: App
   payload: RepositoryReviewDispatchPayload
   verified_repository: string
-  on_admitted?: (admission: { run_id: string; status: string; replayed: boolean }) => void
+  on_admitted?: (admission: {
+    run_id: string
+    status: string
+    replayed: boolean
+  }) => void
   deps?: Partial<DispatchRepositoryReviewCommandDeps>
 }
 
@@ -190,8 +213,12 @@ interface DispatchRepositoryReviewCommandDeps {
     ) =>
       | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
       | ReturnType<typeof controlPlaneClient.admitReviewRun>
-    failPreparation: (...args: Parameters<typeof controlPlaneClient.failPreparation>) => unknown
-    submitPreparedRun: (...args: Parameters<typeof controlPlaneClient.submitPreparedRun>) => unknown
+    failPreparation: (
+      ...args: Parameters<typeof controlPlaneClient.failPreparation>
+    ) => unknown
+    submitPreparedRun: (
+      ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
+    ) => unknown
     renewPreparationClaim: (
       ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
     ) => Promise<boolean>
@@ -208,7 +235,9 @@ async function getRepositoryInstallationOctokit(
     owner: owner_login,
     repo: repo_name
   })
-  return (await app.getInstallationOctokit(installation.data.id)) as unknown as GitHubAppOctokit
+  return (await app.getInstallationOctokit(
+    installation.data.id
+  )) as unknown as GitHubAppOctokit
 }
 
 export async function dispatchRepositoryReview({
@@ -251,8 +280,14 @@ export async function dispatchRepositoryReview({
   const run_id = admission.run_id
   const preparationToken = admission.preparation_token
   if (!preparationToken)
-    throw new Error(`Newly admitted review run ${run_id} has no preparation claim.`)
-  const heartbeat = await startPreparationClaimHeartbeat(store, run_id, preparationToken)
+    throw new Error(
+      `Newly admitted review run ${run_id} has no preparation claim.`
+    )
+  const heartbeat = await startPreparationClaimHeartbeat(
+    store,
+    run_id,
+    preparationToken
+  )
 
   let octokit: GitHubAppOctokit
   let resolved: Awaited<ReturnType<typeof resolveRepositoryReviewDispatch>>
@@ -263,7 +298,8 @@ export async function dispatchRepositoryReview({
     if (await heartbeat.stop()) {
       await store.failPreparation(run_id, preparationToken, {
         code: 'REVIEW_PREPARATION_FAILED',
-        message: asErrorMessage(error) || 'Repository review preparation failed.'
+        message:
+          asErrorMessage(error) || 'Repository review preparation failed.'
       })
     }
     throw new RepositoryReviewDispatchValidationError(
@@ -297,8 +333,11 @@ export async function dispatchRepositoryReview({
       !(error instanceof PreparationClaimLostError)
     ) {
       await store.failPreparation(run_id, preparationToken, {
-        code: isSetupDeclarationError(error) ? 'SETUP_DECLARATION_INVALID' : 'REVIEW_START_FAILED',
-        message: asErrorMessage(error) || 'Repository review could not be started.'
+        code: isSetupDeclarationError(error)
+          ? 'SETUP_DECLARATION_INVALID'
+          : 'REVIEW_START_FAILED',
+        message:
+          asErrorMessage(error) || 'Repository review could not be started.'
       })
     }
     throw error
@@ -450,7 +489,9 @@ async function resolveScheduledBaseSha({
 }): Promise<string> {
   // Scheduled scans derive base_sha by looking back roughly one schedule interval from head_sha.
   const rollbackDays = inferRollbackDaysFromCron(optionalString(schedule))
-  const cutoff = new Date(Date.now() - rollbackDays * 24 * 60 * 60 * 1000).toISOString()
+  const cutoff = new Date(
+    Date.now() - rollbackDays * 24 * 60 * 60 * 1000
+  ).toISOString()
   const commits = await octokit.rest.repos.listCommits({
     owner: owner_login,
     repo: repo_name,
@@ -460,7 +501,9 @@ async function resolveScheduledBaseSha({
   })
   const candidate = String(commits.data[0]?.sha ?? '').trim()
   if (!candidate || candidate === head_sha) {
-    throw new Error(`scheduled incremental scan requires a resolvable base_sha before ${cutoff}.`)
+    throw new Error(
+      `scheduled incremental scan requires a resolvable base_sha before ${cutoff}.`
+    )
   }
   return candidate
 }

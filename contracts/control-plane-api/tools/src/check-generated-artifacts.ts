@@ -12,7 +12,8 @@ import { generatedArtifacts as schemas } from './generate-schemas.js'
 import { generatedArtifacts as types } from './generate-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
-const REGENERATE_COMMAND = 'pnpm --dir contracts/control-plane-api/tools run generate'
+const REGENERATE_COMMAND =
+  'pnpm --dir contracts/control-plane-api/tools run generate'
 
 export interface StaleArtifact {
   /** Path relative to the repository root. */

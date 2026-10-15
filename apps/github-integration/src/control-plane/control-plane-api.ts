@@ -362,9 +362,16 @@ export interface components {
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
       /** @enum {string} */
-      runner_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+      runner_status:
+        | 'preparing'
+        | 'recovering'
+        | 'queued'
+        | 'running'
+        | 'succeeded'
+        | 'failed'
       /** @enum {string} */
-      publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      publication_status:
+        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
       /** Format: date-time */
       created_at: string
       /** Format: date-time */
@@ -396,9 +403,16 @@ export interface components {
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
       /** @enum {string} */
-      runner_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+      runner_status:
+        | 'preparing'
+        | 'recovering'
+        | 'queued'
+        | 'running'
+        | 'succeeded'
+        | 'failed'
       /** @enum {string} */
-      publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      publication_status:
+        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
       /** Format: date-time */
       created_at: string
       /** Format: date-time */
@@ -439,9 +453,16 @@ export interface components {
       /** @enum {string} */
       workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
       /** @enum {string} */
-      execution_status: 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+      execution_status:
+        | 'preparing'
+        | 'recovering'
+        | 'queued'
+        | 'running'
+        | 'succeeded'
+        | 'failed'
       /** @enum {string} */
-      publication_status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      publication_status:
+        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
       /** Format: date-time */
       created_at: string
       /** Format: date-time */
@@ -570,11 +591,18 @@ export interface operations {
           cursor?: string
           /** @enum {string} */
           execution_status?:
-            'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+            | 'preparing'
+            | 'recovering'
+            | 'queued'
+            | 'running'
+            | 'succeeded'
+            | 'failed'
           /** @enum {string} */
-          publication_status?: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+          publication_status?:
+            'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
           /** @enum {string} */
-          workflow?: 'issue-review' | 'pull-request-review' | 'repository-review'
+          workflow?:
+            'issue-review' | 'pull-request-review' | 'repository-review'
           /** Format: date-time */
           from?: string
           /** Format: date-time */
@@ -736,7 +764,8 @@ export interface operations {
           'application/json': {
             run_id: string
             /** @enum {string} */
-            workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+            workflow:
+              'issue-review' | 'pull-request-review' | 'repository-review'
             /** @enum {string} */
             status: 'queued'
           }
@@ -1206,13 +1235,28 @@ export const operationRoutes = {
   listRuns: { path: '/v1/runs', method: 'get' },
   admitRun: { path: '/v1/runs', method: 'post' },
   getRun: { path: '/v1/runs/{runId}', method: 'get' },
-  listRunPublicationSteps: { path: '/v1/runs/{runId}/publication-steps', method: 'get' },
+  listRunPublicationSteps: {
+    path: '/v1/runs/{runId}/publication-steps',
+    method: 'get'
+  },
   submitPreparedRun: { path: '/v1/runs/{runId}/submission', method: 'post' },
-  renewPreparationClaim: { path: '/v1/runs/{runId}/preparation/claim', method: 'post' },
-  failPreparation: { path: '/v1/runs/{runId}/preparation/failure', method: 'post' },
+  renewPreparationClaim: {
+    path: '/v1/runs/{runId}/preparation/claim',
+    method: 'post'
+  },
+  failPreparation: {
+    path: '/v1/runs/{runId}/preparation/failure',
+    method: 'post'
+  },
   claimNextPublication: { path: '/v1/publication/claims/next', method: 'post' },
-  renewPublicationClaim: { path: '/v1/runs/{runId}/publication/claim', method: 'post' },
-  initializePublicationSteps: { path: '/v1/runs/{runId}/publication/steps', method: 'post' },
+  renewPublicationClaim: {
+    path: '/v1/runs/{runId}/publication/claim',
+    method: 'post'
+  },
+  initializePublicationSteps: {
+    path: '/v1/runs/{runId}/publication/steps',
+    method: 'post'
+  },
   requirePublicationStepClaim: {
     path: '/v1/runs/{runId}/publication/steps/{stepKey}/claim',
     method: 'post'
@@ -1225,8 +1269,14 @@ export const operationRoutes = {
     path: '/v1/runs/{runId}/publication/steps/{stepKey}/fail',
     method: 'post'
   },
-  completePublication: { path: '/v1/runs/{runId}/publication/complete', method: 'post' },
-  failPublication: { path: '/v1/runs/{runId}/publication/fail', method: 'post' },
+  completePublication: {
+    path: '/v1/runs/{runId}/publication/complete',
+    method: 'post'
+  },
+  failPublication: {
+    path: '/v1/runs/{runId}/publication/fail',
+    method: 'post'
+  },
   getInternalRun: { path: '/v1/internal/runs/{runId}', method: 'get' },
   listInternalPublicationSteps: {
     path: '/v1/internal/runs/{runId}/publication/steps',

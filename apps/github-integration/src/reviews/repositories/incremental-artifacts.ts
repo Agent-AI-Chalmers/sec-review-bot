@@ -23,7 +23,10 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {}
 }
 
-async function writeJsonArtifact(artifact_path: string, value: unknown): Promise<void> {
+async function writeJsonArtifact(
+  artifact_path: string,
+  value: unknown
+): Promise<void> {
   await fs.writeFile(artifact_path, JSON.stringify(value, null, 2), 'utf8')
 }
 
@@ -58,18 +61,27 @@ export async function materializeIncrementalArtifacts({
     basehead: `${base_sha}...${head_sha}`
   })
   const files = Array.isArray(compare.data?.files) ? compare.data.files : []
-  const commitsRaw = Array.isArray(compare.data?.commits) ? (compare.data.commits as unknown[]) : []
+  const commitsRaw = Array.isArray(compare.data?.commits)
+    ? (compare.data.commits as unknown[])
+    : []
 
-  const compareDiff = await octokit.request('GET /repos/{owner}/{repo}/compare/{basehead}', {
-    owner: repo.owner_login,
-    repo: repo.repo_name,
-    basehead: `${base_sha}...${head_sha}`,
-    headers: {
-      accept: 'application/vnd.github.v3.diff'
+  const compareDiff = await octokit.request(
+    'GET /repos/{owner}/{repo}/compare/{basehead}',
+    {
+      owner: repo.owner_login,
+      repo: repo.repo_name,
+      basehead: `${base_sha}...${head_sha}`,
+      headers: {
+        accept: 'application/vnd.github.v3.diff'
+      }
     }
-  })
+  )
   const patchText = typeof compareDiff.data === 'string' ? compareDiff.data : ''
-  await fs.writeFile(path.join(incremental_window_path, 'incremental.patch'), patchText, 'utf8')
+  await fs.writeFile(
+    path.join(incremental_window_path, 'incremental.patch'),
+    patchText,
+    'utf8'
+  )
 
   const changed_files: ChangedFileRecord[] = []
   for (const item of files) {
@@ -88,8 +100,12 @@ export async function materializeIncrementalArtifacts({
           : statusRaw === 'removed'
             ? 'deleted'
             : 'modified'
-    const additions = Number.isFinite(Number(item?.additions)) ? Number(item?.additions) : 0
-    const deletions = Number.isFinite(Number(item?.deletions)) ? Number(item?.deletions) : 0
+    const additions = Number.isFinite(Number(item?.additions))
+      ? Number(item?.additions)
+      : 0
+    const deletions = Number.isFinite(Number(item?.deletions))
+      ? Number(item?.deletions)
+      : 0
     const changes = Number.isFinite(Number(item?.changes))
       ? Number(item?.changes)
       : additions + deletions
@@ -105,11 +121,14 @@ export async function materializeIncrementalArtifacts({
 
   changed_files.sort((a, b) => a.path.localeCompare(b.path))
 
-  await writeJsonArtifact(path.join(incremental_window_path, 'changed-files.json'), {
-    base_sha,
-    head_sha,
-    files: changed_files
-  })
+  await writeJsonArtifact(
+    path.join(incremental_window_path, 'changed-files.json'),
+    {
+      base_sha,
+      head_sha,
+      files: changed_files
+    }
+  )
 
   const commits = commitsRaw
     .map((item) => {
@@ -126,7 +145,9 @@ export async function materializeIncrementalArtifacts({
       }
     })
     .filter((item) => item.sha !== '')
-  const commit_shas = commits.map((item) => item.sha).filter((sha) => sha !== '')
+  const commit_shas = commits
+    .map((item) => item.sha)
+    .filter((sha) => sha !== '')
 
   await writeJsonArtifact(path.join(history_path, 'commits.json'), {
     base_sha,

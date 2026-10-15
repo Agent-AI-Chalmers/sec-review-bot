@@ -20,7 +20,9 @@ import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 
 function fakeApp(): App {
   return appWithInstallationOctokit({
-    installation_octokit: { installation_id: 123 } as unknown as GitHubAppOctokit,
+    installation_octokit: {
+      installation_id: 123
+    } as unknown as GitHubAppOctokit,
     expected_owner: 'octo',
     expected_repo: 'example'
   })
@@ -82,11 +84,17 @@ test('repository dispatch request resolves scheduled incremental window in the a
     }
   })
 
-  assert.equal(resolved.scan_mode, 'incremental')
-  assert.equal(resolved.event_type, 'scheduled')
-  assert.equal(resolved.target_branch, 'main')
-  assert.equal(resolved.head_sha, 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
-  assert.equal(resolved.base_sha, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+  assert.strictEqual(resolved.scan_mode, 'incremental')
+  assert.strictEqual(resolved.event_type, 'scheduled')
+  assert.strictEqual(resolved.target_branch, 'main')
+  assert.strictEqual(
+    resolved.head_sha,
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+  )
+  assert.strictEqual(
+    resolved.base_sha,
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  )
 })
 
 test('repository dispatch request resolves manual incremental refs from raw payload', async () => {
@@ -104,11 +112,17 @@ test('repository dispatch request resolves manual incremental refs from raw payl
     }
   })
 
-  assert.equal(resolved.scan_mode, 'incremental')
-  assert.equal(resolved.event_type, 'manual')
-  assert.equal(resolved.base_sha, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
-  assert.equal(resolved.head_sha, 'cccccccccccccccccccccccccccccccccccccccc')
-  assert.equal(resolved.test_changes, 'deny')
+  assert.strictEqual(resolved.scan_mode, 'incremental')
+  assert.strictEqual(resolved.event_type, 'manual')
+  assert.strictEqual(
+    resolved.base_sha,
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  )
+  assert.strictEqual(
+    resolved.head_sha,
+    'cccccccccccccccccccccccccccccccccccccccc'
+  )
+  assert.strictEqual(resolved.test_changes, 'deny')
 })
 
 test('dispatchRepositoryReview resolves, submits, and persists a queued repository review run', async () => {
@@ -141,12 +155,12 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
     },
     deps: {
       getInstallationOctokit: async (repo_full_name) => {
-        assert.equal(repo_full_name, 'octo/example')
+        assert.strictEqual(repo_full_name, 'octo/example')
         return octokit
       },
       resolve_dispatch: async (args) => {
-        assert.equal(args.octokit, octokit)
-        assert.equal(args.payload.test_changes, 'deny')
+        assert.strictEqual(args.octokit, octokit)
+        assert.strictEqual(args.payload.test_changes, 'deny')
         return resolved
       },
       submit_run: async (args) => {
@@ -172,7 +186,9 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           workflow: 'repository-review',
           event_type: 'manual'
         }
-        args.on_prepared?.(submitted, { contract_version: CONTRACT_VERSION } as never)
+        args.on_prepared?.(submitted, {
+          contract_version: CONTRACT_VERSION
+        } as never)
         return submitted
       },
       store: {
@@ -187,16 +203,17 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
         },
         submitPreparedRun: (run_id, _token, context, input) =>
           saved_runs.push({ run_id, context, input }),
-        failPreparation: () => assert.fail('successful review must not be marked failed')
+        failPreparation: () =>
+          assert.fail('successful review must not be marked failed')
       }
     }
   })
 
-  assert.equal(submitted.run_id, 'run-1')
-  assert.equal(submit_calls.length, 1)
+  assert.strictEqual(submitted.run_id, 'run-1')
+  assert.strictEqual(submit_calls.length, 1)
   const submitCall = submit_calls[0] as Record<string, unknown>
-  assert.equal(typeof submitCall.on_prepared, 'function')
-  assert.deepEqual(
+  assert.strictEqual(typeof submitCall.on_prepared, 'function')
+  assert.deepStrictEqual(
     {
       octokit: submitCall.octokit,
       run_id: submitCall.run_id,
@@ -215,13 +232,13 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       ...resolved
     }
   )
-  assert.deepEqual(saved_runs[0], {
+  assert.deepStrictEqual(saved_runs[0], {
     workflow: 'repository-review',
     publish_context: {},
     ingress_kind: 'github_actions_dispatch',
     ingress_key: 'octo/example:actions-run-1'
   })
-  assert.deepEqual(saved_runs[1], {
+  assert.deepStrictEqual(saved_runs[1], {
     run_id: 'run-1',
     input: { contract_version: CONTRACT_VERSION },
     context: {
@@ -279,16 +296,20 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
           preparation_token: null,
           record: { run_id: 'run-original', runner_status: 'running' } as never
         }),
-        submitPreparedRun: () => assert.fail('replayed dispatch must not queue again'),
-        failPreparation: () => assert.fail('replayed dispatch must not change the original run')
+        submitPreparedRun: () =>
+          assert.fail('replayed dispatch must not queue again'),
+        failPreparation: () =>
+          assert.fail('replayed dispatch must not change the original run')
       }
     }
   })
 
-  assert.equal(submitted.run_id, 'run-original')
-  assert.equal(submitted.replayed, true)
-  assert.equal(submissions, 0)
-  assert.deepEqual(admissions, [{ run_id: 'run-original', status: 'running', replayed: true }])
+  assert.strictEqual(submitted.run_id, 'run-original')
+  assert.strictEqual(submitted.replayed, true)
+  assert.strictEqual(submissions, 0)
+  assert.deepStrictEqual(admissions, [
+    { run_id: 'run-original', status: 'running', replayed: true }
+  ])
 })
 
 test('dispatchRepositoryReview maps resolver errors to validation errors', async () => {
@@ -315,13 +336,19 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
           admitReviewRun: (run) => {
             transitions.push(['preparing', run])
             return {
-              record: { ...run, run_id: 'run-invalid-window', runner_status: 'preparing' },
+              record: {
+                ...run,
+                run_id: 'run-invalid-window',
+                runner_status: 'preparing'
+              },
               created: true,
               preparation_token: 'claim'
             } as never
           },
-          submitPreparedRun: () => assert.fail('invalid dispatch must not queue a run'),
-          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+          submitPreparedRun: () =>
+            assert.fail('invalid dispatch must not queue a run'),
+          failPreparation: (run_id, _token, error) =>
+            transitions.push(['failed', run_id, error])
         }
       }
     }),
@@ -329,10 +356,13 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
       error instanceof RepositoryReviewDispatchValidationError &&
       error.message === 'manual incremental scan requires base_sha.'
   )
-  assert.deepEqual(transitions.at(-1), [
+  assert.deepStrictEqual(transitions.at(-1), [
     'failed',
     'run-invalid-window',
-    { code: 'REVIEW_PREPARATION_FAILED', message: 'manual incremental scan requires base_sha.' }
+    {
+      code: 'REVIEW_PREPARATION_FAILED',
+      message: 'manual incremental scan requires base_sha.'
+    }
   ])
 })
 
@@ -348,14 +378,19 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
         scan_mode: 'sometimes'
       },
       deps: {
-        getInstallationOctokit: async () => assert.fail('invalid contract must not call GitHub'),
-        resolve_dispatch: async () => assert.fail('invalid contract must not resolve refs'),
+        getInstallationOctokit: async () =>
+          assert.fail('invalid contract must not call GitHub'),
+        resolve_dispatch: async () =>
+          assert.fail('invalid contract must not resolve refs'),
         submit_run: async () => assert.fail('invalid contract must not submit'),
         store: {
           ...preparationClaim,
-          admitReviewRun: () => assert.fail('invalid contract must not create a run'),
-          submitPreparedRun: () => assert.fail('invalid contract must not queue'),
-          failPreparation: () => assert.fail('invalid contract has no run to fail')
+          admitReviewRun: () =>
+            assert.fail('invalid contract must not create a run'),
+          submitPreparedRun: () =>
+            assert.fail('invalid contract must not queue'),
+          failPreparation: () =>
+            assert.fail('invalid contract has no run to fail')
         }
       }
     }),
@@ -390,7 +425,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           correlation_id: 'actions-run-failed'
         }),
         submit_run: async ({ run_id }) => {
-          assert.equal(run_id, 'run-repo-failed')
+          assert.strictEqual(run_id, 'run-repo-failed')
           throw new Error('bundle preparation failed')
         },
         store: {
@@ -398,20 +433,26 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           admitReviewRun: (run) => {
             transitions.push(['preparing', run])
             return {
-              record: { ...run, run_id: 'run-repo-failed', runner_status: 'preparing' },
+              record: {
+                ...run,
+                run_id: 'run-repo-failed',
+                runner_status: 'preparing'
+              },
               created: true,
               preparation_token: 'claim'
             } as never
           },
-          submitPreparedRun: () => assert.fail('failed review must not be queued'),
-          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+          submitPreparedRun: () =>
+            assert.fail('failed review must not be queued'),
+          failPreparation: (run_id, _token, error) =>
+            transitions.push(['failed', run_id, error])
         }
       }
     }),
     /bundle preparation failed/
   )
 
-  assert.deepEqual(transitions, [
+  assert.deepStrictEqual(transitions, [
     [
       'preparing',
       {
@@ -488,19 +529,24 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, run_id: 'run-repo-uncertain', runner_status: 'preparing' },
+              record: {
+                ...run,
+                run_id: 'run-repo-uncertain',
+                runner_status: 'preparing'
+              },
               created: true,
               preparation_token: 'claim'
             }) as never,
           submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
-          failPreparation: (run_id, _token, failure) => transitions.push([run_id, failure])
+          failPreparation: (run_id, _token, failure) =>
+            transitions.push([run_id, failure])
         }
       }
     }),
     error
   )
 
-  assert.equal((transitions[0] as unknown[])[0], 'prepared')
-  assert.equal(transitions.length, 1)
+  assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
+  assert.strictEqual(transitions.length, 1)
 })

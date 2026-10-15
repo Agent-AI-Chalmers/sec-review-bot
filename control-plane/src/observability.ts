@@ -20,7 +20,9 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
   }
 }
 
-export function observePublicationStep(step: PublicationStepRecord): PublicationStepSummary {
+export function observePublicationStep(
+  step: PublicationStepRecord
+): PublicationStepSummary {
   return {
     step_key: step.step_key,
     status: step.status,

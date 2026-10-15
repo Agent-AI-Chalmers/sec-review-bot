@@ -3,10 +3,13 @@ import type { Plugin } from 'vite'
 import { LIST_RUN_QUERY_PARAMS } from './src/list-run-query-params.js'
 
 type Workflow = 'issue-review' | 'pull-request-review' | 'repository-review'
-type ExecutionStatus = 'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-type PublicationStatus = 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+type ExecutionStatus =
+  'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+type PublicationStatus =
+  'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
 type ArtifactStatus = 'available' | 'unavailable' | 'failed'
-type StepStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+type StepStatus =
+  'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
 
 interface FixtureArtifact {
   status: ArtifactStatus
@@ -75,7 +78,11 @@ const RUN_COUNT = 62
 const BASE_TIME = Date.now() - 20 * 60 * 1000
 const RUN_SPACING_MS = 3 * 60 * 60 * 1000
 
-const WORKFLOWS: readonly Workflow[] = ['pull-request-review', 'issue-review', 'repository-review']
+const WORKFLOWS: readonly Workflow[] = [
+  'pull-request-review',
+  'issue-review',
+  'repository-review'
+]
 /**
  * The steps each workflow actually initializes, in publication order:
  * pull-request reviews publish one review, issue reviews always publish a summary
@@ -85,7 +92,9 @@ const WORKFLOWS: readonly Workflow[] = ['pull-request-review', 'issue-review', '
 function stepKeysFor(workflow: Workflow, index: number): string[] {
   if (workflow === 'pull-request-review') return ['pull-request:review']
   if (workflow === 'issue-review') {
-    return index % 3 === 0 ? ['issue:draft-pr', 'issue:summary-comment'] : ['issue:summary-comment']
+    return index % 3 === 0
+      ? ['issue:draft-pr', 'issue:summary-comment']
+      : ['issue:summary-comment']
   }
   const deliveries = 1 + (index % 2)
   return [
@@ -101,14 +110,16 @@ function stepKeysFor(workflow: Workflow, index: number): string[] {
 const REMOTE_ROOT = 'https://github.com/octo/example'
 
 function remoteUrlFor(stepKey: string, index: number): string {
-  if (stepKey.startsWith('issue:draft-pr')) return `${REMOTE_ROOT}/pull/${200 + index}`
+  if (stepKey.startsWith('issue:draft-pr'))
+    return `${REMOTE_ROOT}/pull/${200 + index}`
   if (stepKey === 'issue:summary-comment') {
     return `${REMOTE_ROOT}/issues/${100 + index}#issuecomment-${900 + index}`
   }
   if (stepKey === 'pull-request:review') {
     return `${REMOTE_ROOT}/pull/42#pullrequestreview-${1000 + index}`
   }
-  if (stepKey.startsWith('repository:delivery')) return `${REMOTE_ROOT}/pull/${300 + index}`
+  if (stepKey.startsWith('repository:delivery'))
+    return `${REMOTE_ROOT}/pull/${300 + index}`
   return `${REMOTE_ROOT}/issues/${50 + index}#issuecomment-${800 + index}`
 }
 
@@ -203,7 +214,8 @@ const SCENARIOS: readonly Scenario[] = [
   }
 ]
 
-const iso = (milliseconds: number): string => new Date(milliseconds).toISOString()
+const iso = (milliseconds: number): string =>
+  new Date(milliseconds).toISOString()
 /**
  * Deterministic pseudo-random ids in the shape the Control Plane actually assigns
  * (`crypto.randomUUID()`, a v4 UUID). A time-ordered id would misrepresent what the
@@ -215,7 +227,8 @@ function runId(index: number): string {
     state = (state * 1664525 + 1013904223) >>> 0
     return state
   }
-  const block = (length: number): string => next().toString(16).padStart(8, '0').slice(0, length)
+  const block = (length: number): string =>
+    next().toString(16).padStart(8, '0').slice(0, length)
   return `${block(8)}-${block(4)}-4${block(3)}-${'89ab'.charAt(next() % 4)}${block(3)}-${block(8)}${block(4)}`
 }
 
@@ -232,7 +245,10 @@ function digest(index: number, position: number): string {
   )
 }
 
-function artifactFor(run_id: string, kind: ArtifactStatus | null): FixtureArtifact | null {
+function artifactFor(
+  run_id: string,
+  kind: ArtifactStatus | null
+): FixtureArtifact | null {
   if (kind === null) return null
   if (kind === 'available') {
     return {
@@ -249,29 +265,43 @@ function artifactFor(run_id: string, kind: ArtifactStatus | null): FixtureArtifa
   if (kind === 'failed') {
     return { status: 'failed', error_code: 'ARTIFACT_UPLOAD_FAILED' }
   }
-  return { status: 'unavailable', message: 'The runner reported no diagnostic bundle.' }
+  return {
+    status: 'unavailable',
+    message: 'The runner reported no diagnostic bundle.'
+  }
 }
 
 /**
  * Steps advance in order, so everything before the publication's current position has
  * already succeeded and only the last one can still be running or have failed.
  */
-function stepsFor(scenario: Scenario, workflow: Workflow, index: number): FixtureStep[] {
+function stepsFor(
+  scenario: Scenario,
+  workflow: Workflow,
+  index: number
+): FixtureStep[] {
   const step = scenario.step
   if (step === null) return []
   const keys = stepKeysFor(workflow, index)
   const lastPosition = keys.length - 1
   return keys.map((step_key, position) => {
     const status: StepStatus =
-      position < lastPosition ? 'succeeded' : step === 'running' ? 'running' : step
+      position < lastPosition
+        ? 'succeeded'
+        : step === 'running'
+          ? 'running'
+          : step
     const failed = status === 'terminal_failed'
     return {
       step_key,
       status,
       failure_count: failed ? 1 : 0,
-      remote_object_url: status === 'succeeded' ? remoteUrlFor(step_key, index) : null,
+      remote_object_url:
+        status === 'succeeded' ? remoteUrlFor(step_key, index) : null,
       failure_code: failed ? scenario.failure_code : null,
-      failure_message: failed ? 'GitHub rejected the publication payload.' : null
+      failure_message: failed
+        ? 'GitHub rejected the publication payload.'
+        : null
     }
   })
 }
@@ -285,11 +315,15 @@ function stepsFor(scenario: Scenario, workflow: Workflow, index: number): Fixtur
  */
 function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   const fail = (reason: string): never => {
-    throw new Error(`dev fixture ${run.run_id} describes an unreachable run: ${reason}`)
+    throw new Error(
+      `dev fixture ${run.run_id} describes an unreachable run: ${reason}`
+    )
   }
   const execution = run.execution_status
   const publication = run.publication_status
-  const startedPublication = ['publishing', 'published', 'failed'].includes(publication)
+  const startedPublication = ['publishing', 'published', 'failed'].includes(
+    publication
+  )
 
   if ((run.published_at !== null) !== (publication === 'published')) {
     fail('published_at is set exactly when the publication is published')
@@ -303,7 +337,10 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   if (execution === 'failed' && publication !== 'skipped') {
     fail('a terminal execution failure leaves nothing to publish')
   }
-  if (run.artifact_storage !== null && !['succeeded', 'failed'].includes(execution)) {
+  if (
+    run.artifact_storage !== null &&
+    !['succeeded', 'failed'].includes(execution)
+  ) {
     fail('the diagnostic artifact is only reported at execution terminal')
   }
   const failedOnAnAxis = execution === 'failed' || publication === 'failed'
@@ -315,7 +352,9 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
     !failedOnAnAxis &&
     execution !== 'recovering' // an uncertain submission keeps its code until recovery completes
   ) {
-    fail('only a terminal failure or an uncertain submission carries a failure code')
+    fail(
+      'only a terminal failure or an uncertain submission carries a failure code'
+    )
   }
   if (run.created_at > run.execution_updated_at) {
     fail('execution_updated_at must not precede created_at')
@@ -323,13 +362,23 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   if (run.created_at > run.publication_updated_at) {
     fail('publication_updated_at must not precede created_at')
   }
-  if (publication !== 'pending' && run.execution_updated_at > run.publication_updated_at) {
+  if (
+    publication !== 'pending' &&
+    run.execution_updated_at > run.publication_updated_at
+  ) {
     fail('a started publication must not precede the execution')
   }
-  if (run.published_at !== null && run.published_at !== run.publication_updated_at) {
+  if (
+    run.published_at !== null &&
+    run.published_at !== run.publication_updated_at
+  ) {
     fail('published_at is the completion time of the publication')
   }
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(run.run_id)) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      run.run_id
+    )
+  ) {
     fail('run ids are UUID v4, as the Control Plane assigns them')
   }
 
@@ -339,10 +388,16 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   if (startedPublication && steps.length === 0) {
     fail('a started publication always has steps')
   }
-  if (publication === 'published' && steps.some((step) => step.status !== 'succeeded')) {
+  if (
+    publication === 'published' &&
+    steps.some((step) => step.status !== 'succeeded')
+  ) {
     fail('a published run has only succeeded steps')
   }
-  if (publication === 'publishing' && steps.every((step) => step.status === 'succeeded')) {
+  if (
+    publication === 'publishing' &&
+    steps.every((step) => step.status === 'succeeded')
+  ) {
     fail('a publishing run still has work outstanding')
   }
   if (
@@ -360,7 +415,9 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
   const createdAt = BASE_TIME - index * RUN_SPACING_MS
   const executionUpdatedAt = createdAt + scenario.executionMs
   const publicationUpdatedAt =
-    scenario.publicationMs === undefined ? createdAt : createdAt + scenario.publicationMs
+    scenario.publicationMs === undefined
+      ? createdAt
+      : createdAt + scenario.publicationMs
   const published = scenario.publication_status === 'published'
   return {
     run_id,
@@ -395,8 +452,11 @@ interface Cursor {
 
 function decodeCursor(value: string | null): Cursor | null {
   if (value === null) return null
-  const [createdAt, runId, extra] = Buffer.from(value, 'base64url').toString('utf8').split('|')
-  if (createdAt === undefined || runId === undefined || extra !== undefined) return null
+  const [createdAt, runId, extra] = Buffer.from(value, 'base64url')
+    .toString('utf8')
+    .split('|')
+  if (createdAt === undefined || runId === undefined || extra !== undefined)
+    return null
   return { createdAt, runId }
 }
 
@@ -439,21 +499,34 @@ export function devFixtures(): Plugin {
           if (unknown.length > 0) {
             response.statusCode = 400
             response.end(
-              JSON.stringify({ error: 'unexpected query parameter', code: 'INVALID_QUERY' })
+              JSON.stringify({
+                error: 'unexpected query parameter',
+                code: 'INVALID_QUERY'
+              })
             )
             return
           }
           const limit = Number(url.searchParams.get('limit') ?? DEV_PAGE_SIZE)
           if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
             response.statusCode = 400
-            response.end(JSON.stringify({ error: 'limit is invalid.', code: 'INVALID_QUERY' }))
+            response.end(
+              JSON.stringify({
+                error: 'limit is invalid.',
+                code: 'INVALID_QUERY'
+              })
+            )
             return
           }
           const cursorValue = url.searchParams.get('cursor')
           const cursor = decodeCursor(cursorValue)
           if (cursorValue !== null && cursor === null) {
             response.statusCode = 400
-            response.end(JSON.stringify({ error: 'cursor is invalid.', code: 'INVALID_QUERY' }))
+            response.end(
+              JSON.stringify({
+                error: 'cursor is invalid.',
+                code: 'INVALID_QUERY'
+              })
+            )
             return
           }
           const from = url.searchParams.get('from')
@@ -463,30 +536,40 @@ export function devFixtures(): Plugin {
           const workflow = url.searchParams.get('workflow')
           const filtered = runs.filter(
             (run) =>
-              (executionStatus === null || run.execution_status === executionStatus) &&
-              (publicationStatus === null || run.publication_status === publicationStatus) &&
+              (executionStatus === null ||
+                run.execution_status === executionStatus) &&
+              (publicationStatus === null ||
+                run.publication_status === publicationStatus) &&
               (from === null || run.created_at >= from) &&
               (to === null || run.created_at < to) &&
               (workflow === null || run.workflow === workflow) &&
               // Matches the store's `(created_at, run_id) < (cursor)` page walk.
               (cursor === null ||
                 run.created_at < cursor.createdAt ||
-                (run.created_at === cursor.createdAt && run.run_id < cursor.runId))
+                (run.created_at === cursor.createdAt &&
+                  run.run_id < cursor.runId))
           )
           const page = filtered.slice(0, limit)
           const last = page.at(-1)
           const nextCursor =
             last === undefined || page.length < limit
               ? null
-              : Buffer.from(`${last.created_at}|${last.run_id}`).toString('base64url')
+              : Buffer.from(`${last.created_at}|${last.run_id}`).toString(
+                  'base64url'
+                )
           response.end(JSON.stringify({ runs: page, next_cursor: nextCursor }))
           return
         }
-        const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(request.url)
+        const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(
+          request.url
+        )
         if (stepsMatch) {
           const runId = decodeURIComponent(stepsMatch[1] ?? '')
           response.end(
-            JSON.stringify({ run_id: runId, publication_steps: stepsByRun.get(runId) ?? [] })
+            JSON.stringify({
+              run_id: runId,
+              publication_steps: stepsByRun.get(runId) ?? []
+            })
           )
           return
         }

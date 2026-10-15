@@ -15,7 +15,9 @@ interface TestErrorWithStatus extends Error {
 
 type Content_by_path = Record<string, string | Error>
 
-function createOctokitWithContent(contentByPath: Content_by_path = {}): GitHubAppOctokit {
+function createOctokitWithContent(
+  contentByPath: Content_by_path = {}
+): GitHubAppOctokit {
   return {
     auth: async () => ({}),
     graphql: async () => ({}),
@@ -66,14 +68,14 @@ test('fetchRepositoryTriggerConfig falls back to manual_only when config file is
     ref: 'main'
   })
 
-  assert.deepEqual(config, {
+  assert.deepStrictEqual(config, {
     trigger_mode: 'manual_only',
     paths_ignore: [],
     path: null,
     ref: 'main',
     source: 'default'
   })
-  assert.equal(isAutomaticTriggerModeEnabled(config), false)
+  assert.strictEqual(isAutomaticTriggerModeEnabled(config), false)
 })
 
 test('fetchRepositoryTriggerConfig parses automatic trigger mode from repository config', async () => {
@@ -93,14 +95,14 @@ test('fetchRepositoryTriggerConfig parses automatic trigger mode from repository
     ref: 'main'
   })
 
-  assert.deepEqual(config, {
+  assert.deepStrictEqual(config, {
     trigger_mode: 'automatic',
     paths_ignore: ['frontend/src/assets', '**/*.min.js'],
     path: CONFIG_PATH,
     ref: 'main',
     source: 'repository-config'
   })
-  assert.equal(isAutomaticTriggerModeEnabled(config), true)
+  assert.strictEqual(isAutomaticTriggerModeEnabled(config), true)
 })
 
 test('fetchRepositoryTriggerConfig parses manual_only trigger mode from repository config', async () => {
@@ -114,14 +116,14 @@ test('fetchRepositoryTriggerConfig parses manual_only trigger mode from reposito
     ref: 'main'
   })
 
-  assert.deepEqual(config, {
+  assert.deepStrictEqual(config, {
     trigger_mode: 'manual_only',
     paths_ignore: [],
     path: CONFIG_PATH,
     ref: 'main',
     source: 'repository-config'
   })
-  assert.equal(isAutomaticTriggerModeEnabled(config), false)
+  assert.strictEqual(isAutomaticTriggerModeEnabled(config), false)
 })
 
 test('fetchRepositoryTriggerConfig throws RepositoryTriggerConfigError for invalid YAML', async () => {
@@ -139,13 +141,13 @@ test('fetchRepositoryTriggerConfig throws RepositoryTriggerConfigError for inval
       if (!(error instanceof RepositoryTriggerConfigError)) {
         return false
       }
-      assert.equal(isRepositoryTriggerConfigError(error), true)
-      assert.equal(error instanceof RepositoryTriggerConfigError, true)
-      assert.equal(error.reason, 'invalid-yaml')
-      assert.equal(error.owner_login, 'octo')
-      assert.equal(error.repo_name, 'repo')
-      assert.equal(error.ref, 'main')
-      assert.equal(error.path, CONFIG_PATH)
+      assert.strictEqual(isRepositoryTriggerConfigError(error), true)
+      assert.strictEqual(error instanceof RepositoryTriggerConfigError, true)
+      assert.strictEqual(error.reason, 'invalid-yaml')
+      assert.strictEqual(error.owner_login, 'octo')
+      assert.strictEqual(error.repo_name, 'repo')
+      assert.strictEqual(error.ref, 'main')
+      assert.strictEqual(error.path, CONFIG_PATH)
       return true
     }
   )
@@ -166,8 +168,8 @@ test('fetchRepositoryTriggerConfig throws for missing sec_review_bot.trigger_mod
       if (!(error instanceof RepositoryTriggerConfigError)) {
         return false
       }
-      assert.equal(isRepositoryTriggerConfigError(error), true)
-      assert.equal(error.reason, 'missing-trigger-mode')
+      assert.strictEqual(isRepositoryTriggerConfigError(error), true)
+      assert.strictEqual(error.reason, 'missing-trigger-mode')
       return true
     }
   )
@@ -188,8 +190,8 @@ test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', 
       if (!(error instanceof RepositoryTriggerConfigError)) {
         return false
       }
-      assert.equal(isRepositoryTriggerConfigError(error), true)
-      assert.equal(error.reason, 'invalid-trigger-mode')
+      assert.strictEqual(isRepositoryTriggerConfigError(error), true)
+      assert.strictEqual(error.reason, 'invalid-trigger-mode')
       return true
     }
   )
@@ -197,9 +199,11 @@ test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', 
 
 test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async () => {
   const octokit = createOctokitWithContent({
-    [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic', '  paths_ignore: invalid'].join(
-      '\n'
-    )
+    [CONFIG_PATH]: [
+      'sec_review_bot:',
+      '  trigger_mode: automatic',
+      '  paths_ignore: invalid'
+    ].join('\n')
   })
 
   await assert.rejects(
@@ -212,8 +216,8 @@ test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async
       if (!(error instanceof RepositoryTriggerConfigError)) {
         return false
       }
-      assert.equal(isRepositoryTriggerConfigError(error), true)
-      assert.equal(error.reason, 'invalid-paths-ignore')
+      assert.strictEqual(isRepositoryTriggerConfigError(error), true)
+      assert.strictEqual(error.reason, 'invalid-paths-ignore')
       return true
     }
   )
@@ -226,12 +230,16 @@ test('reads the .sec-review/config.yml path', async () => {
   })
   const originalGetContent = (
     octokit as unknown as {
-      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+      rest: {
+        repos: { getContent: (args: { path: string }) => Promise<unknown> }
+      }
     }
   ).rest.repos.getContent
   ;(
     octokit as unknown as {
-      rest: { repos: { getContent: (args: { path: string }) => Promise<unknown> } }
+      rest: {
+        repos: { getContent: (args: { path: string }) => Promise<unknown> }
+      }
     }
   ).rest.repos.getContent = async (args: { path: string }) => {
     readPaths.push(args.path)
@@ -244,9 +252,9 @@ test('reads the .sec-review/config.yml path', async () => {
     ref: 'main'
   })
 
-  assert.equal(config.trigger_mode, 'automatic')
-  assert.equal(config.path, CONFIG_PATH)
-  assert.deepEqual(readPaths, [CONFIG_PATH])
+  assert.strictEqual(config.trigger_mode, 'automatic')
+  assert.strictEqual(config.path, CONFIG_PATH)
+  assert.deepStrictEqual(readPaths, [CONFIG_PATH])
 })
 
 test('invalid YAML in the config path is rejected', async () => {
@@ -261,7 +269,8 @@ test('invalid YAML in the config path is rejected', async () => {
         repo_name: 'repo',
         ref: 'main'
       }),
-    (error: unknown) => isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
+    (error: unknown) =>
+      isRepositoryTriggerConfigError(error) && error.path === CONFIG_PATH
   )
 })
 
@@ -278,7 +287,9 @@ test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing i
           data: {
             type: 'symlink',
             target: '.sec-review/other.yml',
-            content: Buffer.from('.sec-review/other.yml', 'utf-8').toString('base64')
+            content: Buffer.from('.sec-review/other.yml', 'utf-8').toString(
+              'base64'
+            )
           }
         })
       }
@@ -292,6 +303,8 @@ test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing i
         repo_name: 'repo',
         ref: 'main'
       }),
-    (error: unknown) => isRepositoryTriggerConfigError(error) && error.reason === 'invalid-content'
+    (error: unknown) =>
+      isRepositoryTriggerConfigError(error) &&
+      error.reason === 'invalid-content'
   )
 })
