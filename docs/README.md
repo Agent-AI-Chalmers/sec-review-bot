@@ -48,6 +48,7 @@ The main public workflow IDs are `issue-review`, `pull-request-review`, and `rep
 - [NARRATIVE_FIRST_REVIEW.md](workflows/NARRATIVE_FIRST_REVIEW.md): Narrative-first analyzer output discipline.
 - [REVIEW_INTENT.md](workflows/REVIEW_INTENT.md): Review intent and repair-stage constraints.
 - [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md): Bounded verifier feedback retry.
+- [TRUSTED_SETUP.md](workflows/TRUSTED_SETUP.md): Why setup declarations are shaped this way — the trust question, the constraints it yields, the decisions beyond trust, and the invariants.
 
 #### issue-review
 
@@ -70,7 +71,6 @@ The main public workflow IDs are `issue-review`, `pull-request-review`, and `rep
 ### architecture/
 
 - [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Runtime entities, end-to-end data flow, cross-service contracts, sources of truth, and credential ownership.
-- [SETUP_DECLARATIONS.md](architecture/SETUP_DECLARATIONS.md): Repository setup declarations — format, execution semantics, and trust boundary.
 
 ### operations/
 

@@ -50,6 +50,7 @@
 - [NARRATIVE_FIRST_REVIEW.md](workflows/NARRATIVE_FIRST_REVIEW.md) / [中文](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：Narrative-first analyzer 输出纪律。
 - [REVIEW_INTENT.md](workflows/REVIEW_INTENT.md) / [中文](workflows/REVIEW_INTENT.zh.md)：Review intent 和修复阶段约束。
 - [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md) / [中文](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：Verifier 反馈的有界重试。
+- [TRUSTED_SETUP.md](workflows/TRUSTED_SETUP.md) / [中文](workflows/TRUSTED_SETUP.zh.md)：设置声明为何是这样——信任问题、它推出的约束、与信任无关的决定，以及不变量。
 
 #### issue-review
 
@@ -72,7 +73,6 @@
 ### architecture/
 
 - [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体、端到端数据流、跨服务契约、事实来源和凭据所有权。
-- [SETUP_DECLARATIONS.md](architecture/SETUP_DECLARATIONS.md) / [中文](architecture/SETUP_DECLARATIONS.zh.md)：仓库的设置声明——格式、执行语义和信任边界。
 
 ### operations/
 
