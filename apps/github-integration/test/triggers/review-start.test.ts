@@ -7,6 +7,7 @@ import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
 
 const TRUSTED_DEFAULT_BRANCH = { default_branch: 'main', head_sha: 'default-sha' }
 
@@ -474,4 +475,92 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
 
   assert.equal(submitted.run_id, 'run-original')
   assert.equal(starts, 0)
+})
+
+test('startPullRequestReviewCommand reports an invalid setup declaration distinctly', async () => {
+  const transitions: unknown[] = []
+
+  await assert.rejects(
+    startPullRequestReviewCommand({
+      octokit: {},
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+      pr: pullRequestContext(),
+      event_type: 'opened',
+      delivery_id: 'delivery-pr-setup-invalid',
+      deps: {
+        start_review: async () => {
+          throw new SetupDeclarationError('setup[0] has unsupported key(s): shell', {
+            reason: 'unsupported-step-key'
+          })
+        },
+        store: {
+          ...preparationClaim,
+          admitReviewRun: (run) =>
+            ({
+              record: { ...run, run_id: 'run-pr-setup-invalid' },
+              created: true,
+              preparation_token: 'claim'
+            }) as never,
+          submitPreparedRun: () => assert.fail('invalid setup must not be queued'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+        }
+      }
+    }),
+    SetupDeclarationError
+  )
+
+  assert.deepEqual(transitions, [
+    [
+      'failed',
+      'run-pr-setup-invalid',
+      {
+        code: 'SETUP_DECLARATION_INVALID',
+        message: 'setup[0] has unsupported key(s): shell'
+      }
+    ]
+  ])
+})
+
+test('startIssueReviewCommand reports an invalid setup declaration distinctly', async () => {
+  const transitions: unknown[] = []
+
+  await assert.rejects(
+    startIssueReviewCommand({
+      octokit: {},
+      issue: issueContext(),
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+      event_type: 'manual_review',
+      delivery_id: 'delivery-issue-setup-invalid',
+      deps: {
+        start_review: async () => {
+          throw new SetupDeclarationError('setup declaration is not valid YAML', {
+            reason: 'invalid-yaml'
+          })
+        },
+        store: {
+          ...preparationClaim,
+          admitReviewRun: (run) =>
+            ({
+              record: { ...run, run_id: 'run-issue-setup-invalid' },
+              created: true,
+              preparation_token: 'claim'
+            }) as never,
+          submitPreparedRun: () => assert.fail('invalid setup must not be queued'),
+          failPreparation: (run_id, _token, error) => transitions.push(['failed', run_id, error])
+        }
+      }
+    }),
+    SetupDeclarationError
+  )
+
+  assert.deepEqual(transitions, [
+    [
+      'failed',
+      'run-issue-setup-invalid',
+      {
+        code: 'SETUP_DECLARATION_INVALID',
+        message: 'setup declaration is not valid YAML'
+      }
+    ]
+  ])
 })
