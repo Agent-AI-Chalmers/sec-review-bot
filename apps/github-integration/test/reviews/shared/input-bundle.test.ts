@@ -23,7 +23,9 @@ function octokitForContent(
           if (content === undefined) {
             throw Object.assign(new Error('Not Found'), { status: 404 })
           }
-          return { data: { content: Buffer.from(content, 'utf8').toString('base64') } }
+          return {
+            data: { type: 'file', content: Buffer.from(content, 'utf8').toString('base64') }
+          }
         }
       }
     }
@@ -134,4 +136,60 @@ test('readSetupDeclaration propagates a non-404 read failure instead of skipping
       }),
     /Forbidden/
   )
+})
+
+test('readSetupDeclaration ignores a symlink entry, whose content is the target path', async () => {
+  // GitHub returns a symlink as a single object too, but with `type: "symlink"`
+  // and `content` set to the base64 of the *target path* (not the file body).
+  // Treating it as a declaration would feed a path string to the parser; the
+  // reader must treat any non-`file` entry as "no declaration".
+  const octokit = {
+    rest: {
+      repos: {
+        getContent: async () => ({
+          data: {
+            type: 'symlink',
+            target: '../shared/setup.yml',
+            content: Buffer.from('../shared/setup.yml', 'utf8').toString('base64')
+          }
+        })
+      }
+    }
+  } as unknown as GitHubAppOctokit
+
+  const declaration = await readSetupDeclaration({
+    octokit,
+    default_sha: 'f'.repeat(40),
+    owner_login: 'octo',
+    repo_name: 'demo'
+  })
+
+  assert.equal(declaration, null)
+})
+
+test('readSetupDeclaration treats a directory entry as absent', async () => {
+  const octokit = {
+    rest: {
+      repos: {
+        getContent: async () => ({
+          data: [
+            {
+              type: 'file',
+              path: '.sec-review/setup.yml/README.md',
+              content: Buffer.from('x', 'utf8').toString('base64')
+            }
+          ]
+        })
+      }
+    }
+  } as unknown as GitHubAppOctokit
+
+  const declaration = await readSetupDeclaration({
+    octokit,
+    default_sha: 'a'.repeat(40),
+    owner_login: 'octo',
+    repo_name: 'demo'
+  })
+
+  assert.equal(declaration, null)
 })

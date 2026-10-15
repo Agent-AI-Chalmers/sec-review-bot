@@ -102,7 +102,9 @@ function octokitWithSetupDeclaration(
           if (content === undefined) {
             throw Object.assign(new Error('Not Found'), { status: 404 })
           }
-          return { data: { content: Buffer.from(content, 'utf8').toString('base64') } }
+          return {
+            data: { type: 'file', content: Buffer.from(content, 'utf8').toString('base64') }
+          }
         },
         compareCommitsWithBasehead: async () => ({
           data: { status: 'ahead', files: [], commits: [] }

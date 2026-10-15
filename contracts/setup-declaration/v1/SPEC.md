@@ -45,6 +45,8 @@ ignored:
 
 **Blank content is not a declaration.** An empty or whitespace-only file is treated exactly like a missing file: it is valid and means "no declaration". It is not an error.
 
+**Only a regular file is a declaration.** The integration reads the path through the Contents API and accepts it only when GitHub reports the entry as a file. A directory entry, a symlink (whose API `content` is the target path, not the file body), or any other non-file entry is treated like a missing file: "no declaration". Symlinked declarations are therefore not followed — a repository that wants a declaration keeps it as a regular file at `.sec-review/setup.yml`.
+
 **The declaration text is bounded.** The validated text travels inline in the workflow input, so it is capped at 64 KiB (UTF-8). The integration rejects an oversized file before submission; the runner and the input schema carry the same limit. A declaration that needs more than that is doing too much.
 
 ## Two Enforcers

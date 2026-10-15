@@ -165,11 +165,18 @@ async function readRepositoryFileAtSha({
     throw error
   }
   // A file path returns a single content object; an array means the path
-  // resolved to a directory (or a symlink target), which is not a declaration.
+  // resolved to a directory, which is not a declaration.
   if (Array.isArray(response.data)) {
     return null
   }
   if (!isRecord(response.data) || typeof response.data.content !== 'string') {
+    return null
+  }
+  // Only a regular file is a declaration. A symlink is returned as an object
+  // whose `content` is the base64 of the *target path*, not the file body, so
+  // treating it as a declaration would feed the target string to the parser.
+  // Anything that is not `file` (symlink, submodule, ...) means "no declaration".
+  if (response.data.type !== 'file') {
     return null
   }
   return Buffer.from(response.data.content, 'base64').toString('utf-8')
