@@ -21,3 +21,9 @@ setup:
   - run: pnpm install --frozen-lockfile
     working-directory: control-plane
     timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: contracts/control-plane-api/tools
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: contracts/integration-contract/tools
+    timeout_seconds: 600
