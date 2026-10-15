@@ -1152,7 +1152,12 @@ def test_large_edit_cleans_uploaded_temp_files_after_success() -> None:
 
 def test_container_resource_has_empty_environment_and_unique_name() -> None:
     """Isolation baseline: containers start with no injected environment and a
-    per-run unique name (see design §5.3)."""
+    per-run unique name.
+
+    The empty environment is what the sandbox relies on: the trusted setup
+    declaration is the only supported way to influence it, so anything that
+    leaks in from the host would be an unintended, untracked dependency.
+    """
     first = create_docker_container_resource(
         container_name_prefix="test",
         mounts=[],

@@ -72,12 +72,10 @@ class BootstrapResult:
 def trusted_setup_path_for_backend(bundle_paths: Mapping[str, Any]) -> Path | None:
     """Resolve the trusted setup declaration path for the active backend.
 
-    The design only covers the docker backend (see DESIGN_TRUSTED_SETUP §5.6):
-    docker runs a long-lived container where a single bootstrap is reused for the
-    whole stage, while bwrap/local are out of scope. Rather than branch inside
-    the bootstrap itself, we simply do not surface a declaration for non-docker
-    backends, so they never execute it -- without taking a stance that bwrap is
-    unsupported.
+    Only the docker backend surfaces a declaration: its container is long-lived,
+    so one bootstrap can be reused for the whole stage. Filtering here rather
+    than branching inside the bootstrap keeps bwrap/local out of scope without
+    asserting they are unsupported -- they simply have no declaration to run.
     """
     if selected_sandbox_backend_kind() != "docker":
         return None
@@ -155,8 +153,9 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
 
     The environment-incomplete state must be discoverable by operators and by a
     human reading the run; it is recorded as a stage artifact ("environment.json")
-    and a structured diagnostic log. It is deliberately not fed to the agent
-    (see design D9/§5.5).
+    and a structured diagnostic log. It is deliberately kept out of the agent's
+    context: the agent should reason from the repository, not from host setup
+    details that it cannot act on.
 
     Each step's output is persisted **truncated** to a tail window; this bounds
     volume but is **not redaction** -- artifacts are operator-visible and may
