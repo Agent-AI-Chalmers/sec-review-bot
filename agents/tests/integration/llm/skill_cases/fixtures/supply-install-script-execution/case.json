@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "supply-install-script-execution",
+  "skill": "software-supply-chain-security",
+  "reference": "install-build-execution.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether the selected dependency executes attacker-controlled code during installation.",
+  "facts": [
+    "An attacker controls the selected git dependency revision.",
+    "The dependency declares a prepare lifecycle script that sends environment variables to the attacker.",
+    "The CI job runs npm install with lifecycle scripts enabled and provides a package publishing token.",
+    "The application never imports the dependency at runtime."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "prepare|install|lifecycle|script",
+        "token|runtime|execute"
+      ]
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "supply-install-unknown",
+  "skill": "software-supply-chain-security",
+  "reference": "install-build-execution.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that an installed dependency executes code before application startup.",
+  "facts": [
+    "The dependency appears in a lockfile and its upstream source repository contains an install script.",
+    "The selected package artifact, package-manager version, actual installation command, script settings, and CI environment are not provided."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "artifact|command|version|script",
+        "enabled|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "selected.*artifact|package.*version",
+        "install.*command|script.*setting|enabled",
+        "ci.*environment|build.*authority|credential"
+      ]
+    }
+  }
+}

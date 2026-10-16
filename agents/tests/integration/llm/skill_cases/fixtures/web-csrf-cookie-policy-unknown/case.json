@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "web-csrf-cookie-policy-unknown",
+  "skill": "web-security",
+  "reference": "csrf.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that a state-changing endpoint is cross-site request forgery vulnerable.",
+  "facts": [
+    "The endpoint changes account settings and uses a session cookie.",
+    "The request method, content type, SameSite mode, browser request context, token/origin validation, and CORS policy are unavailable."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "method|content type|samesite|origin",
+        "token|cors|unknown"
+      ],
+      "proof_gap_requirements": [
+        "request.*method|content.*type|browser.*context",
+        "samesite|ambient.*credential|cookie",
+        "token|origin|cors"
+      ]
+    }
+  }
+}

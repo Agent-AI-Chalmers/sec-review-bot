@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "parser-single-owned-decode",
+  "skill": "parser-protocol-security",
+  "reference": "representation-boundaries.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claimed encoded traversal bypass.",
+  "facts": [
+    "The gateway performs the only URL decoding step and passes a typed path object downstream.",
+    "Containment validation and file opening consume that same decoded representation.",
+    "The backend does not decode, normalize, or reinterpret the path again."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "same|representation|decode",
+        "consumer|contain"
+      ]
+    }
+  }
+}

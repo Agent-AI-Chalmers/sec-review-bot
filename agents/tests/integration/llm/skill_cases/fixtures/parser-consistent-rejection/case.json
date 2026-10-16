@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "parser-consistent-rejection",
+  "skill": "parser-protocol-security",
+  "reference": "http-framing.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a request-smuggling claim based on duplicate framing headers.",
+  "facts": [
+    "The only HTTP/1.1 recipient rejects every request containing both Content-Length and Transfer-Encoding before forwarding.",
+    "The connection is closed after rejection and no downstream parser receives the bytes."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "reject|before|downstream",
+        "consistent|close"
+      ]
+    }
+  }
+}

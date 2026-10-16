@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "web-csrf-ambient-cookie",
+  "skill": "web-security",
+  "reference": "csrf.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess whether another site can cause the account email change.",
+  "facts": [
+    "The endpoint accepts a form-encoded POST and changes the authenticated account email.",
+    "The browser automatically includes a session cookie that is sent in the cross-site request context.",
+    "The endpoint has no CSRF token, Origin or Referer validation, or other request binding."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "cross-site|another site",
+        "ambient|automatically.*cookie|session cookie",
+        "state-changing|change.*email",
+        "token|origin|referer|binding",
+        "csrf"
+      ]
+    }
+  }
+}

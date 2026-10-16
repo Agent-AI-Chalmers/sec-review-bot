@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "ci-secret-artifact",
+  "skill": "ci-security",
+  "reference": "secret-and-artifact-exposure.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether the workflow publishes a credential to unauthorized artifact readers.",
+  "facts": [
+    "DEPLOY_TOKEN is a live production deployment credential supplied to the job.",
+    "The artifact is downloadable by every repository reader, including users who cannot access deployment secrets.",
+    "No later step removes or redacts the token file before upload."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "artifact|deploy_token|credential",
+        "secret|reader|upload"
+      ]
+    }
+  }
+}

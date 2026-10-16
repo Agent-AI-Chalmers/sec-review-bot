@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "web-sensitive-public-client-id",
+  "skill": "web-security",
+  "reference": "sensitive-data-exposure.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether returning this browser configuration is sensitive-data exposure.",
+  "facts": [
+    "The response includes an OAuth public client identifier and a map-service browser key documented by the provider as public.",
+    "The map key is restricted by allowed web origins and grants no administrative or server API authority.",
+    "No client secret, bearer token, private user data, internal credential, or privileged configuration is returned."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "public|client|origin",
+        "secret|authority|credential"
+      ]
+    }
+  }
+}

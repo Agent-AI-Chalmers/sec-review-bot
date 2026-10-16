@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "auth-confused-deputy-export",
+  "skill": "authorization-delegation-security",
+  "reference": "delegated-authority.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess whether the automation broker may perform the requested operation.",
+  "facts": [
+    "A tenant user may invoke an automation broker but has no permission to modify projects outside that tenant's delegated project set.",
+    "The caller supplies an arbitrary target project and operation, and the broker performs it with the broker's organization-wide service credential.",
+    "The broker checks only that the caller may invoke the broker; it does not bind the requested target or operation to the caller's delegated scope, so the tenant can modify another tenant's project."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "broker|service|deputy",
+        "organization-wide|own credential|broker.*credential",
+        "target|project",
+        "delegat|scope|caller.*permission",
+        "another tenant|unauthorized"
+      ]
+    }
+  }
+}

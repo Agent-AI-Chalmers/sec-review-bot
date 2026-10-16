@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "os-check-use-replacement",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-resolution.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether the authorization check protects the file opened later.",
+  "facts": [
+    "A privileged Linux service calls access(path, R_OK), waits, then calls open(path).",
+    "A lower-privileged tenant can rename the checked directory and replace it with a symlink during the wait.",
+    "The replacement resolves to a service-readable secret outside the tenant tree."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "check|use|replace",
+        "symlink|actual|access"
+      ]
+    }
+  }
+}

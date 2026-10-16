@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "managed-cancellation-unknown",
+  "skill": "concurrency-resource-security",
+  "reference": "managed-runtime-cancellation.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that canceled work continues indefinitely.",
+  "facts": [
+    "The code calls Future.cancel(true) or a .NET cancellation token depending on the build target.",
+    "The concrete blocking API, loop behavior, cleanup path, admission bound, and runtime target are not provided."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "cooperative|interrupt|token",
+        "api|cleanup|unknown"
+      ],
+      "proof_gap_requirements": [
+        "runtime.*target|blocking.*api|operation",
+        "cooperative|interrupt|token|cancel.*behavior",
+        "cleanup|admission|bound|capacity"
+      ]
+    }
+  }
+}

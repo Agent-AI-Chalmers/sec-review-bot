@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "parser-object-construction",
+  "skill": "parser-protocol-security",
+  "reference": "object-construction.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether the import endpoint unsafely constructs executable objects from attacker-controlled data.",
+  "facts": [
+    "Unauthenticated users control the uploaded import body.",
+    "The service account can read deployment credentials.",
+    "No signature, type allowlist, sandbox, or earlier validation applies."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "pickle|object|construct",
+        "deserial|attacker|code execution"
+      ]
+    }
+  }
+}

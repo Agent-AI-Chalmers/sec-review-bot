@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "web-sensitive-response",
+  "skill": "web-security",
+  "reference": "sensitive-data-exposure.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether the diagnostics endpoint exposes sensitive server data to an unauthorized web user.",
+  "facts": [
+    "The endpoint is reachable without authentication.",
+    "DATABASE_URL contains live database credentials.",
+    "No response filtering, authorization middleware, or deployment-only guard applies."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "database_url|credential|response",
+        "unauth|sensitive|secret"
+      ]
+    }
+  }
+}

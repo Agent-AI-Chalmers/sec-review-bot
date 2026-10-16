@@ -2,17 +2,17 @@
 
 This document reorganizes MITRE CWE View-699 (Software Development) into an agent-friendly navigation aid.
 
-It is intentionally not a full dump of all 427 second-level Base CWEs in View-699. Instead, it keeps the full first-level category structure while only expanding the second-level CWE entries that are already covered by the local protocol subset.
+This is an incomplete local index, not an allowed-label list or a security coverage inventory. The inherited selection is not a complete export of View-699. Labels absent here remain eligible; verify the official entry and its mapping usage when assigning a label.
 
 ## Usage Rules
 
 - Treat first-level entries as navigation categories, not final vulnerability labels.
-- Prefer mapping to second-level Base or Variant CWEs whenever a concrete fit exists.
+- Prefer an accurate Base or Variant with allowed mapping usage; an appropriate Class is acceptable when no accurate Base or Variant fits. Do not select by depth in this view.
 - Never map a real vulnerability directly to a CWE Category.
-- If no precise Base CWE fits naturally, keep the category as search context and explain the issue in prose instead of forcing a bad label.
+- Use categories only to orient further investigation. If no suitable mapping can be verified, explain the issue in prose rather than forcing a label from this index.
 - Use this document as a classification prior, not as proof. Repository evidence still decides the final label.
 
-## Level 1 -> Level 2
+## Selected Category Navigation
 
 ### CWE-1211: Authentication Errors
 
@@ -201,9 +201,9 @@ Security weaknesses involving user-visible presentation, trust cues, or interact
 - `CWE-1007`: Homograph Attack
 - `CWE-1021`: Clickjacking / UI Redress Attack / Tapjacking
 
-## First-Level Categories Currently Uncovered by the Local Protocol
+## Additional Category Navigation
 
-These View-699 categories are present in the official hierarchy, but the local protocol currently does not list any second-level CWE under them.
+These categories have no expanded examples in this local index. This does not mean that the agent cannot analyze or classify their weaknesses.
 
 - `CWE-1228`: API / Function Errors
 - `CWE-1210`: Audit / Logging Errors
@@ -223,19 +223,10 @@ These View-699 categories are present in the official hierarchy, but the local p
 - `CWE-1213`: Random Number Issues
 - `CWE-1217`: User Session Errors
 
-## Protocol Entries Requiring Manual Review
-
-These entries exist in the local protocol but were not matched cleanly into the current View-699 navigation pass and should be reviewed before being used as automatic classification anchors.
-
-- `CWE-410`: Insufficient Resource Pool
-- `CWE-653`: Improper Isolation or Compartmentalization / Separation of Privilege
-- `CWE-656`: Reliance on Security Through Obscurity
-- `CWE-909`: Missing Initialization of Resource
-
 ## Notes for Agents
 
-- Prefer second-level Base CWE labels over category labels.
+- Check the official weakness definition, abstraction, and mapping usage. Category membership and local list membership do not establish the correct label.
 - If a finding is fundamentally a business-logic flaw, keep the prose explanation primary and use the CWE label only as a supporting anchor.
 - If a finding is a chain or composite phenomenon, one CWE may not tell the whole story; explain the exploit path in prose even if you attach a primary CWE.
-- Treat `Separation of Privilege` as ambiguous: MITRE uses it around both compartmentalization (`CWE-653`) and single-factor security decisions (`CWE-654`), so map by repository facts rather than by that phrase alone.
+- Treat `Separation of Privilege` as ambiguous: MITRE uses it around both compartmentalization (`CWE-653`, not expanded in this index) and single-factor security decisions (`CWE-654`), so map by repository facts and the official entries rather than by that phrase alone.
 - Do not force a precise CWE when repository evidence is still ambiguous.

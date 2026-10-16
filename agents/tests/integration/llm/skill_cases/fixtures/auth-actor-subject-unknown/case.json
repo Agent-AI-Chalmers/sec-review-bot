@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "auth-actor-subject-unknown",
+  "skill": "authorization-delegation-security",
+  "reference": "delegated-authority.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that delegated authority permits cross-tenant access.",
+  "facts": [
+    "A gateway exchanges a user token for a downstream token.",
+    "The token claims, actor/subject mapping, audience, scope, target-resource binding, and downstream authorization checks are unavailable."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "cannot|not confirmed|insufficient|unknown",
+        "delegat|token exchange|downstream"
+      ],
+      "proof_gap_requirements": [
+        "actor|subject",
+        "audience",
+        "scope",
+        "resource|target",
+        "authorization|downstream"
+      ]
+    }
+  }
+}

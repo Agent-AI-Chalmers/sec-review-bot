@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "argument-injection-service",
+  "skill": "os-boundary-security",
+  "reference": "process-execution-input.md",
+  "modes": [
+    "prompted",
+    "discovery",
+    "contrast"
+  ],
+  "task": "Assess whether the report-name value controls the child parser and creates a security vulnerability.",
+  "facts": [
+    "post_report is exposed to untrusted remote users and runs as a service account.",
+    "Users may request a report by name, but may not choose an output file.",
+    "The service account can overwrite its configuration under /srv/config.",
+    "There is no earlier input validation.",
+    "The report-name value is exactly --output=/srv/config/runtime.json and reaches renderer as one string."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "argument|option|--output",
+        "remote|untrusted|service account",
+        "config|unauthorized|security boundary"
+      ]
+    },
+    "exact_output": {
+      "crosses_security_boundary": true,
+      "attacker_controlled_argument": "--output=/srv/config/runtime.json"
+    }
+  }
+}

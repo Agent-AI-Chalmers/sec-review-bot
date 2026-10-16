@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "supply-jvm-plugin-filtered",
+  "skill": "software-supply-chain-security",
+  "reference": "jvm-build-dependencies.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that the extra Maven repository can replace the build plugin.",
+  "facts": [
+    "The plugin has fixed group, artifact, and version coordinates.",
+    "Repository content filtering permits that group only from the authenticated internal repository.",
+    "The extra public repository is configured for a different allowlisted group and cannot serve the plugin coordinates."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "filter|coordinates|internal",
+        "select|repository"
+      ]
+    }
+  }
+}

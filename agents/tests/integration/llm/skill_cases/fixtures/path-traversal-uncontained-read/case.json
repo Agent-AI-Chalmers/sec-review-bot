@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "path-traversal-uncontained-read",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-path-policy.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether the download handler contains an attacker-controlled path before reading it.",
+  "facts": [
+    "req.query.file is attacker-controlled.",
+    "There is no earlier path validation or containment guard."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "req\\.query|readfile|contain",
+        "resolve|traversal"
+      ]
+    }
+  }
+}

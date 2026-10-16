@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "crypto-kdf-separated-context",
+  "skill": "cryptography-security",
+  "reference": "key-derivation.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that all tenants receive the same derived encryption key.",
+  "facts": [
+    "The implementation uses HKDF with the tenant's immutable unique identifier encoded into info.",
+    "The same encoding is used for derivation and lookup, identifiers cannot collide, and output length is fixed.",
+    "No derived key export or cross-tenant ciphertext access exists."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "info|tenant|unique",
+        "context|separat|derived"
+      ]
+    }
+  }
+}

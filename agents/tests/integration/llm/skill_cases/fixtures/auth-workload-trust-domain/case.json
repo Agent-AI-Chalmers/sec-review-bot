@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "auth-workload-trust-domain",
+  "skill": "authorization-delegation-security",
+  "reference": "service-workload-identity.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the workload identity authorization.",
+  "facts": [
+    "The verifier accepts any valid certificate from either the production or development trust domain.",
+    "The authorization rule compares only the workload name and ignores the trust domain.",
+    "A developer can obtain a development certificate with the production workload name and invoke the production administration API."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "trust domain|workload|certificate",
+        "authorization|development|production"
+      ]
+    }
+  }
+}

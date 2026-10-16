@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "stable-path",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-path-policy.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the claim that the separate resolve, containment check, and read always permit a symlink race.",
+  "facts": [
+    "Requesters control relative.",
+    "The root and every directory, link, and file under it are immutable to requesters and all other untrusted actors during a request.",
+    "All files under the root are intentionally public exports."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "immutable|cannot.*replace|stable",
+        "public.*export|intended",
+        "not.*vulnerab|not.*confirm|no.*race"
+      ]
+    }
+  }
+}

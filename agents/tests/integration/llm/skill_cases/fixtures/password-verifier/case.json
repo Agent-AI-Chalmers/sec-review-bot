@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "password-verifier",
+  "skill": "web-security",
+  "reference": "auth-session.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the production password verifier against offline password guessing.",
+  "facts": [
+    "The function stores password verifiers for user accounts.",
+    "An attacker obtaining the verifier database is the threat being assessed.",
+    "No database disclosure path has been established."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "password.*verifier|password.*hash",
+        "sha-256|fast.*hash",
+        "offline|database"
+      ]
+    }
+  }
+}

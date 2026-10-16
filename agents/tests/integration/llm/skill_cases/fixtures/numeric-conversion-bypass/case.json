@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "numeric-conversion-bypass",
+  "skill": "memory-numeric-safety",
+  "reference": "numeric-semantics-and-bounds.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether the range check constrains the length consumed by the copy.",
+  "facts": [
+    "A remote request controls signed 64-bit length.",
+    "The code checks length <= 4096 but does not reject negative values.",
+    "It then casts length to unsigned 32-bit and copies that many bytes into a 4096-byte buffer."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "cast|conversion|unsigned",
+        "negative|bounds"
+      ]
+    }
+  }
+}

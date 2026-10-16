@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "windows-reparse-contained-open",
+  "skill": "os-boundary-security",
+  "reference": "windows-filesystem-authority.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether the Windows file open remains confined to the tenant directory.",
+  "facts": [
+    "A low-privilege tenant can replace an intermediate directory with a junction after a string-prefix check.",
+    "The service later opens the original path with service credentials and follows reparse points.",
+    "The junction targets a service-readable secrets directory, and no handle-relative or equivalent constrained open applies."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "reparse|junction|path|open",
+        "tenant|secret|contain"
+      ]
+    }
+  }
+}

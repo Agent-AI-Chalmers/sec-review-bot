@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "ci-gitlab-parent-fork-secrets",
+  "skill": "ci-security",
+  "reference": "gitlab-ci.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess what the contributor-controlled pipeline can access after the maintainer starts it.",
+  "facts": [
+    "A maintainer can start a parent-project pipeline for a fork merge request.",
+    "That pipeline uses CI configuration and scripts from the attacker's fork branch.",
+    "The parent-project job exposes an unprotected deployment credential to those scripts, which can send it to the attacker."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "fork",
+        "parent-project|parent project",
+        "attacker.*config|fork.*config|contributor.*script",
+        "credential|secret",
+        "maintainer|trigger"
+      ]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "crypto-kdf-context-collision",
+  "skill": "cryptography-security",
+  "reference": "key-derivation.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether tenant key derivation keeps tenant authority separated.",
+  "facts": [
+    "Every tenant uses the same master key, input keying material, salt, output length, and empty HKDF info value.",
+    "The resulting bytes are used directly as each tenant's data-encryption key.",
+    "A tenant can obtain its own derived key through an export feature and can read another tenant's ciphertext from a shared backup."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "hkdf|info|context|same",
+        "tenant|derived|key"
+      ]
+    }
+  }
+}

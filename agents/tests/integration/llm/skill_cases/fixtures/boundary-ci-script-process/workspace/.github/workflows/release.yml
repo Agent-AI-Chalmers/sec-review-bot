@@ -1,0 +1,9 @@
+name: release
+on: workflow_dispatch
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python scripts/publish.py '${{ inputs.package_name }}'
+        env:
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}

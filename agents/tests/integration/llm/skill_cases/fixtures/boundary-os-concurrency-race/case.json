@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "boundary-os-concurrency-race",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-resolution.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess the filesystem authority and temporal invariant across check and use.",
+  "facts": [
+    "A privileged service checks that a path resolves under a tenant directory, waits, and then opens the pathname.",
+    "The tenant can concurrently rename a checked directory and replace it with a symlink to a service-readable secret."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "check|use|race",
+        "replace|symlink|invariant"
+      ]
+    }
+  }
+}

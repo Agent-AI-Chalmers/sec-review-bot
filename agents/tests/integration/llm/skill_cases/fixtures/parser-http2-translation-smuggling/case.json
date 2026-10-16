@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "parser-http2-translation-smuggling",
+  "skill": "parser-protocol-security",
+  "reference": "http2-translation.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess how one edge request becomes two backend requests.",
+  "facts": [
+    "An edge proxy accepts an HTTP/2 field value containing a carriage-return and line-feed sequence.",
+    "It copies that value directly into an HTTP/1.1 header block sent on a reused backend connection.",
+    "The injected delimiter creates a second backend request that bypasses the edge authorization check."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "http/2",
+        "http/1",
+        "translat|cop",
+        "carriage|line-feed|delimiter|crlf",
+        "second.*request|two backend requests",
+        "authorization|bypass"
+      ]
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "web-upload-sink-unknown",
+  "skill": "web-security",
+  "reference": "file-upload.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that allowing PDF uploads is exploitable.",
+  "facts": [
+    "Users can upload PDF files.",
+    "The storage location, generated filename behavior, serving origin, content disposition, content type, parser or converter use, permissions, and downstream readers are unavailable."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "storage|serv|disposition|parser",
+        "reader|sink|unknown"
+      ],
+      "proof_gap_requirements": [
+        "storage|filename",
+        "serving.*origin|content.*disposition|content.*type",
+        "parser|converter|reader|permission"
+      ]
+    }
+  }
+}

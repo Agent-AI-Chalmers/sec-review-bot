@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "non-security-checksum",
+  "skill": "web-security",
+  "reference": "auth-session.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the claim that this fast hash weakens password storage.",
+  "facts": [
+    "The function hashes public image bytes only to address a cache.",
+    "It is not a password verifier, authentication decision, or secrecy mechanism."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "public.*image|cache",
+        "not.*password|not.*auth|not.*secret"
+      ]
+    }
+  }
+}

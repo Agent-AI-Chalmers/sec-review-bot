@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "ci-gitlab-parent-context-unknown",
+  "skill": "ci-security",
+  "reference": "gitlab-ci.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that a fork merge request can steal GitLab deployment credentials.",
+  "facts": [
+    "The project accepts merge requests from forks.",
+    "The pipeline location, triggering user, CI configuration source, variable protection, runner protection, branch conditions, job token scope, and deployment job rules are unavailable."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "parent|fork|trigger|configuration",
+        "protected|runner|unknown"
+      ],
+      "proof_gap_requirements": [
+        "pipeline.*location|parent.*project|fork.*project",
+        "configuration.*source|fork.*config",
+        "variable.*protect|runner.*protect|job token|deploy"
+      ]
+    }
+  }
+}

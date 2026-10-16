@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "ci-artifact-unknown-reader",
+  "skill": "ci-security",
+  "reference": "secret-and-artifact-exposure.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that a support bundle uploaded by CI exposes credentials.",
+  "facts": [
+    "A privileged job uploads support-bundle.tar.gz after a deployment test.",
+    "The bundle contents, artifact access policy, retention, and possible credential files are not provided.",
+    "No evidence identifies an unauthorized reader or a live secret in the bundle."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "content|reader|access|secret",
+        "credential|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "bundle|content|file",
+        "artifact.*access|reader|permission",
+        "live.*secret|credential|token"
+      ]
+    }
+  }
+}

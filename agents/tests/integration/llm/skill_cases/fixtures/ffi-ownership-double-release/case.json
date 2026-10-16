@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "ffi-ownership-double-release",
+  "skill": "memory-numeric-safety",
+  "reference": "unsafe-ffi.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether the FFI wrapper violates the foreign allocation ownership contract.",
+  "facts": [
+    "The C API returns an owned buffer that must be released exactly once with library_free.",
+    "The wrapper adopts the pointer into a host object whose destructor calls the host allocator's free.",
+    "An error path also calls library_free before the host object remains reachable and later runs its destructor."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "ownership|double|free",
+        "allocator|destructor|ffi"
+      ]
+    }
+  }
+}

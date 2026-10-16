@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "numeric-checked-rejection",
+  "skill": "memory-numeric-safety",
+  "reference": "numeric-semantics-and-bounds.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the claimed allocation overflow.",
+  "facts": [
+    "The request controls count.",
+    "checked_mul(count, element_size) returns an error on overflow.",
+    "The handler returns 400 before allocation or access when the checked multiplication fails."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "checked|reject",
+        "error|before"
+      ]
+    }
+  }
+}

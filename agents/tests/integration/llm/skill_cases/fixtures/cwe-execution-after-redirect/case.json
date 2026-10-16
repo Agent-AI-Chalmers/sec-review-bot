@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "cwe-execution-after-redirect",
+  "skill": "cwe",
+  "reference": "cwe-699-agent-navigation.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assign the best root-cause CWE to the supported security finding. Supply a navigation category only when applicable.",
+  "facts": [
+    "After response.redirect('/login') for an unauthorized request, the handler does not return.",
+    "Execution continues into a privileged account update and commits the change."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "redirect",
+        "continue|does not return|after",
+        "privileged|account update|commit"
+      ]
+    },
+    "classification": {
+      "cwe_id": "CWE-698",
+      "parent_category_id": "CWE-438"
+    }
+  }
+}

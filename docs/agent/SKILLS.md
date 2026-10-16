@@ -60,7 +60,28 @@ deepagents only reads the source paths it is given. It does not choose or filter
 
 Some external skills or commands cover capabilities this project already implements as workflows. Anthropic's [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) describes "perform security review", and OrchestKit's [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) describes "review a PR". Here, those capabilities are built into the public workflows and their review stages rather than one standalone skill.
 
-Bundled skills stay one layer below the project goal: CWE taxonomy navigation, web security references, CI security references, source / sink / guard, and common false-positive precedents. They provide reusable security knowledge and judgment aids without redefining the workflow.
+Bundled skills stay one layer below the project goal. They supplement the review workflow with reusable security knowledge; they do not redefine the workflow itself.
+
+The bundled knowledge layer contains:
+
+- CWE taxonomy navigation and scanner-finding triage;
+- narrow domain references for web, CI, memory/numeric, cryptography, concurrency/resource, OS boundaries, parser/protocol, software supply-chain, and authorization/delegation security.
+
+Domain ownership follows the mechanism under review. In particular:
+
+- process invocation and filesystem authority belong to OS-boundary security;
+- object construction belongs to parser/protocol security;
+- web and CI own sensitive-data exposure only on their respective surfaces;
+- dependency selection and install/build execution belong to supply-chain security;
+- non-browser service identity, delegated authority, and confused deputies belong to authorization/delegation security.
+
+A reference is eligible when all of the following hold:
+
+- its decision rules are stable enough to maintain;
+- selective reading keeps ecosystem-specific material out of unrelated reviews;
+- it changes a security judgment beyond ordinary source-to-sink, reachability, and authority reasoning.
+
+Do not freeze volatile version/default matrices, vulnerability catalogs, or recommendation lists into bundled references. When a repository's declared platform version makes such information necessary, verify it from current primary documentation for that review.
 
 ### Developer Source Notes
 
@@ -70,7 +91,19 @@ Bundled skills keep developer-facing source notes under:
 sec_review_agents/resources/skill_source_notes/
 ```
 
-These files keep source links, examples, and maintenance notes for humans. They are not exposed to the agent skill view.
+These files map decision-changing rules to authoritative sources and applicability limits.
+
+### Source Note Maintenance Contract
+
+Maintain source notes per reference or small rule group. They are evidence ledgers, not reading lists. Record:
+
+- what the reference owns and the adjacent mechanisms it does not own;
+- each decision-changing operational claim, especially report/reject conditions, guard sufficiency, defaults and exceptions;
+- an authoritative primary source with a section, API, rule or other useful locator;
+- applicability limits, including language, platform, protocol, library and version assumptions;
+- enough scope and exception detail to distinguish the supported rule from nearby but unsupported conclusions.
+
+Identify repository reporting thresholds, workflow ownership and packaging decisions as project policy rather than attributing them to an external standard. Do not trace every explanatory sentence, but do not let a broad source link stand in for an unsupported operational rule. Recheck live defaults against the repository's dependency or target version when they affect the decision.
 
 ### Adding Or Updating Bundled Skills
 
@@ -79,7 +112,7 @@ When adding or changing a bundled skill:
 1. Put the material under `sec_review_agents/resources/skills/<skill-name>/`. `SKILL.md` is the entry point.
 2. `SKILL.md` metadata should be general enough for discovery, while precise enough that the agent can decide when to read it. Do not write the description as a one-off test hint.
 3. Default to `SKILL.md` plus narrow `references/` files. Add templates or assets only for a concrete existing need; do not add `scripts/` unless the filesystem backend and permission model explicitly support skill execution.
-4. If external sources, examples, or source-selection decisions influenced the skill, record them under `sec_review_agents/resources/skill_source_notes/`. Do not expose source notes through `/skills`.
+4. Trace decision-changing rules to authoritative sources under `sec_review_agents/resources/skill_source_notes/`.
 5. Declare the skill in the target agent or stage-local `skills.py`. Do not add skill names to docs, backend helpers, or runtime preparation code just to make them visible.
 6. Ensure the target backend consumes the declaration, prepares the allowlisted view, mounts it at `/skills`, and enables skills middleware for that agent session.
-7. Add focused tests for skill preparation and backend exposure. If the change depends on model behavior, use a gated LLM integration or contrast test, and preserve outputs to confirm whether the model discovered and read the skill.
+7. Add focused tests for skill preparation and backend exposure. Follow the model-case structure documented under [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md).

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "crypto-certificate-policy-unknown",
+  "skill": "cryptography-security",
+  "reference": "certificate-path-identity.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that certificate validation accepts an unauthorized service.",
+  "facts": [
+    "The code calls a helper named verifyCertificate.",
+    "The trust anchors, path constraints, critical-extension handling, reference identity, presented identifiers, key usage policy, and helper implementation are unavailable."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "cannot|not confirmed|unconfirmed|unverifiable|insufficient|unknown",
+        "certificate|path|identity"
+      ],
+      "proof_gap_requirements": [
+        "trust anchor",
+        "constraint|critical extension",
+        "reference identity|identifier",
+        "key usage|extended key usage",
+        "implementation|helper"
+      ]
+    }
+  }
+}

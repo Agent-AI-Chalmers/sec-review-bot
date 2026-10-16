@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "temporal-nonatomic-consume",
+  "skill": "concurrency-resource-security",
+  "reference": "temporal-invariants.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the one-time token invariant under concurrent requests.",
+  "facts": [
+    "Two attacker-controlled requests can run concurrently.",
+    "Each transaction reads used=false before either writes, performs the privileged action, and only then sets used=true.",
+    "The database isolation level permits both reads and there is no conditional update, unique constraint, or lock."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "concurr|atomic|invariant",
+        "both|lock|transaction"
+      ]
+    }
+  }
+}

@@ -41,12 +41,9 @@ Do not enter this workflow when:
 3. Read `/skills/cwe/references/cwe-699-agent-navigation.md` to narrow the search area.
    Use category labels for navigation only.
 
-4. Prefer a second-level Base or Variant CWE when there is a natural fit. If multiple
-   candidates exist, choose the one closest to the root cause, not the most famous
-   label.
+4. Prefer an accurate Base or Variant CWE with allowed mapping usage. Use an appropriate Class when no accurate Base or Variant fits. View depth is not a mapping rule. If multiple candidates exist, choose by the evidenced root cause and check the official entry rather than selecting the most familiar label.
 
-5. If only a broad category fits, keep the prose explanation primary and omit a forced
-   CWE label.
+5. The local navigation reference is incomplete. An absent label is not excluded. If you cannot verify a suitable mapping, keep the prose explanation primary and omit a forced CWE label.
 
 ## Output Rules
 

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "parser-unknown-downstream",
+  "skill": "parser-protocol-security",
+  "reference": "http-framing.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a request-smuggling claim from malformed HTTP headers alone.",
+  "facts": [
+    "A captured request contains conflicting framing headers.",
+    "Proxy behavior, backend behavior, connection reuse, forwarding transformations and topology are unknown."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gap_requirements": [
+        "proxy|front.*end|first recipient",
+        "backend|downstream",
+        "connection.*reuse|forward|topology"
+      ],
+      "explanation_requirements": [
+        "conflict|framing",
+        "proxy|backend|downstream",
+        "unknown|missing|insufficient"
+      ]
+    }
+  }
+}

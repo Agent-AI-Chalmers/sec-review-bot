@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "path-replacement",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-path-policy.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether the containment check still protects the file actually read.",
+  "facts": [
+    "The handler runs as a service account and serves downloads.",
+    "A lower-privileged local tenant can rename /srv/exports/slot and replace it with a symlink after checked is set and before resume is signalled.",
+    "For relative=slot/secret, the original file passes containment.",
+    "The replacement link points to /srv/private, which contains a secret readable only by the service.",
+    "No other guard constrains the subsequent read."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "contain|check",
+        "replace|symlink|race",
+        "service|secret|outside"
+      ]
+    }
+  }
+}

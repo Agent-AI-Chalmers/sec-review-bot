@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "boundary-crypto-token-purpose",
+  "skill": "cryptography-security",
+  "reference": "verification-contracts.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess cryptographic validity and the authentication/session purpose boundary.",
+  "facts": [
+    "The service correctly verifies a token signature with a trusted issuer key.",
+    "It accepts a password-reset token as an authenticated session token without checking audience or token type.",
+    "The reset token grants account access when replayed at the session endpoint."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "signature|audience|type",
+        "purpose|session"
+      ]
+    }
+  }
+}

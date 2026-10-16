@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "crypto-fast-password-verifier",
+  "skill": "cryptography-security",
+  "reference": "password-verifiers.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the deployed password verifier against offline guessing.",
+  "facts": [
+    "Production user passwords are stored as unsalted SHA-256(password).",
+    "The verifier database is included in the stated offline attacker model.",
+    "No password hashing scheme, salt, cost parameter, or separate protection is applied."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "password|offline|salt",
+        "cost|sha"
+      ]
+    }
+  }
+}

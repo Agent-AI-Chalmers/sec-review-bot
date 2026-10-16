@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "web-upload-active-content",
+  "skill": "web-security",
+  "reference": "file-upload.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess what happens when another user opens the profile attachment.",
+  "facts": [
+    "An attacker can upload arbitrary HTML content as a profile attachment.",
+    "The application serves it inline from the authenticated application origin with an attacker-controlled HTML content type.",
+    "Other users open the attachment while authenticated, allowing the uploaded script to act in the application origin."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "upload|attachment",
+        "inline",
+        "html",
+        "application origin|same origin",
+        "script|stored xss"
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+name: package
+on: workflow_dispatch
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - run: printenv DEPLOY_TOKEN > dist/deploy-token.txt
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: dist/

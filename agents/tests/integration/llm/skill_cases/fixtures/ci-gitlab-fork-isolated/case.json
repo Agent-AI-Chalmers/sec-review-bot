@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "ci-gitlab-fork-isolated",
+  "skill": "ci-security",
+  "reference": "gitlab-ci.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that an ordinary fork merge-request pipeline receives parent-project protected secrets.",
+  "facts": [
+    "The pipeline runs only in the contributor's fork project with the fork's configuration, variables, and runners.",
+    "No parent-project pipeline is started, no parent artifact is consumed, and protected variables and runners are unavailable to the fork pipeline."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "fork project|parent-project|protected",
+        "variables|runner|isolated"
+      ]
+    }
+  }
+}

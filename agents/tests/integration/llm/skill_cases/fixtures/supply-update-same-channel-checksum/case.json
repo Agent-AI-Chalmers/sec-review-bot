@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "supply-update-same-channel-checksum",
+  "skill": "software-supply-chain-security",
+  "reference": "tool-plugin-updates.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the downloaded tool update verification.",
+  "facts": [
+    "The updater downloads a privileged build tool and its SHA-256 text file from the same unauthenticated mirror.",
+    "It accepts any matching pair and executes the tool in CI.",
+    "There is no independently trusted signing key, pinned digest, or authenticated metadata root."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "same|channel|checksum",
+        "trust|execute|mirror"
+      ]
+    }
+  }
+}

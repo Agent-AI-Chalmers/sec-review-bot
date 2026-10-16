@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "asyncio-cancellation-unknown",
+  "skill": "concurrency-resource-security",
+  "reference": "python-asyncio-cancellation.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that an async handler leaks capacity when clients disconnect.",
+  "facts": [
+    "The handler awaits a backend operation while holding an object called limiter.",
+    "The limiter implementation, framework disconnect behavior, cancellation path, ownership, cleanup, and production capacity are not provided."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "cancel|limiter|cleanup",
+        "capacity|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "limiter|semaphore|ownership",
+        "cancel|disconnect|cleanup",
+        "capacity|admission|bound"
+      ]
+    }
+  }
+}

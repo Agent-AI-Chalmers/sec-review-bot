@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "supply-unknown-resolver",
+  "skill": "software-supply-chain-security",
+  "reference": "dependency-selection.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that two configured registries create dependency confusion.",
+  "facts": [
+    "The manifest names an internal package and repository configuration mentions two registries.",
+    "The package manager version, source precedence, namespace ownership, available candidate versions, lock enforcement, and actual install command are not provided."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "resolver|precedence|candidate|namespace",
+        "version|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "source.*precedence|registry|resolver",
+        "namespace.*owner|candidate.*version",
+        "lock|install.*command"
+      ]
+    }
+  }
+}

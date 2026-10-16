@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "javascript-abort-not-propagated",
+  "skill": "concurrency-resource-security",
+  "reference": "javascript-cancellation.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess cancellation and retained work after client disconnects.",
+  "facts": [
+    "Each request starts 100 outbound fetches and rejects its wrapper promise when the client disconnects.",
+    "The AbortSignal is not passed to fetch, so all requests continue until a ten-minute upstream timeout.",
+    "An unauthenticated client can repeat this and exhaust the shared connection pool."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "abortsignal|promise|fetch",
+        "continue|connection|resource"
+      ]
+    }
+  }
+}

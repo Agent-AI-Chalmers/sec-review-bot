@@ -13,6 +13,7 @@ Do not use this skill as a CI hardening checklist. A finding must still have a c
 
 - For GitHub Actions workflows, composite actions, local actions, `pull_request_target`, `workflow_run`, workflow command/script injection, artifact trust boundaries, mutable checkout refs, approval/comment gates, permissions, or secrets: read `/skills/ci-security/references/github-actions.md`.
 - For GitLab CI pipelines, `.gitlab-ci.yml`, merge request pipelines, fork pipelines, protected variables/runners, CI job tokens, trigger tokens, or untrusted artifacts crossing pipeline boundaries: read `/skills/ci-security/references/gitlab-ci.md`.
+- For credentials or sensitive values exposed through workflow logs, build output, caches, container layers, packages, or downloadable artifacts: read `/skills/ci-security/references/secret-and-artifact-exposure.md`.
 
 If the concern is only "best practice missing" such as unpinned actions, absent CodeQL, missing Dependabot, broad workflow hygiene, or non-minimal permissions with no exploit-relevant path, keep it non-confirmed unless repository evidence shows concrete impact.
 

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "supply-cargo-build-script",
+  "skill": "software-supply-chain-security",
+  "reference": "cargo-dependencies.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess the build dependency selected by the release command.",
+  "facts": [
+    "Cargo.toml declares build-helper from an explicitly configured public alternate registry, not through source replacement or a private registry namespace.",
+    "The release command runs cargo update -p build-helper before cargo build, no lock or precise version prevents reselection, and the declared semver range accepts the attacker's newly published version; the recorded resolver output selects it.",
+    "The selected crate contains build.rs, which Cargo executes in CI while a deployment signing credential is available."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "alternate|public.*registry",
+        "cargo update|reselect|resolver",
+        "semver|compatible|selected",
+        "build\\.rs|build script",
+        "signing credential|credential"
+      ]
+    }
+  }
+}

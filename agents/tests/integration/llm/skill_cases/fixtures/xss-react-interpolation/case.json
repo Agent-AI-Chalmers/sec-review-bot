@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "xss-react-interpolation",
+  "skill": "web-security",
+  "reference": "xss.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether rendering attacker-controlled displayName with ordinary React interpolation is a confirmed XSS.",
+  "facts": [
+    "src/Profile.tsx contains the complete relevant component.",
+    "user.displayName is attacker-controlled."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "react|interpolation",
+        "escaping|escape"
+      ]
+    }
+  }
+}

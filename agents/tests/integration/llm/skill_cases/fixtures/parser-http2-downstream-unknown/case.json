@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "parser-http2-downstream-unknown",
+  "skill": "parser-protocol-security",
+  "reference": "http2-translation.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim of HTTP/2 request smuggling.",
+  "facts": [
+    "The public listener supports HTTP/2.",
+    "The intermediary validation behavior, protocol translation, downstream protocol, connection reuse, malformed field handling, and downstream parser behavior are unavailable."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "cannot|not confirmed|unconfirmed|unsubstantiated|insufficient|unknown",
+        "http/2"
+      ],
+      "proof_gap_requirements": [
+        "translation|protocol",
+        "downstream",
+        "connection reuse|reuse",
+        "malformed|validation",
+        "parser|interpret"
+      ]
+    }
+  }
+}

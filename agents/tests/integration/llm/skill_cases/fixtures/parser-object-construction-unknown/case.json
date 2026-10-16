@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "parser-object-construction-unknown",
+  "skill": "parser-protocol-security",
+  "reference": "object-construction.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that a polymorphic message decoder permits attacker-selected executable object construction.",
+  "facts": [
+    "Remote users control the JSON message body.",
+    "The code calls a framework polymorphic decoder, but the framework version, enabled type resolver, allowed type set, and deployed classpath are not provided.",
+    "No repository evidence shows a reachable constructor, hook, gadget, or security-relevant side effect."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "version|type|class|constructor",
+        "gadget|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "framework.*version|type.*resolver",
+        "allowed.*type|class.*path|classpath",
+        "constructor|hook|gadget|side effect"
+      ]
+    }
+  }
+}

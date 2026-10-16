@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "supply-provenance-subject-mismatch",
+  "skill": "software-supply-chain-security",
+  "reference": "provenance-verification.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess the artifact admission check.",
+  "facts": [
+    "The admission service verifies that an attestation has a valid signature from the approved builder.",
+    "It never compares the attested subject digest with the container image being admitted.",
+    "An attacker can pair an approved attestation for image A with attacker-controlled image B."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "subject|digest|artifact",
+        "attestation|bind"
+      ]
+    }
+  }
+}

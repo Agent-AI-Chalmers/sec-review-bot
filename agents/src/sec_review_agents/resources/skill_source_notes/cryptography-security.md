@@ -1,0 +1,19 @@
+# Cryptography Security Source Notes
+
+Requirements are tied to the actual primitive or protocol; they do not support a universal IV rule, algorithm blacklist, rotation schedule or complete PKI guide.
+
+| ID and skill location | Primary source and locator | Supported decision and limit |
+| --- | --- | --- |
+| CRYPTO-1: GCM invocation scope; `key-nonce-scope.md` | [NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final), §§8 and 8.1, Appendix A | Assess IV uniqueness within a key's scope. Equal IV bytes under different established keys are not reuse for this rule. |
+| CRYPTO-2: uniqueness versus randomness; `key-nonce-scope.md` | Same NIST source, §8.2 | A deterministic construction can satisfy uniqueness when persistence, concurrency and wrap are controlled. Do not require randomness when uniqueness is the contract. |
+| CRYPTO-3: verification binding; `verification-contracts.md` | [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html), §§3.1-3.4 | Bind algorithms, keys and required verification; do not act on authenticated results after failure. Limited parsing needed to verify is not automatically unsafe. |
+| CRYPTO-4: token context; `verification-contracts.md` | RFC 8725, §§3.8-3.12 | Cryptographic validity is separate from issuer, audience, token type and application authorization. |
+| CRYPTO-5: password verifiers; `password-verifiers.md` | [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html), §3.1.1.2 | Stored password verifiers need salt and a suitable password hashing scheme with cost. Fixed evergreen work factors are intentionally omitted. |
+| CRYPTO-6: HKDF stages and context; `key-derivation.md` | [RFC 5869](https://www.rfc-editor.org/rfc/rfc5869.html), §§2.2-2.3 and 3.2 | Identify input keying material, salt and `info`; context labels can separate purposes when the protocol requires distinct outputs. Omitting `info` is not universally a vulnerability. |
+| CRYPTO-7: password boundary; `key-derivation.md` | RFC 5869, §3.4 | HKDF does not add password guessing cost and is not a password-hashing replacement. Apply password-verifier guidance to low-entropy passwords. |
+| CRYPTO-8: signed representation; `signature-representation.md` | [RFC 8785 JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html), §§1 and 3; [RFC 8032 EdDSA](https://www.rfc-editor.org/rfc/rfc8032.html), §5.1.7 | Verify the exact protocol-defined bytes and scheme checks. Canonical JSON and scalar-range rules are protocol/scheme-specific, not universal requirements. |
+| CRYPTO-9: signature uniqueness assumptions; `signature-representation.md` | The reviewed signature format's protocol specification establishes whether alternate encodings or signatures are valid. | Whether that property is reportable depends on project evidence policy: require a changed verified meaning or a concrete application dependency on signature-byte uniqueness, such as replay or deduplication. CWE-347 supplies general verification context but does not establish this reporting threshold. |
+| CRYPTO-10: X.509 path constraints; `certificate-path-identity.md` | [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280.html), §§4.2 and 6 | A signature chain must also satisfy the relying party's trust anchor and path constraints, including critical extensions, basic constraints, name constraints and intended key usage. Do not infer one universal revocation or pinning policy. |
+| CRYPTO-11: TLS reference identity; `certificate-path-identity.md` | [RFC 9525](https://www.rfc-editor.org/rfc/rfc9525.html), §§2, 4 and 6 | Match the presented identifiers against a reference identity derived from trusted application configuration. Path validity, SNI and destination text do not by themselves establish the intended service identity. |
+
+Public-data checksums are not password verifiers; signature validity alone is not identity; missing rotation alone is not a confirmed exploit.

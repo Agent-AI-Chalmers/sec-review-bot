@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "unknown-path-authority",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-path-policy.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the claim that a tenant can replace a directory between the containment check and read without inventing missing permissions.",
+  "facts": [
+    "The request controls relative and root is configured server-side.",
+    "Directory permissions, possible concurrent writers, and export-tree contents are not provided."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gap_requirements": [
+        "directory.*permission|owner|writer",
+        "export.*content|target.*object|mount"
+      ],
+      "explanation_requirements": [
+        "path|root|relative",
+        "writer|permission|export.*content",
+        "unknown|missing|insufficient"
+      ]
+    }
+  }
+}

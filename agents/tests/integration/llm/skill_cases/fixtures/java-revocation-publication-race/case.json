@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "java-revocation-publication-race",
+  "skill": "concurrency-resource-security",
+  "reference": "java-memory-model.md",
+  "modes": [
+    "discovery"
+  ],
+  "task": "Assess why requests can still use a permission after an administrator removes it.",
+  "facts": [
+    "One Java thread replaces an ordinary non-volatile policy field after an administrator revokes a tenant permission.",
+    "Request threads read that field without a monitor, volatile access, immutable snapshot publication, thread lifecycle edge, or other happens-before relationship.",
+    "The affected tenant can race requests after revocation and a stale policy grants the revoked privileged action."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "happens-before",
+        "volatile|monitor|synchron",
+        "stale",
+        "revok",
+        "privileged|authorization"
+      ]
+    }
+  }
+}

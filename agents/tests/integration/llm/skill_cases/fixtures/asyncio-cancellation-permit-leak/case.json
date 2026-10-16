@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "asyncio-cancellation-permit-leak",
+  "skill": "concurrency-resource-security",
+  "reference": "python-asyncio-cancellation.md",
+  "modes": [
+    "prompted",
+    "discovery"
+  ],
+  "task": "Assess whether request cancellation can exhaust the service's bounded worker permits.",
+  "facts": [
+    "Unauthenticated clients can start a request and disconnect while the handler awaits the backend.",
+    "The framework cancels the handler task on disconnect.",
+    "The handler catches CancelledError and returns without releasing its acquired semaphore permit.",
+    "After all 20 permits leak, new requests wait indefinitely."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "cancel|semaphore|permit",
+        "release|exhaust|disconnect"
+      ]
+    }
+  }
+}
