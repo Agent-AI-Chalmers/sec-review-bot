@@ -58,6 +58,6 @@ python -m scripts.token_usage.summarize \
   .agent-workspace-patcheval-CVE-2023-41039-DEEPSEEK-V4-PRO/local-run-*
 ```
 
-`summarize_patcheval_evaluation` reads the same stage-local transcript artifacts when it fills the token, turn, and price columns in the PatchEval summary.
+`summarize_patcheval_evaluation` reads the same stage-local transcript artifacts when it fills the token, turn, and price columns in the PatchEval summary. Prices come from the same live OpenRouter source as `token_usage.summarize` (see [scripts/token_usage/README.md](../token_usage/README.md)); they are fetched once per run and never cached, and a model the source does not know is left unpriced, with the run then excluded from the average price.
 
 The full CVE issue evaluation notes, archived `DEEPSEEK-V4-PRO` artifacts, and result analysis are in [evaluation/cve-issue/README.md](../../evaluation/cve-issue/README.md).

@@ -10,11 +10,12 @@ from scripts.patcheval.experiments import (
     LIGHTWEIGHT_COST_VARIANTS,
 )
 from scripts.token_usage import (
-    PricingSelection,
+    PriceIndex,
     effective_patch_run,
-    estimate_run_cost,
     lightweight_two_stage_run,
+    load_price_index,
     load_run_usage,
+    run_cost,
 )
 
 
@@ -40,7 +41,12 @@ class EvaluationRow:
     avg_price: float | None
     avg_ai_turns: float | None
     currency: str | None
+    # Runs contributing tokens/turns, priced or not. Kept under its original
+    # name so an existing consumer of this JSON does not silently change meaning.
     cost_case_count: int
+    # Denominator of avg_price: runs that could be priced. May be smaller than
+    # cost_case_count when some run's model was not in the price source.
+    cost_priced_count: int
     failure_breakdown: dict
     failed_cves: dict
     output_dir: str
@@ -52,7 +58,10 @@ class CostSummary:
     avg_price: float | None
     avg_ai_turns: float | None
     currency: str | None
-    case_count: int
+    # Number of runs that could be priced (the denominator of avg_price).
+    priced_case_count: int
+    # Number of runs contributing tokens/turns, priced or not.
+    run_count: int
 
 
 def format_percent(numerator: int, denominator: int) -> str:
@@ -135,16 +144,19 @@ def iter_cost_run_dirs(
 
 
 def collect_costs(
-    workspace_root: Path, tag: str, *, include_unlinked_runs: bool = False
+    workspace_root: Path,
+    tag: str,
+    *,
+    include_unlinked_runs: bool = False,
+    index: PriceIndex | None = None,
 ) -> dict[str, CostSummary]:
-    pricing = PricingSelection(
-        mode="auto-profile",
-        profile=None,
-        input_rate=None,
-        cache_rate=None,
-        output_rate=None,
-        currency=None,
-    )
+    """Aggregate tokens, turns, and cost per experiment variant.
+
+    ``index`` is the OpenRouter price source (see ``load_price_index``); when it
+    is ``None`` or does not know a run's model, that run contributes tokens and
+    turns but no cost, so ``avg_price`` averages only the priced runs and stays
+    ``None`` when none of a variant's runs could be priced.
+    """
     tokens_by_variant: dict[str, list[int]] = {
         variant: [] for variant in EVALUATION_EXPERIMENTS
     }
@@ -170,7 +182,7 @@ def collect_costs(
         effective = effective_patch_run(run)
         tokens_by_variant[variant].append(effective.total_tokens)
         ai_turns_by_variant[variant].append(effective.totals.ai_message_count)
-        cost = estimate_run_cost(effective, pricing)
+        cost = run_cost(effective, index)
         if cost is not None:
             costs_by_variant[variant].append(cost.amount)
             currencies_by_variant[variant].add(cost.currency)
@@ -184,7 +196,7 @@ def collect_costs(
             ai_turns_by_variant[lightweight_variant].append(
                 lightweight_effective.totals.ai_message_count
             )
-            lightweight_cost = estimate_run_cost(lightweight_effective, pricing)
+            lightweight_cost = run_cost(lightweight_effective, index)
             if lightweight_cost is not None:
                 costs_by_variant[lightweight_variant].append(lightweight_cost.amount)
                 currencies_by_variant[lightweight_variant].add(
@@ -208,7 +220,8 @@ def collect_costs(
                 (sum(ai_turn_values) / len(ai_turn_values)) if ai_turn_values else None
             ),
             currency=next(iter(currencies)) if len(currencies) == 1 else None,
-            case_count=len(token_values),
+            priced_case_count=len(cost_values),
+            run_count=len(token_values),
         )
     return summaries
 
@@ -250,7 +263,8 @@ def read_summary(
             round(cost.avg_ai_turns, 2) if cost.avg_ai_turns is not None else None
         ),
         currency=cost.currency,
-        cost_case_count=cost.case_count,
+        cost_case_count=cost.run_count,
+        cost_priced_count=cost.priced_case_count,
         failure_breakdown=data["failure_analysis"]["breakdown"],
         failed_cves=data["failure_analysis"]["failed_cves"],
         output_dir=str(summary_path.parent),
@@ -355,6 +369,7 @@ def main() -> int:
         Path(args.workspace_root),
         args.tag,
         include_unlinked_runs=args.include_unlinked_runs,
+        index=load_price_index(),
     )
     cve_languages = read_cve_languages(Path(args.input_file))
     language_totals = collect_language_totals(
