@@ -2,9 +2,13 @@ import pytest
 from pydantic import ValidationError
 
 from tests.integration.llm.skill_cases.models import (
+    ClassificationOutput,
+    CommandArgumentOutput,
+    DecisionOutput,
     SkillCase,
-    SkillCaseOutput,
+    SkillReadOutput,
     SkillVerdict,
+    output_model_for_case,
 )
 from tests.integration.llm.skill_cases.runner import SkillCaseRun, assert_case_oracles
 
@@ -40,7 +44,7 @@ def _run(
     verdict: SkillVerdict = "unresolved",
 ) -> SkillCaseRun:
     return SkillCaseRun(
-        output=SkillCaseOutput(
+        output=DecisionOutput(
             verdict=verdict,
             evidence="The certificate helper is not available.",
             rationale=rationale,
@@ -77,6 +81,87 @@ def test_discovery_case_can_check_reads_without_a_result_oracle() -> None:
         case,
         _run(rationale="No result oracle is configured.", proof_gaps=[]),
     )
+
+
+@pytest.mark.parametrize(
+    ("oracles", "expected_model"),
+    [
+        ({}, SkillReadOutput),
+        (
+            {
+                "decision": {
+                    "verdict": "rejected",
+                    "explanation_requirements": ["trusted root", "identity"],
+                }
+            },
+            DecisionOutput,
+        ),
+        (
+            {
+                "decision": {
+                    "verdict": "confirmed",
+                    "explanation_requirements": ["weakness", "impact"],
+                },
+                "classification": {"cwe_id": "CWE-287"},
+            },
+            ClassificationOutput,
+        ),
+        (
+            {
+                "decision": {
+                    "verdict": "confirmed",
+                    "explanation_requirements": ["argument", "impact"],
+                },
+                "command_argument": {
+                    "crosses_security_boundary": True,
+                    "attacker_controlled_argument": "--output=/tmp/result",
+                },
+            },
+            CommandArgumentOutput,
+        ),
+    ],
+)
+def test_case_selects_only_the_required_output_model(
+    oracles: dict[str, object],
+    expected_model: type[SkillReadOutput],
+) -> None:
+    payload = _case().model_dump(mode="json")
+    payload["oracles"] = oracles
+
+    assert output_model_for_case(SkillCase.model_validate(payload)) is expected_model
+
+
+@pytest.mark.parametrize(
+    "oracles",
+    [
+        {"classification": {"cwe_id": "CWE-287"}},
+        {
+            "command_argument": {
+                "crosses_security_boundary": True,
+                "attacker_controlled_argument": "--output=/tmp/result",
+            }
+        },
+        {
+            "decision": {
+                "verdict": "confirmed",
+                "explanation_requirements": ["argument", "impact"],
+            },
+            "classification": {"cwe_id": "CWE-287"},
+            "command_argument": {
+                "crosses_security_boundary": True,
+                "attacker_controlled_argument": "--output=/tmp/result",
+            },
+        },
+    ],
+)
+def test_case_rejects_ambiguous_specialized_output_oracles(
+    oracles: dict[str, object],
+) -> None:
+    payload = _case().model_dump(mode="json")
+    payload["oracles"] = oracles
+
+    with pytest.raises(ValidationError):
+        SkillCase.model_validate(payload)
 
 
 @pytest.mark.parametrize(

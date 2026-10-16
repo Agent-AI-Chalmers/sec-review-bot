@@ -65,7 +65,7 @@ Bundled skills stay one layer below the project goal. They supplement the review
 The bundled knowledge layer contains:
 
 - CWE taxonomy navigation and scanner-finding triage;
-- narrow domain references for web, CI, memory/numeric, cryptography, concurrency/resource, OS boundaries, parser/protocol, software supply-chain, and authorization security.
+- mechanism-specific references for web, CI, memory/numeric, cryptography, concurrency/resource, OS boundaries, parser/protocol, software supply-chain, and authorization security.
 
 Domain ownership follows the mechanism under review. In particular:
 

@@ -67,7 +67,7 @@ deepagents 只读取调用方交给它的 source path，不负责替某个 workf
 当前知识层包括：
 
 - CWE 分类导航和 scanner finding triage；
-- Web、CI、memory/numeric、cryptography、concurrency/resource、OS boundary、parser/protocol、software supply chain 和 authorization 的窄领域 reference。
+- Web、CI、memory/numeric、cryptography、concurrency/resource、OS boundary、parser/protocol、software supply chain 和 authorization 中按具体安全机制拆分的 reference。
 
 领域归属按正在审查的机制划分。几个容易混淆的边界是：
 
