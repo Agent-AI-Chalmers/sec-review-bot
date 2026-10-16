@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "req\\.query|readfile|contain|resolve|traversal"
+      "explanation_requirements": [
+        "req\\.query|readfile|contain",
+        "resolve|traversal"
+      ]
     }
   }
 }

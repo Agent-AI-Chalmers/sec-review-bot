@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "artifact|command|version|script|enabled|unknown|evidence"
+      "explanation_requirements": [
+        "artifact|command|version|script",
+        "enabled|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "selected.*artifact|package.*version",
+        "install.*command|script.*setting|enabled",
+        "ci.*environment|build.*authority|credential"
+      ]
     }
   }
 }

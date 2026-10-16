@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "external|entity|file|resolution|xml|attacker"
+      "explanation_requirements": [
+        "external|entity|file",
+        "resolution|xml|attacker"
+      ]
     }
   }
 }

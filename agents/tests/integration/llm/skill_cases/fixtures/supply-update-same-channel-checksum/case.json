@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "same|channel|checksum|trust|execute|mirror"
+      "explanation_requirements": [
+        "same|channel|checksum",
+        "trust|execute|mirror"
+      ]
     }
   }
 }

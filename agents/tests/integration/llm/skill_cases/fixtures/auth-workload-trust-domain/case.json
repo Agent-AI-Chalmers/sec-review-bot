@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "trust domain|workload|certificate|authorization|development|production"
+      "explanation_requirements": [
+        "trust domain|workload|certificate",
+        "authorization|development|production"
+      ]
     }
   }
 }

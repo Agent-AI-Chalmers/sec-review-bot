@@ -188,8 +188,6 @@ def assert_case_oracles(case: SkillCase, run: SkillCaseRun) -> None:
     decision = case.oracles.decision
     if decision is not None:
         assert run.output.verdict == decision.verdict
-        if decision.proof_gaps_required:
-            assert run.output.proof_gaps
         proof_gaps = " ".join(run.output.proof_gaps).lower()
         for requirement in decision.proof_gap_requirements:
             assert re.search(requirement, proof_gaps), (
@@ -205,8 +203,6 @@ def assert_case_oracles(case: SkillCase, run: SkillCaseRun) -> None:
         ).lower()
         for requirement in decision.explanation_requirements:
             assert re.search(requirement, explanation), (requirement, explanation)
-        if decision.explanation_pattern is not None:
-            assert re.search(decision.explanation_pattern, explanation)
 
     exact_output = case.oracles.exact_output
     if exact_output is not None and exact_output.crosses_security_boundary is not None:

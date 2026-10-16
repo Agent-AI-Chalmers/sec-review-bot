@@ -13,7 +13,11 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed"
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "public.*image|cache",
+        "not.*password|not.*auth|not.*secret"
+      ]
     }
   }
 }

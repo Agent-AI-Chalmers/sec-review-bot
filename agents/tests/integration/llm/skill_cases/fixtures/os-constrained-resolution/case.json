@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "openat2|beneath|symlink|constrain|descriptor"
+      "explanation_requirements": [
+        "openat2|beneath|symlink",
+        "constrain|descriptor"
+      ]
     }
   }
 }

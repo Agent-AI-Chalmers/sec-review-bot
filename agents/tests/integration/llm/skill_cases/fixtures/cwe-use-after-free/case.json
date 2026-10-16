@@ -14,7 +14,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "confirmed"
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "free|freed",
+        "dereference|use.after.free",
+        "attacker|callback"
+      ]
     },
     "classification": {
       "cwe_id": "CWE-416"

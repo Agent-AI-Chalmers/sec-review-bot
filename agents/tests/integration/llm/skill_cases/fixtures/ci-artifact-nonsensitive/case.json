@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "public|no secret|artifact|reader|sensitive"
+      "explanation_requirements": [
+        "public|no secret|artifact",
+        "reader|sensitive"
+      ]
     }
   }
 }

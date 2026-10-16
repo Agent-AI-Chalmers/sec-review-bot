@@ -14,7 +14,16 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true
+      "proof_gap_requirements": [
+        "operand.*type|width|signed",
+        "overflow|arithmetic.*behavior",
+        "maximum input|earlier validation|range"
+      ],
+      "explanation_requirements": [
+        "multiplication|allocate|allocation",
+        "type|width|overflow",
+        "unknown|missing|insufficient"
+      ]
     }
   }
 }

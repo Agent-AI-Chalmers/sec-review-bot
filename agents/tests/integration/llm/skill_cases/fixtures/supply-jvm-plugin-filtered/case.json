@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "filter|coordinates|internal|select|repository"
+      "explanation_requirements": [
+        "filter|coordinates|internal",
+        "select|repository"
+      ]
     }
   }
 }

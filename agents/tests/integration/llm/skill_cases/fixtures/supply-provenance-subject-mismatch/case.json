@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "subject|digest|artifact|attestation|bind"
+      "explanation_requirements": [
+        "subject|digest|artifact",
+        "attestation|bind"
+      ]
     }
   }
 }

@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "verification|failure|continue|unverified|claim"
+      "explanation_requirements": [
+        "verification|failure|continue",
+        "unverified|claim"
+      ]
     }
   }
 }

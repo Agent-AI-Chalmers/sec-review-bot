@@ -14,7 +14,16 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true
+      "proof_gap_requirements": [
+        "proxy|front.*end|first recipient",
+        "backend|downstream",
+        "connection.*reuse|forward|topology"
+      ],
+      "explanation_requirements": [
+        "conflict|framing",
+        "proxy|backend|downstream",
+        "unknown|missing|insufficient"
+      ]
     }
   }
 }

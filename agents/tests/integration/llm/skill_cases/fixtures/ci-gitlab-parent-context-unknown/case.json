@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "parent|fork|trigger|configuration|protected|runner|unknown"
+      "explanation_requirements": [
+        "parent|fork|trigger|configuration",
+        "protected|runner|unknown"
+      ],
+      "proof_gap_requirements": [
+        "pipeline.*location|parent.*project|fork.*project",
+        "configuration.*source|fork.*config",
+        "variable.*protect|runner.*protect|job token|deploy"
+      ]
     }
   }
 }

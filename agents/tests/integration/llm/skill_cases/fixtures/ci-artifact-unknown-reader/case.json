@@ -15,8 +15,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "content|reader|access|secret|credential|unknown|evidence"
+      "explanation_requirements": [
+        "content|reader|access|secret",
+        "credential|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "bundle|content|file",
+        "artifact.*access|reader|permission",
+        "live.*secret|credential|token"
+      ]
     }
   }
 }

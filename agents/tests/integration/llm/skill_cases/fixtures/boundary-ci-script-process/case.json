@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "argument|option|process|config|publish|authority"
+      "explanation_requirements": [
+        "argument|option|process",
+        "config|publish|authority"
+      ]
     }
   }
 }

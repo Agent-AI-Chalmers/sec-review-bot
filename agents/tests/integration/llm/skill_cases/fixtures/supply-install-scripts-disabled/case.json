@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "ignore-scripts|disabled|postinstall|later|execution"
+      "explanation_requirements": [
+        "ignore-scripts|disabled|postinstall",
+        "later|execution"
+      ]
     }
   }
 }

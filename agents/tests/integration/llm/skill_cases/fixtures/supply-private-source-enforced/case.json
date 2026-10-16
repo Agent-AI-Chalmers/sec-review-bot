@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "single|private|source|hash|pin|attacker|candidate"
+      "explanation_requirements": [
+        "single|private|source|hash",
+        "pin|attacker|candidate"
+      ]
     }
   }
 }

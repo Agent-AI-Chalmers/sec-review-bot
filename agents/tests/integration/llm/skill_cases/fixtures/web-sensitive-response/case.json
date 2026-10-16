@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "database_url|credential|response|unauth|sensitive|secret"
+      "explanation_requirements": [
+        "database_url|credential|response",
+        "unauth|sensitive|secret"
+      ]
     }
   }
 }

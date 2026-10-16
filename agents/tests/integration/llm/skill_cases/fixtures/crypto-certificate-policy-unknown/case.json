@@ -14,7 +14,6 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
       "explanation_requirements": [
         "cannot|not confirmed|unconfirmed|unverifiable|insufficient|unknown",
         "certificate|path|identity"

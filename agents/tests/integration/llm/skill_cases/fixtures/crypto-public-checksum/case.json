@@ -14,7 +14,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "checksum|cache|public|password|offline"
+      "explanation_requirements": [
+        "checksum|cache|public",
+        "password|offline"
+      ]
     }
   }
 }

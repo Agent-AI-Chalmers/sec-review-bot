@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "handle|inherit|child|token|authority|path"
+      "explanation_requirements": [
+        "handle|inherit|child",
+        "token|authority|path"
+      ]
     }
   }
 }

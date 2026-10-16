@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "happens-before|volatile|monitor|publication|mutation|security|unknown"
+      "explanation_requirements": [
+        "happens-before|volatile|monitor|publication",
+        "mutation|security|unknown"
+      ],
+      "proof_gap_requirements": [
+        "happens-before|volatile|monitor|synchron",
+        "construction|mutation|final",
+        "security.*decision|authorization|policy"
+      ]
     }
   }
 }

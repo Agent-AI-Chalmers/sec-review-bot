@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "storage|serv|disposition|parser|reader|sink|unknown"
+      "explanation_requirements": [
+        "storage|serv|disposition|parser",
+        "reader|sink|unknown"
+      ],
+      "proof_gap_requirements": [
+        "storage|filename",
+        "serving.*origin|content.*disposition|content.*type",
+        "parser|converter|reader|permission"
+      ]
     }
   }
 }

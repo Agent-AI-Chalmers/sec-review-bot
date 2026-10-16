@@ -17,7 +17,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "prepare|install|lifecycle|script|token|runtime|execute"
+      "explanation_requirements": [
+        "prepare|install|lifecycle|script",
+        "token|runtime|execute"
+      ]
     }
   }
 }

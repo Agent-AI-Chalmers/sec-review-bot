@@ -14,7 +14,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "confirmed"
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "redirect",
+        "continue|does not return|after",
+        "privileged|account update|commit"
+      ]
     },
     "classification": {
       "cwe_id": "CWE-698",

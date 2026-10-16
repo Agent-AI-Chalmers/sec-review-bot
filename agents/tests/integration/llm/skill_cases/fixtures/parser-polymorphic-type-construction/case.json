@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "json|polymorphic|type|class|constructor|command"
+      "explanation_requirements": [
+        "json|polymorphic|type",
+        "class|constructor|command"
+      ]
     }
   }
 }

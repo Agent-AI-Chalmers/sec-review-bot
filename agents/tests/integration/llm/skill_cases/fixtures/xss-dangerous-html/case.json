@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "query|dangerouslysetinnerhtml|raw html|sink|saniti[sz]"
+      "explanation_requirements": [
+        "query|dangerouslysetinnerhtml|raw html",
+        "sink|saniti[sz]"
+      ]
     }
   }
 }

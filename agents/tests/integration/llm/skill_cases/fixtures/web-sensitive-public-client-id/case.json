@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "public|client|origin|secret|authority|credential"
+      "explanation_requirements": [
+        "public|client|origin",
+        "secret|authority|credential"
+      ]
     }
   }
 }

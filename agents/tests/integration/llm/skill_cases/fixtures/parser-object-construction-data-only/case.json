@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "data|json|schema|type|constructor|hook"
+      "explanation_requirements": [
+        "data|json|schema",
+        "type|constructor|hook"
+      ]
     }
   }
 }

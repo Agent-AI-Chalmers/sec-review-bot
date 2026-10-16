@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "ownership|double|free|allocator|destructor|ffi"
+      "explanation_requirements": [
+        "ownership|double|free",
+        "allocator|destructor|ffi"
+      ]
     }
   }
 }

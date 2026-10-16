@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "GOPROXY|GOPRIVATE|GONOSUMDB|GOSUMDB|replace|go.sum|unknown"
+      "explanation_requirements": [
+        "goproxy|goprivate|gonosumdb|gosumdb",
+        "replace|go.sum|unknown"
+      ],
+      "proof_gap_requirements": [
+        "goproxy|goprivate|gonosumdb|gosumdb",
+        "go.sum|checksum",
+        "replace|selected.*version|module.*source"
+      ]
     }
   }
 }

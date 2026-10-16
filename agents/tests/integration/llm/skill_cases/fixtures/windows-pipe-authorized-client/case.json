@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "descriptor|service SID|token|remote|revert"
+      "explanation_requirements": [
+        "descriptor|service sid|token",
+        "remote|revert"
+      ]
     }
   }
 }

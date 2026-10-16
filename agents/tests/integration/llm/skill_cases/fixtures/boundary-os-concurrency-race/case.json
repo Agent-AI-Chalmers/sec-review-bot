@@ -14,7 +14,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "check|use|race|replace|symlink|invariant"
+      "explanation_requirements": [
+        "check|use|race",
+        "replace|symlink|invariant"
+      ]
     }
   }
 }

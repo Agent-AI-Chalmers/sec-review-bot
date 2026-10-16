@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from tests.integration.llm.skill_cases.models import SkillCase, SkillCaseOutput
 from tests.integration.llm.skill_cases.runner import SkillCaseRun, assert_case_oracles
@@ -17,7 +18,6 @@ def _case() -> SkillCase:
             "oracles": {
                 "decision": {
                     "verdict": "not-confirmed",
-                    "proof_gaps_required": True,
                     "explanation_requirements": ["certificate", "unconfirmed"],
                     "proof_gap_requirements": [
                         "trust anchor",
@@ -68,6 +68,25 @@ def test_discovery_case_can_check_reads_without_a_result_oracle() -> None:
         case,
         _run(rationale="No result oracle is configured.", proof_gaps=[]),
     )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("explanation_requirements", ["certificate"]),
+        ("proof_gap_requirements", ["trust anchor"]),
+        ("explanation_requirements", ["certificate", "["]),
+    ],
+)
+def test_decision_oracle_rejects_weak_or_invalid_requirement_sets(
+    field: str,
+    value: list[str],
+) -> None:
+    payload = _case().model_dump(mode="json")
+    payload["oracles"]["decision"][field] = value
+
+    with pytest.raises(ValidationError):
+        SkillCase.model_validate(payload)
 
 
 @pytest.mark.parametrize(

@@ -14,7 +14,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed"
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "immutable|cannot.*replace|stable",
+        "public.*export|intended",
+        "not.*vulnerab|not.*confirm|no.*race"
+      ]
     }
   }
 }

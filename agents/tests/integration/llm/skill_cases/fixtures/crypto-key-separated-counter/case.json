@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "key|scope|unique|counter"
+      "explanation_requirements": [
+        "key|scope",
+        "unique|counter"
+      ]
     }
   }
 }

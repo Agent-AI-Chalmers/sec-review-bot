@@ -14,7 +14,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "represent|convert|unsigned|bounds|length"
+      "explanation_requirements": [
+        "represent|convert|unsigned",
+        "bounds|length"
+      ]
     }
   }
 }

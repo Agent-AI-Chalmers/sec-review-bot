@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "reparse|junction|path|open|tenant|secret|contain"
+      "explanation_requirements": [
+        "reparse|junction|path|open",
+        "tenant|secret|contain"
+      ]
     }
   }
 }

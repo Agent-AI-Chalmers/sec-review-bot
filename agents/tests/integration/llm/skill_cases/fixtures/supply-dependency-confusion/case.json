@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "extra-index|public|private|candidate|version|attacker|select"
+      "explanation_requirements": [
+        "extra-index|public|private|candidate",
+        "version|attacker|select"
+      ]
     }
   }
 }

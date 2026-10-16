@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "checked|reject|error|before"
+      "explanation_requirements": [
+        "checked|reject",
+        "error|before"
+      ]
     }
   }
 }

@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "artifact|deploy_token|credential|secret|reader|upload"
+      "explanation_requirements": [
+        "artifact|deploy_token|credential",
+        "secret|reader|upload"
+      ]
     }
   }
 }

@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "method|content type|SameSite|origin|token|CORS|unknown"
+      "explanation_requirements": [
+        "method|content type|samesite|origin",
+        "token|cors|unknown"
+      ],
+      "proof_gap_requirements": [
+        "request.*method|content.*type|browser.*context",
+        "samesite|ambient.*credential|cookie",
+        "token|origin|cors"
+      ]
     }
   }
 }

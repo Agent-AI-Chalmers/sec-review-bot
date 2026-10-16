@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "bearer|Authorization|ambient|CORS|simple|CSRF"
+      "explanation_requirements": [
+        "bearer|authorization|ambient",
+        "cors|simple|csrf"
+      ]
     }
   }
 }

@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "isolated|attachment|content type|generated|parser|execute"
+      "explanation_requirements": [
+        "isolated|attachment|content type",
+        "generated|parser|execute"
+      ]
     }
   }
 }

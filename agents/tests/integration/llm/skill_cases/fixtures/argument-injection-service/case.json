@@ -18,7 +18,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "confirmed"
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "argument|option|--output",
+        "remote|untrusted|service account",
+        "config|unauthorized|security boundary"
+      ]
     },
     "exact_output": {
       "crosses_security_boundary": true,

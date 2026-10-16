@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "check|use|replace|symlink|actual|access"
+      "explanation_requirements": [
+        "check|use|replace",
+        "symlink|actual|access"
+      ]
     }
   }
 }

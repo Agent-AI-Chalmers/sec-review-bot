@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "front|backend|differ|framing|next request|smuggl"
+      "explanation_requirements": [
+        "front|backend|differ",
+        "framing|next request|smuggl"
+      ]
     }
   }
 }

@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "pull_request_target|head\\.sha|fork|secret|untrusted|execute"
+      "explanation_requirements": [
+        "pull_request_target|head\\.sha|fork",
+        "secret|untrusted|execute"
+      ]
     }
   }
 }

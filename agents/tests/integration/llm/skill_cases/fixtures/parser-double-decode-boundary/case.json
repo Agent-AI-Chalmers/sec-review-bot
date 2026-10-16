@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "decode|representation|validation|backend|consumer"
+      "explanation_requirements": [
+        "decode|representation|validation",
+        "backend|consumer"
+      ]
     }
   }
 }

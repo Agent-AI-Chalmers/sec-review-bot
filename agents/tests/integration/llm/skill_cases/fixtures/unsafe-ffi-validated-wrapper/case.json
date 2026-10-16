@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "align|lifetime|layout|precondition|wrapper"
+      "explanation_requirements": [
+        "align|lifetime|layout",
+        "precondition|wrapper"
+      ]
     }
   }
 }

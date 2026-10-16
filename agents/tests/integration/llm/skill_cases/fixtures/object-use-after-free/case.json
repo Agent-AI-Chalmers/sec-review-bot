@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "free|lifetime|dangl|dereference|valid"
+      "explanation_requirements": [
+        "free|lifetime|dangl",
+        "dereference|valid"
+      ]
     }
   }
 }

@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "archive|link|entry|order|extract|outside"
+      "explanation_requirements": [
+        "archive|link|entry",
+        "order|extract|outside"
+      ]
     }
   }
 }

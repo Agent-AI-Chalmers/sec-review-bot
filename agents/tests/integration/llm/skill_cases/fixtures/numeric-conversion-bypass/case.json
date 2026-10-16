@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "cast|conversion|unsigned|negative|bounds"
+      "explanation_requirements": [
+        "cast|conversion|unsigned",
+        "negative|bounds"
+      ]
     }
   }
 }

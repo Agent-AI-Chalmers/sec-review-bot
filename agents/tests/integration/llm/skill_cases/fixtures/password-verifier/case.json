@@ -14,7 +14,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "confirmed"
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "password.*verifier|password.*hash",
+        "sha-256|fast.*hash",
+        "offline|database"
+      ]
     }
   }
 }

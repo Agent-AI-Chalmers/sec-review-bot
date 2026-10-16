@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "master|salt|info|output|consumer|unknown|evidence"
+      "explanation_requirements": [
+        "master|salt|info|output",
+        "consumer|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "master.*key|key.*identity|salt|info",
+        "output.*length|helper.*implementation",
+        "consumer|primitive|purpose"
+      ]
     }
   }
 }

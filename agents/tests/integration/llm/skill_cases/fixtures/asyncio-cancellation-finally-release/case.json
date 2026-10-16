@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "finally|release|cancel|propagat|permit"
+      "explanation_requirements": [
+        "finally|release|cancel",
+        "propagat|permit"
+      ]
     }
   }
 }

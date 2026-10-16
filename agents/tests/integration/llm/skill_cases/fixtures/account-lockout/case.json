@@ -15,7 +15,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "confirmed"
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "unauth|public|attacker",
+        "permanent|lock",
+        "recovery|operator|availability"
+      ]
     }
   }
 }

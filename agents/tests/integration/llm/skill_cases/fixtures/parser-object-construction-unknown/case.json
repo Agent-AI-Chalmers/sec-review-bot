@@ -15,8 +15,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "version|type|class|constructor|gadget|unknown|evidence"
+      "explanation_requirements": [
+        "version|type|class|constructor",
+        "gadget|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "framework.*version|type.*resolver",
+        "allowed.*type|class.*path|classpath",
+        "constructor|hook|gadget|side effect"
+      ]
     }
   }
 }

@@ -14,7 +14,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "keyword|checkout|untrusted|sink|script|secrets|write"
+      "explanation_requirements": [
+        "keyword|checkout|untrusted|sink",
+        "script|secrets|write"
+      ]
     }
   }
 }

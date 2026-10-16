@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "artifact|signing|secret|reader|ci|workflow"
+      "explanation_requirements": [
+        "artifact|signing|secret",
+        "reader|ci|workflow"
+      ]
     }
   }
 }

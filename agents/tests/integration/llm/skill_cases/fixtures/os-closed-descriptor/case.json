@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "close-on-exec|cloexec|descriptor|inherit|allowlist"
+      "explanation_requirements": [
+        "close-on-exec|cloexec|descriptor",
+        "inherit|allowlist"
+      ]
     }
   }
 }

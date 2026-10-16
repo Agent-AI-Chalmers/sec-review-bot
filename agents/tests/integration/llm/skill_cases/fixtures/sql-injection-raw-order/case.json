@@ -14,7 +14,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "orderbyraw|sort|identifier|allowlist|sql|structure"
+      "explanation_requirements": [
+        "orderbyraw|sort|identifier",
+        "allowlist|sql|structure"
+      ]
     }
   }
 }

@@ -14,7 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true
+      "proof_gap_requirements": [
+        "encryption key|key.*identity|same key",
+        "derivation|key.*scope"
+      ],
+      "explanation_requirements": [
+        "nonce|same",
+        "key|scope|same key",
+        "unknown|insufficient|not.*confirm"
+      ]
     }
   }
 }

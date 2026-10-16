@@ -12,10 +12,24 @@ class DecisionOracle(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     verdict: SkillVerdict
-    proof_gaps_required: bool = False
-    explanation_requirements: list[str] = Field(default_factory=list)
+    explanation_requirements: list[str] = Field(min_length=2)
     proof_gap_requirements: list[str] = Field(default_factory=list)
-    explanation_pattern: str | None = None
+
+    @field_validator("explanation_requirements", "proof_gap_requirements")
+    @classmethod
+    def validate_requirements(cls, values: list[str]) -> list[str]:
+        if len(values) == 1:
+            raise ValueError(
+                "must contain zero or at least two independent requirements"
+            )
+        for value in values:
+            if not value.strip():
+                raise ValueError("requirements must not be blank")
+            try:
+                re.compile(value)
+            except re.error as exc:
+                raise ValueError(f"invalid requirement regex: {value!r}") from exc
+        return values
 
 
 class ClassificationOracle(BaseModel):

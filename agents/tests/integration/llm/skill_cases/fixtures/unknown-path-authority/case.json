@@ -14,7 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true
+      "proof_gap_requirements": [
+        "directory.*permission|owner|writer",
+        "export.*content|target.*object|mount"
+      ],
+      "explanation_requirements": [
+        "path|root|relative",
+        "writer|permission|export.*content",
+        "unknown|missing|insufficient"
+      ]
     }
   }
 }

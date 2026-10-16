@@ -16,7 +16,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed"
+      "verdict": "not-confirmed",
+      "explanation_requirements": [
+        "argument|option|--output",
+        "local user|own.*permission|intended",
+        "no.*boundary|not.*vulnerab|not.*security"
+      ]
     },
     "exact_output": {
       "crosses_security_boundary": false,

@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "entity|expan|memory|resource|unbounded"
+      "explanation_requirements": [
+        "entity|expan|memory",
+        "resource|unbounded"
+      ]
     }
   }
 }

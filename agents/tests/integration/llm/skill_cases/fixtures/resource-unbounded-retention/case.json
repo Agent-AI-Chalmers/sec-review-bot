@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "unbounded|retain|concurr|admission|cleanup|resource"
+      "explanation_requirements": [
+        "unbounded|retain|concurr",
+        "admission|cleanup|resource"
+      ]
     }
   }
 }

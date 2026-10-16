@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "client|server|authori[sz]ation|trusted boundary|403"
+      "explanation_requirements": [
+        "client|server|authori[sz]ation",
+        "trusted boundary|403"
+      ]
     }
   }
 }

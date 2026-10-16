@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "subject|actor|audience|scope|resource|bound"
+      "explanation_requirements": [
+        "subject|actor|audience",
+        "scope|resource|bound"
+      ]
     }
   }
 }

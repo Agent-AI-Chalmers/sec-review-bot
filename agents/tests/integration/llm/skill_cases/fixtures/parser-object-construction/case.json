@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "pickle|object|construct|deserial|attacker|code execution"
+      "explanation_requirements": [
+        "pickle|object|construct",
+        "deserial|attacker|code execution"
+      ]
     }
   }
 }

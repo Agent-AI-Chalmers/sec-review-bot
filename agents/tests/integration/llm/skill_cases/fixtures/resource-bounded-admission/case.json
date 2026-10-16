@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "bound|admission|deadline|cleanup|fixed"
+      "explanation_requirements": [
+        "bound|admission|deadline",
+        "cleanup|fixed"
+      ]
     }
   }
 }

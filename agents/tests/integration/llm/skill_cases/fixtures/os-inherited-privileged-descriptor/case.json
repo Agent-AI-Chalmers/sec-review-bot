@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "descriptor|inherit|exec|close-on-exec|authority"
+      "explanation_requirements": [
+        "descriptor|inherit|exec",
+        "close-on-exec|authority"
+      ]
     }
   }
 }

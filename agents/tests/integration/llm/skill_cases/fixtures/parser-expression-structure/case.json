@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "structure|expression|helper|file|escaping|authority"
+      "explanation_requirements": [
+        "structure|expression|helper",
+        "file|escaping|authority"
+      ]
     }
   }
 }

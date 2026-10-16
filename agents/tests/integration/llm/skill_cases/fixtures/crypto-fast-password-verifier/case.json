@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "password|offline|salt|cost|sha"
+      "explanation_requirements": [
+        "password|offline|salt",
+        "cost|sha"
+      ]
     }
   }
 }

@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "concurr|atomic|invariant|both|lock|transaction"
+      "explanation_requirements": [
+        "concurr|atomic|invariant",
+        "both|lock|transaction"
+      ]
     }
   }
 }

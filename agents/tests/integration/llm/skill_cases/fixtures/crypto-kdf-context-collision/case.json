@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "hkdf|info|context|same|tenant|derived|key"
+      "explanation_requirements": [
+        "hkdf|info|context|same",
+        "tenant|derived|key"
+      ]
     }
   }
 }

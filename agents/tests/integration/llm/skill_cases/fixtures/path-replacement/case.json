@@ -16,7 +16,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "confirmed"
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "contain|check",
+        "replace|symlink|race",
+        "service|secret|outside"
+      ]
     }
   }
 }

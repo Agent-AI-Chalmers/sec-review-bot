@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "request\\.args|requests\\.get|server-side|fetch|host|private|ssrf"
+      "explanation_requirements": [
+        "request\\.args|requests\\.get|server-side|fetch",
+        "host|private|ssrf"
+      ]
     }
   }
 }

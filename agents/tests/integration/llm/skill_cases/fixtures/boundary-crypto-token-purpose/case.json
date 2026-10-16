@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "signature|audience|type|purpose|session"
+      "explanation_requirements": [
+        "signature|audience|type",
+        "purpose|session"
+      ]
     }
   }
 }

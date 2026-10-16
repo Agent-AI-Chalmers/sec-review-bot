@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "abstract|local|peer|credential|permission|unprivileged"
+      "explanation_requirements": [
+        "abstract|local|peer",
+        "credential|permission|unprivileged"
+      ]
     }
   }
 }

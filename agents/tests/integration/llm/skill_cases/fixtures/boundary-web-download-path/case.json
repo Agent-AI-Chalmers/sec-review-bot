@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "path|filesystem|read|contain|traversal|credentials"
+      "explanation_requirements": [
+        "path|filesystem|read",
+        "contain|traversal|credentials"
+      ]
     }
   }
 }

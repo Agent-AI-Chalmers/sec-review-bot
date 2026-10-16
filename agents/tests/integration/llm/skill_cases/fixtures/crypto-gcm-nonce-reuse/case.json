@@ -16,7 +16,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "same key|reuse|unique|gcm|nonce"
+      "explanation_requirements": [
+        "same key|reuse|unique",
+        "gcm|nonce"
+      ]
     }
   }
 }

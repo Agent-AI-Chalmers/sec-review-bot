@@ -14,7 +14,16 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true
+      "proof_gap_requirements": [
+        "request.*rate|concurr",
+        "upstream|timeout|cancel",
+        "worker.*capacity|admission|queue"
+      ],
+      "explanation_requirements": [
+        "timeout|network.*call",
+        "rate|concurr|capacity|admission",
+        "unknown|missing|insufficient"
+      ]
     }
   }
 }

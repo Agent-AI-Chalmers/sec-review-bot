@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "ffi|align|layout|pointer|precondition"
+      "explanation_requirements": [
+        "ffi|align|layout",
+        "pointer|precondition"
+      ]
     }
   }
 }

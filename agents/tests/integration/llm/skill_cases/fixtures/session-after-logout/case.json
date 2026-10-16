@@ -15,7 +15,12 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "confirmed"
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "logout|session",
+        "remain.*valid|not.*invalid|old.*token",
+        "attacker|account|authenticated"
+      ]
     }
   }
 }

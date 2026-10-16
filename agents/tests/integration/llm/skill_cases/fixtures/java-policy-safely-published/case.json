@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "immutable|final|volatile|happens-before|publish"
+      "explanation_requirements": [
+        "immutable|final|volatile",
+        "happens-before|publish"
+      ]
     }
   }
 }

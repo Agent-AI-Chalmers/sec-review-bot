@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "goroutine|channel|context|cancel|blocked|retain"
+      "explanation_requirements": [
+        "goroutine|channel|context",
+        "cancel|blocked|retain"
+      ]
     }
   }
 }

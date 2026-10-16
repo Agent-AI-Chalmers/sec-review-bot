@@ -14,7 +14,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "reject|before|downstream|consistent|close"
+      "explanation_requirements": [
+        "reject|before|downstream",
+        "consistent|close"
+      ]
     }
   }
 }

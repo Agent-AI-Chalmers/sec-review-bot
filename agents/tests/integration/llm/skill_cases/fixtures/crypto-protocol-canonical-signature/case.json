@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "protocol|binary|same bytes|scheme|low-S|JSON"
+      "explanation_requirements": [
+        "protocol|binary|same bytes",
+        "scheme|low-s|json"
+      ]
     }
   }
 }

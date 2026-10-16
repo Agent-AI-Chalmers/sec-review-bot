@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "cooperative|interrupt|token|API|cleanup|unknown"
+      "explanation_requirements": [
+        "cooperative|interrupt|token",
+        "api|cleanup|unknown"
+      ],
+      "proof_gap_requirements": [
+        "runtime.*target|blocking.*api|operation",
+        "cooperative|interrupt|token|cancel.*behavior",
+        "cleanup|admission|bound|capacity"
+      ]
     }
   }
 }

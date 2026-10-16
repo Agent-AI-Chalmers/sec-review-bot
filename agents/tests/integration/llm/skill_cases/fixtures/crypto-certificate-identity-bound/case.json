@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "path|reference identity|api.example.com|constraint|usage|match"
+      "explanation_requirements": [
+        "path|reference identity|api.example.com",
+        "constraint|usage|match"
+      ]
     }
   }
 }

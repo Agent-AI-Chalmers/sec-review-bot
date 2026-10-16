@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "confirmed",
-      "explanation_pattern": "AbortSignal|promise|fetch|continue|connection|resource"
+      "explanation_requirements": [
+        "abortsignal|promise|fetch",
+        "continue|connection|resource"
+      ]
     }
   }
 }

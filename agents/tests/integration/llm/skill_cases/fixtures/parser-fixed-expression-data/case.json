@@ -15,7 +15,10 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "explanation_pattern": "fixed|allowlist|data|structure|expression"
+      "explanation_requirements": [
+        "fixed|allowlist|data",
+        "structure|expression"
+      ]
     }
   }
 }

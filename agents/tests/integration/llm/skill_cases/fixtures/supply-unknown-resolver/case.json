@@ -14,8 +14,15 @@
   "oracles": {
     "decision": {
       "verdict": "not-confirmed",
-      "proof_gaps_required": true,
-      "explanation_pattern": "resolver|precedence|candidate|namespace|version|unknown|evidence"
+      "explanation_requirements": [
+        "resolver|precedence|candidate|namespace",
+        "version|unknown|evidence"
+      ],
+      "proof_gap_requirements": [
+        "source.*precedence|registry|resolver",
+        "namespace.*owner|candidate.*version",
+        "lock|install.*command"
+      ]
     }
   }
 }
