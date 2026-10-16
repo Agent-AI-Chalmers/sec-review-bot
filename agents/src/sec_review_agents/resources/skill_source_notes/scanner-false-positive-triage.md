@@ -171,3 +171,14 @@ Potential reference files:
 
 - `references/reachability-and-context.md`
 - `references/scanner-noise-patterns.md`
+
+## Audited boundary corrections
+
+Reviewed 2026-10-16. The following are narrow corrections; the older scanner-source ledger remains background and is not evidence of model improvement.
+
+| Rule group and location | Support | Adoption and limits |
+| --- | --- | --- |
+| TRIAGE-1: knowledge boundary, no cross-skill instructions; `SKILL.md` | Local contracts: `agents/triage/skills.py` exposes only this skill; `agents/triage/backend.py` provides no workspace view; `docs/agent/SKILLS.md`, Skill Selection Level | State the reference's limits directly. The workflow owns subsequent analysis. A skill must not require unavailable domain skills. This is project architecture policy, not a claim established by scanner vendors. |
+| TRIAGE-2: payload evidence versus independent inspection; `SKILL.md` and `reachability-and-context.md`, Minimum Evidence Shape | Same local backend contract; the existing Source Findings and Claim Ledger distinguish missing context from evidence of non-reachability | Repository evidence may be supplied by a candidate payload. Do not imply this agent inspected the repository or infer absence from missing payload detail. Keep a plausible lead when necessary technical context is unresolved. |
+| TRIAGE-3: filesystem guard scope; `reachability-and-context.md`, Guard Context | [CWE-367](https://cwe.mitre.org/data/definitions/367.html), Description; [Linux access(2)](https://man7.org/linux/man-pages/man2/access.2.html), NOTES warning | A normalization/containment check does not establish that the same object is used later if an attacker can replace it. Preserve uncertainty about replacement and API semantics. |
+| TRIAGE-4: guard semantics and internal/admin labels; `scanner-noise-patterns.md`, Context Mismatch | [OWASP Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), “Validate the Permissions on Every Request”; existing ledger “Context and guards change confidence” | Relevant controls must protect the affected operation against the relevant actor. A check name, normalization step or internal label alone is not sufficient. This does not require a complete exploit at early triage. |

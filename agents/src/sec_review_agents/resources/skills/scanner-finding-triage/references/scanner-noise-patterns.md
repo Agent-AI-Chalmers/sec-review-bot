@@ -32,8 +32,8 @@ Lower confidence when the finding depends on assumptions contradicted by reposit
 
 - scanner inferred a version, feature, or mode that the repository does not use;
 - flagged code is test-only, sample-only, migration-only, generated, or unreachable;
-- the dangerous value is fixed, normalized, allowlisted, escaped, or checked before the sink;
-- the route is internal/admin-only and protected by visible controls;
+- the dangerous value is constrained by controls whose scope and semantics cover the observed sink; normalization, escaping, or a check name alone does not establish coverage;
+- the route is protected against the relevant attacker by controls covering the affected operation; an internal/admin label alone does not establish safety;
 - the candidate crosses no meaningful privilege, tenant, network, or data boundary.
 
 ## Evidence-Backed Rejection Rationale

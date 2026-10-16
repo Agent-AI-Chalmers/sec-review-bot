@@ -12,7 +12,7 @@ A candidate is stronger when it identifies:
 - path: route, function, workflow job, import/call graph, handler chain, middleware order, or artifact flow connecting source and sink;
 - effect: data disclosure, code execution, privilege change, policy bypass, request forgery, filesystem access, or other concrete security impact.
 
-Early triage does not need to prove every element. It should decide whether enough elements exist for deeper review to resolve the rest.
+Early triage does not need to prove every element. It should decide whether enough elements exist for deeper review to resolve the rest. When the stage only receives candidate payloads, missing call paths or configuration remain unknown; do not infer non-reachability from their absence.
 
 ## Reachability Checks
 
@@ -32,7 +32,7 @@ Lower confidence when repository evidence shows complete guard coverage:
 - authorization checks cover the same object, tenant, role, or action;
 - validation constrains the dangerous part of the input, not only a neighboring field;
 - sanitization or encoding is context-appropriate for the sink;
-- path normalization is followed by containment checks before filesystem access;
+- filesystem containment applies to the object actually accessed, including relevant link resolution and replacement between checking and use;
 - allowlists are specific enough to prevent attacker-selected sensitive targets;
 - middleware or framework controls execute before the route or handler.
 

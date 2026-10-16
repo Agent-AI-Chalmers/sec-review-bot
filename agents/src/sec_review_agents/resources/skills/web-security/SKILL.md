@@ -1,6 +1,6 @@
 ---
 name: web-security
-description: "Use as a reference for web security source/sink analysis, guard evaluation, report conditions, and false-positive precedents across application security review, discovery, triage, validation, and verification."
+description: "Use as a reference for web security: authentication, authorization, browser boundaries, and application injection, file handling, deserialization, or secrets exposure. The application sink references also apply to workers, CLI services, and repository automation when attacker influence crosses a security boundary."
 ---
 
 # Web Security Reference Skill

@@ -1,6 +1,6 @@
 # Authentication And Session Reference
 
-Use this reference for authentication bypass, session fixation, token validation mistakes, JWT/OAuth/OIDC implementation errors, password reset flows, and cookie/session handling.
+Use this reference for authentication bypass, session fixation, token validation mistakes, JWT/OAuth/OIDC implementation errors, password reset flows, credential protection, authentication availability, and cookie/session lifecycle handling.
 
 ## Sources
 
@@ -13,7 +13,7 @@ Use this reference for authentication bypass, session fixation, token validation
 
 - Session creation, account linking, login-as, impersonation, password/token reset, role assignment during registration, and trusted identity mapping.
 - JWT verification, OAuth/OIDC token exchange, userinfo lookup, callback processing, token refresh, and session cookie issuance.
-- Password hashing and comparison, MFA verification, reset-token validation, and session invalidation.
+- Password storage, hashing and comparison, MFA verification, reset-token validation, session invalidation, and account lockout or login-attempt handling.
 
 ## Guards
 
@@ -21,16 +21,20 @@ Use this reference for authentication bypass, session fixation, token validation
 - Bind password reset, magic link, invitation, and OAuth state to the intended user/session and expire single-use tokens.
 - Do not trust user identity, role, tenant, or email claims unless they come from a verified token or trusted server-side lookup.
 - Set session cookies with appropriate `HttpOnly`, `Secure`, and `SameSite` attributes when browser cookie sessions protect sensitive actions.
-- Invalidate or rotate sessions/tokens after privilege changes, password reset, and sensitive account recovery.
+- Check the session/token lifecycle required by the application: renewal after authentication or privilege changes, expiry, logout, recovery, and revocation. Verify which sessions and tokens an event actually invalidates; do not assume that terminating an identity-provider session terminates every relying-party session.
+- For stored passwords, inspect the password hashing scheme, salt, and work factor in the relevant implementation. Distinguish an offline credential-compromise threat from online login guessing.
+- Inspect whether login throttling or lockout can be bypassed or attacker-triggered against another account; absence of a named rate-limit mechanism alone is not proof.
 
 ## Report Conditions
 
-Report only when repository evidence shows:
+Establish the affected authentication asset or operation, the failing control, the relevant attacker capability, and the resulting security effect. The evidence shape depends on the failure:
 
-- an attacker can influence authentication/session input;
-- the code accepts or transforms that input into an authenticated identity/session/privilege;
-- required verification or binding is missing, bypassed, or checked against the wrong value;
-- impact is account takeover, authentication bypass, session theft/fixation, privilege escalation, or cross-account linking.
+- Identity or account-binding failure: attacker-influenced input is accepted as an unauthorized identity, account link, or privilege because verification or binding is missing, bypassed, or applied to the wrong value.
+- Session lifecycle failure: a token or session remains usable beyond the boundary it is meant to enforce, such as logout, expiry, revocation, or an account/privilege transition. Establish the application's intended boundary and the attacker's ability to use the surviving credential.
+- Credential protection failure: actual password/credential handling enables disclosure or materially weakens resistance to compromise. State assumptions such as an attacker obtaining the stored verifier; do not invent a repository leak or require this defect to create a new authenticated session itself.
+- Authentication availability or guessing failure: attacker-triggerable behavior enables a concrete account lockout or credible guessing path. Explain the attempt scope, limits, recovery, and attacker effort rather than reporting a missing mechanism by name.
+
+A mismatch with a standard's assurance level or preferred configuration alone is not a confirmed repository vulnerability.
 
 ## False-Positive Precedents
 

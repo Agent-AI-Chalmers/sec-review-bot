@@ -18,6 +18,8 @@ Use this reference for operating system command execution, shell wrappers, conve
 
 - Prefer APIs that execute a fixed binary with a fixed argument vector and no shell interpreter.
 - Treat executable path, subcommand, flags, config files, working directory, environment, and input files as security-relevant, not only shell metacharacters.
+- Trace the exact child-process argument vector through the downstream parser. A value passed as one array element may still be interpreted as an option, including parsers that accept a single `--flag=value` element; do not infer positional treatment from the caller's variable name or array position.
+- For a suspected option injection, substitute one concrete candidate into the array and apply the child's option grammar. For example, `[tool, user_value]` with `user_value="--output=/tmp/result"` produces the two-element argv `[tool, "--output=/tmp/result"]`; the second element can be an option. Keeping input in one element prevents whitespace-based argument splitting, not option recognition of that element.
 - Use strict allowlists for externally selected tools, modes, flags, and filenames.
 - Quote/escape only as a last resort and only with library routines for the exact shell/platform.
 - Isolate risky converters/build tools and avoid passing secrets to jobs that process attacker-controlled content.
@@ -34,6 +36,7 @@ Report only when repository evidence shows:
 ## False-Positive Precedents
 
 - Argument-array process execution is not automatically vulnerable; inspect whether attacker input can become the executable, dangerous flag, config path, or script selector.
+- Keep mechanism and authority separate: a caller-controlled value may successfully select a dangerous option while still not be a vulnerability when the caller only exercises their own intended local authority. Conversely, a service parsing the same value under delegated privileges may cross a security boundary.
 - Shell metacharacter absence is not enough if input controls flags such as output path, config loading, template execution, or remote include behavior.
 - Test-only helper commands are not findings unless reachable in production or privileged automation.
 - A command name in code is not a finding without attacker influence and reachable execution.
