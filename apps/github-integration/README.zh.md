@@ -149,6 +149,8 @@ sec_review_bot:
 - 配置始终从**默认分支**读取（经 GitHub API 解析），绝不来自 PR base ref 或 repository-review 的 `target_branch`。因此扫描非默认分支时，使用的是默认分支的 `trigger_mode` / `paths_ignore`。
 - 仓库配置不支持选择 workspace image。GitHub App 不会从 `.sec-review/config.yml` 解析 image 配置字段。
 
+仓库还可以用 [`.sec-review/setup.yml`](../../.sec-review/setup.yml) 声明如何为 agent 准备依赖齐全的环境。GitHub integration 会在提交运行前从默认分支读取并校验该声明；其格式由 [setup declaration 契约](../../contracts/setup-declaration/README.zh.md) 定义，设计缘由见 [Trusted Setup](../../docs/workflows/TRUSTED_SETUP.zh.md)。
+
 ### 手动命令
 
 这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review`。
