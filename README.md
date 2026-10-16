@@ -144,7 +144,6 @@ Package-specific setup and commands live in the package READMEs.
 | GitHub integration development                 | [GitHub integration guide](apps/github-integration/README.md)                       |
 | Agent backend development and local runs       | [Agents local run guide](agents/README.md)                                          |
 | GitHub inbound routing to local                | [Local GitHub inbound setup](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md)         |
-| Repository setup declarations                  | [Setup declarations](docs/workflows/TRUSTED_SETUP.md)                               |
 
 ## Publication
 
