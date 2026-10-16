@@ -3,7 +3,9 @@
   "id": "crypto-public-checksum",
   "skill": "cryptography-security",
   "reference": "password-verifiers.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess the claim that a fast hash weakens password storage.",
   "facts": [
     "SHA-256 is applied only to public image bytes to form a cache key.",

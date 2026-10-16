@@ -21,8 +21,8 @@ The loader rejects unknown fields, duplicate IDs, unknown skills, and unknown re
 {
   "schema_version": 1,
   "id": "example-case",
-  "skill": "web-security",
-  "reference": "path-traversal.md",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-path-policy.md",
   "modes": ["prompted"],
   "task": "Assess whether the requested file can escape the export root.",
   "facts": [

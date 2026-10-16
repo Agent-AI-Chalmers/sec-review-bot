@@ -1,6 +1,6 @@
-# Command Injection Reference
+# Process Execution Input
 
-Use this reference for operating system command execution, shell wrappers, converters, archive tools, media tools, source-control commands, package managers, and child processes influenced by attacker input.
+Use this reference for shell commands and child-process behavior influenced by attacker input. This includes option injection even when no shell parses the value.
 
 ## Sources
 
@@ -29,7 +29,7 @@ Use this reference for operating system command execution, shell wrappers, conve
 Report only when repository evidence shows:
 
 - attacker-controlled data influences a command, executable, argument with command semantics, environment, config, or working directory;
-- the command is reachable in a server, worker, CI, or privileged local path;
+- the process runs with authority, data access, or delegated behavior the attacker is not already entitled to exercise;
 - validation does not constrain the value to safe constants for that sink;
 - impact includes arbitrary command execution, file read/write, code execution through plugin/script behavior, secret exposure, or privileged action.
 

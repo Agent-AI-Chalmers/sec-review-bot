@@ -60,3 +60,25 @@ Claim ledger:
 - Claim: `CI_JOB_TOKEN`, trigger tokens, deploy credentials, artifacts, and caches matter when untrusted pipeline data can influence a privileged job.
   Primary source: GitLab CI job token docs and GitLab pipeline security docs.
   Adoption note: Require attacker role, source-to-sink path, and concrete privileged effect.
+
+## secret-and-artifact-exposure
+
+Primary sources:
+
+- https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions
+- https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
+- https://docs.gitlab.com/ci/variables/
+- https://docs.gitlab.com/ci/jobs/job_artifacts/
+- https://docs.docker.com/build/building/secrets/
+
+Claim ledger:
+
+- Claim: Log masking is limited to values the platform recognizes and does not protect files, transformed values, artifacts, caches, or deliberate exfiltration by code that can read a secret.
+  Primary source: GitHub Actions secrets docs; GitLab CI/CD variables docs.
+  Adoption note: Masking limitations are investigation guidance, not proof that a job exposes a secret.
+- Claim: Build artifacts have explicit readers and retention behavior that must be checked before calling an uploaded file public or unauthorized.
+  Primary source: GitHub artifact docs; GitLab job artifacts docs.
+  Adoption note: Require a concrete artifact path and unauthorized reader.
+- Claim: Build arguments and environment variables can persist in image metadata or layers and are unsuitable for build secrets; secret mounts avoid persisting the secret as build input.
+  Primary source: Docker Build secrets docs.
+  Adoption note: Verify the actual builder and published layers. A Dockerfile keyword alone is insufficient.

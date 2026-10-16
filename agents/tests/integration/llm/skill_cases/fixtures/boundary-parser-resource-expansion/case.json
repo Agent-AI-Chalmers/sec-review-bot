@@ -3,7 +3,9 @@
   "id": "boundary-parser-resource-expansion",
   "skill": "parser-protocol-security",
   "reference": "parser-capabilities.md",
-  "modes": ["natural"],
+  "modes": [
+    "natural"
+  ],
   "task": "Assess the enabled parser capability and resulting finite-resource cost.",
   "facts": [
     "An unauthenticated endpoint parses attacker-controlled XML with internal entity expansion enabled.",

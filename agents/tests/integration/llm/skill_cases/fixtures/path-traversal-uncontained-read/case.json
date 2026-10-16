@@ -1,10 +1,11 @@
 {
   "schema_version": 1,
   "id": "path-traversal-uncontained-read",
-  "skill": "web-security",
-  "reference": "path-traversal.md",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-path-policy.md",
   "modes": [
-    "prompted"
+    "prompted",
+    "natural"
   ],
   "task": "Assess whether the download handler contains an attacker-controlled path before reading it.",
   "facts": [

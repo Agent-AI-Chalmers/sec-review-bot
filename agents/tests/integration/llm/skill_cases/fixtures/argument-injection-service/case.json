@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "id": "argument-injection-service",
-  "skill": "web-security",
-  "reference": "command-injection.md",
+  "skill": "os-boundary-security",
+  "reference": "process-execution-input.md",
   "modes": [
     "prompted",
     "natural",

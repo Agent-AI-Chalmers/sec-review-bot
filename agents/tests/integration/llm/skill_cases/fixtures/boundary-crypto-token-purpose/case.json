@@ -3,7 +3,9 @@
   "id": "boundary-crypto-token-purpose",
   "skill": "cryptography-security",
   "reference": "verification-contracts.md",
-  "modes": ["natural"],
+  "modes": [
+    "natural"
+  ],
   "task": "Assess cryptographic validity and the authentication/session purpose boundary.",
   "facts": [
     "The service correctly verifies a token signature with a trusted issuer key.",

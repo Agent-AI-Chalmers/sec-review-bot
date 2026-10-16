@@ -1,4 +1,4 @@
-# Path Traversal Source/Sink Reference
+# Filesystem Path Policy
 
 Use this reference when a lead involves attacker-influenced paths, filenames, archive entries, filesystem reads/writes, downloads, or static file serving.
 
@@ -16,7 +16,7 @@ Use this reference when a lead involves attacker-influenced paths, filenames, ar
 ## Guards
 
 - Establish containment for the object actually accessed. For pathname-based guards, inspect decoding, normalization, root comparison, separators, case sensitivity where relevant, and link resolution using the target platform semantics.
-- A resolved path checked before a later open/write is not sufficient when an attacker can replace a relevant directory, link, or target in between. Inspect whether constrained resolution, stable directory/file handles, or equivalent controls bind the operation to the authorized object; verify the exact API and flags rather than assuming that a handle or no-follow option covers every path component.
+- If safety depends on whether a checked pathname still identifies the object later accessed, also read `filesystem-resolution.md` and verify the target platform's APIs and flags.
 - Use allowlisted object identifiers when possible instead of raw paths.
 - Archive extraction should reject absolute paths, parent traversal, symlinks/hardlinks when unsafe, and duplicate or normalized conflicting entries.
 
@@ -29,5 +29,5 @@ Use this reference when a lead involves attacker-influenced paths, filenames, ar
 ## False-Positive Precedents
 
 - Merely joining strings into a path is not a vulnerability if the input is not attacker-controlled or the resolved target is contained by a verified guard.
-- Extension checks, basename extraction, or string prefix checks do not by themselves establish containment. A safe handle-based operation need not first construct a canonical pathname; verify its object and resolution constraints.
+- Extension checks, basename extraction, or string prefix checks do not by themselves establish containment. A constrained operation can establish containment without constructing a canonical pathname; verify its object and resolution constraints.
 - UI-visible filenames or client-side path strings are only leads; trusted-side file operations determine exploitability.

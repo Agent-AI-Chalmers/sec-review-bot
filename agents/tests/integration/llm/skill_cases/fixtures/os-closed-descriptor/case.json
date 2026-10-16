@@ -3,7 +3,9 @@
   "id": "os-closed-descriptor",
   "skill": "os-boundary-security",
   "reference": "process-authority-inheritance.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess the claim that the helper inherits the daemon's privileged descriptor.",
   "facts": [
     "The descriptor is opened with O_CLOEXEC and verified to have FD_CLOEXEC before execve.",

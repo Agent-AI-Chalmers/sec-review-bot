@@ -1,6 +1,6 @@
-# Deserialization Source/Sink Reference
+# Object Construction From Serialized Data
 
-Use this reference when a lead involves serialized data, object reconstruction, YAML parsing, uploaded import files, cookie/session blobs, or message queue payloads. XML/XXE issues are related parser/entity-expansion problems, not object-deserialization gadget-chain issues; use the XML bullets below only for XML parser leads.
+Use this reference when untrusted serialized data can select runtime types, constructors, hooks, or executable object behavior. For external entities, includes, expansion, or other parser features, use `parser-capabilities.md`.
 
 ## Sources
 
@@ -13,18 +13,17 @@ Use this reference when a lead involves serialized data, object reconstruction, 
 - PHP: `unserialize` on request/cookie/upload data, especially without `allowed_classes`.
 - Java: `ObjectInputStream`, unsafe polymorphic JSON typing, framework-specific type metadata such as `@type` when reachable from untrusted input.
 - .NET: `BinaryFormatter`, `NetDataContractSerializer`, `ObjectStateFormatter`, unsafe ViewState patterns.
-- XML/XXE parser leads: external entity resolution, DTD loading, unsafe XInclude, entity expansion, or parser defaults that allow external resources. These can cause file disclosure, SSRF, or denial of service without an object gadget chain.
 
 ## Guards
 
 - Prefer safe data formats and schema validation over object deserialization.
-- Use safe YAML loaders, disable XML external entities/DTDs, restrict allowed classes/types, and verify signatures only when they cover the exact payload before parsing.
+- Use data-only parsers, safe YAML loaders and explicit allowed classes/types. Verify signatures only when they cover the exact payload before object construction.
 - A guard only covers the object set it actually checks; type allowlists, signatures, and schema validation must be tied to the same parsed representation.
 
 ## Report Conditions
 
 - Show untrusted serialized input reaching a dangerous parser or object reconstruction sink.
-- Explain the security effect: code execution, object injection, file disclosure via XXE, state tampering, or privileged action.
+- Explain the security effect: code execution, object injection, state tampering, or privileged action.
 - If object-deserialization exploitation depends on a gadget chain or deployment library behavior not established by repository evidence, use a lower-confidence verdict with proof gaps rather than confirmed vulnerability.
 
 ## False-Positive Precedents

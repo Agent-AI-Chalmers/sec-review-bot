@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "id": "path-replacement",
-  "skill": "web-security",
-  "reference": "path-traversal.md",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-path-policy.md",
   "modes": [
     "prompted"
   ],

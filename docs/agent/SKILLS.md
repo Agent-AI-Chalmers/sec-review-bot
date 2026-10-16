@@ -60,7 +60,7 @@ deepagents only reads the source paths it is given. It does not choose or filter
 
 Some external skills or commands cover capabilities this project already implements as workflows. Anthropic's [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) describes "perform security review", and OrchestKit's [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) describes "review a PR". Here, those capabilities are built into the public workflows and their review stages rather than one standalone skill.
 
-Bundled skills stay one layer below the project goal: CWE taxonomy navigation, web security references, CI security references, source / sink / guard, and common false-positive precedents. They provide reusable security knowledge and judgment aids without redefining the workflow.
+Bundled skills stay one layer below the project goal. They provide CWE taxonomy navigation, finding triage, and narrow domain references for web, CI, memory/numeric, cryptography, concurrency/resource, OS boundaries, and parser/protocol security. Domain ownership follows the mechanism: process invocation and filesystem authority belong to OS boundaries; object construction belongs to parser security; web and CI each own only the sensitive-data sinks on their surfaces. These skills provide reusable security knowledge and judgment aids without redefining the workflow.
 
 ### Developer Source Notes
 

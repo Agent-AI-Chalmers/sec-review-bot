@@ -92,22 +92,18 @@ def test_materialize_agent_skills_view_includes_reference_skills(
     assert (skills_root / "web-security" / "references" / "auth-session.md").is_file()
     assert (skills_root / "web-security" / "references" / "ssrf.md").is_file()
     assert (skills_root / "web-security" / "references" / "sql-injection.md").is_file()
-    assert (
-        skills_root / "web-security" / "references" / "command-injection.md"
-    ).is_file()
     assert (skills_root / "web-security" / "references" / "csrf.md").is_file()
     assert (skills_root / "web-security" / "references" / "file-upload.md").is_file()
     assert (
-        skills_root / "web-security" / "references" / "secrets-exposure.md"
+        skills_root / "web-security" / "references" / "sensitive-data-exposure.md"
     ).is_file()
     assert (skills_root / "web-security" / "references" / "xss.md").is_file()
-    assert (skills_root / "web-security" / "references" / "path-traversal.md").is_file()
-    assert (
-        skills_root / "web-security" / "references" / "deserialization.md"
-    ).is_file()
     assert (skills_root / "ci-security" / "SKILL.md").is_file()
     assert (skills_root / "ci-security" / "references" / "github-actions.md").is_file()
     assert (skills_root / "ci-security" / "references" / "gitlab-ci.md").is_file()
+    assert (
+        skills_root / "ci-security" / "references" / "secret-and-artifact-exposure.md"
+    ).is_file()
     assert (skills_root / "scanner-finding-triage" / "SKILL.md").is_file()
     scanner_references = skills_root / "scanner-finding-triage" / "references"
     assert (scanner_references / "reachability-and-context.md").is_file()
@@ -116,7 +112,25 @@ def test_materialize_agent_skills_view_includes_reference_skills(
     assert (skills_root / "cryptography-security" / "SKILL.md").is_file()
     assert (skills_root / "concurrency-resource-security" / "SKILL.md").is_file()
     assert (skills_root / "os-boundary-security" / "SKILL.md").is_file()
+    assert (
+        skills_root
+        / "os-boundary-security"
+        / "references"
+        / "process-execution-input.md"
+    ).is_file()
+    assert (
+        skills_root
+        / "os-boundary-security"
+        / "references"
+        / "filesystem-path-policy.md"
+    ).is_file()
     assert (skills_root / "parser-protocol-security" / "SKILL.md").is_file()
+    assert (
+        skills_root
+        / "parser-protocol-security"
+        / "references"
+        / "object-construction.md"
+    ).is_file()
     assert not (skills_root / "skill_source_notes").exists()
 
 
