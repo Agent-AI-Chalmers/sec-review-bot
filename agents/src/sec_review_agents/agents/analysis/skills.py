@@ -4,5 +4,4 @@ ANALYSIS_AGENT_SKILLS = (
     "cwe",
     "web-security",
     "ci-security",
-    "language-framework-security",
 )

@@ -16,7 +16,6 @@ Probe-agent tests also require `LLM_TEST_DEPLOYMENT=<deployment name>`. Product 
 | CWE skill | `RUN_LLM_CWE_SKILL_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks that a probe agent can read and apply the CWE skill. |
 | Reference skill probes | `RUN_LLM_REFERENCE_SKILL_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks explicit progressive-disclosure skill reading. |
 | Reference skill contrast | `RUN_LLM_REFERENCE_SKILL_CONTRAST=1` | `LLM_TEST_DEPLOYMENT` | Compares natural review behavior with and without reference skills. |
-| Language/framework skill probe | `RUN_LLM_LANGUAGE_FRAMEWORK_SKILL_PROBE=1` | `LLM_TEST_DEPLOYMENT` | Checks explicit language/framework skill reading. |
 | CodeGraph MCP smoke | `RUN_LLM_CODEGRAPH_MCP_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT`, `codegraph` on `PATH` | Checks local CodeGraph MCP wiring. |
 
 Example:
@@ -61,7 +60,6 @@ These use real workflow agents and normal deployment bindings.
 | Issue review narratives | `RUN_LLM_ISSUE_REVIEW_INTEGRATION=1` | issue analyzer binding | Runs the issue analyzer on small synthetic cases. |
 | False-positive precedent | `RUN_LLM_FALSE_POSITIVE_PRECEDENT_INTEGRATION=1` | pull-request analyzer binding | Checks precedent-guided false-positive handling. |
 | Delivery workbench | `RUN_LLM_DELIVERY_WORKBENCH_INTEGRATION=1` | delivery planning binding | Checks delivery planning workbench use. |
-| Discovery skill usage | `RUN_LLM_DISCOVERY_SKILL_INTEGRATION=1` | discovery binding | Checks discovery agent skill usage on inline source. |
 | Triage skill usage | `RUN_LLM_TRIAGE_SKILL_INTEGRATION=1` | triage binding | Checks triage agent skill usage on scanner-shaped candidates. |
 
 Example:
@@ -80,7 +78,6 @@ Heavy probes should be run deliberately. They may start Docker containers, run f
 | --- | --- | --- | --- |
 | Analyzer Docker + CodeGraph | `RUN_LLM_ANALYZER_CODEGRAPH_DOCKER_INTEGRATION=1` | repository analyzer binding, `sec-review-bot-workspace:codegraph` image | Compares analyzer behavior with and without CodeGraph on a cross-file case. |
 | CodeGraph public checkout | `RUN_LLM_CODEGRAPH_REAL_CHECKOUT_INTEGRATION=1` | issue analyzer binding, `sec-review-bot-workspace:codegraph` image, network for clone | Runs a pinned public vulnerable checkout comparison. |
-| Language/framework skill contrast | `RUN_LLM_LANGUAGE_FRAMEWORK_SKILL_CONTRAST=1` | issue analyzer binding, Docker | Runs the issue analyzer with and without the language/framework skill. |
 
 Build the CodeGraph workspace image when a probe needs it:
 

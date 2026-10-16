@@ -224,15 +224,12 @@ def test_repository_review_backends_materialize_agent_skill_views(
     assert (analyzer_skills_root / "cwe").is_dir()
     assert (analyzer_skills_root / "web-security").is_dir()
     assert (analyzer_skills_root / "ci-security").is_dir()
-    assert (analyzer_skills_root / "language-framework-security").is_dir()
     assert not (mitigation_skills_root / "cwe").exists()
     assert (mitigation_skills_root / "web-security").is_dir()
     assert (mitigation_skills_root / "ci-security").is_dir()
-    assert (mitigation_skills_root / "language-framework-security").is_dir()
     assert not (verifier_skills_root / "cwe").exists()
     assert (verifier_skills_root / "web-security").is_dir()
     assert (verifier_skills_root / "ci-security").is_dir()
-    assert (verifier_skills_root / "language-framework-security").is_dir()
     assert not (analyzer_artifacts / "runtime" / "skills").exists()
     assert not (local_root / "resources" / "skills").exists()
     assert "/skills/" not in _routes_for(cvss_backend)
@@ -247,14 +244,12 @@ def test_repository_review_backends_materialize_agent_skill_views(
     assert not (discovery_skills_root / "cwe").exists()
     assert (discovery_skills_root / "web-security").is_dir()
     assert (discovery_skills_root / "ci-security").is_dir()
-    assert (discovery_skills_root / "language-framework-security").is_dir()
     assert "/skills/" in _routes_for(triage_backend)
     triage_skills_root = _route_root(triage_backend, "/skills/")
     assert (triage_skills_root / "scanner-finding-triage").is_dir()
     assert not (triage_skills_root / "cwe").exists()
     assert not (triage_skills_root / "web-security").exists()
     assert not (triage_skills_root / "ci-security").exists()
-    assert not (triage_skills_root / "language-framework-security").exists()
     assert "/triage/" not in _routes_for(triage_backend)
 
 
@@ -376,7 +371,6 @@ def test_repository_analyzer_skills_middleware_loads_analysis_agent_skills(
     cwe_skill = skills_by_name.get("cwe")
     web_skill = skills_by_name.get("web-security")
     ci_skill = skills_by_name.get("ci-security")
-    language_skill = skills_by_name.get("language-framework-security")
 
     assert cwe_skill is not None
     assert cwe_skill["path"] == "/skills/cwe/SKILL.md"
@@ -387,9 +381,6 @@ def test_repository_analyzer_skills_middleware_loads_analysis_agent_skills(
     assert ci_skill is not None
     assert ci_skill["path"] == "/skills/ci-security/SKILL.md"
     assert "ci/cd" in ci_skill["description"].lower()
-    assert language_skill is not None
-    assert language_skill["path"] == "/skills/language-framework-security/SKILL.md"
-    assert "language" in language_skill["description"].lower()
 
 
 def test_repository_cvss_backend_exposes_tmp(tmp_path: Path) -> None:

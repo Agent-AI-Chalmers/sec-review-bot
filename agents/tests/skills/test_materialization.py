@@ -25,7 +25,7 @@ def test_materialize_agent_skills_view_uses_declared_view_shape(tmp_path: Path) 
         ),
     ):
         skills_root = materialize_agent_skills_view(
-            ("cwe", "web-security", "ci-security", "language-framework-security"),
+            ("cwe", "web-security", "ci-security"),
         )
 
     assert skills_root.parent == (tmp_path / "skills-base-root").resolve()
@@ -36,7 +36,6 @@ def test_materialize_agent_skills_view_uses_declared_view_shape(tmp_path: Path) 
     ).is_file()
     assert (skills_root / "web-security" / "SKILL.md").is_file()
     assert (skills_root / "ci-security" / "SKILL.md").is_file()
-    assert (skills_root / "language-framework-security" / "SKILL.md").is_file()
     assert not (skills_root / "skill_source_notes").exists()
 
 
@@ -79,7 +78,6 @@ def test_materialize_agent_skills_view_includes_reference_skills(
             (
                 "web-security",
                 "ci-security",
-                "language-framework-security",
                 "scanner-finding-triage",
             ),
         )
@@ -105,18 +103,6 @@ def test_materialize_agent_skills_view_includes_reference_skills(
     assert (skills_root / "ci-security" / "SKILL.md").is_file()
     assert (skills_root / "ci-security" / "references" / "github-actions.md").is_file()
     assert (skills_root / "ci-security" / "references" / "gitlab-ci.md").is_file()
-    assert (skills_root / "language-framework-security" / "SKILL.md").is_file()
-    language_references = skills_root / "language-framework-security" / "references"
-    assert (language_references / "go-backend.md").is_file()
-    assert (language_references / "python-django.md").is_file()
-    assert (language_references / "python-fastapi.md").is_file()
-    assert (language_references / "python-flask.md").is_file()
-    assert (language_references / "javascript-express.md").is_file()
-    assert (language_references / "javascript-frontend.md").is_file()
-    assert (language_references / "javascript-jquery.md").is_file()
-    assert (language_references / "javascript-typescript-nextjs.md").is_file()
-    assert (language_references / "javascript-typescript-react.md").is_file()
-    assert (language_references / "javascript-typescript-vue.md").is_file()
     assert (skills_root / "scanner-finding-triage" / "SKILL.md").is_file()
     scanner_references = skills_root / "scanner-finding-triage" / "references"
     assert (scanner_references / "reachability-and-context.md").is_file()
@@ -134,9 +120,7 @@ def test_materialized_reference_skills_do_not_expose_source_notes(
             str(tmp_path / "skills-build-1"),
         ],
     ):
-        skills_root = materialize_agent_skills_view(
-            ("web-security", "ci-security", "language-framework-security"),
-        )
+        skills_root = materialize_agent_skills_view(("web-security", "ci-security"))
 
     for reference_path in (skills_root / "web-security" / "references").glob("*.md"):
         reference_text = reference_path.read_text(encoding="utf-8")
@@ -157,14 +141,6 @@ def test_materialized_reference_skills_do_not_expose_source_notes(
     assert "Sources to Audit Before Adoption" not in gitlab_ci_text
     assert "Sources to audit before adoption" not in gitlab_ci_text
     assert "https://" not in gitlab_ci_text
-
-    for reference_path in (
-        skills_root / "language-framework-security" / "references"
-    ).glob("*.md"):
-        reference_text = reference_path.read_text(encoding="utf-8")
-        assert "Sources to Audit Before Adoption" not in reference_text
-        assert "Sources to audit before adoption" not in reference_text
-        assert "https://" not in reference_text
 
     with patch(
         "sec_review_agents.runtime.skills.tempfile.mkdtemp",
