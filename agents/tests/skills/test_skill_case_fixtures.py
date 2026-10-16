@@ -3,7 +3,7 @@ from tests.integration.llm.skill_cases.loader import cases_for_mode, load_skill_
 
 def test_skill_case_fixtures_are_valid_and_cover_each_mode() -> None:
     cases = load_skill_cases()
-    assert cases_for_mode(cases, "forced-read")
+    assert cases_for_mode(cases, "prompted")
     assert cases_for_mode(cases, "natural")
     assert cases_for_mode(cases, "contrast")
 

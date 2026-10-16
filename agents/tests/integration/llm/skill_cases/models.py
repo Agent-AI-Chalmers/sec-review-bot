@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
-SkillCaseMode = Literal["forced-read", "natural", "contrast"]
+SkillCaseMode = Literal["prompted", "natural", "contrast"]
 SkillVerdict = Literal["confirmed", "not-confirmed"]
 
 

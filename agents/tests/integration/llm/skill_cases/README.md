@@ -9,8 +9,8 @@ Each directory under `fixtures/` is one security case. Keep the security facts a
 3. Select the bundled `skill` and one Markdown filename from that skill's `references/` directory. CWE classification uses the same format and can set `cwe_id` and `parent_category_id` in `expected`.
 4. Write the review `task`, the repository/runtime `facts`, and the narrow expected result. Use `explanation_pattern` only when the case must mention a specific mechanism, source, sink, or guard.
 5. Add only the modes that answer a useful question:
-   - `forced-read` explicitly names the skill and reference and requires successful read evidence. Use this by default.
-   - `natural` exposes skills normally without naming one. It checks the case result and records what the model chose to read.
+   - `prompted` explicitly names the skill and reference and requires successful read evidence. Use this by default.
+   - `natural` exposes skills normally without naming one. It requires successful reads of the case's skill and reference, then checks the case result.
    - `contrast` runs the same prompt with and without skills. The skills-enabled result must satisfy the oracle; the baseline is recorded but is not required to fail.
 
 The loader rejects unknown fields, duplicate IDs, unknown skills, and unknown references. A workspace is optional for cases decided entirely from declared facts. Keep detailed security reasoning in the case facts and expected fields, not in the runner.
@@ -23,7 +23,7 @@ The loader rejects unknown fields, duplicate IDs, unknown skills, and unknown re
   "id": "example-case",
   "skill": "web-security",
   "reference": "path-traversal.md",
-  "modes": ["forced-read"],
+  "modes": ["prompted"],
   "task": "Assess whether the requested file can escape the export root.",
   "facts": [
     "The request controls the relative path.",

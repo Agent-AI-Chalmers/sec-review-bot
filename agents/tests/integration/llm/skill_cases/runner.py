@@ -51,7 +51,7 @@ def materialize_case_workspace(case: SkillCase, destination: Path) -> Path:
 def build_case_prompt(case: SkillCase, mode: SkillCaseMode) -> str:
     facts = "\n".join(f"- {fact}" for fact in case.facts)
     instruction = ""
-    if mode == "forced-read":
+    if mode == "prompted":
         instruction = (
             f"First read {case.skill_path} and {case.reference_path}. "
             "Set skill_path_read and reference_path_read to the exact paths used. "
@@ -69,7 +69,7 @@ def build_case_prompt(case: SkillCase, mode: SkillCaseMode) -> str:
     )
 
 
-async def _create_case_agent(*, workspace: Path, skills_enabled: bool, forced: bool):
+async def _create_case_agent(*, workspace: Path, skills_enabled: bool, prompted: bool):
     from sec_review_agents.agents.analysis.repository import (
         create_repository_analyzer_backend,
     )
@@ -129,7 +129,7 @@ async def _create_case_agent(*, workspace: Path, skills_enabled: bool, forced: b
         "You are running a targeted bundled-skill application check. "
         + (
             "Read the explicitly named skill resources before deciding. "
-            if forced
+            if prompted
             else "Select available resources only when they are relevant. "
         )
         + "Base the decision on repository evidence and return structured output only."
@@ -156,7 +156,7 @@ async def run_skill_case(
     backend, agent = await _create_case_agent(
         workspace=workspace,
         skills_enabled=skills_enabled,
-        forced=mode == "forced-read",
+        prompted=mode == "prompted",
     )
     async with amanaged_backend(backend):
         result = await agent.ainvoke(
@@ -213,8 +213,13 @@ def assert_case_oracle(case: SkillCase, run: SkillCaseRun) -> None:
         assert re.search(expected.explanation_pattern, explanation)
 
 
-def assert_forced_read(case: SkillCase, run: SkillCaseRun) -> None:
+def assert_prompted_read(case: SkillCase, run: SkillCaseRun) -> None:
     assert run.output.skill_path_read == case.skill_path
     assert run.output.reference_path_read == case.reference_path
+    assert case.skill_path in run.successful_reads
+    assert case.reference_path in run.successful_reads
+
+
+def assert_natural_read(case: SkillCase, run: SkillCaseRun) -> None:
     assert case.skill_path in run.successful_reads
     assert case.reference_path in run.successful_reads

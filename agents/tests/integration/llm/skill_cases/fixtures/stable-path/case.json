@@ -3,7 +3,7 @@
   "id": "stable-path",
   "skill": "web-security",
   "reference": "path-traversal.md",
-  "modes": ["forced-read"],
+  "modes": ["prompted"],
   "task": "Assess the claim that the separate resolve, containment check, and read always permit a symlink race.",
   "facts": [
     "Requesters control relative.",

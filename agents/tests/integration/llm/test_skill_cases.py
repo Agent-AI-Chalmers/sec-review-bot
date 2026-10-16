@@ -4,7 +4,8 @@ from tests.integration.llm.probe_helpers import llm_probe
 from tests.integration.llm.skill_cases.loader import cases_for_mode, load_skill_cases
 from tests.integration.llm.skill_cases.runner import (
     assert_case_oracle,
-    assert_forced_read,
+    assert_natural_read,
+    assert_prompted_read,
     run_skill_case,
 )
 
@@ -19,17 +20,17 @@ pytestmark = [PROBE.skip_unless(), pytest.mark.asyncio]
 
 @pytest.mark.parametrize(
     "case",
-    cases_for_mode(CASES, "forced-read"),
+    cases_for_mode(CASES, "prompted"),
     ids=lambda case: case.id,
 )
-async def test_forced_read_skill_cases(tmp_path, case) -> None:
+async def test_prompted_skill_cases(tmp_path, case) -> None:
     run = await run_skill_case(
         case,
-        mode="forced-read",
+        mode="prompted",
         skills_enabled=True,
         temp_root=tmp_path,
     )
-    assert_forced_read(case, run)
+    assert_prompted_read(case, run)
     assert_case_oracle(case, run)
 
 
@@ -45,6 +46,7 @@ async def test_natural_skill_cases(tmp_path, case) -> None:
         skills_enabled=True,
         temp_root=tmp_path,
     )
+    assert_natural_read(case, run)
     assert_case_oracle(case, run)
 
 

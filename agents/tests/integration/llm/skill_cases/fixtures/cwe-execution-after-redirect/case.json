@@ -3,7 +3,7 @@
   "id": "cwe-execution-after-redirect",
   "skill": "cwe",
   "reference": "cwe-699-agent-navigation.md",
-  "modes": ["forced-read"],
+  "modes": ["prompted", "natural"],
   "task": "Assign the best root-cause CWE to the supported security finding. Supply a navigation category only when applicable.",
   "facts": [
     "After response.redirect('/login') for an unauthorized request, the handler does not return.",

@@ -3,7 +3,7 @@
   "id": "argument-injection-service",
   "skill": "web-security",
   "reference": "command-injection.md",
-  "modes": ["forced-read", "natural", "contrast"],
+  "modes": ["prompted", "natural", "contrast"],
   "task": "Assess whether the report-name value controls the child parser and creates a security vulnerability.",
   "facts": [
     "post_report is exposed to untrusted remote users and runs as a service account.",

@@ -3,7 +3,7 @@
   "id": "ci-privileged-fork-execution",
   "skill": "ci-security",
   "reference": "github-actions.md",
-  "modes": ["forced-read"],
+  "modes": ["prompted", "natural"],
   "task": "Assess whether this pull_request_target workflow exposes privileged execution to fork-controlled code.",
   "facts": [
     "Fork authors control the checked-out pull request head.",

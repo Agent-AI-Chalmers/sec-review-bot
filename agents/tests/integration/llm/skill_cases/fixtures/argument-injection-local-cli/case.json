@@ -3,7 +3,7 @@
   "id": "argument-injection-local-cli",
   "skill": "web-security",
   "reference": "command-injection.md",
-  "modes": ["forced-read", "contrast"],
+  "modes": ["prompted", "contrast"],
   "task": "Assess whether the report-name value controls the child parser and whether that behavior is a security vulnerability.",
   "facts": [
     "This is a CLI run only by a local user with that user's own file permissions.",

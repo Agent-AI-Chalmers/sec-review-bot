@@ -3,7 +3,7 @@
   "id": "access-control-server-guard",
   "skill": "web-security",
   "reference": "access-control.md",
-  "modes": ["forced-read"],
+  "modes": ["prompted", "natural"],
   "task": "Assess the claim that a client-side admin visibility check is the only authorization control for the role-update operation.",
   "facts": [
     "Inspect both the client component and the server handler.",

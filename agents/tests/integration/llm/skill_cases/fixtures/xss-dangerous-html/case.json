@@ -3,7 +3,7 @@
   "id": "xss-dangerous-html",
   "skill": "web-security",
   "reference": "xss.md",
-  "modes": ["forced-read"],
+  "modes": ["prompted", "natural"],
   "task": "Assess whether the query parameter rendered through dangerouslySetInnerHTML is a confirmed XSS.",
   "facts": [
     "The body query parameter is attacker-controlled.",
