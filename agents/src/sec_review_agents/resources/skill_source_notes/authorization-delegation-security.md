@@ -1,6 +1,6 @@
 # Authorization And Delegation Security Source Notes
 
-Reviewed 2026-10-16. These sources support rules for non-browser service/workload identity, protocol- or credential-level delegation and impersonation, actor/subject distinction and confused deputies.
+These sources support rules for non-browser service/workload identity, protocol- or credential-level delegation and impersonation, actor/subject distinction and confused deputies.
 
 | ID and skill location | Primary source and locator | Supported decision and limit |
 | --- | --- | --- |

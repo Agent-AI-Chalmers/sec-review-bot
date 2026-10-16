@@ -1,6 +1,6 @@
 # Parser And Protocol Security Source Notes
 
-Reviewed 2026-10-16. The skill covers interpretation boundaries and selected parser capabilities, not every format or protocol. Defaults must match the repository's library and version.
+The sources cover interpretation boundaries and selected parser capabilities, not every format or protocol. Defaults must match the repository's library and version.
 
 | ID and skill location | Primary source and locator | Supported decision and limit |
 | --- | --- | --- |

@@ -1,6 +1,6 @@
 # Cryptography Security Source Notes
 
-Reviewed 2026-10-16. Requirements are tied to the actual primitive or protocol; they do not support a universal IV rule, algorithm blacklist, rotation schedule or complete PKI guide.
+Requirements are tied to the actual primitive or protocol; they do not support a universal IV rule, algorithm blacklist, rotation schedule or complete PKI guide.
 
 | ID and skill location | Primary source and locator | Supported decision and limit |
 | --- | --- | --- |

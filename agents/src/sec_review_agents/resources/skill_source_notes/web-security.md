@@ -122,27 +122,17 @@ Claim ledger:
   Primary source: OWASP XSS Prevention Cheat Sheet, with project false-positive policy.
   Adoption note: Do not report CSS URL injection as XSS without a concrete executable/effect path.
 
-Inspiration sources:
-
-- https://skillsmp.com/de/skills/liminal-ai-code-steward-claude-plugins-code-steward-reviews-skills-security-review-skill-md
-- https://skilld.dev/skills/grahamcrackers/skills/security-patterns
-- https://playbooks.com/skills/sickn33/antigravity-awesome-skills/frontend-mobile-security-xss-scan
-
-## Audited rule groups: authentication
-
-Reviewed 2026-10-16. These entries trace the changed operational rules by section, rather than attaching a citation to every sentence. Official guidance establishes the mechanism; the repository-evidence threshold is project policy. These sources do not demonstrate that adding the text improves model behavior.
+## Authentication
 
 | Rule group and affected reference | Primary support and locator | Adoption and limits |
 | --- | --- | --- |
 | AUTH-1: identity and token verification; `auth-session.md`, Guards and Report Conditions | [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html), §§3.1–3.4 and 3.8–3.12 | Algorithm/signature verification and issuer, subject, audience, token-purpose checks have distinct roles. Do not treat a verified signature as sufficient identity binding or require every listed claim in every protocol. |
 | AUTH-2: session lifecycle; `auth-session.md`, Guards and Report Conditions | [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), “Renew the Session ID After Any Privilege Level Change” and “Session Expiration”; [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html), §5.2, “Reauthentication” | Inspect renewal, expiry and invalidation against the actual application boundary. NIST describes independent IdP/RP sessions; do not assume universal logout propagation. Failure need not create a new session. |
 | AUTH-3: password storage; `auth-session.md`, Guards and Report Conditions | [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html), §3.1.1.2, “Password Verifiers” | Password hashing protects against offline attacks; identify the implementation and state attacker access assumptions. The project does not require this storage defect to also prove database compromise. No algorithm/work-factor table or federal assurance requirement is imported. |
-| AUTH-4: guessing and attacker-induced lockout; `auth-session.md`, Guards and Report Conditions | [OWASP Authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), “Login Throttling” and “Account Lockout”; [CWE-645](https://cwe.mitre.org/data/definitions/645.html), Description | Authentication security includes availability and attempt handling. Show attacker effort, affected account and recovery; missing rate limiting alone remains insufficient. This replaces the incorrect universal requirement for attacker input to become an authenticated identity. |
+| AUTH-4: guessing and attacker-induced lockout; `auth-session.md`, Guards and Report Conditions | [OWASP Authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), “Login Throttling” and “Account Lockout”; [CWE-645](https://cwe.mitre.org/data/definitions/645.html), Description | Authentication security includes availability and attempt handling. Show attacker effort, affected account and recovery; missing rate limiting alone remains insufficient. |
 | AUTH-5: recovery, cookie and existing negative precedents; `auth-session.md`, Sources, Guards and False-Positive Precedents | [OWASP Forgot Password](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html), “URL Tokens” and “User Resets Password”; [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), “Cookies” | Tokens need appropriate binding and lifecycle; cookie protections depend on browser/transport use. Whether a missing protection is reportable remains a repository-specific judgment. Missing MFA is not universally a vulnerability. |
 
-## Additional inherited rule groups
-
-Reviewed 2026-10-16. These entries extend traceability to the main guard and report-condition groups in references that previously had only link inventories. This is a mechanism-level audit, not confirmation of every named API's current behavior.
+## Additional rule groups
 
 | Rule group and reference | Primary support and locator | Adoption and limits |
 | --- | --- | --- |
@@ -153,4 +143,4 @@ Reviewed 2026-10-16. These entries extend traceability to the main guard and rep
 | SSRF-1: destination policy, redirects and resolution; `ssrf.md`, Guards and Report Conditions | [OWASP SSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html), “Application layer”, IP/domain validation and DNS pinning guidance | Compare validation with the target actually connected to, including redirects and resolution. A configured host is not necessarily fixed after DNS resolution or redirection. The project additionally requires attacker influence and security effect; accepting a URL is not proof of SSRF. |
 | UPLOAD-1: upload storage and serving; `file-upload.md`, Sinks, Guards and Report Conditions | [OWASP File Upload](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), storage location, filename and content controls | Require attacker-controlled file properties, a reachable storage/serving sink and an unsafe execution or browser interpretation. Upload capability or extension checks alone are not findings. Parser semantics and filesystem authority remain with their domain owners. |
 
-Remaining source work: source inventories and grouped ledgers do not verify every inherited language/API example, exact platform default, or alias. In particular, complex OAuth/OIDC flows need their own protocol sources when changed. Trace material changes to report/reject conditions, guard sufficiency and version-sensitive behavior; do not treat a group-level source as support for unrelated details in the same reference.
+The grouped sources do not verify every language/API example, exact platform default, or alias. Complex OAuth/OIDC flows need their own protocol sources. Do not treat a group-level source as support for unrelated details in the same reference.

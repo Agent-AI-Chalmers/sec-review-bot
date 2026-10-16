@@ -30,12 +30,6 @@ Claim ledger:
   Primary source: Project evidence-discipline policy, with GitHub hardening docs as background.
   Adoption note: This is a project-specific false-positive precedent, not a direct GitHub vulnerability rule.
 
-Inspiration sources:
-
-- https://skillsmp.com/skills/getsentry-skills-plugins-sentry-skills-skills-gha-security-review-skill-md
-- https://skillsmp.com/skills/github-gh-aw-skills-developer-skill-md
-- https://skillsmp.com/skills/mkspwr12-options-scanner-frontend-github-skills-operations-github-actions-workflows-skill-md
-
 ## gitlab-ci
 
 Primary sources:

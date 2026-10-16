@@ -1,6 +1,6 @@
 # Memory And Numeric Safety Source Notes
 
-Reviewed 2026-10-16. Language rules remain language-specific; examples from C and Rust establish mechanisms, not a universal API blacklist.
+Language rules remain language-specific; examples from C and Rust establish mechanisms, not a universal API blacklist.
 
 | ID and skill location | Primary source and locator | Supported decision and limit |
 | --- | --- | --- |

@@ -91,7 +91,7 @@ Bundled skills keep developer-facing source notes under:
 sec_review_agents/resources/skill_source_notes/
 ```
 
-These files map decision-changing rules to authoritative sources and applicability limits for human maintenance. They do not contain test records or coverage decisions, and they are not exposed to the agent skill view. Security-domain packaging decisions are maintained in [`SECURITY_SKILL_COVERAGE.md`](SECURITY_SKILL_COVERAGE.md).
+These files map decision-changing rules to authoritative sources and applicability limits.
 
 ### Source Note Maintenance Contract
 
@@ -112,7 +112,7 @@ When adding or changing a bundled skill:
 1. Put the material under `sec_review_agents/resources/skills/<skill-name>/`. `SKILL.md` is the entry point.
 2. `SKILL.md` metadata should be general enough for discovery, while precise enough that the agent can decide when to read it. Do not write the description as a one-off test hint.
 3. Default to `SKILL.md` plus narrow `references/` files. Add templates or assets only for a concrete existing need; do not add `scripts/` unless the filesystem backend and permission model explicitly support skill execution.
-4. Trace decision-changing rules to authoritative sources under `sec_review_agents/resources/skill_source_notes/`. Keep test cases, model results, coverage decisions, and admission history outside source notes. Do not expose source notes through `/skills`.
+4. Trace decision-changing rules to authoritative sources under `sec_review_agents/resources/skill_source_notes/`.
 5. Declare the skill in the target agent or stage-local `skills.py`. Do not add skill names to docs, backend helpers, or runtime preparation code just to make them visible.
 6. Ensure the target backend consumes the declaration, prepares the allowlisted view, mounts it at `/skills`, and enables skills middleware for that agent session.
-7. Add focused tests for skill preparation and backend exposure. For model behavior, add a JSON case under [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md) and select only the useful `prompted`, `discovery`, or `contrast` modes. A discovery case must show successful reads of the expected skill and reference; merely answering correctly is insufficient. A contrast baseline is recorded but is not required to fail.
+7. Add focused tests for skill preparation and backend exposure. Follow the model-case structure documented under [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md).

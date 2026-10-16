@@ -2,7 +2,7 @@
 
 ## Authoritative scope and mapping rules
 
-Reviewed 2026-10-16. CWE is a classification aid after repository-grounded analysis, not evidence that a vulnerability exists or a source of required skill domains.
+CWE is a classification aid after repository-grounded analysis, not evidence that a vulnerability exists or a source of required skill domains.
 
 | Rule group and location | Primary source and locator | Adoption and limits |
 | --- | --- | --- |

@@ -93,7 +93,7 @@ deepagents 只读取调用方交给它的 source path，不负责替某个 workf
 sec_review_agents/resources/skill_source_notes/
 ```
 
-这些文件面向维护者，把会改变判断的规则对应到权威来源和适用限制。它们不保存测试记录或覆盖决策，也不暴露给 agent skill view。安全领域的打包决策记录在 [`SECURITY_SKILL_COVERAGE.md`](SECURITY_SKILL_COVERAGE.md)。
+这些文件把会改变判断的规则对应到权威来源和适用限制。
 
 ### Source Note 维护契约
 
@@ -114,7 +114,7 @@ Repository 报告阈值、workflow ownership 和 skill 打包决策应标成 pro
 1. 把材料放在 `sec_review_agents/resources/skills/<skill-name>/` 下。`SKILL.md` 是入口。
 2. `SKILL.md` metadata 应该足够一般，能用于 discovery；同时也要足够精确，让 agent 能判断什么时候该读。不要把 description 写成某个测试的一次性提示。
 3. 默认采用 `SKILL.md` 加少量精确 `references/` 文件。只有存在具体需求时才加入 templates 或 assets；除非 filesystem backend 和 permission model 已明确支持 skill execution，否则不要加入 `scripts/`。
-4. 把会改变判断的规则及其权威来源记录到 `sec_review_agents/resources/skill_source_notes/`。测试案例、模型结果、覆盖决策和准入过程不要写入 source notes。不要通过 `/skills` 暴露 source notes。
+4. 把会改变判断的规则及其权威来源记录到 `sec_review_agents/resources/skill_source_notes/`。
 5. 在目标 agent 或 stage-local 的 `skills.py` 里声明 skill。不要为了让 skill 可见，就把 skill name 写进文档、backend helper 或 runtime 准备代码。
 6. 确保目标 backend 消费该声明，先准备 allowlisted view，再挂载到 `/skills`，并为该 agent session 启用 skills middleware。
-7. 为 skill 准备和 backend exposure 增加聚焦测试。模型行为案例放在 [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md) 下的 JSON 中，并只选择有实际用途的 `prompted`（明确提示）、`discovery`（自主发现）或 `contrast`（对照）模式。Discovery 案例不提供 skill 或 reference 路径，必须显示模型从正常目录中选择并成功读取了预期资源；仅仅答对不算成功。Contrast 会记录未挂载 skills 时的 baseline，但不要求 baseline 必须失败。
+7. 为 skill 准备和 backend exposure 增加聚焦测试。模型案例按 [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md) 中记录的结构维护。

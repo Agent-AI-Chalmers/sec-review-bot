@@ -1,6 +1,6 @@
 # Concurrency And Resource Security Source Notes
 
-Reviewed 2026-10-16. Temporal correctness and resource exhaustion remain separate references. Language, database and API-specific synchronization, cancellation and cleanup still require primary documentation.
+Temporal correctness and resource exhaustion remain separate references. Language, database and API-specific synchronization, cancellation and cleanup still require primary documentation.
 
 | ID and skill location | Primary source and locator | Supported decision and limit |
 | --- | --- | --- |

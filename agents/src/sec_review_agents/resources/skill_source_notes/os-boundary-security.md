@@ -1,6 +1,6 @@
 # OS Boundary Security Source Notes
 
-Reviewed 2026-10-16. Process-input and path-policy principles are cross-platform, while API claims are explicitly Linux/POSIX-oriented. No Windows token, ACL, object-manager or named-pipe equivalence is claimed.
+Process-input and path-policy principles are cross-platform, while API claims state their platform limits.
 
 | ID and skill location | Primary source and locator | Supported decision and limit |
 | --- | --- | --- |
