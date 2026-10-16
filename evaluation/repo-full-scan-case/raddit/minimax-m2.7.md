@@ -210,7 +210,7 @@ Two cases were scored as `0.0 / none`; eight cases were unscored. These are most
 
 ## Token and Cost Summary
 
-Cost is estimated with the built-in `minimax-m2.7` USD price profile: $0.30 per 1M uncached input tokens, $0.06 per 1M cached input tokens, and $1.20 per 1M output tokens.
+Cost is estimated at $0.30 per 1M uncached input tokens, $0.06 per 1M cached input tokens, and $1.20 per 1M output tokens.
 
 ```bash
 python -m scripts.token_usage.summarize .agent-workspace/raddit-repo-scan-minimax27/local-run-20260502T003113Z-1a68e255

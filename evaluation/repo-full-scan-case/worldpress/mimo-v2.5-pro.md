@@ -171,7 +171,7 @@ Average base score was 7.61, and the maximum base score was 9.3.
 
 ## Token and Cost Summary
 
-Cost is estimated with the built-in `mimo-v2.5-pro` USD price profile.
+Cost is estimated at $1.00 per 1M uncached input tokens, $0.20 per 1M cached input tokens, and $3.00 per 1M output tokens.
 
 ```bash
 python -m scripts.token_usage.summarize .agent-workspace/worldpress-repo-scan-mimo-v2.5-pro/local-run-20260505T230542Z-7dc4e75a

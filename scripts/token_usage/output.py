@@ -1,34 +1,31 @@
 import csv
 import io
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from . import (
     AttemptUsage,
     CostEstimate,
     EffectivePatchUsage,
-    PricingConfig,
     PricingSelection,
     RunUsage,
     UsageTotals,
     aggregate_stage_usages,
+    collect_used_prices,
     compute_effective_patch_usage,
     effective_patch_efficiency,
     effective_patch_run,
-    estimate_run_cost,
-    estimate_stage_cost,
     resolve_pricing_selection,
 )
-from .price_profiles import (
-    DEFAULT_PRICE_PROFILE,
-    PRICE_PROFILES,
-)
+from . import run_cost as compute_run_cost
+from . import stage_cost as compute_stage_cost
+from .openrouter_pricing import PriceIndex
 
 
 @dataclass(frozen=True)
 class RenderConfig:
-    pricing: PricingConfig = field(default_factory=PricingConfig)
+    index: PriceIndex | None = None
 
 
 def should_render_attempt_rows(run: RunUsage) -> bool:
@@ -57,35 +54,13 @@ def display_run_name(run: RunUsage) -> str:
     return run.experiment or Path(run.run_dir).name
 
 
-def render_price_profiles() -> str:
-    lines = [f"default_price_profile={DEFAULT_PRICE_PROFILE}", ""]
-    for name, rates in sorted(PRICE_PROFILES.items()):
-        lines.append(
-            f"{name}: input={rates['input']} cache={rates['cache']} output={rates['output']} {rates['currency']}/1M"
-        )
-    return "\n".join(lines) + "\n"
-
-
 def render_pricing_header(pricing: PricingSelection) -> list[str]:
-    if pricing.mode == "auto-profile":
-        return ["pricing: profile=auto-by-model_id", ""]
-    if (
-        pricing.input_rate is not None
-        and pricing.cache_rate is not None
-        and pricing.output_rate is not None
-    ):
-        return [
-            (
-                "pricing: "
-                f"profile={pricing.profile or 'custom'} "
-                f"input={pricing.input_rate} "
-                f"cache={pricing.cache_rate} "
-                f"output={pricing.output_rate} "
-                f"{pricing.currency or 'custom'}/1M"
-            ),
-            "",
-        ]
-    return []
+    if pricing.fetched_at is None:
+        return ["pricing: unknown (no price source available)", ""]
+    return [
+        f"pricing: source=openrouter fetched_at={pricing.fetched_at}",
+        "",
+    ]
 
 
 def table_row(columns: list[str], widths: list[int]) -> str:
@@ -119,14 +94,16 @@ def format_cost(cost: CostEstimate | None) -> str:
 
 def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
     config = config or RenderConfig()
-    pricing = resolve_pricing_selection(config.pricing)
+    pricing = resolve_pricing_selection(
+        config.index, used_prices=collect_used_prices(runs, config.index)
+    )
     lines: list[str] = render_pricing_header(pricing)
 
     for run in runs:
         effective = compute_effective_patch_usage(run)
         totals = effective.totals
-        run_cost = estimate_run_cost(run, pricing)
-        effective_cost = estimate_run_cost(effective_patch_run(run), pricing)
+        run_cost = compute_run_cost(run, config.index)
+        effective_cost = compute_run_cost(effective_patch_run(run), config.index)
         visible_attempts = displayable_effective_attempts(run, effective)
 
         lines.append(run.run_dir)
@@ -164,12 +141,12 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
             lines.append(f"  effective_patch_attempts={labels}")
 
         for stage in run.stages:
-            stage_cost, inferred_profile = estimate_stage_cost(stage, pricing)
+            stage_cost, price_model = compute_stage_cost(stage, config.index)
             line = (
                 "  - "
                 f"{stage.stage}: "
                 f"model_id={stage.model_id} "
-                f"profile={inferred_profile or 'unknown'} "
+                f"price_model={price_model or 'unknown'} "
                 f"input={stage.input_tokens:,} "
                 f"output={stage.output_tokens:,} "
                 f"total={stage.total_tokens:,} "
@@ -188,13 +165,15 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
 
 def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
     config = config or RenderConfig()
-    pricing = resolve_pricing_selection(config.pricing)
+    pricing = resolve_pricing_selection(
+        config.index, used_prices=collect_used_prices(runs, config.index)
+    )
     header = [
         "run",
         "stage",
         "scope",
         "model",
-        "profile",
+        "price_model",
         "input",
         "output",
         "cache_read",
@@ -207,10 +186,10 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
     rows: list[list[str]] = []
 
     for run in runs:
-        run_cost = estimate_run_cost(run, pricing)
+        run_cost = compute_run_cost(run, config.index)
         effective = compute_effective_patch_usage(run)
         effective_totals = effective.totals
-        effective_cost = estimate_run_cost(effective_patch_run(run), pricing)
+        effective_cost = compute_run_cost(effective_patch_run(run), config.index)
         efficiency = effective_patch_efficiency(run)
 
         rows.append(
@@ -219,8 +198,7 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                 "TOTAL",
                 "all",
                 "-",
-                pricing.profile
-                or ("auto" if pricing.mode == "auto-profile" else "custom"),
+                "-",
                 f"{run.input_tokens:,}",
                 f"{run.output_tokens:,}",
                 f"{run.cache_read_tokens:,}",
@@ -237,8 +215,7 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                 "TOTAL",
                 "effective_patch",
                 "-",
-                pricing.profile
-                or ("auto" if pricing.mode == "auto-profile" else "custom"),
+                "-",
                 f"{effective_totals.input_tokens:,}",
                 f"{effective_totals.output_tokens:,}",
                 f"{effective_totals.cache_read_tokens:,}",
@@ -251,14 +228,14 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
         )
 
         for stage in run.stages:
-            stage_cost, inferred_profile = estimate_stage_cost(stage, pricing)
+            stage_cost, price_model = compute_stage_cost(stage, config.index)
             rows.append(
                 [
                     "",
                     stage.stage,
                     "all",
                     stage.model_id,
-                    inferred_profile or "unknown",
+                    price_model or "unknown",
                     f"{stage.input_tokens:,}",
                     f"{stage.output_tokens:,}",
                     f"{stage.cache_read_tokens:,}",
@@ -274,8 +251,8 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
         if displayed_attempt_rows:
             visible_attempts = displayable_effective_attempts(run, effective)
             for attempt in displayed_attempt_rows:
-                stage_cost, inferred_profile = estimate_stage_cost(
-                    attempt.usage, pricing
+                stage_cost, price_model = compute_stage_cost(
+                    attempt.usage, config.index
                 )
                 rows.append(
                     [
@@ -283,7 +260,7 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                         attempt.stage,
                         attempt.attempt_label,
                         attempt.usage.model_id,
-                        inferred_profile or "unknown",
+                        price_model or "unknown",
                         f"{attempt.usage.input_tokens:,}",
                         f"{attempt.usage.output_tokens:,}",
                         f"{attempt.usage.cache_read_tokens:,}",
@@ -300,7 +277,6 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
 
 def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
     config = config or RenderConfig()
-    pricing = resolve_pricing_selection(config.pricing)
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
@@ -313,7 +289,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
             "scope",
             "attempt_label",
             "model_id",
-            "price_profile",
+            "price_model",
             "input_tokens",
             "output_tokens",
             "total_tokens",
@@ -335,7 +311,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
         scope: str,
         attempt_label: str,
         model_id: str,
-        profile: str,
+        price_model: str,
         totals: UsageTotals,
         cost: CostEstimate | None,
     ) -> None:
@@ -349,7 +325,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
                 scope,
                 attempt_label,
                 model_id,
-                profile,
+                price_model,
                 totals.input_tokens,
                 totals.output_tokens,
                 totals.total_tokens,
@@ -365,12 +341,8 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
 
     for run in runs:
         effective = compute_effective_patch_usage(run)
-        run_cost = estimate_run_cost(run, pricing)
-        effective_cost = estimate_run_cost(effective_patch_run(run), pricing)
-        profile_label = pricing.profile or (
-            "auto" if pricing.mode == "auto-profile" else "custom"
-        )
-
+        run_cost = compute_run_cost(run, config.index)
+        effective_cost = compute_run_cost(effective_patch_run(run), config.index)
         write_usage_row(
             run=run,
             row_type="run",
@@ -378,7 +350,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
             scope="all",
             attempt_label="",
             model_id="",
-            profile=profile_label,
+            price_model="-",
             totals=run.totals,
             cost=run_cost,
         )
@@ -389,13 +361,13 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
             scope="effective_patch",
             attempt_label="",
             model_id="",
-            profile=profile_label,
+            price_model="-",
             totals=effective.totals,
             cost=effective_cost,
         )
 
         for stage in run.stages:
-            stage_cost, inferred_profile = estimate_stage_cost(stage, pricing)
+            stage_cost, price_model = compute_stage_cost(stage, config.index)
             write_usage_row(
                 run=run,
                 row_type="stage",
@@ -403,7 +375,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
                 scope="all",
                 attempt_label="",
                 model_id=stage.model_id,
-                profile=inferred_profile or "unknown",
+                price_model=price_model or "unknown",
                 totals=aggregate_stage_usages([stage]),
                 cost=stage_cost,
             )
@@ -412,8 +384,8 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
         if displayed_attempt_rows:
             visible_attempts = displayable_effective_attempts(run, effective)
             for attempt in displayed_attempt_rows:
-                stage_cost, inferred_profile = estimate_stage_cost(
-                    attempt.usage, pricing
+                stage_cost, price_model = compute_stage_cost(
+                    attempt.usage, config.index
                 )
                 write_usage_row(
                     run=run,
@@ -426,7 +398,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
                     ),
                     attempt_label=attempt.attempt_label,
                     model_id=attempt.usage.model_id,
-                    profile=inferred_profile or "unknown",
+                    price_model=price_model or "unknown",
                     totals=aggregate_stage_usages([attempt.usage]),
                     cost=stage_cost,
                 )
@@ -436,13 +408,15 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
 
 def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
     config = config or RenderConfig()
-    pricing = resolve_pricing_selection(config.pricing)
+    pricing = resolve_pricing_selection(
+        config.index, used_prices=collect_used_prices(runs, config.index)
+    )
     payload: list[dict] = []
 
     for run in runs:
-        run_cost = estimate_run_cost(run, pricing)
+        run_cost = compute_run_cost(run, config.index)
         effective = compute_effective_patch_usage(run)
-        effective_cost = estimate_run_cost(effective_patch_run(run), pricing)
+        effective_cost = compute_run_cost(effective_patch_run(run), config.index)
         totals = run.totals
         effective_totals = effective.totals
 
@@ -460,13 +434,13 @@ def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str
             "ai_message_count": totals.ai_message_count,
             "ai_messages_with_usage_count": totals.ai_messages_with_usage_count,
             "pricing": {
-                "mode": pricing.mode,
-                "profile": pricing.profile,
-                "input_rate": pricing.input_rate,
-                "cache_rate": pricing.cache_rate,
-                "output_rate": pricing.output_rate,
-                "currency": pricing.currency,
+                "source": "openrouter" if pricing.fetched_at else None,
+                "fetched_at": pricing.fetched_at,
                 "unit": "per_1m_tokens",
+                "used_prices": {
+                    model: (asdict(price) if price is not None else None)
+                    for model, price in pricing.used_prices.items()
+                },
             },
             "estimated_cost": asdict(run_cost) if run_cost is not None else None,
             "effective_patch": {
@@ -491,14 +465,14 @@ def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str
         }
 
         for stage in run.stages:
-            stage_cost, inferred_profile = estimate_stage_cost(stage, pricing)
+            stage_cost, price_model = compute_stage_cost(stage, config.index)
             stage_payload = asdict(stage)
             stage_payload["uncached_input_tokens"] = stage.uncached_input_tokens
             stage_payload["cache_ratio"] = stage.cache_ratio
             stage_payload["estimated_cost"] = (
                 asdict(stage_cost) if stage_cost is not None else None
             )
-            stage_payload["price_profile"] = inferred_profile
+            stage_payload["price_model"] = price_model
             run_payload["stages"].append(stage_payload)
 
         for attempt in run.attempts:

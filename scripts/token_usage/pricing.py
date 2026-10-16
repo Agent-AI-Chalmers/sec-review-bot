@@ -1,5 +1,13 @@
-from .models import CostEstimate, PricingConfig, PricingSelection, RunUsage, StageUsage
-from .price_profiles import MODEL_PROFILE_ALIASES, PRICE_PROFILES
+"""Cost estimation from OpenRouter prices.
+
+Prices are resolved from the OpenRouter price index (see
+``openrouter_pricing``); this module owns the arithmetic. It does not translate
+model names: a stage's ``model_id`` is used as-is, and a model the index does not
+know is reported as unknown cost.
+"""
+
+from .models import CostEstimate, PricingSelection, RunUsage, StageUsage
+from .openrouter_pricing import ModelPrice, PriceIndex
 
 
 def estimate_cost(
@@ -11,163 +19,114 @@ def estimate_cost(
     cache_rate: float | None,
     output_rate: float | None,
 ) -> float | None:
-    if input_rate is None or cache_rate is None or output_rate is None:
+    """Return the cost for one priced stage, or ``None`` if it cannot be priced.
+
+    A rate may be missing when the source does not model it (for example a model
+    without a cache-read price); a missing cache rate is billed at the input
+    rate, while a missing input or output rate makes the stage unknown.
+    """
+    if input_rate is None or output_rate is None:
         return None
+    effective_cache_rate = cache_rate if cache_rate is not None else input_rate
     return (
         (uncached_input_tokens / 1_000_000.0) * input_rate
-        + (cache_read_tokens / 1_000_000.0) * cache_rate
+        + (cache_read_tokens / 1_000_000.0) * effective_cache_rate
         + (output_tokens / 1_000_000.0) * output_rate
     )
 
 
-def resolve_pricing_selection(config: PricingConfig | None = None) -> PricingSelection:
-    config = config or PricingConfig()
-    if config.price_profile is not None:
-        profile = PRICE_PROFILES.get(config.price_profile)
-        input_rate = config.input_rate
-        cache_rate = config.cache_rate
-        output_rate = config.output_rate
-        if profile is not None:
-            input_rate = float(profile["input"]) if input_rate is None else input_rate
-            cache_rate = float(profile["cache"]) if cache_rate is None else cache_rate
-            output_rate = (
-                float(profile["output"]) if output_rate is None else output_rate
-            )
-        return PricingSelection(
-            mode="explicit-profile",
-            profile=config.price_profile,
-            input_rate=input_rate,
-            cache_rate=cache_rate,
-            output_rate=output_rate,
-            currency=(
-                str(profile.get("currency")) if isinstance(profile, dict) else None
-            ),
-        )
+def collect_used_prices(
+    runs: list[RunUsage],
+    index: PriceIndex | None,
+) -> dict[str, ModelPrice | None]:
+    """Map every model id the report looks up to the price used for it.
 
-    if (
-        config.input_rate is not None
-        or config.cache_rate is not None
-        or config.output_rate is not None
-    ):
-        return PricingSelection(
-            mode="explicit-rates",
-            profile=None,
-            input_rate=config.input_rate,
-            cache_rate=config.cache_rate,
-            output_rate=config.output_rate,
-            currency=None,
-        )
+    ``None`` marks a model the source did not know. The map is ordered by first
+    appearance so the report reads in the same order as the runs. This is the
+    report's provenance: it records only the handful of models actually used,
+    not the whole price table, so the numbers stay explainable from the report
+    alone even though no price snapshot is persisted.
+    """
+    if index is None:
+        return {}
+    used: dict[str, ModelPrice | None] = {}
+    for run in runs:
+        for stage in run.stages:
+            model_id = stage.model_id
+            if model_id not in used:
+                used[model_id] = index.lookup(model_id)
+    return used
 
+
+def resolve_pricing_selection(
+    index: PriceIndex | None,
+    *,
+    used_prices: dict[str, ModelPrice | None] | None = None,
+) -> PricingSelection:
+    """Describe the prices this report was priced against.
+
+    The index is resolved once by the caller (see ``load_price_index``) and
+    shared by the report header and the per-stage rows, so the two can never
+    disagree. ``index=None`` means no source was available; every stage is then
+    reported as unknown cost. The only timestamp kept is ``fetched_at``, the
+    instant the live snapshot was taken, which is what a reader needs to judge
+    freshness; ``used_prices`` records the models actually looked up.
+    """
+    if index is None:
+        return PricingSelection(fetched_at=None, used_prices=used_prices or {})
     return PricingSelection(
-        mode="auto-profile",
-        profile=None,
-        input_rate=None,
-        cache_rate=None,
-        output_rate=None,
-        currency=None,
+        fetched_at=index.fetched_at,
+        used_prices=used_prices or {},
     )
 
 
-def _resolve_doubao_tier(model_name: str, avg_input_tokens: float) -> str | None:
-    if avg_input_tokens <= 32_000:
-        suffix = "0-32k"
-    elif avg_input_tokens <= 128_000:
-        suffix = "32-128k"
-    else:
-        suffix = "128-256k"
-    if model_name in {
-        "doubao-seed-2.0-code",
-        "doubao-seed-2.0-pro",
-        "doubao-seed-2.0-lite",
-    }:
-        return f"{model_name}-{suffix}"
-    return None
-
-
-def _resolve_mimo_tier(model_name: str, avg_input_tokens: float) -> str | None:
-    if model_name != "mimo-v2.5-pro":
-        return None
-    if avg_input_tokens <= 256_000:
-        return "mimo-v2.5-pro-0-256k"
-    return "mimo-v2.5-pro-256k-1m"
-
-
-def model_to_price_profile(stage: StageUsage) -> str | None:
-    normalized = str(stage.model_id).strip().lower()
-    if not normalized:
-        return None
-    _, _, model_name = normalized.partition("/")
-    candidate = model_name or normalized
-    alias = MODEL_PROFILE_ALIASES.get(candidate)
-    if alias:
-        return alias
-    doubao_tier = _resolve_doubao_tier(
-        candidate,
-        stage.input_tokens / max(stage.ai_messages_with_usage_count, 1),
-    )
-    if doubao_tier:
-        return doubao_tier
-    mimo_tier = _resolve_mimo_tier(
-        candidate,
-        stage.input_tokens / max(stage.ai_messages_with_usage_count, 1),
-    )
-    if mimo_tier:
-        return mimo_tier
-    return candidate if candidate in PRICE_PROFILES else None
-
-
-def estimate_stage_cost(
-    stage: StageUsage, pricing: PricingSelection
+def stage_cost(
+    stage: StageUsage,
+    index: PriceIndex | None,
 ) -> tuple[CostEstimate | None, str | None]:
-    if pricing.mode == "auto-profile":
-        profile_name = model_to_price_profile(stage)
-        if profile_name is None:
-            return None, None
-        profile = PRICE_PROFILES[profile_name]
-        amount = estimate_cost(
-            uncached_input_tokens=stage.uncached_input_tokens,
-            cache_read_tokens=stage.cache_read_tokens,
-            output_tokens=stage.output_tokens,
-            input_rate=float(profile["input"]),
-            cache_rate=float(profile["cache"]),
-            output_rate=float(profile["output"]),
-        )
-        currency = str(profile["currency"])
-        return (
-            (
-                CostEstimate(amount=amount, currency=currency)
-                if amount is not None
-                else None
-            ),
-            profile_name,
-        )
+    """Return ``(cost, price_model)`` for one stage.
 
+    ``price_model`` is the model id the price came from, or ``None`` when the
+    cost is unknown. Unknown is a first-class result: it means the price source
+    did not know the model, not that the cost was zero.
+    """
+    if index is None:
+        return None, None
+    price = index.lookup(stage.model_id)
+    if price is None:
+        return None, None
     amount = estimate_cost(
         uncached_input_tokens=stage.uncached_input_tokens,
         cache_read_tokens=stage.cache_read_tokens,
         output_tokens=stage.output_tokens,
-        input_rate=pricing.input_rate,
-        cache_rate=pricing.cache_rate,
-        output_rate=pricing.output_rate,
+        input_rate=price.input,
+        cache_rate=price.cache_read,
+        output_rate=price.output,
     )
     if amount is None:
-        return None, pricing.profile
-    return (
-        CostEstimate(amount=amount, currency=pricing.currency or "custom"),
-        pricing.profile,
-    )
+        return None, None
+    return CostEstimate(amount=amount, currency=price.currency), stage.model_id
 
 
-def estimate_run_cost(run: RunUsage, pricing: PricingSelection) -> CostEstimate | None:
+def run_cost(
+    run: RunUsage,
+    index: PriceIndex | None,
+) -> CostEstimate | None:
+    """Total cost for a run, or ``None`` if any stage's price is unknown.
+
+    A run is not partially priced: if one stage has no known price, the run
+    total is unknown rather than an undercount.
+    """
     costs: list[CostEstimate] = []
     for stage in run.stages:
-        stage_cost, _ = estimate_stage_cost(stage, pricing)
-        if stage_cost is None:
+        cost, _ = stage_cost(stage, index)
+        if cost is None:
             return None
-        costs.append(stage_cost)
-
-    currencies = {item.currency for item in costs}
-    if len(currencies) != 1:
+        costs.append(cost)
+    if not costs:
+        # A run with no stages has nothing to price; report unknown rather than 0.
         return None
-    currency = next(iter(currencies))
-    return CostEstimate(amount=sum(item.amount for item in costs), currency=currency)
+    # Every OpenRouter price is USD, so the stages share one currency label.
+    return CostEstimate(
+        amount=sum(item.amount for item in costs), currency=costs[0].currency
+    )
