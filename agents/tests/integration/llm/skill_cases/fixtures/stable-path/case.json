@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "stable-path",
   "skill": "os-boundary-security",
   "reference": "filesystem-path-policy.md",

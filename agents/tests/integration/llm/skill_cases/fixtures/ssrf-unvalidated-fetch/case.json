@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "ssrf-unvalidated-fetch",
   "skill": "web-security",
   "reference": "ssrf.md",

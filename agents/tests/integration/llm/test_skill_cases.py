@@ -72,6 +72,7 @@ async def test_skill_case_contrast(tmp_path, case) -> None:
     assert not any(
         path.startswith("/skills/") for path in without_skills.successful_reads
     )
+    assert_discovery_read(case, with_skills)
     assert_case_oracles(case, with_skills)
     print(
         {

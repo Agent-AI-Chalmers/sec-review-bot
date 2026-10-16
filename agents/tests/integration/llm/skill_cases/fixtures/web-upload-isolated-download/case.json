@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "web-upload-isolated-download",
   "skill": "web-security",
   "reference": "file-upload.md",

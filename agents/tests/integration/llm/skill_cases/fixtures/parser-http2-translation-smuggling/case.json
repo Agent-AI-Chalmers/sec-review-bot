@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-http2-translation-smuggling",
   "skill": "parser-protocol-security",
   "reference": "http2-translation.md",

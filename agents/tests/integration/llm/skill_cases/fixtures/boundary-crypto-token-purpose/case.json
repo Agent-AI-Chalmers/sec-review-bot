@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "boundary-crypto-token-purpose",
   "skill": "cryptography-security",
   "reference": "verification-contracts.md",

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "boundary-parser-memory-length",
   "skill": "memory-numeric-safety",
   "reference": "numeric-semantics-and-bounds.md",

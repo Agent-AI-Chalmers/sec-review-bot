@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-consistent-rejection",
   "skill": "parser-protocol-security",
   "reference": "http-framing.md",

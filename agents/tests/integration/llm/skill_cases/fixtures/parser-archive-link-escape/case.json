@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-archive-link-escape",
   "skill": "parser-protocol-security",
   "reference": "archive-semantics.md",

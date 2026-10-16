@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "auth-actor-subject-unknown",
   "skill": "authorization-security",
   "reference": "delegated-authority.md",

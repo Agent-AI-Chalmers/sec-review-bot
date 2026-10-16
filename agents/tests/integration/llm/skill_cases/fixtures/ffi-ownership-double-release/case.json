@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "ffi-ownership-double-release",
   "skill": "memory-numeric-safety",
   "reference": "unsafe-ffi.md",

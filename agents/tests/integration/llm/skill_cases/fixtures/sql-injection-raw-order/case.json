@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "sql-injection-raw-order",
   "skill": "web-security",
   "reference": "sql-injection.md",

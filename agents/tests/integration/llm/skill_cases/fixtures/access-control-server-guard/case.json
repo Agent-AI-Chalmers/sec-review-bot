@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "access-control-server-guard",
   "skill": "authorization-security",
   "reference": "access-control.md",

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "unknown-path-authority",
   "skill": "os-boundary-security",
   "reference": "filesystem-path-policy.md",

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "supply-private-source-enforced",
   "skill": "software-supply-chain-security",
   "reference": "dependency-selection.md",

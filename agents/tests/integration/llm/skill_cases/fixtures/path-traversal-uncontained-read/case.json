@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "path-traversal-uncontained-read",
   "skill": "os-boundary-security",
   "reference": "filesystem-path-policy.md",

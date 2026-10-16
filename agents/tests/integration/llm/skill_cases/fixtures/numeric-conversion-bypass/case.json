@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "numeric-conversion-bypass",
   "skill": "memory-numeric-safety",
   "reference": "numeric-semantics-and-bounds.md",

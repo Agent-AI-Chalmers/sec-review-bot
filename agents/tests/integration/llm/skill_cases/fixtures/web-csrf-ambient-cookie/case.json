@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "web-csrf-ambient-cookie",
   "skill": "web-security",
   "reference": "csrf.md",

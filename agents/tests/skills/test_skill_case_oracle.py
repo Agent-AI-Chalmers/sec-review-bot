@@ -16,7 +16,6 @@ from tests.integration.llm.skill_cases.runner import SkillCaseRun, assert_case_o
 def _case() -> SkillCase:
     return SkillCase.model_validate(
         {
-            "schema_version": 1,
             "id": "oracle-requirements",
             "skill": "cryptography-security",
             "reference": "certificate-path-identity.md",
@@ -67,7 +66,6 @@ def test_oracle_requires_every_explanation_and_proof_gap_requirement() -> None:
 def test_discovery_case_can_check_reads_without_a_result_oracle() -> None:
     case = SkillCase.model_validate(
         {
-            "schema_version": 1,
             "id": "discovery-only",
             "skill": "cryptography-security",
             "reference": "certificate-path-identity.md",

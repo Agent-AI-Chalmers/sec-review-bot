@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "resource-unbounded-retention",
   "skill": "concurrency-resource-security",
   "reference": "resource-budgets.md",

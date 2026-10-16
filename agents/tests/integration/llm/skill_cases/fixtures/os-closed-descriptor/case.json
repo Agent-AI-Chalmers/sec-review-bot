@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "os-closed-descriptor",
   "skill": "os-boundary-security",
   "reference": "process-authority-inheritance.md",

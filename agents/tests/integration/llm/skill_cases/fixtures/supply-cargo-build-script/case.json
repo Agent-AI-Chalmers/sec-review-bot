@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "supply-cargo-build-script",
   "skill": "software-supply-chain-security",
   "reference": "cargo-dependencies.md",

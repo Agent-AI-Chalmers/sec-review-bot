@@ -88,7 +88,6 @@ class SkillCaseOracles(BaseModel):
 class SkillCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[1]
     id: str
     skill: str
     reference: str
