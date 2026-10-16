@@ -3,7 +3,9 @@
   "id": "cwe-use-after-free",
   "skill": "cwe",
   "reference": "cwe-699-agent-navigation.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assign the best root-cause CWE to the supported security finding. The local navigation index is not a closed label set.",
   "facts": [
     "An attacker-controlled callback frees a heap object.",

@@ -79,6 +79,11 @@ def test_materialize_agent_skills_view_includes_reference_skills(
                 "web-security",
                 "ci-security",
                 "scanner-finding-triage",
+                "memory-numeric-safety",
+                "cryptography-security",
+                "concurrency-resource-security",
+                "os-boundary-security",
+                "parser-protocol-security",
             ),
         )
 
@@ -107,12 +112,27 @@ def test_materialize_agent_skills_view_includes_reference_skills(
     scanner_references = skills_root / "scanner-finding-triage" / "references"
     assert (scanner_references / "reachability-and-context.md").is_file()
     assert (scanner_references / "scanner-noise-patterns.md").is_file()
+    assert (skills_root / "memory-numeric-safety" / "SKILL.md").is_file()
+    assert (skills_root / "cryptography-security" / "SKILL.md").is_file()
+    assert (skills_root / "concurrency-resource-security" / "SKILL.md").is_file()
+    assert (skills_root / "os-boundary-security" / "SKILL.md").is_file()
+    assert (skills_root / "parser-protocol-security" / "SKILL.md").is_file()
     assert not (skills_root / "skill_source_notes").exists()
 
 
 def test_materialized_view_contains_only_declared_skill_resources() -> None:
     """Source notes remain outside the view, regardless of their wording or URLs."""
-    declared = ("cwe", "web-security", "ci-security", "scanner-finding-triage")
+    declared = (
+        "cwe",
+        "web-security",
+        "ci-security",
+        "scanner-finding-triage",
+        "memory-numeric-safety",
+        "cryptography-security",
+        "concurrency-resource-security",
+        "os-boundary-security",
+        "parser-protocol-security",
+    )
     skills_root = materialize_agent_skills_view(declared)
     assert {path.name for path in skills_root.iterdir()} == set(declared)
     expected = {}

@@ -3,7 +3,9 @@
   "id": "ci-pull-request-target-keyword",
   "skill": "ci-security",
   "reference": "github-actions.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess whether using pull_request_target alone confirms an exploitable CI vulnerability in this workflow.",
   "facts": [
     "The workflow shown is complete for the relevant job.",

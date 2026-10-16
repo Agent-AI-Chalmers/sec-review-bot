@@ -3,7 +3,9 @@
   "id": "xss-react-interpolation",
   "skill": "web-security",
   "reference": "xss.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess whether rendering attacker-controlled displayName with ordinary React interpolation is a confirmed XSS.",
   "facts": [
     "src/Profile.tsx contains the complete relevant component.",

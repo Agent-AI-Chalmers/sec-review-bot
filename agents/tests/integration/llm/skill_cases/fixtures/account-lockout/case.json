@@ -3,7 +3,9 @@
   "id": "account-lockout",
   "skill": "web-security",
   "reference": "auth-session.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess an unauthenticated attacker deliberately locking a known victim account.",
   "facts": [
     "The public login endpoint accepts any account name.",

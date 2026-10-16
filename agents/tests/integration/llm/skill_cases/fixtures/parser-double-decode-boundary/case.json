@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "parser-double-decode-boundary",
+  "skill": "parser-protocol-security",
+  "reference": "representation-boundaries.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether validation constrains the path representation consumed downstream.",
+  "facts": [
+    "The gateway URL-decodes a request path once and rejects any ../ sequence in that representation.",
+    "It forwards the decoded string to a backend that URL-decodes it again before opening a file.",
+    "The attacker sends %252e%252e%252fsecret, which has no ../ after the first decode and becomes ../secret after the second."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "decode|representation|validation|backend|consumer"
+  }
+}

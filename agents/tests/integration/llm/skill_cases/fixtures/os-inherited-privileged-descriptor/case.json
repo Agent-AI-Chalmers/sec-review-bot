@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "os-inherited-privileged-descriptor",
+  "skill": "os-boundary-security",
+  "reference": "process-authority-inheritance.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess authority inherited by the untrusted helper process.",
+  "facts": [
+    "A privileged Linux daemon opens a writable descriptor for the protected deployment directory.",
+    "The descriptor does not have close-on-exec set.",
+    "The daemon execs an attacker-selected helper with reduced user IDs, and the helper can write through the inherited descriptor."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "descriptor|inherit|exec|close-on-exec|authority"
+  }
+}

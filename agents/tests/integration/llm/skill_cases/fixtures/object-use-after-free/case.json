@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "object-use-after-free",
+  "skill": "memory-numeric-safety",
+  "reference": "object-validity.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the object lifetime violation.",
+  "facts": [
+    "A remote callback frees the request-owned object.",
+    "The caller then unconditionally dereferences the same pointer to dispatch the next parser step.",
+    "Ownership transfer and the attacker-controlled callback path are established, and no reference keeps the object alive."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "free|lifetime|dangl|dereference|valid"
+  }
+}

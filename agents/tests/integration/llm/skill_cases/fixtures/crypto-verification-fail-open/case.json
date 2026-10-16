@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "crypto-verification-fail-open",
+  "skill": "cryptography-security",
+  "reference": "verification-contracts.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether verification failure is handled safely.",
+  "facts": [
+    "A remote user supplies a signed role token.",
+    "verify_signature returns false for an invalid signature, but the handler logs the failure and continues.",
+    "The handler then trusts the unverified role claim to grant administrator access."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "verification|failure|continue|unverified|claim"
+  }
+}

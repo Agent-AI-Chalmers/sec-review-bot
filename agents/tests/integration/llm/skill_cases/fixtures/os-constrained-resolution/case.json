@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "os-constrained-resolution",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-resolution.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that a pathname check can be raced to escape the export tree.",
+  "facts": [
+    "The Linux service opens an immutable export-root directory once.",
+    "For each request it uses openat2 relative to that descriptor with RESOLVE_BENEATH and RESOLVE_NO_SYMLINKS.",
+    "Untrusted users cannot modify the root descriptor or mount namespace."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "openat2|beneath|symlink|constrain|descriptor"
+  }
+}

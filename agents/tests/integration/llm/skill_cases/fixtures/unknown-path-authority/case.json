@@ -3,7 +3,9 @@
   "id": "unknown-path-authority",
   "skill": "web-security",
   "reference": "path-traversal.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess the claim that a tenant can replace a directory between the containment check and read without inventing missing permissions.",
   "facts": [
     "The request controls relative and root is configured server-side.",

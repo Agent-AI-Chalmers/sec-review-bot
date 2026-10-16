@@ -3,7 +3,9 @@
   "id": "session-after-logout",
   "skill": "web-security",
   "reference": "auth-session.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess continued authenticated access with a copied session token after the victim logs out.",
   "facts": [
     "These are the deployed logout and authenticated-account handlers.",

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "crypto-unknown-key-scope",
+  "skill": "cryptography-security",
+  "reference": "key-nonce-scope.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a report that repeated nonce bytes prove GCM nonce reuse.",
+  "facts": [
+    "Two ciphertext records contain the same nonce bytes.",
+    "The records do not identify the encryption keys, key derivation scope, or whether the same key was used."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true
+  }
+}

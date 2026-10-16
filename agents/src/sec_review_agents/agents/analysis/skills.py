@@ -4,4 +4,9 @@ ANALYSIS_AGENT_SKILLS = (
     "cwe",
     "web-security",
     "ci-security",
+    "memory-numeric-safety",
+    "cryptography-security",
+    "concurrency-resource-security",
+    "os-boundary-security",
+    "parser-protocol-security",
 )

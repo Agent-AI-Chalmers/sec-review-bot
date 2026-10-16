@@ -3,7 +3,9 @@
   "id": "path-replacement",
   "skill": "web-security",
   "reference": "path-traversal.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess whether the containment check still protects the file actually read.",
   "facts": [
     "The handler runs as a service account and serves downloads.",

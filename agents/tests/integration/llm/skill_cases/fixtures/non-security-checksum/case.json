@@ -3,7 +3,9 @@
   "id": "non-security-checksum",
   "skill": "web-security",
   "reference": "auth-session.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess the claim that this fast hash weakens password storage.",
   "facts": [
     "The function hashes public image bytes only to address a cache.",

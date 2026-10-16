@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "resource-unknown-capacity",
+  "skill": "concurrency-resource-security",
+  "reference": "resource-budgets.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a denial-of-service claim based only on a missing timeout.",
+  "facts": [
+    "A network call has no explicit timeout.",
+    "Request rate, concurrency, upstream behavior, worker capacity, cancellation and surrounding admission controls are not provided."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "os-unknown-writer",
+  "skill": "os-boundary-security",
+  "reference": "filesystem-resolution.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claimed filesystem check/use race.",
+  "facts": [
+    "The code resolves and checks a pathname before opening it.",
+    "Directory ownership, permissions, competing writers, mount behavior and exact open flags are not provided."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "unsafe-ffi-invalid-layout",
+  "skill": "memory-numeric-safety",
+  "reference": "unsafe-ffi.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether the FFI wrapper satisfies the foreign layout contract.",
+  "facts": [
+    "A remote packet body is copied into a packed byte buffer.",
+    "The wrapper casts buffer+1 to a C Header pointer and dereferences it.",
+    "The target ABI requires Header to be 8-byte aligned, and no aligned copy or validation occurs."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "ffi|align|layout|pointer|precondition"
+  }
+}

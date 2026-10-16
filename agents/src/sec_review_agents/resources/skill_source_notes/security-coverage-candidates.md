@@ -2,7 +2,7 @@
 
 ## Status and evidence contract
 
-Research notes reviewed 2026-10-16. No candidate in this file has been bundled or behaviorally validated. The scope decisions are engineering hypotheses, not conclusions derived from evaluation outcomes. PatchEval cases, CWE distributions, patches, tests, failures and results are excluded from requirement selection and probe design. PatchEval is reserved for final evaluation after freezing the skills.
+Research notes reviewed 2026-10-16. The first five candidates were subsequently admitted as narrow bundled skills after source review and independent prompted/natural cases; their maintained ledgers are `memory-numeric-safety.md`, `cryptography-security.md`, `concurrency-resource-security.md`, `os-boundary-security.md`, and `parser-protocol-security.md`. The supply-chain candidate remains deferred. PatchEval cases, CWE distributions, patches, tests, failures and results are excluded from requirement selection and probe design. PatchEval is reserved for final evaluation after freezing the skills.
 
 Each row records a rule group, a primary source locator, and the limit of the proposed inference. A taxonomy entry establishes a failure mechanism, not that the mechanism needs a standalone skill. Keep rule groups small enough to have a meaningful counterexample. Record source revision or review date and applicability; recheck a live source or API default against the repository version when material. These notes are outside the mounted skill view.
 
@@ -17,7 +17,7 @@ There is no requirement to trace every connective sentence. Trace decision-chang
 | MEM-3 | Check lifetime, initialization and object validity, including unsafe/FFI boundaries. | Same CERT source, MEM30-C, MEM34-C; [Rust undefined behavior](https://doc.rust-lang.org/reference/behavior-considered-undefined.html), dangling/misaligned pointers, data races, invalid values and foreign ABI | An `unsafe` block is not proof of a violation. Caller preconditions, ownership transfer, aliasing and representation must be established for the specific language/ABI. |
 | MEM-4 | Numeric security consequences need not include memory access. | [CWE-704](https://cwe.mitre.org/data/definitions/704.html), Description and Common Consequences | Type-conversion failure can affect protection logic. Which quota, balance, timeout or range is security-sensitive remains repository-specific reasoning; this does not introduce a generic financial-rules checklist. |
 
-Potential knowledge increment: invalidation of superficially correct range checks by conversion, units or ownership semantics. Proposed references: numeric semantics, bounds/allocation, object validity, unsafe/FFI. Generic “avoid overflow” advice is not sufficient content. First probe pair: a conversion before/after the same check changes the consumed value, contrasted with checked rejection. Behavior evidence: not yet collected.
+Potential knowledge increment: invalidation of superficially correct range checks by conversion, units or ownership semantics. Bundled references cover numeric/bounds semantics and object validity/unsafe boundaries. Generic “avoid overflow” advice is not sufficient content. Prompted positive/counterexample/unknown cases and one natural discovery case passed with the deployed test model.
 
 ## cryptography-security
 
@@ -29,7 +29,7 @@ Potential knowledge increment: invalidation of superficially correct range check
 | CRYPTO-4 | Password verifier protection differs from using a fast generic hash. | [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html), §3.1.1.2 | Identify actual password storage and offline threat assumptions. A fast hash used as a non-security checksum is a counterexample. Avoid fixed work factors and algorithm-deprecation tables in the first skill. |
 | CRYPTO-5 | Certificate path processing requires specific trust inputs and validation rules. | [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280.html), §6 | A valid path is not a full TLS peer-identity decision. General PKI, revocation operations and TLS policy remain deferred until separately sourced and scoped. |
 
-Potential increment: mode-specific preconditions, key/message scope and fail-open verification behavior. Proposed references: primitive contracts, key/randomness/nonce scope, verification and authenticated-result consumption. Rotation programs, universal algorithm recommendations and full certificate operations are excluded from the initial experiment. First probe pair: same-key nonce reuse versus correctly separated keys/counters. Behavior evidence: not yet collected.
+Potential increment: mode-specific preconditions, key/message scope and fail-open verification behavior. Bundled references cover key/nonce scope and verification contracts. Rotation programs, universal algorithm recommendations and full certificate operations remain excluded. Prompted positive/counterexample/unknown cases and one natural discovery case passed with the deployed test model.
 
 ## concurrency-resource-security
 
@@ -40,7 +40,7 @@ Potential increment: mode-specific preconditions, key/message scope and fail-ope
 | RES-1 | Evaluate attacker-induced consumption against actual resource limits and service effect. | [CWE-400](https://cwe.mitre.org/data/definitions/400.html), Description, consequences and mapping notes; [CWE-770](https://cwe.mitre.org/data/definitions/770.html), Description and mitigations | Missing timeout/limit alone is not proof. The project additionally requires a credible cost/amplification, rate, concurrency, capacity or recovery argument; exact production measurement is not always available. State unknown capacity rather than inventing it. |
 | RES-2 | Cleanup and cancellation must cover reachable acquisition/error paths that can accumulate resources. | [CERT C Memory Management](https://cmu-sei.github.io/secure-coding-standards/sei-cert-c-coding-standard/rules/memory-management-mem/), MEM31-C; CWE-400 | Memory cleanup is an example, not proof of uniform descriptor/task semantics. Bounded resources released by verified ownership/cleanup are a negative example. API-specific cancellation behavior requires its own primary documentation. |
 
-Potential increment: temporal invariant versus finite-resource budget. Keep these as distinct references in one initial candidate; do not force both into one source/sink chain. First probes: feasible double-use versus atomic consume; unbounded retained work versus bounded admission and cleanup. Behavior evidence: not yet collected. Lock ordering and platform-specific cancellation need additional sources before operational guidance is adopted.
+Potential increment: temporal invariant versus finite-resource budget. These remain distinct references in one bundled skill and are not forced into one source/sink chain. Resource prompted positive/counterexample/unknown cases and one natural discovery case passed with the deployed test model. Lock ordering and platform-specific cancellation still need additional sources before operational guidance is adopted.
 
 ## os-boundary-security
 
@@ -54,7 +54,7 @@ Renames the proposed `system-boundary-security`; no existing bundled skill is re
 | OS-4 | Local IPC trust depends on endpoint permissions and peer identity semantics. | [Linux unix(7)](https://man7.org/linux/man-pages/man7/unix.7.html), “Pathname socket ownership and permissions”, “Abstract sockets”, `SO_PEERCRED` | Abstract sockets do not inherit pathname permission controls. OS-specific peer checks must match the connection and relevant principal. Do not infer that “local” means “trusted”. |
 | OS-5 | A restriction on privilege gain has a specific scope, not a complete sandbox guarantee. | [Linux kernel no_new_privs](https://docs.kernel.org/userspace-api/no_new_privs.html), documented guarantees and exceptions | Preventing exec-time privilege gain is not general isolation. Container, namespace and seccomp policy packs remain deferred, with no missing-hardening finding by default. |
 
-Potential increment: object authority, process inheritance and identity transitions. First probe pair: attacker-writable path replaced between check/use versus operation constrained to the intended directory/object. Initial support is Linux/POSIX-oriented; no Unix/Windows parity claim. Behavior evidence: not yet collected.
+Potential increment: object authority, process inheritance and identity transitions. Prompted positive/counterexample/unknown filesystem cases and one natural discovery case passed with the deployed test model. Support remains Linux/POSIX-oriented; no Unix/Windows parity claim.
 
 ## parser-protocol-security
 
@@ -65,7 +65,7 @@ Potential increment: object authority, process inheritance and identity transiti
 | PARSE-3 | XML external-resource resolution and entity expansion are distinct capabilities with distinct impacts. | [OWASP XXE Prevention](https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html), attack examples and parser-specific guidance | Verify actual parser features and defaults by version/configuration. Safe JSON parsing is not evidence of unsafe object reconstruction; a format name alone does not prove a dangerous capability. |
 | PARSE-4 | Integrity and replay/context binding are different properties of message processing. | [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html), §§2.7–2.8 and 3.8–3.12 | This supports token substitution/context confusion, not a universal protocol-state or anti-replay checklist. General protocol ordering/replay rules require the protocol's own specification before adoption. |
 
-Potential increment: differential interpretation and cross-message invariants. Proposed references: representation/normalization, framing/differential parsing, dangerous parser capabilities; only add protocol-specific state guidance with its source. Memory legality and resource cost are separate questions, not mandatory subsequent skill loads. Archive, media and compiler are examples of consumers, not promises to cover every format. First probe pair: mismatched framing versus consistent rejection. Behavior evidence: not yet collected.
+Potential increment: differential interpretation and cross-message invariants. Bundled references cover interpretation/framing and dangerous parser capabilities; protocol-specific state guidance still requires its own source. Memory legality and resource cost are separate questions. Prompted positive/counterexample/unknown framing cases and one natural discovery case passed with the deployed test model.
 
 ## software-supply-chain-security
 

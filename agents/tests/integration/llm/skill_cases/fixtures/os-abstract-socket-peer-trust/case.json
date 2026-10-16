@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "os-abstract-socket-peer-trust",
+  "skill": "os-boundary-security",
+  "reference": "local-ipc.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess authorization based on a Linux abstract Unix socket being local.",
+  "facts": [
+    "A privileged daemon accepts commands on a Linux abstract Unix-domain socket.",
+    "Any unprivileged local process can connect.",
+    "The daemon performs privileged file deletion for every command without checking peer credentials or an application credential."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "abstract|local|peer|credential|permission|unprivileged"
+  }
+}

@@ -3,7 +3,9 @@
   "id": "sql-injection-raw-order",
   "skill": "web-security",
   "reference": "sql-injection.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess whether passing the sort query parameter to orderByRaw is a confirmed SQL injection.",
   "facts": [
     "req.query.sort is attacker-controlled.",

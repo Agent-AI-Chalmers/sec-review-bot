@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "crypto-key-separated-counter",
+  "skill": "cryptography-security",
+  "reference": "key-nonce-scope.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the claim that equal counter values across tenants necessarily reuse a GCM nonce.",
+  "facts": [
+    "Each tenant has an independently generated AES-GCM key.",
+    "Each key has a persistent atomic counter starting at zero and encryption stops before wrap.",
+    "Counter values may be equal across different keys."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "key|scope|unique|counter"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "crypto-gcm-nonce-reuse",
+  "skill": "cryptography-security",
+  "reference": "key-nonce-scope.md",
+  "modes": [
+    "prompted",
+    "natural"
+  ],
+  "task": "Assess AES-GCM nonce reuse.",
+  "facts": [
+    "An attacker can trigger repeated encryption under the same long-lived AES-GCM key.",
+    "Every operation uses the constant 96-bit nonce 000000000000000000000000.",
+    "Ciphertexts are exposed to the attacker."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "same key|reuse|unique|gcm|nonce"
+  }
+}

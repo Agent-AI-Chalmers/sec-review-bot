@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "parser-xxe-enabled",
+  "skill": "parser-protocol-security",
+  "reference": "parser-capabilities.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the enabled XML parser capability.",
+  "facts": [
+    "An unauthenticated upload endpoint parses attacker-controlled XML.",
+    "The configured parser version enables external general entities and permits file URI resolution.",
+    "The parsed entity text is returned in the response, and no resolver restriction or sandbox applies."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "external|entity|file|resolution|xml|attacker"
+  }
+}

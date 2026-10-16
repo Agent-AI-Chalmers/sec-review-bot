@@ -3,7 +3,9 @@
   "id": "path-traversal-uncontained-read",
   "skill": "web-security",
   "reference": "path-traversal.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess whether the download handler contains an attacker-controlled path before reading it.",
   "facts": [
     "req.query.file is attacker-controlled.",

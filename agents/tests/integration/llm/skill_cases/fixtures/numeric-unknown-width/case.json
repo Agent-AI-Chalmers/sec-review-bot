@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "numeric-unknown-width",
+  "skill": "memory-numeric-safety",
+  "reference": "numeric-semantics-and-bounds.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that count * size necessarily overflows before allocation.",
+  "facts": [
+    "The code fragment shows total = count * size followed by allocate(total).",
+    "Operand types, maximum input, language overflow behavior and earlier validation are not provided."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true
+  }
+}

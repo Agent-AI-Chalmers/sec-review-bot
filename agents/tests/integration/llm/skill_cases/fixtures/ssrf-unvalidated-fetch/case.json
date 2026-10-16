@@ -3,7 +3,9 @@
   "id": "ssrf-unvalidated-fetch",
   "skill": "web-security",
   "reference": "ssrf.md",
-  "modes": ["prompted"],
+  "modes": [
+    "prompted"
+  ],
   "task": "Assess whether fetching the attacker-controlled URL is a confirmed SSRF.",
   "facts": [
     "request.args['url'] is attacker-controlled.",

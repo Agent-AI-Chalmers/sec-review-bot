@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "parser-framing-disagreement",
+  "skill": "parser-protocol-security",
+  "reference": "http-framing.md",
+  "modes": [
+    "prompted",
+    "natural"
+  ],
+  "task": "Assess an HTTP/1.1 request-smuggling path.",
+  "facts": [
+    "A front proxy accepts both Content-Length and Transfer-Encoding and frames the request by Content-Length.",
+    "It forwards both headers on one reused connection.",
+    "The backend frames the same bytes by Transfer-Encoding, leaving attacker-chosen bytes to become the next request."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "front|backend|differ|framing|next request|smuggl"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "resource-bounded-admission",
+  "skill": "concurrency-resource-security",
+  "reference": "resource-budgets.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim of unbounded task exhaustion.",
+  "facts": [
+    "The service admits at most 20 tasks globally and rejects additional work.",
+    "Each task has a 2-second deadline and releases its fixed 64 KB buffer in a finally block.",
+    "The report provides no bypass or capacity impact within those bounds."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "bound|admission|deadline|cleanup|fixed"
+  }
+}

@@ -224,6 +224,16 @@ def test_repository_review_backends_materialize_agent_skill_views(
     assert (analyzer_skills_root / "cwe").is_dir()
     assert (analyzer_skills_root / "web-security").is_dir()
     assert (analyzer_skills_root / "ci-security").is_dir()
+    for skill_name in (
+        "memory-numeric-safety",
+        "cryptography-security",
+        "concurrency-resource-security",
+        "os-boundary-security",
+        "parser-protocol-security",
+    ):
+        assert (analyzer_skills_root / skill_name).is_dir()
+        assert (mitigation_skills_root / skill_name).is_dir()
+        assert (verifier_skills_root / skill_name).is_dir()
     assert not (mitigation_skills_root / "cwe").exists()
     assert (mitigation_skills_root / "web-security").is_dir()
     assert (mitigation_skills_root / "ci-security").is_dir()
@@ -244,6 +254,14 @@ def test_repository_review_backends_materialize_agent_skill_views(
     assert not (discovery_skills_root / "cwe").exists()
     assert (discovery_skills_root / "web-security").is_dir()
     assert (discovery_skills_root / "ci-security").is_dir()
+    for skill_name in (
+        "memory-numeric-safety",
+        "cryptography-security",
+        "concurrency-resource-security",
+        "os-boundary-security",
+        "parser-protocol-security",
+    ):
+        assert (discovery_skills_root / skill_name).is_dir()
     assert "/skills/" in _routes_for(triage_backend)
     triage_skills_root = _route_root(triage_backend, "/skills/")
     assert (triage_skills_root / "scanner-finding-triage").is_dir()

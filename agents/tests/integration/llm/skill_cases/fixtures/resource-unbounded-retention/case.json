@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "resource-unbounded-retention",
+  "skill": "concurrency-resource-security",
+  "reference": "resource-budgets.md",
+  "modes": [
+    "prompted",
+    "natural"
+  ],
+  "task": "Assess attacker-driven retained work.",
+  "facts": [
+    "An unauthenticated endpoint starts one background task per request.",
+    "Each task retains a 10 MB body and waits indefinitely on an attacker-selected unreachable peer.",
+    "There is no admission limit, timeout, cancellation, or cleanup, and requests can be sent concurrently."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "unbounded|retain|concurr|admission|cleanup|resource"
+  }
+}
