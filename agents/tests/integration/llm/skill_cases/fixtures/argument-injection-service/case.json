@@ -5,7 +5,7 @@
   "modes": [
     "prompted",
     "discovery",
-    "contrast"
+    "compare"
   ],
   "task": "Assess whether the report-name value controls the child parser and creates a security vulnerability.",
   "facts": [

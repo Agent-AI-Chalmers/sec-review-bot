@@ -52,19 +52,19 @@ async def test_discovery_skill_cases(tmp_path, case) -> None:
 
 @pytest.mark.parametrize(
     "case",
-    cases_for_mode(CASES, "contrast"),
+    cases_for_mode(CASES, "compare"),
     ids=lambda case: case.id,
 )
-async def test_skill_case_contrast(tmp_path, case) -> None:
+async def test_skill_case_comparison(tmp_path, case) -> None:
     without_skills = await run_skill_case(
         case,
-        mode="contrast",
+        mode="compare",
         skills_enabled=False,
         temp_root=tmp_path / "without-skills",
     )
     with_skills = await run_skill_case(
         case,
-        mode="contrast",
+        mode="compare",
         skills_enabled=True,
         temp_root=tmp_path / "with-skills",
     )

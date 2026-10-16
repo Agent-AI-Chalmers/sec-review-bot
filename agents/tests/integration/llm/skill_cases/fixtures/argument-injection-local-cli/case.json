@@ -4,7 +4,7 @@
   "reference": "process-execution-input.md",
   "modes": [
     "prompted",
-    "contrast"
+    "compare"
   ],
   "task": "Assess whether the report-name value controls the child parser and whether that behavior is a security vulnerability.",
   "facts": [

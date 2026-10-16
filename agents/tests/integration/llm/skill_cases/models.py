@@ -11,7 +11,7 @@ from pydantic import (
     model_validator,
 )
 
-SkillCaseMode = Literal["prompted", "discovery", "contrast"]
+SkillCaseMode = Literal["prompted", "discovery", "compare"]
 SkillVerdict = Literal["confirmed", "rejected", "unresolved"]
 
 

@@ -11,7 +11,7 @@ Each directory under `fixtures/` is one security case. Keep the security facts a
 5. Add only the modes that answer a useful question:
    - `prompted` explicitly names the skill and reference and requires successful read evidence. Use this by default.
    - `discovery` does not name a skill or reference path. The model sees the normal skill catalog and must choose and read the expected resources from the case wording. This proves selection only for that wording; it does not prove that realistic repository code will trigger the same choice.
-   - `contrast` runs the same prompt with and without skills. The skills-enabled run must read the expected skill and reference and satisfy the oracle; the baseline is recorded but is not required to fail.
+   - `compare` runs the same prompt with and without skills. The skills-enabled run must read the expected skill and reference and satisfy the oracle; the baseline is recorded but is not required to fail. This mode produces a comparable output pair. It does not automatically decide that the skills-enabled result is better; that judgment belongs to a human review or a separately defined blinded judge.
 
 The loader rejects unknown fields, duplicate IDs, unknown skills, and unknown references. A workspace is optional for cases decided entirely from declared facts. Keep detailed security reasoning in the case facts and oracle requirements, not in the runner.
 
