@@ -148,6 +148,8 @@ Notes:
 - Config is always read from the **default branch** (resolved via the GitHub API), never from the PR base ref or a repository-review `target_branch`. A non-default branch scan therefore uses the default branch's `trigger_mode` / `paths_ignore`.
 - Repository config does not support selecting a workspace image. The GitHub integration does not parse image configuration fields from `.sec-review/config.yml`.
 
+A repository can also declare how to prepare a dependency-complete environment for the agent in [`.sec-review/setup.yml`](../../.sec-review/setup.yml). The GitHub integration reads and validates that declaration on the default branch before submitting the run; the format is owned by the [setup declaration contract](../../contracts/setup-declaration/README.md) and the reasoning by [Trusted Setup](../../docs/workflows/TRUSTED_SETUP.md).
+
 ### Manual commands
 
 `<app-slug>` is not a literal placeholder; it is the actual slug registered for the GitHub App. If the app slug is `web-sec-bot`, the real comment is `@web-sec-bot review`.

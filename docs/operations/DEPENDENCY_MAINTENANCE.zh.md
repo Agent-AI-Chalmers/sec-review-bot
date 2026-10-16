@@ -4,7 +4,7 @@
 
 本文是 [DEPENDENCY_MAINTENANCE.md](DEPENDENCY_MAINTENANCE.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-本文说明本仓库如何处理 GitHub integration、Python agents、GitHub Actions，以及 Node / Python 版本策略相关的更新。
+本文说明本仓库如何处理 GitHub integration、Python agents、GitHub Actions，以及运行时与工具链版本相关的更新。
 
 ## 策略
 
@@ -14,24 +14,23 @@
 - 对安全问题、已知生产 bug 或高风险运行时依赖，使用定向更新。
 - 只有在 dependency-only、resolver 有解、更新集合可理解，并且 package-local checks 通过时，才做完整 lockfile refresh。
 
-Dependabot 配置在 [`.github/dependabot.yml`](../../.github/dependabot.yml)，管理 `npm`、`uv` 和 GitHub Actions。Dependabot PR 是有用的更新探针，但 grouped PR 通常更新目标依赖，以及让这些目标能升级所需的 lockfile 变化；它不一定会把所有兼容的传递依赖都升到当前 resolver 能选到的最高版本。
+Dependabot 配置在 [`.github/dependabot.yml`](../../.github/dependabot.yml)，管理 `npm`、`uv`、`pip` 和 GitHub Actions。Dependabot PR 是有用的更新探针，但 grouped PR 通常更新目标依赖，以及让这些目标能升级所需的 lockfile 变化；它不一定会把所有兼容的传递依赖都升到当前 resolver 能选到的最高版本。
 
-## GitHub Integration
+## Node Packages (pnpm)
 
-GitHub integration package 在 `apps/github-integration/` 下使用 `pnpm`。
+Node 包使用 `pnpm`，每个都有自己的 manifest 和 lockfile：
 
-| 目标 | 命令 |
+- `apps/github-integration/`
+- `apps/control-plane-ui/`
+- `control-plane/`
+- `contracts/control-plane-api/tools/`
+- `contracts/integration-contract/tools/`
+
+| 目标 | 命令（在包目录中运行） |
 | --- | --- |
 | 检查过期依赖 | `pnpm outdated` |
 | 在 manifest 范围内更新 | `pnpm update` |
-
-检查：
-
-```bash
-pnpm run lint
-pnpm run typecheck
-pnpm test
-```
+| 本地检查 | `pnpm run lint`、`pnpm run typecheck`、`pnpm test` |
 
 ## Python Agents
 
@@ -53,3 +52,23 @@ uv run mypy .
 uv run pyright .
 uv run python -m pytest
 ```
+
+## RustFS Init
+
+RustFS init 容器在 `ops/rustfs-init/` 下使用 `pip`；它唯一的依赖钉在 [`requirements.txt`](../../ops/rustfs-init/requirements.txt)。用 `pip list --outdated` 检查。
+
+## GitHub Actions
+
+action 以 major tag 固定在 `.github/workflows/`，由 Dependabot 的 `github-actions` 生态更新。把 major 升级当作行为变化，合并前先读 release notes。
+
+## 运行时与工具链版本
+
+当前声明：每个 TypeScript 包把 `engines.node` 钉在 `>=24 <25`，CI 通过 `node-version-file` 从 `package.json` 安装 Node，Dependabot 忽略 `typescript` 与 `@types/node` 的 semver-major。agents package 声明 `requires-python = ">=3.14"`，精确 patch 记在 `agents/.python-version`，CI 通过 `python-version-file` 安装 Python。
+
+何时可以升级到下一个版本：
+
+- Node 26：在它于 2026-10-28 成为 Active LTS 之后。
+- Python 3.15：在我们要构建的原生扩展包发布 3.15 wheel 之后。3.15 已于 2026-10-09 发布，但其中若干仍是仅源码。
+- TypeScript 7：在 `typescript-eslint` 接受它之后。其 peer 范围仍是 `>=4.8.4 <6.1.0`，tracking issue 仍为 open。
+
+版本变更不是依赖更新：同步移动声明、CI 版本文件和任何 Dockerfile 基础镜像，然后重跑完整的本地检查。
