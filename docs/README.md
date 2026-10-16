@@ -16,7 +16,7 @@ Use these docs when you need agent boundaries, capabilities, or framework decisi
 - [SKILLS.md](agent/SKILLS.md): Agent skills selection, preparation, and mounting.
 - [FRAMEWORK_SELECTION.md](agent/FRAMEWORK_SELECTION.md): Agent framework selection.
 - [MEMORY_SYSTEM.md](agent/MEMORY_SYSTEM.md): Agent experience memory extraction and maintenance.
-- [MCP.md](agent/MCP.md): Agent MCP tool boundary and runtime placement.
+- [EXTERNAL_TOOLS.md](agent/EXTERNAL_TOOLS.md): Agent external tools, CLI defaults, and optional MCP integrations.
 - [RELATED_ISSUES.md](agent/RELATED_ISSUES.md): Agent-related design issues.
 
 ### contracts/

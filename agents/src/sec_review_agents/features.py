@@ -10,7 +10,8 @@ def agent_skills_enabled() -> bool:
 
 
 def agent_mcp_enabled() -> bool:
-    return parse_bool_env(env_value(AGENT_MCP_ENABLED_ENV), True)
+    # MCP is opt-in; sandbox tools should use self-describing CLIs by default.
+    return parse_bool_env(env_value(AGENT_MCP_ENABLED_ENV), False)
 
 
 def agent_memory_enabled() -> bool:

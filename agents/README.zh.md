@@ -291,18 +291,19 @@ agent 的正常运行环境优先是 Docker sandbox。本地 filesystem backend 
 
 benchmark 和本地调试可以设置 `runtime.workspace_image`，指定承载目标代码库的隔离容器镜像。
 
-### 可选 MCP 工具
+### Workspace 工具
 
-MCP 在本项目里的定位见 [Agent MCP](../docs/agent/MCP.zh.md)。这里仅列本地常用的可选工具。
-
----
-
-workspace tools 镜像提供 CodeGraph symbol / caller tracing 和 Playwright 浏览器验证。要在 Docker 中使用它们，先构建该镜像，把它设为 sandbox image，并开启 MCP：
+可选的 workspace tools 镜像在 Docker sandbox 中安装了 Joern、CodeGraph、Playwright 和 Chromium。构建镜像，并在本地运行时选用它：
 
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
 AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
+```
+
+Joern 和 Playwright 计划通过 bash 和各自的 CLI 使用。现有 CodeGraph 和 Playwright MCP 集成仍然可用，但默认关闭；需要时显式开启：
+
+```bash
 AGENT_MCP_ENABLED=true
 ```
 
-集成与部署边界见 [Agent MCP](../docs/agent/MCP.zh.md)。
+工具及接入方式的选择见 [Agent 外部工具](../docs/agent/EXTERNAL_TOOLS.zh.md)。

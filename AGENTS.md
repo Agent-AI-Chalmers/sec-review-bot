@@ -32,12 +32,12 @@ Do not keep old public names, fields, formats, or paths just because they once e
 - Triage and delivery workbench states are intentionally separate despite similar tool shapes. Do not add a shared workbench base class just to remove repetition.
 - `review_stages.record` owns generic review-record projection only. Domain-specific result builders belong near their workflows.
 
-## Prompts, Skills, And MCP
+## Prompts, Skills, And External Tools
 
 Treat prompt, skill, and MCP changes as architecture changes: they alter agent behavior even without Python or TypeScript control-flow changes. Use the maintained agent docs for the detailed boundaries:
 
 - `docs/agent/SKILLS.md#design-principles-in-this-project` and `docs/agent/SKILLS.md#adding-or-updating-bundled-skills` for skill selection, materialization, mounting, and update rules.
-- `docs/agent/MCP.md#choosing-mcp-tools`, `docs/agent/MCP.md#adding-mcp-integrations`, and `docs/agent/MCP.md#bash--skills-vs-mcp` for MCP tool boundaries, runtime placement, and integration tests.
+- `docs/agent/EXTERNAL_TOOLS.md#self-describing-clis`, `docs/agent/EXTERNAL_TOOLS.md#why-joern-and-playwright-use-only-clis`, and `docs/agent/EXTERNAL_TOOLS.md#optional-mcp-integrations` for external-tool selection, CLI and skill boundaries, and optional MCP integration tests.
 - `docs/agent/RELATED_ISSUES.md` for prompt/cache/structured-output design concerns.
 
 For agent-facing Markdown such as skills and memory notes, do not hard-wrap prose to a fixed column width; prefer semantic paragraphs and short lists.

@@ -18,7 +18,7 @@
 - [SKILLS.md](agent/SKILLS.md) / [中文](agent/SKILLS.zh.md)：Agent skills 的选择、准备和挂载。
 - [FRAMEWORK_SELECTION.md](agent/FRAMEWORK_SELECTION.md) / [中文](agent/FRAMEWORK_SELECTION.zh.md)：Agent framework 的选型。
 - [MEMORY_SYSTEM.md](agent/MEMORY_SYSTEM.md) / [中文](agent/MEMORY_SYSTEM.zh.md)：Agent memory system、经验提取和整理。
-- [MCP.md](agent/MCP.md) / [中文](agent/MCP.zh.md)：Agent MCP 工具边界和运行位置。
+- [EXTERNAL_TOOLS.md](agent/EXTERNAL_TOOLS.md) / [中文](agent/EXTERNAL_TOOLS.zh.md)：Agent 外部工具、默认 CLI 接入方式与可选 MCP 集成。
 - [RELATED_ISSUES.md](agent/RELATED_ISSUES.md) / [中文](agent/RELATED_ISSUES.zh.md)：Agent 相关设计问题。
 
 ### contracts/
