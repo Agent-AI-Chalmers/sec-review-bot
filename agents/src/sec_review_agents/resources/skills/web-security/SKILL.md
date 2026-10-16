@@ -1,6 +1,6 @@
 ---
 name: web-security
-description: "Use for web security at application and browser boundaries: authentication, authorization, sessions, request forgery, browser execution, server-side requests, database queries, uploads, and sensitive data exposed through web surfaces."
+description: "Use for web security at browser and HTTP boundaries: authentication sessions, request forgery, browser execution, server-side requests, database queries, uploads, and sensitive data exposed through web surfaces. General object, tenant and service authorization belongs to authorization-security."
 ---
 
 # Web Security Reference Skill
@@ -13,7 +13,6 @@ Do not use this skill as a general web security checklist or as proof that a vul
 
 Read only the reference that matches the current reviewed lead:
 
-- Authorization checks, tenant boundaries, object ownership, role checks, IDOR/BOLA, privilege escalation: read `/skills/web-security/references/access-control.md`.
 - Login, session, JWT, OAuth/OIDC, password reset, cookie/session-token handling: read `/skills/web-security/references/auth-session.md`.
 - Server-side URL fetches, webhooks, image/proxy fetchers, metadata/internal network access: read `/skills/web-security/references/ssrf.md`.
 - SQL query construction, raw ORM fragments, dynamic filters/sorting, stored data later used in queries: read `/skills/web-security/references/sql-injection.md`.

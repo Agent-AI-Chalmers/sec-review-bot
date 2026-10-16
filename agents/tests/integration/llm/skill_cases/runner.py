@@ -64,8 +64,11 @@ def build_case_prompt(case: SkillCase, mode: SkillCaseMode) -> str:
     return (
         f"{instruction}{workspace_instruction}Task: {case.task}\n"
         f"Runtime facts:\n{facts}\n"
-        "Return the verdict, evidence, rationale, material proof gaps, and any "
-        "other structured fields that apply."
+        "Return confirmed when the security failure and impact are established, "
+        "rejected when known facts break the claimed security relation, or "
+        "unresolved when material facts needed for that decision are unavailable. "
+        "For unresolved, list the material proof gaps. Return the evidence, "
+        "rationale, and any other structured fields that apply."
     )
 
 
@@ -188,6 +191,8 @@ def assert_case_oracles(case: SkillCase, run: SkillCaseRun) -> None:
     decision = case.oracles.decision
     if decision is not None:
         assert run.output.verdict == decision.verdict
+        if decision.verdict != "unresolved":
+            assert not run.output.proof_gaps, run.output.proof_gaps
         proof_gaps = " ".join(run.output.proof_gaps).lower()
         for requirement in decision.proof_gap_requirements:
             assert re.search(requirement, proof_gaps), (

@@ -13,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "proof_gap_requirements": [
         "operand.*type|width|signed",
         "overflow|arithmetic.*behavior",

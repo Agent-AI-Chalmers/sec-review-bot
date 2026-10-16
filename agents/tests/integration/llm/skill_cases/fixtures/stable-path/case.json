@@ -14,7 +14,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "immutable|cannot.*replace|stable",
         "public.*export|intended",

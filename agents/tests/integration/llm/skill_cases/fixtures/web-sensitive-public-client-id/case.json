@@ -14,7 +14,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "public|client|origin",
         "secret|authority|credential"

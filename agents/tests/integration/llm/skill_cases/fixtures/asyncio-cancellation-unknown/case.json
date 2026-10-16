@@ -13,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "cancel|limiter|cleanup",
         "capacity|unknown|evidence"

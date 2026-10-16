@@ -13,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "proof_gap_requirements": [
         "directory.*owner|permission|writer",
         "mount|open.*flag|resolution"

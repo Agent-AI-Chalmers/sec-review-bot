@@ -13,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "proof_gap_requirements": [
         "encryption key|key.*identity|same key",
         "derivation|key.*scope"

@@ -14,7 +14,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "live|credential|auth|reader",
         "access|unknown|evidence"

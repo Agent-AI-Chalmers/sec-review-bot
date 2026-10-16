@@ -14,7 +14,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "single|private|source|hash",
         "pin|attacker|candidate"

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "auth-actor-subject-unknown",
-  "skill": "authorization-delegation-security",
+  "skill": "authorization-security",
   "reference": "delegated-authority.md",
   "modes": [
     "prompted"
@@ -13,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "cannot|not confirmed|insufficient|unknown",
         "delegat|token exchange|downstream"

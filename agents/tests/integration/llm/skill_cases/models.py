@@ -2,10 +2,17 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 SkillCaseMode = Literal["prompted", "discovery", "contrast"]
-SkillVerdict = Literal["confirmed", "not-confirmed"]
+SkillVerdict = Literal["confirmed", "rejected", "unresolved"]
 
 
 class DecisionOracle(BaseModel):
@@ -30,6 +37,18 @@ class DecisionOracle(BaseModel):
             except re.error as exc:
                 raise ValueError(f"invalid requirement regex: {value!r}") from exc
         return values
+
+    @model_validator(mode="after")
+    def validate_proof_gap_semantics(self) -> DecisionOracle:
+        if self.verdict == "unresolved" and len(self.proof_gap_requirements) < 2:
+            raise ValueError(
+                "unresolved decisions require at least two material proof gaps"
+            )
+        if self.verdict != "unresolved" and self.proof_gap_requirements:
+            raise ValueError(
+                "only unresolved decisions may define proof-gap requirements"
+            )
+        return self
 
 
 class ClassificationOracle(BaseModel):
@@ -100,7 +119,13 @@ class SkillCase(BaseModel):
 
 
 class SkillCaseOutput(BaseModel):
-    verdict: SkillVerdict
+    verdict: SkillVerdict = Field(
+        description=(
+            "Use confirmed when the security failure and impact are established, "
+            "rejected when known facts break the claimed security relation, and "
+            "unresolved when material facts needed for the decision are unavailable."
+        )
+    )
     vulnerability_type: str = ""
     skill_path_read: str | None = None
     reference_path_read: str | None = None
@@ -115,7 +140,13 @@ class SkillCaseOutput(BaseModel):
     crosses_security_boundary: bool | None = None
     evidence: str
     rationale: str
-    proof_gaps: list[str] = Field(default_factory=list)
+    proof_gaps: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Material missing facts that prevent a confirmed or rejected decision. "
+            "Populate for unresolved and leave empty otherwise."
+        ),
+    )
     cwe_id: str | None = None
     cwe_name: str | None = None
     parent_category_id: str | None = None

@@ -16,7 +16,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "argument|option|--output",
         "local user|own.*permission|intended",

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "auth-delegation-bound",
-  "skill": "authorization-delegation-security",
+  "skill": "authorization-security",
   "reference": "delegated-authority.md",
   "modes": [
     "prompted"
@@ -14,7 +14,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "subject|actor|audience",
         "scope|resource|bound"
