@@ -61,6 +61,8 @@ Claim ledger:
   Primary source: GitLab CI job token docs and GitLab pipeline security docs.
   Adoption note: Require attacker role, source-to-sink path, and concrete privileged effect.
 
+Behavior cases: `ci-gitlab-parent-fork-secrets` (confirmed and natural discovery), `ci-gitlab-fork-isolated` (counterexample), and `ci-gitlab-parent-context-unknown` (unresolved boundary).
+
 ## secret-and-artifact-exposure
 
 Primary sources:

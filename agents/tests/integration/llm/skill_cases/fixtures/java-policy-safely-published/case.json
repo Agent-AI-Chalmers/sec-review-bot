@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "java-policy-safely-published",
+  "skill": "concurrency-resource-security",
+  "reference": "java-memory-model.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that request threads can observe a partially initialized policy.",
+  "facts": [
+    "The policy is immutable after construction and all of its fields are final.",
+    "The fully constructed policy reference is published with one volatile write, and every request obtains it through the corresponding volatile read.",
+    "No mutable object reachable from the policy is changed after publication."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "immutable|final|volatile|happens-before|publish"
+  }
+}

@@ -15,6 +15,8 @@ Reviewed 2026-10-16. The skill covers interpretation boundaries and selected par
 | PARSE-9: JSON polymorphic typing; `object-construction.md` | [Jackson Polymorphic Deserialization](https://github.com/FasterXML/jackson-docs/wiki/JacksonPolymorphicDeserialization), type identifiers, default typing and security notes | JSON remains data-only unless configured metadata/resolvers construct application types. Allowed types and defaults are version/configuration-specific. |
 | PARSE-10: archive-controlled structure; `archive-semantics.md` | [Python tarfile extraction filters](https://docs.python.org/3/library/tarfile.html#extraction-filters); [SEI CERT IDS04-J](https://wiki.sei.cmu.edu/confluence/display/java/IDS04-J.+Safely+extract+files+from+ZipInputStream) | Member names, links, types, metadata and order can alter extraction. Filters are library/version-specific; path authority after acceptance remains owned by OS security. |
 | PARSE-11: expression structure versus data; `expression-interpreters.md` | [OWASP Expression Language Injection](https://owasp.org/www-community/vulnerabilities/Expression_Language_Injection); the reviewed engine's grammar/API documentation | Report attacker control of executable structure or enabled capabilities, not merely attacker values passed to a fixed expression. Engine names and delimiters alone are insufficient. |
+| PARSE-12: HTTP/2 malformed messages; `http2-translation.md` | [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113.html), §§8.2.1, 8.2.3 and 8.2.4 | HTTP/2 recipients and processing intermediaries must reject defined malformed requests rather than forward them. Apply the exact pseudo-header, field and length rules; HTTP/2 presence alone is not a finding. |
+| PARSE-13: HTTP/2-to-HTTP/1 translation; `http2-translation.md` | RFC 9113, §§8.2.1 and 11.1; [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html), field parsing requirements | A translator must not turn invalid HTTP/2 field data into a different HTTP/1.1 message. Require a concrete unsafe translation and downstream disagreement or cross-request effect. |
 
 Format names, malformed input and parser API presence are leads. Confirmation requires attacker input, enabled interpretation/capability, an ineffective guard and concrete effect.
 
@@ -22,6 +24,8 @@ Behavior cases for object construction: `parser-object-construction` and `parser
 
 Behavior cases for the added rules: `parser-archive-link-escape`, `parser-fixed-expression-data`, and `parser-expression-structure`.
 
+Behavior cases for HTTP/2 translation: `parser-http2-translation-smuggling`, `parser-http2-consistent-rejection`, and `parser-http2-downstream-unknown`.
+
 ## Coverage and exclusions
 
-Current coverage: validation/consumption representation gaps, HTTP/1.1 framing, XML external resources/entity expansion, unsafe object construction, archive structure, expression interpreters and token-context substitution. HTTP/2, HTTP/3, gRPC and replay/state rules require protocol-specific references before admission. Media/codec vulnerability catalogs and parser-version default matrices are excluded because they age quickly; stable format invariants can still be added when they change a general review decision.
+Current coverage: validation/consumption representation gaps, HTTP/1.1 framing, HTTP/2 validation/translation, XML external resources/entity expansion, unsafe object construction, archive structure, expression interpreters and token-context substitution. HTTP/3, gRPC and replay/state rules require protocol-specific references before admission. Media/codec vulnerability catalogs and parser-version default matrices are excluded because they age quickly; stable format invariants can still be added when they change a general review decision.

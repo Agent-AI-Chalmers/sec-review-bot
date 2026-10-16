@@ -15,6 +15,8 @@ Each directory under `fixtures/` is one security case. Keep the security facts a
 
 The loader rejects unknown fields, duplicate IDs, unknown skills, and unknown references. A workspace is optional for cases decided entirely from declared facts. Keep detailed security reasoning in the case facts and expected fields, not in the runner.
 
+Deterministic coverage also requires every bundled domain reference to have at least one JSON behavior case. `scanner-finding-triage` is exempt because its cases run through the separate triage workflow. One case per reference is only a maintenance floor; important rule groups should still use positive, counterexample, unresolved-boundary, and natural-discovery cases where they answer distinct questions.
+
 ## Minimal example
 
 ```json

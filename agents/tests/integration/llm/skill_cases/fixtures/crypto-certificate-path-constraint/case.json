@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "crypto-certificate-path-constraint",
+  "skill": "cryptography-security",
+  "reference": "certificate-path-identity.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess the custom certificate-path validation.",
+  "facts": [
+    "The validator verifies every certificate signature to a trusted root.",
+    "It ignores an intermediate CA pathLenConstraint of zero and accepts a subordinate CA below that intermediate.",
+    "The unauthorized subordinate CA signs a TLS certificate that the deployment client accepts for a privileged internal connection."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "path|constraint|pathLen|intermediate|signature|trusted"
+  }
+}

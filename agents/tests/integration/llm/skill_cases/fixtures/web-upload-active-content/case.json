@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "web-upload-active-content",
+  "skill": "web-security",
+  "reference": "file-upload.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess how uploaded profile files are served to other users.",
+  "facts": [
+    "An attacker can upload arbitrary HTML content as a profile attachment.",
+    "The application serves it inline from the authenticated application origin with an attacker-controlled HTML content type.",
+    "Other users open the attachment while authenticated, allowing the uploaded script to act in the application origin."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "upload|inline|HTML|origin|script|stored"
+  }
+}

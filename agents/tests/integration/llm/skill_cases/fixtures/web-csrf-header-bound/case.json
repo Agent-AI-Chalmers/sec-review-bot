@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "web-csrf-header-bound",
+  "skill": "web-security",
+  "reference": "csrf.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that the JSON update endpoint lacks a CSRF token.",
+  "facts": [
+    "The endpoint requires a bearer token in an Authorization header that browsers do not attach automatically.",
+    "The attacker origin is not allowed by CORS, and the endpoint rejects form and simple content types.",
+    "No cookie or other ambient credential authenticates the request."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "bearer|Authorization|ambient|CORS|simple|CSRF"
+  }
+}

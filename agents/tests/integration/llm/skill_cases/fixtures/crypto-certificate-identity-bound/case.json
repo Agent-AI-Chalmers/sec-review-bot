@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "crypto-certificate-identity-bound",
+  "skill": "cryptography-security",
+  "reference": "certificate-path-identity.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that the client accepts any certificate chaining to its trust store.",
+  "facts": [
+    "The client performs full certification-path validation against its configured trust anchor.",
+    "It derives api.example.com from trusted configuration and requires a matching supported certificate identifier.",
+    "The chain satisfies time, critical extension, basic constraint, name constraint, key usage, and extended key usage checks."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "path|reference identity|api.example.com|constraint|usage|match"
+  }
+}

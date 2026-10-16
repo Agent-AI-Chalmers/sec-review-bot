@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "parser-http2-translation-smuggling",
+  "skill": "parser-protocol-security",
+  "reference": "http2-translation.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess the HTTP/2-to-HTTP/1 request translation boundary.",
+  "facts": [
+    "An edge proxy accepts an HTTP/2 field value containing a carriage-return and line-feed sequence.",
+    "It copies that value directly into an HTTP/1.1 header block sent on a reused backend connection.",
+    "The injected delimiter creates a second backend request that bypasses the edge authorization check."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "HTTP/2|HTTP/1|translat|field|delimiter|smuggl|authorization"
+  }
+}

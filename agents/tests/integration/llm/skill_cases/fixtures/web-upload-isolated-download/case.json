@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "web-upload-isolated-download",
+  "skill": "web-security",
+  "reference": "file-upload.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a blanket claim that arbitrary document uploads execute in the application origin.",
+  "facts": [
+    "Uploads use server-generated object keys and are stored outside executable application paths.",
+    "Downloads come from an isolated origin without application cookies and use attachment disposition plus a fixed binary content type.",
+    "No server-side parser, template, plugin, archive extraction, or executable handoff consumes the files."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "isolated|attachment|content type|generated|parser|execute"
+  }
+}

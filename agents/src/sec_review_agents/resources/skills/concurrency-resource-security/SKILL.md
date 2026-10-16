@@ -11,5 +11,6 @@ description: "Use when security depends on interleaving, atomicity, synchronizat
 - For JavaScript promises, abort signals and work that continues after promise rejection: read `/skills/concurrency-resource-security/references/javascript-cancellation.md`.
 - For Java interruption/Future cancellation and .NET cancellation tokens: read `/skills/concurrency-resource-security/references/managed-runtime-cancellation.md`.
 - For Go contexts, goroutine/channel cancellation and leaked derived contexts: read `/skills/concurrency-resource-security/references/go-context-cancellation.md`.
+- For Java happens-before, volatile/monitor publication and shared security state: read `/skills/concurrency-resource-security/references/java-memory-model.md`.
 
 Keep temporal correctness and resource cost as separate claims unless the evidence connects them.

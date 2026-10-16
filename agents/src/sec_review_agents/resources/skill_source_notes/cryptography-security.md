@@ -13,6 +13,8 @@ Reviewed 2026-10-16. Requirements are tied to the actual primitive or protocol; 
 | CRYPTO-7: password boundary; `key-derivation.md` | RFC 5869, §3.4 | HKDF does not add password guessing cost and is not a password-hashing replacement. Apply password-verifier guidance to low-entropy passwords. |
 | CRYPTO-8: signed representation; `signature-representation.md` | [RFC 8785 JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html), §§1 and 3; [RFC 8032 EdDSA](https://www.rfc-editor.org/rfc/rfc8032.html), §5.1.7 | Verify the exact protocol-defined bytes and scheme checks. Canonical JSON and scalar-range rules are protocol/scheme-specific, not universal requirements. |
 | CRYPTO-9: signature uniqueness assumptions; `signature-representation.md` | [CWE-347](https://cwe.mitre.org/data/definitions/347.html), Description; protocol specification for the reviewed signature format | Multiple encodings or valid signatures matter only when they change the verified meaning or when the application relies on signature-byte uniqueness. Require that concrete effect. |
+| CRYPTO-10: X.509 path constraints; `certificate-path-identity.md` | [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280.html), §§4.2 and 6 | A signature chain must also satisfy the relying party's trust anchor and path constraints, including critical extensions, basic constraints, name constraints and intended key usage. Do not infer one universal revocation or pinning policy. |
+| CRYPTO-11: TLS reference identity; `certificate-path-identity.md` | [RFC 9525](https://www.rfc-editor.org/rfc/rfc9525.html), §§2, 4 and 6 | Match the presented identifiers against a reference identity derived from trusted application configuration. Path validity, SNI and destination text do not by themselves establish the intended service identity. |
 
 Public-data checksums are not password verifiers; signature validity alone is not identity; missing rotation alone is not a confirmed exploit.
 
@@ -20,6 +22,8 @@ Behavior cases for key derivation: `crypto-kdf-context-collision` (confirmed and
 
 Behavior cases for signature representation: `crypto-signed-representation-gap` and `crypto-protocol-canonical-signature`.
 
+Behavior cases for certificate paths and identity: `crypto-certificate-path-constraint`, `crypto-certificate-identity-bound`, and `crypto-certificate-policy-unknown`.
+
 ## Coverage and exclusions
 
-Current coverage: GCM nonce/key scope, verification and token-purpose contracts, password verifiers, HKDF purpose/context separation, and protocol-specific signature representation. Full certificate-path processing and key-management operations require narrower references before admission. TLS configuration matrices, rotation schedules and evergreen algorithm recommendation tables are excluded because they change over time and should be checked against current platform policy.
+Current coverage: GCM nonce/key scope, verification and token-purpose contracts, password verifiers, HKDF purpose/context separation, protocol-specific signature representation, and core X.509 path/service-identity validation. Key-management operations still require narrower references before admission. TLS configuration matrices, rotation schedules and evergreen algorithm recommendation tables are excluded because they change over time and should be checked against current platform policy.

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "java-publication-unknown",
+  "skill": "concurrency-resource-security",
+  "reference": "java-memory-model.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that shared security state is unsafely published.",
+  "facts": [
+    "A policy object is written by one thread and read by another.",
+    "Field modifiers, construction behavior, monitor use, volatile accesses, executor submission, thread start/join edges, later mutation, and the affected security decision are unavailable."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true,
+    "explanation_pattern": "happens-before|volatile|monitor|publication|mutation|security|unknown"
+  }
+}

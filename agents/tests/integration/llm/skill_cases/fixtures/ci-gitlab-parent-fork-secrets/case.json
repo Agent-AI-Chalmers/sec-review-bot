@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "ci-gitlab-parent-fork-secrets",
+  "skill": "ci-security",
+  "reference": "gitlab-ci.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess the GitLab fork merge-request pipeline boundary.",
+  "facts": [
+    "A maintainer can start a parent-project pipeline for a fork merge request.",
+    "That pipeline uses CI configuration and scripts from the attacker's fork branch.",
+    "The parent-project job exposes an unprotected deployment credential to those scripts, which can send it to the attacker."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "GitLab|fork|parent-project|configuration|credential|maintainer"
+  }
+}
