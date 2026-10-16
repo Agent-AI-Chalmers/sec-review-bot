@@ -10,11 +10,3 @@ Reviewed 2026-10-16. Language rules remain language-specific; examples from C an
 | MEM-4: lifetime and invalid free; `object-validity.md` | SEI CERT C Memory Management, MEM30-C and MEM34-C | Trace ownership, release and later reachable use. Cleanup syntax alone does not prove a dangling use or invalid free. |
 | MEM-5: unsafe validity; `unsafe-ffi.md` | [Rust undefined behavior](https://doc.rust-lang.org/reference/behavior-considered-undefined.html), dangling/misaligned pointers, invalid values, data races and foreign ABI | Unsafe operations require specific validity, alignment, lifetime and ABI preconditions. `unsafe`, raw pointers or FFI alone are not proof. |
 | MEM-6: FFI ownership and allocator pairing; `unsafe-ffi.md` | [Rust Nomicon FFI](https://doc.rust-lang.org/nomicon/ffi.html), resource management and opaque structs; SEI CERT MEM34-C | Establish which side owns and releases foreign storage and whether the deallocator matches. A borrowed pointer or copied buffer is a counterexample to assumed ownership transfer. |
-
-Project policy requires the violated semantic contract, actual consumer and concrete security consequence. Unknown types, ownership or ABI remain proof gaps.
-
-Behavior cases for the maintained reference split include numeric conversion/bounds cases, object lifetime cases, `unsafe-ffi-invalid-layout`, `unsafe-ffi-validated-wrapper`, and `ffi-ownership-double-release`. These cover the requested conversion, length and FFI ownership mechanisms without another reference layer.
-
-## Coverage and deferred work
-
-Current coverage: integer conversions, overflow semantics, allocation/access units, object lifetime, invalid frees, unsafe pointer validity, FFI layout and ownership. These concerns remain cohesive: splitting conversion, length arithmetic and ownership into additional references would duplicate the same consumer/precondition analysis. Deferred: language-specific allocator internals, speculative-execution issues, hardware memory tagging and exhaustive per-language undefined behavior catalogs.

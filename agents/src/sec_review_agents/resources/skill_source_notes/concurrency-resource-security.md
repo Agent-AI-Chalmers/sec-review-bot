@@ -19,13 +19,3 @@ Reviewed 2026-10-16. Temporal correctness and resource exhaustion remain separat
 | JAVA-MM-2: safe publication limits; `java-memory-model.md` | Same JLS source, §§17.4-17.5 | Volatile, monitors, thread start/join and final-field semantics have defined scopes. An unrelated lock or volatile field is not a general publication barrier; immutable safely published state is a counterexample. |
 
 Unknown production capacity can remain a proof gap, but exact measurement is unnecessary when code establishes unbounded attacker-controlled retention and service impact.
-
-Behavior cases for Python cancellation: `asyncio-cancellation-permit-leak` (confirmed and discovery), `asyncio-cancellation-finally-release` (counterexample), and `asyncio-cancellation-unknown` (unresolved boundary).
-
-Additional behavior cases: `javascript-abort-not-propagated`, `managed-cancellation-unknown`, and `go-goroutine-cancellation-leak`.
-
-Behavior cases for Java shared security state: `java-revocation-publication-race`, `java-policy-safely-published`, and `java-publication-unknown`.
-
-## Coverage and exclusions
-
-Current coverage: conflicting operations, temporal invariants, check/use invalidation, attacker-driven resource budgets, accumulating cleanup failures, cancellation/lifetime rules for Python asyncio, JavaScript, Java/.NET and Go, and focused Java happens-before/publication semantics. Other language memory models require their own specifications when they change a repository decision. Lock-order catalogs and distributed-consensus correctness remain workflow reasoning unless a stable security rule is identified. A deadlock or retry loop belongs here only when it creates a concrete security effect.

@@ -14,13 +14,3 @@ Reviewed 2026-10-16. The bundled skill is limited to dependency candidate select
 | SUPPLY-8: Go module sources and checksums; `go-modules.md` | [Go Modules Reference](https://go.dev/ref/mod), environment variables for proxies, private modules and authenticating modules | `GOPROXY`, private-module settings, replacements and checksum controls jointly determine selection and authentication. A private path disclosure is not automatically code substitution. |
 | SUPPLY-9: provenance consumption; `provenance-verification.md` | [SLSA v1.2 Verifying Artifacts](https://slsa.dev/spec/v1.2/verifying-artifacts); [in-toto Attestation Framework](https://github.com/in-toto/attestation/blob/main/spec/README.md) | A consumer must bind the admitted artifact to the attested subject and policy. Attestation presence or signature validity alone is insufficient; missing provenance alone is not a finding. |
 | SUPPLY-10: update trust and freshness; `tool-plugin-updates.md` | [The Update Framework Specification](https://theupdateframework.github.io/specification/latest/), roles and rollback/freeze attacks | A checksum from the same compromised channel is not an independent trust root. Freshness requirements depend on the update contract; do not turn every absent updater feature into a finding. |
-
-Project policy requires an attacker-influenced selectable dependency or install/build execution path and concrete authority or code-consumption effect. Missing pinning, SBOM, provenance or a preferred package-manager setting alone remains non-confirmed.
-
-Behavior cases for dependency selection: `supply-dependency-confusion` (confirmed and discovery), `supply-private-source-enforced` (counterexample), and `supply-unknown-resolver` (unresolved boundary). Behavior cases for install/build execution: `supply-install-script-execution` (confirmed and discovery), `supply-install-scripts-disabled` (counterexample), and `supply-install-unknown` (unresolved boundary). All six passed with the deployed integration model on 2026-10-16; this is local evidence, not a general quality estimate.
-
-Additional behavior cases: `supply-cargo-build-script`, `supply-jvm-plugin-filtered`, `supply-go-integrity-unknown`, `supply-provenance-subject-mismatch`, and `supply-update-same-channel-checksum`.
-
-## Coverage and exclusions
-
-Current coverage includes pip, npm, Cargo, Maven/Gradle and Go source-selection or build-execution mechanisms, provenance consumption, and downloaded tool/plugin/update trust. Maintainer-account compromise without a repository-controlled decision point remains workflow threat reasoning. Product-specific updater catalogs, live package-manager default matrices and vulnerability feeds are excluded because they age quickly and do not form stable bundled rules.

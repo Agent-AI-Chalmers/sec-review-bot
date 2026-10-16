@@ -15,7 +15,7 @@ Each directory under `fixtures/` is one security case. Keep the security facts a
 
 The loader rejects unknown fields, duplicate IDs, unknown skills, and unknown references. A workspace is optional for cases decided entirely from declared facts. Keep detailed security reasoning in the case facts and oracle requirements, not in the runner.
 
-Do not add a case merely to give every reference a green marker. A reference may have no model case when its source note explains why deterministic review or an adjacent case is sufficient. Admit model cases only when their facts and oracle test a decision-changing rule. An unresolved case that merely lists every relevant fact as unavailable is not evidence of domain knowledge by itself.
+Do not add a case merely to give every reference a green marker. References and model cases have separate maintenance records; a reference does not need a matching case. Admit model cases only when their facts and oracle test a decision-changing rule. An unresolved case that merely lists every relevant fact as unavailable is not evidence of domain knowledge by itself.
 
 ## Minimal example
 

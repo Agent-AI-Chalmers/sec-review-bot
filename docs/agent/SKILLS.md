@@ -91,7 +91,7 @@ Bundled skills keep developer-facing source notes under:
 sec_review_agents/resources/skill_source_notes/
 ```
 
-These files keep source links, examples, and maintenance notes for humans. They are not exposed to the agent skill view.
+These files map decision-changing rules to authoritative sources and applicability limits for human maintenance. They do not contain test records or coverage decisions, and they are not exposed to the agent skill view. Security-domain packaging decisions are maintained in [`SECURITY_SKILL_COVERAGE.md`](SECURITY_SKILL_COVERAGE.md).
 
 ### Source Note Maintenance Contract
 
@@ -101,8 +101,7 @@ Maintain source notes per reference or small rule group. They are evidence ledge
 - each decision-changing operational claim, especially report/reject conditions, guard sufficiency, defaults and exceptions;
 - an authoritative primary source with a section, API, rule or other useful locator;
 - applicability limits, including language, platform, protocol, library and version assumptions;
-- a positive example, a counterexample and an unresolved-boundary example in JSON cases when the rule is admitted;
-- the corresponding case IDs or an explicit reason model testing is unnecessary.
+- enough scope and exception detail to distinguish the supported rule from nearby but unsupported conclusions.
 
 Identify repository reporting thresholds, workflow ownership and packaging decisions as project policy rather than attributing them to an external standard. Do not trace every explanatory sentence, but do not let a broad source link stand in for an unsupported operational rule. Recheck live defaults against the repository's dependency or target version when they affect the decision.
 
@@ -113,7 +112,7 @@ When adding or changing a bundled skill:
 1. Put the material under `sec_review_agents/resources/skills/<skill-name>/`. `SKILL.md` is the entry point.
 2. `SKILL.md` metadata should be general enough for discovery, while precise enough that the agent can decide when to read it. Do not write the description as a one-off test hint.
 3. Default to `SKILL.md` plus narrow `references/` files. Add templates or assets only for a concrete existing need; do not add `scripts/` unless the filesystem backend and permission model explicitly support skill execution.
-4. If external sources, examples, or source-selection decisions influenced the skill, record them under `sec_review_agents/resources/skill_source_notes/`. Do not expose source notes through `/skills`.
+4. Trace decision-changing rules to authoritative sources under `sec_review_agents/resources/skill_source_notes/`. Keep test cases, model results, coverage decisions, and admission history outside source notes. Do not expose source notes through `/skills`.
 5. Declare the skill in the target agent or stage-local `skills.py`. Do not add skill names to docs, backend helpers, or runtime preparation code just to make them visible.
 6. Ensure the target backend consumes the declaration, prepares the allowlisted view, mounts it at `/skills`, and enables skills middleware for that agent session.
 7. Add focused tests for skill preparation and backend exposure. For model behavior, add a JSON case under [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md) and select only the useful `prompted`, `discovery`, or `contrast` modes. A discovery case must show successful reads of the expected skill and reference; merely answering correctly is insufficient. A contrast baseline is recorded but is not required to fail.

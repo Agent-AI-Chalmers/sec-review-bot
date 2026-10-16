@@ -19,13 +19,3 @@ Reviewed 2026-10-16. The skill covers interpretation boundaries and selected par
 | PARSE-13: HTTP/2-to-HTTP/1 translation; `http2-translation.md` | RFC 9113, §§8.2.1 and 11.1; [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html), field parsing requirements | A translator must not turn invalid HTTP/2 field data into a different HTTP/1.1 message. Require a concrete unsafe translation and downstream disagreement or cross-request effect. |
 
 Format names, malformed input and parser API presence are leads. Confirmation requires attacker input, enabled interpretation/capability, an ineffective guard and concrete effect.
-
-Behavior cases for object construction: `parser-object-construction` and `parser-polymorphic-type-construction` (confirmed), `parser-object-construction-data-only` (counterexample), `parser-object-construction-unknown` (unresolved boundary), and `boundary-web-upload-object-construction` (parser rather than upload ownership).
-
-Behavior cases for the added rules: `parser-archive-link-escape`, `parser-fixed-expression-data`, and `parser-expression-structure`.
-
-Behavior cases for HTTP/2 translation: `parser-http2-translation-smuggling`, `parser-http2-consistent-rejection`, and `parser-http2-downstream-unknown`.
-
-## Coverage and exclusions
-
-Current coverage: validation/consumption representation gaps, HTTP/1.1 framing, HTTP/2 validation/translation, XML external resources/entity expansion, unsafe object construction, archive structure, expression interpreters and token-context substitution. HTTP/3, gRPC and replay/state rules require protocol-specific references before admission. Media/codec vulnerability catalogs and parser-version default matrices are excluded because they age quickly; stable format invariants can still be added when they change a general review decision.

@@ -17,13 +17,3 @@ Reviewed 2026-10-16. Requirements are tied to the actual primitive or protocol; 
 | CRYPTO-11: TLS reference identity; `certificate-path-identity.md` | [RFC 9525](https://www.rfc-editor.org/rfc/rfc9525.html), §§2, 4 and 6 | Match the presented identifiers against a reference identity derived from trusted application configuration. Path validity, SNI and destination text do not by themselves establish the intended service identity. |
 
 Public-data checksums are not password verifiers; signature validity alone is not identity; missing rotation alone is not a confirmed exploit.
-
-Behavior cases for key derivation: `crypto-kdf-context-collision` (confirmed and discovery), `crypto-kdf-separated-context` (counterexample), and `crypto-kdf-unknown-scope` (unresolved boundary).
-
-Behavior cases for signature representation: `crypto-signed-representation-gap` and `crypto-protocol-canonical-signature`.
-
-Behavior cases for certificate paths and identity: `crypto-certificate-path-constraint`, `crypto-certificate-identity-bound`, and `crypto-certificate-policy-unknown`.
-
-## Coverage and exclusions
-
-Current coverage: GCM nonce/key scope, verification and token-purpose contracts, password verifiers, HKDF purpose/context separation, protocol-specific signature representation, and core X.509 path/service-identity validation. Key-management operations still require narrower references before admission. TLS configuration matrices, rotation schedules and evergreen algorithm recommendation tables are excluded because they change over time and should be checked against current platform policy.
