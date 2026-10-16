@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "windows-inherited-privileged-handle",
+  "skill": "os-boundary-security",
+  "reference": "windows-process-authority.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether the sandboxed child retains unintended Windows object authority.",
+  "facts": [
+    "The parent opens a deployment-token file for read and leaves the handle inheritable.",
+    "It starts an attacker-controlled helper with handle inheritance enabled and no explicit handle allowlist.",
+    "The child account cannot open the file by path but can read the inherited handle."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "handle|inherit|child|token|authority|path"
+  }
+}

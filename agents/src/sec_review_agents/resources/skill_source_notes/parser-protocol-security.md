@@ -11,8 +11,12 @@ Reviewed 2026-10-16. The skill covers interpretation boundaries and selected par
 | PARSE-5: context substitution; `representation-boundaries.md` | [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html), §§2.7-2.8 and 3.8-3.12 | Integrity does not establish audience or token type. This is not a universal replay/state checklist. |
 | PARSE-6: object construction versus data parsing; `object-construction.md` | [OWASP Deserialization](https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html), language-specific prevention sections; [CWE-502](https://cwe.mitre.org/data/definitions/502.html) | Identify reachable types, constructors or hooks and a concrete security effect. A format name or parser API alone is only a lead; runtime gadget availability and defaults need repository/library evidence. |
 | PARSE-7: guard scope; `object-construction.md` | OWASP Deserialization Cheat Sheet, language-specific prevention sections | Data-only parsing, type allowlists, schemas and signatures address different mechanisms. Verify that the control covers the same bytes and object-construction path. |
+| PARSE-8: YAML constructors and safe loading; `object-construction.md` | [PyYAML Documentation](https://pyyaml.org/wiki/PyYAMLDocumentation), constructors, `safe_load` and `SafeLoader` | YAML tags and constructors can select language objects; a data-only safe loader is a counterexample. Verify the installed library/version and later consumers. |
+| PARSE-9: JSON polymorphic typing; `object-construction.md` | [Jackson Polymorphic Deserialization](https://github.com/FasterXML/jackson-docs/wiki/JacksonPolymorphicDeserialization), type identifiers, default typing and security notes | JSON remains data-only unless configured metadata/resolvers construct application types. Allowed types and defaults are version/configuration-specific. |
 
 Format names, malformed input and parser API presence are leads. Confirmation requires attacker input, enabled interpretation/capability, an ineffective guard and concrete effect.
+
+Behavior cases for object construction: `parser-object-construction` and `parser-polymorphic-type-construction` (confirmed), `parser-object-construction-data-only` (counterexample), `parser-object-construction-unknown` (unresolved boundary), and `boundary-web-upload-object-construction` (parser rather than upload ownership).
 
 ## Coverage and deferred work
 

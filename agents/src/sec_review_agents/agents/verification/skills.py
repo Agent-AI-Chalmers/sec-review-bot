@@ -6,4 +6,5 @@ VERIFICATION_AGENT_SKILLS = (
     "concurrency-resource-security",
     "os-boundary-security",
     "parser-protocol-security",
+    "software-supply-chain-security",
 )

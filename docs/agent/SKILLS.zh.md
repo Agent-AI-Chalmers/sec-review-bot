@@ -62,7 +62,7 @@ deepagents 只读取调用方交给它的 source path，不负责替某个 workf
 
 有些外部 skill 或 command 覆盖的能力，在本项目里已经由公开 workflow 和对应 review stage 实现。例如 Anthropic 的 [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) 描述的是“做安全审查”，OrchestKit 的 [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) 描述的是“审查 PR”。在这里，它们不是一个单独 skill。
 
-因此，本项目内置 skills 选择比项目目标低一层的材料：CWE 分类导航、finding triage，以及 Web、CI、memory/numeric、cryptography、concurrency/resource、OS boundary 和 parser/protocol 的窄领域参考。领域归属按机制划分：进程调用和文件系统 authority 归 OS boundary，对象构建归 parser，Web 与 CI 只负责各自 surface 上的敏感数据 sink。它们补充 agent 的安全知识和判断材料，不改变既有流程。
+因此，本项目内置 skills 选择比项目目标低一层的材料：CWE 分类导航、finding triage，以及 Web、CI、memory/numeric、cryptography、concurrency/resource、OS boundary、parser/protocol 和 software supply chain 的窄领域参考。领域归属按机制划分：进程调用和文件系统 authority 归 OS boundary，对象构建归 parser，Web 与 CI 只负责各自 surface 上的敏感数据 sink，dependency selection 与 install/build execution 归 supply-chain security。它们补充 agent 的安全知识和判断材料，不改变既有流程。
 
 ### Developer Source Notes
 
@@ -73,6 +73,19 @@ sec_review_agents/resources/skill_source_notes/
 ```
 
 这些文件给人保留来源链接、示例和维护说明，不暴露给 agent skill view。
+
+### Source Note 维护契约
+
+Source note 应按 reference 或较小的规则组维护。它是证据账本，不是普通链接列表。至少记录：
+
+- 该 reference 负责什么，以及相邻的哪些机制不由它负责；
+- 会改变判断的 operational claim，尤其是报告/拒绝条件、guard 是否充分、默认行为和例外；
+- 权威一手来源及可定位的章节、API、规则或其他 locator；
+- 适用限制，包括语言、平台、协议、library 和版本前提；
+- 规则准入后，对应的正例、反例和未知边界 JSON 案例；
+- 对应 case ID，或者不需要模型测试的明确理由。
+
+Repository 报告阈值、workflow ownership 和 skill 打包决策应标成 project policy，不能冒充外部标准结论。不必追溯每句解释性文字，但不能用一个宽泛来源链接替代缺乏支持的 operational rule。当默认行为会改变判断时，应按 repository 实际依赖或目标版本重新核验。
 
 ### 新增或更新内置 Skills
 

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "supply-install-scripts-disabled",
+  "skill": "software-supply-chain-security",
+  "reference": "install-build-execution.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that a dependency postinstall script executes in this build.",
+  "facts": [
+    "The reviewed npm version and command use --ignore-scripts for dependency installation.",
+    "No later command invokes the dependency binary, build plugin, script, or source build.",
+    "The claimed impact depends only on the postinstall lifecycle script running."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "ignore-scripts|disabled|postinstall|later|execution"
+  }
+}

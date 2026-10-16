@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "ci-artifact-nonsensitive",
+  "skill": "ci-security",
+  "reference": "secret-and-artifact-exposure.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether this uploaded CI artifact exposes a secret.",
+  "facts": [
+    "The artifact contains compiled public documentation, test coverage percentages, and the public commit SHA.",
+    "The job receives no secrets and the artifact directory is created from scratch from those inputs.",
+    "Repository readers are intended to download the artifact."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "public|no secret|artifact|reader|sensitive"
+  }
+}

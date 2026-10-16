@@ -4,6 +4,7 @@
 
 - Identify the exact unsafe operation and the obligations it places on callers: valid address range, alignment, initialization, lifetime, aliasing, mutability and thread access.
 - At FFI boundaries, verify ABI, layout, calling convention, ownership transfer and which side allocates or releases storage.
+- Treat allocator pairing and ownership transfer as one contract: memory returned by a foreign allocator must be released only by the documented owner and compatible deallocator. A wrapper that copies data and leaves foreign ownership unchanged differs from one that adopts the pointer.
 - Trace safe wrappers to the unsafe primitive. A safe public API can still violate an internal contract; an unsafe API can be correct when all preconditions are enforced.
 - Treat foreign callbacks as possible lifetime and reentrancy boundaries only when the callback can actually occur on the reviewed path.
 

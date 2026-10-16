@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "parser-polymorphic-type-construction",
+  "skill": "parser-protocol-security",
+  "reference": "object-construction.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether this JSON endpoint performs unsafe object construction.",
+  "facts": [
+    "Remote users control JSON including a class-name type field.",
+    "The configured polymorphic resolver accepts any class on the application classpath.",
+    "A reachable class constructor executes an operating-system command from another attacker-controlled field, and no type allowlist applies."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "json|polymorphic|type|class|constructor|command"
+  }
+}

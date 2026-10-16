@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "supply-private-source-enforced",
+  "skill": "software-supply-chain-security",
+  "reference": "dependency-selection.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a dependency-confusion claim for this private package installation.",
+  "facts": [
+    "The installer uses one authenticated private index and disables all fallback or extra indexes.",
+    "The package is pinned to an exact version and hash present in the reviewed lock input.",
+    "The attacker cannot publish to the private namespace or modify the lock input."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "single|private|source|hash|pin|attacker|candidate"
+  }
+}

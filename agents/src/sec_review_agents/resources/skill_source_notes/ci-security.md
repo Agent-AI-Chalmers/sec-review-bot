@@ -82,3 +82,5 @@ Claim ledger:
 - Claim: Build arguments and environment variables can persist in image metadata or layers and are unsuitable for build secrets; secret mounts avoid persisting the secret as build input.
   Primary source: Docker Build secrets docs.
   Adoption note: Verify the actual builder and published layers. A Dockerfile keyword alone is insufficient.
+
+Behavior cases for secret/artifact exposure: `ci-secret-artifact` (confirmed), `ci-artifact-nonsensitive` (counterexample), `ci-artifact-unknown-reader` (unresolved boundary), and `boundary-ci-artifact-exposure` (CI rather than Web ownership). `boundary-ci-script-process` intentionally assigns child-parser semantics to OS process execution.

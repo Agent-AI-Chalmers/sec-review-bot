@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "supply-dependency-confusion",
+  "skill": "software-supply-chain-security",
+  "reference": "dependency-selection.md",
+  "modes": [
+    "prompted",
+    "natural"
+  ],
+  "task": "Assess whether the dependency source configuration permits an attacker package to replace the intended private package.",
+  "facts": [
+    "acme-build-tools is intended to come only from the private index.",
+    "The private index has version 1.4.0, while an attacker can publish the same unreserved name and version 99.0.0 to the public index.",
+    "The installation command uses the public index plus the private index as --extra-index-url without hashes or an enforced source binding."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "extra-index|public|private|candidate|version|attacker|select"
+  }
+}

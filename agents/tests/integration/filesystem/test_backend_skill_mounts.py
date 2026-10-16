@@ -230,6 +230,7 @@ def test_repository_review_backends_materialize_agent_skill_views(
         "concurrency-resource-security",
         "os-boundary-security",
         "parser-protocol-security",
+        "software-supply-chain-security",
     ):
         assert (analyzer_skills_root / skill_name).is_dir()
         assert (mitigation_skills_root / skill_name).is_dir()
@@ -260,6 +261,7 @@ def test_repository_review_backends_materialize_agent_skill_views(
         "concurrency-resource-security",
         "os-boundary-security",
         "parser-protocol-security",
+        "software-supply-chain-security",
     ):
         assert (discovery_skills_root / skill_name).is_dir()
     assert "/skills/" in _routes_for(triage_backend)
@@ -367,7 +369,10 @@ def test_repository_analyzer_skills_middleware_loads_analysis_agent_skills(
     with (
         patch(
             "sec_review_agents.runtime.skills.tempfile.mkdtemp",
-            return_value=str(root / "skills-root"),
+            side_effect=[
+                str(root / "skills-base-root"),
+                str(root / "skills-build"),
+            ],
         ),
         patch(
             "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",

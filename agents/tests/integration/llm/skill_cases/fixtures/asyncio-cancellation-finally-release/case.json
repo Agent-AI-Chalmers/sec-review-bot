@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "asyncio-cancellation-finally-release",
+  "skill": "concurrency-resource-security",
+  "reference": "python-asyncio-cancellation.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that cancellation leaks the semaphore permit.",
+  "facts": [
+    "The handler acquires one semaphore permit.",
+    "Every path after acquisition is covered by a finally block that releases exactly one permit.",
+    "CancelledError is propagated after cleanup, and the semaphore is shared by every admitted request."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "finally|release|cancel|propagat|permit"
+  }
+}

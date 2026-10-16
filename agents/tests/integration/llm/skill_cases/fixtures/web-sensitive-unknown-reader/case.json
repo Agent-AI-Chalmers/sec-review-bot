@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "web-sensitive-unknown-reader",
+  "skill": "web-security",
+  "reference": "sensitive-data-exposure.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that a diagnostics response exposes a deployment token.",
+  "facts": [
+    "A diagnostics handler can include a field named token in its response.",
+    "The repository materials do not establish whether the value is a live credential, a redacted status label, or test data.",
+    "Authentication middleware, deployment exposure, and the users allowed to call the handler are not provided."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true,
+    "explanation_pattern": "live|credential|auth|reader|access|unknown|evidence"
+  }
+}

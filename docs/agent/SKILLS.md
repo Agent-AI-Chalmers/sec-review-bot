@@ -60,7 +60,7 @@ deepagents only reads the source paths it is given. It does not choose or filter
 
 Some external skills or commands cover capabilities this project already implements as workflows. Anthropic's [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) describes "perform security review", and OrchestKit's [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) describes "review a PR". Here, those capabilities are built into the public workflows and their review stages rather than one standalone skill.
 
-Bundled skills stay one layer below the project goal. They provide CWE taxonomy navigation, finding triage, and narrow domain references for web, CI, memory/numeric, cryptography, concurrency/resource, OS boundaries, and parser/protocol security. Domain ownership follows the mechanism: process invocation and filesystem authority belong to OS boundaries; object construction belongs to parser security; web and CI each own only the sensitive-data sinks on their surfaces. These skills provide reusable security knowledge and judgment aids without redefining the workflow.
+Bundled skills stay one layer below the project goal. They provide CWE taxonomy navigation, finding triage, and narrow domain references for web, CI, memory/numeric, cryptography, concurrency/resource, OS boundaries, parser/protocol, and software supply-chain security. Domain ownership follows the mechanism: process invocation and filesystem authority belong to OS boundaries; object construction belongs to parser security; web and CI each own only the sensitive-data sinks on their surfaces; dependency selection and install/build execution belong to supply-chain security. These skills provide reusable security knowledge and judgment aids without redefining the workflow.
 
 ### Developer Source Notes
 
@@ -71,6 +71,19 @@ sec_review_agents/resources/skill_source_notes/
 ```
 
 These files keep source links, examples, and maintenance notes for humans. They are not exposed to the agent skill view.
+
+### Source Note Maintenance Contract
+
+Maintain source notes per reference or small rule group. They are evidence ledgers, not reading lists. Record:
+
+- what the reference owns and the adjacent mechanisms it does not own;
+- each decision-changing operational claim, especially report/reject conditions, guard sufficiency, defaults and exceptions;
+- an authoritative primary source with a section, API, rule or other useful locator;
+- applicability limits, including language, platform, protocol, library and version assumptions;
+- a positive example, a counterexample and an unresolved-boundary example in JSON cases when the rule is admitted;
+- the corresponding case IDs or an explicit reason model testing is unnecessary.
+
+Identify repository reporting thresholds, workflow ownership and packaging decisions as project policy rather than attributing them to an external standard. Do not trace every explanatory sentence, but do not let a broad source link stand in for an unsupported operational rule. Recheck live defaults against the repository's dependency or target version when they affect the decision.
 
 ### Adding Or Updating Bundled Skills
 

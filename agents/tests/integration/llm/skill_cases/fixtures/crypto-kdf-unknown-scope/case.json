@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "crypto-kdf-unknown-scope",
+  "skill": "cryptography-security",
+  "reference": "key-derivation.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that two consumers reuse the same derived key.",
+  "facts": [
+    "Both consumers call a helper named derive_key.",
+    "The master-key identities, salt, info, output lengths, helper implementation, and consumer primitive requirements are not provided."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true,
+    "explanation_pattern": "master|salt|info|output|consumer|unknown|evidence"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "parser-object-construction-data-only",
+  "skill": "parser-protocol-security",
+  "reference": "object-construction.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether parsing this untrusted import is unsafe object construction.",
+  "facts": [
+    "The endpoint decodes the request with the standard JSON data parser into dictionaries, strings, booleans, numbers, and arrays only.",
+    "A fixed schema rejects unknown fields and constrains every value before business logic consumes it.",
+    "No type metadata, object hook, dynamic import, constructor selection, expression evaluation, or later deserialization occurs."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "data|json|schema|type|constructor|hook"
+  }
+}

@@ -10,6 +10,8 @@ Use this reference when untrusted serialized data can select runtime types, cons
 ## Sinks
 
 - Python: `pickle.load` / `pickle.loads`, `marshal`, unsafe `yaml.load`, dynamic import or object hooks driven by untrusted data.
+- YAML: explicit tags, custom constructors and language-object tags can select object types or invoke construction behavior. Data-only safe loaders are a counterexample when no later dynamic construction occurs.
+- JSON: polymorphic type metadata, default typing, class-name fields and object hooks can turn a data format into object construction. Verify the configured resolver, allowed types and library version.
 - PHP: `unserialize` on request/cookie/upload data, especially without `allowed_classes`.
 - Java: `ObjectInputStream`, unsafe polymorphic JSON typing, framework-specific type metadata such as `@type` when reachable from untrusted input.
 - .NET: `BinaryFormatter`, `NetDataContractSerializer`, `ObjectStateFormatter`, unsafe ViewState patterns.
@@ -30,5 +32,6 @@ Use this reference when untrusted serialized data can select runtime types, cons
 
 - Parsing trusted local config is not a vulnerability by itself.
 - Safe YAML/JSON parsing plus schema validation is not unsafe deserialization by itself.
+- A JSON or YAML format name does not establish data-only behavior; inspect enabled type metadata, tags, constructors and hooks.
 - Dependency presence alone does not prove reachability.
 - A theoretical gadget chain is not enough without an untrusted deserialization path and relevant classes or framework behavior.

@@ -2,7 +2,7 @@
 
 ## Status and evidence contract
 
-Research notes reviewed 2026-10-16. The first five candidates were subsequently admitted as narrow bundled skills after source review and independent prompted/natural cases; their maintained ledgers are `memory-numeric-safety.md`, `cryptography-security.md`, `concurrency-resource-security.md`, `os-boundary-security.md`, and `parser-protocol-security.md`. The supply-chain candidate remains deferred. PatchEval cases, CWE distributions, patches, tests, failures and results are excluded from requirement selection and probe design. PatchEval is reserved for final evaluation after freezing the skills.
+Research notes reviewed 2026-10-16. All six candidates were subsequently admitted as narrow bundled skills after source review and independent prompted/natural cases. Their maintained ledgers are `memory-numeric-safety.md`, `cryptography-security.md`, `concurrency-resource-security.md`, `os-boundary-security.md`, `parser-protocol-security.md`, and `software-supply-chain-security.md`. PatchEval cases, CWE distributions, patches, tests, failures and results are excluded from requirement selection and probe design. PatchEval is reserved for final evaluation after freezing the skills.
 
 Each row records a rule group, a primary source locator, and the limit of the proposed inference. A taxonomy entry establishes a failure mechanism, not that the mechanism needs a standalone skill. Keep rule groups small enough to have a meaningful counterexample. Record source revision or review date and applicability; recheck a live source or API default against the repository version when material. These notes are outside the mounted skill view.
 
@@ -69,7 +69,7 @@ Potential increment: differential interpretation and cross-message invariants. B
 
 ## software-supply-chain-security
 
-Independent packaging is deferred; the narrow core remains under investigation.
+Admitted with only the dependency-selection and install/build-execution core. The maintained ledger is `software-supply-chain-security.md`; provenance and artifact promotion remain outside the first bundled references.
 
 | ID | Candidate operational claim | Primary support and locator | Scope and counterexample |
 | --- | --- | --- | --- |
@@ -78,7 +78,7 @@ Independent packaging is deferred; the narrow core remains under investigation.
 | SUPPLY-3 | Source/build identity and artifact promotion must refer to the intended production chain. | [SLSA v1.2 threats](https://slsa.dev/spec/v1.2/threats-overview), “Threat model” and integrity scope | Artifact production/promotion authority remains owned by CI references. Provenance presence is not proof that a consumer verified identity and policy. SLSA does not address every usage or malicious-producer threat. |
 | SUPPLY-4 | Missing pinning, SBOM or attestation alone does not establish a repository exploit. | Project evidence policy; SLSA supplies threat context, not this reporting threshold | Require a concrete attacker-influenced selection/execution/promotion path. Dependency CVE presence and ordinary runtime reachability remain triage questions, not the center of this candidate. |
 
-Potential increment: resolution and install/build execution before runtime. First probe pair: an attacker-publishable competing source actually selectable by the resolver versus an enforced trusted source. Downloaded-tool integrity and update rollback/freeze protection require additional source work before inclusion. Behavior evidence: not yet collected.
+Potential increment: resolution and install/build execution before runtime. An attacker-publishable competing source actually selectable by the resolver differs from an enforced trusted source; runtime import reachability does not cover enabled install scripts. Downloaded-tool integrity, provenance consumption and update rollback/freeze protection require additional source work before inclusion.
 
 ## Admission and maintenance decisions
 

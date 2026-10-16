@@ -84,6 +84,7 @@ def test_materialize_agent_skills_view_includes_reference_skills(
                 "concurrency-resource-security",
                 "os-boundary-security",
                 "parser-protocol-security",
+                "software-supply-chain-security",
             ),
         )
 
@@ -131,6 +132,19 @@ def test_materialize_agent_skills_view_includes_reference_skills(
         / "references"
         / "object-construction.md"
     ).is_file()
+    assert (skills_root / "software-supply-chain-security" / "SKILL.md").is_file()
+    assert (
+        skills_root
+        / "software-supply-chain-security"
+        / "references"
+        / "dependency-selection.md"
+    ).is_file()
+    assert (
+        skills_root
+        / "software-supply-chain-security"
+        / "references"
+        / "install-build-execution.md"
+    ).is_file()
     assert not (skills_root / "skill_source_notes").exists()
 
 
@@ -146,6 +160,7 @@ def test_materialized_view_contains_only_declared_skill_resources() -> None:
         "concurrency-resource-security",
         "os-boundary-security",
         "parser-protocol-security",
+        "software-supply-chain-security",
     )
     skills_root = materialize_agent_skills_view(declared)
     assert {path.name for path in skills_root.iterdir()} == set(declared)
