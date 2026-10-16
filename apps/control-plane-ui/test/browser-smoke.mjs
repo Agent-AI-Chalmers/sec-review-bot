@@ -105,6 +105,39 @@ async function waitForServer(url) {
   }
 }
 
+// Poll a predicate until it is true, instead of sleeping a fixed amount and
+// hoping the UI has settled. The predicate runs immediately and then every
+// interval, so a condition that is already true costs nothing.
+async function waitUntil(
+  predicate,
+  message,
+  { timeoutMs = 5_000, intervalMs = 50 } = {}
+) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    if (await predicate()) return
+    if (Date.now() > deadline) throw new Error(message)
+    await delay(intervalMs)
+  }
+}
+
+// Like waitUntil, but for a producer whose current value is wanted back: poll
+// until the predicate accepts the value, then return it.
+async function waitUntilValue(
+  produce,
+  predicate,
+  message,
+  { timeoutMs = 5_000, intervalMs = 50 } = {}
+) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const value = await produce()
+    if (predicate(value)) return value
+    if (Date.now() > deadline) throw new Error(message)
+    await delay(intervalMs)
+  }
+}
+
 const browser = await chromium.launch({
   executablePath: CHROME_PATH,
   headless: true
@@ -175,18 +208,14 @@ try {
       `${name} a row action must rest hidden`
     )
     await page.locator('tbody tr:first-child').hover()
-    await page.waitForTimeout(250)
-    assert.strictEqual(
-      await rowActionOpacity(),
-      '1',
+    await waitUntil(
+      async () => (await rowActionOpacity()) === '1',
       `${name} hovering a row must reveal its action`
     )
     await page.mouse.move(2, 2)
     await page.locator('tbody tr:first-child td a').first().focus()
-    await page.waitForTimeout(250)
-    assert.strictEqual(
-      await rowActionOpacity(),
-      '1',
+    await waitUntil(
+      async () => (await rowActionOpacity()) === '1',
       `${name} focusing a row must reveal its action too`
     )
 
@@ -232,17 +261,13 @@ try {
       // server default, so a selection must change what the server returns.
       const perPage = page.getByLabel('Per page')
       await perPage.selectOption('20')
-      await page.waitForTimeout(750)
-      assert.strictEqual(
-        (await rows()).length,
-        20,
+      await waitUntil(
+        async () => (await rows()).length === 20,
         `${name} selected page size must apply`
       )
       await perPage.selectOption('50')
-      await page.waitForTimeout(750)
-      assert.strictEqual(
-        (await rows()).length,
-        50,
+      await waitUntil(
+        async () => (await rows()).length === 50,
         `${name} default page size must apply`
       )
 
@@ -251,24 +276,19 @@ try {
       const timeRange = page.getByLabel('Time range')
       const allRows = (await rows()).length
       await timeRange.selectOption('1h')
-      await page.waitForTimeout(750)
-      const hourRows = (await rows()).length
-      assert.ok(
-        hourRows < allRows,
+      await waitUntil(
+        async () => (await rows()).length < allRows,
         `${name} a one-hour range must narrow the list`
       )
+      const hourRows = (await rows()).length
       await timeRange.selectOption('24h')
-      await page.waitForTimeout(750)
-      const dayRows = (await rows()).length
-      assert.ok(
-        dayRows > hourRows && dayRows < allRows,
-        `${name} a 24-hour range must sit between the hour and everything`
-      )
+      await waitUntil(async () => {
+        const count = (await rows()).length
+        return count > hourRows && count < allRows
+      }, `${name} a 24-hour range must sit between the hour and everything`)
       await timeRange.selectOption('')
-      await page.waitForTimeout(750)
-      assert.strictEqual(
-        (await rows()).length,
-        allRows,
+      await waitUntil(
+        async () => (await rows()).length === allRows,
         `${name} clearing the range must restore the list`
       )
 
@@ -283,14 +303,15 @@ try {
       )
 
       await next.click()
-      await page.waitForTimeout(750)
+      await waitUntil(async () => {
+        const pageIds = await rows()
+        return (
+          pageIds.length > 0 &&
+          pageIds.every((runId) => !firstPage.includes(runId))
+        )
+      }, `${name} next page must not repeat the first page`)
       const secondPage = await rows()
       assert.ok(secondPage.length > 0, `${name} next page must return runs`)
-      assert.deepStrictEqual(
-        secondPage.filter((runId) => firstPage.includes(runId)),
-        [],
-        `${name} next page must not repeat the first page`
-      )
       assert.ok(
         !(await previous.isDisabled()),
         `${name} a later page must enable the previous control`
@@ -299,10 +320,8 @@ try {
       // The API only pages forward, so returning has to reuse the remembered
       // cursor rather than silently sending the reader back to the first page.
       await previous.click()
-      await page.waitForTimeout(750)
-      assert.deepStrictEqual(
-        await rows(),
-        firstPage,
+      await waitUntil(
+        async () => JSON.stringify(await rows()) === JSON.stringify(firstPage),
         `${name} previous page must restore the first page`
       )
 
@@ -337,11 +356,9 @@ try {
       // state has to be keyed by id or the 404 reads as a failed refresh of the old run.
       await jump.fill('00000000-0000-0000-0000-000000000000')
       await page.getByRole('button', { name: 'Go to run' }).click()
-      await page.waitForTimeout(900)
-      assert.ok(
-        await page.getByRole('heading', { name: 'Run not found' }).isVisible(),
-        `${name} an unknown run id must say the run is missing`
-      )
+      await page.getByRole('heading', { name: 'Run not found' }).waitFor({
+        state: 'visible'
+      })
       assert.strictEqual(
         await page.getByText('Unable to load Control Plane').count(),
         0,
@@ -365,7 +382,17 @@ try {
       // published one must render the multi-step delivery list.
       await page.getByLabel('Workflow').selectOption('repository-review')
       await page.getByLabel('Publication').selectOption('published')
-      await page.waitForTimeout(800)
+      // Wait until the filters have been applied to the list, so the first row we
+      // open is actually a published repository review rather than a stale row.
+      await waitUntil(
+        async () =>
+          (
+            (await page
+              .locator('tbody tr:first-child td:nth-child(2)')
+              .textContent()) ?? ''
+          ).trim() === 'Repository review',
+        `${name} the repository-review filter must apply to the list`
+      )
       await page.locator('tbody tr:first-child td a').first().click()
       await page.waitForSelector('.run-progress-timeline')
       assert.match(
@@ -541,9 +568,12 @@ try {
         }
       )
       await page.getByRole('heading', { name: 'Runs' }).waitFor()
-      await page.waitForTimeout(600)
+      await page.locator('tbody tr:first-child td a').first().waitFor()
       await page.locator('tbody tr:first-child td a').first().click()
       await page.waitForSelector('.delivery-item')
+      // This case asserts an absence: the summary must not carry the exit link.
+      // There is no event to wait on for "does not appear", so keep a short settle
+      // window and then check the count.
       await page.waitForTimeout(300)
       assert.strictEqual(
         await page.locator('.publication-summary .delivery-link').count(),
@@ -637,10 +667,10 @@ try {
       `${name} an in-flight phase must read as still running`
     )
     await page.getByRole('button', { name: 'Copy run ID' }).click()
-    await page.waitForTimeout(300)
-    assert.strictEqual(
-      await page.evaluate(() => navigator.clipboard.readText()),
-      knownRunIdForCopy,
+    await waitUntil(
+      async () =>
+        (await page.evaluate(() => navigator.clipboard.readText())) ===
+        knownRunIdForCopy,
       `${name} the copy button must put the full run id on the clipboard`
     )
 
@@ -697,11 +727,14 @@ try {
     // silent rather than repeat the execution failure time.
     await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
     await page.getByLabel('Execution').selectOption('failed')
-    await page.waitForTimeout(750)
-    assert.match(
-      (await page.locator('tbody tr:first-child td').last().textContent()) ??
-        '',
-      /[A-Z_]{4,}/,
+    await waitUntil(
+      async () =>
+        /[A-Z_]{4,}/.test(
+          (await page
+            .locator('tbody tr:first-child td')
+            .last()
+            .textContent()) ?? ''
+        ),
       `${name} a failed row must show its failure code in the list`
     )
     await page.locator('tbody tr:first-child td a').first().click()
@@ -733,14 +766,8 @@ try {
       })
     )
     await page.getByRole('button', { name: 'Refresh' }).click()
-    await page.waitForTimeout(900)
-    assert.ok(
-      await page
-        .getByLabel('Access token')
-        .isVisible()
-        .catch(() => false),
-      `${name} a 401 must return the reader to the sign-in form`
-    )
+    // A 401 must return the reader to the sign-in form.
+    await page.getByLabel('Access token').waitFor({ state: 'visible' })
     await page.unroute('**/api/runs*')
 
     // A specific backend failure must not collapse into the generic sentence.
@@ -754,10 +781,11 @@ try {
       })
     )
     await page.getByRole('button', { name: 'Refresh' }).click()
-    await page.waitForTimeout(900)
-    assert.match(
-      (await page.locator('[role="alert"]').first().textContent()) ?? '',
-      /unreachable/,
+    await waitUntil(
+      async () =>
+        /unreachable/.test(
+          (await page.locator('[role="alert"]').first().textContent()) ?? ''
+        ),
       `${name} an unreachable Control Plane must say so`
     )
     await page.unroute('**/api/runs*')
@@ -771,12 +799,11 @@ try {
     const touchPage = await touchContext.newPage()
     await touchPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
     await touchPage.getByRole('heading', { name: 'Runs' }).waitFor()
-    await touchPage.waitForTimeout(400)
-    assert.strictEqual(
-      await touchPage
-        .locator('tbody tr:first-child .row-action')
-        .evaluate((element) => getComputedStyle(element).opacity),
-      '1',
+    await waitUntil(
+      async () =>
+        (await touchPage
+          .locator('tbody tr:first-child .row-action')
+          .evaluate((element) => getComputedStyle(element).opacity)) === '1',
       `${name} a touch device must see the row action without hovering`
     )
     await touchContext.close()
@@ -795,8 +822,15 @@ try {
       )
       await themePage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
       await themePage.getByRole('heading', { name: 'Runs' }).waitFor()
-      await themePage.waitForTimeout(500)
-      const contrast = await themePage.evaluate(CONTRAST)
+      const contrast = await waitUntilValue(
+        () => themePage.evaluate(CONTRAST),
+        (value) =>
+          Number.isFinite(value.title) &&
+          value.title >= 4.5 &&
+          Number.isFinite(value.cell) &&
+          value.cell >= 4.5,
+        `${name} the ${theme} theme must render a readable contrast`
+      )
       const dark = theme === 'dark'
       assert.strictEqual(
         contrast.background.r < 128,
@@ -822,12 +856,15 @@ try {
     await manualPage.getByRole('heading', { name: 'Runs' }).waitFor()
     await manualPage.locator('tbody tr:first-child td a').first().click()
     await manualPage.waitForSelector('.run-progress-timeline')
-    await manualPage.waitForTimeout(500)
     const readElapsed = () =>
       manualPage
         .locator('.run-progress-timeline .mantine-Timeline-itemBody')
         .nth(1)
         .textContent()
+    await waitUntil(
+      async () => /so far/.test((await readElapsed()) ?? ''),
+      `${name} an in-flight phase must read as still running`
+    )
     const elapsedBefore = await readElapsed()
     assert.match(
       elapsedBefore ?? '',
@@ -853,13 +890,16 @@ try {
         waitUntil: 'networkidle'
       }
     )
-    await zhPage.waitForTimeout(700)
+    await zhPage.locator('tbody tr:first-child td a').first().waitFor()
     await zhPage.locator('tbody tr:first-child td a').first().click()
     await zhPage.waitForSelector('.run-progress-timeline')
-    await zhPage.waitForTimeout(500)
-    const zhBadges = await zhPage.$$eval(
-      '.delivery-item .mantine-Badge-root',
-      (items) => items.map((item) => item.textContent?.trim())
+    const zhBadges = await waitUntilValue(
+      () =>
+        zhPage.$$eval('.delivery-item .mantine-Badge-root', (items) =>
+          items.map((item) => item.textContent?.trim())
+        ),
+      (badges) => badges.length > 0,
+      `${name} the zh run must show its publication steps`
     )
     assert.ok(
       zhBadges.length > 0,
@@ -876,11 +916,15 @@ try {
     await zhPage.getByRole('heading', { name: 'Runs' }).waitFor()
     await zhPage.locator('tbody tr:first-child td a').first().click()
     await zhPage.waitForSelector('.run-progress-timeline')
-    await zhPage.waitForTimeout(500)
-    const zhExecution = await zhPage
-      .locator('.run-progress-timeline .mantine-Timeline-itemBody')
-      .nth(1)
-      .textContent()
+    const zhExecution = await waitUntilValue(
+      () =>
+        zhPage
+          .locator('.run-progress-timeline .mantine-Timeline-itemBody')
+          .nth(1)
+          .textContent(),
+      (text) => text !== null && text.length > 0,
+      `${name} the zh run must render its execution phase`
+    )
     assert.match(
       zhExecution ?? '',
       /· 已持续 /,
