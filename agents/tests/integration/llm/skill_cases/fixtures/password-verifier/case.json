@@ -12,7 +12,9 @@
     "An attacker obtaining the verifier database is the threat being assessed.",
     "No database disclosure path has been established."
   ],
-  "expected": {
-    "verdict": "confirmed"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed"
+    }
   }
 }

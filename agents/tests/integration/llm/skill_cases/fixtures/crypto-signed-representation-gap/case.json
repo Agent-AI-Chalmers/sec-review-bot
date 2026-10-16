@@ -4,7 +4,7 @@
   "skill": "cryptography-security",
   "reference": "signature-representation.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess why the same authorized payment can be accepted twice.",
   "facts": [
@@ -12,14 +12,16 @@
     "The verifier accepts a second non-canonical encoding of the same valid signature.",
     "The replay cache keys on the encoded signature bytes, so an attacker can resubmit the same authorized payment with the alternate encoding and bypass the one-time check."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_requirements": [
-      "canonical|non-canonical|alternate encoding",
-      "signature",
-      "replay|one-time",
-      "encoded.*bytes|signature bytes",
-      "resubmit|accepted twice|bypass"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "canonical|non-canonical|alternate encoding",
+        "signature",
+        "replay|one-time",
+        "encoded.*bytes|signature bytes",
+        "resubmit|accepted twice|bypass"
+      ]
+    }
   }
 }

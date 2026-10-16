@@ -5,16 +5,20 @@
   "reference": "cwe-699-agent-navigation.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assign the best root-cause CWE to the supported security finding. Supply a navigation category only when applicable.",
   "facts": [
     "After response.redirect('/login') for an unauthorized request, the handler does not return.",
     "Execution continues into a privileged account update and commits the change."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "cwe_id": "CWE-698",
-    "parent_category_id": "CWE-438"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed"
+    },
+    "classification": {
+      "cwe_id": "CWE-698",
+      "parent_category_id": "CWE-438"
+    }
   }
 }

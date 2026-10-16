@@ -12,8 +12,10 @@
     "The descriptor does not have close-on-exec set.",
     "The daemon execs an attacker-selected helper with reduced user IDs, and the helper can write through the inherited descriptor."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "descriptor|inherit|exec|close-on-exec|authority"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "descriptor|inherit|exec|close-on-exec|authority"
+    }
   }
 }

@@ -12,8 +12,10 @@
     "There is no scheme or host allowlist and no private-network guard.",
     "The service returns part of the fetched response body."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "request\\.args|requests\\.get|server-side|fetch|host|private|ssrf"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "request\\.args|requests\\.get|server-side|fetch|host|private|ssrf"
+    }
   }
 }

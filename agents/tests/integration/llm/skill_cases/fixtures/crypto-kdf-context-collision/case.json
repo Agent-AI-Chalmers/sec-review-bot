@@ -5,7 +5,7 @@
   "reference": "key-derivation.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether tenant key derivation keeps tenant authority separated.",
   "facts": [
@@ -13,8 +13,10 @@
     "The resulting bytes are used directly as each tenant's data-encryption key.",
     "A tenant can obtain its own derived key through an export feature and can read another tenant's ciphertext from a shared backup."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "hkdf|info|context|same|tenant|derived|key"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "hkdf|info|context|same|tenant|derived|key"
+    }
   }
 }

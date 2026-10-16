@@ -4,7 +4,7 @@
   "skill": "parser-protocol-security",
   "reference": "object-construction.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess the main security mechanism in this upload handler.",
   "facts": [
@@ -12,8 +12,10 @@
     "The handler stores no file and does not serve it back; it immediately reconstructs Python objects from the bytes.",
     "The service account can read deployment credentials and no signature, type allowlist, or sandbox applies."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "pickle|object|construct|deserial|upload|code execution"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "pickle|object|construct|deserial|upload|code execution"
+    }
   }
 }

@@ -14,9 +14,13 @@
     "There is no service, delegated privilege, remote input, or other user.",
     "The report-name value is exactly --output=/srv/config/runtime.json and reaches renderer as one string."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "crosses_security_boundary": false,
-    "attacker_controlled_argument": "--output=/srv/config/runtime.json"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed"
+    },
+    "exact_output": {
+      "crosses_security_boundary": false,
+      "attacker_controlled_argument": "--output=/srv/config/runtime.json"
+    }
   }
 }

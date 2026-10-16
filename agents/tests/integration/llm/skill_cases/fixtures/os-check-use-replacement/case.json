@@ -5,7 +5,7 @@
   "reference": "filesystem-resolution.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether the authorization check protects the file opened later.",
   "facts": [
@@ -13,8 +13,10 @@
     "A lower-privileged tenant can rename the checked directory and replace it with a symlink during the wait.",
     "The replacement resolves to a service-readable secret outside the tenant tree."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "check|use|replace|symlink|actual|access"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "check|use|replace|symlink|actual|access"
+    }
   }
 }

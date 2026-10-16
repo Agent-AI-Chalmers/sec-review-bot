@@ -5,7 +5,7 @@
   "reference": "key-nonce-scope.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess AES-GCM nonce reuse.",
   "facts": [
@@ -13,8 +13,10 @@
     "Every operation uses the constant 96-bit nonce 000000000000000000000000.",
     "Ciphertexts are exposed to the attacker."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "same key|reuse|unique|gcm|nonce"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "same key|reuse|unique|gcm|nonce"
+    }
   }
 }

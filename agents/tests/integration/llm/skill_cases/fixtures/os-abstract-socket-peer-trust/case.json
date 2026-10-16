@@ -12,8 +12,10 @@
     "Any unprivileged local process can connect.",
     "The daemon performs privileged file deletion for every command without checking peer credentials or an application credential."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "abstract|local|peer|credential|permission|unprivileged"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "abstract|local|peer|credential|permission|unprivileged"
+    }
   }
 }

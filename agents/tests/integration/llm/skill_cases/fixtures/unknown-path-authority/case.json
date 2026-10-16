@@ -11,8 +11,10 @@
     "The request controls relative and root is configured server-side.",
     "Directory permissions, possible concurrent writers, and export-tree contents are not provided."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true
+    }
   }
 }

@@ -11,8 +11,10 @@
     "A captured request contains conflicting framing headers.",
     "Proxy behavior, backend behavior, connection reuse, forwarding transformations and topology are unknown."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true
+    }
   }
 }

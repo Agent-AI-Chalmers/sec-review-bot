@@ -17,7 +17,7 @@ Reviewed 2026-10-16. The bundled skill is limited to dependency candidate select
 
 Project policy requires an attacker-influenced selectable dependency or install/build execution path and concrete authority or code-consumption effect. Missing pinning, SBOM, provenance or a preferred package-manager setting alone remains non-confirmed.
 
-Behavior cases for dependency selection: `supply-dependency-confusion` (confirmed and natural discovery), `supply-private-source-enforced` (counterexample), and `supply-unknown-resolver` (unresolved boundary). Behavior cases for install/build execution: `supply-install-script-execution` (confirmed and natural discovery), `supply-install-scripts-disabled` (counterexample), and `supply-install-unknown` (unresolved boundary). All six passed with the deployed integration model on 2026-10-16; this is local evidence, not a general quality estimate.
+Behavior cases for dependency selection: `supply-dependency-confusion` (confirmed and discovery), `supply-private-source-enforced` (counterexample), and `supply-unknown-resolver` (unresolved boundary). Behavior cases for install/build execution: `supply-install-script-execution` (confirmed and discovery), `supply-install-scripts-disabled` (counterexample), and `supply-install-unknown` (unresolved boundary). All six passed with the deployed integration model on 2026-10-16; this is local evidence, not a general quality estimate.
 
 Additional behavior cases: `supply-cargo-build-script`, `supply-jvm-plugin-filtered`, `supply-go-integrity-unknown`, `supply-provenance-subject-mismatch`, and `supply-update-same-channel-checksum`.
 

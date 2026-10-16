@@ -12,8 +12,10 @@
     "It derives api.example.com from trusted configuration and requires a matching supported certificate identifier.",
     "The chain satisfies time, critical extension, basic constraint, name constraint, key usage, and extended key usage checks."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "path|reference identity|api.example.com|constraint|usage|match"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "path|reference identity|api.example.com|constraint|usage|match"
+    }
   }
 }

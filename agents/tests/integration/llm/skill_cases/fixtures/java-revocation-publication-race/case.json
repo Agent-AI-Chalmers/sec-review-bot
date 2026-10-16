@@ -4,7 +4,7 @@
   "skill": "concurrency-resource-security",
   "reference": "java-memory-model.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess why requests can still use a permission after an administrator removes it.",
   "facts": [
@@ -12,14 +12,16 @@
     "Request threads read that field without a monitor, volatile access, immutable snapshot publication, thread lifecycle edge, or other happens-before relationship.",
     "The affected tenant can race requests after revocation and a stale policy grants the revoked privileged action."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_requirements": [
-      "happens-before",
-      "volatile|monitor|synchron",
-      "stale",
-      "revok",
-      "privileged|authorization"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "happens-before",
+        "volatile|monitor|synchron",
+        "stale",
+        "revok",
+        "privileged|authorization"
+      ]
+    }
   }
 }

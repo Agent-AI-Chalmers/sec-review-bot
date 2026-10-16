@@ -11,9 +11,11 @@
     "The handler awaits a backend operation while holding an object called limiter.",
     "The limiter implementation, framework disconnect behavior, cancellation path, ownership, cleanup, and production capacity are not provided."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true,
-    "explanation_pattern": "cancel|limiter|cleanup|capacity|unknown|evidence"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true,
+      "explanation_pattern": "cancel|limiter|cleanup|capacity|unknown|evidence"
+    }
   }
 }

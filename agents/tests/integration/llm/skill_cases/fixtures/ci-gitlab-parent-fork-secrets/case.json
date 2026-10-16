@@ -4,7 +4,7 @@
   "skill": "ci-security",
   "reference": "gitlab-ci.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess what the contributor-controlled pipeline can access after the maintainer starts it.",
   "facts": [
@@ -12,14 +12,16 @@
     "That pipeline uses CI configuration and scripts from the attacker's fork branch.",
     "The parent-project job exposes an unprotected deployment credential to those scripts, which can send it to the attacker."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_requirements": [
-      "fork",
-      "parent-project|parent project",
-      "attacker.*config|fork.*config|contributor.*script",
-      "credential|secret",
-      "maintainer|trigger"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "fork",
+        "parent-project|parent project",
+        "attacker.*config|fork.*config|contributor.*script",
+        "credential|secret",
+        "maintainer|trigger"
+      ]
+    }
   }
 }

@@ -12,8 +12,10 @@
     "The configured polymorphic resolver accepts any class on the application classpath.",
     "A reachable class constructor executes an operating-system command from another attacker-controlled field, and no type allowlist applies."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "json|polymorphic|type|class|constructor|command"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "json|polymorphic|type|class|constructor|command"
+    }
   }
 }

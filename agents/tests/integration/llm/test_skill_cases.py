@@ -3,8 +3,8 @@ import pytest
 from tests.integration.llm.probe_helpers import llm_probe
 from tests.integration.llm.skill_cases.loader import cases_for_mode, load_skill_cases
 from tests.integration.llm.skill_cases.runner import (
-    assert_case_oracle,
-    assert_natural_read,
+    assert_case_oracles,
+    assert_discovery_read,
     assert_prompted_read,
     run_skill_case,
 )
@@ -31,23 +31,23 @@ async def test_prompted_skill_cases(tmp_path, case) -> None:
         temp_root=tmp_path,
     )
     assert_prompted_read(case, run)
-    assert_case_oracle(case, run)
+    assert_case_oracles(case, run)
 
 
 @pytest.mark.parametrize(
     "case",
-    cases_for_mode(CASES, "natural"),
+    cases_for_mode(CASES, "discovery"),
     ids=lambda case: case.id,
 )
-async def test_natural_skill_cases(tmp_path, case) -> None:
+async def test_discovery_skill_cases(tmp_path, case) -> None:
     run = await run_skill_case(
         case,
-        mode="natural",
+        mode="discovery",
         skills_enabled=True,
         temp_root=tmp_path,
     )
-    assert_natural_read(case, run)
-    assert_case_oracle(case, run)
+    assert_discovery_read(case, run)
+    assert_case_oracles(case, run)
 
 
 @pytest.mark.parametrize(
@@ -72,7 +72,7 @@ async def test_skill_case_contrast(tmp_path, case) -> None:
     assert not any(
         path.startswith("/skills/") for path in without_skills.successful_reads
     )
-    assert_case_oracle(case, with_skills)
+    assert_case_oracles(case, with_skills)
     print(
         {
             "case": case.id,

@@ -11,8 +11,10 @@
     "The only HTTP/1.1 recipient rejects every request containing both Content-Length and Transfer-Encoding before forwarding.",
     "The connection is closed after rejection and no downstream parser receives the bytes."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "reject|before|downstream|consistent|close"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "reject|before|downstream|consistent|close"
+    }
   }
 }

@@ -12,8 +12,10 @@
     "Each transaction reads used=false before either writes, performs the privileged action, and only then sets used=true.",
     "The database isolation level permits both reads and there is no conditional update, unique constraint, or lock."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "concurr|atomic|invariant|both|lock|transaction"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "concurr|atomic|invariant|both|lock|transaction"
+    }
   }
 }

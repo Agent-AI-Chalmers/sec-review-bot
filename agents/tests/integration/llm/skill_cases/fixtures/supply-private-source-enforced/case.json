@@ -12,8 +12,10 @@
     "The package is pinned to an exact version and hash present in the reviewed lock input.",
     "The attacker cannot publish to the private namespace or modify the lock input."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "single|private|source|hash|pin|attacker|candidate"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "single|private|source|hash|pin|attacker|candidate"
+    }
   }
 }

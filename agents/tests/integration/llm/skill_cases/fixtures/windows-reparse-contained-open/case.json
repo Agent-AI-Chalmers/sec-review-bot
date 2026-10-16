@@ -12,8 +12,10 @@
     "The service later opens the original path with service credentials and follows reparse points.",
     "The junction targets a service-readable secrets directory, and no handle-relative or equivalent constrained open applies."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "reparse|junction|path|open|tenant|secret|contain"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "reparse|junction|path|open|tenant|secret|contain"
+    }
   }
 }

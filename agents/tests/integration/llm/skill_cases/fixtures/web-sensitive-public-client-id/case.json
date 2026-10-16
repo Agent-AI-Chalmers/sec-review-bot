@@ -12,8 +12,10 @@
     "The map key is restricted by allowed web origins and grants no administrative or server API authority.",
     "No client secret, bearer token, private user data, internal credential, or privileged configuration is returned."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "public|client|origin|secret|authority|credential"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "public|client|origin|secret|authority|credential"
+    }
   }
 }

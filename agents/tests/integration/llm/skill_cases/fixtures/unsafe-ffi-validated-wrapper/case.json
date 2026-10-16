@@ -12,8 +12,10 @@
     "It initializes every field, keeps the storage alive for the call, and the documented foreign function does not retain the pointer.",
     "The target ABI and layout are asserted at build time."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "align|lifetime|layout|precondition|wrapper"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "align|lifetime|layout|precondition|wrapper"
+    }
   }
 }

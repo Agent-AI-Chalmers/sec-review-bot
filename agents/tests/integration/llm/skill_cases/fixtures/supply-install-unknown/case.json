@@ -11,9 +11,11 @@
     "The dependency appears in a lockfile and its upstream source repository contains an install script.",
     "The selected package artifact, package-manager version, actual installation command, script settings, and CI environment are not provided."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true,
-    "explanation_pattern": "artifact|command|version|script|enabled|unknown|evidence"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true,
+      "explanation_pattern": "artifact|command|version|script|enabled|unknown|evidence"
+    }
   }
 }

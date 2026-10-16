@@ -12,8 +12,10 @@
     "The protocol does not use JSON and its signature scheme does not define a low-S requirement.",
     "The application never treats signature bytes as a unique identifier."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "protocol|binary|same bytes|scheme|low-S|JSON"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "protocol|binary|same bytes|scheme|low-S|JSON"
+    }
   }
 }

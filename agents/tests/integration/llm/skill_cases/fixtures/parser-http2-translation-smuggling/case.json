@@ -4,7 +4,7 @@
   "skill": "parser-protocol-security",
   "reference": "http2-translation.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess how one edge request becomes two backend requests.",
   "facts": [
@@ -12,15 +12,17 @@
     "It copies that value directly into an HTTP/1.1 header block sent on a reused backend connection.",
     "The injected delimiter creates a second backend request that bypasses the edge authorization check."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_requirements": [
-      "http/2",
-      "http/1",
-      "translat|cop",
-      "carriage|line-feed|delimiter|crlf",
-      "second.*request|two backend requests",
-      "authorization|bypass"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "http/2",
+        "http/1",
+        "translat|cop",
+        "carriage|line-feed|delimiter|crlf",
+        "second.*request|two backend requests",
+        "authorization|bypass"
+      ]
+    }
   }
 }

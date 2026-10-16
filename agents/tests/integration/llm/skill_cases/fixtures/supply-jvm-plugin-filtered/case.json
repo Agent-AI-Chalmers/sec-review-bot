@@ -12,8 +12,10 @@
     "Repository content filtering permits that group only from the authenticated internal repository.",
     "The extra public repository is configured for a different allowlisted group and cannot serve the plugin coordinates."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "filter|coordinates|internal|select|repository"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "filter|coordinates|internal|select|repository"
+    }
   }
 }

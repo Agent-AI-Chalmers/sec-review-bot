@@ -13,7 +13,9 @@
     "Product policy promises that logout revokes the session.",
     "An attacker has copied the victim's old session token."
   ],
-  "expected": {
-    "verdict": "confirmed"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed"
+    }
   }
 }

@@ -5,7 +5,7 @@
   "reference": "secret-and-artifact-exposure.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether the workflow publishes a credential to unauthorized artifact readers.",
   "facts": [
@@ -13,8 +13,10 @@
     "The artifact is downloadable by every repository reader, including users who cannot access deployment secrets.",
     "No later step removes or redacts the token file before upload."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "artifact|deploy_token|credential|secret|reader|upload"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "artifact|deploy_token|credential|secret|reader|upload"
+    }
   }
 }

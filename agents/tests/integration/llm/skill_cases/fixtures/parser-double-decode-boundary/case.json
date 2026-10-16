@@ -12,8 +12,10 @@
     "It forwards the decoded string to a backend that URL-decodes it again before opening a file.",
     "The attacker sends %252e%252e%252fsecret, which has no ../ after the first decode and becomes ../secret after the second."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "decode|representation|validation|backend|consumer"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "decode|representation|validation|backend|consumer"
+    }
   }
 }

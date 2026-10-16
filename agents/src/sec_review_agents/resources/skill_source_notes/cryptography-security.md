@@ -18,7 +18,7 @@ Reviewed 2026-10-16. Requirements are tied to the actual primitive or protocol; 
 
 Public-data checksums are not password verifiers; signature validity alone is not identity; missing rotation alone is not a confirmed exploit.
 
-Behavior cases for key derivation: `crypto-kdf-context-collision` (confirmed and natural discovery), `crypto-kdf-separated-context` (counterexample), and `crypto-kdf-unknown-scope` (unresolved boundary).
+Behavior cases for key derivation: `crypto-kdf-context-collision` (confirmed and discovery), `crypto-kdf-separated-context` (counterexample), and `crypto-kdf-unknown-scope` (unresolved boundary).
 
 Behavior cases for signature representation: `crypto-signed-representation-gap` and `crypto-protocol-canonical-signature`.
 

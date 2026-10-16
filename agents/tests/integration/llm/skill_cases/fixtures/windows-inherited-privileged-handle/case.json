@@ -12,8 +12,10 @@
     "It starts an attacker-controlled helper with handle inheritance enabled and no explicit handle allowlist.",
     "The child account cannot open the file by path but can read the inherited handle."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "handle|inherit|child|token|authority|path"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "handle|inherit|child|token|authority|path"
+    }
   }
 }

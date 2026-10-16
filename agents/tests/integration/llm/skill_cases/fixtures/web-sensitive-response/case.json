@@ -5,7 +5,7 @@
   "reference": "sensitive-data-exposure.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether the diagnostics endpoint exposes sensitive server data to an unauthorized web user.",
   "facts": [
@@ -13,8 +13,10 @@
     "DATABASE_URL contains live database credentials.",
     "No response filtering, authorization middleware, or deployment-only guard applies."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "database_url|credential|response|unauth|sensitive|secret"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "database_url|credential|response|unauth|sensitive|secret"
+    }
   }
 }

@@ -12,8 +12,10 @@
     "The same encoding is used for derivation and lookup, identifiers cannot collide, and output length is fixed.",
     "No derived key export or cross-tenant ciphertext access exists."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "info|tenant|unique|context|separat|derived"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "info|tenant|unique|context|separat|derived"
+    }
   }
 }

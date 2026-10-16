@@ -12,9 +12,11 @@
     "The bundle contents, artifact access policy, retention, and possible credential files are not provided.",
     "No evidence identifies an unauthorized reader or a live secret in the bundle."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true,
-    "explanation_pattern": "content|reader|access|secret|credential|unknown|evidence"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true,
+      "explanation_pattern": "content|reader|access|secret|credential|unknown|evidence"
+    }
   }
 }

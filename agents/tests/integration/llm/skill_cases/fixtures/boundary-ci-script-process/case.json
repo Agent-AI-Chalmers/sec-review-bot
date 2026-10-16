@@ -4,7 +4,7 @@
   "skill": "os-boundary-security",
   "reference": "process-execution-input.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess the main injection mechanism in this CI helper.",
   "facts": [
@@ -12,8 +12,10 @@
     "The trusted release job has package publishing credentials.",
     "The helper invokes a fixed package-manager executable but permits package_name to be parsed as an option that selects an attacker-controlled configuration file."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "argument|option|process|config|publish|authority"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "argument|option|process|config|publish|authority"
+    }
   }
 }

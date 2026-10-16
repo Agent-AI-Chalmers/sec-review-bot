@@ -5,7 +5,7 @@
   "reference": "github-actions.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether this pull_request_target workflow exposes privileged execution to fork-controlled code.",
   "facts": [
@@ -13,8 +13,10 @@
     "The workflow runs install and preview scripts from that checkout.",
     "The job has contents write permission and supplies DEPLOY_TOKEN."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "pull_request_target|head\\.sha|fork|secret|untrusted|execute"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "pull_request_target|head\\.sha|fork|secret|untrusted|execute"
+    }
   }
 }

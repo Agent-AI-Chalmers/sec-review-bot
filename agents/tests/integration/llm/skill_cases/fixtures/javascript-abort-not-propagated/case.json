@@ -4,7 +4,7 @@
   "skill": "concurrency-resource-security",
   "reference": "javascript-cancellation.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess cancellation and retained work after client disconnects.",
   "facts": [
@@ -12,8 +12,10 @@
     "The AbortSignal is not passed to fetch, so all requests continue until a ten-minute upstream timeout.",
     "An unauthenticated client can repeat this and exhaust the shared connection pool."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "AbortSignal|promise|fetch|continue|connection|resource"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "AbortSignal|promise|fetch|continue|connection|resource"
+    }
   }
 }

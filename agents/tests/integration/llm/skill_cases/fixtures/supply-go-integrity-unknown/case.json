@@ -11,9 +11,11 @@
     "The repository imports example.corp/security/lib.",
     "The effective GOPROXY, GOPRIVATE, GONOSUMDB, GOSUMDB, replace directives, selected version, and go.sum entry are unavailable."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true,
-    "explanation_pattern": "GOPROXY|GOPRIVATE|GONOSUMDB|GOSUMDB|replace|go.sum|unknown"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true,
+      "explanation_pattern": "GOPROXY|GOPRIVATE|GONOSUMDB|GOSUMDB|replace|go.sum|unknown"
+    }
   }
 }

@@ -12,8 +12,10 @@
     "It accepts any matching pair and executes the tool in CI.",
     "There is no independently trusted signing key, pinned digest, or authenticated metadata root."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "same|channel|checksum|trust|execute|mirror"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "same|channel|checksum|trust|execute|mirror"
+    }
   }
 }

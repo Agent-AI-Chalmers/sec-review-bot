@@ -11,19 +11,21 @@
     "A gateway exchanges a user token for a downstream token.",
     "The token claims, actor/subject mapping, audience, scope, target-resource binding, and downstream authorization checks are unavailable."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true,
-    "explanation_requirements": [
-      "cannot|not confirmed|insufficient|unknown",
-      "delegat|token exchange|downstream"
-    ],
-    "proof_gap_requirements": [
-      "actor|subject",
-      "audience",
-      "scope",
-      "resource|target",
-      "authorization|downstream"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true,
+      "explanation_requirements": [
+        "cannot|not confirmed|insufficient|unknown",
+        "delegat|token exchange|downstream"
+      ],
+      "proof_gap_requirements": [
+        "actor|subject",
+        "audience",
+        "scope",
+        "resource|target",
+        "authorization|downstream"
+      ]
+    }
   }
 }

@@ -13,7 +13,9 @@
     "There is no rate gate, automatic expiry, alternate login, or self-service recovery.",
     "Only operator intervention restores access and password verification itself is correct."
   ],
-  "expected": {
-    "verdict": "confirmed"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed"
+    }
   }
 }

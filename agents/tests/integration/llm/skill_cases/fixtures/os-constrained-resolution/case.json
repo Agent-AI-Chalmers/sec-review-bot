@@ -12,8 +12,10 @@
     "For each request it uses openat2 relative to that descriptor with RESOLVE_BENEATH and RESOLVE_NO_SYMLINKS.",
     "Untrusted users cannot modify the root descriptor or mount namespace."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "openat2|beneath|symlink|constrain|descriptor"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "openat2|beneath|symlink|constrain|descriptor"
+    }
   }
 }

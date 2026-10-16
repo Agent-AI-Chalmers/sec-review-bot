@@ -11,8 +11,10 @@
     "SHA-256 is applied only to public image bytes to form a cache key.",
     "No password, authentication secret, verifier database, or offline guessing threat is involved."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "checksum|cache|public|password|offline"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "checksum|cache|public|password|offline"
+    }
   }
 }

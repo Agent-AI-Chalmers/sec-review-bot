@@ -4,7 +4,7 @@
   "skill": "software-supply-chain-security",
   "reference": "provenance-verification.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess the artifact admission check.",
   "facts": [
@@ -12,8 +12,10 @@
     "It never compares the attested subject digest with the container image being admitted.",
     "An attacker can pair an approved attestation for image A with attacker-controlled image B."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "subject|digest|artifact|attestation|bind"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "subject|digest|artifact|attestation|bind"
+    }
   }
 }

@@ -4,7 +4,7 @@
   "skill": "authorization-delegation-security",
   "reference": "delegated-authority.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether the automation broker may perform the requested operation.",
   "facts": [
@@ -12,14 +12,16 @@
     "The caller supplies an arbitrary target project and operation, and the broker performs it with the broker's organization-wide service credential.",
     "The broker checks only that the caller may invoke the broker; it does not bind the requested target or operation to the caller's delegated scope, so the tenant can modify another tenant's project."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_requirements": [
-      "broker|service|deputy",
-      "organization-wide|own credential|broker.*credential",
-      "target|project",
-      "delegat|scope|caller.*permission",
-      "another tenant|unauthorized"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "broker|service|deputy",
+        "organization-wide|own credential|broker.*credential",
+        "target|project",
+        "delegat|scope|caller.*permission",
+        "another tenant|unauthorized"
+      ]
+    }
   }
 }

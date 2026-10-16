@@ -12,8 +12,10 @@
     "The authorization rule compares only the workload name and ignores the trust domain.",
     "A developer can obtain a development certificate with the production workload name and invoke the production administration API."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "trust domain|workload|certificate|authorization|development|production"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "trust domain|workload|certificate|authorization|development|production"
+    }
   }
 }

@@ -4,22 +4,40 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
-SkillCaseMode = Literal["prompted", "natural", "contrast"]
+SkillCaseMode = Literal["prompted", "discovery", "contrast"]
 SkillVerdict = Literal["confirmed", "not-confirmed"]
 
 
-class SkillCaseExpected(BaseModel):
+class DecisionOracle(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     verdict: SkillVerdict
-    crosses_security_boundary: bool | None = None
-    attacker_controlled_argument: str | None = None
-    require_proof_gaps: bool = False
-    cwe_id: str | None = None
-    parent_category_id: str | None = None
+    proof_gaps_required: bool = False
     explanation_requirements: list[str] = Field(default_factory=list)
     proof_gap_requirements: list[str] = Field(default_factory=list)
     explanation_pattern: str | None = None
+
+
+class ClassificationOracle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cwe_id: str
+    parent_category_id: str | None = None
+
+
+class ExactOutputOracle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    crosses_security_boundary: bool | None = None
+    attacker_controlled_argument: str | None = None
+
+
+class SkillCaseOracles(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decision: DecisionOracle | None = None
+    classification: ClassificationOracle | None = None
+    exact_output: ExactOutputOracle | None = None
 
 
 class SkillCase(BaseModel):
@@ -32,7 +50,7 @@ class SkillCase(BaseModel):
     modes: set[SkillCaseMode] = Field(min_length=1)
     task: str
     facts: list[str] = Field(min_length=1)
-    expected: SkillCaseExpected
+    oracles: SkillCaseOracles = Field(default_factory=SkillCaseOracles)
 
     _directory: Path = PrivateAttr()
 

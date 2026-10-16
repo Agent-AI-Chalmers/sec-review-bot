@@ -12,8 +12,10 @@
     "Downloads come from an isolated origin without application cookies and use attachment disposition plus a fixed binary content type.",
     "No server-side parser, template, plugin, archive extraction, or executable handoff consumes the files."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "isolated|attachment|content type|generated|parser|execute"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "isolated|attachment|content type|generated|parser|execute"
+    }
   }
 }

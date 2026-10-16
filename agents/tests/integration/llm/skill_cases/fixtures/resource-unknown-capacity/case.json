@@ -11,8 +11,10 @@
     "A network call has no explicit timeout.",
     "Request rate, concurrency, upstream behavior, worker capacity, cancellation and surrounding admission controls are not provided."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true
+    }
   }
 }

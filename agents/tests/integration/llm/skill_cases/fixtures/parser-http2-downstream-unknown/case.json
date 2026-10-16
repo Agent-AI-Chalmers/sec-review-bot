@@ -11,19 +11,21 @@
     "The public listener supports HTTP/2.",
     "The intermediary validation behavior, protocol translation, downstream protocol, connection reuse, malformed field handling, and downstream parser behavior are unavailable."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true,
-    "explanation_requirements": [
-      "cannot|not confirmed|unconfirmed|unsubstantiated|insufficient|unknown",
-      "http/2"
-    ],
-    "proof_gap_requirements": [
-      "translation|protocol",
-      "downstream",
-      "connection reuse|reuse",
-      "malformed|validation",
-      "parser|interpret"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true,
+      "explanation_requirements": [
+        "cannot|not confirmed|unconfirmed|unsubstantiated|insufficient|unknown",
+        "http/2"
+      ],
+      "proof_gap_requirements": [
+        "translation|protocol",
+        "downstream",
+        "connection reuse|reuse",
+        "malformed|validation",
+        "parser|interpret"
+      ]
+    }
   }
 }

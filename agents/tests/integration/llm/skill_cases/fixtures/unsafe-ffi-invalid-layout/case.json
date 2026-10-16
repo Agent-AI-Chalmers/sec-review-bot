@@ -12,8 +12,10 @@
     "The wrapper casts buffer+1 to a C Header pointer and dereferences it.",
     "The target ABI requires Header to be 8-byte aligned, and no aligned copy or validation occurs."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "ffi|align|layout|pointer|precondition"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "ffi|align|layout|pointer|precondition"
+    }
   }
 }

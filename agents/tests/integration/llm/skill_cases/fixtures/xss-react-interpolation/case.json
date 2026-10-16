@@ -11,8 +11,10 @@
     "src/Profile.tsx contains the complete relevant component.",
     "user.displayName is attacker-controlled."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "react|interpolation|escaping|escape"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "react|interpolation|escaping|escape"
+    }
   }
 }

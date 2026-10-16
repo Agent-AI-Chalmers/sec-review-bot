@@ -11,8 +11,10 @@
     "The code resolves and checks a pathname before opening it.",
     "Directory ownership, permissions, competing writers, mount behavior and exact open flags are not provided."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true
+    }
   }
 }

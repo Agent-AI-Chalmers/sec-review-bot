@@ -5,15 +5,17 @@
   "reference": "xss.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether the query parameter rendered through dangerouslySetInnerHTML is a confirmed XSS.",
   "facts": [
     "The body query parameter is attacker-controlled.",
     "There is no earlier validation or HTML sanitization."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "query|dangerouslysetinnerhtml|raw html|sink|saniti[sz]"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "query|dangerouslysetinnerhtml|raw html|sink|saniti[sz]"
+    }
   }
 }

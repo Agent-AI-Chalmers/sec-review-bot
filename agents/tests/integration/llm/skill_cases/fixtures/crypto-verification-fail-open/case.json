@@ -12,8 +12,10 @@
     "verify_signature returns false for an invalid signature, but the handler logs the failure and continues.",
     "The handler then trusts the unverified role claim to grant administrator access."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "verification|failure|continue|unverified|claim"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "verification|failure|continue|unverified|claim"
+    }
   }
 }

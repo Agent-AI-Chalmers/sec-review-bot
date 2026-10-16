@@ -4,7 +4,7 @@
   "skill": "cryptography-security",
   "reference": "verification-contracts.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess cryptographic validity and the authentication/session purpose boundary.",
   "facts": [
@@ -12,8 +12,10 @@
     "It accepts a password-reset token as an authenticated session token without checking audience or token type.",
     "The reset token grants account access when replayed at the session endpoint."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "signature|audience|type|purpose|session"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "signature|audience|type|purpose|session"
+    }
   }
 }

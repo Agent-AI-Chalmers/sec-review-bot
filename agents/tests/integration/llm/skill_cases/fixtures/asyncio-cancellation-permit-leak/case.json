@@ -5,7 +5,7 @@
   "reference": "python-asyncio-cancellation.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether request cancellation can exhaust the service's bounded worker permits.",
   "facts": [
@@ -14,8 +14,10 @@
     "The handler catches CancelledError and returns without releasing its acquired semaphore permit.",
     "After all 20 permits leak, new requests wait indefinitely."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "cancel|semaphore|permit|release|exhaust|disconnect"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "cancel|semaphore|permit|release|exhaust|disconnect"
+    }
   }
 }

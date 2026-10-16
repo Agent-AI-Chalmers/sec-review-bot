@@ -4,7 +4,7 @@
   "skill": "ci-security",
   "reference": "secret-and-artifact-exposure.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess the main exposure boundary in this repository automation.",
   "facts": [
@@ -12,8 +12,10 @@
     "Every repository reader can download uploaded workflow artifacts, but those readers cannot access the signing secret.",
     "The uploaded directory includes the copied key and no cleanup runs before upload."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "artifact|signing|secret|reader|ci|workflow"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "artifact|signing|secret|reader|ci|workflow"
+    }
   }
 }

@@ -12,8 +12,10 @@
     "The caller then unconditionally dereferences the same pointer to dispatch the next parser step.",
     "Ownership transfer and the attacker-controlled callback path are established, and no reference keeps the object alive."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "free|lifetime|dangl|dereference|valid"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "free|lifetime|dangl|dereference|valid"
+    }
   }
 }

@@ -4,7 +4,7 @@
   "skill": "os-boundary-security",
   "reference": "filesystem-path-policy.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess the main security mechanism in this download endpoint.",
   "facts": [
@@ -12,8 +12,10 @@
     "The service account can read both public exports and /srv/private/credentials.json.",
     "No earlier normalization, identifier mapping, or containment guard applies."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "path|filesystem|read|contain|traversal|credentials"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "path|filesystem|read|contain|traversal|credentials"
+    }
   }
 }

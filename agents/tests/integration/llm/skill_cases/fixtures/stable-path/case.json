@@ -12,7 +12,9 @@
     "The root and every directory, link, and file under it are immutable to requesters and all other untrusted actors during a request.",
     "All files under the root are intentionally public exports."
   ],
-  "expected": {
-    "verdict": "not-confirmed"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed"
+    }
   }
 }

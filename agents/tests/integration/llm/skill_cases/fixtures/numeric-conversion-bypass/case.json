@@ -5,7 +5,7 @@
   "reference": "numeric-semantics-and-bounds.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether the range check constrains the length consumed by the copy.",
   "facts": [
@@ -13,8 +13,10 @@
     "The code checks length <= 4096 but does not reject negative values.",
     "It then casts length to unsigned 32-bit and copies that many bytes into a 4096-byte buffer."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "cast|conversion|unsigned|negative|bounds"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "cast|conversion|unsigned|negative|bounds"
+    }
   }
 }

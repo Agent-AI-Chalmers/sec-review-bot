@@ -12,8 +12,10 @@
     "It is audience-bound to one service, scoped to read one resource, expires in two minutes, and the downstream service enforces every binding.",
     "The upstream bearer credential is not forwarded."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "subject|actor|audience|scope|resource|bound"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "subject|actor|audience|scope|resource|bound"
+    }
   }
 }

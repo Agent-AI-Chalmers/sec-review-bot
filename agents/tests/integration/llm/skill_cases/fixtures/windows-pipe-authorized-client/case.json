@@ -12,8 +12,10 @@
     "The server verifies the client token before the protected operation.",
     "Remote clients are disabled, and impersonation is reverted in a finally-style cleanup on every path."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "descriptor|service SID|token|remote|revert"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "descriptor|service SID|token|remote|revert"
+    }
   }
 }

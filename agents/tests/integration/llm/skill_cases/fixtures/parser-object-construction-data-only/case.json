@@ -12,8 +12,10 @@
     "A fixed schema rejects unknown fields and constrains every value before business logic consumes it.",
     "No type metadata, object hook, dynamic import, constructor selection, expression evaluation, or later deserialization occurs."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "data|json|schema|type|constructor|hook"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "data|json|schema|type|constructor|hook"
+    }
   }
 }

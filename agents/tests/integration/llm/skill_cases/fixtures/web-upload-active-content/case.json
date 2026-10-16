@@ -4,7 +4,7 @@
   "skill": "web-security",
   "reference": "file-upload.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess what happens when another user opens the profile attachment.",
   "facts": [
@@ -12,14 +12,16 @@
     "The application serves it inline from the authenticated application origin with an attacker-controlled HTML content type.",
     "Other users open the attachment while authenticated, allowing the uploaded script to act in the application origin."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_requirements": [
-      "upload|attachment",
-      "inline",
-      "html",
-      "application origin|same origin",
-      "script|stored xss"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "upload|attachment",
+        "inline",
+        "html",
+        "application origin|same origin",
+        "script|stored xss"
+      ]
+    }
   }
 }

@@ -11,9 +11,11 @@
     "Both consumers call a helper named derive_key.",
     "The master-key identities, salt, info, output lengths, helper implementation, and consumer primitive requirements are not provided."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true,
-    "explanation_pattern": "master|salt|info|output|consumer|unknown|evidence"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true,
+      "explanation_pattern": "master|salt|info|output|consumer|unknown|evidence"
+    }
   }
 }

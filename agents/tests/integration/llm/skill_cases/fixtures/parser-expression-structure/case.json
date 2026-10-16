@@ -12,8 +12,10 @@
     "The engine exposes a file-reading helper and runs with access to other tenants' policy files.",
     "Output HTML escaping is applied only after expression evaluation."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "structure|expression|helper|file|escaping|authority"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "structure|expression|helper|file|escaping|authority"
+    }
   }
 }

@@ -12,8 +12,10 @@
     "Attacker values are passed only as typed data variables.",
     "The attacker cannot alter operators, names, functions, templates, or the selected expression."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "fixed|allowlist|data|structure|expression"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "fixed|allowlist|data|structure|expression"
+    }
   }
 }

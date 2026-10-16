@@ -11,8 +11,10 @@
     "The workflow shown is complete for the relevant job.",
     "No pull-request code or pull-request-controlled script is checked out or executed."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "keyword|checkout|untrusted|sink|script|secrets|write"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "keyword|checkout|untrusted|sink|script|secrets|write"
+    }
   }
 }

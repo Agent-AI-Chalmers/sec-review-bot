@@ -4,7 +4,7 @@
   "skill": "os-boundary-security",
   "reference": "windows-services-local-ipc.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess the worker-thread identity cleanup and service effect.",
   "facts": [
@@ -12,14 +12,16 @@
     "The LocalSystem service impersonates the client, rejects the request on one error path, and returns without RevertToSelf.",
     "The poisoned worker thread is reused for mandatory service health and credential-rotation operations, which fail under the retained low-privilege token; the attacker can repeatedly poison every worker and keep the service unavailable until restart."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_requirements": [
-      "impersonat|client token",
-      "RevertToSelf|revert",
-      "worker|thread",
-      "low-privilege|restricted",
-      "unavailable|denial|fail"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "impersonat|client token",
+        "RevertToSelf|revert",
+        "worker|thread",
+        "low-privilege|restricted",
+        "unavailable|denial|fail"
+      ]
+    }
   }
 }

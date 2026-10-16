@@ -11,7 +11,9 @@
     "The function hashes public image bytes only to address a cache.",
     "It is not a password verifier, authentication decision, or secrecy mechanism."
   ],
-  "expected": {
-    "verdict": "not-confirmed"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed"
+    }
   }
 }

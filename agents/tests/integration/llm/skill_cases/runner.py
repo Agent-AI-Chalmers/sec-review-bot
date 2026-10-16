@@ -184,41 +184,50 @@ async def run_skill_case(
     )
 
 
-def assert_case_oracle(case: SkillCase, run: SkillCaseRun) -> None:
-    expected = case.expected
-    assert run.output.verdict == expected.verdict
-    if expected.crosses_security_boundary is not None:
+def assert_case_oracles(case: SkillCase, run: SkillCaseRun) -> None:
+    decision = case.oracles.decision
+    if decision is not None:
+        assert run.output.verdict == decision.verdict
+        if decision.proof_gaps_required:
+            assert run.output.proof_gaps
+        proof_gaps = " ".join(run.output.proof_gaps).lower()
+        for requirement in decision.proof_gap_requirements:
+            assert re.search(requirement, proof_gaps), (
+                requirement,
+                run.output.proof_gaps,
+            )
+        explanation = " ".join(
+            (
+                run.output.precedent_applied,
+                run.output.evidence,
+                run.output.rationale,
+            )
+        ).lower()
+        for requirement in decision.explanation_requirements:
+            assert re.search(requirement, explanation), (requirement, explanation)
+        if decision.explanation_pattern is not None:
+            assert re.search(decision.explanation_pattern, explanation)
+
+    exact_output = case.oracles.exact_output
+    if exact_output is not None and exact_output.crosses_security_boundary is not None:
         assert (
-            run.output.crosses_security_boundary is expected.crosses_security_boundary
+            run.output.crosses_security_boundary
+            is exact_output.crosses_security_boundary
         )
-    if expected.attacker_controlled_argument is not None:
+    if (
+        exact_output is not None
+        and exact_output.attacker_controlled_argument is not None
+    ):
         assert (
             run.output.attacker_controlled_argument
-            == expected.attacker_controlled_argument
+            == exact_output.attacker_controlled_argument
         )
-    if expected.require_proof_gaps:
-        assert run.output.proof_gaps
-    proof_gaps = " ".join(run.output.proof_gaps).lower()
-    for requirement in expected.proof_gap_requirements:
-        assert re.search(requirement, proof_gaps), (
-            requirement,
-            run.output.proof_gaps,
-        )
-    if expected.cwe_id is not None:
-        assert run.output.cwe_id == expected.cwe_id
-    if expected.parent_category_id is not None:
-        assert run.output.parent_category_id == expected.parent_category_id
-    explanation = " ".join(
-        (
-            run.output.precedent_applied,
-            run.output.evidence,
-            run.output.rationale,
-        )
-    ).lower()
-    for requirement in expected.explanation_requirements:
-        assert re.search(requirement, explanation), (requirement, explanation)
-    if expected.explanation_pattern is not None:
-        assert re.search(expected.explanation_pattern, explanation)
+
+    classification = case.oracles.classification
+    if classification is not None:
+        assert run.output.cwe_id == classification.cwe_id
+        if classification.parent_category_id is not None:
+            assert run.output.parent_category_id == classification.parent_category_id
 
 
 def assert_prompted_read(case: SkillCase, run: SkillCaseRun) -> None:
@@ -228,6 +237,6 @@ def assert_prompted_read(case: SkillCase, run: SkillCaseRun) -> None:
     assert case.reference_path in run.successful_reads
 
 
-def assert_natural_read(case: SkillCase, run: SkillCaseRun) -> None:
+def assert_discovery_read(case: SkillCase, run: SkillCaseRun) -> None:
     assert case.skill_path in run.successful_reads
     assert case.reference_path in run.successful_reads

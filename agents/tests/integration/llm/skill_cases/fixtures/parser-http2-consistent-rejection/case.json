@@ -11,8 +11,10 @@
     "The proxy rejects prohibited connection fields, invalid pseudo-headers, mismatched content length, and field values containing HTTP/1 delimiters.",
     "Only one validated HTTP/1.1 request is constructed after validation, and the backend never receives rejected bytes."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "reject|validated|HTTP/1|delimiter|malformed|backend"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "reject|validated|HTTP/1|delimiter|malformed|backend"
+    }
   }
 }

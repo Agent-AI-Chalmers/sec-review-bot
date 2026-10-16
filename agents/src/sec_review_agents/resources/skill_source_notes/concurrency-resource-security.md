@@ -20,7 +20,7 @@ Reviewed 2026-10-16. Temporal correctness and resource exhaustion remain separat
 
 Unknown production capacity can remain a proof gap, but exact measurement is unnecessary when code establishes unbounded attacker-controlled retention and service impact.
 
-Behavior cases for Python cancellation: `asyncio-cancellation-permit-leak` (confirmed and natural discovery), `asyncio-cancellation-finally-release` (counterexample), and `asyncio-cancellation-unknown` (unresolved boundary).
+Behavior cases for Python cancellation: `asyncio-cancellation-permit-leak` (confirmed and discovery), `asyncio-cancellation-finally-release` (counterexample), and `asyncio-cancellation-unknown` (unresolved boundary).
 
 Additional behavior cases: `javascript-abort-not-propagated`, `managed-cancellation-unknown`, and `go-goroutine-cancellation-leak`.
 

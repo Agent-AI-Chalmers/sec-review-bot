@@ -12,8 +12,10 @@
     "The configured parser version enables external general entities and permits file URI resolution.",
     "The parsed entity text is returned in the response, and no resolver restriction or sandbox applies."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "external|entity|file|resolution|xml|attacker"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "external|entity|file|resolution|xml|attacker"
+    }
   }
 }

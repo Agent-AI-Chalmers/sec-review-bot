@@ -4,15 +4,17 @@
   "skill": "memory-numeric-safety",
   "reference": "numeric-semantics-and-bounds.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess both the interpreted length boundary and the numeric value consumed by allocation and copy.",
   "facts": [
     "A binary parser validates a signed length as <= 4096 before normalizing the field to an unsigned 32-bit value.",
     "Negative attacker-controlled values pass the first comparison, become large unsigned values, and drive allocation and copy length."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "represent|convert|unsigned|bounds|length"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "represent|convert|unsigned|bounds|length"
+    }
   }
 }

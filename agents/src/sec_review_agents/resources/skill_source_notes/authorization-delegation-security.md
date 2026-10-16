@@ -10,7 +10,7 @@ Reviewed 2026-10-16. This skill owns non-browser service/workload identity, prot
 
 Project policy requires a concrete unauthorized target or operation and identifies the requester, actor/deputy, subject, credential binding and exercised authority. Missing a preferred workload-identity or delegation platform alone remains non-confirmed.
 
-Behavior cases: `auth-confused-deputy-export` (confirmed and natural discovery), `auth-delegation-bound` (counterexample), `auth-workload-trust-domain` (confirmed), and `auth-actor-subject-unknown` (unresolved boundary).
+Behavior cases: `auth-confused-deputy-export` (confirmed and discovery), `auth-delegation-bound` (counterexample), `auth-workload-trust-domain` (confirmed), and `auth-actor-subject-unknown` (unresolved boundary).
 
 ## Coverage and exclusions
 

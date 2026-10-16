@@ -1,4 +1,4 @@
-# Stable Security Coverage Audit
+# Security Coverage Decisions
 
 Reviewed 2026-10-16. This ledger records the systematic disposition of the remaining proposed areas. The first filter is whether the rule is stable enough to maintain. A stable rule is admitted only when it also changes a security decision beyond ordinary workflow source/sink, reachability and authority reasoning.
 
@@ -20,9 +20,3 @@ Reviewed 2026-10-16. This ledger records the systematic disposition of the remai
 - `scanner-finding-triage` remains a method for validating tool output, not a security domain.
 - Platform references may be selective and still belong in a general skill. They must state their platform/version limits.
 - Live vulnerability catalogs, product defaults, deprecation schedules and evergreen recommendation lists are excluded from bundled knowledge because they age quickly. When a review depends on them, obtain current primary documentation rather than freezing them into a skill.
-
-The 19 added JSON cases produced 12 prompted and 7 path-unprompted runs with `deepseek-v4-pro` on 2026-10-16. These runs established resource readability and agreement with the then-current lightweight verdict/keyword oracle. They do not independently validate the references, and the path-unprompted cases do not establish routing from realistic repository code. One ambiguous JSON-signature case selected parser security and was replaced with a narrower signature-encoding/replay case rather than forcing a disputed owner.
-
-A subsequent depth pass added X.509 path/service-identity rules, HTTP/2 validation and translation, and Java happens-before/publication semantics. It also added cases for Web CSRF, Web file serving, and GitLab fork/parent pipelines. The original 12 prompted and 6 path-unprompted runs showed that the model could read the selected resources and match the lightweight oracle; they were not independent correctness evidence. The former one-case-per-reference gate was removed because it rewarded placeholder cases rather than decision-changing tests.
-
-An independent correctness review then found three invalid or under-specified cases and an overclaim in the test evidence. The confused-deputy case was rewritten around a broker's independent organization-wide credential and missing delegated target/operation binding. The Windows impersonation case now establishes a repeatable availability impact from a retained low-privilege thread token. The Cargo case now uses an explicit alternate registry, an update command, an admissible version and recorded resolver selection rather than misusing source replacement. Stronger cases can require multiple independent explanation concepts and named proof gaps; deterministic tests ensure every listed requirement is enforced. Legacy single-regex fixtures remain weaker historical checks and are not counted as independent correctness evidence.

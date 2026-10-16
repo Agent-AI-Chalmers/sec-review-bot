@@ -14,7 +14,9 @@
     "The replacement link points to /srv/private, which contains a secret readable only by the service.",
     "No other guard constrains the subsequent read."
   ],
-  "expected": {
-    "verdict": "confirmed"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed"
+    }
   }
 }

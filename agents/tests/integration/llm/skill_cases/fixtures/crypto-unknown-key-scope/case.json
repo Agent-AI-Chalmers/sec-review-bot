@@ -11,8 +11,10 @@
     "Two ciphertext records contain the same nonce bytes.",
     "The records do not identify the encryption keys, key derivation scope, or whether the same key was used."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true
+    }
   }
 }

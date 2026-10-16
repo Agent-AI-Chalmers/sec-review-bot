@@ -5,7 +5,7 @@
   "reference": "object-construction.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether the import endpoint unsafely constructs executable objects from attacker-controlled data.",
   "facts": [
@@ -13,8 +13,10 @@
     "The service account can read deployment credentials.",
     "No signature, type allowlist, sandbox, or earlier validation applies."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "pickle|object|construct|deserial|attacker|code execution"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "pickle|object|construct|deserial|attacker|code execution"
+    }
   }
 }

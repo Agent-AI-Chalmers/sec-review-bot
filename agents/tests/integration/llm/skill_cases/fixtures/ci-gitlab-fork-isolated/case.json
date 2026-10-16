@@ -11,8 +11,10 @@
     "The pipeline runs only in the contributor's fork project with the fork's configuration, variables, and runners.",
     "No parent-project pipeline is started, no parent artifact is consumed, and protected variables and runners are unavailable to the fork pipeline."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "fork project|parent-project|protected|variables|runner|isolated"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "fork project|parent-project|protected|variables|runner|isolated"
+    }
   }
 }

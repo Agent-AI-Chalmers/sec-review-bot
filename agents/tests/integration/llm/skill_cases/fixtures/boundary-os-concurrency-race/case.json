@@ -4,15 +4,17 @@
   "skill": "os-boundary-security",
   "reference": "filesystem-resolution.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess the filesystem authority and temporal invariant across check and use.",
   "facts": [
     "A privileged service checks that a path resolves under a tenant directory, waits, and then opens the pathname.",
     "The tenant can concurrently rename a checked directory and replace it with a symlink to a service-readable secret."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "check|use|race|replace|symlink|invariant"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "check|use|race|replace|symlink|invariant"
+    }
   }
 }

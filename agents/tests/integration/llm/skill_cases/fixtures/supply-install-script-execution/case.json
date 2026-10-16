@@ -5,7 +5,7 @@
   "reference": "install-build-execution.md",
   "modes": [
     "prompted",
-    "natural"
+    "discovery"
   ],
   "task": "Assess whether the selected dependency executes attacker-controlled code during installation.",
   "facts": [
@@ -14,8 +14,10 @@
     "The CI job runs npm install with lifecycle scripts enabled and provides a package publishing token.",
     "The application never imports the dependency at runtime."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "prepare|install|lifecycle|script|token|runtime|execute"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "prepare|install|lifecycle|script|token|runtime|execute"
+    }
   }
 }

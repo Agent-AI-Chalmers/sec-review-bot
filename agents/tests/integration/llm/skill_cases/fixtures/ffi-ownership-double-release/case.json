@@ -12,8 +12,10 @@
     "The wrapper adopts the pointer into a host object whose destructor calls the host allocator's free.",
     "An error path also calls library_free before the host object remains reachable and later runs its destructor."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "ownership|double|free|allocator|destructor|ffi"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "ownership|double|free|allocator|destructor|ffi"
+    }
   }
 }

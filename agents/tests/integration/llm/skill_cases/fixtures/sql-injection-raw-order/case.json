@@ -11,8 +11,10 @@
     "req.query.sort is attacker-controlled.",
     "There is no allowlist of column or direction names."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "orderbyraw|sort|identifier|allowlist|sql|structure"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "orderbyraw|sort|identifier|allowlist|sql|structure"
+    }
   }
 }

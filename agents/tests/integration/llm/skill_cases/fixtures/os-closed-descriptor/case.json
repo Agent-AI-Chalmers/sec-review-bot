@@ -12,8 +12,10 @@
     "The child receives an explicit minimal descriptor allowlist and environment.",
     "No alternate inherited capability is identified."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "close-on-exec|cloexec|descriptor|inherit|allowlist"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "close-on-exec|cloexec|descriptor|inherit|allowlist"
+    }
   }
 }

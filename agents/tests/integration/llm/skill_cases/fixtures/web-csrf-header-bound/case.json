@@ -12,8 +12,10 @@
     "The attacker origin is not allowed by CORS, and the endpoint rejects form and simple content types.",
     "No cookie or other ambient credential authenticates the request."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "bearer|Authorization|ambient|CORS|simple|CSRF"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "bearer|Authorization|ambient|CORS|simple|CSRF"
+    }
   }
 }

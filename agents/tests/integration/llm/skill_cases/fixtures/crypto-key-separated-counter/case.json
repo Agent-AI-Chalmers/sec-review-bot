@@ -12,8 +12,10 @@
     "Each key has a persistent atomic counter starting at zero and encryption stops before wrap.",
     "Counter values may be equal across different keys."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "explanation_pattern": "key|scope|unique|counter"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "explanation_pattern": "key|scope|unique|counter"
+    }
   }
 }

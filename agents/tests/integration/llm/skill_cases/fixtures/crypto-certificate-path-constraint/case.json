@@ -4,7 +4,7 @@
   "skill": "cryptography-security",
   "reference": "certificate-path-identity.md",
   "modes": [
-    "natural"
+    "discovery"
   ],
   "task": "Assess why the internal client accepts the subordinate credential.",
   "facts": [
@@ -12,14 +12,16 @@
     "It ignores an intermediate CA pathLenConstraint of zero and accepts a subordinate CA below that intermediate.",
     "The unauthorized subordinate CA signs a TLS certificate that the deployment client accepts for a privileged internal connection."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_requirements": [
-      "pathlen|path length",
-      "intermediate",
-      "subordinate",
-      "constraint",
-      "trusted root|signature chain"
-    ]
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "pathlen|path length",
+        "intermediate",
+        "subordinate",
+        "constraint",
+        "trusted root|signature chain"
+      ]
+    }
   }
 }

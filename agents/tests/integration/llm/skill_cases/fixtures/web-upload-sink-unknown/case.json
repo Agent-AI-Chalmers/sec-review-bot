@@ -11,9 +11,11 @@
     "Users can upload PDF files.",
     "The storage location, generated filename behavior, serving origin, content disposition, content type, parser or converter use, permissions, and downstream readers are unavailable."
   ],
-  "expected": {
-    "verdict": "not-confirmed",
-    "require_proof_gaps": true,
-    "explanation_pattern": "storage|serv|disposition|parser|reader|sink|unknown"
+  "oracles": {
+    "decision": {
+      "verdict": "not-confirmed",
+      "proof_gaps_required": true,
+      "explanation_pattern": "storage|serv|disposition|parser|reader|sink|unknown"
+    }
   }
 }

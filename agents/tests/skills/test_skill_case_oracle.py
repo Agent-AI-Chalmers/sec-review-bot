@@ -1,7 +1,7 @@
 import pytest
 
 from tests.integration.llm.skill_cases.models import SkillCase, SkillCaseOutput
-from tests.integration.llm.skill_cases.runner import SkillCaseRun, assert_case_oracle
+from tests.integration.llm.skill_cases.runner import SkillCaseRun, assert_case_oracles
 
 
 def _case() -> SkillCase:
@@ -14,11 +14,16 @@ def _case() -> SkillCase:
             "modes": ["prompted"],
             "task": "Assess the validation claim.",
             "facts": ["The implementation is unavailable."],
-            "expected": {
-                "verdict": "not-confirmed",
-                "require_proof_gaps": True,
-                "explanation_requirements": ["certificate", "unconfirmed"],
-                "proof_gap_requirements": ["trust anchor", "reference identity"],
+            "oracles": {
+                "decision": {
+                    "verdict": "not-confirmed",
+                    "proof_gaps_required": True,
+                    "explanation_requirements": ["certificate", "unconfirmed"],
+                    "proof_gap_requirements": [
+                        "trust anchor",
+                        "reference identity",
+                    ],
+                }
             },
         }
     )
@@ -43,7 +48,26 @@ def test_oracle_requires_every_explanation_and_proof_gap_requirement() -> None:
         proof_gaps=["Trust anchor configuration", "Reference identity matching"],
     )
 
-    assert_case_oracle(case, run)
+    assert_case_oracles(case, run)
+
+
+def test_discovery_case_can_check_reads_without_a_result_oracle() -> None:
+    case = SkillCase.model_validate(
+        {
+            "schema_version": 1,
+            "id": "discovery-only",
+            "skill": "cryptography-security",
+            "reference": "certificate-path-identity.md",
+            "modes": ["discovery"],
+            "task": "Select the relevant security material.",
+            "facts": ["A certificate chain is validated for a service."],
+        }
+    )
+
+    assert_case_oracles(
+        case,
+        _run(rationale="No result oracle is configured.", proof_gaps=[]),
+    )
 
 
 @pytest.mark.parametrize(
@@ -61,4 +85,4 @@ def test_oracle_rejects_a_missing_required_concept(
     proof_gaps: list[str],
 ) -> None:
     with pytest.raises(AssertionError):
-        assert_case_oracle(_case(), _run(rationale=rationale, proof_gaps=proof_gaps))
+        assert_case_oracles(_case(), _run(rationale=rationale, proof_gaps=proof_gaps))

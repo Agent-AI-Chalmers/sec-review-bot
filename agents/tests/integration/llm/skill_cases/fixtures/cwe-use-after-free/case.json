@@ -12,8 +12,12 @@
     "The parser then dereferences that same object, causing an exploitable use-after-free.",
     "The ownership and attacker path are established."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "cwe_id": "CWE-416"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed"
+    },
+    "classification": {
+      "cwe_id": "CWE-416"
+    }
   }
 }

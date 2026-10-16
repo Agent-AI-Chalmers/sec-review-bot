@@ -12,8 +12,10 @@
     "The verifier database is included in the stated offline attacker model.",
     "No password hashing scheme, salt, cost parameter, or separate protection is applied."
   ],
-  "expected": {
-    "verdict": "confirmed",
-    "explanation_pattern": "password|offline|salt|cost|sha"
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_pattern": "password|offline|salt|cost|sha"
+    }
   }
 }
