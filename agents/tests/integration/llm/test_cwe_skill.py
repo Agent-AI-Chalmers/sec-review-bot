@@ -7,7 +7,7 @@
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -32,13 +32,17 @@ from sec_review_agents.runtime.summarization_middleware import (
 )
 from tests.integration.llm.deployment_helpers import llm_test_deployment
 from tests.integration.llm.probe_helpers import llm_probe
+from tests.integration.llm.skill_probe_helpers import (
+    record_skill_probe_result,
+    successful_read_paths,
+)
 
 
 class CweSkillProbeOutput(BaseModel):
-    cwe_id: Literal["CWE-698"] = Field()
+    cwe_id: str = Field()
     cwe_name: str = Field()
-    parent_category_id: Literal["CWE-438"] = Field()
-    parent_category_name: str = Field()
+    parent_category_id: str | None = None
+    parent_category_name: str | None = None
     skill_path_read: str = Field()
     navigation_path_read: str = Field()
     rationale: str
@@ -52,8 +56,35 @@ PROBE = llm_probe(
 
 @pytest.mark.skipif(not PROBE.enabled(), reason=PROBE.skip_reason())
 @pytest.mark.asyncio
-async def test_llm_uses_cwe_skill_navigation_to_classify_execution_after_redirect(
+@pytest.mark.parametrize(
+    ("finding", "expected_cwe", "expected_parent"),
+    [
+        (
+            (
+                "After response.redirect('/login') for an unauthorized request, "
+                "the handler does not return. It continues into a privileged "
+                "account update and commits the change."
+            ),
+            "CWE-698",
+            "CWE-438",
+        ),
+        (
+            (
+                "An attacker-controlled callback frees a heap object. The parser "
+                "then dereferences that same object, causing an exploitable "
+                "use-after-free. The ownership and attacker path are established."
+            ),
+            "CWE-416",
+            None,
+        ),
+    ],
+    ids=["redirect", "label-absent-from-local-index"],
+)
+async def test_llm_classifies_supported_findings_without_a_closed_label_set(
     tmp_path: Path,
+    finding: str,
+    expected_cwe: str,
+    expected_parent: str | None,
 ) -> None:
     local_root = tmp_path / "local"
     workspace = local_root / "workspace"
@@ -95,6 +126,7 @@ async def test_llm_uses_cwe_skill_navigation_to_classify_execution_after_redirec
         create_summarization_middleware(
             agent_name="cwe-skill-probe",
             model=model,
+            deployment_override=deployment,
         ),
         PatchToolCallsMiddleware(),
     ]
@@ -119,15 +151,12 @@ async def test_llm_uses_cwe_skill_navigation_to_classify_execution_after_redirec
                     {
                         "role": "user",
                         "content": (
-                            "A supported security finding already exists: after "
-                            "calling `response.redirect('/login')` for an "
-                            "unauthorized request, the handler does not return or "
-                            "stop execution. It continues into the privileged "
-                            "account-update branch and can still apply the update "
-                            "after the redirect response was issued. Use the CWE "
-                            "skill and its navigation document to assign the best "
-                            "second-level CWE. Set skill_path_read and "
-                            "navigation_path_read to the exact paths you used."
+                            f"A supported security finding already exists: {finding} "
+                            "Use the CWE skill and its navigation document to "
+                            "assign the best root-cause CWE. "
+                            "Supply a navigation category only when applicable. "
+                            "Set skill_path_read and navigation_path_read to the "
+                            "exact paths you used."
                         ),
                     }
                 ]
@@ -135,16 +164,19 @@ async def test_llm_uses_cwe_skill_navigation_to_classify_execution_after_redirec
             config={"recursion_limit": 20},
         )
 
+    record_skill_probe_result(result, label="cwe-classification")
+    reads = successful_read_paths(result)
+    assert "/skills/cwe/SKILL.md" in reads
+    assert "/skills/cwe/references/cwe-699-agent-navigation.md" in reads
     parsed = result.get("structured_response")
     if isinstance(parsed, dict):
         parsed = CweSkillProbeOutput.model_validate(parsed)
 
     assert isinstance(parsed, CweSkillProbeOutput)
     print(parsed.model_dump(by_alias=True))
-    assert parsed.cwe_id == "CWE-698"
-    assert "REDIRECT" in parsed.cwe_name.upper()
-    assert parsed.parent_category_id == "CWE-438"
-    assert "BEHAVIORAL" in parsed.parent_category_name.upper()
+    assert parsed.cwe_id == expected_cwe
+    if expected_parent is not None:
+        assert parsed.parent_category_id == expected_parent
     assert parsed.skill_path_read == "/skills/cwe/SKILL.md"
     assert (
         parsed.navigation_path_read

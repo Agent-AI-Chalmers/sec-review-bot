@@ -79,6 +79,7 @@ async def test_triage_reads_scanner_finding_skill_for_reachability_noise() -> No
         for candidate in result.get("suppressed_candidates") or []
     }
 
+    assert "internal-export-unknown-guard" in kept_candidate_ids
     assert "runtime-yaml-import" in kept_candidate_ids
     assert "sca-minimist-lockfile-only" in suppressed_candidate_ids
     assert "eval-test-fixture-only" in suppressed_candidate_ids
@@ -93,6 +94,25 @@ def _artifact_root() -> Path:
 
 def _scanner_style_candidates() -> list[dict]:
     return [
+        {
+            "candidate_id": "internal-export-unknown-guard",
+            "title": "Internal tenant export accepts a requester-selected object",
+            "category": "Access control",
+            "paths": ["src/internal/export.py"],
+            "locations": [
+                {"file": "src/internal/export.py", "line": 20, "label": "Export lookup"}
+            ],
+            "confidence": "medium",
+            "description": (
+                "An authenticated tenant user supplies object_id to the internal "
+                "export endpoint, which returns load_export(object_id). The payload "
+                "does not establish whether middleware enforces object ownership. "
+                "The internal label alone does not establish tenant isolation; "
+                "the ownership guard needs repository analysis."
+            ),
+            "evidence": ["return load_export(request.json['object_id'])"],
+            "grounding_status": "grounded",
+        },
         {
             "candidate_id": "sca-minimist-lockfile-only",
             "title": "Scanner flags minimist CVE from package-lock entry",

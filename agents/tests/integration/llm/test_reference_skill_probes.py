@@ -30,6 +30,10 @@ from sec_review_agents.runtime.summarization_middleware import (
 )
 from tests.integration.llm.deployment_helpers import llm_test_deployment
 from tests.integration.llm.probe_helpers import llm_probe
+from tests.integration.llm.skill_probe_helpers import (
+    record_skill_probe_result,
+    successful_read_paths,
+)
 
 
 class ReferenceSkillProbeOutput(BaseModel):
@@ -38,6 +42,7 @@ class ReferenceSkillProbeOutput(BaseModel):
     reference_path_read: str = Field()
     precedent_applied: str = Field()
     rationale: str
+    proof_gaps: list[str] = Field(default_factory=list)
 
 
 _PROBE_RECURSION_LIMIT = 64
@@ -84,6 +89,7 @@ async def _create_skill_probe_agent(
         create_summarization_middleware(
             agent_name="reference-skill-probe",
             model=model,
+            deployment_override=deployment,
         ),
         PatchToolCallsMiddleware(),
     ]
@@ -103,15 +109,20 @@ async def _create_skill_probe_agent(
     return backend, agent
 
 
-def _parse_structured_response[ParsedOutput: BaseModel](
+def _parse_structured_response(
     result: dict,
-    model: type[ParsedOutput],
-) -> ParsedOutput:
+    model: type[ReferenceSkillProbeOutput],
+) -> ReferenceSkillProbeOutput:
+    record_skill_probe_result(result, label="reference-smoke")
     parsed = result.get("structured_response")
     if isinstance(parsed, dict):
         parsed = model.model_validate(parsed)
     if not isinstance(parsed, model):
         raise AssertionError(f"missing structured response: {result!r}")
+    assert isinstance(parsed, ReferenceSkillProbeOutput)
+    reads = successful_read_paths(result)
+    assert parsed.skill_path_read in reads
+    assert parsed.reference_path_read in reads
     return parsed
 
 
@@ -342,52 +353,43 @@ async def test_web_path_traversal_reference_confirms_uncontained_file_read() -> 
 async def test_web_command_injection_reference_confirms_argument_injection() -> None:
     with tempfile.TemporaryDirectory() as tempdir:
         workspace = Path(tempdir) / "workspace"
-        (workspace / "pkg").mkdir(parents=True)
-        (workspace / "pkg" / "vcs.py").write_text(
-            "\n".join(
-                [
-                    "import subprocess",
-                    "",
-                    "def checkout(repo_type, checkout_ref, cwd):",
-                    "    subprocess.check_output(",
-                    "        [repo_type, 'checkout', checkout_ref],",
-                    "        cwd=cwd,",
-                    "    )",
-                    "",
-                ]
-            ),
+        workspace.mkdir()
+        (workspace / "tool.py").write_text(
+            "import argparse\n"
+            "from pathlib import Path\n"
+            "parser = argparse.ArgumentParser()\n"
+            "parser.add_argument('name', nargs='?')\n"
+            "parser.add_argument('--output', default='/srv/reports/result.txt')\n"
+            "args = parser.parse_args()\n"
+            "Path(args.output).write_text('generated report')\n",
             encoding="utf-8",
         )
-
-        backend, agent = await _create_skill_probe_agent(
-            workspace=workspace,
+        (workspace / "handler.py").write_text(
+            "import subprocess, sys\n"
+            "from pathlib import Path\n"
+            "def post_report(request):\n"
+            "    tool = str(Path(__file__).with_name('tool.py'))\n"
+            "    subprocess.run([sys.executable, tool, request.json['name']], check=True)\n",
+            encoding="utf-8",
         )
+        backend, agent = await _create_skill_probe_agent(workspace=workspace)
         async with amanaged_backend(backend):
             result = await _ask_reference_probe(
                 agent,
-                "Read /skills/web-security/SKILL.md, route to the "
-                "command-injection reference, and assess this lead: "
-                "`pkg/vcs.py` passes caller-controlled "
-                "`checkout_ref` as an argument-array element to "
-                "`subprocess.check_output([repo_type, 'checkout', "
-                "checkout_ref])`. For Mercurial, a value like "
-                "`--config=hooks.pre-checkout=id` is parsed as an "
-                "option and can execute a hook command. Is this a "
-                "confirmed command/argument injection? Set "
-                "skill_path_read and reference_path_read to the exact "
-                "paths you used.",
+                "Read /skills/web-security/SKILL.md and its command-injection "
+                "reference. Inspect /workspace/handler.py and tool.py without "
+                "executing them. post_report is an endpoint exposed to untrusted "
+                "remote users, running as a service account that can overwrite "
+                "its configuration under /srv/config. Users may request a report "
+                "by name, not write arbitrary files. There is no earlier input "
+                "validation. The lead supplies name='--output=/srv/config/runtime.json'. "
+                "Assess how the downstream parser handles this value and its effect. "
+                "Set skill_path_read and reference_path_read to the paths used.",
             )
-
         parsed = _parse_structured_response(result, ReferenceSkillProbeOutput)
-        print(parsed.model_dump(by_alias=True))
         assert parsed.verdict == "confirmed"
-        assert parsed.skill_path_read == "/skills/web-security/SKILL.md"
         assert parsed.reference_path_read == (
             "/skills/web-security/references/command-injection.md"
-        )
-        assert re.search(
-            r"argument|array|--config|hook|subprocess|flag|option",
-            f"{parsed.precedent_applied} {parsed.rationale}".lower(),
         )
 
 
@@ -610,3 +612,182 @@ async def test_ci_github_actions_reference_confirms_privileged_fork_code_executi
             r"pull_request_target|head\.sha|fork|secret|untrusted|execute",
             f"{parsed.precedent_applied} {parsed.rationale}".lower(),
         )
+
+
+@pytest.mark.parametrize(
+    ("case", "source", "context", "reference", "expected"),
+    [
+        (
+            "password-verifier",
+            (
+                "import hashlib\n"
+                "def password_verifier(password):\n"
+                "    return hashlib.sha256(password.encode()).hexdigest()\n"
+            ),
+            (
+                "This is the production password storage function for user accounts. "
+                "Assess offline password guessing if an attacker obtains the verifier "
+                "database. No database disclosure path has been established."
+            ),
+            "auth-session",
+            "confirmed",
+        ),
+        (
+            "non-security-checksum",
+            (
+                "import hashlib\n"
+                "def cache_key(public_image_bytes):\n"
+                "    return hashlib.sha256(public_image_bytes).hexdigest()\n"
+            ),
+            (
+                "This hashes public image bytes solely to address a cache. It is not "
+                "a password verifier, authentication decision, or secrecy mechanism. "
+                "Assess the lead that using a fast hash here weakens password storage."
+            ),
+            "auth-session",
+            "not-confirmed",
+        ),
+        (
+            "session-after-logout",
+            (
+                "sessions = {}\n"
+                "def logout(token):\n"
+                "    return {'delete_cookie': True}\n"
+                "def account(token):\n"
+                "    return sessions.get(token)\n"
+            ),
+            (
+                "These are the deployed logout and authenticated-account handlers. "
+                "A server-side session remains in sessions until logout invalidates it; "
+                "there is no separate expiry/revocation layer. Product policy promises "
+                "logout revokes that session. An attacker has copied the victim's old "
+                "session token. Assess continued access after the victim logs out."
+            ),
+            "auth-session",
+            "confirmed",
+        ),
+        (
+            "account-lockout",
+            (
+                "locked = set()\n"
+                "def login(user, password):\n"
+                "    if user in locked: return False\n"
+                "    if not verify_password(user, password):\n"
+                "        locked.add(user)\n"
+                "        return False\n"
+                "    return True\n"
+            ),
+            (
+                "This public login endpoint accepts any account name. One incorrect "
+                "password permanently locks the named existing account. There is no "
+                "rate gate, automatic expiry, alternate login or self-service recovery; "
+                "only operator intervention restores access. Assess an unauthenticated "
+                "attacker targeting a known victim account; password verification "
+                "itself is correct."
+            ),
+            "auth-session",
+            "confirmed",
+        ),
+        (
+            "path-replacement",
+            (
+                "from pathlib import Path\n"
+                "ROOT = Path('/srv/exports')\n"
+                "def download(relative, checked, resume):\n"
+                "    target = (ROOT / relative).resolve()\n"
+                "    if not target.is_relative_to(ROOT): raise PermissionError()\n"
+                "    checked.set()\n"
+                "    resume.wait()\n"
+                "    return target.read_bytes()\n"
+            ),
+            (
+                "This service-account handler serves downloads. A lower-privileged "
+                "local tenant can rename /srv/exports/slot and replace it with a "
+                "symlink after checked fires and before resume is signalled. For "
+                "relative='slot/secret', the original file passes containment. The "
+                "replacement link points to /srv/private, which holds secret readable "
+                "only by the service. No other guard constrains the subsequent read. "
+                "Assess filesystem containment."
+            ),
+            "path-traversal",
+            "confirmed",
+        ),
+        (
+            "stable-path",
+            (
+                "from pathlib import Path\n"
+                "ROOT = Path('/srv/exports')\n"
+                "def download(relative):\n"
+                "    target = (ROOT / relative).resolve()\n"
+                "    if not target.is_relative_to(ROOT): raise PermissionError()\n"
+                "    return target.read_bytes()\n"
+            ),
+            (
+                "Requesters control relative. The root and every directory, link and "
+                "file under it are immutable to them and all other untrusted actors "
+                "during a request. All files there are intentionally public exports. "
+                "Assess the lead that a separate resolve/check/read always permits "
+                "a symlink race."
+            ),
+            "path-traversal",
+            "not-confirmed",
+        ),
+        (
+            "unknown-path-authority",
+            (
+                "from pathlib import Path\n"
+                "def download(root, relative):\n"
+                "    target = (root / relative).resolve()\n"
+                "    if not target.is_relative_to(root): raise PermissionError()\n"
+                "    return target.read_bytes()\n"
+            ),
+            (
+                "The request controls relative; root is configured server-side. "
+                "Directory permissions, possible concurrent writers and the contents "
+                "of the export tree are not provided. Assess the claim that a tenant "
+                "can replace a directory between check and read. Preserve unknown "
+                "preconditions rather than inventing writable directories."
+            ),
+            "path-traversal",
+            "not-confirmed",
+        ),
+    ],
+    ids=[
+        "password-verifier",
+        "non-security-checksum",
+        "session-after-logout",
+        "account-lockout",
+        "path-replacement",
+        "stable-path",
+        "unknown-path-authority",
+    ],
+)
+async def test_corrected_reference_boundaries(
+    tmp_path: Path,
+    case: str,
+    source: str,
+    context: str,
+    reference: str,
+    expected: str,
+) -> None:
+    """Synthetic mechanism cases are independent of benchmark cases and outcomes."""
+    workspace = tmp_path / case
+    workspace.mkdir()
+    (workspace / "handler.py").write_text(source, encoding="utf-8")
+    backend, agent = await _create_skill_probe_agent(workspace=workspace)
+    async with amanaged_backend(backend):
+        result = await _ask_reference_probe(
+            agent,
+            "Read /skills/web-security/SKILL.md and its "
+            f"{reference} reference, then inspect /workspace/handler.py. "
+            f"{context} Return your verdict and explain the relevant conditions; "
+            "Set skill_path_read and reference_path_read to the paths used. "
+            "List material unknown preconditions in proof_gaps.",
+        )
+    parsed = _parse_structured_response(result, ReferenceSkillProbeOutput)
+    assert parsed.verdict == expected
+    assert (
+        parsed.reference_path_read == f"/skills/web-security/references/{reference}.md"
+    )
+    if case == "unknown-path-authority":
+        assert parsed.proof_gaps

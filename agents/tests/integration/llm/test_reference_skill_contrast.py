@@ -4,7 +4,6 @@
 # The skills-enabled run only receives the normal SkillsMiddleware exposure; the
 # no-skills run receives the same repository and task without SkillsMiddleware.
 
-import re
 from pathlib import Path
 from typing import Any, Literal
 from unittest.mock import patch
@@ -27,11 +26,23 @@ from sec_review_agents.runtime.summarization_middleware import (
 )
 from tests.integration.llm.deployment_helpers import llm_test_deployment
 from tests.integration.llm.probe_helpers import llm_probe
+from tests.integration.llm.skill_probe_helpers import (
+    record_skill_probe_result,
+    successful_read_paths,
+)
 
 
 class ReferenceSkillContrastOutput(BaseModel):
     verdict: Literal["confirmed", "not-confirmed"] = Field()
     vulnerability_type: str = Field()
+    attacker_controlled_argv: str | None = Field(
+        description=(
+            "One exact value supplied as the report name that changes the child "
+            "parser's behavior, or null when no such single argv value exists."
+        )
+    )
+    crosses_security_boundary: bool = Field()
+    proof_gaps: list[str] = Field(default_factory=list)
     evidence: str
     rationale: str
 
@@ -49,9 +60,19 @@ async def _create_natural_review_agent(
     )
     from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 
-    with patch(
-        "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
-        return_value="local",
+    with (
+        patch(
+            "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
+            return_value="local",
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.repository.agent_skills_enabled",
+            return_value=skills_enabled,
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.repository.agent_memory_enabled",
+            return_value=False,
+        ),
     ):
         backend = create_repository_analyzer_backend(
             workspace_root_path=workspace,
@@ -85,6 +106,7 @@ async def _create_natural_review_agent(
         create_summarization_middleware(
             agent_name="reference-skill-contrast-probe",
             model=model,
+            deployment_override=deployment,
         )
     )
     middleware.append(PatchToolCallsMiddleware())
@@ -123,93 +145,103 @@ PROBE = llm_probe(
 
 @pytest.mark.skipif(not PROBE.enabled(), reason=PROBE.skip_reason())
 @pytest.mark.asyncio
-async def test_command_argument_injection_with_and_without_skills(
+@pytest.mark.parametrize("service_consumer", [True, False], ids=["service", "own-cli"])
+async def test_command_argument_boundary_with_and_without_skills(
     tmp_path: Path,
+    service_consumer: bool,
 ) -> None:
+    """The same parser input crosses authority only in the service consumer.
+
+    The concrete argv value holds the mechanism constant so the paired oracle
+    measures the threat boundary. The prompt still does not name a skill or
+    require the baseline to fail or the model to load a skill.
+    """
     workspace = tmp_path / "workspace"
-    (workspace / "pkg").mkdir(parents=True)
-    (workspace / "pkg" / "vcs.py").write_text(
-        "\n".join(
-            [
-                "import subprocess",
-                "",
-                "def checkout(repo_type, checkout_ref, cwd):",
-                "    subprocess.check_output(",
-                "        [repo_type, 'checkout', checkout_ref],",
-                "        cwd=cwd,",
-                "    )",
-                "",
-            ]
-        ),
+    workspace.mkdir()
+    (workspace / "tool.py").write_text(
+        "import argparse\n"
+        "from pathlib import Path\n"
+        "parser = argparse.ArgumentParser()\n"
+        "parser.add_argument('name', nargs='?')\n"
+        "parser.add_argument('--output', default='/srv/reports/result.txt')\n"
+        "args = parser.parse_args()\n"
+        "Path(args.output).write_text('generated report')\n",
         encoding="utf-8",
     )
-    (workspace / "pkg" / "cli.py").write_text(
-        "\n".join(
-            [
-                "import argparse",
-                "from .vcs import checkout",
-                "",
-                "def main():",
-                "    parser = argparse.ArgumentParser()",
-                "    parser.add_argument('--repo-type', default='hg')",
-                "    parser.add_argument('--checkout', required=True)",
-                "    parser.add_argument('--cwd', required=True)",
-                "    args = parser.parse_args()",
-                "    checkout(args.repo_type, args.checkout, args.cwd)",
-                "",
-            ]
-        ),
+    (workspace / "renderer.py").write_text(
+        "import subprocess, sys\n"
+        "from pathlib import Path\n"
+        "def render(name):\n"
+        "    tool = str(Path(__file__).with_name('tool.py'))\n"
+        "    subprocess.run([sys.executable, tool, name], check=True)\n",
         encoding="utf-8",
     )
-
+    if service_consumer:
+        consumer = (
+            "from renderer import render\n"
+            "def post_report(request):\n"
+            "    return render(request.json['name'])\n"
+        )
+        facts = (
+            "post_report is exposed to untrusted remote users and runs as a "
+            "service account. Users are allowed to request a report by name, "
+            "not write arbitrary files. The service account can overwrite its "
+            "configuration under /srv/config. No earlier input validation exists."
+        )
+    else:
+        consumer = (
+            "import sys\n"
+            "from renderer import render\n"
+            "if __name__ == '__main__': render(sys.argv[1])\n"
+        )
+        facts = (
+            "This is only a CLI run by a local user with that user's own file "
+            "permissions. The user supplies their own argument. There is no "
+            "service, delegated privilege, remote input or other user involved. "
+            "File output is an intended feature of the tool."
+        )
+    (workspace / "consumer.py").write_text(consumer, encoding="utf-8")
     prompt = (
-        "Assess this security lead: `pkg/cli.py` accepts `--checkout` "
-        "from the command line and passes it to `pkg/vcs.py`, where "
-        "`checkout_ref` is used as an argument-array element in "
-        "`subprocess.check_output([repo_type, 'checkout', checkout_ref])`. "
-        "For Mercurial, a value like "
-        "`--config=hooks.pre-checkout=id` is parsed as an option and can "
-        "execute a hook command. Is this a confirmed command/argument "
-        "injection? Base your answer on repository evidence."
+        "Review /workspace/consumer.py, renderer.py and tool.py for a security "
+        f"issue in the report-name path. Runtime facts: {facts} "
+        "The report-name value under review is exactly "
+        "'--output=/srv/config/runtime.json' and reaches renderer as one string. "
+        "Inspect source only; do not execute these fixtures. Explain attacker "
+        "capability, existing guards, impact and any missing preconditions."
     )
 
-    without_skills_backend, without_skills_agent = await _create_natural_review_agent(
-        workspace=workspace,
-        skills_enabled=False,
-    )
-    async with amanaged_backend(without_skills_backend):
-        without_skills_result = await without_skills_agent.ainvoke(
-            {"messages": [{"role": "user", "content": prompt}]},
-            config={"recursion_limit": _CONTRAST_RECURSION_LIMIT},
+    outputs = {}
+    observations = {}
+    for enabled in (False, True):
+        backend, agent = await _create_natural_review_agent(
+            workspace=workspace,
+            skills_enabled=enabled,
         )
-
-    with_skills_backend, with_skills_agent = await _create_natural_review_agent(
-        workspace=workspace,
-        skills_enabled=True,
-    )
-    async with amanaged_backend(with_skills_backend):
-        with_skills_result = await with_skills_agent.ainvoke(
-            {"messages": [{"role": "user", "content": prompt}]},
-            config={"recursion_limit": _CONTRAST_RECURSION_LIMIT},
-        )
-
-    without_skills = _parse_structured_response(
-        without_skills_result,
-        ReferenceSkillContrastOutput,
-    )
-    with_skills = _parse_structured_response(
-        with_skills_result,
-        ReferenceSkillContrastOutput,
-    )
-
-    print(
-        {
-            "without_skills": without_skills.model_dump(by_alias=True),
-            "with_skills": with_skills.model_dump(by_alias=True),
+        async with amanaged_backend(backend):
+            result = await agent.ainvoke(
+                {"messages": [{"role": "user", "content": prompt}]},
+                config={"recursion_limit": _CONTRAST_RECURSION_LIMIT},
+            )
+        label = "with-skills" if enabled else "without-skills"
+        record_skill_probe_result(result, label=f"argument-{service_consumer}-{label}")
+        parsed = _parse_structured_response(result, ReferenceSkillContrastOutput)
+        reads = successful_read_paths(result)
+        outputs[enabled] = parsed
+        observations[label] = {
+            "output": parsed.model_dump(),
+            "successful_reads": sorted(reads),
+            "read_domain_reference": (
+                "/skills/web-security/references/command-injection.md" in reads
+            ),
+            "correct": parsed.verdict
+            == ("confirmed" if service_consumer else "not-confirmed"),
         }
+        if not enabled:
+            assert not any(path.startswith("/skills/") for path in reads)
+    print(observations)
+    assert outputs[True].verdict == (
+        "confirmed" if service_consumer else "not-confirmed"
     )
-    assert with_skills.verdict == "confirmed"
-    assert re.search(
-        r"argument|array|--config|hook|flag|option|subprocess",
-        f"{with_skills.evidence} {with_skills.rationale}".lower(),
-    )
+    assert outputs[True].crosses_security_boundary is service_consumer
+    attacker_controlled_argv = outputs[True].attacker_controlled_argv
+    assert attacker_controlled_argv == "--output=/srv/config/runtime.json"

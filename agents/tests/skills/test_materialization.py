@@ -110,50 +110,20 @@ def test_materialize_agent_skills_view_includes_reference_skills(
     assert not (skills_root / "skill_source_notes").exists()
 
 
-def test_materialized_reference_skills_do_not_expose_source_notes(
-    tmp_path: Path,
-) -> None:
-    with patch(
-        "sec_review_agents.runtime.skills.tempfile.mkdtemp",
-        side_effect=[
-            str(tmp_path / "skills-base-root"),
-            str(tmp_path / "skills-build-1"),
-        ],
-    ):
-        skills_root = materialize_agent_skills_view(("web-security", "ci-security"))
-
-    for reference_path in (skills_root / "web-security" / "references").glob("*.md"):
-        reference_text = reference_path.read_text(encoding="utf-8")
-        assert "Sources to Audit Before Adoption" not in reference_text
-        assert "Sources to audit before adoption" not in reference_text
-        assert "https://" not in reference_text
-
-    github_actions_text = (
-        skills_root / "ci-security" / "references" / "github-actions.md"
-    ).read_text(encoding="utf-8")
-    assert "Sources to Audit Before Adoption" not in github_actions_text
-    assert "Sources to audit before adoption" not in github_actions_text
-    assert "https://" not in github_actions_text
-
-    gitlab_ci_text = (
-        skills_root / "ci-security" / "references" / "gitlab-ci.md"
-    ).read_text(encoding="utf-8")
-    assert "Sources to Audit Before Adoption" not in gitlab_ci_text
-    assert "Sources to audit before adoption" not in gitlab_ci_text
-    assert "https://" not in gitlab_ci_text
-
-    with patch(
-        "sec_review_agents.runtime.skills.tempfile.mkdtemp",
-        side_effect=[
-            str(tmp_path / "skills-base-root-2"),
-            str(tmp_path / "skills-build-2"),
-        ],
-    ):
-        skills_root = materialize_agent_skills_view(("scanner-finding-triage",))
-    for reference_path in (skills_root / "scanner-finding-triage" / "references").glob(
-        "*.md"
-    ):
-        reference_text = reference_path.read_text(encoding="utf-8")
-        assert "Sources to Audit Before Adoption" not in reference_text
-        assert "Sources to audit before adoption" not in reference_text
-        assert "https://" not in reference_text
+def test_materialized_view_contains_only_declared_skill_resources() -> None:
+    """Source notes remain outside the view, regardless of their wording or URLs."""
+    declared = ("cwe", "web-security", "ci-security", "scanner-finding-triage")
+    skills_root = materialize_agent_skills_view(declared)
+    assert {path.name for path in skills_root.iterdir()} == set(declared)
+    expected = {}
+    for name in declared:
+        source = runtime_skills.AGENT_SKILLS / name
+        expected[f"{name}/SKILL.md"] = (source / "SKILL.md").read_bytes()
+        for reference in (source / "references").iterdir():
+            expected[f"{name}/references/{reference.name}"] = reference.read_bytes()
+    actual = {
+        str(path.relative_to(skills_root)): path.read_bytes()
+        for path in skills_root.rglob("*")
+        if path.is_file()
+    }
+    assert actual == expected
