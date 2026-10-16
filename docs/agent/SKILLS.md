@@ -60,9 +60,28 @@ deepagents only reads the source paths it is given. It does not choose or filter
 
 Some external skills or commands cover capabilities this project already implements as workflows. Anthropic's [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) describes "perform security review", and OrchestKit's [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) describes "review a PR". Here, those capabilities are built into the public workflows and their review stages rather than one standalone skill.
 
-Bundled skills stay one layer below the project goal. They provide CWE taxonomy navigation, finding triage, and narrow domain references for web, CI, memory/numeric, cryptography, concurrency/resource, OS boundaries, parser/protocol, software supply-chain, and authorization/delegation security. Domain ownership follows the mechanism: process invocation and filesystem authority belong to OS boundaries; object construction belongs to parser security; web and CI each own only the sensitive-data sinks on their surfaces; dependency selection and install/build execution belong to supply-chain security; non-browser service identity, delegated authority and confused deputies belong to authorization/delegation security. These skills provide reusable security knowledge and judgment aids without redefining the workflow.
+Bundled skills stay one layer below the project goal. They supplement the review workflow with reusable security knowledge; they do not redefine the workflow itself.
 
-Admit stable decision rules even when they apply only to a particular ecosystem, because references are read selectively. Exclude volatile version/default matrices, vulnerability catalogs and recommendation lists unless a repository's declared platform version makes them necessary. Stability alone is not sufficient: a reference must still change a security decision beyond ordinary source-to-sink and authority reasoning.
+The bundled knowledge layer contains:
+
+- CWE taxonomy navigation and scanner-finding triage;
+- narrow domain references for web, CI, memory/numeric, cryptography, concurrency/resource, OS boundaries, parser/protocol, software supply-chain, and authorization/delegation security.
+
+Domain ownership follows the mechanism under review. In particular:
+
+- process invocation and filesystem authority belong to OS-boundary security;
+- object construction belongs to parser/protocol security;
+- web and CI own sensitive-data exposure only on their respective surfaces;
+- dependency selection and install/build execution belong to supply-chain security;
+- non-browser service identity, delegated authority, and confused deputies belong to authorization/delegation security.
+
+A reference is eligible when all of the following hold:
+
+- its decision rules are stable enough to maintain;
+- selective reading keeps ecosystem-specific material out of unrelated reviews;
+- it changes a security judgment beyond ordinary source-to-sink, reachability, and authority reasoning.
+
+Do not freeze volatile version/default matrices, vulnerability catalogs, or recommendation lists into bundled references. When a repository's declared platform version makes such information necessary, verify it from current primary documentation for that review.
 
 ### Developer Source Notes
 

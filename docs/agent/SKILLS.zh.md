@@ -62,9 +62,28 @@ deepagents 只读取调用方交给它的 source path，不负责替某个 workf
 
 有些外部 skill 或 command 覆盖的能力，在本项目里已经由公开 workflow 和对应 review stage 实现。例如 Anthropic 的 [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) 描述的是“做安全审查”，OrchestKit 的 [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) 描述的是“审查 PR”。在这里，它们不是一个单独 skill。
 
-因此，本项目内置 skills 选择比项目目标低一层的材料：CWE 分类导航、finding triage，以及 Web、CI、memory/numeric、cryptography、concurrency/resource、OS boundary、parser/protocol、software supply chain 和 authorization/delegation 的窄领域参考。领域归属按机制划分：进程调用和文件系统 authority 归 OS boundary，对象构建归 parser，Web 与 CI 只负责各自 surface 上的敏感数据 sink，dependency selection 与 install/build execution 归 supply-chain security，非浏览器服务身份、委托 authority 和 confused deputy 归 authorization/delegation security。它们补充 agent 的安全知识和判断材料，不改变既有流程。
+内置 skills 位于项目目标的下一层。它们为 review workflow 补充可复用的安全知识，但不重新定义 workflow。
 
-即使某条判断规则只适用于特定生态，只要它稳定且 reference 会被选择性读取，就可以纳入。除非仓库声明的平台版本确实需要，否则排除容易变化的版本/default 矩阵、漏洞目录和推荐清单。稳定本身仍不够：reference 必须能在普通 source-to-sink 和 authority 推理之外改变安全判断。
+当前知识层包括：
+
+- CWE 分类导航和 scanner finding triage；
+- Web、CI、memory/numeric、cryptography、concurrency/resource、OS boundary、parser/protocol、software supply chain 和 authorization/delegation 的窄领域 reference。
+
+领域归属按正在审查的机制划分。几个容易混淆的边界是：
+
+- 进程调用和文件系统 authority 归 OS boundary；
+- 对象构建归 parser/protocol；
+- Web 与 CI 只负责各自 surface 上的敏感数据暴露；
+- dependency selection 与 install/build execution 归 supply-chain security；
+- 非浏览器服务身份、委托 authority 和 confused deputy 归 authorization/delegation security。
+
+一份 reference 只有同时满足以下条件才应纳入：
+
+- 判断规则足够稳定，可以长期维护；
+- 通过选择性读取，不会把特定生态的材料带入无关 review；
+- 能在普通 source-to-sink、reachability 和 authority 推理之外改变安全判断。
+
+不要把容易变化的版本/default 矩阵、漏洞目录或推荐清单固化进内置 reference。某个仓库声明的平台版本确实需要这些信息时，应在该次 review 中查询当前的一手资料。
 
 ### Developer Source Notes
 
