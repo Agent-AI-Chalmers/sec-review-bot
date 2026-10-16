@@ -1,0 +1,81 @@
+import pytest
+
+from tests.integration.llm.probe_helpers import llm_probe
+from tests.integration.llm.skill_cases.loader import cases_for_mode, load_skill_cases
+from tests.integration.llm.skill_cases.runner import (
+    assert_case_oracle,
+    assert_forced_read,
+    run_skill_case,
+)
+
+CASES = load_skill_cases()
+PROBE = llm_probe(
+    run_env="RUN_LLM_SKILL_CASES",
+    description="data-driven bundled skill cases",
+)
+
+pytestmark = [PROBE.skip_unless(), pytest.mark.asyncio]
+
+
+@pytest.mark.parametrize(
+    "case",
+    cases_for_mode(CASES, "forced-read"),
+    ids=lambda case: case.id,
+)
+async def test_forced_read_skill_cases(tmp_path, case) -> None:
+    run = await run_skill_case(
+        case,
+        mode="forced-read",
+        skills_enabled=True,
+        temp_root=tmp_path,
+    )
+    assert_forced_read(case, run)
+    assert_case_oracle(case, run)
+
+
+@pytest.mark.parametrize(
+    "case",
+    cases_for_mode(CASES, "natural"),
+    ids=lambda case: case.id,
+)
+async def test_natural_skill_cases(tmp_path, case) -> None:
+    run = await run_skill_case(
+        case,
+        mode="natural",
+        skills_enabled=True,
+        temp_root=tmp_path,
+    )
+    assert_case_oracle(case, run)
+
+
+@pytest.mark.parametrize(
+    "case",
+    cases_for_mode(CASES, "contrast"),
+    ids=lambda case: case.id,
+)
+async def test_skill_case_contrast(tmp_path, case) -> None:
+    without_skills = await run_skill_case(
+        case,
+        mode="contrast",
+        skills_enabled=False,
+        temp_root=tmp_path / "without-skills",
+    )
+    with_skills = await run_skill_case(
+        case,
+        mode="contrast",
+        skills_enabled=True,
+        temp_root=tmp_path / "with-skills",
+    )
+
+    assert not any(
+        path.startswith("/skills/") for path in without_skills.successful_reads
+    )
+    assert_case_oracle(case, with_skills)
+    print(
+        {
+            "case": case.id,
+            "without_skills": without_skills.output.model_dump(),
+            "with_skills": with_skills.output.model_dump(),
+            "with_skills_reads": sorted(with_skills.successful_reads),
+        }
+    )

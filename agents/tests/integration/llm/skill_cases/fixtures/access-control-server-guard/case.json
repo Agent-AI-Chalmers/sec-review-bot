@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "access-control-server-guard",
+  "skill": "web-security",
+  "reference": "access-control.md",
+  "modes": ["forced-read"],
+  "task": "Assess the claim that a client-side admin visibility check is the only authorization control for the role-update operation.",
+  "facts": [
+    "Inspect both the client component and the server handler.",
+    "The shown server handler is the endpoint called by the client."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "client|server|authori[sz]ation|trusted boundary|403"
+  }
+}

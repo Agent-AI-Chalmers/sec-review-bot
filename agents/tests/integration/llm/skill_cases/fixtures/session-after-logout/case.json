@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "session-after-logout",
+  "skill": "web-security",
+  "reference": "auth-session.md",
+  "modes": ["forced-read"],
+  "task": "Assess continued authenticated access with a copied session token after the victim logs out.",
+  "facts": [
+    "These are the deployed logout and authenticated-account handlers.",
+    "A server-side session remains valid until it is invalidated; there is no separate expiry or revocation layer.",
+    "Product policy promises that logout revokes the session.",
+    "An attacker has copied the victim's old session token."
+  ],
+  "expected": {
+    "verdict": "confirmed"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "account-lockout",
+  "skill": "web-security",
+  "reference": "auth-session.md",
+  "modes": ["forced-read"],
+  "task": "Assess an unauthenticated attacker deliberately locking a known victim account.",
+  "facts": [
+    "The public login endpoint accepts any account name.",
+    "One incorrect password permanently locks the named existing account.",
+    "There is no rate gate, automatic expiry, alternate login, or self-service recovery.",
+    "Only operator intervention restores access and password verification itself is correct."
+  ],
+  "expected": {
+    "verdict": "confirmed"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "xss-dangerous-html",
+  "skill": "web-security",
+  "reference": "xss.md",
+  "modes": ["forced-read"],
+  "task": "Assess whether the query parameter rendered through dangerouslySetInnerHTML is a confirmed XSS.",
+  "facts": [
+    "The body query parameter is attacker-controlled.",
+    "There is no earlier validation or HTML sanitization."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "query|dangerouslysetinnerhtml|raw html|sink|saniti[sz]"
+  }
+}

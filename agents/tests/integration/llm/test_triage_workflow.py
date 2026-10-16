@@ -1,4 +1,4 @@
-# Real-LLM repository triage agent smoke test with progressive-disclosure skills exposed.
+# Real-LLM repository triage workflow smoke test.
 #
 # The candidate payloads are adapted from historical `.agent-workspace` triage
 # runs, then made intentionally scanner-shaped: dependency presence without
@@ -25,15 +25,15 @@ from tests.integration.llm.transcript_artifact_helpers import (
 )
 
 PROBE = llm_probe(
-    run_env="RUN_LLM_TRIAGE_SKILL_INTEGRATION",
-    description="real LLM triage skill smoke test",
+    run_env="RUN_LLM_TRIAGE_WORKFLOW_INTEGRATION",
+    description="real LLM triage workflow smoke test",
     requires_deployment=False,
 )
 
 
 @pytest.mark.skipif(not PROBE.enabled(), reason=PROBE.skip_reason())
 @pytest.mark.asyncio
-async def test_triage_reads_scanner_finding_skill_for_reachability_noise() -> None:
+async def test_triage_workflow_handles_scanner_noise_and_uses_guidance() -> None:
     triage_root = _artifact_root()
 
     with patch(
@@ -89,7 +89,9 @@ async def test_triage_reads_scanner_finding_skill_for_reachability_noise() -> No
 
 def _artifact_root() -> Path:
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    return Path(".agent-artifacts") / "triage-skill-llm" / f"{run_id}-{uuid4().hex[:8]}"
+    return (
+        Path(".agent-artifacts") / "triage-workflow-llm" / f"{run_id}-{uuid4().hex[:8]}"
+    )
 
 
 def _scanner_style_candidates() -> list[dict]:

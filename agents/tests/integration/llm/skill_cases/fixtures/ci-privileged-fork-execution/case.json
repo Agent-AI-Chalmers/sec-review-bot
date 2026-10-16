@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "ci-privileged-fork-execution",
+  "skill": "ci-security",
+  "reference": "github-actions.md",
+  "modes": ["forced-read"],
+  "task": "Assess whether this pull_request_target workflow exposes privileged execution to fork-controlled code.",
+  "facts": [
+    "Fork authors control the checked-out pull request head.",
+    "The workflow runs install and preview scripts from that checkout.",
+    "The job has contents write permission and supplies DEPLOY_TOKEN."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "pull_request_target|head\\.sha|fork|secret|untrusted|execute"
+  }
+}

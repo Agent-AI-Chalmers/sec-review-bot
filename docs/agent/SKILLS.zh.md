@@ -84,4 +84,4 @@ sec_review_agents/resources/skill_source_notes/
 4. 如果 skill 受外部来源、示例或来源筛选决策影响，把这些内容记录到 `sec_review_agents/resources/skill_source_notes/`。不要通过 `/skills` 暴露 source notes。
 5. 在目标 agent 或 stage-local 的 `skills.py` 里声明 skill。不要为了让 skill 可见，就把 skill name 写进文档、backend helper 或 runtime 准备代码。
 6. 确保目标 backend 消费该声明，先准备 allowlisted view，再挂载到 `/skills`，并为该 agent session 启用 skills middleware。
-7. 为 skill 准备和 backend exposure 增加聚焦测试。如果改动依赖模型行为，用 gated LLM integration 或 contrast test 验证，并保留输出以确认模型是否发现并读取了 skill。
+7. 为 skill 准备和 backend exposure 增加聚焦测试。模型行为案例放在 [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md) 下的 JSON 中，并只选择有实际用途的 `forced-read`、`natural` 或 `contrast` modes。保留输出以确认模型是否发现并读取了 skill；contrast 会记录 baseline，但不要求 baseline 必须失败。

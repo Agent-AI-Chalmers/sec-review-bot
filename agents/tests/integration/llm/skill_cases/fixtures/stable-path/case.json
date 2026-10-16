@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "stable-path",
+  "skill": "web-security",
+  "reference": "path-traversal.md",
+  "modes": ["forced-read"],
+  "task": "Assess the claim that the separate resolve, containment check, and read always permit a symlink race.",
+  "facts": [
+    "Requesters control relative.",
+    "The root and every directory, link, and file under it are immutable to requesters and all other untrusted actors during a request.",
+    "All files under the root are intentionally public exports."
+  ],
+  "expected": {
+    "verdict": "not-confirmed"
+  }
+}

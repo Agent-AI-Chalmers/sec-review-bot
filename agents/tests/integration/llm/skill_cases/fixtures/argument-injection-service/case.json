@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "argument-injection-service",
+  "skill": "web-security",
+  "reference": "command-injection.md",
+  "modes": ["forced-read", "natural", "contrast"],
+  "task": "Assess whether the report-name value controls the child parser and creates a security vulnerability.",
+  "facts": [
+    "post_report is exposed to untrusted remote users and runs as a service account.",
+    "Users may request a report by name, but may not choose an output file.",
+    "The service account can overwrite its configuration under /srv/config.",
+    "There is no earlier input validation.",
+    "The report-name value is exactly --output=/srv/config/runtime.json and reaches renderer as one string."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "crosses_security_boundary": true,
+    "attacker_controlled_argument": "--output=/srv/config/runtime.json"
+  }
+}

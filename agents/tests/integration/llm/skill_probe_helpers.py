@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -36,7 +37,12 @@ def successful_read_paths(result: dict[str, Any]) -> set[str]:
     return successful
 
 
-def record_skill_probe_result(result: dict[str, Any], *, label: str) -> None:
+def record_skill_probe_result(
+    result: dict[str, Any],
+    *,
+    label: str,
+    metadata: Mapping[str, Any] | None = None,
+) -> None:
     artifact = Path(".agent-artifacts") / "skill-probes" / f"{label}-{uuid4().hex}.json"
     artifact.parent.mkdir(parents=True, exist_ok=True)
     reads = successful_read_paths(result)
@@ -55,6 +61,7 @@ def record_skill_probe_result(result: dict[str, Any], *, label: str) -> None:
                 "structured_response": json_safe(result.get("structured_response")),
                 "successful_read_paths": sorted(reads),
                 "resource_hashes": hashes,
+                "metadata": json_safe(metadata or {}),
             },
             ensure_ascii=False,
             indent=2,

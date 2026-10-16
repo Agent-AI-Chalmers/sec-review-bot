@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "path-traversal-uncontained-read",
+  "skill": "web-security",
+  "reference": "path-traversal.md",
+  "modes": ["forced-read"],
+  "task": "Assess whether the download handler contains an attacker-controlled path before reading it.",
+  "facts": [
+    "req.query.file is attacker-controlled.",
+    "There is no earlier path validation or containment guard."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "req\\.query|readfile|contain|resolve|traversal"
+  }
+}

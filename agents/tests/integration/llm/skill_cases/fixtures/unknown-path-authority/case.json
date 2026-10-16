@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "unknown-path-authority",
+  "skill": "web-security",
+  "reference": "path-traversal.md",
+  "modes": ["forced-read"],
+  "task": "Assess the claim that a tenant can replace a directory between the containment check and read without inventing missing permissions.",
+  "facts": [
+    "The request controls relative and root is configured server-side.",
+    "Directory permissions, possible concurrent writers, and export-tree contents are not provided."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true
+  }
+}

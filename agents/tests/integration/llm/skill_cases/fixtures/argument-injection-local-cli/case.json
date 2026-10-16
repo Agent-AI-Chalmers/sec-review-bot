@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "argument-injection-local-cli",
+  "skill": "web-security",
+  "reference": "command-injection.md",
+  "modes": ["forced-read", "contrast"],
+  "task": "Assess whether the report-name value controls the child parser and whether that behavior is a security vulnerability.",
+  "facts": [
+    "This is a CLI run only by a local user with that user's own file permissions.",
+    "The user supplies their own argument and file output is an intended feature.",
+    "There is no service, delegated privilege, remote input, or other user.",
+    "The report-name value is exactly --output=/srv/config/runtime.json and reaches renderer as one string."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "crosses_security_boundary": false,
+    "attacker_controlled_argument": "--output=/srv/config/runtime.json"
+  }
+}

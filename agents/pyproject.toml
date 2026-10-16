@@ -83,8 +83,12 @@ target-version = ["py314"]
 # Keep Black and Ruff on the same width (see [tool.ruff] above).
 line-length = 88
 
+[tool.mypy]
+exclude = "^tests/integration/llm/skill_cases/fixtures/"
+
 [tool.pyright]
 pythonVersion = "3.14"
+exclude = ["tests/integration/llm/skill_cases/fixtures"]
 reportUnusedFunction = "error"
 reportUnusedClass = "error"
 

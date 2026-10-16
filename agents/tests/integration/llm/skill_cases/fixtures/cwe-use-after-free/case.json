@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "cwe-use-after-free",
+  "skill": "cwe",
+  "reference": "cwe-699-agent-navigation.md",
+  "modes": ["forced-read"],
+  "task": "Assign the best root-cause CWE to the supported security finding. The local navigation index is not a closed label set.",
+  "facts": [
+    "An attacker-controlled callback frees a heap object.",
+    "The parser then dereferences that same object, causing an exploitable use-after-free.",
+    "The ownership and attacker path are established."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "cwe_id": "CWE-416"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "ssrf-unvalidated-fetch",
+  "skill": "web-security",
+  "reference": "ssrf.md",
+  "modes": ["forced-read"],
+  "task": "Assess whether fetching the attacker-controlled URL is a confirmed SSRF.",
+  "facts": [
+    "request.args['url'] is attacker-controlled.",
+    "There is no scheme or host allowlist and no private-network guard.",
+    "The service returns part of the fetched response body."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "request\\.args|requests\\.get|server-side|fetch|host|private|ssrf"
+  }
+}
