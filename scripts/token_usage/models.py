@@ -1,5 +1,7 @@
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from .openrouter_pricing import ModelPrice
 
 STAGE_NAMES = ("analyzer", "mitigator", "verifier", "single-agent")
 
@@ -131,20 +133,18 @@ class EffectivePatchUsage:
 
 @dataclass(frozen=True)
 class PricingSelection:
-    mode: str
-    profile: str | None
-    input_rate: float | None
-    cache_rate: float | None
-    output_rate: float | None
-    currency: str | None
+    """The prices a report was priced against, for self-contained provenance.
 
+    ``fetched_at`` is the UTC instant the live OpenRouter snapshot was
+    retrieved. ``used_prices`` maps each model id the report actually looked up
+    (whether or not it was found) to the price that was used, so the numbers can
+    be explained from the report alone, with no external state. ``fetched_at``
+    is ``None`` when no price source was available; every stage is then reported
+    as unknown cost rather than guessed.
+    """
 
-@dataclass(frozen=True)
-class PricingConfig:
-    price_profile: str | None = None
-    input_rate: float | None = None
-    cache_rate: float | None = None
-    output_rate: float | None = None
+    fetched_at: str | None = None
+    used_prices: dict[str, ModelPrice | None] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
