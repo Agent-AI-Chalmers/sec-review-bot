@@ -194,7 +194,7 @@ Two cases were scored as `0.0 / none`: the vote race condition and logout redire
 
 ## Token and Cost Summary
 
-Cost is estimated with the built-in `mimo-v2.5-pro` USD price profile. The official overseas model price for inputs up to 256K tokens is $1.00 per 1M uncached input tokens, $0.20 per 1M cached input tokens, and $3.00 per 1M output tokens. The 256K-1M tier is $2.00, $0.40, and $6.00 per 1M tokens respectively; this run falls into the <=256K tier by average input size per agent call.
+Cost is estimated at $1.00 per 1M uncached input tokens, $0.20 per 1M cached input tokens, and $3.00 per 1M output tokens. These are the official overseas `mimo-v2.5-pro` prices for inputs up to 256K tokens; the 256K-1M tier is $2.00, $0.40, and $6.00 per 1M tokens respectively, and this run falls into the <=256K tier by average input size per agent call.
 
 ```bash
 python -m scripts.token_usage.summarize .agent-workspace/raddit-repo-scan-mimo-v2.5-pro/local-run-20260501T134557Z-bbb2ee06

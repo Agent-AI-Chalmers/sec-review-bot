@@ -161,7 +161,7 @@ The severity distribution is directionally plausible: direct exploit paths such 
 
 ## Token and Cost Summary
 
-Cost is estimated with the built-in `doubao-seed-2.0-lite` USD price profile.
+Cost is estimated at $0.09 per 1M uncached input tokens, $0.018 per 1M cached input tokens, and $0.53 per 1M output tokens.
 
 ```bash
 python -m scripts.token_usage.summarize .agent-workspace/bookshop-repo-scan-Doubao-Seed-2.0-lite/local-run-20260505T185514Z-252339bb

@@ -176,7 +176,7 @@ Average base score was 7.84, and the maximum base score was 9.9.
 
 ## Token and Cost Summary
 
-Cost is estimated with the built-in `minimax-m2.7` USD price profile.
+Cost is estimated at $0.30 per 1M uncached input tokens, $0.06 per 1M cached input tokens, and $1.20 per 1M output tokens.
 
 ```bash
 python -m scripts.token_usage.summarize .agent-workspace/worldpress-repo-scan-minimax27/local-run-20260506T121631Z-5e446d7c

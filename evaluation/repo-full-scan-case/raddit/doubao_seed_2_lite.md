@@ -202,7 +202,7 @@ Average base score was 6.99, and the maximum base score was 9.3. The severe case
 
 ## Token and Cost Summary
 
-Cost is estimated with the built-in Doubao Seed 2.0 Lite USD price profile. The official [Seed2.0 model card](https://lf3-static.bytednsdoc.com/obj/eden-cn/lapzild-tss/ljhwZthlaukjlkulzlp/seed2/0214/Seed2.0%20Model%20Card.pdf) reports representative USD prices for interval-priced Seed2.0 models; cache-hit input is priced at 20% of normal input following the [Volcengine cache-hit pricing rule](https://www.volcengine.com/docs/84458/1585097). This run reported cache-read tokens, and the total observed cache ratio was 46.15%.
+Cost is estimated at $0.09 per 1M uncached input tokens, $0.018 per 1M cached input tokens, and $0.53 per 1M output tokens. These are the representative USD prices for interval-priced Seed2.0 models from the official [Seed2.0 model card](https://lf3-static.bytednsdoc.com/obj/eden-cn/lapzild-tss/ljhwZthlaukjlkulzlp/seed2/0214/Seed2.0%20Model%20Card.pdf); cache-hit input is priced at 20% of normal input following the [Volcengine cache-hit pricing rule](https://www.volcengine.com/docs/84458/1585097). This run reported cache-read tokens, and the total observed cache ratio was 46.15%.
 
 ```bash
 python -m scripts.token_usage.summarize .agent-workspace/raddit-repo-scan-Doubao-Seed-2.0-lite/local-run-20260502T151836Z-1d44b29a

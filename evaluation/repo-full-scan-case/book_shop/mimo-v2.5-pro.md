@@ -175,7 +175,7 @@ Scoring quality is directionally reasonable. Critical findings include SQL injec
 
 ## Token and Cost Summary
 
-Cost is estimated with the built-in `mimo-v2.5-pro` USD price profile.
+Cost is estimated at $1.00 per 1M uncached input tokens, $0.20 per 1M cached input tokens, and $3.00 per 1M output tokens.
 
 ```bash
 python -m scripts.token_usage.summarize .agent-workspace/bookshop-repo-scan-mimo-v2.5-pro/local-run-20260502T175619Z-d577f5d9
