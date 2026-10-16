@@ -11,3 +11,7 @@ Reviewed 2026-10-16. The skill covers interpretation boundaries and selected par
 | PARSE-5: context substitution; `representation-boundaries.md` | [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html), §§2.7-2.8 and 3.8-3.12 | Integrity does not establish audience or token type. This is not a universal replay/state checklist. |
 
 Format names, malformed input and parser API presence are leads. Confirmation requires attacker input, enabled interpretation/capability, an ineffective guard and concrete effect.
+
+## Coverage and deferred work
+
+Current coverage: validation/consumption representation gaps, HTTP/1.1 framing, XML external resources/entity expansion and token-context substitution. Deferred: HTTP/2 and HTTP/3 downgrade specifics, gRPC framing, archive-format catalogs, media/compiler parsers and general replay/state-machine rules. Each needs its own protocol or parser source before inclusion.

@@ -12,3 +12,7 @@ Reviewed 2026-10-16. Guidance is Linux/POSIX-oriented. No Windows token, ACL, ob
 | OS-6: restriction scope; `process-authority-inheritance.md` | [Linux no_new_privs](https://docs.kernel.org/userspace-api/no_new_privs.html), guarantees and limits | `no_new_privs` blocks specific exec-time gains; it is not a complete sandbox. |
 
 Project policy requires a concrete unauthorized operation, retained capability or identity-confusion path. Missing sandbox hardening alone remains non-confirmed.
+
+## Coverage and deferred work
+
+Current coverage: Linux pathname resolution, process credentials and exec inheritance, Unix-domain socket permissions and peer identity. Deferred: Windows security tokens and ACLs, namespaces, seccomp policy design, container escape catalogs, capabilities and mandatory-access-control policy packs. `no_new_privs` is included only to prevent treating it as a complete sandbox.

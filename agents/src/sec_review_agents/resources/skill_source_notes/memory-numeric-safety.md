@@ -11,3 +11,7 @@ Reviewed 2026-10-16. Language rules remain language-specific; examples from C an
 | MEM-5: unsafe validity; `unsafe-ffi.md` | [Rust undefined behavior](https://doc.rust-lang.org/reference/behavior-considered-undefined.html), dangling/misaligned pointers, invalid values, data races and foreign ABI | Unsafe operations require specific validity, alignment, lifetime and ABI preconditions. `unsafe`, raw pointers or FFI alone are not proof. |
 
 Project policy requires the violated semantic contract, actual consumer and concrete security consequence. Unknown types, ownership or ABI remain proof gaps.
+
+## Coverage and deferred work
+
+Current coverage: integer conversions and overflow semantics, allocation/access units, object lifetime, invalid frees, unsafe pointer validity and FFI contracts. Deferred: language-specific allocator internals, speculative-execution issues, hardware memory tagging and exhaustive per-language undefined behavior catalogs. Add these only with a concrete repository need and primary language/platform sources.

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "unsafe-ffi-validated-wrapper",
+  "skill": "memory-numeric-safety",
+  "reference": "unsafe-ffi.md",
+  "modes": ["prompted"],
+  "task": "Assess the claim that the unsafe FFI wrapper necessarily violates pointer validity.",
+  "facts": [
+    "The safe wrapper copies input into aligned owned storage of the exact C structure size.",
+    "It initializes every field, keeps the storage alive for the call, and the documented foreign function does not retain the pointer.",
+    "The target ABI and layout are asserted at build time."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "align|lifetime|layout|precondition|wrapper"
+  }
+}

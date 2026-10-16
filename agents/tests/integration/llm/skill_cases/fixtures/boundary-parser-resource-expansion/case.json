@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "boundary-parser-resource-expansion",
+  "skill": "parser-protocol-security",
+  "reference": "parser-capabilities.md",
+  "modes": ["natural"],
+  "task": "Assess the enabled parser capability and resulting finite-resource cost.",
+  "facts": [
+    "An unauthenticated endpoint parses attacker-controlled XML with internal entity expansion enabled.",
+    "A small document recursively expands to multiple gigabytes in memory before any application limit runs.",
+    "Requests can run concurrently and there is no admission limit or parser expansion bound."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "entity|expan|memory|resource|unbounded"
+  }
+}

@@ -11,3 +11,7 @@ Reviewed 2026-10-16. Temporal correctness and resource exhaustion remain separat
 | RES-2: cleanup accumulation; `resource-budgets.md` | [SEI CERT C Memory Management](https://cmu-sei.github.io/secure-coding-standards/sei-cert-c-coding-standard/rules/memory-management-mem/), MEM31-C; CWE-400 | Follow acquisition and reachable cleanup paths. Descriptor, task and cancellation semantics remain API-specific. |
 
 Unknown production capacity can remain a proof gap, but exact measurement is unnecessary when code establishes unbounded attacker-controlled retention and service impact.
+
+## Coverage and deferred work
+
+Current coverage: conflicting operations, temporal invariants, check/use invalidation, attacker-driven resource budgets and accumulating cleanup failures. Deferred: language-specific memory models, lock-order/deadlock catalogs, distributed consensus correctness and API-specific cancellation guarantees. A deadlock or retry loop belongs here only when it creates a concrete security effect.
