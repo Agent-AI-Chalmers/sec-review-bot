@@ -1,6 +1,6 @@
 # CI Security Skill Source Notes
 
-These sources support the `ci-security` bundled skill references. Primary sources should be preferred when changing agent-facing content. Third-party skill examples may be retained as inspiration, but they are not authoritative security sources.
+These sources support the `ci-security` references.
 
 ## github-actions
 
@@ -16,19 +16,16 @@ Claim ledger:
 
 - Claim: GitHub event context and expression values can be attacker controlled and can become script injection when interpolated into `run:` scripts.
   Primary source: GitHub Docs script injections.
-  Adoption note: Agent-facing guidance requires a concrete source-to-shell/script path, not keyword matching.
+  Limit: An untrusted context value is not a finding unless it reaches a script interpreter or another security-relevant consumer.
 - Claim: `pull_request_target` is privileged relative to untrusted fork code and is dangerous when it checks out or executes attacker-controlled PR content.
   Primary source: GitHub Docs event warning; GitHub Security Lab pwn request examples.
-  Adoption note: The reference also keeps the false-positive precedent that `pull_request_target` alone is not exploitable.
+  Limit: The event alone is insufficient; attacker-controlled content must reach a privileged operation.
 - Claim: `workflow_run` can access secrets/write token even when the triggering workflow was unprivileged.
   Primary source: GitHub Docs `workflow_run` warning.
-  Adoption note: The reference treats `workflow_run` as a privileged boundary only when untrusted code/artifacts get a privileged effect.
+  Limit: Require a path from untrusted code or artifacts to the privileged follow-up workflow.
 - Claim: Artifacts from untrusted PR workflows remain untrusted in privileged workflows, but inert data such as PR numbers or coverage text can be used safely.
   Primary source: GitHub Security Lab "Preventing pwn requests".
-  Adoption note: The reference must not require cryptographic binding as a standalone vulnerability condition.
-- Claim: Missing hardening items such as CodeQL, Dependabot, pinning, or minimal permissions are not findings without a reachable exploit path.
-  Primary source: Project evidence-discipline policy, with GitHub hardening docs as background.
-  Adoption note: This is a project-specific false-positive precedent, not a direct GitHub vulnerability rule.
+  Limit: Artifact use is not unsafe when the consumed data is inert and cannot alter a privileged operation.
 
 ## gitlab-ci
 
@@ -44,16 +41,16 @@ Claim ledger:
 
 - Claim: Ordinary fork merge request pipelines are created and run in the fork project and use the fork project's CI/CD configuration, resources, and variables.
   Primary source: GitLab merge request pipelines docs, "Use with forked projects".
-  Adoption note: Do not report parent-variable exposure from ordinary fork MR pipeline behavior alone.
+  Limit: Ordinary fork-project execution does not by itself expose parent-project variables.
 - Claim: Parent-project pipelines for fork merge requests run in the parent project, use the CI/CD configuration from the fork branch, and use parent project settings/resources/variables plus triggering member permissions.
   Primary source: GitLab merge request pipelines docs, "Run pipelines in the parent project".
-  Adoption note: This is the main GitLab fork-to-parent trust boundary to inspect.
+  Limit: Verify that the parent-project pipeline is actually created and which member triggers it.
 - Claim: Protected variables and protected runners have separate protected-resource access conditions; fork merge request pipelines cannot access protected resources.
   Primary source: GitLab merge request pipelines docs, "Control access to protected variables and runners"; GitLab CI/CD variables docs.
-  Adoption note: Keep general parent-project variables/resources distinct from protected variables/runners.
+  Limit: General parent-project resources and protected resources have different access conditions.
 - Claim: `CI_JOB_TOKEN`, trigger tokens, deploy credentials, artifacts, and caches matter when untrusted pipeline data can influence a privileged job.
   Primary source: GitLab CI job token docs and GitLab pipeline security docs.
-  Adoption note: Require attacker role, source-to-sink path, and concrete privileged effect.
+  Limit: Token or artifact presence alone does not establish attacker access or privileged consumption.
 
 ## secret-and-artifact-exposure
 
@@ -69,10 +66,10 @@ Claim ledger:
 
 - Claim: Log masking is limited to values the platform recognizes and does not protect files, transformed values, artifacts, caches, or deliberate exfiltration by code that can read a secret.
   Primary source: GitHub Actions secrets docs; GitLab CI/CD variables docs.
-  Adoption note: Masking limitations are investigation guidance, not proof that a job exposes a secret.
+  Limit: Masking limitations do not prove that a secret reaches an unauthorized sink.
 - Claim: Build artifacts have explicit readers and retention behavior that must be checked before calling an uploaded file public or unauthorized.
   Primary source: GitHub artifact docs; GitLab job artifacts docs.
-  Adoption note: Require a concrete artifact path and unauthorized reader.
+  Limit: Artifact upload alone does not establish unauthorized access.
 - Claim: Build arguments and environment variables can persist in image metadata or layers and are unsuitable for build secrets; secret mounts avoid persisting the secret as build input.
   Primary source: Docker Build secrets docs.
-  Adoption note: Verify the actual builder and published layers. A Dockerfile keyword alone is insufficient.
+  Limit: Verify the actual builder and published layers. A Dockerfile keyword alone is insufficient.
