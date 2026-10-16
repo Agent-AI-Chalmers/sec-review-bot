@@ -1,0 +1,40 @@
+{
+  "id": "sftpgo-rsync-command",
+  "tool": "joern",
+  "modes": [
+    "compare"
+  ],
+  "workflow": "analysis",
+  "checkout": {
+    "repository": "https://github.com/drakkan/sftpgo.git",
+    "commit": "4611d05d7fa1a7effa1d04e0d4eaec36ab4fb5a6"
+  },
+  "review_input": "Audit this SFTPGo checkout for the repository-grounded claim that an authenticated SSH user can abuse the optional rsync command to pass unsafe client-controlled arguments to the local rsync process and read or write files with the SFTPGo server process permissions. Independently identify the complete code path from SSH command payload parsing to operating-system process creation, the decisive missing validation, and the affected production file. If Joern is available, you must use its code property graph to obtain independent graph evidence for that path; if it is unavailable, establish the path from repository source. Do not rely on advisories, commit history, or a supplied vulnerable location.",
+  "analysis_overview": "The vulnerable checkout predates argument-format validation for the optional rsync SSH command.",
+  "oracles": {
+    "required_execute_interactions": [
+      {
+        "arguments_pattern": "joern",
+        "result_pattern": "processSSHCommand|getSystemCommand|exec.Command|rsync"
+      }
+    ],
+    "result_requirements": [
+      "processsshcommand|parsecommandpayload",
+      "getsystemcommand",
+      "exec\\.command",
+      "rsync",
+      "argument|args",
+      "internal/sftpd/ssh_cmd\\.go"
+    ],
+    "comparison_evidence_patterns": [
+      "processsshcommand",
+      "parsecommandpayload",
+      "getsystemcommand",
+      "exec\\.command",
+      "internal/sftpd/ssh_cmd\\.go",
+      "rsync",
+      "client.controlled|user.controlled|attacker.controlled",
+      "missing.{0,40}(validation|allowlist|saniti)|without.{0,40}(validation|allowlist|saniti)"
+    ]
+  }
+}

@@ -77,7 +77,7 @@ Heavy probes should be run deliberately. They may start Docker containers, run f
 | Analyzer Docker + CodeGraph | `RUN_LLM_ANALYZER_CODEGRAPH_DOCKER_INTEGRATION=1` | repository analyzer binding, `sec-review-bot-workspace:tools` image | Compares analyzer behavior with and without CodeGraph on a cross-file case. |
 | CodeGraph public checkout | `RUN_LLM_CODEGRAPH_REAL_CHECKOUT_INTEGRATION=1` | issue analyzer binding, `sec-review-bot-workspace:tools` image, network for clone | Runs a pinned public vulnerable checkout comparison. |
 | MCP cases | `RUN_LLM_MCP_CASES=1` | relevant product agent bindings, `sec-review-bot-workspace:tools` image | Runs data-driven MCP discovery and paired comparison cases through normal product workflows. Transport and state continuity are covered by separate no-model capability tests. |
-| External tool cases | `RUN_LLM_EXTERNAL_TOOL_CASES=1` | repository verifier binding, `sec-review-bot-workspace:tools` image | Runs Joern and Playwright CLI discovery cases with skills and MCP disabled. Installation and CLI behavior are covered by separate no-model capability tests. |
+| External tool cases | `RUN_LLM_EXTERNAL_TOOL_CASES=1` | product agent bindings, base and `sec-review-bot-workspace:tools` images | Runs Joern and Playwright CLI discovery cases plus pinned public-checkout comparisons with skills and MCP disabled. Comparison OFF arms use the base image so the CLI is genuinely unavailable. Installation and CLI behavior are covered by separate no-model capability tests. |
 
 Build the workspace tools image when a probe needs CodeGraph or Playwright:
 

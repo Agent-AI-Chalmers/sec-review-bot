@@ -5,6 +5,29 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
 ExternalToolName = Literal["joern", "playwright"]
+ExternalToolCaseMode = Literal["discovery", "compare"]
+ExternalToolCaseWorkflow = Literal["analysis", "verification"]
+
+
+class GitCheckoutSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    repository: str
+    commit: str
+
+    @field_validator("repository", "commit")
+    @classmethod
+    def validate_nonblank_value(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("commit")
+    @classmethod
+    def validate_commit(cls, value: str) -> str:
+        if not re.fullmatch(r"[0-9a-f]{40}", value):
+            raise ValueError("must be a full 40-character lowercase commit hash")
+        return value
 
 
 class ExternalToolInteractionOracle(BaseModel):
@@ -28,13 +51,14 @@ class ExternalToolInteractionOracle(BaseModel):
 class ExternalToolCaseOracle(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    validation_level: str
+    validation_level: str | None = None
     required_execute_interactions: list[ExternalToolInteractionOracle] = Field(
         min_length=1
     )
     result_requirements: list[str] = Field(min_length=1)
+    comparison_evidence_patterns: list[str] = Field(default_factory=list)
 
-    @field_validator("result_requirements")
+    @field_validator("result_requirements", "comparison_evidence_patterns")
     @classmethod
     def validate_result_patterns(cls, values: list[str]) -> list[str]:
         for value in values:
@@ -52,9 +76,12 @@ class ExternalToolCase(BaseModel):
 
     id: str
     tool: ExternalToolName
+    modes: set[ExternalToolCaseMode] = Field(min_length=1)
+    workflow: ExternalToolCaseWorkflow = "verification"
     review_input: str
     analysis_overview: str
     setup_file: str | None = None
+    checkout: GitCheckoutSource | None = None
     oracles: ExternalToolCaseOracle
 
     _directory: Path = PrivateAttr()
