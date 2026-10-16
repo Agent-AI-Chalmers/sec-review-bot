@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "parser-archive-link-escape",
+  "skill": "parser-protocol-security",
+  "reference": "archive-semantics.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess the archive acceptance policy before extraction.",
+  "facts": [
+    "The importer rejects member names containing dot-dot.",
+    "It accepts symbolic-link entries and later file entries beneath those link names.",
+    "The extractor follows the archive-created link and writes a service configuration outside the destination."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "archive|link|entry|order|extract|outside"
+  }
+}

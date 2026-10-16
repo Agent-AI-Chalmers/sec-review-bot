@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "crypto-signed-representation-gap",
+  "skill": "cryptography-security",
+  "reference": "signature-representation.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess whether signature representation can bypass replay enforcement.",
+  "facts": [
+    "The payment protocol requires one canonical signature encoding for each accepted signature value.",
+    "The verifier accepts a second non-canonical encoding of the same valid signature.",
+    "The replay cache keys on the encoded signature bytes, so an attacker can resubmit the same authorized payment with the alternate encoding and bypass the one-time check."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "represent|canonical|signature|replay|encoding"
+  }
+}

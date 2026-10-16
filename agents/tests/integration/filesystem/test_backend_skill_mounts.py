@@ -231,6 +231,7 @@ def test_repository_review_backends_materialize_agent_skill_views(
         "os-boundary-security",
         "parser-protocol-security",
         "software-supply-chain-security",
+        "authorization-delegation-security",
     ):
         assert (analyzer_skills_root / skill_name).is_dir()
         assert (mitigation_skills_root / skill_name).is_dir()
@@ -262,6 +263,7 @@ def test_repository_review_backends_materialize_agent_skill_views(
         "os-boundary-security",
         "parser-protocol-security",
         "software-supply-chain-security",
+        "authorization-delegation-security",
     ):
         assert (discovery_skills_root / skill_name).is_dir()
     assert "/skills/" in _routes_for(triage_backend)

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "go-goroutine-cancellation-leak",
+  "skill": "concurrency-resource-security",
+  "reference": "go-context-cancellation.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess whether request cancellation can retain goroutines.",
+  "facts": [
+    "Each request starts a goroutine that sends an unbuffered result.",
+    "The handler returns on context cancellation without receiving the result, and the goroutine select has no context case.",
+    "Attackers can repeatedly cancel requests and retain one blocked goroutine per request."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "goroutine|channel|context|cancel|blocked|retain"
+  }
+}

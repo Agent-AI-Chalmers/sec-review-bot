@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "parser-expression-structure",
+  "skill": "parser-protocol-security",
+  "reference": "expression-interpreters.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess the policy expression evaluation path.",
+  "facts": [
+    "A tenant controls the complete expression string compiled by the policy engine.",
+    "The engine exposes a file-reading helper and runs with access to other tenants' policy files.",
+    "Output HTML escaping is applied only after expression evaluation."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "structure|expression|helper|file|escaping|authority"
+  }
+}

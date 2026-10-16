@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "crypto-protocol-canonical-signature",
+  "skill": "cryptography-security",
+  "reference": "signature-representation.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a generic claim that the signature must use low-S and canonical JSON.",
+  "facts": [
+    "The protocol signs a specified binary encoding and verifies the same bytes.",
+    "The protocol does not use JSON and its signature scheme does not define a low-S requirement.",
+    "The application never treats signature bytes as a unique identifier."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "protocol|binary|same bytes|scheme|low-S|JSON"
+  }
+}

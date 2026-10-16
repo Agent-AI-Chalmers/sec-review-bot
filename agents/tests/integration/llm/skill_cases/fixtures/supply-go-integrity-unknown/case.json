@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "supply-go-integrity-unknown",
+  "skill": "software-supply-chain-security",
+  "reference": "go-modules.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that a Go module bypasses source and checksum controls.",
+  "facts": [
+    "The repository imports example.corp/security/lib.",
+    "The effective GOPROXY, GOPRIVATE, GONOSUMDB, GOSUMDB, replace directives, selected version, and go.sum entry are unavailable."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "require_proof_gaps": true,
+    "explanation_pattern": "GOPROXY|GOPRIVATE|GONOSUMDB|GOSUMDB|replace|go.sum|unknown"
+  }
+}

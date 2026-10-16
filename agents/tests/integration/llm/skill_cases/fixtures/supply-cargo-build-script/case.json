@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "supply-cargo-build-script",
+  "skill": "software-supply-chain-security",
+  "reference": "cargo-dependencies.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess the dependency source and build-time execution risk.",
+  "facts": [
+    "The build replaces the internal Cargo registry with a public registry controlled through repository configuration.",
+    "An attacker can publish the selected crate name and higher compatible version there.",
+    "The selected crate contains build.rs, which runs in CI with a deployment signing credential available."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "cargo|registry|source|build.rs|credential"
+  }
+}

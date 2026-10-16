@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "auth-confused-deputy-export",
+  "skill": "authorization-delegation-security",
+  "reference": "delegated-authority.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess the service-to-service export authorization.",
+  "facts": [
+    "A low-privilege tenant asks an export service to fetch any object ID.",
+    "The export service uses its own broad storage credential and checks only that the caller is authenticated.",
+    "It does not verify that the requested object belongs to the caller, so the caller can export another tenant's object."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "deputy|caller|service|object|authority|tenant"
+  }
+}

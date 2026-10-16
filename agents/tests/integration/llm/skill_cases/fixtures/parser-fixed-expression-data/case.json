@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "parser-fixed-expression-data",
+  "skill": "parser-protocol-security",
+  "reference": "expression-interpreters.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim of expression injection.",
+  "facts": [
+    "The application selects one fixed expression from an allowlist owned by developers.",
+    "Attacker values are passed only as typed data variables.",
+    "The attacker cannot alter operators, names, functions, templates, or the selected expression."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "fixed|allowlist|data|structure|expression"
+  }
+}

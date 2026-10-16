@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "windows-pipe-authorized-client",
+  "skill": "os-boundary-security",
+  "reference": "windows-services-local-ipc.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that any local user can invoke the privileged pipe operation.",
+  "facts": [
+    "The pipe security descriptor grants connect access only to a dedicated service SID.",
+    "The server verifies the client token before the protected operation.",
+    "Remote clients are disabled, and impersonation is reverted in a finally-style cleanup on every path."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "descriptor|service SID|token|remote|revert"
+  }
+}

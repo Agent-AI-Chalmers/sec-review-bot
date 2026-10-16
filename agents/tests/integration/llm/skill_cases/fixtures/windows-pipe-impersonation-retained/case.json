@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "windows-pipe-impersonation-retained",
+  "skill": "os-boundary-security",
+  "reference": "windows-services-local-ipc.md",
+  "modes": [
+    "natural"
+  ],
+  "task": "Assess the named-pipe impersonation path.",
+  "facts": [
+    "An unprivileged local user can connect to the service named pipe.",
+    "The LocalSystem service impersonates the client, rejects the request on one error path, and returns without RevertToSelf.",
+    "The same worker thread later handles an administrative operation using the retained thread token."
+  ],
+  "expected": {
+    "verdict": "confirmed",
+    "explanation_pattern": "pipe|impersonat|RevertToSelf|thread|token"
+  }
+}

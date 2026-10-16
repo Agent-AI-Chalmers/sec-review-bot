@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "auth-delegation-bound",
+  "skill": "authorization-delegation-security",
+  "reference": "delegated-authority.md",
+  "modes": [
+    "prompted"
+  ],
+  "task": "Assess a claim that the on-behalf-of call grants broad delegated authority.",
+  "facts": [
+    "The downstream token names both the user subject and calling-service actor.",
+    "It is audience-bound to one service, scoped to read one resource, expires in two minutes, and the downstream service enforces every binding.",
+    "The upstream bearer credential is not forwarded."
+  ],
+  "expected": {
+    "verdict": "not-confirmed",
+    "explanation_pattern": "subject|actor|audience|scope|resource|bound"
+  }
+}

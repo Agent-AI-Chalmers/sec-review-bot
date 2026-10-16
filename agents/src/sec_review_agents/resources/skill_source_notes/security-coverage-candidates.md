@@ -4,6 +4,8 @@
 
 Research notes reviewed 2026-10-16. All six candidates were subsequently admitted as narrow bundled skills after source review and independent prompted/natural cases. Their maintained ledgers are `memory-numeric-safety.md`, `cryptography-security.md`, `concurrency-resource-security.md`, `os-boundary-security.md`, `parser-protocol-security.md`, and `software-supply-chain-security.md`. PatchEval cases, CWE distributions, patches, tests, failures and results are excluded from requirement selection and probe design. PatchEval is reserved for final evaluation after freezing the skills.
 
+This file preserves the six-candidate admission record. The later systematic disposition of package ecosystems, Windows IPC, runtime cancellation, signature representation, provenance, updater channels, interpreter formats and non-Web delegation is maintained in `stable-coverage-audit.md`; current operational rules live in each skill's own ledger.
+
 Each row records a rule group, a primary source locator, and the limit of the proposed inference. A taxonomy entry establishes a failure mechanism, not that the mechanism needs a standalone skill. Keep rule groups small enough to have a meaningful counterexample. Record source revision or review date and applicability; recheck a live source or API default against the repository version when material. These notes are outside the mounted skill view.
 
 There is no requirement to trace every connective sentence. Trace decision-changing rules: report/reject conditions, guard sufficiency, platform defaults, and exceptions. Project choices about workflow, reporting thresholds, ownership, and packaging must be identified as project policy rather than attributed to a standard.

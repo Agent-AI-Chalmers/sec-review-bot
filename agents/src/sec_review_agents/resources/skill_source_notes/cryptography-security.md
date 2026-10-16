@@ -11,11 +11,15 @@ Reviewed 2026-10-16. Requirements are tied to the actual primitive or protocol; 
 | CRYPTO-5: password verifiers; `password-verifiers.md` | [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html), §3.1.1.2 | Stored password verifiers need salt and a suitable password hashing scheme with cost. Fixed evergreen work factors are intentionally omitted. |
 | CRYPTO-6: HKDF stages and context; `key-derivation.md` | [RFC 5869](https://www.rfc-editor.org/rfc/rfc5869.html), §§2.2-2.3 and 3.2 | Identify input keying material, salt and `info`; context labels can separate purposes when the protocol requires distinct outputs. Omitting `info` is not universally a vulnerability. |
 | CRYPTO-7: password boundary; `key-derivation.md` | RFC 5869, §3.4 | HKDF does not add password guessing cost and is not a password-hashing replacement. Apply password-verifier guidance to low-entropy passwords. |
+| CRYPTO-8: signed representation; `signature-representation.md` | [RFC 8785 JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html), §§1 and 3; [RFC 8032 EdDSA](https://www.rfc-editor.org/rfc/rfc8032.html), §5.1.7 | Verify the exact protocol-defined bytes and scheme checks. Canonical JSON and scalar-range rules are protocol/scheme-specific, not universal requirements. |
+| CRYPTO-9: signature uniqueness assumptions; `signature-representation.md` | [CWE-347](https://cwe.mitre.org/data/definitions/347.html), Description; protocol specification for the reviewed signature format | Multiple encodings or valid signatures matter only when they change the verified meaning or when the application relies on signature-byte uniqueness. Require that concrete effect. |
 
 Public-data checksums are not password verifiers; signature validity alone is not identity; missing rotation alone is not a confirmed exploit.
 
 Behavior cases for key derivation: `crypto-kdf-context-collision` (confirmed and natural discovery), `crypto-kdf-separated-context` (counterexample), and `crypto-kdf-unknown-scope` (unresolved boundary).
 
-## Coverage and deferred work
+Behavior cases for signature representation: `crypto-signed-representation-gap` and `crypto-protocol-canonical-signature`.
 
-Current coverage: GCM nonce/key scope, verification and token-purpose contracts, password verifiers, and HKDF purpose/context separation. Signature encoding remains protocol/algorithm-specific and is deferred until a concrete repository need supplies the relevant specification. Also deferred: full certificate-path processing, TLS configuration matrices, key-management operations, rotation programs, hardware security modules and evergreen algorithm recommendation tables.
+## Coverage and exclusions
+
+Current coverage: GCM nonce/key scope, verification and token-purpose contracts, password verifiers, HKDF purpose/context separation, and protocol-specific signature representation. Full certificate-path processing and key-management operations require narrower references before admission. TLS configuration matrices, rotation schedules and evergreen algorithm recommendation tables are excluded because they change over time and should be checked against current platform policy.
