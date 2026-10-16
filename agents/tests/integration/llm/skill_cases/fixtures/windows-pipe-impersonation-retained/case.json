@@ -6,14 +6,20 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess the named-pipe impersonation path.",
+  "task": "Assess the worker-thread identity cleanup and service effect.",
   "facts": [
     "An unprivileged local user can connect to the service named pipe.",
     "The LocalSystem service impersonates the client, rejects the request on one error path, and returns without RevertToSelf.",
-    "The same worker thread later handles an administrative operation using the retained thread token."
+    "The poisoned worker thread is reused for mandatory service health and credential-rotation operations, which fail under the retained low-privilege token; the attacker can repeatedly poison every worker and keep the service unavailable until restart."
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "pipe|impersonat|RevertToSelf|thread|token"
+    "explanation_requirements": [
+      "impersonat|client token",
+      "RevertToSelf|revert",
+      "worker|thread",
+      "low-privilege|restricted",
+      "unavailable|denial|fail"
+    ]
   }
 }

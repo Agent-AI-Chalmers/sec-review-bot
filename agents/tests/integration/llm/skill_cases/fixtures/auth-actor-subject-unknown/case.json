@@ -14,6 +14,16 @@
   "expected": {
     "verdict": "not-confirmed",
     "require_proof_gaps": true,
-    "explanation_pattern": "actor|subject|audience|scope|resource|authorization|unknown"
+    "explanation_requirements": [
+      "cannot|not confirmed|insufficient|unknown",
+      "delegat|token exchange|downstream"
+    ],
+    "proof_gap_requirements": [
+      "actor|subject",
+      "audience",
+      "scope",
+      "resource|target",
+      "authorization|downstream"
+    ]
   }
 }

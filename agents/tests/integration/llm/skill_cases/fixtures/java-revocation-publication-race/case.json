@@ -6,7 +6,7 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess publication of the shared authorization policy.",
+  "task": "Assess why requests can still use a permission after an administrator removes it.",
   "facts": [
     "One Java thread replaces an ordinary non-volatile policy field after an administrator revokes a tenant permission.",
     "Request threads read that field without a monitor, volatile access, immutable snapshot publication, thread lifecycle edge, or other happens-before relationship.",
@@ -14,6 +14,12 @@
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "happens-before|volatile|publish|stale|revok|authorization"
+    "explanation_requirements": [
+      "happens-before",
+      "volatile|monitor|synchron",
+      "stale",
+      "revok",
+      "privileged|authorization"
+    ]
   }
 }

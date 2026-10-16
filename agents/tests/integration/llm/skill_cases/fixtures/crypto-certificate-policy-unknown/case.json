@@ -14,6 +14,16 @@
   "expected": {
     "verdict": "not-confirmed",
     "require_proof_gaps": true,
-    "explanation_pattern": "trust anchor|constraint|critical|identity|usage|unknown|evidence"
+    "explanation_requirements": [
+      "cannot|not confirmed|unconfirmed|unverifiable|insufficient|unknown",
+      "certificate|path|identity"
+    ],
+    "proof_gap_requirements": [
+      "trust anchor",
+      "constraint|critical extension",
+      "reference identity|identifier",
+      "key usage|extended key usage",
+      "implementation|helper"
+    ]
   }
 }

@@ -6,7 +6,7 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess the HTTP/2-to-HTTP/1 request translation boundary.",
+  "task": "Assess how one edge request becomes two backend requests.",
   "facts": [
     "An edge proxy accepts an HTTP/2 field value containing a carriage-return and line-feed sequence.",
     "It copies that value directly into an HTTP/1.1 header block sent on a reused backend connection.",
@@ -14,6 +14,13 @@
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "HTTP/2|HTTP/1|translat|field|delimiter|smuggl|authorization"
+    "explanation_requirements": [
+      "http/2",
+      "http/1",
+      "translat|cop",
+      "carriage|line-feed|delimiter|crlf",
+      "second.*request|two backend requests",
+      "authorization|bypass"
+    ]
   }
 }

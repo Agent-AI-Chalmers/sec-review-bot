@@ -17,6 +17,8 @@ class SkillCaseExpected(BaseModel):
     require_proof_gaps: bool = False
     cwe_id: str | None = None
     parent_category_id: str | None = None
+    explanation_requirements: list[str] = Field(default_factory=list)
+    proof_gap_requirements: list[str] = Field(default_factory=list)
     explanation_pattern: str | None = None
 
 

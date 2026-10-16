@@ -14,6 +14,16 @@
   "expected": {
     "verdict": "not-confirmed",
     "require_proof_gaps": true,
-    "explanation_pattern": "translation|downstream|reuse|malformed|parser|unknown|evidence"
+    "explanation_requirements": [
+      "cannot|not confirmed|unconfirmed|unsubstantiated|insufficient|unknown",
+      "http/2"
+    ],
+    "proof_gap_requirements": [
+      "translation|protocol",
+      "downstream",
+      "connection reuse|reuse",
+      "malformed|validation",
+      "parser|interpret"
+    ]
   }
 }

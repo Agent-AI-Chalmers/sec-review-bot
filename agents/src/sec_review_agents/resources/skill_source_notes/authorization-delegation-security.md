@@ -1,6 +1,6 @@
 # Authorization And Delegation Security Source Notes
 
-Reviewed 2026-10-16. This skill owns non-browser service/workload identity, delegated credentials, actor/subject distinction and confused deputies. `web-security` continues to own request, object and browser-session authorization. Cryptography owns signature verification; this skill owns what a verified identity may do.
+Reviewed 2026-10-16. This skill owns non-browser service/workload identity, protocol- or credential-level delegation and impersonation, actor/subject distinction and confused deputies. `web-security` continues to own request, object and browser-session authorization. OS thread/process token impersonation remains in `os-boundary-security`. Cryptography owns signature verification; this skill owns what a verified identity may do.
 
 | ID and skill location | Primary source and locator | Supported decision and limit |
 | --- | --- | --- |

@@ -6,7 +6,7 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess the GitLab fork merge-request pipeline boundary.",
+  "task": "Assess what the contributor-controlled pipeline can access after the maintainer starts it.",
   "facts": [
     "A maintainer can start a parent-project pipeline for a fork merge request.",
     "That pipeline uses CI configuration and scripts from the attacker's fork branch.",
@@ -14,6 +14,12 @@
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "GitLab|fork|parent-project|configuration|credential|maintainer"
+    "explanation_requirements": [
+      "fork",
+      "parent-project|parent project",
+      "attacker.*config|fork.*config|contributor.*script",
+      "credential|secret",
+      "maintainer|trigger"
+    ]
   }
 }

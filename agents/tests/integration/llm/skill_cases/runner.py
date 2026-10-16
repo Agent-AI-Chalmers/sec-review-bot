@@ -198,18 +198,26 @@ def assert_case_oracle(case: SkillCase, run: SkillCaseRun) -> None:
         )
     if expected.require_proof_gaps:
         assert run.output.proof_gaps
+    proof_gaps = " ".join(run.output.proof_gaps).lower()
+    for requirement in expected.proof_gap_requirements:
+        assert re.search(requirement, proof_gaps), (
+            requirement,
+            run.output.proof_gaps,
+        )
     if expected.cwe_id is not None:
         assert run.output.cwe_id == expected.cwe_id
     if expected.parent_category_id is not None:
         assert run.output.parent_category_id == expected.parent_category_id
+    explanation = " ".join(
+        (
+            run.output.precedent_applied,
+            run.output.evidence,
+            run.output.rationale,
+        )
+    ).lower()
+    for requirement in expected.explanation_requirements:
+        assert re.search(requirement, explanation), (requirement, explanation)
     if expected.explanation_pattern is not None:
-        explanation = " ".join(
-            (
-                run.output.precedent_applied,
-                run.output.evidence,
-                run.output.rationale,
-            )
-        ).lower()
         assert re.search(expected.explanation_pattern, explanation)
 
 

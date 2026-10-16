@@ -6,7 +6,7 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess whether signature representation can bypass replay enforcement.",
+  "task": "Assess why the same authorized payment can be accepted twice.",
   "facts": [
     "The payment protocol requires one canonical signature encoding for each accepted signature value.",
     "The verifier accepts a second non-canonical encoding of the same valid signature.",
@@ -14,6 +14,12 @@
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "represent|canonical|signature|replay|encoding"
+    "explanation_requirements": [
+      "canonical|non-canonical|alternate encoding",
+      "signature",
+      "replay|one-time",
+      "encoded.*bytes|signature bytes",
+      "resubmit|accepted twice|bypass"
+    ]
   }
 }

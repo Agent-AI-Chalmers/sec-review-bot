@@ -6,7 +6,7 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess how uploaded profile files are served to other users.",
+  "task": "Assess what happens when another user opens the profile attachment.",
   "facts": [
     "An attacker can upload arbitrary HTML content as a profile attachment.",
     "The application serves it inline from the authenticated application origin with an attacker-controlled HTML content type.",
@@ -14,6 +14,12 @@
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "upload|inline|HTML|origin|script|stored"
+    "explanation_requirements": [
+      "upload|attachment",
+      "inline",
+      "html",
+      "application origin|same origin",
+      "script|stored xss"
+    ]
   }
 }

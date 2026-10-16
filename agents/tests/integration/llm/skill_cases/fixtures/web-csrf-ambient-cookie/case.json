@@ -6,7 +6,7 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess the cross-site account-email change path.",
+  "task": "Assess whether another site can cause the account email change.",
   "facts": [
     "The endpoint accepts a form-encoded POST and changes the authenticated account email.",
     "The browser automatically includes a session cookie that is sent in the cross-site request context.",
@@ -14,6 +14,12 @@
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "CSRF|cross-site|ambient|cookie|state|email"
+    "explanation_requirements": [
+      "cross-site|another site",
+      "ambient|automatically.*cookie|session cookie",
+      "state-changing|change.*email",
+      "token|origin|referer|binding",
+      "csrf"
+    ]
   }
 }

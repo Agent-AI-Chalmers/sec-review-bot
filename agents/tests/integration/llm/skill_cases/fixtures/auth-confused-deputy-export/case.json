@@ -6,14 +6,20 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess the service-to-service export authorization.",
+  "task": "Assess whether the automation broker may perform the requested operation.",
   "facts": [
-    "A low-privilege tenant asks an export service to fetch any object ID.",
-    "The export service uses its own broad storage credential and checks only that the caller is authenticated.",
-    "It does not verify that the requested object belongs to the caller, so the caller can export another tenant's object."
+    "A tenant user may invoke an automation broker but has no permission to modify projects outside that tenant's delegated project set.",
+    "The caller supplies an arbitrary target project and operation, and the broker performs it with the broker's organization-wide service credential.",
+    "The broker checks only that the caller may invoke the broker; it does not bind the requested target or operation to the caller's delegated scope, so the tenant can modify another tenant's project."
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "deputy|caller|service|object|authority|tenant"
+    "explanation_requirements": [
+      "broker|service|deputy",
+      "organization-wide|own credential|broker.*credential",
+      "target|project",
+      "delegat|scope|caller.*permission",
+      "another tenant|unauthorized"
+    ]
   }
 }

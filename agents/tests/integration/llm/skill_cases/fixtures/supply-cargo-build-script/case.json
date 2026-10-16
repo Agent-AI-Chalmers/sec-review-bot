@@ -6,14 +6,20 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess the dependency source and build-time execution risk.",
+  "task": "Assess the build dependency selected by the release command.",
   "facts": [
-    "The build replaces the internal Cargo registry with a public registry controlled through repository configuration.",
-    "An attacker can publish the selected crate name and higher compatible version there.",
-    "The selected crate contains build.rs, which runs in CI with a deployment signing credential available."
+    "Cargo.toml declares build-helper from an explicitly configured public alternate registry, not through source replacement or a private registry namespace.",
+    "The release command runs cargo update -p build-helper before cargo build, no lock or precise version prevents reselection, and the declared semver range accepts the attacker's newly published version; the recorded resolver output selects it.",
+    "The selected crate contains build.rs, which Cargo executes in CI while a deployment signing credential is available."
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "cargo|registry|source|build.rs|credential"
+    "explanation_requirements": [
+      "alternate|public.*registry",
+      "cargo update|reselect|resolver",
+      "semver|compatible|selected",
+      "build\\.rs|build script",
+      "signing credential|credential"
+    ]
   }
 }

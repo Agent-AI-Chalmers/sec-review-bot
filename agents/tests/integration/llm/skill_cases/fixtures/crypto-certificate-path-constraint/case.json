@@ -6,7 +6,7 @@
   "modes": [
     "natural"
   ],
-  "task": "Assess the custom certificate-path validation.",
+  "task": "Assess why the internal client accepts the subordinate credential.",
   "facts": [
     "The validator verifies every certificate signature to a trusted root.",
     "It ignores an intermediate CA pathLenConstraint of zero and accepts a subordinate CA below that intermediate.",
@@ -14,6 +14,12 @@
   ],
   "expected": {
     "verdict": "confirmed",
-    "explanation_pattern": "path|constraint|pathLen|intermediate|signature|trusted"
+    "explanation_requirements": [
+      "pathlen|path length",
+      "intermediate",
+      "subordinate",
+      "constraint",
+      "trusted root|signature chain"
+    ]
   }
 }
