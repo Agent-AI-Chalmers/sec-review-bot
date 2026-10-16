@@ -85,12 +85,11 @@ def test_materialize_agent_skills_view_includes_reference_skills(
                 "os-boundary-security",
                 "parser-protocol-security",
                 "software-supply-chain-security",
-                "authorization-delegation-security",
+                "authorization-security",
             ),
         )
 
     assert (skills_root / "web-security" / "SKILL.md").is_file()
-    assert (skills_root / "web-security" / "references" / "access-control.md").is_file()
     assert (skills_root / "web-security" / "references" / "auth-session.md").is_file()
     assert (skills_root / "web-security" / "references" / "ssrf.md").is_file()
     assert (skills_root / "web-security" / "references" / "sql-injection.md").is_file()
@@ -140,12 +139,12 @@ def test_materialize_agent_skills_view_includes_reference_skills(
         / "references"
         / "dependency-selection.md"
     ).is_file()
-    assert (skills_root / "authorization-delegation-security" / "SKILL.md").is_file()
+    assert (skills_root / "authorization-security" / "SKILL.md").is_file()
     assert (
-        skills_root
-        / "authorization-delegation-security"
-        / "references"
-        / "delegated-authority.md"
+        skills_root / "authorization-security" / "references" / "access-control.md"
+    ).is_file()
+    assert (
+        skills_root / "authorization-security" / "references" / "delegated-authority.md"
     ).is_file()
     assert (
         skills_root
@@ -169,7 +168,7 @@ def test_materialized_view_contains_only_declared_skill_resources() -> None:
         "os-boundary-security",
         "parser-protocol-security",
         "software-supply-chain-security",
-        "authorization-delegation-security",
+        "authorization-security",
     )
     skills_root = materialize_agent_skills_view(declared)
     assert {path.name for path in skills_root.iterdir()} == set(declared)

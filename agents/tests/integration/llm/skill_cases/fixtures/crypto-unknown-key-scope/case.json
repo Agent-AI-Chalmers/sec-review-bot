@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "crypto-unknown-key-scope",
   "skill": "cryptography-security",
   "reference": "key-nonce-scope.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "proof_gap_requirements": [
         "encryption key|key.*identity|same key",
         "derivation|key.*scope"

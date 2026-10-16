@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "crypto-certificate-policy-unknown",
   "skill": "cryptography-security",
   "reference": "certificate-path-identity.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "cannot|not confirmed|unconfirmed|unverifiable|insufficient|unknown",
         "certificate|path|identity"

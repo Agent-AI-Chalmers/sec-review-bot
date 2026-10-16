@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-expression-structure",
   "skill": "parser-protocol-security",
   "reference": "expression-interpreters.md",

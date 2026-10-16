@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "web-upload-isolated-download",
   "skill": "web-security",
   "reference": "file-upload.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "isolated|attachment|content type",
         "generated|parser|execute"

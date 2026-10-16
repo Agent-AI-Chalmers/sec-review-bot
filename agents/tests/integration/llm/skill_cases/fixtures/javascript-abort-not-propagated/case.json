@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "javascript-abort-not-propagated",
   "skill": "concurrency-resource-security",
   "reference": "javascript-cancellation.md",

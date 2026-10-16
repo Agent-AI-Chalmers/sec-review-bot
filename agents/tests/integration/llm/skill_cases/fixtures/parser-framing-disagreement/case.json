@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-framing-disagreement",
   "skill": "parser-protocol-security",
   "reference": "http-framing.md",

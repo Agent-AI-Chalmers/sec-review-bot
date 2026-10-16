@@ -2,19 +2,9 @@
 
 These sources support the `web-security` references.
 
-## access-control
-
-Primary sources:
-
-- https://portswigger.net/web-security/access-control
-- https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html
-- https://cwe.mitre.org/data/definitions/639.html
-- https://cwe.mitre.org/data/definitions/862.html
-
 ## auth-session
 
-Primary sources:
+Authoritative references:
 
 - https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
 - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
@@ -27,7 +17,7 @@ Primary sources:
 
 ## csrf
 
-Primary sources:
+Authoritative references:
 
 - https://portswigger.net/web-security/csrf
 - https://portswigger.net/kb/issues/00200700_cross-site-request-forgery
@@ -36,7 +26,7 @@ Primary sources:
 
 ## file-upload
 
-Primary sources:
+Authoritative references:
 
 - https://portswigger.net/web-security/file-upload
 - https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
@@ -56,7 +46,7 @@ Claim ledger:
 
 ## sensitive-data-exposure
 
-Primary sources:
+Authoritative references:
 
 - https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html
 - https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html
@@ -73,12 +63,12 @@ Claim ledger:
 - Claim: Error or tenant-visible log exposure becomes security relevant when sensitive values, credentials, headers, connection strings, stack/context details, or private data reach unauthorized web users or tenants.
   Primary source: OWASP Error Handling Cheat Sheet; OWASP Logging Cheat Sheet; CWE-209.
   Limit: Generic error logging is not evidence of unauthorized disclosure.
-- Claim: Public source maps or bundled source are not secrets exposure unless they contain live secrets, security tokens, or sensitive configuration.
-  Primary source: OWASP Secrets Management Cheat Sheet.
+- Project reporting rule: Public source maps or bundled source are not classified as sensitive-data exposure solely because source is visible. Apply the reference's ordinary exposure test to the actual contents and audience; report live secrets, private data or sensitive configuration, or establish a separate information-disclosure or exploit-chain impact.
+  External support: OWASP Secrets Management Cheat Sheet identifies the security properties and lifecycle expected of secrets; it does not classify source maps as safe or unsafe.
 
 ## sql-injection
 
-Primary sources:
+Authoritative references:
 
 - https://portswigger.net/web-security/sql-injection
 - https://portswigger.net/kb/issues/00100200_sql-injection
@@ -88,7 +78,7 @@ Primary sources:
 
 ## ssrf
 
-Primary sources:
+Authoritative references:
 
 - https://portswigger.net/web-security/ssrf
 - https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
@@ -97,7 +87,7 @@ Primary sources:
 
 ## xss
 
-Primary sources:
+Authoritative references:
 
 - https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
 - https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html
@@ -131,7 +121,6 @@ Claim ledger:
 
 | Rule group and reference | Primary support and locator | Supported inference and limits |
 | --- | --- | --- |
-| ACCESS-1: trusted-side checks and resolved resource scope; `access-control.md`, Guards and Report Conditions | [OWASP Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), “Validate the Permissions on Every Request”, “Verify that Authorization Checks are Performed in the Right Location”, “Exit Safely when Authorization Checks Fail” | UI visibility is not the enforcing boundary. Inspect the actual actor/resource/action and effect. Public resources may intentionally need no authentication or per-user ownership check. A recommendation to centralize checks is not a finding. |
 | CSRF-1: ambient credentials and cross-site submission; `csrf.md`, Sources and Report Conditions | [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), Introduction, “Disallowing simple requests”, “Custom Headers and CORS” | Establish what the victim browser submits, what credentials accompany it and what action follows. Missing a token alone is insufficient. Do not assume permissive CORS supplies an otherwise unavailable bearer token. |
 | CSRF-2: origin/token and cookie controls; `csrf.md`, Guards and False-Positive Precedents | Same source, “Synchronizer Token Pattern”, “SameSite (Cookie Attribute)”, “Using Standard Headers to Verify Origin” | Account for actual cookie mode, origin policy and endpoint behavior. Defense-in-depth guidance does not prove that every single-control deployment is exploitable. Protocol-specific login/account-linking bindings need the relevant authentication specification. |
 | SQL-1: data values versus query structure; `sql-injection.md`, Guards and Report Conditions | [OWASP SQL Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html), “Prepared Statements”, “Allow-list Input Validation”, “Safest Use Of Dynamic SQL Generation (DISCOURAGED)” | Parameterized values do not make attacker-selected identifiers or raw structure safe. Verify the exact ORM API and whether it binds values or emits SQL. Finite trusted mappings are a counterexample to blanket dynamic-query findings. |

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-xxe-enabled",
   "skill": "parser-protocol-security",
   "reference": "parser-capabilities.md",

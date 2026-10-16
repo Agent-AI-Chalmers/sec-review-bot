@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "non-security-checksum",
   "skill": "web-security",
   "reference": "auth-session.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "public.*image|cache",
         "not.*password|not.*auth|not.*secret"

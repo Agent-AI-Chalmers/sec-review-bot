@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-object-construction-unknown",
   "skill": "parser-protocol-security",
   "reference": "object-construction.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "version|type|class|constructor",
         "gadget|unknown|evidence"

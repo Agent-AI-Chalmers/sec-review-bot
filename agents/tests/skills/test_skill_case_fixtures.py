@@ -5,7 +5,7 @@ def test_skill_case_fixtures_are_valid_and_cover_each_mode() -> None:
     cases = load_skill_cases()
     assert cases_for_mode(cases, "prompted")
     assert cases_for_mode(cases, "discovery")
-    assert cases_for_mode(cases, "contrast")
+    assert cases_for_mode(cases, "compare")
 
     for case in cases:
         if case.workspace_source.is_dir():

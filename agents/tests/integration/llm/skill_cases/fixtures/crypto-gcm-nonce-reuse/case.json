@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "crypto-gcm-nonce-reuse",
   "skill": "cryptography-security",
   "reference": "key-nonce-scope.md",

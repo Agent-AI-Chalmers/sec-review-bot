@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "os-closed-descriptor",
   "skill": "os-boundary-security",
   "reference": "process-authority-inheritance.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "close-on-exec|cloexec|descriptor",
         "inherit|allowlist"

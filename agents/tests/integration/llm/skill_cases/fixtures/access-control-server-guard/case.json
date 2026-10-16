@@ -1,7 +1,6 @@
 {
-  "schema_version": 1,
   "id": "access-control-server-guard",
-  "skill": "web-security",
+  "skill": "authorization-security",
   "reference": "access-control.md",
   "modes": [
     "prompted",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "client|server|authori[sz]ation",
         "trusted boundary|403"

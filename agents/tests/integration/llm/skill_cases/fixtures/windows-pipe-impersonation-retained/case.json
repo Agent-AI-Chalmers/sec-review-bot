@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "windows-pipe-impersonation-retained",
   "skill": "os-boundary-security",
   "reference": "windows-services-local-ipc.md",

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "numeric-checked-rejection",
   "skill": "memory-numeric-safety",
   "reference": "numeric-semantics-and-bounds.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "checked|reject",
         "error|before"

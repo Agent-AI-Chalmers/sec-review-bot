@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-consistent-rejection",
   "skill": "parser-protocol-security",
   "reference": "http-framing.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "reject|before|downstream",
         "consistent|close"

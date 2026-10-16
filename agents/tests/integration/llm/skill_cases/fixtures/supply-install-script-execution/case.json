@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "supply-install-script-execution",
   "skill": "software-supply-chain-security",
   "reference": "install-build-execution.md",

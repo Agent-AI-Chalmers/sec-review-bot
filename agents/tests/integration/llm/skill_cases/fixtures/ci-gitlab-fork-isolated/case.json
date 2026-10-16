@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "ci-gitlab-fork-isolated",
   "skill": "ci-security",
   "reference": "gitlab-ci.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "fork project|parent-project|protected",
         "variables|runner|isolated"

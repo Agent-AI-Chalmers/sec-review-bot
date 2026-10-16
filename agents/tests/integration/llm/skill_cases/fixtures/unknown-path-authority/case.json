@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "unknown-path-authority",
   "skill": "os-boundary-security",
   "reference": "filesystem-path-policy.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "proof_gap_requirements": [
         "directory.*permission|owner|writer",
         "export.*content|target.*object|mount"

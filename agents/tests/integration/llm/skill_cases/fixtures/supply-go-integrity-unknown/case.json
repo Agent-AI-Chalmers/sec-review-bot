@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "supply-go-integrity-unknown",
   "skill": "software-supply-chain-security",
   "reference": "go-modules.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "goproxy|goprivate|gonosumdb|gosumdb",
         "replace|go.sum|unknown"

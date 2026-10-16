@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "supply-jvm-plugin-filtered",
   "skill": "software-supply-chain-security",
   "reference": "jvm-build-dependencies.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "filter|coordinates|internal",
         "select|repository"

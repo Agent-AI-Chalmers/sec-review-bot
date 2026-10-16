@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "os-constrained-resolution",
   "skill": "os-boundary-security",
   "reference": "filesystem-resolution.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "openat2|beneath|symlink",
         "constrain|descriptor"

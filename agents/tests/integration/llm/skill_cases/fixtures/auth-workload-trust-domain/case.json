@@ -1,7 +1,6 @@
 {
-  "schema_version": 1,
   "id": "auth-workload-trust-domain",
-  "skill": "authorization-delegation-security",
+  "skill": "authorization-security",
   "reference": "service-workload-identity.md",
   "modes": [
     "prompted"

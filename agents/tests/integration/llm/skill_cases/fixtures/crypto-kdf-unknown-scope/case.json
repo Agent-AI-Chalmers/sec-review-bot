@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "crypto-kdf-unknown-scope",
   "skill": "cryptography-security",
   "reference": "key-derivation.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "master|salt|info|output",
         "consumer|unknown|evidence"

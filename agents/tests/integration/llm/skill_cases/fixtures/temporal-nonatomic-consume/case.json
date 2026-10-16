@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "temporal-nonatomic-consume",
   "skill": "concurrency-resource-security",
   "reference": "temporal-invariants.md",

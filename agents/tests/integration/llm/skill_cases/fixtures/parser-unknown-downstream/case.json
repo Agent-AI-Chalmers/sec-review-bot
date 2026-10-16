@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "parser-unknown-downstream",
   "skill": "parser-protocol-security",
   "reference": "http-framing.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "proof_gap_requirements": [
         "proxy|front.*end|first recipient",
         "backend|downstream",

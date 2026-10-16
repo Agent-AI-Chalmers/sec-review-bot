@@ -18,7 +18,7 @@ Use this reference when a lead involves attacker-influenced paths, filenames, ar
 - Establish containment for the object actually accessed. For pathname-based guards, inspect decoding, normalization, root comparison, separators, case sensitivity where relevant, and link resolution using the target platform semantics.
 - If safety depends on whether a checked pathname still identifies the object later accessed, also read `filesystem-resolution.md` and verify the target platform's APIs and flags.
 - Use allowlisted object identifiers when possible instead of raw paths.
-- Archive extraction should reject absolute paths, parent traversal, symlinks/hardlinks when unsafe, and duplicate or normalized conflicting entries.
+- For archive extraction, apply containment to the filesystem operations produced by accepted entries. Archive entry-type, duplicate-name and ordering policy belongs to archive parsing semantics.
 
 ## Report Conditions
 

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "web-sensitive-unknown-reader",
   "skill": "web-security",
   "reference": "sensitive-data-exposure.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "live|credential|auth|reader",
         "access|unknown|evidence"

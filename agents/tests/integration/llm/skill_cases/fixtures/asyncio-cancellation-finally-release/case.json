@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "asyncio-cancellation-finally-release",
   "skill": "concurrency-resource-security",
   "reference": "python-asyncio-cancellation.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "finally|release|cancel",
         "propagat|permit"

@@ -2,10 +2,17 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
-SkillCaseMode = Literal["prompted", "discovery", "contrast"]
-SkillVerdict = Literal["confirmed", "not-confirmed"]
+SkillCaseMode = Literal["prompted", "discovery", "compare"]
+SkillVerdict = Literal["confirmed", "rejected", "unresolved"]
 
 
 class DecisionOracle(BaseModel):
@@ -31,6 +38,18 @@ class DecisionOracle(BaseModel):
                 raise ValueError(f"invalid requirement regex: {value!r}") from exc
         return values
 
+    @model_validator(mode="after")
+    def validate_proof_gap_semantics(self) -> DecisionOracle:
+        if self.verdict == "unresolved" and len(self.proof_gap_requirements) < 2:
+            raise ValueError(
+                "unresolved decisions require at least two material proof gaps"
+            )
+        if self.verdict != "unresolved" and self.proof_gap_requirements:
+            raise ValueError(
+                "only unresolved decisions may define proof-gap requirements"
+            )
+        return self
+
 
 class ClassificationOracle(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -39,11 +58,11 @@ class ClassificationOracle(BaseModel):
     parent_category_id: str | None = None
 
 
-class ExactOutputOracle(BaseModel):
+class CommandArgumentOracle(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    crosses_security_boundary: bool | None = None
-    attacker_controlled_argument: str | None = None
+    crosses_security_boundary: bool
+    attacker_controlled_argument: str
 
 
 class SkillCaseOracles(BaseModel):
@@ -51,13 +70,24 @@ class SkillCaseOracles(BaseModel):
 
     decision: DecisionOracle | None = None
     classification: ClassificationOracle | None = None
-    exact_output: ExactOutputOracle | None = None
+    command_argument: CommandArgumentOracle | None = None
+
+    @model_validator(mode="after")
+    def validate_output_shape(self) -> SkillCaseOracles:
+        specialized = sum(
+            oracle is not None
+            for oracle in (self.classification, self.command_argument)
+        )
+        if specialized > 1:
+            raise ValueError("a case may define only one specialized output oracle")
+        if specialized and self.decision is None:
+            raise ValueError("specialized output oracles require a decision oracle")
+        return self
 
 
 class SkillCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[1]
     id: str
     skill: str
     reference: str
@@ -99,24 +129,61 @@ class SkillCase(BaseModel):
         return f"/skills/{self.skill}/references/{self.reference}"
 
 
-class SkillCaseOutput(BaseModel):
-    verdict: SkillVerdict
-    vulnerability_type: str = ""
+class SkillReadOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     skill_path_read: str | None = None
     reference_path_read: str | None = None
-    precedent_applied: str = ""
-    attacker_controlled_argument: str | None = Field(
-        default=None,
+
+
+class DecisionOutput(SkillReadOutput):
+    verdict: SkillVerdict = Field(
+        description=(
+            "Use confirmed when the security failure and impact are established, "
+            "rejected when known facts break the claimed security relation, and "
+            "unresolved when material facts needed for the decision are unavailable."
+        )
+    )
+    evidence: str
+    rationale: str
+    proof_gaps: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Material missing facts that prevent a confirmed or rejected decision. "
+            "Populate for unresolved and leave empty otherwise."
+        ),
+    )
+
+
+class ClassificationOutput(DecisionOutput):
+    cwe_id: str
+    cwe_name: str = ""
+    parent_category_id: str | None = None
+    parent_category_name: str = ""
+
+
+class CommandArgumentOutput(DecisionOutput):
+    attacker_controlled_argument: str = Field(
         description=(
             "The exact single caller-controlled argument value that changes the "
             "child parser's behavior, not the complete argv list."
         ),
     )
-    crosses_security_boundary: bool | None = None
-    evidence: str
-    rationale: str
-    proof_gaps: list[str] = Field(default_factory=list)
-    cwe_id: str | None = None
-    cwe_name: str | None = None
-    parent_category_id: str | None = None
-    parent_category_name: str | None = None
+    crosses_security_boundary: bool
+
+
+type SkillCaseOutput = (
+    SkillReadOutput | DecisionOutput | ClassificationOutput | CommandArgumentOutput
+)
+
+
+def output_model_for_case(
+    case: SkillCase,
+) -> type[SkillReadOutput]:
+    if case.oracles.command_argument is not None:
+        return CommandArgumentOutput
+    if case.oracles.classification is not None:
+        return ClassificationOutput
+    if case.oracles.decision is not None:
+        return DecisionOutput
+    return SkillReadOutput

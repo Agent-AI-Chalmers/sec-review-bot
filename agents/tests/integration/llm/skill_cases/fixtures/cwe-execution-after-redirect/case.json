@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "cwe-execution-after-redirect",
   "skill": "cwe",
   "reference": "cwe-699-agent-navigation.md",

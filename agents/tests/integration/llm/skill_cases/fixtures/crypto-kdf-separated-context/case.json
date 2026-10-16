@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "crypto-kdf-separated-context",
   "skill": "cryptography-security",
   "reference": "key-derivation.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "info|tenant|unique",
         "context|separat|derived"

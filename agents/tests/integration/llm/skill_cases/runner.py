@@ -21,9 +21,14 @@ from sec_review_agents.runtime.summarization_middleware import (
 )
 from tests.integration.llm.deployment_helpers import llm_test_deployment
 from tests.integration.llm.skill_cases.models import (
+    ClassificationOutput,
+    CommandArgumentOutput,
+    DecisionOutput,
     SkillCase,
     SkillCaseMode,
     SkillCaseOutput,
+    SkillReadOutput,
+    output_model_for_case,
 )
 from tests.integration.llm.skill_probe_helpers import (
     record_skill_probe_result,
@@ -61,15 +66,30 @@ def build_case_prompt(case: SkillCase, mode: SkillCaseMode) -> str:
         if case.workspace_source.is_dir()
         else ""
     )
+    output_instruction = "Return the skill and reference paths you read."
+    if case.oracles.decision is not None:
+        output_instruction = (
+            "Return confirmed when the security failure and impact are established, "
+            "rejected when known facts break the claimed security relation, or "
+            "unresolved when material facts needed for that decision are unavailable. "
+            "For unresolved, list the material proof gaps. Return the evidence, "
+            "rationale, skill and reference paths read, and any specialized fields "
+            "requested by the response schema."
+        )
     return (
         f"{instruction}{workspace_instruction}Task: {case.task}\n"
         f"Runtime facts:\n{facts}\n"
-        "Return the verdict, evidence, rationale, material proof gaps, and any "
-        "other structured fields that apply."
+        f"{output_instruction}"
     )
 
 
-async def _create_case_agent(*, workspace: Path, skills_enabled: bool, prompted: bool):
+async def _create_case_agent(
+    *,
+    workspace: Path,
+    skills_enabled: bool,
+    prompted: bool,
+    response_model: type[SkillReadOutput],
+):
     from sec_review_agents.agents.analysis.repository import (
         create_repository_analyzer_backend,
     )
@@ -139,7 +159,7 @@ async def _create_case_agent(*, workspace: Path, skills_enabled: bool, prompted:
         agent_name="skill-case-probe",
         backend=backend,
         system_prompt=system_prompt,
-        response_format=SkillCaseOutput,
+        response_format=response_model,
         middleware=middleware,
     )
     return backend, agent
@@ -157,6 +177,7 @@ async def run_skill_case(
         workspace=workspace,
         skills_enabled=skills_enabled,
         prompted=mode == "prompted",
+        response_model=output_model_for_case(case),
     )
     async with amanaged_backend(backend):
         result = await agent.ainvoke(
@@ -174,9 +195,10 @@ async def run_skill_case(
         },
     )
     parsed = result.get("structured_response")
+    response_model = output_model_for_case(case)
     if isinstance(parsed, dict):
-        parsed = SkillCaseOutput.model_validate(parsed)
-    if not isinstance(parsed, SkillCaseOutput):
+        parsed = response_model.model_validate(parsed)
+    if not isinstance(parsed, response_model):
         raise AssertionError(f"missing structured response for {case.id}: {result!r}")
     return SkillCaseRun(
         output=parsed,
@@ -187,40 +209,35 @@ async def run_skill_case(
 def assert_case_oracles(case: SkillCase, run: SkillCaseRun) -> None:
     decision = case.oracles.decision
     if decision is not None:
+        assert isinstance(run.output, DecisionOutput)
         assert run.output.verdict == decision.verdict
+        if decision.verdict != "unresolved":
+            assert not run.output.proof_gaps, run.output.proof_gaps
         proof_gaps = " ".join(run.output.proof_gaps).lower()
         for requirement in decision.proof_gap_requirements:
             assert re.search(requirement, proof_gaps), (
                 requirement,
                 run.output.proof_gaps,
             )
-        explanation = " ".join(
-            (
-                run.output.precedent_applied,
-                run.output.evidence,
-                run.output.rationale,
-            )
-        ).lower()
+        explanation = " ".join((run.output.evidence, run.output.rationale)).lower()
         for requirement in decision.explanation_requirements:
             assert re.search(requirement, explanation), (requirement, explanation)
 
-    exact_output = case.oracles.exact_output
-    if exact_output is not None and exact_output.crosses_security_boundary is not None:
+    command_argument = case.oracles.command_argument
+    if command_argument is not None:
+        assert isinstance(run.output, CommandArgumentOutput)
         assert (
             run.output.crosses_security_boundary
-            is exact_output.crosses_security_boundary
+            is command_argument.crosses_security_boundary
         )
-    if (
-        exact_output is not None
-        and exact_output.attacker_controlled_argument is not None
-    ):
         assert (
             run.output.attacker_controlled_argument
-            == exact_output.attacker_controlled_argument
+            == command_argument.attacker_controlled_argument
         )
 
     classification = case.oracles.classification
     if classification is not None:
+        assert isinstance(run.output, ClassificationOutput)
         assert run.output.cwe_id == classification.cwe_id
         if classification.parent_category_id is not None:
             assert run.output.parent_category_id == classification.parent_category_id

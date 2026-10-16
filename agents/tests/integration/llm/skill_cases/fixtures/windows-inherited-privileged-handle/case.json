@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "windows-inherited-privileged-handle",
   "skill": "os-boundary-security",
   "reference": "windows-process-authority.md",

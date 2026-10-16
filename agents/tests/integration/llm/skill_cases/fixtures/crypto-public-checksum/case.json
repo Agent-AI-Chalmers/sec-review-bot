@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "crypto-public-checksum",
   "skill": "cryptography-security",
   "reference": "password-verifiers.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "checksum|cache|public",
         "password|offline"

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "supply-private-source-enforced",
   "skill": "software-supply-chain-security",
   "reference": "dependency-selection.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "single|private|source|hash",
         "pin|attacker|candidate"

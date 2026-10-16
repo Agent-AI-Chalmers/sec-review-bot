@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "supply-install-scripts-disabled",
   "skill": "software-supply-chain-security",
   "reference": "install-build-execution.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "ignore-scripts|disabled|postinstall",
         "later|execution"

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "web-upload-sink-unknown",
   "skill": "web-security",
   "reference": "file-upload.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "storage|serv|disposition|parser",
         "reader|sink|unknown"

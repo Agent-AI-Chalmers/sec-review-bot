@@ -1,11 +1,10 @@
 {
-  "schema_version": 1,
   "id": "argument-injection-local-cli",
   "skill": "os-boundary-security",
   "reference": "process-execution-input.md",
   "modes": [
     "prompted",
-    "contrast"
+    "compare"
   ],
   "task": "Assess whether the report-name value controls the child parser and whether that behavior is a security vulnerability.",
   "facts": [
@@ -16,14 +15,14 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "argument|option|--output",
         "local user|own.*permission|intended",
         "no.*boundary|not.*vulnerab|not.*security"
       ]
     },
-    "exact_output": {
+    "command_argument": {
       "crosses_security_boundary": false,
       "attacker_controlled_argument": "--output=/srv/config/runtime.json"
     }

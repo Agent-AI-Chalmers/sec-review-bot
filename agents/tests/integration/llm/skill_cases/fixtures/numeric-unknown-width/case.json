@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "numeric-unknown-width",
   "skill": "memory-numeric-safety",
   "reference": "numeric-semantics-and-bounds.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "proof_gap_requirements": [
         "operand.*type|width|signed",
         "overflow|arithmetic.*behavior",

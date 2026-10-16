@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "ci-artifact-unknown-reader",
   "skill": "ci-security",
   "reference": "secret-and-artifact-exposure.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "content|reader|access|secret",
         "credential|unknown|evidence"

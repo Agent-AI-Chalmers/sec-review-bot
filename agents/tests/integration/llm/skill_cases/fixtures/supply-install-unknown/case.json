@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "supply-install-unknown",
   "skill": "software-supply-chain-security",
   "reference": "install-build-execution.md",
@@ -13,7 +12,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "unresolved",
       "explanation_requirements": [
         "artifact|command|version|script",
         "enabled|unknown|evidence"

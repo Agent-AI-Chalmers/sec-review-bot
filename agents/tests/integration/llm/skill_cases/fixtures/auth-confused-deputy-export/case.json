@@ -1,7 +1,6 @@
 {
-  "schema_version": 1,
   "id": "auth-confused-deputy-export",
-  "skill": "authorization-delegation-security",
+  "skill": "authorization-security",
   "reference": "delegated-authority.md",
   "modes": [
     "discovery"

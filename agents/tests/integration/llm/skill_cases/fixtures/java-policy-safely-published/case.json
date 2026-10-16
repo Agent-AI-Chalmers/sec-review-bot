@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "id": "java-policy-safely-published",
   "skill": "concurrency-resource-security",
   "reference": "java-memory-model.md",
@@ -14,7 +13,7 @@
   ],
   "oracles": {
     "decision": {
-      "verdict": "not-confirmed",
+      "verdict": "rejected",
       "explanation_requirements": [
         "immutable|final|volatile",
         "happens-before|publish"

@@ -7,5 +7,5 @@ VERIFICATION_AGENT_SKILLS = (
     "os-boundary-security",
     "parser-protocol-security",
     "software-supply-chain-security",
-    "authorization-delegation-security",
+    "authorization-security",
 )
