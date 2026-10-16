@@ -16,6 +16,7 @@ price source, and every stage is then reported as unknown cost.
 
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
 import urllib.request
@@ -160,7 +161,12 @@ def _fetch_payload(timeout_s: float) -> Any | None:
     try:
         with urllib.request.urlopen(request, timeout=timeout_s) as response:
             return json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, OSError, ValueError):
+    except (
+        urllib.error.URLError,
+        OSError,
+        ValueError,
+        http.client.HTTPException,
+    ):
         return None
 
 
