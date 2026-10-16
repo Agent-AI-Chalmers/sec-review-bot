@@ -17,7 +17,7 @@
       "verdict": "confirmed",
       "explanation_requirements": [
         "impersonat|client token",
-        "RevertToSelf|revert",
+        "reverttoself|revert",
         "worker|thread",
         "low-privilege|restricted",
         "unavailable|denial|fail"
