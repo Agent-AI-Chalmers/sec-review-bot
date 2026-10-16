@@ -3,6 +3,7 @@ from sec_review_agents.agents.analysis.issue import (
     build_issue_analyzer_system_prompt,
 )
 from sec_review_agents.agents.analysis.pull_request import (
+    build_pr_analyzer_filesystem_system_prompt,
     build_pr_analyzer_system_prompt,
 )
 from sec_review_agents.agents.analysis.repository import (
@@ -10,10 +11,13 @@ from sec_review_agents.agents.analysis.repository import (
     build_repository_analyzer_system_prompt,
 )
 from sec_review_agents.agents.mitigation.issue import (
+    build_issue_mitigation_filesystem_system_prompt,
     build_issue_mitigation_system_prompt,
+    build_issue_self_check_mitigation_filesystem_system_prompt,
     build_issue_self_check_mitigation_system_prompt,
 )
 from sec_review_agents.agents.mitigation.pull_request import (
+    build_pr_mitigation_filesystem_system_prompt,
     build_pr_mitigation_system_prompt,
 )
 from sec_review_agents.agents.mitigation.repository import (
@@ -29,6 +33,7 @@ from sec_review_agents.agents.verification.issue import (
     build_issue_verification_system_prompt,
 )
 from sec_review_agents.agents.verification.pull_request import (
+    build_pr_verification_filesystem_system_prompt,
     build_pr_verification_system_prompt,
 )
 from sec_review_agents.agents.verification.repository import (
@@ -203,8 +208,46 @@ def test_filesystem_prompts_bound_git_exploration() -> None:
         ),
     ]
 
-    for prompt, core_path, delta_path in prompt_resources:
-        assert prompt == _joined_prompt_resources(core_path, delta_path)
+    for prompt, *resource_paths in prompt_resources:
+        assert prompt == _joined_prompt_resources(*resource_paths)
+
+
+def test_review_filesystem_prompts_advertise_configured_external_tools(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
+    monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
+    joern = load_prompt_resource("external-tools/joern.md")
+    playwright = load_prompt_resource("external-tools/playwright.md")
+    prompts = [
+        build_issue_analyzer_filesystem_system_prompt(),
+        build_pr_analyzer_filesystem_system_prompt(),
+        build_repository_analyzer_filesystem_system_prompt("full"),
+        build_issue_mitigation_filesystem_system_prompt(),
+        build_issue_self_check_mitigation_filesystem_system_prompt(),
+        build_pr_mitigation_filesystem_system_prompt(),
+        build_repository_mitigation_filesystem_system_prompt("full"),
+        build_issue_verification_filesystem_system_prompt(),
+        build_pr_verification_filesystem_system_prompt(),
+        build_repository_verification_filesystem_system_prompt("full"),
+        build_issue_single_agent_filesystem_system_prompt(),
+    ]
+
+    for prompt in prompts:
+        assert prompt.count(joern) == 1
+        assert prompt.count(playwright) == 1
+
+
+def test_review_filesystem_prompts_omit_unconfigured_external_tools(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AGENT_JOERN_ENABLED", raising=False)
+    monkeypatch.delenv("AGENT_PLAYWRIGHT_ENABLED", raising=False)
+
+    prompt = build_issue_analyzer_filesystem_system_prompt()
+
+    assert load_prompt_resource("external-tools/joern.md") not in prompt
+    assert load_prompt_resource("external-tools/playwright.md") not in prompt
 
 
 def test_repository_incremental_evidence_prompt_is_incremental_only() -> None:

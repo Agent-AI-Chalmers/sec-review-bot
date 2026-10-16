@@ -4,6 +4,7 @@ from sec_review_agents.mcp.resolver import resolve_agent_mcp_connection_factorie
 
 
 def test_mcp_connection_factories_resolve_declared_codegraph_tool(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
     backend = object()
     calls = []
 
@@ -26,6 +27,7 @@ def test_mcp_connection_factories_resolve_declared_codegraph_tool(monkeypatch) -
 def test_mcp_connection_factories_resolve_declared_playwright_tool(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
     backend = object()
     calls = []
 

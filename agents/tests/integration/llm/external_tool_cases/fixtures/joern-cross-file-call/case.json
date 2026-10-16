@@ -1,0 +1,19 @@
+{
+  "id": "joern-cross-file-call",
+  "tool": "joern",
+  "review_input": "Verify the repository-grounded claim that authorize delegates its security decision to validate_token across a file boundary. For this discovery probe, direct source reading is necessary but not sufficient: obtain supporting call-relationship evidence from the enabled external code property graph CLI without relying on a prewritten command. No mitigation patch was supplied.",
+  "analysis_overview": "handler.c calls the validation routine implemented in service.c, so the authorization decision depends on a cross-file call edge.",
+  "oracles": {
+    "validation_level": "static",
+    "required_execute_interactions": [
+      {
+        "arguments_pattern": "joern",
+        "result_pattern": "authorize|validate_token"
+      }
+    ],
+    "result_requirements": [
+      "authorize",
+      "validate_token"
+    ]
+  }
+}

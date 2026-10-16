@@ -2,6 +2,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from sec_review_agents.agents.single_agent.external_tools import (
+    SINGLE_AGENT_EXTERNAL_TOOLS,
+)
 from sec_review_agents.agents.single_agent.skills import SINGLE_AGENT_SKILLS
 from sec_review_agents.features import agent_memory_enabled, agent_skills_enabled
 from sec_review_agents.filesystem import backend_selection
@@ -16,6 +19,9 @@ from sec_review_agents.memory.store import configured_memory_path_view
 from sec_review_agents.resources.loader import (
     join_prompt_sections,
     load_prompt_resource,
+)
+from sec_review_agents.runtime.external_tools import (
+    external_tool_prompt_paths_for,
 )
 from sec_review_agents.runtime.runtime_config import (
     RunnerRuntimeContext,
@@ -101,6 +107,7 @@ def build_issue_single_agent_filesystem_system_prompt() -> str:
     return join_prompt_sections(
         [
             "single-agent/filesystem-system-core.md",
+            *external_tool_prompt_paths_for(SINGLE_AGENT_EXTERNAL_TOOLS),
             "scopes/issue/single-agent/filesystem-system-delta.md",
         ]
     )

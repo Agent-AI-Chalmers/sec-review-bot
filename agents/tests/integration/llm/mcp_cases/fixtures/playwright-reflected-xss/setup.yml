@@ -1,6 +1,6 @@
 setup:
   - run: |
-      nohup python app.py >/tmp/playwright-xss-case.log 2>&1 &
+      nohup python mcp_reflected_server.py >/tmp/playwright-xss-case.log 2>&1 &
       for attempt in $(seq 1 50); do
         curl --fail --silent http://127.0.0.1:8765/ >/dev/null && exit 0
         sleep 0.1

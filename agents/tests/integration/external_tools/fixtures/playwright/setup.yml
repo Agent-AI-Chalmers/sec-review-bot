@@ -1,0 +1,9 @@
+setup:
+  - run: |
+      nohup python app.py >/tmp/playwright-cli-capability.log 2>&1 &
+      for attempt in $(seq 1 50); do
+        curl --fail --silent http://127.0.0.1:8770/ >/dev/null && exit 0
+        sleep 0.1
+      done
+      cat /tmp/playwright-cli-capability.log
+      exit 1

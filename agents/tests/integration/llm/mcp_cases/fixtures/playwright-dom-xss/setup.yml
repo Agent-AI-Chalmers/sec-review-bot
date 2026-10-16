@@ -1,6 +1,6 @@
 setup:
   - run: |
-      nohup python app.py >/tmp/playwright-dom-xss-case.log 2>&1 &
+      nohup python mcp_dom_server.py >/tmp/playwright-dom-xss-case.log 2>&1 &
       for attempt in $(seq 1 50); do
         curl --fail --silent http://127.0.0.1:8766/ >/dev/null && exit 0
         sleep 0.1

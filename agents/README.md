@@ -295,6 +295,8 @@ The optional workspace tools image installs Joern, CodeGraph, Playwright, and Ch
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
 AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
+AGENT_JOERN_ENABLED=true
+AGENT_PLAYWRIGHT_ENABLED=true
 ```
 
 Joern and Playwright are intended for use through bash and their CLIs. The existing CodeGraph and Playwright MCP integrations remain available but are disabled by default. Enable them explicitly when needed:

@@ -2,6 +2,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from sec_review_agents.agents.mitigation.external_tools import (
+    MITIGATION_AGENT_EXTERNAL_TOOLS,
+)
 from sec_review_agents.agents.mitigation.skills import MITIGATION_AGENT_SKILLS
 from sec_review_agents.features import agent_memory_enabled, agent_skills_enabled
 from sec_review_agents.filesystem import backend_selection
@@ -20,6 +23,9 @@ from sec_review_agents.resources.loader import (
 from sec_review_agents.review_stages.feedback_loop import (
     mitigation_feedback_retry_context,
     render_retry_revision_context_section,
+)
+from sec_review_agents.runtime.external_tools import (
+    external_tool_prompt_paths_for,
 )
 from sec_review_agents.runtime.runtime_config import (
     RunnerRuntimeContext,
@@ -129,6 +135,7 @@ def build_repository_mitigation_filesystem_system_prompt(
 ) -> str:
     paths = [
         "mitigator/filesystem-system-core.md",
+        *external_tool_prompt_paths_for(MITIGATION_AGENT_EXTERNAL_TOOLS),
         "scopes/repository/mitigator/filesystem-system-delta.md",
     ]
     if scan_mode == "incremental":

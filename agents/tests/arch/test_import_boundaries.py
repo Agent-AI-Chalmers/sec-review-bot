@@ -160,6 +160,7 @@ def test_review_single_agent_core_stays_workflow_neutral() -> None:
     expected_agent_files = {
         "__init__.py",
         "agent.py",
+        "external_tools.py",
         "issue.py",
         "mcp.py",
         "model.py",

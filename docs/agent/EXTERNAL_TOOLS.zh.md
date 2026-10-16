@@ -8,7 +8,7 @@
 
 ## TL;DR
 
-选定的默认外部工具是用于 code property graph 分析的 Joern，以及用于浏览器运行时验证的 Playwright。它们将通过 bash 和各自的 CLI 暴露给 agent。Runtime 只需要提示 agent 这些命令可用；默认不需要为它们提供 bundled skill。
+选定的默认外部工具是用于 code property graph 分析的 Joern，以及用于浏览器运行时验证的 Playwright。配置 `AGENT_JOERN_ENABLED=true` 和 `AGENT_PLAYWRIGHT_ENABLED=true` 后，它们通过 bash 和各自的 CLI 暴露给 agent。默认不需要为它们提供 bundled skill。
 
 项目同时保留 MCP 集成框架。CodeGraph 和 Playwright 已为能够使用它们的 agent 提供可选 MCP 配置，但 MCP 默认关闭。这些集成仍可用于开发、实验，以及明确选择 MCP 的部署环境。
 
@@ -37,7 +37,7 @@ MCP 是向 model client 暴露能力的协议。它的 [server features](https:/
 
 ## 自描述 CLI
 
-Agent 已经可以在 sandbox 中使用 bash。可用的 CLI 能够通过命令树、`--help`、结构化输出、退出状态、stdout 和 stderr 说明自己的接口。Runtime 告诉 agent 某个命令已经安装后，agent 可以按需发现其用法，而不必预先把所有操作都作为 tool schema 放进上下文。
+Agent 已经可以在 sandbox 中使用 bash。可用的 CLI 能够通过命令树、`--help`、结构化输出、退出状态、stdout 和 stderr 说明自己的接口。部署分别通过 `AGENT_JOERN_ENABLED` 和 `AGENT_PLAYWRIGHT_ENABLED` 启用已安装的命令；两者默认都为 false。每类 review agent 还会声明自己负责使用哪些外部工具。只有部署开关已启用且该 agent 声明过的工具才会进入提示，因此无需修改 prompt 代码就能选择不提示、只提示其中一个或全部提示。Agent 随后可以按需发现所选接口的用法，而不必预先把所有操作都作为 tool schema 放进上下文。
 
 CLI 不需要自动配套 skill。不要把 command reference 复制进 `SKILL.md`。只有实验表明 agent 反复缺少 CLI 接口以外的知识时，才增加 skill，例如：
 
@@ -51,7 +51,7 @@ CLI 不需要自动配套 skill。不要把 command reference 复制进 `SKILL.m
 
 ## 为什么 Joern 和 Playwright 只使用 CLI
 
-Joern 提供 code property graph、结构查询、调用关系和数据流分析。Playwright 提供浏览器交互和运行时证据。项目选择它们是因为这些能力，而不是因为某种接入协议。这里描述的 CLI 路径是目标默认方案；runtime 提示和对应 integration tests 需要随迁移一同落地。
+Joern 提供 code property graph、结构查询、调用关系和数据流分析。Playwright 提供浏览器交互和运行时证据。项目选择它们是因为这些能力，而不是因为某种接入协议。
 
 在当前 runtime 中，这两项能力都不要求 MCP：
 
@@ -63,6 +63,12 @@ Joern 提供 code property graph、结构查询、调用关系和数据流分析
 因此，MCP layer 暴露的能力大体相同，却会增加 tool schema 和 connection lifecycle。它尚未证明能够提供默认 workflow 所需的额外能力。选择 CLI 是因为 CLI 已经足够，而不是因为 CLI 在任何场景都优于 MCP。
 
 Skills 对 Joern 和 Playwright 而言是可选的增强，而不是使用这些工具的前提。它们可以在确有帮助时补充 workflow 或结果解释指导，但默认集成不依赖 skills。
+
+Playwright 的 agent prompt 会显式选择 `--browser chromium`。workspace image 安装的是 Playwright Chromium，但 CLI 默认寻找系统 Chrome；当前帮助文本也没有把实际可用的 `chromium` 列在可选值中。这项部署知识目前无法由 `--help` 可靠提供，因此应当进入选中的工具 prompt，而不是另建 skill。
+
+Capability tests 使用显式 `println` marker 固定 Joern query 的证据。Joern 的交互输出包含 ANSI 格式；稳定 marker 让确定性测试能够断言语义值，而不与终端渲染绑定。Agent 正常使用 Joern 时不需要遵循这项约定。
+
+Joern 的 agent prompt 还记录了一项 discovery probe 证明 `--help` 没有安全说明的 CLI 行为：script 接口期待文件，因此 `joern --script /dev/stdin` 可能持续运行而不退出。Agent 的非交互查询应先用 `joern-parse` 创建 CPG，再从可写目录把 `importCpg` 和 query 作为独立的交互输入行管道给 `joern`。Prompt 只保留这项很小的运行约束，其余 query DSL 仍由 agent 自行发现。
 
 ## 可选 MCP 集成
 

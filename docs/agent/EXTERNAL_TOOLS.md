@@ -6,7 +6,7 @@ This page explains which external tools the agent uses and how those tools enter
 
 ## TL;DR
 
-The chosen default external tools are Joern for code property graph analysis and Playwright for browser-based runtime validation. They will be exposed through bash and their CLIs. The runtime only needs to advertise that the commands are available; neither tool requires a bundled skill by default.
+The chosen default external tools are Joern for code property graph analysis and Playwright for browser-based runtime validation. They are exposed through bash and their CLIs when `AGENT_JOERN_ENABLED=true` and `AGENT_PLAYWRIGHT_ENABLED=true` are configured. Neither tool requires a bundled skill by default.
 
 The project also retains its MCP integration framework. CodeGraph and Playwright have optional MCP configurations for the agents that can use them, but MCP is disabled by default. These integrations remain available for development, experiments, and deployments that deliberately choose MCP.
 
@@ -35,7 +35,7 @@ Official references:
 
 ## Self-Describing CLIs
 
-Agents already have bash inside the sandbox. A usable CLI can describe itself through its command tree, `--help`, structured output, exit status, stdout, and stderr. Once the runtime tells the agent that a command is installed, the agent can discover the interface as needed instead of receiving every operation as a tool schema up front.
+Agents already have bash inside the sandbox. A usable CLI can describe itself through its command tree, `--help`, structured output, exit status, stdout, and stderr. A deployment enables the installed commands independently with `AGENT_JOERN_ENABLED` and `AGENT_PLAYWRIGHT_ENABLED`; both default to false. Each review agent also declares the external tools it owns. A tool is advertised only when its deployment switch is enabled and the agent declares it, so deployments can expose neither tool, either tool, or both without changing prompt code. The agent can then discover each selected interface as needed instead of receiving every operation as a tool schema up front.
 
 A CLI does not automatically need a skill. Do not copy its command reference into `SKILL.md`. Add a skill only when experiments show that the agent repeatedly lacks knowledge outside the interface, such as:
 
@@ -49,7 +49,7 @@ Until such a gap appears, advertising the command and allowing the agent to insp
 
 ## Why Joern And Playwright Use Only CLIs
 
-Joern contributes code property graphs, structural queries, call relationships, and data-flow analysis. Playwright contributes browser interaction and runtime evidence. The project chooses them for those capabilities, not for any particular integration protocol. The CLI path described here is the target default; the runtime advertisement and corresponding integration tests must land with that migration.
+Joern contributes code property graphs, structural queries, call relationships, and data-flow analysis. Playwright contributes browser interaction and runtime evidence. The project chooses them for those capabilities, not for any particular integration protocol.
 
 Neither capability requires MCP in this runtime:
 
@@ -61,6 +61,12 @@ Neither capability requires MCP in this runtime:
 An MCP layer would therefore expose substantially the same capabilities while adding tool schemas and connection lifecycle. It has not demonstrated an additional capability that the default workflow needs. CLI is the default because it is sufficient, not because CLI is universally better than MCP.
 
 Skills remain an optional enhancement for Joern and Playwright, not a prerequisite for using either tool. They may provide additional workflow or interpretation guidance when that guidance proves useful, but the default integration does not depend on them.
+
+The Playwright agent prompt explicitly selects `--browser chromium`. The workspace image installs Playwright Chromium, but the CLI defaults to a system Chrome executable and its current help text does not list `chromium` among the accepted values even though the option works. This is deployment knowledge that `--help` cannot currently supply reliably, so it belongs in the selected tool prompt rather than in a skill.
+
+Capability tests use explicit `println` markers for Joern query evidence. Joern's interactive output contains ANSI formatting, so a stable marker gives the deterministic test oracle a semantic value to assert without coupling it to terminal rendering. Agents do not need this convention to use Joern normally.
+
+The Joern agent prompt also records one CLI behavior that discovery probes showed `--help` does not make safe: `joern --script /dev/stdin` may remain running because the script interface expects a file. Non-interactive agent queries instead create a CPG with `joern-parse` and pipe `importCpg` plus the query as separate interactive input lines to `joern` from a writable directory. The prompt preserves this small operational constraint while leaving the query DSL discoverable.
 
 ## Optional MCP Integrations
 
