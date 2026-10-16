@@ -1,0 +1,26 @@
+{
+  "id": "playwright-reflected-xss",
+  "modes": [
+    "discovery"
+  ],
+  "review_input": "Verify the repository-grounded claim that the search endpoint at http://127.0.0.1:8765/ has executable reflected XSS through the q query parameter. For unambiguous browser evidence, use an encoded payload whose execution calls alert('MCP_REFLECTED_XSS_EXECUTED'). Independently inspect the implementation and obtain focused browser runtime evidence when useful. No mitigation patch was supplied; this case measures verifier validation behavior.",
+  "analysis_overview": "app.py reflects q into an HTML response without escaping, so an injected script may execute in the browser.",
+  "setup_file": "setup.yml",
+  "oracles": {
+    "validation_level": "runtime-endpoint",
+    "required_tool_interactions": [
+      {
+        "tool": "playwright_browser_navigate",
+        "arguments_pattern": "MCP_REFLECTED_XSS_EXECUTED",
+        "result_pattern": "alert.*MCP_REFLECTED_XSS_EXECUTED"
+      }
+    ],
+    "forbidden_tool_error_prefixes": [
+      "playwright_"
+    ],
+    "result_requirements": [
+      "xss|script",
+      "runtime|browser|execut"
+    ]
+  }
+}

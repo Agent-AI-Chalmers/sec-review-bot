@@ -6,13 +6,9 @@ from deepagents.middleware.skills import SkillsMiddleware
 from langchain.agents.middleware import AgentMiddleware
 from langgraph.graph.state import CompiledStateGraph
 
-from sec_review_agents.agents.verification.mcp import (
-    VERIFICATION_AGENT_MCP_TOOLS,
-)
 from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.features import agent_memory_enabled, agent_skills_enabled
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.mcp.resolver import resolve_agent_mcp_connection_factories
 from sec_review_agents.memory.middleware import (
     SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
     MemoryMiddleware,
@@ -39,6 +35,7 @@ async def create_verification_agent_graph(
     backend: BackendProtocol,
     system_prompt: str,
     filesystem_system_prompt: str,
+    mcp_tools: list[Any],
 ) -> CompiledStateGraph:
     model = create_chat_model(agent_name=agent_name)
     memory_enabled = agent_memory_enabled() and memory_runtime_available()
@@ -72,18 +69,12 @@ async def create_verification_agent_graph(
     if model_turn_diagnostics_enabled():
         agent_middleware.append(ModelTurnDiagnosticsMiddleware(agent_name=agent_name))
 
-    mcp_connections: dict[str, Any] = {}
-    for connection_factory in resolve_agent_mcp_connection_factories(
-        VERIFICATION_AGENT_MCP_TOOLS,
-        backend,
-    ):
-        mcp_connections.update(connection_factory())
     return await build_agent_runtime_graph(
         model=model,
         agent_name=agent_name,
         backend=backend,
         system_prompt=system_prompt,
         response_format=VerificationOutput,
-        mcp_connections=mcp_connections,
+        tools=mcp_tools,
         middleware=agent_middleware,
     )

@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict, deque
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -97,6 +98,35 @@ def message_tool_errors(message: dict[str, Any]) -> list[dict[str, str]]:
             "error": content,
         }
     ]
+
+
+def tool_interactions_from_transcript(
+    transcript_path: Path,
+) -> list[dict[str, Any]]:
+    pending: dict[str, deque[dict[str, Any]]] = defaultdict(deque)
+    interactions: list[dict[str, Any]] = []
+    for message in transcript_messages(transcript_path):
+        for tool_call in message.get("tool_calls") or []:
+            if not isinstance(tool_call, dict):
+                continue
+            name = tool_call.get("name")
+            arguments = tool_call.get("args")
+            if isinstance(name, str) and isinstance(arguments, dict):
+                pending[name].append(arguments)
+
+        if message.get("type") != "tool":
+            continue
+        name = message.get("name")
+        if not isinstance(name, str) or not pending[name]:
+            continue
+        interactions.append(
+            {
+                "tool": name,
+                "arguments": pending[name].popleft(),
+                "result": message.get("content"),
+            }
+        )
+    return interactions
 
 
 def looks_like_git_command(command: str) -> bool:

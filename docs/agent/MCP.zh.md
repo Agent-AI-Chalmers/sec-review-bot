@@ -37,7 +37,13 @@ CodeGraph 比较特殊，因为它必须读取 agent 当前看到的 repository 
 
 在本项目里，`/workspace` 是 agent 稳定使用的路径，但它背后对应的真实目录由当前 run / stage / session 组装出来。CodeGraph 需要的是一个可访问的 workspace 绝对路径；这个路径必须指向 agent 当前这次看到的那份 workspace，并且 tool result 里的路径也要能让 agent 继续使用。
 
-这就是为什么 CodeGraph 要贴近 sandbox filesystem。Docker sandbox 模式下启用 CodeGraph，意味着 sandbox image 需要包含 CodeGraph；见 [`workspace-codegraph.Dockerfile`](../../agents/docker/workspace-codegraph.Dockerfile)。
+这就是为什么 CodeGraph 必须运行在能够直接寻址 sandbox workspace 的位置。当前 Docker 集成选择把它安装进 sandbox image；见 [`workspace-tools.Dockerfile`](../../agents/docker/workspace-tools.Dockerfile)。这是 CodeGraph 的 workspace 约束，不是 MCP 的通用规则：只要 trust、identity、network 和 data boundary 允许，其他 MCP server 完全可以运行在 worker 旁边或作为远程服务。
+
+## Playwright
+
+Playwright 并非天然需要运行在 sandbox 内。浏览器 MCP server 可以是远程服务，前提是 workflow 明确定义它如何访问目标应用、由谁持有浏览器状态，以及页面内容和凭据会跨越哪条 trust boundary。
+
+当前实现把 Playwright MCP 和 Chromium 放在 Docker sandbox 中。这是部署选择：浏览器可以与 repository setup 启动的服务共享同一个 stage 生命周期和 network namespace，不需要把这些服务暴露到 sandbox 外，同时浏览器运行时也能与其他 workspace tools 一起打包。未来若增加 remote 或 runner-side Playwright，应使用独立 resolver，并明确 network、identity、isolation 和 artifact handling contract；MCP 协议本身不要求共置。
 
 ## 选择 MCP 工具
 
@@ -61,7 +67,7 @@ CodeGraph 比较特殊，因为它必须读取 agent 当前看到的 repository 
 
 新增 MCP 集成时，MCP client / connection helper 应该放在专门的 MCP package 里；真正需要该工具的 agent 再调用这些 helper 接入工具。不要让 runtime 全局默认挂载。文档里要说明需要的环境变量、sandbox、凭据或 server 可用性，并明确失败时应该降级还是中断。
 
-增加聚焦测试，证明 MCP tools 能被加载、环境开关和失败处理符合预期，并且只有目标 agent session 能拿到这些 tools。如果价值依赖模型行为，用 gated LLM integration 或 contrast test 验证。除非项目同时定义 provenance、合并顺序和 prompt-injection 处理方式，否则不要加载 MCP prompts / resources。
+增加聚焦的 contract tests，证明 MCP tools 能被加载、环境开关和失败处理符合预期，并且只有目标 agent session 能拿到这些 tools。使用不依赖模型的 capability integration tests 验证 transport、tool execution 和 state continuity。只有 model tool selection 或 decision quality 才使用 gated LLM discovery 或 paired comparison cases。除非项目同时定义 provenance、合并顺序和 prompt-injection 处理方式，否则不要加载 MCP prompts / resources。
 
 ## Bash + Skills vs. MCP
 

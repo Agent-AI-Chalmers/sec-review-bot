@@ -297,12 +297,12 @@ MCP 在本项目里的定位见 [Agent MCP](../docs/agent/MCP.zh.md)。这里仅
 
 ---
 
-CodeGraph 能帮助 agent 做 symbol / caller tracing，比单纯 grep 更适合跨文件调用关系。Docker sandbox 下，先构建带 CodeGraph 的 workspace 镜像，再把它作为 sandbox 镜像，并开启 MCP：
+workspace tools 镜像提供 CodeGraph symbol / caller tracing 和 Playwright 浏览器验证。要在 Docker 中使用它们，先构建该镜像，把它设为 sandbox image，并开启 MCP：
 
 ```bash
-docker build -f agents/docker/workspace-codegraph.Dockerfile -t sec-review-bot-workspace:codegraph agents
-AGENT_DOCKER_IMAGE=sec-review-bot-workspace:codegraph
+docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
+AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
 AGENT_MCP_ENABLED=true
 ```
 
-正常阶段执行的 CodeGraph 正式路径是 Docker sandbox。
+集成与部署边界见 [Agent MCP](../docs/agent/MCP.zh.md)。

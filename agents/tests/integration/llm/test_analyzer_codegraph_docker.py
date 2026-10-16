@@ -22,7 +22,7 @@ from tests.integration.llm.probe_helpers import ProbeRequirement, llm_probe
 from tests.integration.llm.transcript_artifact_helpers import tool_usage_from_transcript
 
 _CODEGRAPH_DOCKER_IMAGE_ENV = "AGENT_CODEGRAPH_DOCKER_IMAGE"
-_DEFAULT_CODEGRAPH_DOCKER_IMAGE = "sec-review-bot-workspace:codegraph"
+_DEFAULT_CODEGRAPH_DOCKER_IMAGE = "sec-review-bot-workspace:tools"
 
 
 def _codegraph_docker_image() -> str:
@@ -55,8 +55,8 @@ PROBE = llm_probe(
             is_met=lambda: _docker_image_exists(_codegraph_docker_image()),
             instruction=(
                 "build the CodeGraph Docker image with: docker build -f "
-                "agents/docker/workspace-codegraph.Dockerfile -t "
-                "sec-review-bot-workspace:codegraph agents"
+                "agents/docker/workspace-tools.Dockerfile -t "
+                "sec-review-bot-workspace:tools agents"
             ),
         ),
     ),

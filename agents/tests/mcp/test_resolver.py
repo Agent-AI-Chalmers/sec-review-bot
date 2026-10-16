@@ -23,6 +23,28 @@ def test_mcp_connection_factories_resolve_declared_codegraph_tool(monkeypatch) -
     assert calls == [backend]
 
 
+def test_mcp_connection_factories_resolve_declared_playwright_tool(
+    monkeypatch,
+) -> None:
+    backend = object()
+    calls = []
+
+    def fake_playwright_connections(received_backend):
+        calls.append(received_backend)
+        return {"playwright": {"transport": "stdio"}}
+
+    monkeypatch.setattr(
+        "sec_review_agents.mcp.resolver.playwright_mcp_connections_for_backend",
+        fake_playwright_connections,
+    )
+
+    factories = resolve_agent_mcp_connection_factories(("playwright",), backend)
+
+    assert len(factories) == 1
+    assert factories[0]() == {"playwright": {"transport": "stdio"}}
+    assert calls == [backend]
+
+
 def test_mcp_connection_factories_reject_unknown_tool() -> None:
     with pytest.raises(ValueError, match="Unknown agent MCP tool: osv"):
         resolve_agent_mcp_connection_factories(("osv",), object())

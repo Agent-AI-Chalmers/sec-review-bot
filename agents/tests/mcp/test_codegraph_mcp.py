@@ -1,3 +1,10 @@
+"""Contract tests for CodeGraph MCP connection resolution.
+
+These tests isolate backend support, index preparation policy, path mapping,
+and connection construction. The real Docker index and explore behavior is
+covered without a model by tests/integration/mcp/test_codegraph_capability.py.
+"""
+
 import subprocess
 from pathlib import Path
 from unittest.mock import Mock, patch

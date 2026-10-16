@@ -1,0 +1,32 @@
+{
+  "id": "playwright-dom-xss",
+  "modes": [
+    "compare"
+  ],
+  "review_input": "Verify the repository-grounded claim that http://127.0.0.1:8766/ has executable DOM XSS through the URL fragment. The fragment is client-side state and is not sent in the HTTP request. For unambiguous browser evidence, use an encoded payload whose execution calls alert('MCP_DOM_XSS_EXECUTED'). Independently inspect the implementation and obtain runtime evidence when useful. No mitigation patch was supplied; this case compares verification with MCP disabled and enabled.",
+  "analysis_overview": "The page decodes location.hash and assigns it to innerHTML, so attacker-controlled fragment markup may execute in the browser.",
+  "setup_file": "setup.yml",
+  "oracles": {
+    "validation_level": "runtime-endpoint",
+    "required_tool_interactions": [
+      {
+        "tool": "playwright_browser_navigate",
+        "arguments_pattern": "MCP_DOM_XSS_EXECUTED",
+        "result_pattern": "alert.*MCP_DOM_XSS_EXECUTED"
+      }
+    ],
+    "forbidden_tool_error_prefixes": [
+      "playwright_"
+    ],
+    "without_mcp_forbidden_tool_prefixes": [
+      "playwright_"
+    ],
+    "without_mcp_forbidden_validation_levels": [
+      "runtime-endpoint"
+    ],
+    "result_requirements": [
+      "dom|fragment|location\\.hash",
+      "xss|script|execut"
+    ]
+  }
+}

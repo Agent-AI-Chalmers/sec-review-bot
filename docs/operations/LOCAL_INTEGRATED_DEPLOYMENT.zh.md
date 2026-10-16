@@ -239,11 +239,11 @@ AGENT_DOCKER_NETWORK_MODE=none
 
 执行节点使用 `AGENT_SANDBOX_BACKEND=docker` 后，Docker 不可用时 worker 会在启动阶段失败。
 
-要在 sandbox 中启用 CodeGraph MCP，先构建专用镜像，再修改镜像和 MCP 配置：
+要通过仓库提供的 Docker 镜像启用 CodeGraph 和 Playwright MCP，先构建 workspace tools 镜像，再修改镜像和 MCP 配置：
 
 ```bash
-docker build -f agents/docker/workspace-codegraph.Dockerfile -t sec-review-bot-workspace:codegraph agents
-AGENT_DOCKER_IMAGE=sec-review-bot-workspace:codegraph
+docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
+AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
 AGENT_MCP_ENABLED=true
 ```
 

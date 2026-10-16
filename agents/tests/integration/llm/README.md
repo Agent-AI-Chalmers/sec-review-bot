@@ -74,15 +74,17 @@ Heavy probes should be run deliberately. They may start Docker containers, run f
 
 | Probe | Enable with | Extra requirements | Purpose |
 | --- | --- | --- | --- |
-| Analyzer Docker + CodeGraph | `RUN_LLM_ANALYZER_CODEGRAPH_DOCKER_INTEGRATION=1` | repository analyzer binding, `sec-review-bot-workspace:codegraph` image | Compares analyzer behavior with and without CodeGraph on a cross-file case. |
-| CodeGraph public checkout | `RUN_LLM_CODEGRAPH_REAL_CHECKOUT_INTEGRATION=1` | issue analyzer binding, `sec-review-bot-workspace:codegraph` image, network for clone | Runs a pinned public vulnerable checkout comparison. |
+| Analyzer Docker + CodeGraph | `RUN_LLM_ANALYZER_CODEGRAPH_DOCKER_INTEGRATION=1` | repository analyzer binding, `sec-review-bot-workspace:tools` image | Compares analyzer behavior with and without CodeGraph on a cross-file case. |
+| CodeGraph public checkout | `RUN_LLM_CODEGRAPH_REAL_CHECKOUT_INTEGRATION=1` | issue analyzer binding, `sec-review-bot-workspace:tools` image, network for clone | Runs a pinned public vulnerable checkout comparison. |
+| MCP cases | `RUN_LLM_MCP_CASES=1` | relevant product agent bindings, `sec-review-bot-workspace:tools` image | Runs data-driven MCP discovery and paired comparison cases through normal product workflows. Transport and state continuity are covered by separate no-model capability tests. |
 
-Build the CodeGraph workspace image when a probe needs it:
+Build the workspace tools image when a probe needs CodeGraph or Playwright:
 
 ```bash
-docker build -f agents/docker/workspace-codegraph.Dockerfile \
-  -t sec-review-bot-workspace:codegraph \
+docker build -f agents/docker/workspace-tools.Dockerfile \
+  -t sec-review-bot-workspace:tools \
   agents
 ```
 
 Heavy probes usually write artifacts under `.agent-artifacts/`.
+MCP cases retain each run under `.agent-artifacts/mcp-cases/`; set `MCP_CASE_OUTPUT_DIR` to override that location.

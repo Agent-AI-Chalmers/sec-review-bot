@@ -237,11 +237,11 @@ AGENT_DOCKER_NETWORK_MODE=none
 
 With `AGENT_SANDBOX_BACKEND=docker`, the worker fails during startup when Docker is unavailable.
 
-To enable CodeGraph MCP in the sandbox, build the dedicated image and update the image and MCP settings:
+To enable CodeGraph and Playwright MCP with the provided Docker image, build the workspace tools image and update the image and MCP settings:
 
 ```bash
-docker build -f agents/docker/workspace-codegraph.Dockerfile -t sec-review-bot-workspace:codegraph agents
-AGENT_DOCKER_IMAGE=sec-review-bot-workspace:codegraph
+docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
+AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
 AGENT_MCP_ENABLED=true
 ```
 

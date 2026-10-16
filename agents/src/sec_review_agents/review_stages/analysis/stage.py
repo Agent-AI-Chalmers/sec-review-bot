@@ -8,6 +8,9 @@ from typing import Any
 from sec_review_agents.agents.analysis.agent import (
     create_analysis_agent_graph,
 )
+from sec_review_agents.agents.analysis.mcp import ANALYSIS_AGENT_MCP_TOOLS
+from sec_review_agents.mcp.client import managed_mcp_tools_async
+from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.review_stages.analysis.result import build_analysis_stage_result
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
@@ -55,19 +58,28 @@ async def run_analysis_stage(
                     backend, setup_declaration_content=setup_declaration_content
                 ),
             )
-            agent_graph = await create_analysis_agent_graph(
-                agent_name=agent_name,
-                backend=backend,
-                system_prompt=system_prompt,
-                filesystem_system_prompt=filesystem_system_prompt,
+            # The agent package owns MCP capability selection. The stage
+            # materializes those tools so their sessions span graph construction
+            # and the complete invocation.
+            mcp_connections = resolve_agent_mcp_connections(
+                ANALYSIS_AGENT_MCP_TOOLS,
+                backend,
             )
-            agent_output = await invoke_agent_runtime_graph(
-                agent=agent_graph,
-                agent_name=agent_name,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                transcript_paths=transcript_paths,
-            )
+            async with managed_mcp_tools_async(mcp_connections) as mcp_tools:
+                agent_graph = await create_analysis_agent_graph(
+                    agent_name=agent_name,
+                    backend=backend,
+                    system_prompt=system_prompt,
+                    filesystem_system_prompt=filesystem_system_prompt,
+                    mcp_tools=mcp_tools,
+                )
+                agent_output = await invoke_agent_runtime_graph(
+                    agent=agent_graph,
+                    agent_name=agent_name,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    transcript_paths=transcript_paths,
+                )
         return persist_analysis_stage_result(
             agent_output=agent_output,
             analyzer_artifacts_path=analyzer_artifacts_path,

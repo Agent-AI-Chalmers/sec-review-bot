@@ -35,7 +35,13 @@ CodeGraph is special because it must read the repository workspace the agent cur
 
 In this project, `/workspace` is the stable path the agent uses, but the real directory behind it is assembled for the current run / stage / session. CodeGraph needs a reachable absolute workspace path; that path must point to the workspace the agent sees for this session, and tool results must use paths the agent can continue using.
 
-This is why CodeGraph belongs close to the sandbox filesystem. In Docker sandbox mode, enabling CodeGraph means the sandbox image needs to include CodeGraph; see [`workspace-codegraph.Dockerfile`](../../agents/docker/workspace-codegraph.Dockerfile).
+This is why CodeGraph must run where it can address the sandbox workspace directly. The current Docker integration installs it in the sandbox image; see [`workspace-tools.Dockerfile`](../../agents/docker/workspace-tools.Dockerfile). That placement is a CodeGraph workspace constraint, not a general MCP rule: other MCP servers may run beside the worker or as remote services when their trust, identity, network, and data boundaries allow it.
+
+## Playwright
+
+Playwright does not inherently need to run inside the sandbox. A browser MCP server can be remote as long as the workflow deliberately defines how it reaches the target application, what browser state it owns, and which trust boundary receives page content and credentials.
+
+The current implementation runs Playwright MCP and Chromium in the Docker sandbox. This is a deployment choice that keeps the browser in the same stage lifetime and network namespace as services started by repository setup, avoids exposing those services outside the sandbox, and packages the browser runtime in the same `workspace-tools` image. A future remote or runner-side Playwright integration should be a separate resolver with explicit network, identity, isolation, and artifact-handling contracts; MCP itself does not require co-location.
 
 ## Choosing MCP Tools
 
@@ -61,7 +67,7 @@ Related code-intelligence MCP projects:
 
 When adding an MCP integration, keep the MCP client / connection helper in the MCP package, and attach it only to agents that need the tool. Do not make runtime attach the tool globally. Document the required environment, sandbox, credentials, or server availability, and decide whether failures should degrade or abort.
 
-Add focused tests showing that the MCP tools can be loaded, environment gates and failure handling behave as expected, and only the intended agent sessions receive the tools. If the value depends on model behavior, use a gated LLM integration or contrast test. Do not load MCP prompts / resources unless the project also defines provenance, merge order, and prompt-injection handling for them.
+Add focused contract tests showing that the MCP tools can be loaded, environment gates and failure handling behave as expected, and only the intended agent sessions receive the tools. Add no-model capability integration tests for transport, tool execution, and state continuity. Use gated LLM discovery or paired comparison cases only for behavior that depends on model tool selection or decision quality. Do not load MCP prompts / resources unless the project also defines provenance, merge order, and prompt-injection handling for them.
 
 ## Bash + Skills vs. MCP
 

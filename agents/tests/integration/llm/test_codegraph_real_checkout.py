@@ -24,7 +24,7 @@ from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.integration.llm.probe_helpers import ProbeRequirement, llm_probe
 from tests.integration.llm.transcript_artifact_helpers import tool_usage_from_transcript
 
-_WORKSPACE_IMAGE = "sec-review-bot-workspace:codegraph"
+_WORKSPACE_IMAGE = "sec-review-bot-workspace:tools"
 _RUN_ENV = "RUN_LLM_CODEGRAPH_REAL_CHECKOUT_INTEGRATION"
 _OUTPUT_DIR_ENV = "CODEGRAPH_REAL_CHECKOUT_OUTPUT_DIR"
 _DEFAULT_OUTPUT_ROOT = Path(".agent-artifacts/codegraph-real-checkout")
@@ -85,7 +85,7 @@ PROBE = llm_probe(
         ProbeRequirement(
             name="CodeGraph workspace Docker image",
             is_met=lambda: _docker_image_exists(_WORKSPACE_IMAGE),
-            instruction="build sec-review-bot-workspace:codegraph",
+            instruction="build sec-review-bot-workspace:tools",
         ),
     ),
 )

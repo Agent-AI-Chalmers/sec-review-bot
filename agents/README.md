@@ -292,12 +292,12 @@ Benchmark and local debug runs can set `runtime.workspace_image` to choose the i
 
 See [Agent MCP](../docs/agent/MCP.md) for how MCP fits into this project. This section only lists common optional tools for local runs.
 
-CodeGraph helps the agent with symbol / caller tracing, which is often better than plain grep for cross-file call relationships. For Docker sandbox, build a workspace image with CodeGraph installed, use it as the sandbox image, and enable MCP:
+The workspace tools image provides CodeGraph for symbol / caller tracing and Playwright for browser validation. To use them with Docker, build the image, select it as the sandbox image, and enable MCP:
 
 ```bash
-docker build -f agents/docker/workspace-codegraph.Dockerfile -t sec-review-bot-workspace:codegraph agents
-AGENT_DOCKER_IMAGE=sec-review-bot-workspace:codegraph
+docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
+AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
 AGENT_MCP_ENABLED=true
 ```
 
-The documented CodeGraph path for normal stage execution is Docker sandbox.
+See [Agent MCP](../docs/agent/MCP.md) for integration and deployment boundaries.
