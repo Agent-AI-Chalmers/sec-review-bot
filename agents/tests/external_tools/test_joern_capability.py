@@ -1,6 +1,10 @@
-"""No-model capability tests for Joern CLI in the Docker sandbox."""
+"""No-model cases proving that the installed Joern CLI can provide CPG evidence.
 
-import shutil
+These capability cases test the tool and sandbox integration directly. They do not
+test whether an agent discovers Joern or chooses an effective query; the LLM
+discovery and comparison modes own those behavioral questions.
+"""
+
 import subprocess
 from pathlib import Path
 from unittest.mock import patch
@@ -15,11 +19,32 @@ from sec_review_agents.filesystem.docker_runtime import (
     is_docker_runtime_available,
 )
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from tests.external_tools.case_support.loader import (
+    cases_for_mode,
+    load_external_tool_cases,
+)
+from tests.external_tools.case_support.models import ExternalToolCase
+from tests.external_tools.case_support.runner import (
+    materialize_external_tool_case_workspace,
+)
 
 _TOOLS_IMAGE = "sec-review-bot-workspace:tools"
-_FIXTURE = Path(__file__).with_name("capability_fixtures") / "joern"
+_QUERIES = {
+    "joern-cross-file-call": (
+        'println("CALLS=" + ' 'cpg.method.name("authorize").call.name.l.mkString(","))'
+    ),
+    "joern-source-to-sink": (
+        'println("FLOW_COUNT=" + cpg.call.name("system").argument.reachableByFlows('
+        'cpg.call.name("read_input")).p.l.size)'
+    ),
+}
 
 pytestmark = pytest.mark.integration
+CASES = tuple(
+    case
+    for case in cases_for_mode(load_external_tool_cases(), "capability")
+    if case.tool == "joern"
+)
 
 
 def _tools_image_available() -> bool:
@@ -35,9 +60,16 @@ def _tools_image_available() -> bool:
     return result.returncode == 0
 
 
-async def _query_joern(tmp_path: Path, query: str) -> str:
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not _tools_image_available(),
+    reason="build sec-review-bot-workspace:tools to run Joern capability tests",
+)
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case.id)
+async def test_joern_capability_case(case: ExternalToolCase, tmp_path: Path) -> None:
+    assert case.capability is not None
     workspace = tmp_path / "workspace"
-    shutil.copytree(_FIXTURE, workspace)
+    materialize_external_tool_case_workspace(case, workspace)
     with patch.dict(
         "os.environ",
         {
@@ -63,40 +95,13 @@ async def _query_joern(tmp_path: Path, query: str) -> str:
                 timeout=120,
             )
             assert parse.exit_code == 0, parse.output
-            command = (
+            query = _QUERIES[case.capability.probe]
+            result = await backend.aexecute(
                 "cd /tmp && printf '%s\\n' "
                 "'importCpg(\"/tmp/external-tools-cpg.bin\")' "
-                f"'{query}' | joern"
+                f"'{query}' | joern",
+                timeout=120,
             )
-            result = await backend.aexecute(command, timeout=120)
-            assert result.exit_code == 0, result.output
-            return result.output
 
-
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    not _tools_image_available(),
-    reason="build sec-review-bot-workspace:tools to run Joern capability tests",
-)
-async def test_joern_queries_cross_file_calls(tmp_path: Path) -> None:
-    output = await _query_joern(
-        tmp_path,
-        'println("CALLS=" + cpg.method.name("authorize").call.name.l.mkString(","))',
-    )
-
-    assert "CALLS=validate_token" in output
-
-
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    not _tools_image_available(),
-    reason="build sec-review-bot-workspace:tools to run Joern capability tests",
-)
-async def test_joern_queries_source_to_sink_data_flow(tmp_path: Path) -> None:
-    output = await _query_joern(
-        tmp_path,
-        'println("FLOW_COUNT=" + cpg.call.name("system").argument.reachableByFlows('
-        'cpg.call.name("read_input")).p.l.size)',
-    )
-
-    assert "FLOW_COUNT=1" in output
+    assert result.exit_code == 0, result.output
+    assert case.capability.expected_marker in result.output

@@ -1,0 +1,11 @@
+{
+  "id": "playwright-browser-state",
+  "tool": "playwright",
+  "modes": ["capability"],
+  "setup_file": "setup.yml",
+  "capability": {
+    "probe": "playwright-browser-state",
+    "expected_marker": "stored",
+    "target_url": "http://127.0.0.1:8770/"
+  }
+}

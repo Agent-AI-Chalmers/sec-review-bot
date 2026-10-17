@@ -3,26 +3,35 @@ from pathlib import Path
 
 import pytest
 
-from tests.external_tools.cases.loader import (
+from tests.external_tools.case_support.loader import (
     cases_for_mode,
     load_external_tool_cases,
 )
-from tests.external_tools.cases.models import GitCheckoutSource
-from tests.external_tools.cases.runner import (
+from tests.external_tools.case_support.models import GitCheckoutSource
+from tests.external_tools.case_support.runner import (
     assert_external_tool_case_oracles,
     has_required_external_tool_evidence,
     materialize_external_tool_case_workspace,
 )
 
 
-def test_external_tool_case_fixtures_are_valid_and_cover_each_tool_twice() -> None:
+def test_external_tool_cases_cover_each_tool_and_mode() -> None:
     cases = load_external_tool_cases()
 
     assert sum(case.tool == "joern" for case in cases) >= 2
     assert sum(case.tool == "playwright" for case in cases) >= 2
+    for mode in ("capability", "discovery", "compare"):
+        assert cases_for_mode(cases, mode), mode
     for case in cases:
         if case.checkout is None:
             assert any(case.workspace_source.iterdir()), case.id
+
+
+def test_external_tool_capability_cases_cover_each_tool() -> None:
+    cases = cases_for_mode(load_external_tool_cases(), "capability")
+
+    assert {case.tool for case in cases} == {"joern", "playwright"}
+    assert all(case.capability is not None for case in cases)
 
 
 def test_external_tool_compare_cases_use_pinned_remote_checkouts() -> None:
@@ -32,7 +41,8 @@ def test_external_tool_compare_cases_use_pinned_remote_checkouts() -> None:
     for case in cases:
         assert case.checkout is not None
         assert len(case.checkout.commit) == 40
-        assert case.oracles.comparison_evidence_patterns
+        assert case.compare is not None
+        assert case.compare.oracles.comparison_evidence_patterns
 
 
 def test_external_tool_oracle_binds_command_and_evidence_to_one_execution() -> None:
@@ -42,6 +52,7 @@ def test_external_tool_oracle_binds_command_and_evidence_to_one_execution() -> N
         if case.id == "playwright-reflected-xss"
     )
     observation = {
+        "mode": "discovery",
         "toolInteractions": [
             {
                 "tool": "execute",
@@ -69,13 +80,14 @@ def test_external_tool_availability_probe_is_not_tool_evidence() -> None:
         case for case in load_external_tool_cases() if case.id == "sftpgo-rsync-command"
     )
     observation = {
+        "mode": "compare",
         "toolInteractions": [
             {
                 "tool": "execute",
                 "arguments": {"command": "which joern joern-parse"},
                 "result": "[Command failed with exit code 1]",
             }
-        ]
+        ],
     }
 
     assert not has_required_external_tool_evidence(case, observation)

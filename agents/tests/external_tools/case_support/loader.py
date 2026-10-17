@@ -3,18 +3,18 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from sec_review_agents.entrypoints.setup_declaration import parse_setup_declaration
-from tests.external_tools.cases.models import (
+from tests.external_tools.case_support.models import (
     ExternalToolCase,
     ExternalToolCaseMode,
 )
 
-EXTERNAL_TOOL_CASE_FIXTURES = Path(__file__).with_name("fixtures")
+EXTERNAL_TOOL_CASES = Path(__file__).parents[1] / "cases"
 
 
 def load_external_tool_cases() -> tuple[ExternalToolCase, ...]:
     cases: list[ExternalToolCase] = []
     seen_ids: set[str] = set()
-    for case_path in sorted(EXTERNAL_TOOL_CASE_FIXTURES.glob("*/case.json")):
+    for case_path in sorted(EXTERNAL_TOOL_CASES.glob("*/case.json")):
         try:
             case = ExternalToolCase.model_validate_json(
                 case_path.read_text(encoding="utf-8")
@@ -36,7 +36,14 @@ def load_external_tool_cases() -> tuple[ExternalToolCase, ...]:
             raise AssertionError(
                 f"external tool case {case.id} cannot have checkout and workspace"
             )
-        if case.workflow == "analysis" and case.setup_path is not None:
+        agent_modes = [
+            agent_case
+            for agent_case in (case.discovery, case.compare)
+            if agent_case is not None
+        ]
+        if case.setup_path is not None and any(
+            agent_case.workflow == "analysis" for agent_case in agent_modes
+        ):
             raise AssertionError(f"analysis case {case.id} cannot declare setup")
         if case.setup_path is not None:
             if not case.setup_path.is_file():
@@ -46,7 +53,7 @@ def load_external_tool_cases() -> tuple[ExternalToolCase, ...]:
         cases.append(case)
     if not cases:
         raise AssertionError(
-            f"no external tool cases found under {EXTERNAL_TOOL_CASE_FIXTURES}"
+            f"no external tool cases found under {EXTERNAL_TOOL_CASES}"
         )
     return tuple(cases)
 

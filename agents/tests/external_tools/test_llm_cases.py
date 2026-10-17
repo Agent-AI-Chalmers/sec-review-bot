@@ -9,11 +9,11 @@ from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
-from tests.external_tools.cases.loader import (
+from tests.external_tools.case_support.loader import (
     cases_for_mode,
     load_external_tool_cases,
 )
-from tests.external_tools.cases.runner import (
+from tests.external_tools.case_support.runner import (
     assert_external_tool_case_oracles,
     has_required_external_tool_evidence,
     materialize_external_tool_case_workspace,
@@ -101,6 +101,7 @@ pytestmark = [
 async def test_external_tool_discovery_case(case) -> None:
     observation = await run_external_tool_case(
         case,
+        mode="discovery",
         run_root=_case_run_root(case.id),
         docker_image=_docker_image(),
     )
@@ -117,6 +118,7 @@ async def test_external_tool_comparison_case(case) -> None:
     materialize_external_tool_case_workspace(case, source_workspace)
     without_tool = await run_external_tool_case(
         case,
+        mode="compare",
         run_root=run_root / "without-tool",
         docker_image=_baseline_docker_image(),
         external_tool_enabled=False,
@@ -124,6 +126,7 @@ async def test_external_tool_comparison_case(case) -> None:
     )
     with_tool = await run_external_tool_case(
         case,
+        mode="compare",
         run_root=run_root / "with-tool",
         docker_image=_docker_image(),
         external_tool_enabled=True,

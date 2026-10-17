@@ -1,6 +1,11 @@
-"""No-model capability tests for Playwright CLI in the Docker sandbox."""
+"""No-model cases proving that the installed Playwright CLI controls Chromium.
 
-import shutil
+These capability cases test deterministic browser behavior in the Docker sandbox.
+They do not test whether an agent elects to use Playwright or gathers sufficient
+runtime evidence; the LLM discovery mode owns that behavioral contract.
+"""
+
+import shlex
 import subprocess
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -21,11 +26,23 @@ from sec_review_agents.runtime.setup_bootstrap import (
     BootstrapStatus,
     bootstrap_environment,
 )
+from tests.external_tools.case_support.loader import (
+    cases_for_mode,
+    load_external_tool_cases,
+)
+from tests.external_tools.case_support.models import ExternalToolCase
+from tests.external_tools.case_support.runner import (
+    materialize_external_tool_case_workspace,
+)
 
 _TOOLS_IMAGE = "sec-review-bot-workspace:tools"
-_FIXTURE = Path(__file__).with_name("capability_fixtures") / "playwright"
 
 pytestmark = pytest.mark.integration
+CASES = tuple(
+    case
+    for case in cases_for_mode(load_external_tool_cases(), "capability")
+    if case.tool == "playwright"
+)
 
 
 def _tools_image_available() -> bool:
@@ -42,9 +59,10 @@ def _tools_image_available() -> bool:
 
 
 @asynccontextmanager
-async def _playwright_backend(tmp_path: Path) -> AsyncIterator:
+async def _playwright_backend(case: ExternalToolCase, tmp_path: Path) -> AsyncIterator:
     workspace = tmp_path / "workspace"
-    shutil.copytree(_FIXTURE, workspace)
+    materialize_external_tool_case_workspace(case, workspace)
+    assert case.setup_path is not None
     with patch.dict(
         "os.environ",
         {
@@ -66,9 +84,7 @@ async def _playwright_backend(tmp_path: Path) -> AsyncIterator:
         async with amanaged_backend(backend):
             bootstrap = await bootstrap_environment(
                 backend,
-                setup_declaration_content=(_FIXTURE / "setup.yml").read_text(
-                    encoding="utf-8"
-                ),
+                setup_declaration_content=case.setup_path.read_text(encoding="utf-8"),
             )
             assert bootstrap.status is BootstrapStatus.COMPLETED
             yield backend
@@ -79,54 +95,39 @@ async def _playwright_backend(tmp_path: Path) -> AsyncIterator:
     not _tools_image_available(),
     reason="build sec-review-bot-workspace:tools to run Playwright capability tests",
 )
-async def test_playwright_cli_preserves_browser_state(tmp_path: Path) -> None:
-    async with _playwright_backend(tmp_path) as backend:
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case.id)
+async def test_playwright_capability_case(
+    case: ExternalToolCase, tmp_path: Path
+) -> None:
+    assert case.capability is not None
+    assert case.capability.target_url is not None
+    session = case.id
+    target_url = shlex.quote(case.capability.target_url)
+    async with _playwright_backend(case, tmp_path) as backend:
         opened = await backend.aexecute(
-            "playwright cli --browser chromium -s=capability "
-            "open http://127.0.0.1:8770/",
+            f"playwright cli --browser chromium -s={session} open {target_url}",
             timeout=60,
         )
         assert opened.exit_code == 0, opened.output
-        stored = await backend.aexecute(
-            "playwright cli -s=capability eval "
-            "\"() => { localStorage.setItem('probe', 'stored'); "
-            "return localStorage.getItem('probe'); }\"",
-            timeout=30,
-        )
-        assert stored.exit_code == 0, stored.output
-        read_back = await backend.aexecute(
-            "playwright cli -s=capability eval "
-            "\"() => localStorage.getItem('probe')\"",
-            timeout=30,
-        )
-        await backend.aexecute("playwright cli -s=capability close", timeout=30)
-
-    assert read_back.exit_code == 0, read_back.output
-    assert "stored" in read_back.output
-
-
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    not _tools_image_available(),
-    reason="build sec-review-bot-workspace:tools to run Playwright capability tests",
-)
-async def test_playwright_cli_observes_browser_sink_effect(tmp_path: Path) -> None:
-    url = (
-        "http://127.0.0.1:8770/"
-        "?q=%3Cscript%3Edocument.title%3D"
-        "%27PLAYWRIGHT_CLI_EXECUTED%27%3C%2Fscript%3E"
-    )
-    async with _playwright_backend(tmp_path) as backend:
-        opened = await backend.aexecute(
-            f"playwright cli --browser chromium -s=sink open '{url}'",
-            timeout=60,
-        )
-        assert opened.exit_code == 0, opened.output
-        observed = await backend.aexecute(
-            'playwright cli -s=sink eval "() => document.title"',
-            timeout=30,
-        )
-        await backend.aexecute("playwright cli -s=sink close", timeout=30)
+        if case.capability.probe == "playwright-browser-state":
+            stored = await backend.aexecute(
+                f"playwright cli -s={session} eval "
+                "\"() => { localStorage.setItem('probe', 'stored'); "
+                "return localStorage.getItem('probe'); }\"",
+                timeout=30,
+            )
+            assert stored.exit_code == 0, stored.output
+            observed = await backend.aexecute(
+                f"playwright cli -s={session} eval "
+                "\"() => localStorage.getItem('probe')\"",
+                timeout=30,
+            )
+        else:
+            observed = await backend.aexecute(
+                f'playwright cli -s={session} eval "() => document.title"',
+                timeout=30,
+            )
+        await backend.aexecute(f"playwright cli -s={session} close", timeout=30)
 
     assert observed.exit_code == 0, observed.output
-    assert "PLAYWRIGHT_CLI_EXECUTED" in observed.output
+    assert case.capability.expected_marker in observed.output

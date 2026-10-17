@@ -13,8 +13,9 @@ from sec_review_agents.workflows.repository_case.verification import (
     verify_repository_case,
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
-from tests.external_tools.cases.models import (
+from tests.external_tools.case_support.models import (
     ExternalToolCase,
+    ExternalToolCaseMode,
     ExternalToolInteractionOracle,
 )
 from tests.integration.llm.transcript_artifact_helpers import (
@@ -26,15 +27,19 @@ from tests.integration.llm.transcript_artifact_helpers import (
 async def run_external_tool_case(
     case: ExternalToolCase,
     *,
+    mode: ExternalToolCaseMode,
     run_root: Path,
     docker_image: str,
     external_tool_enabled: bool = True,
     workspace_source: Path | None = None,
 ) -> dict:
+    if mode == "capability":
+        raise ValueError("capability cases use the deterministic capability runner")
+    agent_case = case.agent_case_for(mode)
     run_root.mkdir(parents=True, exist_ok=False)
     workspace = run_root / "workspace"
     snapshot = run_root / "workspace.snapshot.tar"
-    artifact_role = "analyzer" if case.workflow == "analysis" else "verifier"
+    artifact_role = "analyzer" if agent_case.workflow == "analysis" else "verifier"
     artifacts = run_root / "artifacts" / artifact_role
     if workspace_source is None:
         materialize_external_tool_case_workspace(case, workspace)
@@ -64,14 +69,14 @@ async def run_external_tool_case(
         },
         clear=False,
     ):
-        if case.workflow == "analysis":
+        if agent_case.workflow == "analysis":
             result = await analyze_repository_case(
                 workspace_snapshot_tar_path=snapshot,
                 history_path=None,
                 incremental_window_path=None,
                 analyzer_artifacts_path=artifacts,
                 scan_mode="full",
-                review_input=case.review_input,
+                review_input=agent_case.review_input,
             )
             transcript = artifacts / "transcript.json"
         else:
@@ -81,9 +86,9 @@ async def run_external_tool_case(
                 incremental_window_path=None,
                 verifier_artifacts_path=artifacts,
                 scan_mode="full",
-                review_input=case.review_input,
+                review_input=agent_case.review_input,
                 analysis_result={
-                    "overview": case.analysis_overview,
+                    "overview": agent_case.analysis_overview,
                     "verdict": "confirmed-vulnerability",
                 },
                 mitigation_result={
@@ -99,6 +104,7 @@ async def run_external_tool_case(
     usage = tool_usage_from_transcript(transcript)
     return {
         "case": case.id,
+        "mode": mode,
         "tool": case.tool,
         "externalToolEnabled": external_tool_enabled,
         "dockerImage": docker_image,
@@ -164,33 +170,36 @@ def materialize_external_tool_case_workspace(
 def assert_external_tool_case_oracles(
     case: ExternalToolCase, observation: dict
 ) -> None:
+    agent_case = case.agent_case_for(observation["mode"])
     interactions = observation["toolInteractions"]
-    for required in case.oracles.required_execute_interactions:
+    for required in agent_case.oracles.required_execute_interactions:
         matching = _matching_execute_interactions(interactions, required)
         assert matching, (required, interactions)
     result = observation["result"]
-    if case.oracles.validation_level is not None:
-        assert result["validation_level"] == case.oracles.validation_level, result
+    if agent_case.oracles.validation_level is not None:
+        assert result["validation_level"] == agent_case.oracles.validation_level, result
     result_text = json.dumps(result, ensure_ascii=False).lower()
-    for requirement in case.oracles.result_requirements:
+    for requirement in agent_case.oracles.result_requirements:
         assert re.search(requirement, result_text), (requirement, result)
 
 
 def result_requirements_satisfied(case: ExternalToolCase, observation: dict) -> bool:
+    agent_case = case.agent_case_for(observation["mode"])
     result_text = json.dumps(observation["result"], ensure_ascii=False).lower()
     return all(
         re.search(requirement, result_text)
-        for requirement in case.oracles.result_requirements
+        for requirement in agent_case.oracles.result_requirements
     )
 
 
 def has_required_external_tool_evidence(
     case: ExternalToolCase, observation: dict
 ) -> bool:
+    agent_case = case.agent_case_for(observation["mode"])
     interactions = observation["toolInteractions"]
     return all(
         _matching_execute_interactions(interactions, required)
-        for required in case.oracles.required_execute_interactions
+        for required in agent_case.oracles.required_execute_interactions
     )
 
 
@@ -213,10 +222,11 @@ def _matching_execute_interactions(
 
 
 def comparison_evidence_score(case: ExternalToolCase, observation: dict) -> int:
+    agent_case = case.agent_case_for("compare")
     result_text = json.dumps(observation["result"], ensure_ascii=False).lower()
     return sum(
         bool(re.search(pattern, result_text))
-        for pattern in case.oracles.comparison_evidence_patterns
+        for pattern in agent_case.oracles.comparison_evidence_patterns
     )
 
 
@@ -266,7 +276,9 @@ def write_external_tool_comparison_summary(
                 "withTool": comparison_evidence_score(case, with_tool),
                 "delta": comparison_evidence_score(case, with_tool)
                 - comparison_evidence_score(case, without_tool),
-                "maximum": len(case.oracles.comparison_evidence_patterns),
+                "maximum": len(
+                    case.agent_case_for("compare").oracles.comparison_evidence_patterns
+                ),
             },
         },
     )
