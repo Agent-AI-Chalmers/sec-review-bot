@@ -37,8 +37,6 @@ uv run ruff check . --fix
 
 LLM configuration is deployment-based.
 
-Real-model test probes are disabled by default and documented in [`tests/LLM_PROBES.md`](./tests/LLM_PROBES.md).
-
 This layer is responsible for:
 
 - reading chat / embedding deployment config through [`llm/config.py`](./src/sec_review_agents/llm/config.py)
