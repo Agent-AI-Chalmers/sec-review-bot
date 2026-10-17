@@ -385,6 +385,100 @@ def test_delivery_planning_create_groups_accepts_complete_draft() -> None:
     ]
 
 
+def test_delivery_planning_create_groups_rolls_back_late_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workbench_state = DeliveryWorkbenchState.initial(["case-a", "case-b"])
+    existing_group_id = workbench_state.create_group(item_ids=["case-a", "case-b"])[
+        "created_group_ids"
+    ][0]
+    original_replace = DeliveryWorkbenchState._replace_group_item_ids
+    replace_calls = 0
+
+    def fail_second_replace(
+        state: DeliveryWorkbenchState,
+        group_id: str,
+        item_ids: list[str],
+    ) -> None:
+        nonlocal replace_calls
+        replace_calls += 1
+        if replace_calls == 2:
+            raise RuntimeError("late batch failure")
+        original_replace(state, group_id, item_ids)
+
+    monkeypatch.setattr(
+        DeliveryWorkbenchState,
+        "_replace_group_item_ids",
+        fail_second_replace,
+    )
+
+    with pytest.raises(RuntimeError, match="late batch failure"):
+        workbench_state.create_groups(
+            groups=[
+                {"item_ids": ["case-a"]},
+                {"item_ids": ["case-b"]},
+            ]
+        )
+
+    assert workbench_state.read_groups()["groups"] == [
+        {
+            "group_id": existing_group_id,
+            "kind": "delivery",
+            "reason": None,
+            "item_ids": ["case-a", "case-b"],
+        }
+    ]
+    assert workbench_state.edit_events == [{"operation": "create_group"}]
+
+    monkeypatch.setattr(
+        DeliveryWorkbenchState,
+        "_replace_group_item_ids",
+        original_replace,
+    )
+    assert workbench_state.create_group(item_ids=["case-a"])["created_group_ids"] == [
+        "group-2"
+    ]
+
+
+def test_delivery_planning_update_groups_rolls_back_late_failure() -> None:
+    workbench_state = DeliveryWorkbenchState.initial(["case-a", "case-b"])
+    create_result = workbench_state.create_groups(
+        groups=[
+            {"item_ids": ["case-a"], "reason": "First delivery."},
+            {"item_ids": ["case-b"], "reason": "Second delivery."},
+        ]
+    )
+    first_group_id, second_group_id = create_result["created_group_ids"]
+
+    with pytest.raises(ValueError, match="unknown group_id: missing"):
+        workbench_state.update_groups(
+            groups=[
+                {
+                    "group_id": first_group_id,
+                    "item_ids": ["case-b"],
+                    "reason": "Changed delivery.",
+                },
+                {"group_id": "missing", "reason": "Fails late."},
+            ]
+        )
+
+    assert workbench_state.read_groups()["groups"] == [
+        {
+            "group_id": first_group_id,
+            "kind": "delivery",
+            "reason": "First delivery.",
+            "item_ids": ["case-a"],
+        },
+        {
+            "group_id": second_group_id,
+            "kind": "delivery",
+            "reason": "Second delivery.",
+            "item_ids": ["case-b"],
+        },
+    ]
+    assert workbench_state.edit_events == [{"operation": "create_groups"}]
+
+
 def test_delivery_planning_group_drafts_snapshot_can_seed_global_state() -> None:
     batch_state = DeliveryWorkbenchState.initial(["case-a", "case-b"])
     batch_state.create_groups(

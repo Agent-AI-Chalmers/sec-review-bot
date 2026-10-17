@@ -1,4 +1,5 @@
 import hashlib
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -142,13 +143,14 @@ class DeliveryWorkbenchState:
         payload = _CreateGroupsInput(
             groups=[_CreateGroupInput.model_validate(group) for group in groups]
         )
-        preflight_group_ids = self._next_create_group_ids(len(payload.groups))
+        staged = deepcopy(self)
+        preflight_group_ids = staged._next_create_group_ids(len(payload.groups))
         for group in payload.groups:
-            self._validate_known_item_ids(group.item_ids)
+            staged._validate_known_item_ids(group.item_ids)
         created_group_ids: list[str] = []
         for group, group_id in zip(payload.groups, preflight_group_ids, strict=True):
             created_group_ids.append(
-                self._create_group(
+                staged._create_group(
                     _CreateGroupInput(
                         kind=group.kind,
                         reason=group.reason,
@@ -157,6 +159,8 @@ class DeliveryWorkbenchState:
                     group_id=group_id,
                 )
             )
+        self.groups = staged.groups
+        self._next_group_number = staged._next_group_number
         self._record_edit("create_groups")
         return self._mutation_result(
             operation="create_groups",
@@ -189,11 +193,14 @@ class DeliveryWorkbenchState:
         payload = _UpdateGroupsInput(
             groups=[_UpdateGroupInput.model_validate(group) for group in groups]
         )
+        staged = deepcopy(self)
         changed_group_ids: list[str] = []
         for group in payload.groups:
-            changed_group_id = self._update_group(group)
+            changed_group_id = staged._update_group(group)
             if changed_group_id:
                 changed_group_ids.append(changed_group_id)
+        self.groups = staged.groups
+        self._next_group_number = staged._next_group_number
         self._record_edit("update_groups")
         return self._mutation_result(
             operation="update_groups",
@@ -213,15 +220,18 @@ class DeliveryWorkbenchState:
 
     def delete_groups(self, *, group_ids: list[str]) -> dict[str, Any]:
         payload = _DeleteGroupsInput(group_ids=group_ids)
+        staged = deepcopy(self)
         deleted_group_ids: list[str] = []
         unprocessed_item_ids: list[str] = []
         for group_id in _dedupe_ids(payload.group_ids):
-            deleted_group_id, released_item_ids = self._delete_group(
+            deleted_group_id, released_item_ids = staged._delete_group(
                 _DeleteGroupInput(group_id=group_id)
             )
             if deleted_group_id:
                 deleted_group_ids.append(deleted_group_id)
             unprocessed_item_ids.extend(released_item_ids)
+        self.groups = staged.groups
+        self._next_group_number = staged._next_group_number
         self._record_edit("delete_groups")
         return self._mutation_result(
             operation="delete_groups",
