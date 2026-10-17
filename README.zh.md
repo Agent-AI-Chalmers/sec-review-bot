@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/sec-review-bot-logo.svg" alt="Sec Review Bot logo" width="120">
+<img src="assets/sec-review-bot-mascot-400.png" alt="Sec Review Bot logo" width="200">
 
 # Sec Review Bot
 
