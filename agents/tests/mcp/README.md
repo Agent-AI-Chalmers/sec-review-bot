@@ -45,8 +45,11 @@ uv run pytest -q -s tests/mcp/test_llm.py \
 
 This is the same selection model used by bundled skill cases: one probe gate enables the suite, while pytest node IDs and `-k` choose the specific case.
 
+The workspace tools image is intentionally not built by standard CI because it is a large development image. Build it explicitly before running this developer-provisioned integration check; the ordinary suite skips the capability cases when the image is absent.
+
 Run the no-model capability integration with:
 
 ```bash
+docker image inspect sec-review-bot-workspace:tools >/dev/null
 uv run pytest -q -s tests/mcp/test_capability.py
 ```

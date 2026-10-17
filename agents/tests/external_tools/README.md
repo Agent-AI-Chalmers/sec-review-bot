@@ -46,15 +46,19 @@ Joern queries pipe interactive input instead of using `--script /dev/stdin`, whi
 
 ## Running Tests
 
+The workspace tools image is intentionally not built by standard CI because it is a large development image. Capability tests are developer-provisioned integration checks: build the image explicitly, then verify that it exists before running them. The ordinary suite skips these cases when the image is absent.
+
 Run deterministic tests, including no-model capability cases, from `agents/`:
 
 ```bash
+docker image inspect sec-review-bot-workspace:tools >/dev/null
 uv run python -m pytest tests/external_tools -m "not llm"
 ```
 
 Run only capability cases:
 
 ```bash
+docker image inspect sec-review-bot-workspace:tools >/dev/null
 uv run python -m pytest tests/external_tools -m "integration and not llm"
 ```
 

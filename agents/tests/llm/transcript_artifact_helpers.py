@@ -1,5 +1,4 @@
 import json
-from collections import defaultdict, deque
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -103,7 +102,7 @@ def message_tool_errors(message: dict[str, Any]) -> list[dict[str, str]]:
 def tool_interactions_from_transcript(
     transcript_path: Path,
 ) -> list[dict[str, Any]]:
-    pending: dict[str, deque[dict[str, Any]]] = defaultdict(deque)
+    pending: dict[str, tuple[str, dict[str, Any]]] = {}
     interactions: list[dict[str, Any]] = []
     for message in transcript_messages(transcript_path):
         for tool_call in message.get("tool_calls") or []:
@@ -111,18 +110,30 @@ def tool_interactions_from_transcript(
                 continue
             name = tool_call.get("name")
             arguments = tool_call.get("args")
-            if isinstance(name, str) and isinstance(arguments, dict):
-                pending[name].append(arguments)
+            tool_call_id = tool_call.get("id")
+            if (
+                isinstance(name, str)
+                and isinstance(arguments, dict)
+                and isinstance(tool_call_id, str)
+            ):
+                pending[tool_call_id] = (name, arguments)
 
         if message.get("type") != "tool":
             continue
-        name = message.get("name")
-        if not isinstance(name, str) or not pending[name]:
+        tool_call_id = message.get("tool_call_id")
+        if not isinstance(tool_call_id, str):
+            continue
+        call = pending.pop(tool_call_id, None)
+        if call is None:
+            continue
+        name, arguments = call
+        result_name = message.get("name")
+        if isinstance(result_name, str) and result_name != name:
             continue
         interactions.append(
             {
                 "tool": name,
-                "arguments": pending[name].popleft(),
+                "arguments": arguments,
                 "result": message.get("content"),
             }
         )

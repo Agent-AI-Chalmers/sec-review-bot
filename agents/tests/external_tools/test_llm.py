@@ -76,6 +76,14 @@ PROBE = llm_probe(
                 "sec-review-bot-workspace:tools agents"
             ),
         ),
+    ),
+)
+COMPARISON_PROBE = llm_probe(
+    run_env="RUN_LLM_EXTERNAL_TOOL_CASES",
+    description="real LLM external CLI comparison cases",
+    requires_deployment=False,
+    heavy=True,
+    requirements=(
         ProbeRequirement(
             name="baseline Docker image without external tools",
             is_met=lambda: _docker_image_exists(_baseline_docker_image()),
@@ -112,6 +120,7 @@ async def test_external_tool_discovery_case(case) -> None:
 @pytest.mark.parametrize(
     "case", cases_for_mode(CASES, "compare"), ids=lambda case: case.id
 )
+@COMPARISON_PROBE.skip_unless()
 async def test_external_tool_comparison_case(case) -> None:
     run_root = _case_run_root(case.id)
     source_workspace = run_root / "source-workspace"
