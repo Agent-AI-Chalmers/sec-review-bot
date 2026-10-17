@@ -1,0 +1,22 @@
+{
+  "id": "cross-stage-authorization-context",
+  "issue": {
+    "title": "Queued export loses the authorization context checked by the API",
+    "body": "A tenant can modify queued messages before the worker consumes them. The API authorizes the original project against caller.tenant_id, but the message contains only project_id. The worker reloads that ID and exports with organization-wide storage authority without carrying or rechecking the authorized tenant. Audit the cross-stage authorization-context invariant."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-vulnerability"],
+    "mechanism": "Authorization is checked before enqueue, but the queued work drops the authorized tenant and the worker resolves by attacker-chosen project ID alone.",
+    "required_evidence": [
+      {
+        "label": "authorization context is not preserved",
+        "any_of": ["authorization context", "tenant.*not.*carri", "drops.*tenant", "without.*tenant"]
+      },
+      {
+        "label": "worker trusts mutable queued identity",
+        "any_of": ["queue.*project.id", "message.*project.id", "worker.*project.id", "mutable.*message"]
+      }
+    ],
+    "required_locations": ["src/api.py", "src/worker.py"]
+  }
+}

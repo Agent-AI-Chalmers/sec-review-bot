@@ -1,0 +1,22 @@
+{
+  "id": "confused-deputy",
+  "issue": {
+    "title": "Automation broker acts outside the caller's delegated scope",
+    "body": "A tenant user may invoke the broker but may modify only projects in that tenant's delegated project set. The caller controls target_project and operation. organization_client has organization-wide authority, and the broker does not bind the requested target or operation to the caller's delegated scope. Audit the confused-deputy claim."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-defect", "confirmed-vulnerability"],
+    "mechanism": "A broker exercises broader authority without binding the target and operation to delegated caller scope.",
+    "required_evidence": [
+      {
+        "label": "missing delegated-scope binding",
+        "any_of": ["delegat.*scope", "scope.*delegat", "outside.*scope", "does not bind"]
+      },
+      {
+        "label": "broader deputy authority",
+        "any_of": ["organization.*authority", "organization.wide", "confused deputy", "broker.*authority"]
+      }
+    ],
+    "required_locations": ["src/export_broker.py"]
+  }
+}

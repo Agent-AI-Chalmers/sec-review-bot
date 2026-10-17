@@ -1,0 +1,22 @@
+{
+  "id": "gcm-nonce-reuse",
+  "issue": {
+    "title": "AES-GCM nonce is reused under a long-lived key",
+    "body": "Remote tenants can repeatedly request encryption. The same long-lived key and the constant nonce are used for every request. Audit the confidentiality and integrity consequence of this key/nonce scope."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-vulnerability"],
+    "mechanism": "AES-GCM reuses a nonce under the same long-lived key.",
+    "required_evidence": [
+      {
+        "label": "key and nonce reuse",
+        "any_of": ["nonce.*reuse", "same.*nonce", "constant nonce", "key.*nonce.*pair"]
+      },
+      {
+        "label": "GCM security consequence",
+        "any_of": ["confidentiality", "integrity", "tag forg", "keystream"]
+      }
+    ],
+    "required_locations": ["src/encryption.py"]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "concurrent-one-time-token",
+  "issue": {
+    "title": "One-time token can be consumed twice concurrently",
+    "body": "Two attacker-controlled requests can execute consume_token concurrently. The database isolation level permits both transactions to read used=false before either writes. There is no conditional update, unique constraint, row lock, or other serialization. Audit whether the one-time-use invariant is enforced."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-vulnerability"],
+    "mechanism": "A non-atomic read-check-act protocol violates a one-time-use invariant.",
+    "required_evidence": [
+      {
+        "label": "non-atomic protocol",
+        "any_of": ["non.atomic", "race", "check.*act", "concurr"]
+      },
+      {
+        "label": "one-time-use invariant violation",
+        "any_of": ["consum.*twice", "both.*proceed", "one.time.*violat", "execut.*more than once"]
+      }
+    ],
+    "required_locations": ["src/tokens.py"]
+  }
+}

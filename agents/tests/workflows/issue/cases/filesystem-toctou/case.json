@@ -1,0 +1,22 @@
+{
+  "id": "filesystem-toctou",
+  "issue": {
+    "title": "Tenant can replace a checked directory before privileged file open",
+    "body": "The tenant controls relative and can rename directories under root while wait_for_background_scan runs. After the containment check, the tenant can replace an intermediate directory with a symlink to a service-readable secrets directory. The final read follows the replacement. Audit the check/use object-identity invariant."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-vulnerability"],
+    "mechanism": "A pathname is validated and later reopened after an attacker-controlled namespace replacement.",
+    "required_evidence": [
+      {
+        "label": "check-use identity race",
+        "any_of": ["toctou", "check.*use", "race", "replace.*between"]
+      },
+      {
+        "label": "symlink escapes the checked root",
+        "any_of": ["symlink", "outside.*root", "containment", "secret"]
+      }
+    ],
+    "required_locations": ["src/export_reader.py"]
+  }
+}

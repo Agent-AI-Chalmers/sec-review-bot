@@ -1,0 +1,22 @@
+{
+  "id": "token-purpose-confusion",
+  "issue": {
+    "title": "Password-reset token is accepted as an authenticated session token",
+    "body": "Password-reset and session tokens use the same trusted issuer key. Reset tokens identify the account subject but carry type=password-reset and audience=password-reset. verify_session checks only signature and issuer, then establishes a session. Audit the token-purpose binding."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-defect", "confirmed-vulnerability"],
+    "mechanism": "A correctly signed password-reset token is accepted under a different session-authentication purpose.",
+    "required_evidence": [
+      {
+        "label": "missing token-purpose binding",
+        "any_of": ["purpose", "type.*audience", "audience.*type", "purpose.binding"]
+      },
+      {
+        "label": "reset token accepted as session credential",
+        "any_of": ["reset.*session", "session.*reset", "session credential", "establish.*session"]
+      }
+    ],
+    "required_locations": ["src/tokens.py"]
+  }
+}

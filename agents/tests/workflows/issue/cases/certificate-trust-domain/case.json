@@ -1,0 +1,22 @@
+{
+  "id": "certificate-trust-domain",
+  "issue": {
+    "title": "Development workload certificate is accepted as a production administrator",
+    "body": "Developers can obtain certificates in dev.example for arbitrary development workload names. The production administration API accepts certificates from either configured trust domain and authorizes only by workload_name. Audit whether a dev.example/deployment-admin identity is incorrectly accepted as the production administrator."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-vulnerability"],
+    "mechanism": "Authorization binds only a workload name and omits the certificate trust domain from identity.",
+    "required_evidence": [
+      {
+        "label": "incomplete certificate identity binding",
+        "any_of": ["trust.domain", "identity.*workload", "workload.*identity"]
+      },
+      {
+        "label": "development-to-production authority crossover",
+        "any_of": ["dev.*prod", "development.*production", "non.production.*administrator"]
+      }
+    ],
+    "required_locations": ["src/workload_auth.py"]
+  }
+}
