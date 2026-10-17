@@ -8,6 +8,9 @@ from typing import Any
 from sec_review_agents.agents.mitigation.agent import (
     create_mitigation_agent_graph,
 )
+from sec_review_agents.agents.mitigation.mcp import MITIGATION_AGENT_MCP_TOOLS
+from sec_review_agents.mcp.client import managed_mcp_tools_async
+from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
 from sec_review_agents.review_stages.mitigation.result import (
     build_mitigation_stage_result,
@@ -181,21 +184,30 @@ async def run_mitigation_stage(
                     backend, setup_declaration_content=setup_declaration_content
                 ),
             )
-            agent = await create_mitigation_agent_graph(
-                agent_name=agent_name,
-                backend=backend,
-                system_prompt=system_prompt,
-                filesystem_system_prompt=filesystem_system_prompt,
-                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
-                workspace_root_path=workspace_path,
+            # The agent package owns MCP capability selection. The stage
+            # materializes those tools so their sessions span graph construction
+            # and the complete invocation.
+            mcp_connections = resolve_agent_mcp_connections(
+                MITIGATION_AGENT_MCP_TOOLS,
+                backend,
             )
-            agent_output = await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=agent_name,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                transcript_paths=transcript_paths,
-            )
+            async with managed_mcp_tools_async(mcp_connections) as mcp_tools:
+                agent = await create_mitigation_agent_graph(
+                    agent_name=agent_name,
+                    backend=backend,
+                    system_prompt=system_prompt,
+                    filesystem_system_prompt=filesystem_system_prompt,
+                    baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+                    workspace_root_path=workspace_path,
+                    mcp_tools=mcp_tools,
+                )
+                agent_output = await invoke_agent_runtime_graph(
+                    agent=agent,
+                    agent_name=agent_name,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    transcript_paths=transcript_paths,
+                )
         raw_declared_paths = agent_output.get("declared_changed_files")
         if raw_declared_paths is None:
             declared_patch_paths: list[str] = []

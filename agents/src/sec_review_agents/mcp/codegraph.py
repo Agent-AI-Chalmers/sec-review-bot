@@ -1,7 +1,6 @@
 import shlex
 import shutil
 import subprocess
-from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -101,43 +100,38 @@ def codegraph_mcp_connections_for_backend(
 ) -> dict[str, dict[str, Any]]:
     """Build MCP stdio connection config for a backend with a writable workspace."""
     if isinstance(backend, DockerSandboxBackend):
-        try:
-            backend.container.ensure_started()
-            container_workspace = backend.sandbox_path_for_agent_path(
-                CODEGRAPH_AGENT_WORKSPACE,
-                require_writable=True,
-            )
-            workspace = (
-                None
-                if container_workspace is None
-                else _prepare_sandbox_codegraph_index(backend, container_workspace)
-            )
-            if workspace is None:
-                log_diagnostic("codegraph_mcp_skipped", reason="index_not_available")
-                return {}
-            return {
-                "codegraph": {
-                    "transport": "stdio",
-                    "command": docker_runtime.default_docker_bin(),
-                    "args": [
-                        "exec",
-                        "-i",
-                        "--workdir",
-                        workspace,
-                        backend.container_name,
-                        "codegraph",
-                        "serve",
-                        "--mcp",
-                        "--no-watch",
-                        "--path",
-                        workspace,
-                    ],
-                }
+        backend.container.ensure_started()
+        container_workspace = backend.sandbox_path_for_agent_path(
+            CODEGRAPH_AGENT_WORKSPACE,
+            require_writable=True,
+        )
+        workspace = (
+            None
+            if container_workspace is None
+            else _prepare_sandbox_codegraph_index(backend, container_workspace)
+        )
+        if workspace is None:
+            log_diagnostic("codegraph_mcp_skipped", reason="index_not_available")
+            return {}
+        return {
+            "codegraph": {
+                "transport": "stdio",
+                "command": docker_runtime.default_docker_bin(),
+                "args": [
+                    "exec",
+                    "-i",
+                    "--workdir",
+                    workspace,
+                    backend.container_name,
+                    "codegraph",
+                    "serve",
+                    "--mcp",
+                    "--no-watch",
+                    "--path",
+                    workspace,
+                ],
             }
-        except Exception:
-            with suppress(Exception):
-                backend.close()
-            raise
+        }
 
     if isinstance(backend, BwrapSandboxBackend):
         workspace = backend.sandbox_path_for_agent_path(

@@ -8,6 +8,9 @@ from typing import Any
 from sec_review_agents.agents.single_agent.agent import (
     create_single_agent_graph,
 )
+from sec_review_agents.agents.single_agent.mcp import SINGLE_AGENT_MCP_TOOLS
+from sec_review_agents.mcp.client import managed_mcp_tools_async
+from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.review_stages.single_agent.result import (
     build_single_agent_fix_outcome,
 )
@@ -82,23 +85,32 @@ async def run_single_agent_stage(
                     backend, setup_declaration_content=setup_declaration_content
                 ),
             )
-            agent = await create_single_agent_graph(
-                agent_name=agent_name,
-                backend=backend,
-                system_prompt=system_prompt,
-                filesystem_system_prompt=filesystem_system_prompt,
-                todo_system_prompt=todo_system_prompt,
-                todo_tool_description=todo_tool_description,
-                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
-                workspace_root_path=workspace_path,
+            # The agent package owns MCP capability selection. The stage
+            # materializes those tools so their sessions span graph construction
+            # and the complete invocation.
+            mcp_connections = resolve_agent_mcp_connections(
+                SINGLE_AGENT_MCP_TOOLS,
+                backend,
             )
-            agent_output = await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=agent_name,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                transcript_paths=(transcript_path,),
-            )
+            async with managed_mcp_tools_async(mcp_connections) as mcp_tools:
+                agent = await create_single_agent_graph(
+                    agent_name=agent_name,
+                    backend=backend,
+                    system_prompt=system_prompt,
+                    filesystem_system_prompt=filesystem_system_prompt,
+                    todo_system_prompt=todo_system_prompt,
+                    todo_tool_description=todo_tool_description,
+                    baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+                    workspace_root_path=workspace_path,
+                    mcp_tools=mcp_tools,
+                )
+                agent_output = await invoke_agent_runtime_graph(
+                    agent=agent,
+                    agent_name=agent_name,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    transcript_paths=(transcript_path,),
+                )
         raw_declared_paths = agent_output.get("declared_changed_files")
         if raw_declared_paths is None:
             declared_patch_paths: list[str] = []

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from tests.integration.llm.skill_cases.models import (
+from tests.skills.cases.models import (
     ClassificationOutput,
     CommandArgumentOutput,
     DecisionOutput,
@@ -10,7 +10,7 @@ from tests.integration.llm.skill_cases.models import (
     SkillVerdict,
     output_model_for_case,
 )
-from tests.integration.llm.skill_cases.runner import SkillCaseRun, assert_case_oracles
+from tests.skills.cases.runner import SkillCaseRun, assert_case_oracles
 
 
 def _case() -> SkillCase:

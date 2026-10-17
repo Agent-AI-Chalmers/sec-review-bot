@@ -9,6 +9,9 @@ from typing import Any
 from sec_review_agents.agents.verification.agent import (
     create_verification_agent_graph,
 )
+from sec_review_agents.agents.verification.mcp import VERIFICATION_AGENT_MCP_TOOLS
+from sec_review_agents.mcp.client import managed_mcp_tools_async
+from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
 from sec_review_agents.review_stages.verification.result import (
     build_verification_stage_result,
@@ -224,19 +227,28 @@ async def run_verification_stage(
                     backend, setup_declaration_content=setup_declaration_content
                 ),
             )
-            agent = await create_verification_agent_graph(
-                agent_name=agent_name,
-                backend=backend,
-                system_prompt=system_prompt,
-                filesystem_system_prompt=filesystem_system_prompt,
+            # The agent package owns MCP capability selection. The stage
+            # materializes those tools so their sessions span graph construction
+            # and the complete invocation.
+            mcp_connections = resolve_agent_mcp_connections(
+                VERIFICATION_AGENT_MCP_TOOLS,
+                backend,
             )
-            agent_output = await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=agent_name,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                transcript_paths=transcript_paths,
-            )
+            async with managed_mcp_tools_async(mcp_connections) as mcp_tools:
+                agent = await create_verification_agent_graph(
+                    agent_name=agent_name,
+                    backend=backend,
+                    system_prompt=system_prompt,
+                    filesystem_system_prompt=filesystem_system_prompt,
+                    mcp_tools=mcp_tools,
+                )
+                agent_output = await invoke_agent_runtime_graph(
+                    agent=agent,
+                    agent_name=agent_name,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    transcript_paths=transcript_paths,
+                )
 
         validate_verification_coverages(agent_output, mitigation_result)
         result = build_verification_stage_result(

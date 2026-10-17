@@ -1,0 +1,23 @@
+{
+  "id": "playwright-dom-xss",
+  "tool": "playwright",
+  "modes": ["discovery"],
+  "setup_file": "setup.yml",
+  "discovery": {
+    "review_input": "Verify the repository-grounded claim that http://127.0.0.1:8781/ has executable DOM XSS through the URL fragment. Obtain real browser evidence using an encoded fragment payload that sets document.title to CLI_DOM_XSS_EXECUTED, and observe that title after navigation. No mitigation patch was supplied.",
+    "analysis_overview": "The page decodes location.hash and assigns it to innerHTML, so fragment-controlled markup may execute in the browser.",
+    "oracles": {
+      "validation_level": "runtime-endpoint",
+      "required_execute_interactions": [
+        {
+          "arguments_pattern": "playwright cli.*eval.*document\\.title",
+          "result_pattern": "CLI_DOM_XSS_EXECUTED"
+        }
+      ],
+      "result_requirements": [
+        "dom|fragment|location\\.hash",
+        "xss|script|execut"
+      ]
+    }
+  }
+}

@@ -288,16 +288,21 @@ Analyzer / mitigator / verifier stages that need to run tests, reproductions, bu
 
 Benchmark and local debug runs can set `runtime.workspace_image` to choose the image for the isolated container that hosts the target repository.
 
-### Optional MCP Tools
+### Workspace Tools
 
-See [Agent MCP](../docs/agent/MCP.md) for how MCP fits into this project. This section only lists common optional tools for local runs.
-
-CodeGraph helps the agent with symbol / caller tracing, which is often better than plain grep for cross-file call relationships. For Docker sandbox, build a workspace image with CodeGraph installed, use it as the sandbox image, and enable MCP:
+The optional workspace tools image installs Joern, CodeGraph, Playwright, and Chromium in the Docker sandbox. Build the image and select it for a local run:
 
 ```bash
-docker build -f agents/docker/workspace-codegraph.Dockerfile -t sec-review-bot-workspace:codegraph agents
-AGENT_DOCKER_IMAGE=sec-review-bot-workspace:codegraph
-AGENT_MCP_ENABLED=true
+docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
+export AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
+export AGENT_JOERN_ENABLED=true
+export AGENT_PLAYWRIGHT_ENABLED=true
 ```
 
-The documented CodeGraph path for normal stage execution is Docker sandbox.
+Joern and Playwright are intended for use through bash and their CLIs. The existing CodeGraph and Playwright MCP integrations remain available but are disabled by default. Enable them explicitly when needed:
+
+```bash
+export AGENT_MCP_ENABLED=true
+```
+
+See [Agent External Tools](../docs/agent/EXTERNAL_TOOLS.md) for the tool and interface choices.

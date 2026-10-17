@@ -117,4 +117,4 @@ Repository 报告阈值、workflow ownership 和 skill 打包决策应标成 pro
 4. 把会改变判断的规则及其权威来源记录到 `sec_review_agents/resources/skill_source_notes/`。
 5. 在目标 agent 或 stage-local 的 `skills.py` 里声明 skill。不要为了让 skill 可见，就把 skill name 写进文档、backend helper 或 runtime 准备代码。
 6. 确保目标 backend 消费该声明，先准备 allowlisted view，再挂载到 `/skills`，并为该 agent session 启用 skills middleware。
-7. 为 skill 准备和 backend exposure 增加聚焦测试。模型案例按 [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md) 中记录的结构维护。
+7. 为 skill 准备和 backend exposure 增加聚焦测试。模型案例按 [`agents/tests/skills/README.md`](../../agents/tests/skills/README.md) 中记录的结构维护。

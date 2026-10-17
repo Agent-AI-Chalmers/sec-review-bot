@@ -11,3 +11,4 @@
 - If validation was attempted but blocked before the intended target or decision was reached, use the strongest validation level actually reached and call out that limit.
 - Treat environment failures and agent/tooling method errors as validation limits unless repository evidence directly ties the failure to the investigated behavior.
 - Use `runtime-endpoint` only for successful focused runtime evidence at the intended target.
+- For browser-side claims, `runtime-endpoint` requires exercising the target behavior in a real browser or equivalent DOM and JavaScript runtime and observing the claimed sink effect. Fetching the page over HTTP and separately simulating its JavaScript logic is at most `runtime-partial`.

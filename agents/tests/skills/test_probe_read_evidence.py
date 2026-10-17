@@ -1,6 +1,6 @@
 from langchain_core.messages import AIMessage, ToolMessage
 
-from tests.integration.llm.skill_probe_helpers import successful_read_paths
+from tests.skills.probe_helpers import successful_read_paths
 
 
 def test_read_evidence_requires_a_matching_successful_tool_response() -> None:

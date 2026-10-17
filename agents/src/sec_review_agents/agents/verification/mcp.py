@@ -1,1 +1,1 @@
-VERIFICATION_AGENT_MCP_TOOLS = ("codegraph",)
+VERIFICATION_AGENT_MCP_TOOLS = ("codegraph", "playwright")

@@ -17,16 +17,16 @@ def test_agent_skills_disabled(monkeypatch) -> None:
     assert agent_skills_enabled() is False
 
 
-def test_agent_mcp_enabled_defaults_to_true(monkeypatch) -> None:
+def test_agent_mcp_enabled_defaults_to_false(monkeypatch) -> None:
     monkeypatch.delenv("AGENT_MCP_ENABLED", raising=False)
 
-    assert agent_mcp_enabled() is True
-
-
-def test_agent_mcp_disabled(monkeypatch) -> None:
-    monkeypatch.setenv("AGENT_MCP_ENABLED", "false")
-
     assert agent_mcp_enabled() is False
+
+
+def test_agent_mcp_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
+
+    assert agent_mcp_enabled() is True
 
 
 def test_agent_memory_enabled_defaults_to_true(monkeypatch) -> None:

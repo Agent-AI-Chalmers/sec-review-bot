@@ -2,6 +2,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from sec_review_agents.agents.analysis.external_tools import (
+    ANALYSIS_AGENT_EXTERNAL_TOOLS,
+)
 from sec_review_agents.agents.analysis.skills import ANALYSIS_AGENT_SKILLS
 from sec_review_agents.features import agent_memory_enabled, agent_skills_enabled
 from sec_review_agents.filesystem import backend_selection
@@ -14,6 +17,9 @@ from sec_review_agents.filesystem.path_views import (
 )
 from sec_review_agents.memory.store import configured_memory_path_view
 from sec_review_agents.resources.loader import join_prompt_sections
+from sec_review_agents.runtime.external_tools import (
+    external_tool_prompt_paths_for,
+)
 from sec_review_agents.runtime.runtime_config import (
     RunnerRuntimeContext,
     runtime_workspace_image,
@@ -85,6 +91,7 @@ def build_issue_analyzer_filesystem_system_prompt() -> str:
     return join_prompt_sections(
         [
             "analyzer/filesystem-system-core.md",
+            *external_tool_prompt_paths_for(ANALYSIS_AGENT_EXTERNAL_TOOLS),
             "scopes/issue/analyzer/filesystem-system-delta.md",
         ]
     )

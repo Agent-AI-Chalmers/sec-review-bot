@@ -4,6 +4,7 @@ from sec_review_agents.mcp.resolver import resolve_agent_mcp_connection_factorie
 
 
 def test_mcp_connection_factories_resolve_declared_codegraph_tool(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
     backend = object()
     calls = []
 
@@ -20,6 +21,29 @@ def test_mcp_connection_factories_resolve_declared_codegraph_tool(monkeypatch) -
 
     assert len(factories) == 1
     assert factories[0]() == {"codegraph": {"transport": "stdio"}}
+    assert calls == [backend]
+
+
+def test_mcp_connection_factories_resolve_declared_playwright_tool(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
+    backend = object()
+    calls = []
+
+    def fake_playwright_connections(received_backend):
+        calls.append(received_backend)
+        return {"playwright": {"transport": "stdio"}}
+
+    monkeypatch.setattr(
+        "sec_review_agents.mcp.resolver.playwright_mcp_connections_for_backend",
+        fake_playwright_connections,
+    )
+
+    factories = resolve_agent_mcp_connection_factories(("playwright",), backend)
+
+    assert len(factories) == 1
+    assert factories[0]() == {"playwright": {"transport": "stdio"}}
     assert calls == [backend]
 
 

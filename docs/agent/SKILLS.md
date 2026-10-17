@@ -115,4 +115,4 @@ When adding or changing a bundled skill:
 4. Trace decision-changing rules to authoritative sources under `sec_review_agents/resources/skill_source_notes/`.
 5. Declare the skill in the target agent or stage-local `skills.py`. Do not add skill names to docs, backend helpers, or runtime preparation code just to make them visible.
 6. Ensure the target backend consumes the declaration, prepares the allowlisted view, mounts it at `/skills`, and enables skills middleware for that agent session.
-7. Add focused tests for skill preparation and backend exposure. Follow the model-case structure documented under [`agents/tests/integration/llm/skill_cases/`](../../agents/tests/integration/llm/skill_cases/README.md).
+7. Add focused tests for skill preparation and backend exposure. Follow the model-case structure documented in [`agents/tests/skills/README.md`](../../agents/tests/skills/README.md).

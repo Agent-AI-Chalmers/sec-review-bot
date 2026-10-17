@@ -1,0 +1,28 @@
+{
+  "id": "playwright-reflected-xss",
+  "tool": "playwright",
+  "modes": ["capability", "discovery"],
+  "setup_file": "setup.yml",
+  "capability": {
+    "probe": "playwright-browser-sink-effect",
+    "expected_marker": "CLI_REFLECTED_XSS_EXECUTED",
+    "target_url": "http://127.0.0.1:8780/?q=%3Cscript%3Edocument.title%3D%27CLI_REFLECTED_XSS_EXECUTED%27%3C%2Fscript%3E"
+  },
+  "discovery": {
+    "review_input": "Verify the repository-grounded claim that http://127.0.0.1:8780/ has executable reflected XSS through q. Obtain real browser evidence using an encoded payload that sets document.title to CLI_REFLECTED_XSS_EXECUTED, and observe that title after navigation. No mitigation patch was supplied.",
+    "analysis_overview": "cli_reflected_server.py reflects q into an HTML response without escaping, so injected script markup may execute in a browser.",
+    "oracles": {
+      "validation_level": "runtime-endpoint",
+      "required_execute_interactions": [
+        {
+          "arguments_pattern": "playwright cli.*eval.*document\\.title",
+          "result_pattern": "CLI_REFLECTED_XSS_EXECUTED"
+        }
+      ],
+      "result_requirements": [
+        "xss|script",
+        "browser|execut|title"
+      ]
+    }
+  }
+}
