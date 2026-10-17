@@ -8,11 +8,11 @@ from sec_review_agents.workflows.repository_case.verification import (
     verify_repository_case,
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
-from tests.llm.transcript_artifact_helpers import (
+from tests.mcp.cases.models import McpCase, McpCaseMode
+from tests.runtime.transcript_artifact_helpers import (
     tool_interactions_from_transcript,
     tool_usage_from_transcript,
 )
-from tests.mcp.cases.models import McpCase, McpCaseMode
 
 
 async def run_mcp_case(

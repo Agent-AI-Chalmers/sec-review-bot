@@ -19,8 +19,8 @@ import pytest
 from sec_review_agents.scan_stages.triage.agent_passes import (
     run_repository_triage_agent,
 )
-from tests.llm.probe_helpers import llm_probe
-from tests.llm.transcript_artifact_helpers import (
+from tests.llm_probe import llm_probe
+from tests.runtime.transcript_artifact_helpers import (
     read_file_paths_from_transcript,
 )
 

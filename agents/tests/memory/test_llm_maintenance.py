@@ -15,8 +15,7 @@ from sec_review_agents.memory.store import (
     memory_content_dir,
     memory_observations_dir,
 )
-from tests.llm.deployment_helpers import llm_test_deployment
-from tests.llm.probe_helpers import llm_probe
+from tests.llm_probe import llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 

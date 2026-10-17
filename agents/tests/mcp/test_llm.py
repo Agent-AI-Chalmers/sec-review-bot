@@ -9,7 +9,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
-from tests.llm.probe_helpers import ProbeRequirement, llm_probe
+from tests.llm_probe import ProbeRequirement, llm_probe
 from tests.mcp.cases.loader import cases_for_mode, load_mcp_cases
 from tests.mcp.cases.runner import (
     assert_mcp_case_oracles,

@@ -21,8 +21,8 @@ from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workflows.issue.analysis import analyze_issue
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
-from tests.llm.probe_helpers import ProbeRequirement, llm_probe
-from tests.llm.transcript_artifact_helpers import tool_usage_from_transcript
+from tests.llm_probe import ProbeRequirement, llm_probe
+from tests.runtime.transcript_artifact_helpers import tool_usage_from_transcript
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 

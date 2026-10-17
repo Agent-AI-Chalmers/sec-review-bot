@@ -26,8 +26,7 @@ from sec_review_agents.runtime.structured_response_middleware import (
 from sec_review_agents.runtime.summarization_middleware import (
     create_summarization_middleware,
 )
-from tests.llm.deployment_helpers import llm_test_deployment
-from tests.llm.probe_helpers import llm_probe
+from tests.llm_probe import llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 

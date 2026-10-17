@@ -18,8 +18,8 @@ from sec_review_agents.filesystem.docker_runtime import (
 )
 from sec_review_agents.workflows.repository_case.analysis import analyze_repository_case
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
-from tests.llm.probe_helpers import ProbeRequirement, llm_probe
-from tests.llm.transcript_artifact_helpers import tool_usage_from_transcript
+from tests.llm_probe import ProbeRequirement, llm_probe
+from tests.runtime.transcript_artifact_helpers import tool_usage_from_transcript
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
