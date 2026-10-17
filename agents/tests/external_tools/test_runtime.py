@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from sec_review_agents.runtime.external_tools import (
@@ -32,6 +34,7 @@ def test_external_tool_selection(
     expected_tools: tuple[str, ...],
     expected_paths: tuple[str, ...],
 ) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
     monkeypatch.setenv("AGENT_JOERN_ENABLED", str(joern_enabled))
     monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", str(playwright_enabled))
 
@@ -42,6 +45,7 @@ def test_external_tool_selection(
 def test_external_tool_prompts_intersect_configuration_and_agent_declaration(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
     monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
     monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
 
@@ -52,7 +56,37 @@ def test_external_tool_prompts_intersect_configuration_and_agent_declaration(
 def test_external_tool_selection_rejects_unknown_agent_declaration(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
     monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
 
     with pytest.raises(ValueError, match="Unknown agent external tool.*unknown"):
         external_tool_prompt_paths_for(("unknown",))
+
+
+def test_external_tool_prompts_reject_local_backend(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "local")
+    monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
+
+    with pytest.raises(
+        ValueError,
+        match="External CLI tools require an execution-capable sandbox backend",
+    ):
+        external_tool_prompt_paths_for(("joern",))
+
+
+def test_external_tool_prompts_reject_auto_local_fallback(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "auto")
+    monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
+
+    with (
+        patch(
+            "sec_review_agents.filesystem.backend_selection."
+            "is_docker_runtime_available",
+            return_value=False,
+        ),
+        pytest.raises(
+            ValueError,
+            match="External CLI tools require an execution-capable sandbox backend",
+        ),
+    ):
+        external_tool_prompt_paths_for(("playwright",))

@@ -37,7 +37,7 @@ MCP 是向 model client 暴露能力的协议。它的 [server features](https:/
 
 ## 自描述 CLI
 
-Agent 已经可以在 sandbox 中使用 bash。可用的 CLI 能够通过命令树、`--help`、结构化输出、退出状态、stdout 和 stderr 说明自己的接口。部署分别通过 `AGENT_JOERN_ENABLED` 和 `AGENT_PLAYWRIGHT_ENABLED` 启用已安装的命令；两者默认都为 false。每类 review agent 还会声明自己负责使用哪些外部工具。只有部署开关已启用且该 agent 声明过的工具才会进入提示，因此无需修改 prompt 代码就能选择不提示、只提示其中一个或全部提示。Agent 随后可以按需发现所选接口的用法，而不必预先把所有操作都作为 tool schema 放进上下文。
+可用的 CLI 能够通过命令树、`--help`、结构化输出、退出状态、stdout 和 stderr 说明自己的接口。能够使用 shell 的 agent 可以按需发现这套接口，而不必预先把所有操作都作为 tool schema 放进上下文。当底层能力不需要独立 session、credential 或由 host 持有的状态边界时，CLI 本身便可以构成足够的接入界面。
 
 CLI 不需要自动配套 skill。不要把 command reference 复制进 `SKILL.md`。只有实验表明 agent 反复缺少 CLI 接口以外的知识时，才增加 skill，例如：
 
@@ -59,6 +59,8 @@ Joern 提供 code property graph、结构查询、调用关系和数据流分析
 - Playwright CLI 可以持有持续的 browser session、访问 repository setup 启动的服务，并把浏览器观察结果返回给 agent。
 - 两个工具都运行在 agent 已经能够使用 bash 的同一个 sandbox 中。
 - 两项集成都不需要只能由 host 持有的 credential、既有的人工操作 session，或者无法提供给 sandbox 的 host 资源。
+
+本项目分别通过 `AGENT_JOERN_ENABLED` 和 `AGENT_PLAYWRIGHT_ENABLED` 启用已安装的命令；两者默认均为 false。每类 review agent 会声明自己可以使用哪些外部工具，只有部署开关和 agent 声明同时选中某项工具时，相关提示才会进入上下文。这些开关要求使用具备命令执行能力的 Docker 或 bwrap backend；如果 backend selection 最终落到不能执行命令的 local fallback，配置会直接失败。Docker 部署必须在所选镜像中提供相应命令；bwrap 部署必须在 sandbox 可见的 host 路径中提供它们。
 
 因此，MCP layer 暴露的能力大体相同，却会增加 tool schema 和 connection lifecycle。它尚未证明能够提供默认 workflow 所需的额外能力。选择 CLI 是因为 CLI 已经足够，而不是因为 CLI 在任何场景都优于 MCP。
 

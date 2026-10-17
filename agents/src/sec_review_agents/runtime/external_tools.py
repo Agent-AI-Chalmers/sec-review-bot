@@ -1,5 +1,8 @@
 from collections.abc import Iterable
 
+from sec_review_agents.filesystem.backend_selection import (
+    selected_sandbox_backend_kind,
+)
 from sec_review_agents.utils.env import env_value, parse_bool_env
 
 AGENT_JOERN_ENABLED_ENV = "AGENT_JOERN_ENABLED"
@@ -27,6 +30,11 @@ def external_tool_prompt_paths_for(
     if unknown:
         raise ValueError("Unknown agent external tool(s): " + ", ".join(unknown))
     selected = set(configured_external_tools()).intersection(declared)
+    if selected and selected_sandbox_backend_kind() == "local":
+        raise ValueError(
+            "External CLI tools require an execution-capable sandbox backend; "
+            "AGENT_SANDBOX_BACKEND resolved to local"
+        )
     return tuple(
         path
         for name, (_, path) in _EXTERNAL_TOOL_PROMPT_PATHS.items()

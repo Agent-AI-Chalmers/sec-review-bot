@@ -215,6 +215,7 @@ def test_filesystem_prompts_bound_git_exploration() -> None:
 def test_review_filesystem_prompts_advertise_configured_external_tools(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
     monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
     monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
     joern = load_prompt_resource("external-tools/joern.md")

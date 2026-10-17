@@ -35,7 +35,7 @@ Official references:
 
 ## Self-Describing CLIs
 
-Agents already have bash inside the sandbox. A usable CLI can describe itself through its command tree, `--help`, structured output, exit status, stdout, and stderr. A deployment enables the installed commands independently with `AGENT_JOERN_ENABLED` and `AGENT_PLAYWRIGHT_ENABLED`; both default to false. Each review agent also declares the external tools it owns. A tool is advertised only when its deployment switch is enabled and the agent declares it, so deployments can expose neither tool, either tool, or both without changing prompt code. The agent can then discover each selected interface as needed instead of receiving every operation as a tool schema up front.
+A usable CLI can describe itself through its command tree, `--help`, structured output, exit status, stdout, and stderr. An agent with shell access can discover that interface as needed instead of receiving every operation as a tool schema up front. This makes a CLI a sufficient integration surface when the underlying capability does not require a separate session, credential, or host-owned state boundary.
 
 A CLI does not automatically need a skill. Do not copy its command reference into `SKILL.md`. Add a skill only when experiments show that the agent repeatedly lacks knowledge outside the interface, such as:
 
@@ -59,6 +59,8 @@ Neither capability requires MCP in this runtime:
 - Playwright CLI can own a persistent browser session, reach services started by repository setup, and return browser observations to the agent.
 - Both tools run in the same sandbox in which the agent already has bash.
 - Neither integration needs host-only credentials, an existing human-operated application session, or a host resource that cannot be made available to the sandbox.
+
+The project enables the installed commands independently with `AGENT_JOERN_ENABLED` and `AGENT_PLAYWRIGHT_ENABLED`; both default to false. Each review agent declares which external tools it may use, and a tool is advertised only when both the deployment switch and the agent declaration select it. These switches require an execution-capable Docker or bwrap backend. Configuration fails when backend selection resolves to the non-executing local fallback. Docker deployments must provide the commands in their selected image; bwrap deployments must provide them on the host paths visible inside the sandbox.
 
 An MCP layer would therefore expose substantially the same capabilities while adding tool schemas and connection lifecycle. It has not demonstrated an additional capability that the default workflow needs. CLI is the default because it is sufficient, not because CLI is universally better than MCP.
 
