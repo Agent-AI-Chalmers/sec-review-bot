@@ -1,6 +1,6 @@
 # External Tool Cases
 
-These gated LLM cases test whether product agents can use an enabled Joern or Playwright CLI through their normal `execute` tool. Installation and basic CLI behavior belong to the no-model capability tests under `tests/integration/external_tools/`.
+These gated LLM cases test whether product agents can use an enabled Joern or Playwright CLI through their normal `execute` tool. Installation and basic CLI behavior belong to the no-model capability tests next to this package under `tests/external_tools/`.
 
 ## Test Levels
 
@@ -37,13 +37,13 @@ Joern queries pipe interactive input instead of using `--script /dev/stdin`, whi
 Run all discovery and comparison cases from `agents/`:
 
 ```bash
-RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/integration/llm/test_external_tool_cases.py -q -s
+RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/external_tools/test_llm_cases.py -q -s
 ```
 
 Run only the larger paired comparisons:
 
 ```bash
-RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/integration/llm/test_external_tool_cases.py -q -s -k comparison
+RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/external_tools/test_llm_cases.py -q -s -k comparison
 ```
 
 ## Current Fixtures

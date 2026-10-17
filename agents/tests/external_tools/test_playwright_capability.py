@@ -23,7 +23,9 @@ from sec_review_agents.runtime.setup_bootstrap import (
 )
 
 _TOOLS_IMAGE = "sec-review-bot-workspace:tools"
-_FIXTURE = Path(__file__).with_name("fixtures") / "playwright"
+_FIXTURE = Path(__file__).with_name("capability_fixtures") / "playwright"
+
+pytestmark = pytest.mark.integration
 
 
 def _tools_image_available() -> bool:

@@ -9,11 +9,11 @@ from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
-from tests.integration.llm.external_tool_cases.loader import (
+from tests.external_tools.cases.loader import (
     cases_for_mode,
     load_external_tool_cases,
 )
-from tests.integration.llm.external_tool_cases.runner import (
+from tests.external_tools.cases.runner import (
     assert_external_tool_case_oracles,
     has_required_external_tool_evidence,
     materialize_external_tool_case_workspace,
@@ -87,7 +87,12 @@ PROBE = llm_probe(
     ),
 )
 
-pytestmark = [PROBE.skip_unless(), pytest.mark.asyncio]
+pytestmark = [
+    PROBE.skip_unless(),
+    pytest.mark.asyncio,
+    pytest.mark.integration,
+    pytest.mark.llm,
+]
 
 
 @pytest.mark.parametrize(

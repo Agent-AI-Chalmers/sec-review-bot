@@ -3,7 +3,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from sec_review_agents.entrypoints.setup_declaration import parse_setup_declaration
-from tests.integration.llm.external_tool_cases.models import (
+from tests.external_tools.cases.models import (
     ExternalToolCase,
     ExternalToolCaseMode,
 )

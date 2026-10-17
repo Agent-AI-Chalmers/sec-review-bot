@@ -60,6 +60,10 @@ sec-review-agents-memory = "sec_review_agents.cli.memory:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "integration: requires a real runtime or external process beyond ordinary in-process tests",
+  "llm: invokes a real language model and is gated from normal test runs",
+]
 
 [tool.ruff]
 target-version = "py314"

@@ -17,7 +17,9 @@ from sec_review_agents.filesystem.docker_runtime import (
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 _TOOLS_IMAGE = "sec-review-bot-workspace:tools"
-_FIXTURE = Path(__file__).with_name("fixtures") / "joern"
+_FIXTURE = Path(__file__).with_name("capability_fixtures") / "joern"
+
+pytestmark = pytest.mark.integration
 
 
 def _tools_image_available() -> bool:
