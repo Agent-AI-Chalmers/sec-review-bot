@@ -1,24 +1,53 @@
 # External Tool Cases
 
-These gated LLM cases verify that a product agent can discover and use an enabled Joern or Playwright CLI through its normal `execute` tool. They do not prove installation or transport; the no-model capability tests under `tests/integration/external_tools/` own those facts.
+These gated LLM cases test whether product agents can use an enabled Joern or Playwright CLI through their normal `execute` tool. Installation and basic CLI behavior belong to the no-model capability tests under `tests/integration/external_tools/`.
 
-Discovery cases use small local workspaces with stable oracles. Comparison cases may instead declare a public Git repository and full commit hash. The runner clones that checkout only when the gated probe runs, checks out the pinned revision, removes Git metadata, and then gives identical source copies to the external-tool OFF and ON arms. The OFF arm uses the underlying workspace base image, while the ON arm uses `sec-review-bot-workspace:tools`; disabling only the prompt would be a false baseline because the CLI would remain discoverable in the image. Override the images with `AGENT_EXTERNAL_TOOLS_BASELINE_DOCKER_IMAGE` and `AGENT_EXTERNAL_TOOLS_DOCKER_IMAGE` when needed.
+## Test Levels
 
-Comparison prompts may name the tool because they measure the result after use; autonomous selection belongs to discovery cases. Each comparison retains both transcripts and a compact summary containing image names, tool-use facts, result-oracle status, evidence-coverage scores, and the score delta. The test requires genuine tool use in the enabled arm but does not require that arm to win: a neutral or worse result is experimental evidence rather than a test-infrastructure failure. Discovery cases retain the strict result oracle.
+### Discovery
 
-The SFTPGo rsync case is a neutral control: its decisive source and sink are concentrated in one production file, so Joern may corroborate the path without improving the final conclusion. The Helm chart-name case exercises a broader CPG-shaped task: its result oracle requires the analyzer to connect metadata decoding in the chart loader to both filesystem and tar-path construction in the chart saver. Neither fixture is designated a positive result in advance; the retained comparison artifacts are the evidence for whether a tool improved a particular run.
+Discovery cases use small local workspaces and strict result oracles. They test whether an agent notices the enabled tool, uses it without a tool-specific task instruction, and produces the required evidence.
 
-Each enabled arm injects exactly one external-tool prompt. All arms disable skills and MCP and retain their workspace, transcript, and workflow artifacts under `.agent-artifacts/external-tool-cases/`. Set `EXTERNAL_TOOL_CASE_OUTPUT_DIR` to override the artifact root.
+### Comparison
 
-The Playwright capability and discovery cases select `--browser chromium` because the image installs Playwright Chromium while the CLI defaults to an unavailable system Chrome. Joern queries pipe interactive input rather than using `--script /dev/stdin`, which may not terminate because Joern expects a script file. Joern capability tests also print explicit evidence markers because interactive output includes ANSI formatting; the marker is an oracle aid, not an agent workflow requirement.
+Comparison cases run the same task twice against identical source: once without the external tool and once with it enabled. Their prompts may name the tool because autonomous selection is already covered by discovery cases.
 
-Run the discovery cases from `agents/`:
+The OFF arm uses `mcr.microsoft.com/devcontainers/universal:6-noble`. The ON arm uses `sec-review-bot-workspace:tools`. Merely removing the tool prompt would not create a valid baseline because the CLI would remain discoverable in the image. Override these images with `AGENT_EXTERNAL_TOOLS_BASELINE_DOCKER_IMAGE` and `AGENT_EXTERNAL_TOOLS_DOCKER_IMAGE` when necessary.
+
+A comparison test requires the ON arm to provide genuine tool-use evidence, but it does not require that arm to outperform the baseline. The summary records result-oracle status, evidence-coverage scores, and the score delta. A neutral or worse ON result is retained as experimental evidence rather than treated as a harness failure.
+
+## Comparison Checkouts
+
+A comparison fixture may declare a public Git repository and a full commit hash. The runner fetches only that pinned revision, removes `.git`, and copies the resulting source tree into each arm while preserving symlinks. Both agents therefore receive the same repository state without commit history.
+
+Current comparison fixtures have different roles:
+
+- `sftpgo-rsync-command` is a neutral control. Its decisive source and sink are concentrated in one production file, so Joern may corroborate the path without improving the conclusion.
+- `helm-chart-name-traversal` exercises a broader CPG-shaped task. Its result oracle covers metadata decoding in the chart loader and both filesystem and tar-path construction in the chart saver.
+
+Neither fixture is designated a positive Joern result in advance. The retained artifacts determine whether the tool helped a particular run.
+
+## Isolation And Artifacts
+
+Each enabled arm injects exactly one external-tool prompt. All arms disable skills and MCP.
+
+Workspaces, transcripts, workflow artifacts, and comparison summaries are retained under `.agent-artifacts/external-tool-cases/`. Set `EXTERNAL_TOOL_CASE_OUTPUT_DIR` to use another artifact root.
+
+## Tool Notes
+
+Playwright cases specify `--browser chromium` because the image installs Playwright Chromium while the CLI otherwise looks for an unavailable system Chrome.
+
+Joern queries pipe interactive input instead of using `--script /dev/stdin`, which may not terminate because Joern expects a script file. Capability tests print explicit evidence markers because interactive Joern output contains ANSI formatting; those markers support stable test assertions and are not required in normal agent workflows.
+
+## Running Cases
+
+Run all discovery and comparison cases from `agents/`:
 
 ```bash
 RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/integration/llm/test_external_tool_cases.py -q -s
 ```
 
-Run only the larger paired checkout comparison with:
+Run only the larger paired comparisons:
 
 ```bash
 RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/integration/llm/test_external_tool_cases.py -q -s -k comparison
