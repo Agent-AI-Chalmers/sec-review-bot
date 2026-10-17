@@ -100,62 +100,23 @@ Messages to summarize:
 """.strip()
 
 
-def _resolve_summarization_keep_tokens(
-    agent_name: str,
-    *,
-    deployment_override: str | None,
-) -> int:
-    return max(
-        1,
-        int(
-            resolve_bound_deployment_max_input_tokens(
-                agent_name,
-                deployment_override=deployment_override,
-            )
-            * SUMMARIZATION_KEEP_FRACTION
-        ),
-    )
-
-
-def _resolve_summarization_trigger_tokens(
-    agent_name: str,
-    *,
-    deployment_override: str | None,
-) -> int:
-    return max(
-        1,
-        int(
-            resolve_bound_deployment_max_input_tokens(
-                agent_name,
-                deployment_override=deployment_override,
-            )
-            * SUMMARIZATION_TRIGGER_FRACTION
-        ),
-    )
-
-
 def create_summarization_middleware(
     *,
     agent_name: str,
     model: BaseChatModel,
     deployment_override: str | None = None,
 ) -> SummarizationMiddleware:
+    max_input_tokens = resolve_bound_deployment_max_input_tokens(
+        agent_name,
+        deployment_override=deployment_override,
+    )
+    trigger_tokens = max(1, int(max_input_tokens * SUMMARIZATION_TRIGGER_FRACTION))
+    keep_tokens = max(1, int(max_input_tokens * SUMMARIZATION_KEEP_FRACTION))
+
     return SummarizationMiddleware(
         model=model,
-        trigger=(
-            "tokens",
-            _resolve_summarization_trigger_tokens(
-                agent_name,
-                deployment_override=deployment_override,
-            ),
-        ),
-        keep=(
-            "tokens",
-            _resolve_summarization_keep_tokens(
-                agent_name,
-                deployment_override=deployment_override,
-            ),
-        ),
+        trigger=("tokens", trigger_tokens),
+        keep=("tokens", keep_tokens),
         summary_prompt=SEC_REVIEW_SUMMARY_PROMPT,
         # The first user message is the stage input contract; LangChain's
         # default "last 4000 tokens" summary trim can cut that boundary away.

@@ -303,7 +303,7 @@ def test_create_summarization_middleware_uses_absolute_token_limits() -> None:
         patch(
             "sec_review_agents.runtime.summarization_middleware.resolve_bound_deployment_max_input_tokens",
             return_value=1000,
-        ),
+        ) as resolve_max_input_tokens,
         patch(
             "sec_review_agents.runtime.summarization_middleware.SummarizationMiddleware",
             return_value=Mock(),
@@ -312,8 +312,13 @@ def test_create_summarization_middleware_uses_absolute_token_limits() -> None:
         create_summarization_middleware(
             agent_name="issue-analyzer",
             model=Mock(),
+            deployment_override="test-deployment",
         )
 
+    resolve_max_input_tokens.assert_called_once_with(
+        "issue-analyzer",
+        deployment_override="test-deployment",
+    )
     middleware_cls.assert_called_once()
     assert middleware_cls.call_args.kwargs["trigger"] == ("tokens", 850)
     assert middleware_cls.call_args.kwargs["keep"] == ("tokens", 300)
