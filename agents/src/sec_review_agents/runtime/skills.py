@@ -1,3 +1,5 @@
+"""Materialize immutable views of bundled agent skills for sandbox backends."""
+
 import fcntl
 import hashlib
 import shutil
@@ -11,7 +13,24 @@ from sec_review_agents.resources.paths import AGENT_SKILLS
 _DEFAULT_SKILLS_MATERIALIZED_ROOT: Path | None = None
 
 
+def bundled_agent_skill_names() -> tuple[str, ...]:
+    """Return every packaged top-level skill directory in stable name order.
+
+    A directory is considered a skill only when it contains ``SKILL.md``. This
+    keeps auxiliary resource directories out of automatic all-skill views while
+    allowing newly packaged skills to become visible without another allowlist.
+    """
+    return tuple(
+        sorted(
+            child.name
+            for child in AGENT_SKILLS.iterdir()
+            if child.is_dir() and child.joinpath("SKILL.md").is_file()
+        )
+    )
+
+
 def skills_materialized_base_root() -> Path:
+    """Return the process-local cache root used for materialized skill views."""
     global _DEFAULT_SKILLS_MATERIALIZED_ROOT
     if _DEFAULT_SKILLS_MATERIALIZED_ROOT is None:
         _DEFAULT_SKILLS_MATERIALIZED_ROOT = Path(
@@ -82,6 +101,12 @@ def _rebuild_skills_view(
 def materialize_agent_skills_view(
     skill_names: Iterable[str],
 ) -> Path:
+    """Build or reuse a read-only source tree for the declared bundled skills.
+
+    The returned directory is content-addressed by declaration and guarded by a
+    manifest plus a file lock, so concurrent agent construction sees a complete
+    view and changed packaged resources trigger a rebuild.
+    """
     normalized_skill_names = tuple(
         _normalize_component(skill_name, "Skill name") for skill_name in skill_names
     )
@@ -108,3 +133,8 @@ def materialize_agent_skills_view(
             manifest_path.write_text(f"{expected_manifest}\n", encoding="utf-8")
 
     return destination
+
+
+def materialize_all_agent_skills_view() -> Path:
+    """Materialize every bundled skill discovered by :func:`bundled_agent_skill_names`."""
+    return materialize_agent_skills_view(bundled_agent_skill_names())

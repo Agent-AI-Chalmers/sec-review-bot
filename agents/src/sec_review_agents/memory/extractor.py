@@ -8,16 +8,13 @@ from sec_review_agents.agents.memory_extractor.agent import (
     MEMORY_EXTRACTOR_AGENT_NAME,
     create_memory_extractor_agent_graph,
 )
+from sec_review_agents.agents.memory_extractor.backend import (
+    create_memory_extractor_backend,
+)
 from sec_review_agents.agents.memory_extractor.model import StagedTranscripts
 from sec_review_agents.agents.memory_extractor.prompts import (
     MEMORY_EXTRACTOR_SYSTEM_PROMPT,
     build_extractor_prompt,
-)
-from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_path_views,
-)
-from sec_review_agents.filesystem.path_views import (
-    read_only_path_view,
 )
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.state import (
@@ -41,6 +38,8 @@ PUBLISHED_TRANSCRIPT_STAGES = {"analyzer", "mitigator", "verifier"}
 
 @dataclass(frozen=True)
 class TranscriptRef:
+    """A published transcript plus its review-stage provenance."""
+
     stage: str
     attempt: str
     path: Path
@@ -60,6 +59,8 @@ class TranscriptRef:
 
 @dataclass(frozen=True)
 class MemoryObservationResult:
+    """Outcome of extraction, including any observation files that were published."""
+
     skipped: bool
     summary: str
     observation_paths: tuple[Path, ...] = ()
@@ -83,6 +84,7 @@ def observation_id(
     *,
     job_id: str | None = None,
 ) -> str:
+    """Derive a filesystem-safe observation ID from a job ID or transcript paths."""
     if job_id:
         return _slug_component(job_id)
 
@@ -99,6 +101,7 @@ def resolve_observation_id(
     explicit_observation_id: str | None,
     job_id: str | None,
 ) -> str:
+    """Resolve the final ID, giving an explicit operator value highest priority."""
     if explicit_observation_id:
         return _slug_component(explicit_observation_id)
     return observation_id([ref.path for ref in transcript_refs], job_id=job_id)
@@ -107,6 +110,7 @@ def resolve_observation_id(
 def collect_review_memory_transcripts(
     review_artifact_root: Path,
 ) -> list[TranscriptRef]:
+    """Collect memory-eligible transcripts from one published review artifact."""
     root = review_artifact_root.expanduser().resolve()
     return collect_published_transcripts(root)
 
@@ -123,6 +127,7 @@ def _published_transcript_stage_attempt(transcript: Path) -> tuple[str, str]:
 
 
 def collect_published_transcripts(review_artifact_root: Path) -> list[TranscriptRef]:
+    """Read the current flat ``transcripts/`` publication layout in filename order."""
     transcripts_root = review_artifact_root / "transcripts"
     if not transcripts_root.is_dir():
         return []
@@ -140,6 +145,7 @@ def collect_published_transcripts(review_artifact_root: Path) -> list[Transcript
 
 
 def collect_transcript_refs(paths: list[Path]) -> list[TranscriptRef]:
+    """Resolve artifact directories or explicit transcript files without duplicates."""
     refs: list[TranscriptRef] = []
     seen: set[Path] = set()
 
@@ -176,6 +182,7 @@ def collect_transcript_refs(paths: list[Path]) -> list[TranscriptRef]:
 def stage_transcripts(
     transcripts: list[TranscriptRef], destination: Path
 ) -> StagedTranscripts:
+    """Copy transcripts into a deterministic extractor-visible sequence."""
     destination.mkdir(parents=True, exist_ok=True)
     entries: list[tuple[str, Path]] = []
     for index, transcript in enumerate(transcripts, start=1):
@@ -197,6 +204,7 @@ def build_observation_document(
     staged_transcripts: StagedTranscripts,
     observation_markdown: str,
 ) -> str:
+    """Render one observation body with stable provenance metadata."""
     stage_labels = [label for label, _mounted in staged_transcripts.entries]
     lines = [
         f"# Memory Observation: {observation_id_value}",
@@ -269,15 +277,8 @@ async def _extract_memory_observation_for_refs(
         temp_root = Path(tempdir)
         transcript_root = temp_root / "transcripts"
         staged_transcripts = stage_transcripts(transcript_refs, transcript_root)
-        backend = create_backend_with_path_views(
-            container_name_prefix="memory-extractor",
-            path_views=[
-                read_only_path_view(
-                    agent_path="/transcripts",
-                    host_path=transcript_root,
-                ),
-            ],
-            backend_kind="local",
+        backend = create_memory_extractor_backend(
+            transcript_root=transcript_root,
         )
         model = create_chat_model(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
@@ -358,6 +359,12 @@ async def extract_memory_observations_from_paths(
     run_id: str | None = None,
     artifact_root_path: Path | None = None,
 ) -> MemoryObservationResult:
+    """Extract and publish one pending observation from the supplied transcripts.
+
+    This is the direct, non-Temporal entry point used by workflow activities and
+    local callers. It initializes the configured store, avoids replacing an
+    already processed observation, and records successful output in the ledger.
+    """
     transcript_refs = collect_transcript_refs(transcript_paths)
     if not transcript_refs:
         return MemoryObservationResult(
@@ -394,3 +401,4 @@ __all__ = [
     "resolve_observation_id",
     "stage_transcripts",
 ]
+"""Extract durable memory observations from published review transcripts."""

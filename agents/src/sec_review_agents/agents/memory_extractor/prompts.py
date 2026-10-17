@@ -5,6 +5,7 @@ MEMORY_EXTRACTOR_SYSTEM_PROMPT = load_prompt_resource("memory/extract-system.md"
 
 
 def build_extractor_prompt(staged_transcripts: StagedTranscripts) -> str:
+    """Build the ordered transcript-reading task for one extraction attempt."""
     transcript_lines = [
         f"- {label}: `{mounted}`" for label, mounted in staged_transcripts.entries
     ]

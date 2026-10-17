@@ -3,6 +3,8 @@
 # APIs, and may not fit current memory or observation files. Review and adapt
 # this script for your own inputs and risk tolerance before use.
 
+"""Import observation Markdown files and run direct memory maintenance."""
+
 import argparse
 import asyncio
 import tempfile
@@ -69,6 +71,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _collect_observations(args: argparse.Namespace) -> list[Path]:
+    """Resolve explicitly selected observation files in deterministic order."""
     paths: list[Path] = []
     if args.observations_dir is not None:
         observations_dir = args.observations_dir.expanduser().resolve()
@@ -96,6 +99,7 @@ def _import_observations(
     *,
     memory_store_dir: Path,
 ) -> None:
+    """Atomically publish observations and register them as pending ledger rows."""
     observations_root = memory_observations_dir(memory_store_dir)
     observation_ids = [source.stem for source in observation_paths]
     if len(observation_ids) != len(set(observation_ids)):
@@ -127,6 +131,7 @@ def _import_observations(
 
 
 async def main() -> int:
+    """Run the experimental non-Temporal maintenance command."""
     bootstrap_agents_env()
     args = _parse_args()
     print(WARNING)

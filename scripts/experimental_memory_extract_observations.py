@@ -3,6 +3,8 @@
 # APIs, and may not fit current run artifacts. Review and adapt this script for
 # your own inputs and risk tolerance before use.
 
+"""Preview memory observation extraction without modifying a memory store."""
+
 import argparse
 import asyncio
 import tempfile
@@ -12,12 +14,13 @@ from sec_review_agents.agents.memory_extractor.agent import (
     MEMORY_EXTRACTOR_AGENT_NAME,
     create_memory_extractor_agent_graph,
 )
+from sec_review_agents.agents.memory_extractor.backend import (
+    create_memory_extractor_backend,
+)
 from sec_review_agents.agents.memory_extractor.prompts import (
     MEMORY_EXTRACTOR_SYSTEM_PROMPT,
     build_extractor_prompt,
 )
-from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
-from sec_review_agents.filesystem.path_views import read_only_path_view
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.extractor import (
     build_observation_document,
@@ -91,11 +94,13 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _write_observation(path: Path, content: str) -> None:
+    """Write one normalized observation document to the requested preview path."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
 
 
 async def main() -> int:
+    """Run one local extraction attempt over the supplied transcript sequence."""
     bootstrap_agents_env()
     args = _parse_args()
     output_dir = args.output_dir.expanduser().resolve()
@@ -117,15 +122,8 @@ async def main() -> int:
         temp_root = Path(tempdir)
         transcript_root = temp_root / "transcripts"
         staged = stage_transcripts(transcript_refs, transcript_root)
-        backend = create_backend_with_path_views(
-            container_name_prefix="memory-observation-preview",
-            path_views=[
-                read_only_path_view(
-                    agent_path="/transcripts",
-                    host_path=transcript_root,
-                )
-            ],
-            backend_kind="local",
+        backend = create_memory_extractor_backend(
+            transcript_root=transcript_root,
         )
         model = create_chat_model(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
