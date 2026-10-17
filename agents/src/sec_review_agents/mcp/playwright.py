@@ -1,5 +1,4 @@
 import shlex
-from contextlib import suppress
 from typing import Any
 
 from sec_review_agents.filesystem import docker_runtime
@@ -41,49 +40,44 @@ def playwright_mcp_connections_for_backend(
         log_diagnostic("playwright_mcp_skipped", reason="unsupported_backend")
         return {}
 
-    try:
-        backend.container.ensure_started()
-        workspace = backend.sandbox_path_for_agent_path(
-            PLAYWRIGHT_AGENT_WORKSPACE,
-            require_writable=True,
-        )
-        executable = _docker_playwright_executable(backend)
-        if workspace is None or executable is None:
-            log_diagnostic("playwright_mcp_skipped", reason="runtime_not_available")
-            return {}
+    backend.container.ensure_started()
+    workspace = backend.sandbox_path_for_agent_path(
+        PLAYWRIGHT_AGENT_WORKSPACE,
+        require_writable=True,
+    )
+    executable = _docker_playwright_executable(backend)
+    if workspace is None or executable is None:
+        log_diagnostic("playwright_mcp_skipped", reason="runtime_not_available")
+        return {}
 
-        launch_command = " ".join(
-            [
-                "exec playwright-mcp",
-                "--headless",
-                "--isolated",
-                "--no-sandbox",
-                "--browser chrome",
-                f"--executable-path {shlex.quote(executable)}",
-                "--block-service-workers",
-                "--image-responses omit",
-                f"--output-dir {shlex.quote(PLAYWRIGHT_OUTPUT_DIR)}",
-                "--snapshot-mode full",
-                "--no-webmcp",
-            ]
-        )
-        return {
-            "playwright": {
-                "transport": "stdio",
-                "command": docker_runtime.default_docker_bin(),
-                "args": [
-                    "exec",
-                    "-i",
-                    "--workdir",
-                    workspace,
-                    backend.container_name,
-                    "/bin/sh",
-                    "-lc",
-                    launch_command,
-                ],
-            }
+    launch_command = " ".join(
+        [
+            "exec playwright-mcp",
+            "--headless",
+            "--isolated",
+            "--no-sandbox",
+            "--browser chrome",
+            f"--executable-path {shlex.quote(executable)}",
+            "--block-service-workers",
+            "--image-responses omit",
+            f"--output-dir {shlex.quote(PLAYWRIGHT_OUTPUT_DIR)}",
+            "--snapshot-mode full",
+            "--no-webmcp",
+        ]
+    )
+    return {
+        "playwright": {
+            "transport": "stdio",
+            "command": docker_runtime.default_docker_bin(),
+            "args": [
+                "exec",
+                "-i",
+                "--workdir",
+                workspace,
+                backend.container_name,
+                "/bin/sh",
+                "-lc",
+                launch_command,
+            ],
         }
-    except Exception:
-        with suppress(Exception):
-            backend.close()
-        raise
+    }

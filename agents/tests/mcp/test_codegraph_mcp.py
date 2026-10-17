@@ -218,7 +218,7 @@ def test_skips_read_only_bwrap_workspace(tmp_path: Path) -> None:
     )
 
 
-def test_closes_docker_container_when_codegraph_prepare_raises() -> None:
+def test_does_not_close_borrowed_backend_when_codegraph_prepare_raises() -> None:
     backend = _docker_backend()
 
     with (
@@ -228,13 +228,13 @@ def test_closes_docker_container_when_codegraph_prepare_raises() -> None:
             "execute",
             side_effect=RuntimeError("prepare exploded"),
         ),
-        patch.object(backend.container, "close") as close,
+        patch.object(backend, "close") as close,
         pytest.raises(RuntimeError, match="prepare exploded"),
     ):
         codegraph_mcp_connections_for_backend(backend)
 
     ensure_started.assert_called_once_with()
-    close.assert_called_once_with()
+    close.assert_not_called()
 
 
 def test_skips_local_backend_without_host_workspace_path(tmp_path: Path) -> None:

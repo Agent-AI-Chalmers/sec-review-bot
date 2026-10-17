@@ -7,6 +7,8 @@ multiple tool calls; the real capability check lives in test_capability.py.
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from sec_review_agents.filesystem.docker_backend import (
     DockerRoute,
     DockerSandboxBackend,
@@ -113,3 +115,20 @@ def test_skips_non_docker_backend() -> None:
         "playwright_mcp_skipped",
         reason="unsupported_backend",
     )
+
+
+def test_resolver_does_not_close_borrowed_backend_on_failure() -> None:
+    backend = _docker_backend()
+
+    with (
+        patch.object(
+            backend.container,
+            "ensure_started",
+            side_effect=RuntimeError("start failed"),
+        ),
+        patch.object(backend, "close") as close,
+        pytest.raises(RuntimeError, match="start failed"),
+    ):
+        playwright_mcp_connections_for_backend(backend)
+
+    close.assert_not_called()

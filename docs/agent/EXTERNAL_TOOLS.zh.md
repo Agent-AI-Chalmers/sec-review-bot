@@ -60,7 +60,7 @@ Joern 提供 code property graph、结构查询、调用关系和数据流分析
 - 两个工具都运行在 agent 已经能够使用 bash 的同一个 sandbox 中。
 - 两项集成都不需要只能由 host 持有的 credential、既有的人工操作 session，或者无法提供给 sandbox 的 host 资源。
 
-本项目分别通过 `AGENT_JOERN_ENABLED` 和 `AGENT_PLAYWRIGHT_ENABLED` 启用已安装的命令；两者默认均为 false。每类 review agent 会声明自己可以使用哪些外部工具，只有部署开关和 agent 声明同时选中某项工具时，相关提示才会进入上下文。这些开关要求使用具备命令执行能力的 Docker 或 bwrap backend；如果 backend selection 最终落到不能执行命令的 local fallback，配置会直接失败。Docker 部署必须在所选镜像中提供相应命令；bwrap 部署必须在 sandbox 可见的 host 路径中提供它们。
+本项目分别通过 `AGENT_JOERN_ENABLED` 和 `AGENT_PLAYWRIGHT_ENABLED` 启用已安装的命令；两者默认均为 false。每类 review agent 会声明自己可以使用哪些外部工具，只有部署开关和 agent 声明同时选中某项工具时，相关提示才会进入上下文。Joern 支持具备命令执行能力的 Docker 和 bwrap backend。Playwright 要求使用 Docker，因为 browser session 和 setup service 必须在多次命令之间留在同一个持久 sandbox 中。如果选中的工具与最终 backend 不兼容，配置会直接失败。Docker 部署必须在所选镜像中提供相应命令；bwrap 部署必须在 sandbox 可见的 host 路径中提供 Joern。
 
 因此，MCP layer 暴露的能力大体相同，却会增加 tool schema 和 connection lifecycle。它尚未证明能够提供默认 workflow 所需的额外能力。选择 CLI 是因为 CLI 已经足够，而不是因为 CLI 在任何场景都优于 MCP。
 

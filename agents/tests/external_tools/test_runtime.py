@@ -90,3 +90,13 @@ def test_external_tool_prompts_reject_auto_local_fallback(monkeypatch) -> None:
         ),
     ):
         external_tool_prompt_paths_for(("playwright",))
+
+
+def test_bwrap_allows_joern_but_rejects_playwright(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "bwrap")
+    monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
+    monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
+
+    assert external_tool_prompt_paths_for(("joern",)) == ("external-tools/joern.md",)
+    with pytest.raises(ValueError, match="Playwright CLI requires.*Docker sandbox"):
+        external_tool_prompt_paths_for(("playwright",))
