@@ -18,7 +18,7 @@ from tests.external_tools.cases.models import (
     ExternalToolCaseMode,
     ExternalToolInteractionOracle,
 )
-from tests.llm.transcript_artifact_helpers import (
+from tests.runtime.transcript_artifact_helpers import (
     tool_interactions_from_transcript,
     tool_usage_from_transcript,
 )

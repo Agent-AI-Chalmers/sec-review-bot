@@ -7,23 +7,7 @@ from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from referencing import Registry, Resource
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION_DIR
-
-
-def _workspace_root() -> Path:
-    """Locate the repository root by the presence of the shared `contracts/` tree.
-
-    The probe is the contracts root's own `README.md`, not any one family inside
-    it: each family derives its own paths from `CONTRACTS_ROOT`, so no family
-    depends on another family's location, and a merely-named `contracts/`
-    directory (such as this package's own `tests/contracts/`) does not match.
-    """
-    for candidate in Path(__file__).resolve().parents:
-        if (candidate / "contracts" / "README.md").is_file():
-            return candidate
-    raise RuntimeError("Could not locate workspace contracts root.")
-
-
-CONTRACTS_ROOT = _workspace_root() / "contracts"
+from tests.project_paths import CONTRACTS_ROOT
 
 # --- integration-contract family ------------------------------------------
 

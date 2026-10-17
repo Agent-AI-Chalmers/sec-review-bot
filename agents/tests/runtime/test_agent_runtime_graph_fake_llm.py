@@ -16,14 +16,14 @@ from sec_review_agents.runtime.changed_files_acceptance_middleware import (
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
 )
-from tests.llm.fake_chat_models import (
-    ToolCallingFakeMessagesListChatModel,
-    structured_tool_call_message,
-)
 from tests.review_stages.stages.test_mitigation_changed_files_acceptance import (
     _baseline_snapshot,
     _copy_repo,
     _create_repo,
+)
+from tests.runtime.fake_chat_models import (
+    ToolCallingFakeMessagesListChatModel,
+    structured_tool_call_message,
 )
 
 

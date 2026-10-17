@@ -18,8 +18,7 @@ from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.mcp.codegraph import codegraph_mcp_connections_for_backend
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from tests.llm.deployment_helpers import llm_test_deployment
-from tests.llm.probe_helpers import ProbeRequirement, llm_probe
+from tests.llm_probe import ProbeRequirement, llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 

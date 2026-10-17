@@ -1,8 +1,7 @@
-from pathlib import Path
-
 from sec_review_agents.workflows.repository.case_execution_input import (
     build_review_input,
 )
+from tests.project_paths import PACKAGE_ROOT
 
 
 def test_repository_review_input_renders_summary_evidence_and_anchors() -> None:
@@ -61,12 +60,11 @@ def test_repository_review_input_renders_incremental_evidence_paths() -> None:
 
 
 def test_repository_fix_prompts_consume_prepared_review_input() -> None:
-    package_root = Path(__file__).resolve().parents[3] / "src" / "sec_review_agents"
     prompt_paths = [
-        package_root / "workflows" / "repository_case" / "analysis.py",
-        package_root / "workflows" / "repository_case" / "cvss.py",
-        package_root / "workflows" / "repository_case" / "mitigation.py",
-        package_root / "workflows" / "repository_case" / "verification.py",
+        PACKAGE_ROOT / "workflows" / "repository_case" / "analysis.py",
+        PACKAGE_ROOT / "workflows" / "repository_case" / "cvss.py",
+        PACKAGE_ROOT / "workflows" / "repository_case" / "mitigation.py",
+        PACKAGE_ROOT / "workflows" / "repository_case" / "verification.py",
     ]
     forbidden_tokens = (
         'input_data["case"]',
@@ -89,8 +87,7 @@ def test_repository_fix_prompts_consume_prepared_review_input() -> None:
 
 
 def test_repository_review_input_is_only_fix_adapter_for_case_detail_fields() -> None:
-    package_root = Path(__file__).resolve().parents[3] / "src" / "sec_review_agents"
-    repository_case_root = package_root / "workflows" / "repository_case"
+    repository_case_root = PACKAGE_ROOT / "workflows" / "repository_case"
     forbidden_tokens = (
         "affectedPaths",
         "anchor_locations",
@@ -101,7 +98,7 @@ def test_repository_review_input_is_only_fix_adapter_for_case_detail_fields() ->
     for path in repository_case_root.rglob("*.py"):
         source = path.read_text(encoding="utf-8")
         violations.extend(
-            f"{path.relative_to(package_root)}: {token}"
+            f"{path.relative_to(PACKAGE_ROOT)}: {token}"
             for token in forbidden_tokens
             if token in source
         )

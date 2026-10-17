@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, ToolMessage, messages_to_dict
 
 from sec_review_agents.resources.paths import AGENT_SKILLS
 from sec_review_agents.utils.serialization import json_safe
-from tests.llm.deployment_helpers import llm_test_deployment
+from tests.llm_probe import llm_test_deployment
 
 
 def successful_read_paths(result: dict[str, Any]) -> set[str]:

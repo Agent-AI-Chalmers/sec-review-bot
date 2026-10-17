@@ -1,6 +1,6 @@
 import pytest
 
-from tests.llm.probe_helpers import llm_probe
+from tests.llm_probe import llm_probe
 from tests.skills.cases.loader import cases_for_mode, load_skill_cases
 from tests.skills.cases.runner import (
     assert_case_oracles,

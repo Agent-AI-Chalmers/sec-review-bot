@@ -23,4 +23,4 @@ Run deterministic memory tests from `agents/`:
 uv run python -m pytest tests/memory -m "not llm"
 ```
 
-Real-model probes are disabled by default. Enable one probe with its corresponding environment variable and `LLM_TEST_DEPLOYMENT`; the commands are listed in [`tests/llm/README.md`](../llm/README.md).
+Real-model probes are disabled by default. Enable one probe with its corresponding environment variable and `LLM_TEST_DEPLOYMENT`; the commands are listed in [`tests/README.md`](../README.md).

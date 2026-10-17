@@ -5,7 +5,7 @@ import pytest
 from sec_review_agents.delivery_stages.planning.agent_passes import (
     run_delivery_planning,
 )
-from tests.llm.probe_helpers import llm_probe
+from tests.llm_probe import llm_probe
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 

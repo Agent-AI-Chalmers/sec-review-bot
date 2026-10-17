@@ -1,0 +1,22 @@
+{
+  "id": "cancellation-permit-leak",
+  "issue": {
+    "title": "Cancelled requests permanently consume worker permits",
+    "body": "Unauthenticated clients can start requests and disconnect while fetch is pending. The framework cancels the handler task on disconnect. limiter is a shared semaphore with 20 permits. After permits leak, new requests wait indefinitely. Audit the cancellation and availability claim."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-defect", "confirmed-vulnerability"],
+    "expected_mechanism": "Cancellation and normal returns bypass semaphore release, exhausting bounded capacity.",
+    "required_evidence": [
+      {
+        "label": "permit lifecycle failure",
+        "any_of": ["release.*unreachable", "never.*release", "bypass.*release"]
+      },
+      {
+        "label": "bounded-capacity exhaustion",
+        "any_of": ["permit.*exhaust", "semaphore.*block", "denial of service", "availability"]
+      }
+    ],
+    "required_locations": ["src/handler.py"]
+  }
+}

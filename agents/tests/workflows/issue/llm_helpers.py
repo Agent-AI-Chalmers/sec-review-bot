@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from sec_review_agents.workflows.issue.analysis import analyze_issue
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
-from tests.llm.probe_helpers import llm_probe
+from tests.llm_probe import llm_probe
 
 ISSUE_LLM_PROBE = llm_probe(
     run_env="RUN_LLM_ISSUE_REVIEW_INTEGRATION",
