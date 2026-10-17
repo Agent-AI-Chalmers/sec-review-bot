@@ -1,5 +1,7 @@
 """Agent graph for extracting durable observations from review transcripts."""
 
+from typing import Any
+
 from deepagents.backends.protocol import BackendProtocol
 from deepagents.middleware.skills import SkillsMiddleware
 from langchain.agents.middleware import AgentMiddleware
@@ -27,7 +29,7 @@ async def create_memory_extractor_agent_graph(
     backend: BackendProtocol,
 ) -> CompiledStateGraph:
     """Create the structured-output extractor with filesystem and skill access."""
-    agent_middleware: list[AgentMiddleware] = [
+    agent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
         MissingStructuredResponseMiddleware(
             max_retries=missing_structured_response_max_retries(),
         )
