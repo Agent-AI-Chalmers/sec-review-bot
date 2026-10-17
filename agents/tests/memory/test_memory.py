@@ -717,7 +717,6 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
             job_id="issue-review-run-1",
             source_workflow="issue-review",
             run_id="run-1",
-            artifact_root_path=transcript.parent.parent,
         )
 
     run_agent.assert_called_once()
@@ -728,12 +727,11 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
     )
     assert result.observation_path is not None
     observation_text = result.observation_path.read_text(encoding="utf-8")
-    assert "# Memory Observation: issue-review-run-1" in observation_text
+    assert "# Memory Observation:" not in observation_text
     assert "## Provenance" in observation_text
     assert "## Observation\n\nReusable lesson:" in observation_text
     assert "- Source workflow: `issue-review`" in observation_text
     assert "- Run id: `run-1`" in observation_text
-    assert "- Artifact root name: `review`" in observation_text
     assert "- Stages: analyzer initial" in observation_text
     assert str(transcript.resolve()) not in observation_text
     assert "## Source" not in observation_text
@@ -997,6 +995,131 @@ async def test_maintain_memory_marks_observations_processed(tmp_path: Path) -> N
     with open_memory_state(memory_root) as connection:
         rows = _fetch_observations_by_ids(connection, ["issue-review-run-1"])
     assert rows[0].status == "processed"
+
+
+@pytest.mark.asyncio
+async def test_maintain_memory_selected_ids_limit_prompt_and_worktree(
+    tmp_path: Path,
+) -> None:
+    memory_root = tmp_path / "memory"
+    memory_store.initialize_memory_store(memory_root)
+    observations_root = _memory_observations_dir(memory_root)
+
+    from sec_review_agents.memory.state import open_memory_state, upsert_observation
+
+    with open_memory_state(memory_root) as connection:
+        for observation_id in ("first", "second", "unselected"):
+            path = observations_root / f"{observation_id}.md"
+            path.write_text(f"{observation_id} lesson.\n", encoding="utf-8")
+            upsert_observation(
+                connection,
+                observation_id=observation_id,
+                path=str(path),
+                status="pending",
+            )
+
+    captured_worktree: Path | None = None
+
+    async def fake_create_agent_graph(*, worktree_root: Path, **_kwargs):
+        nonlocal captured_worktree
+        captured_worktree = worktree_root
+        return object()
+
+    async def fake_invoke_agent_runtime_graph(*, user_prompt, **_kwargs):
+        assert user_prompt.index("`second`") < user_prompt.index("`first`")
+        assert "`unselected`" not in user_prompt
+        assert captured_worktree is not None
+        staged_names = sorted(
+            path.name for path in (captured_worktree / "observations").iterdir()
+        )
+        assert staged_names == ["first.md", "second.md"]
+        return {"done": True}
+
+    with (
+        patch(
+            "sec_review_agents.memory.maintainer.create_memory_maintainer_agent_graph",
+            side_effect=fake_create_agent_graph,
+        ),
+        patch(
+            "sec_review_agents.memory.maintainer.invoke_agent_runtime_graph",
+            side_effect=fake_invoke_agent_runtime_graph,
+        ),
+    ):
+        result = await memory_maintenance.maintain_memory_with_result(
+            memory_store_dir=memory_root,
+            deployment="test-deployment",
+            observation_ids=["second", "first"],
+        )
+
+    assert result.processed_count == 2
+    with open_memory_state(memory_root) as connection:
+        rows = _fetch_observations_by_ids(
+            connection,
+            ["first", "second", "unselected"],
+        )
+    statuses = {row.observation_id: row.status for row in rows}
+    assert statuses == {
+        "first": "processed",
+        "second": "processed",
+        "unselected": "pending",
+    }
+
+
+@pytest.mark.asyncio
+async def test_maintain_memory_selected_ids_reject_unknown_or_processed(
+    tmp_path: Path,
+) -> None:
+    memory_root = tmp_path / "memory"
+    memory_store.initialize_memory_store(memory_root)
+    observation = _memory_observations_dir(memory_root) / "processed.md"
+    observation.write_text("Processed lesson.\n", encoding="utf-8")
+
+    from sec_review_agents.memory.state import open_memory_state, upsert_observation
+
+    with open_memory_state(memory_root) as connection:
+        upsert_observation(
+            connection,
+            observation_id="processed",
+            path=str(observation),
+            status="processed",
+        )
+
+    with pytest.raises(ValueError, match="Unknown memory observation ids: missing"):
+        await memory_maintenance.maintain_memory_with_result(
+            memory_store_dir=memory_root,
+            observation_ids=["missing"],
+        )
+    with pytest.raises(
+        ValueError,
+        match=r"Selected memory observations must be pending: processed \(processed\)",
+    ):
+        await memory_maintenance.maintain_memory_with_result(
+            memory_store_dir=memory_root,
+            observation_ids=["processed"],
+        )
+
+
+@pytest.mark.asyncio
+async def test_maintain_memory_empty_selected_ids_is_noop(tmp_path: Path) -> None:
+    memory_root = tmp_path / "memory"
+
+    with (
+        patch(
+            "sec_review_agents.memory.maintainer.create_memory_maintainer_agent_graph"
+        ) as create_agent,
+        patch(
+            "sec_review_agents.memory.maintainer.invoke_agent_runtime_graph"
+        ) as run_agent,
+    ):
+        result = await memory_maintenance.maintain_memory_with_result(
+            memory_store_dir=memory_root,
+            observation_ids=[],
+        )
+
+    assert result.processed_count == 0
+    assert result.skipped is False
+    create_agent.assert_not_called()
+    run_agent.assert_not_called()
 
 
 @pytest.mark.asyncio

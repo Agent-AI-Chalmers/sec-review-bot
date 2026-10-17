@@ -50,6 +50,7 @@ memory/
 
 extraction
   ├─ 读取 transcripts
+  ├─ 对照已有 system prompt 与 skills 指导
   └─ 写入 observations
 
 maintenance
@@ -57,7 +58,7 @@ maintenance
   └─ 更新 memory
 ```
 
-extraction 从一次 review 的阶段 transcripts 中提取可复用经验，例如 analyzer、mitigation、verification 的过程记录，并写成 observation；如果没有可长期复用的经验，就不产生 observation。
+extraction 从一次 review 的阶段 transcripts 中提取可复用经验，例如 analyzer、mitigation、verification 的过程记录，并写成 observation。system prompts 和 `/skills` 下的全部 bundled skills 都算是 agent 已经有的指导；observation 应该在此基础上增加有证据支持、可长期复用的经验，否则就不产生 observation。
 
 maintenance 会读取 extraction 产生的 observations，并把有用经验并入 memory。
 
@@ -73,7 +74,7 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 
 大致流程就是定时检查：
 
-- 来源：issue 或 pull-request review 发布 transcripts 后，会登记一个待处理的 extraction job。repository review 则会为每个成功完成的 case 单独登记 job，并以该 case 的 artifact root 作为输入；未完整执行的 case 不会登记 extraction。
+- 来源：issue 或 pull-request review 发布 transcripts 后，会登记一个待处理的 extraction job。repository review 则会为每个成功完成的 case 单独登记 job；未完整执行的 case 不会登记 extraction。
 - extraction 定时检查，有就处理：extraction schedule 默认每 10 分钟运行一次，处理已登记的 extraction jobs 并产出 pending observations。
   - 可以并发处理多个 job。
 - maintenance 定时检查，达到阈值或者时间过长就处理：maintenance trigger schedule 默认每小时运行一次。只有 pending observations 至少有 10 条，或者最老的 pending observation 已经等待至少 1 天时，才启动 maintenance。

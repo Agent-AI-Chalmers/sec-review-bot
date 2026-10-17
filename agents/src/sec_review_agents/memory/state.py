@@ -173,6 +173,37 @@ def fetch_observations_by_status(
     return [ObservationRow(*row) for row in rows]
 
 
+def fetch_observations_by_ids(
+    connection: sqlite3.Connection,
+    *,
+    observation_ids: list[str],
+) -> list[ObservationRow]:
+    """Fetch existing observations in caller-supplied order."""
+    if not observation_ids:
+        return []
+
+    placeholders = ",".join("?" for _ in observation_ids)
+    rows = connection.execute(
+        f"""
+        select
+          observation_id,
+          path,
+          status,
+          created_at,
+          updated_at
+        from observations
+        where observation_id in ({placeholders})
+        """,
+        observation_ids,
+    ).fetchall()
+    rows_by_id = {str(row["observation_id"]): ObservationRow(*row) for row in rows}
+    return [
+        rows_by_id[observation_id]
+        for observation_id in observation_ids
+        if observation_id in rows_by_id
+    ]
+
+
 def fetch_extraction_job_by_id(
     connection: sqlite3.Connection,
     job_id: str,

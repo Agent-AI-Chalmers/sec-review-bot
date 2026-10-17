@@ -32,6 +32,7 @@ from sec_review_agents.memory.middleware import (
 from sec_review_agents.memory.state import (
     OBSERVATION_STATUS_PENDING,
     ObservationRow,
+    fetch_observations_by_ids,
     fetch_observations_by_status,
     mark_observations_processed_if_unchanged,
     open_memory_state,
@@ -121,7 +122,9 @@ def _maintenance_prompt_observations(
 def _copy_memory_maintenance_worktree(
     memory_store_dir: Path,
     destination: Path,
+    observation_rows: list[ObservationRow],
 ) -> None:
+    """Copy curated memory and only the observations selected for this run."""
     destination.mkdir(parents=True, exist_ok=True)
     content_dir = memory_content_dir(memory_store_dir)
     index_path = content_dir / "MEMORY.md"
@@ -133,16 +136,11 @@ def _copy_memory_maintenance_worktree(
         shutil.copytree(topics_source, topics_destination, dirs_exist_ok=True)
     else:
         topics_destination.mkdir(exist_ok=True)
-    observations_source = memory_observations_dir(memory_store_dir)
     observations_destination = destination / "observations"
-    if observations_source.is_dir():
-        shutil.copytree(
-            observations_source,
-            observations_destination,
-            dirs_exist_ok=True,
-        )
-    else:
-        observations_destination.mkdir(exist_ok=True)
+    observations_destination.mkdir(exist_ok=True)
+    for row in observation_rows:
+        source = Path(row.path)
+        shutil.copy2(source, observations_destination / source.name)
 
 
 def _publish_maintained_memory(*, source: Path, memory_store_dir: Path) -> None:
@@ -195,9 +193,16 @@ async def maintain_memory_with_result(
     memory_store_dir: Path | None = None,
     deployment: str | None = None,
     batch_size: int | None = None,
+    observation_ids: list[str] | None = None,
 ) -> MemoryMaintenanceResult:
     if batch_size is not None and batch_size < 1:
         raise ValueError("batch_size must be positive when provided.")
+    if batch_size is not None and observation_ids is not None:
+        raise ValueError("batch_size and observation_ids cannot be used together.")
+    if observation_ids is not None and len(observation_ids) != len(
+        set(observation_ids)
+    ):
+        raise ValueError("observation_ids must be unique.")
     memory_store_dir = resolve_memory_store_dir(memory_store_dir, required=True)
     initialize_memory_store(memory_store_dir)
 
@@ -208,6 +213,7 @@ async def maintain_memory_with_result(
             memory_store_dir=memory_store_dir,
             deployment=deployment,
             batch_size=batch_size,
+            observation_ids=observation_ids,
         )
 
 
@@ -216,6 +222,7 @@ async def _maintain_memory_with_result_locked(
     memory_store_dir: Path,
     deployment: str | None,
     batch_size: int | None,
+    observation_ids: list[str] | None,
 ) -> MemoryMaintenanceResult:
     selected_rows: list[ObservationRow] = []
     processed_count = 0
@@ -224,11 +231,39 @@ async def _maintain_memory_with_result_locked(
 
         with memory_store_lock(memory_store_dir, exclusive=True):
             with open_memory_state(memory_store_dir) as connection:
-                selected_rows = fetch_observations_by_status(
-                    connection,
-                    status=OBSERVATION_STATUS_PENDING,
-                    limit=batch_size,
+                selected_rows = (
+                    fetch_observations_by_ids(
+                        connection,
+                        observation_ids=observation_ids,
+                    )
+                    if observation_ids is not None
+                    else fetch_observations_by_status(
+                        connection,
+                        status=OBSERVATION_STATUS_PENDING,
+                        limit=batch_size,
+                    )
                 )
+                if observation_ids is not None:
+                    selected_ids = {row.observation_id for row in selected_rows}
+                    missing_ids = [
+                        observation_id
+                        for observation_id in observation_ids
+                        if observation_id not in selected_ids
+                    ]
+                    if missing_ids:
+                        raise ValueError(
+                            "Unknown memory observation ids: " + ", ".join(missing_ids)
+                        )
+                    non_pending = [
+                        f"{row.observation_id} ({row.status})"
+                        for row in selected_rows
+                        if row.status != OBSERVATION_STATUS_PENDING
+                    ]
+                    if non_pending:
+                        raise ValueError(
+                            "Selected memory observations must be pending: "
+                            + ", ".join(non_pending)
+                        )
                 if not selected_rows:
                     # No-pending runs are often the only time index bloat is noticed.
                     return MemoryMaintenanceResult(
@@ -242,7 +277,11 @@ async def _maintain_memory_with_result_locked(
                     memory_store_dir=memory_store_dir,
                     observation_rows=selected_rows,
                 )
-            _copy_memory_maintenance_worktree(memory_store_dir, worktree_root)
+            _copy_memory_maintenance_worktree(
+                memory_store_dir,
+                worktree_root,
+                selected_rows,
+            )
 
         backend = create_backend_with_path_views(
             container_name_prefix="memory-maintainer",

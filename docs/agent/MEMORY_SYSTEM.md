@@ -48,6 +48,7 @@ main agent
 
 extraction
   ├─ read transcripts
+  ├─ consult existing system-prompt and skill guidance
   └─ write observations
 
 maintenance
@@ -55,7 +56,7 @@ maintenance
   └─ update memory
 ```
 
-Extraction reads the stage transcripts from one review, such as analyzer, mitigation, and verification process records, and extracts reusable experience into observations. If there is no long-term reusable experience, it produces no observation.
+Extraction reads the stage transcripts from one review, such as analyzer, mitigation, and verification process records, and extracts reusable experience into observations. System prompts and all bundled skills under `/skills` count as guidance the agents already have. An observation should add supported, durable experience beyond that guidance; otherwise, extraction produces no observation.
 
 Maintenance reads observations produced by extraction and folds useful experience into memory.
 
@@ -71,7 +72,7 @@ Experience production runs through an asynchronous path and does not affect the 
 
 Roughly, the flow is a set of periodic checks:
 
-- Source: after an issue or pull-request review publishes transcripts, it registers a pending extraction job. Repository review registers one job per successfully completed case, using that case's artifact root; a case that fails before completion never registers extraction.
+- Source: after an issue or pull-request review publishes transcripts, it registers a pending extraction job. Repository review registers one job per successfully completed case; a case that fails before completion never registers extraction.
 - Extraction checks periodically and processes available work: the extraction schedule runs every 10 minutes by default, processes registered extraction jobs, and produces pending observations.
   - Multiple jobs can be processed concurrently.
 - Maintenance checks periodically and runs when the threshold or age condition is met: the maintenance trigger schedule runs every hour by default. It starts maintenance only when at least 10 observations are pending, or when the oldest pending observation has waited at least one day.

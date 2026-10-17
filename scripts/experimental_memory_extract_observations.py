@@ -3,30 +3,15 @@
 # APIs, and may not fit current run artifacts. Review and adapt this script for
 # your own inputs and risk tolerance before use.
 
+"""Preview memory observation extraction without modifying a memory store."""
+
 import argparse
 import asyncio
-import tempfile
 from pathlib import Path
 
-from sec_review_agents.agents.memory_extractor.agent import (
-    MEMORY_EXTRACTOR_AGENT_NAME,
-    create_memory_extractor_agent_graph,
-)
-from sec_review_agents.agents.memory_extractor.prompts import (
-    MEMORY_EXTRACTOR_SYSTEM_PROMPT,
-    build_extractor_prompt,
-)
-from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
-from sec_review_agents.filesystem.path_views import read_only_path_view
-from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.extractor import (
-    _observation_header,
-    _observation_id_for_transcripts,
-    collect_transcript_refs,
-    stage_transcripts,
+    preview_memory_observation_from_paths,
 )
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 WARNING = (
@@ -64,100 +49,57 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Optional LLM deployment override for the memory-extractor agent.",
     )
-    parser.add_argument(
+    id_group = parser.add_mutually_exclusive_group(required=True)
+    id_group.add_argument(
         "--observation-id",
         default=None,
-        help="Optional observation id for the collected transcript sequence.",
+        help="Stable observation id for the collected transcript sequence.",
     )
     parser.add_argument(
         "--source-workflow",
         default="experimental-local-preview",
         help="Provenance label written into observation headers.",
     )
+    id_group.add_argument(
+        "--job-id",
+        default=None,
+        help="Stable extraction job id used to derive the observation id.",
+    )
     parser.add_argument(
         "--run-id",
         default=None,
-        help="Optional provenance run id and id component.",
+        help="Optional provenance run id written into the observation header.",
     )
     return parser.parse_args()
 
 
 def _write_observation(path: Path, content: str) -> None:
+    """Write one normalized observation document to the requested preview path."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
 
 
 async def main() -> int:
+    """Run one local extraction attempt over the supplied transcript sequence."""
     bootstrap_agents_env()
     args = _parse_args()
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    transcript_refs = collect_transcript_refs(args.inputs)
-    if not transcript_refs:
-        print("No transcript files found.")
-        return 1
-
-    observation_id_value = _observation_id_for_transcripts(
-        transcript_refs,
-        explicit_observation_id=args.observation_id,
+    result = await preview_memory_observation_from_paths(
+        args.inputs,
+        deployment=args.deployment,
+        observation_id_value=args.observation_id,
+        job_id=args.job_id,
         source_workflow=args.source_workflow,
         run_id=args.run_id,
     )
-    with tempfile.TemporaryDirectory(
-        prefix="sec-review-memory-observation-preview-"
-    ) as tempdir:
-        temp_root = Path(tempdir)
-        transcript_root = temp_root / "transcripts"
-        staged = stage_transcripts(transcript_refs, transcript_root)
-        backend = create_backend_with_path_views(
-            container_name_prefix="memory-observation-preview",
-            path_views=[
-                read_only_path_view(
-                    agent_path="/transcripts",
-                    host_path=transcript_root,
-                )
-            ],
-            backend_kind="local",
-        )
-        model = create_chat_model(
-            agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-            deployment_override=args.deployment,
-        )
-        async with amanaged_backend(backend):
-            agent = await create_memory_extractor_agent_graph(
-                model=model,
-                backend=backend,
-            )
-            structured_result = await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-                system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
-                user_prompt=build_extractor_prompt(staged),
-            )
-
-    observation_body = str(structured_result.get("observation_markdown") or "").strip()
-    if not structured_result.get("has_observation") or not observation_body:
-        print("No observation written: no durable observation.")
+    if result.skipped or result.observation_markdown is None:
+        print(f"No observation written: {result.summary}")
         return 1
 
-    artifact_root = None
-    input_dirs = [path for path in args.inputs if path.expanduser().is_dir()]
-    if len(input_dirs) == 1:
-        artifact_root = input_dirs[0]
-    content = (
-        _observation_header(
-            observation_id_value=observation_id_value,
-            source_workflow=args.source_workflow,
-            run_id=args.run_id,
-            artifact_root_path=artifact_root,
-            staged_transcripts=staged,
-        )
-        + observation_body.rstrip()
-        + "\n"
-    )
-    target = output_dir / f"{observation_id_value}.md"
-    _write_observation(target, content)
+    target = output_dir / f"{result.observation_id}.md"
+    _write_observation(target, result.observation_markdown)
     print(f"Wrote {target}")
     print(WARNING)
     return 0
