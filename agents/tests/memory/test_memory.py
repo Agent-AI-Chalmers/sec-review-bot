@@ -45,6 +45,7 @@ from sec_review_agents.memory.store import (
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.utils.env import load_dotenv_file
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
+from tests.project_paths import AGENTS_ROOT
 
 
 @pytest.fixture(autouse=True)
@@ -360,7 +361,7 @@ def test_security_review_agents_select_specialized_memory_prompt(
     relative_path: str,
 ) -> None:
     """Keep domain policy explicit where security-review agents are assembled."""
-    module_path = Path(__file__).parents[2] / relative_path
+    module_path = AGENTS_ROOT / relative_path
     module = ast.parse(module_path.read_text(encoding="utf-8"))
     memory_calls = [
         node

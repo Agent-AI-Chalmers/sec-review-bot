@@ -47,12 +47,12 @@ Do not add a case merely to give every reference a green marker. References and 
 Run deterministic validation with:
 
 ```bash
-uv run pytest -q tests/skills/test_case_fixtures.py
+uv run python -m pytest -q tests/skills/test_case_fixtures.py
 ```
 
 Run the real-model cases with an available deployment:
 
 ```bash
 LLM_TEST_DEPLOYMENT=<deployment> RUN_LLM_SKILL_CASES=1 \
-  uv run pytest -q -s tests/skills/test_llm.py
+  uv run python -m pytest -q -s tests/skills/test_llm.py
 ```

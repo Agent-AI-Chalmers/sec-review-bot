@@ -25,21 +25,21 @@ MCP contract tests mock connection construction. `test_capability.py` covers Pla
 Run deterministic fixture validation with:
 
 ```bash
-uv run pytest -q tests/mcp/test_case_fixtures.py
+uv run python -m pytest -q tests/mcp/test_case_fixtures.py
 ```
 
 Run the real-model integration cases after building the tools image:
 
 ```bash
 RUN_LLM_MCP_CASES=1 \
-uv run pytest -q -s tests/mcp/test_llm.py
+uv run python -m pytest -q -s tests/mcp/test_llm.py
 ```
 
 Cases are pytest parameters whose IDs match their fixture directory names. Select one case or one mode without adding another environment-variable namespace:
 
 ```bash
 RUN_LLM_MCP_CASES=1 \
-uv run pytest -q -s tests/mcp/test_llm.py \
+uv run python -m pytest -q -s tests/mcp/test_llm.py \
   -k 'discovery and playwright-reflected-xss'
 ```
 
@@ -51,5 +51,5 @@ Run the no-model capability integration with:
 
 ```bash
 docker image inspect sec-review-bot-workspace:tools >/dev/null
-uv run pytest -q -s tests/mcp/test_capability.py
+uv run python -m pytest -q -s tests/mcp/test_capability.py
 ```

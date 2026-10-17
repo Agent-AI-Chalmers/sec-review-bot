@@ -1,6 +1,4 @@
-from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from tests.project_paths import AGENTS_ROOT
 
 LOCAL_INPUT_ADAPTERS = (
     "src/sec_review_agents/cli/local_materialization/issue.py",
@@ -23,7 +21,7 @@ STAGE_ARTIFACT_PATH_KEYS = (
 
 def test_local_input_adapters_only_send_run_level_artifact_roots() -> None:
     for relative_path in LOCAL_INPUT_ADAPTERS:
-        source = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+        source = (AGENTS_ROOT / relative_path).read_text(encoding="utf-8")
         for key in STAGE_ARTIFACT_PATH_KEYS:
             assert (
                 key not in source

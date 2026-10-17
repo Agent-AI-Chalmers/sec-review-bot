@@ -59,6 +59,8 @@ sec-review-agents-run-local-repository = "sec_review_agents.cli.run_local_reposi
 sec-review-agents-memory = "sec_review_agents.cli.memory:main"
 
 [tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
   "integration: requires a real runtime or external process beyond ordinary in-process tests",

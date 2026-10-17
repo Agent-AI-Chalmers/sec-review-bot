@@ -8,7 +8,7 @@ from tests.external_tools.cases.models import (
     ExternalToolCaseMode,
 )
 
-EXTERNAL_TOOL_CASES = Path(__file__).parents[1] / "cases"
+EXTERNAL_TOOL_CASES = Path(__file__).parent
 
 
 def load_external_tool_cases() -> tuple[ExternalToolCase, ...]:

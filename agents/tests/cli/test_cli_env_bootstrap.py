@@ -1,8 +1,7 @@
 import ast
 from pathlib import Path
 
-AGENTS_ROOT = Path(__file__).resolve().parents[2]
-SRC_ROOT = AGENTS_ROOT / "src" / "sec_review_agents"
+from tests.project_paths import PACKAGE_ROOT
 
 
 def _module_tree(path: Path) -> ast.Module:
@@ -21,7 +20,7 @@ def _function_calls_name(function: ast.FunctionDef, name: str) -> bool:
 
 
 def test_package_import_does_not_bootstrap_env() -> None:
-    tree = _module_tree(SRC_ROOT / "__init__.py")
+    tree = _module_tree(PACKAGE_ROOT / "__init__.py")
     calls = [
         node
         for node in ast.walk(tree)
@@ -43,7 +42,7 @@ def test_cli_mains_bootstrap_env_explicitly() -> None:
     missing: list[str] = []
 
     for module_name in cli_modules:
-        tree = _module_tree(SRC_ROOT / "cli" / module_name)
+        tree = _module_tree(PACKAGE_ROOT / "cli" / module_name)
         main = next(
             (
                 node

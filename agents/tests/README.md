@@ -26,9 +26,9 @@ uv run python -m pytest
 During development, prefer the narrowest relevant file or directory. Marker selection can further control execution:
 
 ```bash
-uv run pytest tests/workflows/issue -q
-uv run pytest -m integration -q
-uv run pytest -m llm -q
+uv run python -m pytest tests/workflows/issue -q
+uv run python -m pytest -m integration -q
+uv run python -m pytest -m llm -q
 ```
 
 Real-model tests remain skipped unless their probe-specific environment variable is enabled. Selecting the `llm` marker alone does not opt into external model calls.
@@ -83,7 +83,7 @@ Example:
 cd agents
 RUN_LLM_SKILL_CASES=1 \
 LLM_TEST_DEPLOYMENT=anthropic_strong \
-uv run pytest tests/skills/test_llm.py -q -s
+uv run python -m pytest tests/skills/test_llm.py -q -s
 ```
 
 By default, deployments are read from `config/model-providers.toml`. If you keep the TOML somewhere else, either set `MODEL_PROVIDERS_CONFIG_TOML` in the command or put it in `agents/.env`.
@@ -95,19 +95,19 @@ cd agents
 
 RUN_LLM_MEMORY_MIDDLEWARE_INTEGRATION=1 \
 LLM_TEST_DEPLOYMENT=<deployment> \
-uv run pytest tests/memory/test_llm_middleware.py -q -s
+uv run python -m pytest tests/memory/test_llm_middleware.py -q -s
 
 RUN_LLM_MEMORY_EXTRACTION_INTEGRATION=1 \
 LLM_TEST_DEPLOYMENT=<deployment> \
-uv run pytest tests/memory/test_llm_extraction.py -q -s
+uv run python -m pytest tests/memory/test_llm_extraction.py -q -s
 
 RUN_LLM_MEMORY_MAINTENANCE_INTEGRATION=1 \
 LLM_TEST_DEPLOYMENT=<deployment> \
-uv run pytest tests/memory/test_llm_maintenance.py -q -s
+uv run python -m pytest tests/memory/test_llm_maintenance.py -q -s
 
 RUN_LLM_MEMORY_LIFECYCLE_INTEGRATION=1 \
 LLM_TEST_DEPLOYMENT=<deployment> \
-uv run pytest tests/memory/test_llm_lifecycle.py -q -s
+uv run python -m pytest tests/memory/test_llm_lifecycle.py -q -s
 ```
 
 ### Product Workflow Probes
@@ -126,7 +126,7 @@ Example:
 ```bash
 cd agents
 RUN_LLM_ISSUE_REVIEW_INTEGRATION=1 \
-uv run pytest tests/workflows/issue/test_llm_mixed_claims.py -q -s
+uv run python -m pytest tests/workflows/issue/test_llm_mixed_claims.py -q -s
 ```
 
 The non-dataflow evidence-shape probe reads issue fixtures from `tests/workflows/issue/cases/`. Repeat every case and retain each analyzer result for comparison with:
@@ -135,7 +135,7 @@ The non-dataflow evidence-shape probe reads issue fixtures from `tests/workflows
 cd agents
 RUN_LLM_ISSUE_REVIEW_INTEGRATION=1 \
 NON_DATAFLOW_EVIDENCE_PROBE_REPEATS=3 \
-uv run pytest tests/workflows/issue/test_llm_non_dataflow_evidence.py -q -s
+uv run python -m pytest tests/workflows/issue/test_llm_non_dataflow_evidence.py -q -s
 ```
 
 Results are written under `.agent-artifacts/non-dataflow-evidence/` by default. Set `NON_DATAFLOW_EVIDENCE_OUTPUT_DIR` to use another directory. The repeat count must be between 1 and 10.
