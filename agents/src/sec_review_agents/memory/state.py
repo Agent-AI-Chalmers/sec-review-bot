@@ -173,15 +173,12 @@ def fetch_observations_by_status(
     return [ObservationRow(*row) for row in rows]
 
 
-def fetch_observations_by_ids_and_status(
+def fetch_observations_by_ids(
     connection: sqlite3.Connection,
     *,
     observation_ids: list[str],
-    status: str,
 ) -> list[ObservationRow]:
-    """Fetch selected observations in caller-supplied order when status matches."""
-    if status not in OBSERVATION_STATUSES:
-        raise ValueError(f"Invalid observation status: {status}")
+    """Fetch existing observations in caller-supplied order."""
     if not observation_ids:
         return []
 
@@ -195,9 +192,9 @@ def fetch_observations_by_ids_and_status(
           created_at,
           updated_at
         from observations
-        where status = ? and observation_id in ({placeholders})
+        where observation_id in ({placeholders})
         """,
-        [status, *observation_ids],
+        observation_ids,
     ).fetchall()
     rows_by_id = {str(row["observation_id"]): ObservationRow(*row) for row in rows}
     return [

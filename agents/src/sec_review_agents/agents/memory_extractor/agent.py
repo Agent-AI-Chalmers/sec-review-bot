@@ -1,3 +1,5 @@
+"""Agent graph for extracting durable observations from review transcripts."""
+
 from deepagents.backends.protocol import BackendProtocol
 from deepagents.middleware.skills import SkillsMiddleware
 from langchain.agents.middleware import AgentMiddleware
@@ -47,6 +49,3 @@ async def create_memory_extractor_agent_graph(
         response_format=MemoryObservationOutput,
         middleware=agent_middleware,
     )
-
-
-"""Agent graph for extracting durable observations from review transcripts."""
