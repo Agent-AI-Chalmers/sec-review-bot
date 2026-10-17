@@ -9,8 +9,7 @@ from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_g
 from sec_review_agents.runtime.changed_files_acceptance_middleware import (
     ChangedFilesAcceptanceMiddleware,
 )
-from tests.llm.deployment_helpers import llm_test_deployment
-from tests.llm.probe_helpers import llm_probe
+from tests.llm_probe import llm_probe, llm_test_deployment
 from tests.review_stages.stages.test_mitigation_changed_files_acceptance import (
     _baseline_snapshot,
     _copy_repo,
@@ -28,13 +27,13 @@ class PatchClaimProbeOutput(BaseModel):
 
 PROBE = llm_probe(
     run_env="RUN_LLM_STRUCTURED_CORRECTION_INTEGRATION",
-    description="real LLM structured correction probe",
+    description="real LLM changed-files response correction probe",
 )
 
 
 @pytest.mark.skipif(not PROBE.enabled(), reason=PROBE.skip_reason())
 @pytest.mark.asyncio
-async def test_llm_can_correct_candidate_structured_response_in_same_thread(
+async def test_llm_corrects_rejected_changed_files_response_in_same_thread(
     tmp_path: Path,
 ) -> None:
     deployment_override = llm_test_deployment()
