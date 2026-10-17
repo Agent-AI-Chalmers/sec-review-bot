@@ -93,7 +93,7 @@ def observation_id(
     return f"transcripts-{hasher.hexdigest()[:16]}"
 
 
-def _observation_id_for_transcripts(
+def resolve_observation_id(
     transcript_refs: list[TranscriptRef],
     *,
     explicit_observation_id: str | None,
@@ -188,13 +188,14 @@ def stage_transcripts(
     return StagedTranscripts(entries=entries)
 
 
-def _observation_header(
+def build_observation_document(
     *,
     observation_id_value: str,
     source_workflow: str | None,
     run_id: str | None,
     artifact_root_path: Path | None,
     staged_transcripts: StagedTranscripts,
+    observation_markdown: str,
 ) -> str:
     stage_labels = [label for label, _mounted in staged_transcripts.entries]
     lines = [
@@ -219,7 +220,7 @@ def _observation_header(
             "",
         ]
     )
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n" + observation_markdown.rstrip() + "\n"
 
 
 def _publish_observation(
@@ -305,16 +306,13 @@ async def _extract_memory_observation_for_refs(
                 summary="No durable memory observation produced.",
             )
 
-        observation_content = (
-            _observation_header(
-                observation_id_value=resolved_observation_id,
-                source_workflow=source_workflow,
-                run_id=run_id,
-                artifact_root_path=artifact_root_path,
-                staged_transcripts=staged_transcripts,
-            )
-            + observation_body.rstrip()
-            + "\n"
+        observation_content = build_observation_document(
+            observation_id_value=resolved_observation_id,
+            source_workflow=source_workflow,
+            run_id=run_id,
+            artifact_root_path=artifact_root_path,
+            staged_transcripts=staged_transcripts,
+            observation_markdown=observation_body,
         )
 
     with memory_store_lock(memory_root, exclusive=True):
@@ -373,7 +371,7 @@ async def extract_memory_observations_from_paths(
         transcript_refs,
         memory_root=memory_store_dir,
         deployment=deployment,
-        resolved_observation_id=_observation_id_for_transcripts(
+        resolved_observation_id=resolve_observation_id(
             transcript_refs,
             explicit_observation_id=observation_id_value,
             job_id=job_id,
@@ -382,3 +380,17 @@ async def extract_memory_observations_from_paths(
         run_id=run_id,
         artifact_root_path=artifact_root_path,
     )
+
+
+__all__ = [
+    "MemoryObservationResult",
+    "TranscriptRef",
+    "build_observation_document",
+    "collect_published_transcripts",
+    "collect_review_memory_transcripts",
+    "collect_transcript_refs",
+    "extract_memory_observations_from_paths",
+    "observation_id",
+    "resolve_observation_id",
+    "stage_transcripts",
+]

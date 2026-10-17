@@ -20,9 +20,9 @@ from sec_review_agents.filesystem.backend_factory import create_backend_with_pat
 from sec_review_agents.filesystem.path_views import read_only_path_view
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.extractor import (
-    _observation_header,
-    _observation_id_for_transcripts,
+    build_observation_document,
     collect_transcript_refs,
+    resolve_observation_id,
     stage_transcripts,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
@@ -75,9 +75,17 @@ def _parse_args() -> argparse.Namespace:
         help="Provenance label written into observation headers.",
     )
     parser.add_argument(
+        "--job-id",
+        default=None,
+        help=(
+            "Optional extraction job id used to derive the observation id. "
+            "Without it, the id is derived from transcript paths."
+        ),
+    )
+    parser.add_argument(
         "--run-id",
         default=None,
-        help="Optional provenance run id and id component.",
+        help="Optional provenance run id written into the observation header.",
     )
     return parser.parse_args()
 
@@ -98,11 +106,10 @@ async def main() -> int:
         print("No transcript files found.")
         return 1
 
-    observation_id_value = _observation_id_for_transcripts(
+    observation_id_value = resolve_observation_id(
         transcript_refs,
         explicit_observation_id=args.observation_id,
-        source_workflow=args.source_workflow,
-        run_id=args.run_id,
+        job_id=args.job_id,
     )
     with tempfile.TemporaryDirectory(
         prefix="sec-review-memory-observation-preview-"
@@ -145,16 +152,13 @@ async def main() -> int:
     input_dirs = [path for path in args.inputs if path.expanduser().is_dir()]
     if len(input_dirs) == 1:
         artifact_root = input_dirs[0]
-    content = (
-        _observation_header(
-            observation_id_value=observation_id_value,
-            source_workflow=args.source_workflow,
-            run_id=args.run_id,
-            artifact_root_path=artifact_root,
-            staged_transcripts=staged,
-        )
-        + observation_body.rstrip()
-        + "\n"
+    content = build_observation_document(
+        observation_id_value=observation_id_value,
+        source_workflow=args.source_workflow,
+        run_id=args.run_id,
+        artifact_root_path=artifact_root,
+        staged_transcripts=staged,
+        observation_markdown=observation_body,
     )
     target = output_dir / f"{observation_id_value}.md"
     _write_observation(target, content)

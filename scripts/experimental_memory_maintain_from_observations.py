@@ -5,41 +5,26 @@
 
 import argparse
 import asyncio
-import shutil
 import tempfile
 from pathlib import Path
 
-from sec_review_agents.agents.memory_maintainer.agent import (
-    MEMORY_MAINTAINER_AGENT_NAME,
-    create_memory_maintainer_agent_graph,
+from sec_review_agents.memory.maintainer import maintain_memory_with_result
+from sec_review_agents.memory.state import (
+    OBSERVATION_STATUS_PENDING,
+    open_memory_state,
+    upsert_observation,
 )
-from sec_review_agents.agents.memory_maintainer.model import (
-    MemoryMaintenanceObservation,
-)
-from sec_review_agents.agents.memory_maintainer.prompts import (
-    MEMORY_MAINTAINER_SYSTEM_PROMPT,
-    build_maintenance_prompt,
-)
-from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
-from sec_review_agents.filesystem.path_views import writable_memory_view
-from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.memory.maintainer import (
-    _publish_maintained_memory,
-)
-from sec_review_agents.memory.state import ObservationRow
 from sec_review_agents.memory.store import (
     initialize_memory_store,
-    memory_content_dir,
+    memory_observations_dir,
+    memory_store_lock,
 )
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.utils.env import bootstrap_agents_env
-from sec_review_agents.utils.time import utc_now_iso
 
 WARNING = (
     "Experimental local script. This is not an operational memory maintenance "
-    "path. It does not use Temporal, does not read or write the memory DB, and "
-    "may overwrite memory/MEMORY.md and memory/topics/*.md. It may not track the "
+    "path. It does not use Temporal, but it writes the normal memory DB and may "
+    "overwrite memory/MEMORY.md and memory/topics/*.md. It may not track the "
     "latest package APIs. Review and adapt the script before use. Run it only on "
     "a copied or temporary memory store unless you are ready to inspect and keep "
     "the diff."
@@ -106,57 +91,39 @@ def _collect_observations(args: argparse.Namespace) -> list[Path]:
     return unique
 
 
-def _copy_memory_source(memory_store_dir: Path, worktree: Path) -> None:
-    worktree.mkdir(parents=True, exist_ok=True)
-    memory_path = memory_content_dir(memory_store_dir)
-    index = memory_path / "MEMORY.md"
-    if not index.is_file():
-        raise FileNotFoundError(f"Memory index does not exist: {index}")
-    shutil.copy2(index, worktree / "MEMORY.md")
-
-    topics_source = memory_path / "topics"
-    topics_target = worktree / "topics"
-    if topics_source.is_dir():
-        shutil.copytree(topics_source, topics_target, dirs_exist_ok=True)
-    else:
-        topics_target.mkdir(exist_ok=True)
-    (worktree / "observations").mkdir(exist_ok=True)
-
-
-def _stage_observations(
+def _import_observations(
     observation_paths: list[Path],
     *,
-    worktree: Path,
-) -> list[ObservationRow]:
-    rows: list[ObservationRow] = []
-    now = utc_now_iso()
-    observations_root = worktree / "observations"
-    for index, source in enumerate(observation_paths, start=1):
-        observation_id = source.stem or f"observation-{index:04d}"
-        target = observations_root / f"{index:04d}-{source.name}"
-        shutil.copy2(source, target)
-        rows.append(
-            ObservationRow(
+    memory_store_dir: Path,
+) -> None:
+    observations_root = memory_observations_dir(memory_store_dir)
+    observation_ids = [source.stem for source in observation_paths]
+    if len(observation_ids) != len(set(observation_ids)):
+        raise ValueError("Observation input file stems must be unique.")
+    with (
+        memory_store_lock(memory_store_dir, exclusive=True),
+        open_memory_state(memory_store_dir) as connection,
+    ):
+        for source in observation_paths:
+            observation_id = source.stem
+            target = observations_root / f"{observation_id}.md"
+            content = source.read_bytes()
+            with tempfile.NamedTemporaryFile(
+                "wb",
+                dir=observations_root,
+                prefix=f".{observation_id}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
+                temp_file.write(content)
+            temp_path.replace(target)
+            upsert_observation(
+                connection,
                 observation_id=observation_id,
                 path=str(target),
-                status="pending",
-                created_at=now,
-                updated_at=now,
+                status=OBSERVATION_STATUS_PENDING,
             )
-        )
-    return rows
-
-
-def _maintenance_prompt_observations(
-    rows: list[ObservationRow],
-) -> list[MemoryMaintenanceObservation]:
-    return [
-        MemoryMaintenanceObservation(
-            observation_id=row.observation_id,
-            mounted_path=f"/memory/observations/{Path(row.path).name}",
-        )
-        for row in rows
-    ]
 
 
 async def main() -> int:
@@ -171,42 +138,18 @@ async def main() -> int:
         print("No observation Markdown files selected.")
         return 1
 
-    with tempfile.TemporaryDirectory(
-        prefix="sec-review-memory-maintenance-experiment-"
-    ) as tempdir:
-        worktree = Path(tempdir) / "memory"
-        _copy_memory_source(memory_store_dir, worktree)
-        rows = _stage_observations(observation_paths, worktree=worktree)
-
-        backend = create_backend_with_path_views(
-            container_name_prefix="memory-maintenance-experiment",
-            path_views=[writable_memory_view(host_path=worktree)],
-            backend_kind="local",
-        )
-        model = create_chat_model(
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            deployment_override=args.deployment,
-        )
-        async with amanaged_backend(backend):
-            agent = await create_memory_maintainer_agent_graph(
-                model=model,
-                backend=backend,
-                worktree_root=worktree,
-            )
-            await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-                system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
-                user_prompt=build_maintenance_prompt(
-                    _maintenance_prompt_observations(rows)
-                ),
-            )
-        _publish_maintained_memory(source=worktree, memory_store_dir=memory_store_dir)
-
-    print(
-        f"Maintained {memory_store_dir} from {len(observation_paths)} observation files. "
-        "Inspect the memory store diff before keeping it."
+    _import_observations(
+        observation_paths,
+        memory_store_dir=memory_store_dir,
     )
+    result = await maintain_memory_with_result(
+        memory_store_dir=memory_store_dir,
+        deployment=args.deployment,
+        batch_size=None,
+    )
+
+    print(result.summary)
+    print(f"Inspect {memory_store_dir} before keeping the changes.")
     return 0
 
 
