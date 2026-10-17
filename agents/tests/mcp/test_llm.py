@@ -9,12 +9,12 @@ from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
-from tests.integration.llm.mcp_cases.loader import cases_for_mode, load_mcp_cases
-from tests.integration.llm.mcp_cases.runner import (
+from tests.integration.llm.probe_helpers import ProbeRequirement, llm_probe
+from tests.mcp.cases.loader import cases_for_mode, load_mcp_cases
+from tests.mcp.cases.runner import (
     assert_mcp_case_oracles,
     run_mcp_case,
 )
-from tests.integration.llm.probe_helpers import ProbeRequirement, llm_probe
 
 _MCP_DOCKER_IMAGE_ENV = "AGENT_MCP_DOCKER_IMAGE"
 _DEFAULT_MCP_DOCKER_IMAGE = "sec-review-bot-workspace:tools"
@@ -67,7 +67,12 @@ PROBE = llm_probe(
     ),
 )
 
-pytestmark = [PROBE.skip_unless(), pytest.mark.asyncio]
+pytestmark = [
+    PROBE.skip_unless(),
+    pytest.mark.asyncio,
+    pytest.mark.integration,
+    pytest.mark.llm,
+]
 
 
 @pytest.mark.parametrize(
@@ -78,6 +83,7 @@ pytestmark = [PROBE.skip_unless(), pytest.mark.asyncio]
 async def test_mcp_discovery_case(case) -> None:
     observation = await run_mcp_case(
         case,
+        mode="discovery",
         run_root=_case_run_root(case.id),
         docker_image=_mcp_docker_image(),
         mcp_enabled=True,
@@ -95,21 +101,24 @@ async def test_mcp_comparison_case(case) -> None:
     run_root = _case_run_root(case.id)
     without_mcp = await run_mcp_case(
         case,
+        mode="compare",
         run_root=run_root / "without-mcp",
         docker_image=_mcp_docker_image(),
         mcp_enabled=False,
     )
     with_mcp = await run_mcp_case(
         case,
+        mode="compare",
         run_root=run_root / "with-mcp",
         docker_image=_mcp_docker_image(),
         mcp_enabled=True,
     )
-    for prefix in case.oracles.without_mcp_forbidden_tool_prefixes:
+    agent_case = case.agent_case_for("compare")
+    for prefix in agent_case.oracles.without_mcp_forbidden_tool_prefixes:
         assert not any(name.startswith(prefix) for name in without_mcp["toolNames"])
     assert (
         without_mcp["result"]["validation_level"]
-        not in case.oracles.without_mcp_forbidden_validation_levels
+        not in agent_case.oracles.without_mcp_forbidden_validation_levels
     ), without_mcp["result"]
     assert_mcp_case_oracles(case, with_mcp)
     print({"withoutMcp": without_mcp, "withMcp": with_mcp})

@@ -1,8 +1,8 @@
 import pytest
 
 from tests.integration.llm.probe_helpers import llm_probe
-from tests.integration.llm.skill_cases.loader import cases_for_mode, load_skill_cases
-from tests.integration.llm.skill_cases.runner import (
+from tests.skills.cases.loader import cases_for_mode, load_skill_cases
+from tests.skills.cases.runner import (
     assert_case_oracles,
     assert_discovery_read,
     assert_prompted_read,
@@ -15,7 +15,12 @@ PROBE = llm_probe(
     description="data-driven bundled skill cases",
 )
 
-pytestmark = [PROBE.skip_unless(), pytest.mark.asyncio]
+pytestmark = [
+    PROBE.skip_unless(),
+    pytest.mark.asyncio,
+    pytest.mark.integration,
+    pytest.mark.llm,
+]
 
 
 @pytest.mark.parametrize(

@@ -1,8 +1,16 @@
-# MCP LLM Cases
+# MCP Tests
 
-Each directory under `fixtures/` is one end-to-end MCP case. Put the repository files visible to the agent under `workspace/`, the container bootstrap commands in `setup.yml`, and the review input plus observable oracles in `case.json`.
+This directory owns MCP contract, capability, and LLM behavior tests. Each scenario under `cases/<case-id>/` has a `case.json` and may participate in one or more modes.
 
-The current fixtures include reflected XSS discovery and a paired DOM XSS comparison. The DOM case uses a URL fragment, which is not sent to the HTTP server, so runtime browser behavior is the decisive evidence rather than an HTTP response alone.
+## Modes
+
+- `capability` runs without an LLM and proves that a real MCP server and tool work through the Docker backend.
+- `discovery` checks whether a product agent selects enabled MCP tools and obtains the required evidence.
+- `compare` runs the same product task with MCP disabled and enabled.
+
+Put repository files visible to the agent under `workspace/`, container bootstrap commands in `setup.yml`, and mode-specific inputs and oracles in `case.json`.
+
+The current cases include reflected XSS capability and discovery plus a paired DOM XSS comparison. The DOM case uses a URL fragment, which is not sent to the HTTP server, so runtime browser behavior is the decisive evidence rather than an HTTP response alone. CodeGraph has a deterministic cross-file capability case.
 
 These cases exercise normal product workflows. They do not inject MCP connections or call MCP adapters directly. The runner selects the Docker sandbox, enables MCP, uses the configured tools image, and keeps networking disabled unless a future case establishes a separate requirement.
 
@@ -12,26 +20,26 @@ Use `discovery` when the prompt does not name the MCP tool and the case checks w
 
 Runs retain workspaces, transcripts, and verifier artifacts under `.agent-artifacts/mcp-cases/`, relative to the test process working directory. Set `MCP_CASE_OUTPUT_DIR` to use another location. Each case invocation gets a unique directory; comparison cases keep `without-mcp/` and `with-mcp/` beneath the same run directory for inspection.
 
-MCP transport and tool behavior are covered separately without a model under `tests/integration/mcp/`. Playwright capability tests cover browser startup and state continuity; the CodeGraph capability test covers real index preparation and cross-file exploration. Keep infrastructure assertions there rather than making an LLM case diagnose MCP runtime failures.
+MCP contract tests mock connection construction. `test_capability.py` covers Playwright browser startup and browser-observed effects plus CodeGraph index preparation and cross-file exploration. Keep infrastructure assertions there rather than making an LLM case diagnose MCP runtime failures.
 
 Run deterministic fixture validation with:
 
 ```bash
-uv run pytest -q tests/mcp/test_mcp_case_fixtures.py
+uv run pytest -q tests/mcp/test_case_fixtures.py
 ```
 
 Run the real-model integration cases after building the tools image:
 
 ```bash
 RUN_LLM_MCP_CASES=1 \
-uv run pytest -q -s tests/integration/llm/test_mcp_cases.py
+uv run pytest -q -s tests/mcp/test_llm.py
 ```
 
 Cases are pytest parameters whose IDs match their fixture directory names. Select one case or one mode without adding another environment-variable namespace:
 
 ```bash
 RUN_LLM_MCP_CASES=1 \
-uv run pytest -q -s tests/integration/llm/test_mcp_cases.py \
+uv run pytest -q -s tests/mcp/test_llm.py \
   -k 'discovery and playwright-reflected-xss'
 ```
 
@@ -40,5 +48,5 @@ This is the same selection model used by bundled skill cases: one probe gate ena
 Run the no-model capability integration with:
 
 ```bash
-uv run pytest -q -s tests/integration/mcp/test_playwright_capability.py
+uv run pytest -q -s tests/mcp/test_capability.py
 ```

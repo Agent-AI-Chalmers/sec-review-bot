@@ -1,6 +1,8 @@
-# Bundled Skill LLM Cases
+# Skill Tests
 
-Each directory under `fixtures/` is one security case. Keep the security facts and any required oracles in `case.json`; when the case needs repository evidence, put files under `workspace/` exactly as the model should see them.
+This directory owns deterministic skill preparation, selection, materialization, oracle, and LLM behavior tests. Each security scenario under `cases/<case-id>/` has a `case.json`; when a case needs repository evidence, its files live under `workspace/` exactly as the model should see them.
+
+The LLM case modes are `prompted`, `discovery`, and `compare`. Skills do not have a synthetic capability mode: their deterministic capability is already covered by preparation, materialization, backend exposure, and read-evidence tests.
 
 ## Adding a case
 
@@ -45,12 +47,12 @@ Do not add a case merely to give every reference a green marker. References and 
 Run deterministic validation with:
 
 ```bash
-uv run pytest -q tests/skills/test_skill_case_fixtures.py
+uv run pytest -q tests/skills/test_case_fixtures.py
 ```
 
 Run the real-model cases with an available deployment:
 
 ```bash
 LLM_TEST_DEPLOYMENT=<deployment> RUN_LLM_SKILL_CASES=1 \
-  uv run pytest -q -s tests/integration/llm/test_skill_cases.py
+  uv run pytest -q -s tests/skills/test_llm.py
 ```

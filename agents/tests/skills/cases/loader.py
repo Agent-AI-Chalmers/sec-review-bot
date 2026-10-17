@@ -3,15 +3,15 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from sec_review_agents.resources.paths import AGENT_SKILLS
-from tests.integration.llm.skill_cases.models import SkillCase, SkillCaseMode
+from tests.skills.cases.models import SkillCase, SkillCaseMode
 
-SKILL_CASE_FIXTURES = Path(__file__).with_name("fixtures")
+SKILL_CASES = Path(__file__).parent
 
 
 def load_skill_cases() -> tuple[SkillCase, ...]:
     cases = []
     seen_ids = set()
-    for case_path in sorted(SKILL_CASE_FIXTURES.glob("*/case.json")):
+    for case_path in sorted(SKILL_CASES.glob("*/case.json")):
         try:
             case = SkillCase.model_validate_json(case_path.read_text(encoding="utf-8"))
         except ValidationError as exc:
@@ -34,7 +34,7 @@ def load_skill_cases() -> tuple[SkillCase, ...]:
             )
         cases.append(case)
     if not cases:
-        raise AssertionError(f"no skill cases found under {SKILL_CASE_FIXTURES}")
+        raise AssertionError(f"no skill cases found under {SKILL_CASES}")
     return tuple(cases)
 
 

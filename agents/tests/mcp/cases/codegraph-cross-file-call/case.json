@@ -1,0 +1,9 @@
+{
+  "id": "codegraph-cross-file-call",
+  "mcp": "codegraph",
+  "modes": ["capability"],
+  "capability": {
+    "probe": "codegraph-cross-file-call",
+    "expected_marker": "validate_token"
+  }
+}

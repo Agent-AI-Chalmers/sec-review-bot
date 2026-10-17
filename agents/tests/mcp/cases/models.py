@@ -2,9 +2,44 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
-McpCaseMode = Literal["discovery", "compare"]
+McpName = Literal["codegraph", "playwright"]
+McpCaseMode = Literal["capability", "discovery", "compare"]
+McpCapabilityProbe = Literal[
+    "codegraph-cross-file-call",
+    "playwright-browser-sink-effect",
+]
+
+
+class McpCapabilityCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    probe: McpCapabilityProbe
+    expected_marker: str
+    target_url: str | None = None
+
+    @field_validator("expected_marker")
+    @classmethod
+    def validate_expected_marker(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def validate_target_url(self) -> McpCapabilityCase:
+        needs_target = self.probe.startswith("playwright-")
+        if needs_target != (self.target_url is not None):
+            requirement = "requires" if needs_target else "does not accept"
+            raise ValueError(f"probe {self.probe!r} {requirement} target_url")
+        return self
 
 
 class McpToolInteractionOracle(BaseModel):
@@ -66,15 +101,31 @@ class McpCaseOracle(BaseModel):
         return values
 
 
+class McpAgentCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    review_input: str
+    analysis_overview: str
+    oracles: McpCaseOracle
+
+    @field_validator("review_input", "analysis_overview")
+    @classmethod
+    def validate_nonblank_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+
 class McpCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
+    mcp: McpName
     modes: set[McpCaseMode] = Field(min_length=1)
-    review_input: str
-    analysis_overview: str
-    setup_file: str
-    oracles: McpCaseOracle
+    setup_file: str | None = None
+    capability: McpCapabilityCase | None = None
+    discovery: McpAgentCase | None = None
+    compare: McpAgentCase | None = None
 
     _directory: Path = PrivateAttr()
 
@@ -87,10 +138,39 @@ class McpCase(BaseModel):
 
     @field_validator("setup_file")
     @classmethod
-    def validate_setup_file(cls, value: str) -> str:
-        if Path(value).name != value or Path(value).suffix not in {".yml", ".yaml"}:
+    def validate_setup_file(cls, value: str | None) -> str | None:
+        if value is not None and (
+            Path(value).name != value or Path(value).suffix not in {".yml", ".yaml"}
+        ):
             raise ValueError("must be one YAML filename")
         return value
+
+    @model_validator(mode="after")
+    def validate_mode_configuration(self) -> McpCase:
+        configured_modes = {
+            mode
+            for mode in ("capability", "discovery", "compare")
+            if getattr(self, mode) is not None
+        }
+        if configured_modes != self.modes:
+            raise ValueError(
+                f"modes {sorted(self.modes)!r} must match configured mode blocks "
+                f"{sorted(configured_modes)!r}"
+            )
+        if self.capability is not None:
+            probe_mcp = self.capability.probe.split("-", maxsplit=1)[0]
+            if probe_mcp != self.mcp:
+                raise ValueError(
+                    f"capability probe {self.capability.probe!r} does not match "
+                    f"MCP {self.mcp!r}"
+                )
+        return self
+
+    def agent_case_for(self, mode: Literal["discovery", "compare"]) -> McpAgentCase:
+        agent_case = getattr(self, mode)
+        if agent_case is None:
+            raise ValueError(f"case {self.id!r} does not configure {mode!r} mode")
+        return agent_case
 
     @property
     def directory(self) -> Path:
@@ -101,5 +181,5 @@ class McpCase(BaseModel):
         return self.directory / "workspace"
 
     @property
-    def setup_path(self) -> Path:
-        return self.directory / self.setup_file
+    def setup_path(self) -> Path | None:
+        return self.directory / self.setup_file if self.setup_file else None

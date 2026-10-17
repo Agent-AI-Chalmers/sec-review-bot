@@ -1,4 +1,4 @@
-from tests.integration.llm.skill_cases.loader import cases_for_mode, load_skill_cases
+from tests.skills.cases.loader import cases_for_mode, load_skill_cases
 
 
 def test_skill_case_fixtures_are_valid_and_cover_each_mode() -> None:

@@ -22,7 +22,7 @@ Example:
 cd agents
 RUN_LLM_SKILL_CASES=1 \
 LLM_TEST_DEPLOYMENT=anthropic_strong \
-uv run pytest tests/integration/llm/test_skill_cases.py -q -s
+uv run pytest tests/skills/test_llm.py -q -s
 ```
 
 By default, deployments are read from `config/model-providers.toml`. If you keep the TOML somewhere else, either set `MODEL_PROVIDERS_CONFIG_TOML` in the command or put it in `agents/.env`.

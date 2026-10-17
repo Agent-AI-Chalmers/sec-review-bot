@@ -1,11 +1,12 @@
 import pytest
 
-from tests.integration.llm.mcp_cases.loader import cases_for_mode, load_mcp_cases
-from tests.integration.llm.mcp_cases.runner import assert_mcp_case_oracles
+from tests.mcp.cases.loader import cases_for_mode, load_mcp_cases
+from tests.mcp.cases.runner import assert_mcp_case_oracles
 
 
 def test_mcp_case_fixtures_are_valid() -> None:
     cases = load_mcp_cases()
+    assert cases_for_mode(cases, "capability")
     assert cases_for_mode(cases, "discovery")
     assert cases_for_mode(cases, "compare")
     for case in cases:
@@ -17,6 +18,7 @@ def test_mcp_case_fixtures_are_valid() -> None:
 def test_mcp_oracle_requires_arguments_and_result_from_one_interaction() -> None:
     case = next(case for case in load_mcp_cases() if case.id == "playwright-dom-xss")
     observation = {
+        "mode": "compare",
         "toolInteractions": [
             {
                 "tool": "playwright_browser_navigate",

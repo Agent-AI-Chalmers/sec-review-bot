@@ -88,11 +88,11 @@ target-version = ["py314"]
 line-length = 88
 
 [tool.mypy]
-exclude = "^tests/integration/llm/skill_cases/fixtures/"
+exclude = "^tests/skills/cases/[^/]+/workspace/"
 
 [tool.pyright]
 pythonVersion = "3.14"
-exclude = ["tests/integration/llm/skill_cases/fixtures"]
+exclude = ["tests/skills/cases/*/workspace"]
 reportUnusedFunction = "error"
 reportUnusedClass = "error"
 

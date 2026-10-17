@@ -2,7 +2,7 @@
 
 These tests isolate connection construction, backend gating, and launch policy
 with mocks. They do not start an MCP server or prove that browser state survives
-multiple tool calls; the real capability check lives under tests/integration/mcp.
+multiple tool calls; the real capability check lives in test_capability.py.
 """
 
 from unittest.mock import Mock, patch
