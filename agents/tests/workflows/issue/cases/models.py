@@ -37,7 +37,9 @@ class IssueCaseOracle(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     acceptable_verdicts: set[FindingVerdict] = Field(min_length=1)
-    mechanism: str = Field(min_length=1)
+    # Human-review reference recorded in artifacts; automated scoring uses the
+    # structured evidence and location requirements below.
+    expected_mechanism: str = Field(min_length=1)
     required_evidence: list[EvidenceRequirement] = Field(min_length=1)
     required_locations: list[str] = Field(min_length=1)
 

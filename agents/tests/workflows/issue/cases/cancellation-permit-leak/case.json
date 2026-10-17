@@ -6,7 +6,7 @@
   },
   "oracle": {
     "acceptable_verdicts": ["confirmed-defect", "confirmed-vulnerability"],
-    "mechanism": "Cancellation and normal returns bypass semaphore release, exhausting bounded capacity.",
+    "expected_mechanism": "Cancellation and normal returns bypass semaphore release, exhausting bounded capacity.",
     "required_evidence": [
       {
         "label": "permit lifecycle failure",

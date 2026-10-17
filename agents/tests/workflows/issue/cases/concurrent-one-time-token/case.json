@@ -6,7 +6,7 @@
   },
   "oracle": {
     "acceptable_verdicts": ["confirmed-vulnerability"],
-    "mechanism": "A non-atomic read-check-act protocol violates a one-time-use invariant.",
+    "expected_mechanism": "A non-atomic read-check-act protocol violates a one-time-use invariant.",
     "required_evidence": [
       {
         "label": "non-atomic protocol",

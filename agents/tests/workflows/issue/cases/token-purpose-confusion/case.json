@@ -6,7 +6,7 @@
   },
   "oracle": {
     "acceptable_verdicts": ["confirmed-defect", "confirmed-vulnerability"],
-    "mechanism": "A correctly signed password-reset token is accepted under a different session-authentication purpose.",
+    "expected_mechanism": "A correctly signed password-reset token is accepted under a different session-authentication purpose.",
     "required_evidence": [
       {
         "label": "missing token-purpose binding",

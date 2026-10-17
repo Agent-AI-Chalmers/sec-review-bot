@@ -6,7 +6,7 @@
   },
   "oracle": {
     "acceptable_verdicts": ["confirmed-vulnerability"],
-    "mechanism": "AES-GCM reuses a nonce under the same long-lived key.",
+    "expected_mechanism": "AES-GCM reuses a nonce under the same long-lived key.",
     "required_evidence": [
       {
         "label": "key and nonce reuse",

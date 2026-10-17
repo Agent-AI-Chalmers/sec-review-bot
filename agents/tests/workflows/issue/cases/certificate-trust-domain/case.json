@@ -6,7 +6,7 @@
   },
   "oracle": {
     "acceptable_verdicts": ["confirmed-vulnerability"],
-    "mechanism": "Authorization binds only a workload name and omits the certificate trust domain from identity.",
+    "expected_mechanism": "Authorization binds only a workload name and omits the certificate trust domain from identity.",
     "required_evidence": [
       {
         "label": "incomplete certificate identity binding",

@@ -12,7 +12,6 @@ from tests.workflows.issue.llm_helpers import (
     ISSUE_LLM_SKIP_REASON,
     analyze_issue_case,
     confirmed_findings,
-    confirmed_narratives,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -89,9 +88,9 @@ async def test_issue_analyzer_non_dataflow_evidence_shape(case, repeat: int) -> 
     )
     _record_result(case=case, repeat=repeat, result=result)
 
-    assert_issue_case_oracle(case, result)
+    matching_findings = assert_issue_case_oracle(case, result)
 
-    for narrative in confirmed_narratives(result):
+    for narrative in matching_findings:
         flow_review = narrative.get("flow_review") or {}
         assert flow_review.get("source_facts"), narrative
         assert flow_review.get("sink_facts"), narrative

@@ -6,7 +6,7 @@
   },
   "oracle": {
     "acceptable_verdicts": ["confirmed-defect", "confirmed-vulnerability"],
-    "mechanism": "A broker exercises broader authority without binding the target and operation to delegated caller scope.",
+    "expected_mechanism": "A broker exercises broader authority without binding the target and operation to delegated caller scope.",
     "required_evidence": [
       {
         "label": "missing delegated-scope binding",

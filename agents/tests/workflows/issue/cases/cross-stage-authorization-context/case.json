@@ -6,7 +6,7 @@
   },
   "oracle": {
     "acceptable_verdicts": ["confirmed-vulnerability"],
-    "mechanism": "Authorization is checked before enqueue, but the queued work drops the authorized tenant and the worker resolves by attacker-chosen project ID alone.",
+    "expected_mechanism": "Authorization is checked before enqueue, but the queued work drops the authorized tenant and the worker resolves by attacker-chosen project ID alone.",
     "required_evidence": [
       {
         "label": "authorization context is not preserved",

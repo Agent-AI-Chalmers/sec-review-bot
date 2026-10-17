@@ -6,7 +6,7 @@
   },
   "oracle": {
     "acceptable_verdicts": ["confirmed-vulnerability"],
-    "mechanism": "A pathname is validated and later reopened after an attacker-controlled namespace replacement.",
+    "expected_mechanism": "A pathname is validated and later reopened after an attacker-controlled namespace replacement.",
     "required_evidence": [
       {
         "label": "check-use identity race",
