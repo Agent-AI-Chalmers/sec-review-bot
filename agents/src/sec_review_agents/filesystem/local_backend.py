@@ -241,19 +241,13 @@ class LocalFilesystemBackend(FilesystemBackend):
 
         matches.sort(key=lambda item: item.get("path", ""))
         return GlobResult(
-            error=(
-                bounded_filesystem_error("glob", stop_reason) if stop_reason else None
-            ),
             matches=matches,
+            truncated=stop_reason is not None,
+            truncation_reason="budget" if stop_reason is not None else None,
         )
 
     def read(self, file_path: str, offset: int = 0, limit: int = 2000) -> ReadResult:
-        # Match line-window semantics up front; negative values otherwise produce
-        # surprising slices after the file scan has already paid its cost.
-        if offset < 0:
-            return ReadResult(error="Line offset must be non-negative")
-        if limit <= 0:
-            return ReadResult(error="Line limit must be positive")
+        offset = max(0, offset)
 
         try:
             unresolved_path = self._unresolved_virtual_path(file_path)
@@ -284,16 +278,27 @@ class LocalFilesystemBackend(FilesystemBackend):
                     f"file size {size} bytes exceeds limit {self.limits.read_max_bytes} bytes",
                 )
             )
+        if size == 0:
+            return ReadResult(file_data={"content": "", "encoding": "utf-8"})
+        if limit <= 0:
+            return ReadResult(
+                file_data={"content": "", "encoding": "utf-8"},
+                no_lines_requested=True,
+            )
 
         selected: list[str] = []
         scanned_bytes = 0
         line_count = 0
+        scan_truncated = False
         try:
             fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
             with os.fdopen(fd, "r", encoding="utf-8") as handle:
                 for line in handle:
                     scanned_bytes += len(line.encode("utf-8", errors="ignore"))
                     if scanned_bytes > self.limits.read_max_scan_bytes:
+                        if selected:
+                            scan_truncated = True
+                            break
                         return ReadResult(
                             error=bounded_filesystem_error(
                                 "read_file",
@@ -303,21 +308,25 @@ class LocalFilesystemBackend(FilesystemBackend):
                     if line_count >= offset and len(selected) < limit:
                         selected.append(line.rstrip("\n"))
                     line_count += 1
-                    if len(selected) >= limit:
-                        break
         except (OSError, UnicodeDecodeError) as error:
             return ReadResult(error=f"Error reading file '{file_path}': {error}")
 
-        if offset >= line_count and not selected:
+        if offset >= line_count > 0:
             return ReadResult(
                 error=f"Line offset {offset} exceeds file length ({line_count} lines)"
             )
         if not selected:
-            return ReadResult(
-                file_data={"content": "(empty file)", "encoding": "utf-8"}
-            )
+            return ReadResult(file_data={"content": "", "encoding": "utf-8"})
         file_data: FileData = {"content": "\n".join(selected), "encoding": "utf-8"}
-        return ReadResult(file_data=file_data)
+        start_line = offset + 1
+        end_line = offset + len(selected)
+        return ReadResult(
+            file_data=file_data,
+            total_lines=None if scan_truncated else line_count,
+            start_line=start_line,
+            end_line=end_line,
+            next_offset=(end_line if scan_truncated or end_line < line_count else None),
+        )
 
     def grep(
         self,

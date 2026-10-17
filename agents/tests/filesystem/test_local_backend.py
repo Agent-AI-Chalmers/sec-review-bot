@@ -95,7 +95,9 @@ def test_glob_limits_results_and_ignores_dependency_dirs(tmp_path: Path) -> None
 
     result = backend.glob("/**/*.js", "/")
 
-    assert result.error is not None
+    assert result.error is None
+    assert result.truncated
+    assert result.truncation_reason == "budget"
     assert len(result.matches or []) == 3
     paths = [item["path"] for item in result.matches or []]
     assert all(path.startswith("/src/") for path in paths)
@@ -111,7 +113,9 @@ def test_glob_returns_deterministic_order_before_limit(tmp_path: Path) -> None:
 
     result = backend.glob("/**/*.js", "/")
 
-    assert result.error is not None
+    assert result.error is None
+    assert result.truncated
+    assert result.truncation_reason == "budget"
     assert [item["path"] for item in result.matches or []] == ["/a/a.js"]
 
 
@@ -141,15 +145,63 @@ def test_read_rejects_files_over_byte_budget(tmp_path: Path) -> None:
     assert "filesystem resource budget" in (result.error or "")
 
 
-def test_read_rejects_invalid_line_window(tmp_path: Path) -> None:
-    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+def test_read_normalizes_degenerate_line_windows(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("first\nsecond\nthird\n", encoding="utf-8")
     backend = make_backend(tmp_path, FilesystemLimits())
 
-    negative_offset = backend.read("/app.py", offset=-1)
+    negative_offset = backend.read("/app.py", offset=-1, limit=2)
     non_positive_limit = backend.read("/app.py", limit=0)
 
-    assert negative_offset.error == "Line offset must be non-negative"
-    assert non_positive_limit.error == "Line limit must be positive"
+    assert negative_offset.file_data == {
+        "content": "first\nsecond",
+        "encoding": "utf-8",
+    }
+    assert negative_offset.start_line == 1
+    assert negative_offset.end_line == 2
+    assert negative_offset.total_lines == 3
+    assert negative_offset.next_offset == 2
+    assert non_positive_limit.file_data == {"content": "", "encoding": "utf-8"}
+    assert non_positive_limit.no_lines_requested
+
+
+def test_read_degenerate_window_still_validates_path(tmp_path: Path) -> None:
+    backend = make_backend(tmp_path, FilesystemLimits())
+
+    result = backend.read("/missing.py", limit=0)
+
+    assert result.error == "File '/missing.py' not found"
+
+
+def test_read_keeps_page_when_total_count_exceeds_scan_budget(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "app.py").write_text("first\nsecond\nthird\n", encoding="utf-8")
+    backend = make_backend(
+        tmp_path,
+        FilesystemLimits(read_max_scan_bytes=len("first\nsecond\n")),
+    )
+
+    result = backend.read("/app.py", offset=0, limit=1)
+
+    assert result.error is None
+    assert result.file_data == {"content": "first", "encoding": "utf-8"}
+    assert result.start_line == 1
+    assert result.end_line == 1
+    assert result.total_lines is None
+    assert result.next_offset == 1
+
+
+def test_read_reports_last_page_metadata(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("first\nsecond\nthird\n", encoding="utf-8")
+    backend = make_backend(tmp_path, FilesystemLimits())
+
+    result = backend.read("/app.py", offset=2, limit=2)
+
+    assert result.file_data == {"content": "third", "encoding": "utf-8"}
+    assert result.start_line == 3
+    assert result.end_line == 3
+    assert result.total_lines == 3
+    assert result.next_offset is None
 
 
 def test_read_rejects_symlinked_files(tmp_path: Path) -> None:

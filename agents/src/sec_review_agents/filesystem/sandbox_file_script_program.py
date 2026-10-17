@@ -98,12 +98,7 @@ try:
         offset = int(payload["offset"])
         limit = int(payload["limit"])
         limits = payload["limits"]
-        if offset < 0:
-            emit({"error": "Line offset must be non-negative"})
-            sys.exit(0)
-        if limit <= 0:
-            emit({"error": "Line limit must be positive"})
-            sys.exit(0)
+        offset = max(0, offset)
         if os.path.islink(path):
             emit({"error": "symlink targets are not allowed"})
             sys.exit(0)
@@ -115,23 +110,34 @@ try:
             emit({"error": "read_max_bytes", "size": size})
             sys.exit(0)
         if size == 0:
-            emit({"encoding": "utf-8", "content": "(empty file)"})
+            emit({"encoding": "utf-8", "content": ""})
+            sys.exit(0)
+        if limit <= 0:
+            emit(
+                {
+                    "encoding": "utf-8",
+                    "content": "",
+                    "no_lines_requested": True,
+                }
+            )
             sys.exit(0)
         try:
             with open(path, "r", encoding="utf-8") as text_handle:
                 selected: list[str] = []
                 scanned_bytes = 0
                 line_count = 0
+                scan_truncated = False
                 for line in text_handle:
                     scanned_bytes += len(line.encode("utf-8", errors="ignore"))
                     if scanned_bytes > int(limits["read_max_scan_bytes"]):
+                        if selected:
+                            scan_truncated = True
+                            break
                         emit({"error": "read_max_scan_bytes"})
                         sys.exit(0)
                     if line_count >= offset and len(selected) < limit:
                         selected.append(line.rstrip("\n"))
                     line_count += 1
-                    if len(selected) >= limit:
-                        break
         except UnicodeDecodeError:
             with open(path, "rb") as binary_handle:
                 raw = binary_handle.read()
@@ -139,13 +145,21 @@ try:
                 {"encoding": "base64", "content": base64.b64encode(raw).decode("ascii")}
             )
             sys.exit(0)
-        if offset >= line_count and not selected:
+        if offset >= line_count:
             emit({"error": "offset_exceeds_length", "line_count": line_count})
             sys.exit(0)
+        start_line = offset + 1
+        end_line = offset + len(selected)
         emit(
             {
                 "encoding": "utf-8",
-                "content": "\n".join(selected) if selected else "(empty file)",
+                "content": "\n".join(selected),
+                "total_lines": None if scan_truncated else line_count,
+                "start_line": start_line,
+                "end_line": end_line,
+                "next_offset": (
+                    end_line if scan_truncated or end_line < line_count else None
+                ),
             }
         )
         sys.exit(0)
