@@ -1,3 +1,5 @@
+"""Extract durable memory observations from published review transcripts."""
+
 import hashlib
 import shutil
 import tempfile
@@ -68,6 +70,16 @@ class MemoryObservationResult:
     @property
     def observation_path(self) -> Path | None:
         return self.observation_paths[0] if self.observation_paths else None
+
+
+@dataclass(frozen=True)
+class MemoryObservationPreviewResult:
+    """Outcome of extraction before any observation is published."""
+
+    observation_id: str
+    skipped: bool
+    summary: str
+    observation_markdown: str | None = None
 
 
 def _slug_component(value: str) -> str:
@@ -197,7 +209,6 @@ def stage_transcripts(
 
 def build_observation_document(
     *,
-    observation_id_value: str,
     source_workflow: str | None,
     run_id: str | None,
     staged_transcripts: StagedTranscripts,
@@ -206,8 +217,6 @@ def build_observation_document(
     """Render one observation body with stable provenance metadata."""
     stage_labels = [label for label, _mounted in staged_transcripts.entries]
     lines = [
-        f"# Memory Observation: {observation_id_value}",
-        "",
         "## Provenance",
         "",
     ]
@@ -224,6 +233,57 @@ def build_observation_document(
         ]
     )
     return "\n".join(lines) + "\n" + observation_markdown.rstrip() + "\n"
+
+
+async def _generate_memory_observation_for_refs(
+    transcript_refs: list[TranscriptRef],
+    *,
+    deployment: str | None,
+    resolved_observation_id: str,
+    source_workflow: str | None,
+    run_id: str | None,
+) -> MemoryObservationPreviewResult:
+    with tempfile.TemporaryDirectory(prefix="sec-review-memory-extractor-") as tempdir:
+        transcript_root = Path(tempdir) / "transcripts"
+        staged_transcripts = stage_transcripts(transcript_refs, transcript_root)
+        backend = create_memory_extractor_backend(transcript_root=transcript_root)
+        model = create_chat_model(
+            agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
+            deployment_override=deployment,
+        )
+        async with amanaged_backend(backend):
+            agent = await create_memory_extractor_agent_graph(
+                model=model,
+                backend=backend,
+            )
+            structured_result = await invoke_agent_runtime_graph(
+                agent=agent,
+                agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
+                system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
+                user_prompt=build_extractor_prompt(staged_transcripts),
+            )
+
+        observation_body = str(
+            structured_result.get("observation_markdown") or ""
+        ).strip()
+        if not structured_result.get("has_observation") or not observation_body:
+            return MemoryObservationPreviewResult(
+                observation_id=resolved_observation_id,
+                skipped=True,
+                summary="No durable memory observation produced.",
+            )
+
+        return MemoryObservationPreviewResult(
+            observation_id=resolved_observation_id,
+            skipped=False,
+            summary="Durable memory observation produced.",
+            observation_markdown=build_observation_document(
+                source_workflow=source_workflow,
+                run_id=run_id,
+                staged_transcripts=staged_transcripts,
+                observation_markdown=observation_body,
+            ),
+        )
 
 
 def _publish_observation(
@@ -267,47 +327,15 @@ async def _extract_memory_observation_for_refs(
             observation_paths=(Path(existing.path),),
         )
 
-    with tempfile.TemporaryDirectory(prefix="sec-review-memory-extractor-") as tempdir:
-        temp_root = Path(tempdir)
-        transcript_root = temp_root / "transcripts"
-        staged_transcripts = stage_transcripts(transcript_refs, transcript_root)
-        backend = create_memory_extractor_backend(
-            transcript_root=transcript_root,
-        )
-        model = create_chat_model(
-            agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-            deployment_override=deployment,
-        )
-        async with amanaged_backend(backend):
-            agent = await create_memory_extractor_agent_graph(
-                model=model,
-                backend=backend,
-            )
-            structured_result = await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-                system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
-                user_prompt=build_extractor_prompt(staged_transcripts),
-            )
-        has_observation = bool(structured_result.get("has_observation"))
-        observation_body = str(
-            structured_result.get("observation_markdown") or ""
-        ).strip()
-        if not observation_body:
-            has_observation = False
-        if not has_observation:
-            return MemoryObservationResult(
-                skipped=True,
-                summary="No durable memory observation produced.",
-            )
-
-        observation_content = build_observation_document(
-            observation_id_value=resolved_observation_id,
-            source_workflow=source_workflow,
-            run_id=run_id,
-            staged_transcripts=staged_transcripts,
-            observation_markdown=observation_body,
-        )
+    preview = await _generate_memory_observation_for_refs(
+        transcript_refs,
+        deployment=deployment,
+        resolved_observation_id=resolved_observation_id,
+        source_workflow=source_workflow,
+        run_id=run_id,
+    )
+    if preview.skipped or preview.observation_markdown is None:
+        return MemoryObservationResult(skipped=True, summary=preview.summary)
 
     with memory_store_lock(memory_root, exclusive=True):
         with open_memory_state(memory_root) as connection:
@@ -324,7 +352,7 @@ async def _extract_memory_observation_for_refs(
         observation_path = _publish_observation(
             memory_root=memory_root,
             observation_id_value=resolved_observation_id,
-            content=observation_content,
+            content=preview.observation_markdown,
         )
         with open_memory_state(memory_root) as connection:
             upsert_observation(
@@ -338,6 +366,37 @@ async def _extract_memory_observation_for_refs(
         skipped=False,
         summary=f"Memory observation written: {observation_path}",
         observation_paths=(observation_path,),
+    )
+
+
+async def preview_memory_observation_from_paths(
+    transcript_paths: list[Path],
+    *,
+    deployment: str | None = None,
+    observation_id_value: str | None = None,
+    job_id: str | None = None,
+    source_workflow: str | None = None,
+    run_id: str | None = None,
+) -> MemoryObservationPreviewResult:
+    """Extract one observation document without publishing it to a memory store."""
+    transcript_refs = collect_transcript_refs(transcript_paths)
+    resolved_observation_id = resolve_observation_id(
+        transcript_refs,
+        explicit_observation_id=observation_id_value,
+        job_id=job_id,
+    )
+    if not transcript_refs:
+        return MemoryObservationPreviewResult(
+            observation_id=resolved_observation_id,
+            skipped=True,
+            summary="No transcript files found.",
+        )
+    return await _generate_memory_observation_for_refs(
+        transcript_refs,
+        deployment=deployment,
+        resolved_observation_id=resolved_observation_id,
+        source_workflow=source_workflow,
+        run_id=run_id,
     )
 
 
@@ -381,6 +440,7 @@ async def extract_memory_observations_from_paths(
 
 
 __all__ = [
+    "MemoryObservationPreviewResult",
     "MemoryObservationResult",
     "TranscriptRef",
     "build_observation_document",
@@ -389,7 +449,7 @@ __all__ = [
     "collect_transcript_refs",
     "extract_memory_observations_from_paths",
     "observation_id",
+    "preview_memory_observation_from_paths",
     "resolve_observation_id",
     "stage_transcripts",
 ]
-"""Extract durable memory observations from published review transcripts."""

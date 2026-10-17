@@ -727,7 +727,7 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
     )
     assert result.observation_path is not None
     observation_text = result.observation_path.read_text(encoding="utf-8")
-    assert "# Memory Observation: issue-review-run-1" in observation_text
+    assert "# Memory Observation:" not in observation_text
     assert "## Provenance" in observation_text
     assert "## Observation\n\nReusable lesson:" in observation_text
     assert "- Source workflow: `issue-review`" in observation_text
