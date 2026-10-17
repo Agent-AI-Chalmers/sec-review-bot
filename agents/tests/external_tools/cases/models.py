@@ -17,7 +17,6 @@ ExternalToolCaseWorkflow = Literal["analysis", "verification"]
 ExternalToolCapabilityProbe = Literal[
     "joern-cross-file-call",
     "joern-source-to-sink",
-    "playwright-browser-state",
     "playwright-browser-sink-effect",
 ]
 

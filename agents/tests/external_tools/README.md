@@ -61,13 +61,13 @@ uv run python -m pytest tests/external_tools -m "integration and not llm"
 Run all discovery and compare cases:
 
 ```bash
-RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/external_tools/test_llm_cases.py -q -s
+RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/external_tools/test_llm.py -q -s
 ```
 
 Run only the paired comparisons:
 
 ```bash
-RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/external_tools/test_llm_cases.py -q -s -k comparison
+RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/external_tools/test_llm.py -q -s -k comparison
 ```
 
 ## Current Cases
@@ -76,7 +76,6 @@ Capability coverage:
 
 - `joern-cross-file-call` checks a CPG cross-file call edge.
 - `joern-source-to-sink` checks a CPG data-flow path.
-- `playwright-browser-state` checks state persistence across CLI calls.
 - `playwright-reflected-xss` checks a browser-observed script side effect.
 
 Discovery coverage:

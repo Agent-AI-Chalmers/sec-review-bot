@@ -3,12 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.external_tools.case_support.loader import (
+from tests.external_tools.cases.loader import (
     cases_for_mode,
     load_external_tool_cases,
 )
-from tests.external_tools.case_support.models import GitCheckoutSource
-from tests.external_tools.case_support.runner import (
+from tests.external_tools.cases.models import GitCheckoutSource
+from tests.external_tools.cases.runner import (
     assert_external_tool_case_oracles,
     has_required_external_tool_evidence,
     materialize_external_tool_case_workspace,

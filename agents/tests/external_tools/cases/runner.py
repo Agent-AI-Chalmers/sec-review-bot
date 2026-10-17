@@ -13,7 +13,7 @@ from sec_review_agents.workflows.repository_case.verification import (
     verify_repository_case,
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
-from tests.external_tools.case_support.models import (
+from tests.external_tools.cases.models import (
     ExternalToolCase,
     ExternalToolCaseMode,
     ExternalToolInteractionOracle,
