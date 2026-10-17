@@ -51,6 +51,8 @@ Until such a gap appears, advertising the command and allowing the agent to insp
 
 Joern contributes code property graphs, structural queries, call relationships, and data-flow analysis. Playwright contributes browser interaction and runtime evidence. The project chooses them for those capabilities, not for any particular integration protocol.
 
+The current gated probes establish availability and agent use, not a general improvement in review outcomes. Real-checkout comparisons have produced neutral and negative results as well as additional graph evidence. Joern is therefore retained for the distinct analysis capability it makes available, not because the project has demonstrated that enabling it consistently raises agent success rates.
+
 Neither capability requires MCP in this runtime:
 
 - Joern can create and query its analysis projects through local commands and scripts. Its useful state can be stored as files in the sandbox.

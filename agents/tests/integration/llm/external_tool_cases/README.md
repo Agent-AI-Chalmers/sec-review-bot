@@ -20,13 +20,6 @@ A comparison test requires the ON arm to provide genuine tool-use evidence, but 
 
 A comparison fixture may declare a public Git repository and a full commit hash. The runner fetches only that pinned revision, removes `.git`, and copies the resulting source tree into each arm while preserving symlinks. Both agents therefore receive the same repository state without commit history.
 
-Current comparison fixtures have different roles:
-
-- `sftpgo-rsync-command` is a neutral control. Its decisive source and sink are concentrated in one production file, so Joern may corroborate the path without improving the conclusion.
-- `helm-chart-name-traversal` exercises a broader CPG-shaped task. Its result oracle covers metadata decoding in the chart loader and both filesystem and tar-path construction in the chart saver.
-
-Neither fixture is designated a positive Joern result in advance. The retained artifacts determine whether the tool helped a particular run.
-
 ## Isolation And Artifacts
 
 Each enabled arm injects exactly one external-tool prompt. All arms disable skills and MCP.
@@ -52,3 +45,27 @@ Run only the larger paired comparisons:
 ```bash
 RUN_LLM_EXTERNAL_TOOL_CASES=1 uv run python -m pytest tests/integration/llm/test_external_tool_cases.py -q -s -k comparison
 ```
+
+## Current Fixtures
+
+Discovery cases:
+
+- `joern-source-to-sink` requires Joern evidence for a local source-to-sink flow.
+- `joern-cross-file-call` requires Joern evidence across a caller and callee.
+- `playwright-reflected-xss` requires browser-observed reflected XSS execution.
+- `playwright-dom-xss` requires browser-observed DOM XSS execution.
+
+Comparison cases:
+
+- `sftpgo-rsync-command` is a neutral control. Its decisive source and sink are concentrated in one production file, so Joern may corroborate the path without improving the conclusion.
+- `helm-chart-name-traversal` exercises a broader CPG-shaped task. Its result oracle covers metadata decoding in the chart loader and both filesystem and tar-path construction in the chart saver.
+
+Neither comparison fixture is designated a positive Joern result in advance. The retained artifacts determine whether the tool helped a particular run. Playwright currently has discovery coverage but no paired comparison fixture.
+
+## Selection Conclusion
+
+These cases support an engineering choice, not a general effectiveness claim. Joern remains available because its CPG, call-relationship, and data-dependency queries provide a capability that ordinary repository navigation does not. The capability and discovery cases establish that the installed CLI works and that an agent can use it.
+
+The comparison cases have not shown a consistent outcome improvement. In the recorded runs, SFTPGo reached the same evidence coverage with and without Joern, while the Helm Joern arm successfully built and queried a CPG but omitted one item retained by the baseline. These are useful neutral and negative observations: they show that tool access can add evidence and cost without necessarily improving the final answer.
+
+The project therefore keeps Joern as an opt-in CLI without treating these gated probes as a benchmark of general review quality. Broader statistical evaluation or a deterministic CPG-context pipeline is warranted only if the project later needs to make a stronger claim than capability-based tool selection.
