@@ -34,19 +34,19 @@ cd agents
 
 RUN_LLM_MEMORY_MIDDLEWARE_INTEGRATION=1 \
 LLM_TEST_DEPLOYMENT=<deployment> \
-uv run pytest tests/integration/llm/test_memory_middleware.py -q -s
+uv run pytest tests/memory/test_llm_middleware.py -q -s
 
 RUN_LLM_MEMORY_EXTRACTION_INTEGRATION=1 \
 LLM_TEST_DEPLOYMENT=<deployment> \
-uv run pytest tests/integration/llm/test_memory_extraction.py -q -s
+uv run pytest tests/memory/test_llm_extraction.py -q -s
 
 RUN_LLM_MEMORY_MAINTENANCE_INTEGRATION=1 \
 LLM_TEST_DEPLOYMENT=<deployment> \
-uv run pytest tests/integration/llm/test_memory_maintenance.py -q -s
+uv run pytest tests/memory/test_llm_maintenance.py -q -s
 
 RUN_LLM_MEMORY_LIFECYCLE_INTEGRATION=1 \
 LLM_TEST_DEPLOYMENT=<deployment> \
-uv run pytest tests/integration/llm/test_memory_lifecycle.py -q -s
+uv run pytest tests/memory/test_llm_lifecycle.py -q -s
 ```
 
 ## Product Workflow Probes

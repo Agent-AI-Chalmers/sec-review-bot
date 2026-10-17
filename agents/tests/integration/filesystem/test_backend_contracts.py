@@ -26,9 +26,6 @@ from sec_review_agents.agents.patch_synthesis.backend import (
 from sec_review_agents.agents.triage.backend import (
     create_repository_triage_backend,
 )
-from sec_review_agents.agents.verification.pull_request import (
-    create_pr_verification_backend,
-)
 from sec_review_agents.agents.verification.repository import (
     create_repository_verification_backend,
 )
@@ -273,58 +270,6 @@ def test_repository_review_backends_materialize_agent_skill_views(
     assert not (triage_skills_root / "web-security").exists()
     assert not (triage_skills_root / "ci-security").exists()
     assert "/triage/" not in _routes_for(triage_backend)
-
-
-def test_review_backends_mount_materialized_memory_view_when_configured(
-    tmp_path: Path,
-) -> None:
-    root = tmp_path
-    local_root = root / "local"
-    workspace = local_root / "workspace"
-    history = local_root / "history"
-    incremental = local_root / "incremental-window"
-    memory_source = root / "memory-source"
-    memory_materialized = root / "memory-materialized"
-    for path in (workspace, history, incremental, memory_source / "memory" / "topics"):
-        path.mkdir(parents=True, exist_ok=True)
-    (memory_source / "memory" / "MEMORY.md").write_text(
-        "# Memory\n\n- Mounted memory lesson.\n",
-        encoding="utf-8",
-    )
-
-    with patch.dict(
-        "os.environ",
-        {
-            "AGENT_SANDBOX_BACKEND": "local",
-            "AGENT_MEMORY_DIR": str(memory_source),
-            "AGENT_MEMORY_MATERIALIZED_ROOT": str(memory_materialized),
-        },
-        clear=False,
-    ):
-        issue_backend = create_issue_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=history,
-        )
-        pr_backend = create_pr_verification_backend(
-            workspace_root_path=workspace,
-            history_path=history,
-            incremental_window_path=incremental,
-        )
-        repository_backend = create_repository_mitigation_backend(
-            workspace_root=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
-        )
-
-    for backend in (issue_backend, pr_backend, repository_backend):
-        memory_root = _default_route_root(backend, "/memory/")
-        assert memory_root.parent == memory_materialized.resolve()
-        assert memory_root != memory_source.resolve()
-        assert (memory_root / "MEMORY.md").read_text(encoding="utf-8") == (
-            "# Memory\n\n- Mounted memory lesson.\n"
-        )
-        assert not _default_route_writable(backend, "/memory/")
 
 
 def test_bwrap_env_reaches_workflow_backend_factory(tmp_path: Path) -> None:

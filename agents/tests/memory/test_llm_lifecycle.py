@@ -16,6 +16,8 @@ from sec_review_agents.memory.store import (
 from tests.integration.llm.deployment_helpers import llm_test_deployment
 from tests.integration.llm.probe_helpers import llm_probe
 
+pytestmark = [pytest.mark.integration, pytest.mark.llm]
+
 LIFECYCLE_PROBE = llm_probe(
     run_env="RUN_LLM_MEMORY_LIFECYCLE_INTEGRATION",
     description="real LLM memory lifecycle extraction + maintenance probe",

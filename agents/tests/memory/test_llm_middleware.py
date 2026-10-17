@@ -29,6 +29,8 @@ from sec_review_agents.runtime.summarization_middleware import (
 from tests.integration.llm.deployment_helpers import llm_test_deployment
 from tests.integration.llm.probe_helpers import llm_probe
 
+pytestmark = [pytest.mark.integration, pytest.mark.llm]
+
 
 class MemoryMiddlewareProbeOutput(BaseModel):
     sentinel: str
