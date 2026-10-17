@@ -717,7 +717,6 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
             job_id="issue-review-run-1",
             source_workflow="issue-review",
             run_id="run-1",
-            artifact_root_path=transcript.parent.parent,
         )
 
     run_agent.assert_called_once()
@@ -733,7 +732,6 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
     assert "## Observation\n\nReusable lesson:" in observation_text
     assert "- Source workflow: `issue-review`" in observation_text
     assert "- Run id: `run-1`" in observation_text
-    assert "- Artifact root name: `review`" in observation_text
     assert "- Stages: analyzer initial" in observation_text
     assert str(transcript.resolve()) not in observation_text
     assert "## Source" not in observation_text

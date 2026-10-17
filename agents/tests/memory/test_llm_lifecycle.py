@@ -108,7 +108,6 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
             job_id="llm-memory-lifecycle-probe-run-1",
             source_workflow="llm-memory-lifecycle-probe",
             run_id="run-1",
-            artifact_root_path=artifacts,
         )
         maintenance = await maintain_memory_with_result(
             memory_store_dir=memory_root,

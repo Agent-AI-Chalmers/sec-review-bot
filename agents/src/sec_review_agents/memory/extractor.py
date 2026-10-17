@@ -200,7 +200,6 @@ def build_observation_document(
     observation_id_value: str,
     source_workflow: str | None,
     run_id: str | None,
-    artifact_root_path: Path | None,
     staged_transcripts: StagedTranscripts,
     observation_markdown: str,
 ) -> str:
@@ -216,10 +215,6 @@ def build_observation_document(
         lines.append(f"- Source workflow: `{source_workflow}`")
     if run_id:
         lines.append(f"- Run id: `{run_id}`")
-    if artifact_root_path is not None:
-        lines.append(
-            f"- Artifact root name: `{artifact_root_path.expanduser().resolve().name}`"
-        )
     lines.append(f"- Stages: {', '.join(stage_labels)}")
     lines.extend(
         [
@@ -262,7 +257,6 @@ async def _extract_memory_observation_for_refs(
     resolved_observation_id: str,
     source_workflow: str | None = None,
     run_id: str | None = None,
-    artifact_root_path: Path | None = None,
 ) -> MemoryObservationResult:
     with open_memory_state(memory_root) as connection:
         existing = fetch_observation_by_id(connection, resolved_observation_id)
@@ -311,7 +305,6 @@ async def _extract_memory_observation_for_refs(
             observation_id_value=resolved_observation_id,
             source_workflow=source_workflow,
             run_id=run_id,
-            artifact_root_path=artifact_root_path,
             staged_transcripts=staged_transcripts,
             observation_markdown=observation_body,
         )
@@ -357,7 +350,6 @@ async def extract_memory_observations_from_paths(
     job_id: str | None = None,
     source_workflow: str | None = None,
     run_id: str | None = None,
-    artifact_root_path: Path | None = None,
 ) -> MemoryObservationResult:
     """Extract and publish one pending observation from the supplied transcripts.
 
@@ -385,7 +377,6 @@ async def extract_memory_observations_from_paths(
         ),
         source_workflow=source_workflow,
         run_id=run_id,
-        artifact_root_path=artifact_root_path,
     )
 
 

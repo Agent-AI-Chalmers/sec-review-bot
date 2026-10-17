@@ -160,7 +160,6 @@ async def run_memory_extraction_job(
         job_id=job_id,
         source_workflow=source_workflow,
         run_id=run_id,
-        artifact_root_path=Path(artifact_root_path),
     )
     with open_memory_state(memory_store_dir) as connection:
         marked = mark_running_extraction_job_processed(

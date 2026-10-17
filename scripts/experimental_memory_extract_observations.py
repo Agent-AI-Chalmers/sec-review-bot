@@ -146,15 +146,10 @@ async def main() -> int:
         print("No observation written: no durable observation.")
         return 1
 
-    artifact_root = None
-    input_dirs = [path for path in args.inputs if path.expanduser().is_dir()]
-    if len(input_dirs) == 1:
-        artifact_root = input_dirs[0]
     content = build_observation_document(
         observation_id_value=observation_id_value,
         source_workflow=args.source_workflow,
         run_id=args.run_id,
-        artifact_root_path=artifact_root,
         staged_transcripts=staged,
         observation_markdown=observation_body,
     )
