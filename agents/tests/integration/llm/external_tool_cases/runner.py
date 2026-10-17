@@ -39,7 +39,7 @@ async def run_external_tool_case(
     if workspace_source is None:
         materialize_external_tool_case_workspace(case, workspace)
     else:
-        shutil.copytree(workspace_source, workspace)
+        shutil.copytree(workspace_source, workspace, symlinks=True)
     create_workspace_snapshot_tar(workspace_path=workspace, tar_path=snapshot)
     setup_content = (
         case.setup_path.read_text(encoding="utf-8")
@@ -116,23 +116,43 @@ def materialize_external_tool_case_workspace(
 ) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if case.checkout is None:
-        shutil.copytree(case.workspace_source, destination)
+        shutil.copytree(case.workspace_source, destination, symlinks=True)
         return
+    destination.mkdir()
     subprocess.run(
-        [
-            "git",
-            "clone",
-            "--filter=blob:none",
-            "--no-checkout",
-            case.checkout.repository,
-            str(destination),
-        ],
+        ["git", "init", "--quiet"],
+        cwd=destination,
         check=True,
         capture_output=True,
         text=True,
     )
+    fetch_command = [
+        "git",
+        "fetch",
+        "--quiet",
+        "--depth",
+        "1",
+        case.checkout.repository,
+        case.checkout.commit,
+    ]
+    for attempt in range(2):
+        fetch = subprocess.run(
+            fetch_command,
+            cwd=destination,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if fetch.returncode == 0:
+            break
+        if attempt == 1:
+            raise RuntimeError(
+                "failed to fetch pinned external-tool checkout "
+                f"{case.checkout.repository}@{case.checkout.commit}: "
+                f"{fetch.stderr.strip()}"
+            )
     subprocess.run(
-        ["git", "checkout", "--detach", case.checkout.commit],
+        ["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"],
         cwd=destination,
         check=True,
         capture_output=True,
@@ -154,6 +174,14 @@ def assert_external_tool_case_oracles(
     result_text = json.dumps(result, ensure_ascii=False).lower()
     for requirement in case.oracles.result_requirements:
         assert re.search(requirement, result_text), (requirement, result)
+
+
+def result_requirements_satisfied(case: ExternalToolCase, observation: dict) -> bool:
+    result_text = json.dumps(observation["result"], ensure_ascii=False).lower()
+    return all(
+        re.search(requirement, result_text)
+        for requirement in case.oracles.result_requirements
+    )
 
 
 def has_required_external_tool_evidence(
@@ -218,6 +246,9 @@ def write_external_tool_comparison_summary(
             "usedConfiguredTool": has_required_external_tool_evidence(
                 case, observation
             ),
+            "resultRequirementsSatisfied": result_requirements_satisfied(
+                case, observation
+            ),
             "result": observation["result"],
             "evidenceScore": comparison_evidence_score(case, observation),
         }
@@ -233,6 +264,8 @@ def write_external_tool_comparison_summary(
             "evidenceScores": {
                 "withoutTool": comparison_evidence_score(case, without_tool),
                 "withTool": comparison_evidence_score(case, with_tool),
+                "delta": comparison_evidence_score(case, with_tool)
+                - comparison_evidence_score(case, without_tool),
                 "maximum": len(case.oracles.comparison_evidence_patterns),
             },
         },

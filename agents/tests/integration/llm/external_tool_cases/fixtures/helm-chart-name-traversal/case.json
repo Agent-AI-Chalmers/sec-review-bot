@@ -1,0 +1,50 @@
+{
+  "id": "helm-chart-name-traversal",
+  "tool": "joern",
+  "modes": [
+    "compare"
+  ],
+  "workflow": "analysis",
+  "checkout": {
+    "repository": "https://github.com/helm/helm.git",
+    "commit": "e81f6140ddb22bc99a08f7409522a8dbe5338ee3"
+  },
+  "review_input": "Audit this Helm checkout for the repository-grounded claim that a malicious chart name containing path separators can escape an intended output boundary while a chart is saved or packaged. Identify the complete production-code flow from untrusted Chart.yaml metadata decoding to every affected production output boundary and the decisive missing validation. If Joern is available, you must use its code property graph to obtain independent cross-file evidence; if it is unavailable, establish the path from repository source. Do not rely on advisories, commit history, tests, or a supplied vulnerable location.",
+  "analysis_overview": "The vulnerable checkout accepts path-bearing chart names and later incorporates them into filesystem and archive paths.",
+  "oracles": {
+    "required_execute_interactions": [
+      {
+        "arguments_pattern": "joern-parse",
+        "result_pattern": "Successfully wrote graph"
+      },
+      {
+        "arguments_pattern": "joern",
+        "result_pattern": "SaveDir|writeTarContents|Join|Name"
+      }
+    ],
+    "result_requirements": [
+      "pkg/chart/loader/load\\.go",
+      "loadfiles|yaml\\.unmarshal",
+      "metadata\\.name|c\\.name",
+      "pkg/chartutil/save\\.go",
+      "savedir",
+      "writetarcontents",
+      "filepath\\.join",
+      "path separator|traversal|outside|escape",
+      "validation"
+    ],
+    "comparison_evidence_patterns": [
+      "pkg/chart/loader/load\\.go",
+      "loadfiles",
+      "yaml\\.unmarshal",
+      "metadata\\.name|c\\.name",
+      "pkg/chartutil/save\\.go",
+      "savedir",
+      "writetarcontents",
+      "filepath\\.join",
+      "tar.{0,40}(entry|path)|archive.{0,40}(entry|path)",
+      "filesystem.{0,40}(output|path)|output.{0,40}(directory|path)",
+      "missing.{0,50}valid|without.{0,50}valid|does not.{0,50}valid"
+    ]
+  }
+}

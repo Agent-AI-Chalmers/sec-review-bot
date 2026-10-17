@@ -1,12 +1,17 @@
+import subprocess
+from pathlib import Path
+
 import pytest
 
 from tests.integration.llm.external_tool_cases.loader import (
     cases_for_mode,
     load_external_tool_cases,
 )
+from tests.integration.llm.external_tool_cases.models import GitCheckoutSource
 from tests.integration.llm.external_tool_cases.runner import (
     assert_external_tool_case_oracles,
     has_required_external_tool_evidence,
+    materialize_external_tool_case_workspace,
 )
 
 
@@ -74,3 +79,60 @@ def test_external_tool_availability_probe_is_not_tool_evidence() -> None:
     }
 
     assert not has_required_external_tool_evidence(case, observation)
+
+
+def test_external_tool_workspace_materialization_preserves_dangling_symlinks(
+    tmp_path,
+) -> None:
+    case = next(
+        case for case in load_external_tool_cases() if case.id == "joern-source-to-sink"
+    ).model_copy(deep=True)
+    case._directory = tmp_path / "case"
+    case.workspace_source.mkdir(parents=True)
+    (case.workspace_source / "dangling").symlink_to("missing-target")
+
+    destination = tmp_path / "materialized"
+    materialize_external_tool_case_workspace(case, destination)
+
+    assert (destination / "dangling").is_symlink()
+    assert (destination / "dangling").readlink() == Path("missing-target")
+
+
+def test_external_tool_checkout_materializes_only_the_pinned_revision(tmp_path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=repository,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=repository,
+        check=True,
+    )
+    (repository / "evidence.txt").write_text("pinned\n", encoding="utf-8")
+    subprocess.run(["git", "add", "evidence.txt"], cwd=repository, check=True)
+    subprocess.run(
+        ["git", "commit", "--quiet", "-m", "pinned"],
+        cwd=repository,
+        check=True,
+    )
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    case = next(
+        case for case in load_external_tool_cases() if case.id == "joern-source-to-sink"
+    ).model_copy(deep=True)
+    case.checkout = GitCheckoutSource(repository=str(repository), commit=commit)
+
+    destination = tmp_path / "checkout"
+    materialize_external_tool_case_workspace(case, destination)
+
+    assert (destination / "evidence.txt").read_text(encoding="utf-8") == "pinned\n"
+    assert not (destination / ".git").exists()

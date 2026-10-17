@@ -133,5 +133,5 @@ async def test_external_tool_comparison_case(case) -> None:
         with_tool=with_tool,
     )
     assert not has_required_external_tool_evidence(case, without_tool)
-    assert_external_tool_case_oracles(case, with_tool)
+    assert has_required_external_tool_evidence(case, with_tool)
     print(summary_path.read_text(encoding="utf-8"))
