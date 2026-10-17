@@ -31,6 +31,10 @@ def int_value(value: object, default: int) -> int:
     return value if isinstance(value, int) else default
 
 
+def optional_int_value(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 def map_edit_error(error: str, file_path: str, old_string: str) -> EditResult:
     messages: dict[str, str] = {
         "file_not_found": f"Error: File '{file_path}' not found",

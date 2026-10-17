@@ -98,6 +98,15 @@ def test_filesystem_middleware_can_still_enable_human_message_eviction() -> None
     assert middleware._human_message_token_limit_before_evict == 50_000
 
 
+def test_filesystem_middleware_leaves_tool_descriptions_to_deepagents() -> None:
+    with patch(
+        "sec_review_agents.runtime.filesystem_middleware.FilesystemMiddleware"
+    ) as middleware_class:
+        create_filesystem_middleware(backend=None)
+
+    assert "custom_tool_descriptions" not in middleware_class.call_args.kwargs
+
+
 @pytest.mark.asyncio
 async def test_build_agent_runtime_graph_does_not_treat_backend_as_resource() -> None:
     backend = _BackendStub()
@@ -303,7 +312,7 @@ def test_create_summarization_middleware_uses_absolute_token_limits() -> None:
         patch(
             "sec_review_agents.runtime.summarization_middleware.resolve_bound_deployment_max_input_tokens",
             return_value=1000,
-        ),
+        ) as resolve_max_input_tokens,
         patch(
             "sec_review_agents.runtime.summarization_middleware.SummarizationMiddleware",
             return_value=Mock(),
@@ -312,8 +321,13 @@ def test_create_summarization_middleware_uses_absolute_token_limits() -> None:
         create_summarization_middleware(
             agent_name="issue-analyzer",
             model=Mock(),
+            deployment_override="test-deployment",
         )
 
+    resolve_max_input_tokens.assert_called_once_with(
+        "issue-analyzer",
+        deployment_override="test-deployment",
+    )
     middleware_cls.assert_called_once()
     assert middleware_cls.call_args.kwargs["trigger"] == ("tokens", 850)
     assert middleware_cls.call_args.kwargs["keep"] == ("tokens", 300)

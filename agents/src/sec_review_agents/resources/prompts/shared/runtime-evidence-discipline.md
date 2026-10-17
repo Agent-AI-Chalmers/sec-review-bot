@@ -4,7 +4,7 @@
 - Prefer narrow repro or targeted validation commands over broad suites.
 - Keep commands tightly scoped and reproducible.
 - Do not state external command, library, framework, platform, or runtime semantics as verified fact in final findings or control analysis based only on recollection. Support the behavior with repository evidence or focused runtime evidence, mark it as unverified, or omit it when it is not needed for the conclusion.
-- When command outcome matters, preserve real upstream exit status; do not rely on pipelines ending with `head`, `tail`, `grep`, `sed`, or similar filters unless failure propagation is preserved with `set -o pipefail` or equivalent handling.
+- When command outcome matters, avoid pipelines ending with `head`, `tail`, `grep`, `sed`, or similar filters. If filtered output is necessary, use portable `/bin/sh` handling: redirect the command output to a file, save `$?` immediately, inspect the file separately, then exit with the saved status.
 - Treat output-truncation pipelines as visibility aids, not proof of success. A command like `build-or-test | head` can hide later failures or hangs even when the pipeline exit status is zero.
 - Interpret command outcomes in command-purpose context; an intentional non-zero repro outcome can still be valid evidence.
 - Listing files, checking tool versions, locating tests, or confirming build files is setup or environment context, not behavior validation.

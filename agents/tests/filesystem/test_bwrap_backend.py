@@ -70,6 +70,44 @@ def test_backend_command_timeout_uses_shared_environment_override(
     assert backend.command_timeout_ms == 1234
 
 
+def test_read_maps_pagination_metadata(tmp_path: Path) -> None:
+    backend = _backend(tmp_path)
+
+    with patch.object(
+        backend,
+        "_run_file_operation",
+        return_value={
+            "content": "second\nthird",
+            "encoding": "utf-8",
+            "total_lines": 4,
+            "start_line": 2,
+            "end_line": 3,
+            "next_offset": 3,
+        },
+    ):
+        result = backend.read("/workspace/app.py", offset=1, limit=2)
+
+    assert result.start_line == 2
+    assert result.end_line == 3
+    assert result.total_lines == 4
+    assert result.next_offset == 3
+
+
+def test_glob_budget_returns_structured_truncation(tmp_path: Path) -> None:
+    backend = _backend(tmp_path)
+
+    with patch.object(
+        backend,
+        "_run_file_operation",
+        return_value={"matches": [], "stop_reason": "result_limit"},
+    ):
+        result = backend.glob("**/*.py", "/workspace")
+
+    assert result.error is None
+    assert result.truncated
+    assert result.truncation_reason == "budget"
+
+
 def test_execute_uses_basic_bwrap_with_network_isolated(tmp_path: Path) -> None:
     backend = _backend(tmp_path)
 

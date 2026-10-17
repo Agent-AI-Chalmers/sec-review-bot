@@ -14,6 +14,12 @@ This page describes how this repository handles dependency updates for the GitHu
 
 Dependabot is configured in [`.github/dependabot.yml`](../../.github/dependabot.yml) for `npm`, `uv`, `pip`, and GitHub Actions. Dependabot PRs are useful update probes, but grouped PRs usually update target dependencies and the lockfile changes needed for those targets; they do not necessarily raise every compatible transitive dependency to the newest resolvable version.
 
+## Review Local Dependency Overrides
+
+Dependency maintenance also includes wrappers, adapters, prompts, and tool-description overrides that compensate for upstream behavior. When a direct dependency changes, compare each local override with both the old and current upstream implementation and history. Delete an override once upstream owns the same behavior; a full local replacement can otherwise hide later fixes and create a silent fork of the dependency contract.
+
+The Deep Agents filesystem tool descriptions were one such case. The overrides were written for behavior present through Deep Agents 0.6.12, when the `grep` description did not adequately prevent models from submitting regex-like patterns and interpreting the resulting empty matches as evidence. Deep Agents 0.7.0 introduced explicit literal guidance, likely-regex-miss recovery, and backend-aware `rg` fallback guidance in commit `b1dbf5e`. When this repository was audited against its locked Deep Agents 0.7.26, upstream also owned `max_count`, offloaded-result instructions, complete `read_file` pagination and result-shape guidance, and an `execute.timeout` schema whose unit is seconds and whose maximum is enforced by `max_execute_timeout`. The local `grep`, `read_file`, and `execute` replacements were therefore deleted. The remaining project-specific command-evidence policy lives in the composed agent prompt instead of replacing the dependency's tool contracts.
+
 ## Node Packages (pnpm)
 
 The Node packages use `pnpm`, each with its own manifest and lockfile:

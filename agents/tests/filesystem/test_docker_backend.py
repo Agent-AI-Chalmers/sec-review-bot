@@ -323,6 +323,106 @@ def test_container_file_script_edits_mixed_newline_content() -> None:
         assert target.read_bytes() == b"ALPHA\r\nBETA\r\ngamma\r\n"
 
 
+def test_container_file_script_reports_read_pagination() -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        target = Path(tempdir) / "lines.txt"
+        target.write_text("first\nsecond\nthird\n", encoding="utf-8")
+
+        result = _run_file_script(
+            {
+                "op": "read",
+                "path": str(target),
+                "offset": 1,
+                "limit": 1,
+                "limits": limits_payload(FilesystemLimits()),
+            }
+        )
+
+    assert result == {
+        "encoding": "utf-8",
+        "content": "second",
+        "total_lines": 3,
+        "start_line": 2,
+        "end_line": 2,
+        "next_offset": 2,
+    }
+
+
+def test_container_file_script_normalizes_degenerate_read_windows() -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        target = Path(tempdir) / "lines.txt"
+        target.write_text("first\nsecond\n", encoding="utf-8")
+
+        negative_offset = _run_file_script(
+            {
+                "op": "read",
+                "path": str(target),
+                "offset": -1,
+                "limit": 1,
+                "limits": limits_payload(FilesystemLimits()),
+            }
+        )
+        no_lines = _run_file_script(
+            {
+                "op": "read",
+                "path": str(target),
+                "offset": 0,
+                "limit": 0,
+                "limits": limits_payload(FilesystemLimits()),
+            }
+        )
+
+    assert negative_offset["content"] == "first"
+    assert negative_offset["start_line"] == 1
+    assert no_lines == {
+        "encoding": "utf-8",
+        "content": "",
+        "no_lines_requested": True,
+    }
+
+
+def test_container_file_script_degenerate_window_still_validates_path() -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        result = _run_file_script(
+            {
+                "op": "read",
+                "path": str(Path(tempdir) / "missing.txt"),
+                "offset": 0,
+                "limit": 0,
+                "limits": limits_payload(FilesystemLimits()),
+            }
+        )
+
+    assert result == {"error": "file_not_found"}
+
+
+def test_container_file_script_keeps_page_when_count_exceeds_scan_budget() -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        target = Path(tempdir) / "lines.txt"
+        target.write_text("first\nsecond\nthird\n", encoding="utf-8")
+
+        result = _run_file_script(
+            {
+                "op": "read",
+                "path": str(target),
+                "offset": 0,
+                "limit": 1,
+                "limits": limits_payload(
+                    FilesystemLimits(read_max_scan_bytes=len("first\nsecond\n"))
+                ),
+            }
+        )
+
+    assert result == {
+        "encoding": "utf-8",
+        "content": "first",
+        "total_lines": None,
+        "start_line": 1,
+        "end_line": 1,
+        "next_offset": 1,
+    }
+
+
 def test_container_file_script_stops_glob_at_result_budget() -> None:
     with tempfile.TemporaryDirectory() as tempdir:
         root = Path(tempdir)
@@ -726,7 +826,7 @@ def test_ls_maps_container_paths_back_to_agent_paths() -> None:
     assert result.entries[0]["path"] == "/workspace/app.py"
 
 
-def test_glob_budget_error_uses_filesystem_limits() -> None:
+def test_glob_budget_returns_structured_truncation() -> None:
     backend = _backend(
         routes=[
             DockerRoute(
@@ -744,9 +844,40 @@ def test_glob_budget_error_uses_filesystem_limits() -> None:
     ):
         result = backend.glob("**/*.py", "/workspace")
 
-    error = result.error or ""
-    assert "filesystem resource budget" in error
-    assert "result limit" in error
+    assert result.error is None
+    assert result.truncated
+    assert result.truncation_reason == "budget"
+
+
+def test_read_maps_pagination_metadata() -> None:
+    backend = _backend(
+        routes=[
+            DockerRoute(
+                container_path="/workspace",
+                agent_path="/workspace",
+                writable=False,
+            )
+        ],
+    )
+
+    with patch.object(
+        backend,
+        "_run_file_operation",
+        return_value={
+            "content": "second\nthird",
+            "encoding": "utf-8",
+            "total_lines": 4,
+            "start_line": 2,
+            "end_line": 3,
+            "next_offset": 3,
+        },
+    ):
+        result = backend.read("/workspace/app.py", offset=1, limit=2)
+
+    assert result.start_line == 2
+    assert result.end_line == 3
+    assert result.total_lines == 4
+    assert result.next_offset == 3
 
 
 def test_edit_uses_newline_tolerant_docker_file_operation() -> None:

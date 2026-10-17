@@ -66,6 +66,7 @@ from sec_review_agents.filesystem.result_parsing import (
     infer_file_operation_error,
     int_value,
     map_edit_error,
+    optional_int_value,
 )
 from sec_review_agents.filesystem.sandbox_file_ops import (
     EDIT_INLINE_MAX_BYTES,
@@ -608,7 +609,14 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             "content": str(data.get("content", "")),
             "encoding": str(data.get("encoding", "utf-8")),
         }
-        return ReadResult(file_data=file_data)
+        return ReadResult(
+            file_data=file_data,
+            total_lines=optional_int_value(data.get("total_lines")),
+            start_line=optional_int_value(data.get("start_line")),
+            end_line=optional_int_value(data.get("end_line")),
+            next_offset=optional_int_value(data.get("next_offset")),
+            no_lines_requested=data.get("no_lines_requested") is True,
+        )
 
     async def aread(
         self,
@@ -727,7 +735,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                 error=f"Error globbing path '{search_path}': {error}", matches=[]
             )
         return GlobResult(
-            error=self._bounded_stop_error("glob", data.get("stop_reason")),
             matches=[
                 {
                     **match,
@@ -735,6 +742,10 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                 }
                 for match in file_infos_from_payload(data.get("matches"))
             ],
+            truncated=data.get("stop_reason") is not None,
+            truncation_reason=(
+                "budget" if data.get("stop_reason") is not None else None
+            ),
         )
 
     async def aglob(self, pattern: str, path: str | None = "/") -> GlobResult:
