@@ -8,6 +8,8 @@ from sec_review_agents.filesystem.bwrap_backend import (
 )
 from sec_review_agents.filesystem.bwrap_runtime import is_bwrap_runtime_available
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.skipif(
     not is_bwrap_runtime_available(),

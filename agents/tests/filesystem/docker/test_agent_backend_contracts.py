@@ -21,10 +21,13 @@ def _docker_available() -> bool:
     return is_docker_runtime_available(default_docker_bin())
 
 
-pytestmark = pytest.mark.skipif(
-    not _docker_available(),
-    reason="Docker runtime is not available in this environment.",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not _docker_available(),
+        reason="Docker runtime is not available in this environment.",
+    ),
+]
 
 
 def test_repository_analyzer_docker_tmp_write_and_execute_contract(

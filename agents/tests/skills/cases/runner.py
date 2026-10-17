@@ -19,11 +19,7 @@ from sec_review_agents.runtime.structured_response_middleware import (
 from sec_review_agents.runtime.summarization_middleware import (
     create_summarization_middleware,
 )
-from tests.integration.llm.deployment_helpers import llm_test_deployment
-from tests.integration.llm.skill_probe_helpers import (
-    record_skill_probe_result,
-    successful_read_paths,
-)
+from tests.llm.deployment_helpers import llm_test_deployment
 from tests.skills.cases.models import (
     ClassificationOutput,
     CommandArgumentOutput,
@@ -33,6 +29,10 @@ from tests.skills.cases.models import (
     SkillCaseOutput,
     SkillReadOutput,
     output_model_for_case,
+)
+from tests.skills.probe_helpers import (
+    record_skill_probe_result,
+    successful_read_paths,
 )
 
 _RECURSION_LIMIT = 64

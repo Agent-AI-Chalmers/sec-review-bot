@@ -1,6 +1,6 @@
 import json
 
-from tests.integration.llm.transcript_artifact_helpers import (
+from tests.llm.transcript_artifact_helpers import (
     tool_interactions_from_transcript,
 )
 

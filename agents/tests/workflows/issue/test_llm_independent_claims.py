@@ -6,13 +6,15 @@ import re
 
 import pytest
 
-from tests.integration.llm.issue_helpers import (
+from tests.workflows.issue.llm_helpers import (
     ISSUE_LLM_ENABLED,
     ISSUE_LLM_SKIP_REASON,
     analyze_issue_case,
     confirmed_narratives,
     narrative_text,
 )
+
+pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
 
 @pytest.mark.skipif(not ISSUE_LLM_ENABLED, reason=ISSUE_LLM_SKIP_REASON)

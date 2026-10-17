@@ -19,10 +19,12 @@ import pytest
 from sec_review_agents.scan_stages.triage.agent_passes import (
     run_repository_triage_agent,
 )
-from tests.integration.llm.probe_helpers import llm_probe
-from tests.integration.llm.transcript_artifact_helpers import (
+from tests.llm.probe_helpers import llm_probe
+from tests.llm.transcript_artifact_helpers import (
     read_file_paths_from_transcript,
 )
+
+pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
 PROBE = llm_probe(
     run_env="RUN_LLM_TRIAGE_WORKFLOW_INTEGRATION",

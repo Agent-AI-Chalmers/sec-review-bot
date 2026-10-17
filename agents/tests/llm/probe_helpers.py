@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from sec_review_agents.utils.package_paths import default_agents_env_path
-from tests.integration.llm.deployment_helpers import LLM_TEST_DEPLOYMENT_ENV
+from tests.llm.deployment_helpers import LLM_TEST_DEPLOYMENT_ENV
 
 _LLM_PROBE_DOTENV_KEYS = {
     "LANGFUSE_BASE_URL",

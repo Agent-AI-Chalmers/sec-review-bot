@@ -1,6 +1,8 @@
-# Real LLM Integration Probes
+# LLM Tests
 
-Most integration tests run without model access. Real LLM probes are skipped by default and must be enabled one at a time with an explicit environment variable. There is intentionally no "run every LLM probe" switch because some probes use Docker, clone public repositories, or run full workflow agents.
+This directory owns shared LLM test helpers and model-runtime probes. Domain-specific probes live with their owning domain and import the common helpers from this directory.
+
+Real LLM probes are skipped by default and must be enabled one at a time with an explicit environment variable. There is intentionally no "run every LLM probe" switch because some probes use Docker, clone public repositories, or run full workflow agents.
 
 LLM probes intentionally do not load the full application `.env`. They only pick up `LANGFUSE_*` tracing settings and `MODEL_PROVIDERS_CONFIG_TOML` from `agents/.env`; values passed in the shell still take precedence. Probe enable flags such as `RUN_LLM_SKILL_CASES=1` should be set explicitly in the command that runs the probe.
 
@@ -65,7 +67,7 @@ Example:
 ```bash
 cd agents
 RUN_LLM_ISSUE_REVIEW_INTEGRATION=1 \
-uv run pytest tests/integration/llm/test_issue_mixed_claims.py -q -s
+uv run pytest tests/workflows/issue/test_llm_mixed_claims.py -q -s
 ```
 
 ## Heavy Probes

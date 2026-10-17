@@ -20,7 +20,7 @@ from tests.external_tools.cases.runner import (
     run_external_tool_case,
     write_external_tool_comparison_summary,
 )
-from tests.integration.llm.probe_helpers import ProbeRequirement, llm_probe
+from tests.llm.probe_helpers import ProbeRequirement, llm_probe
 
 _DOCKER_IMAGE_ENV = "AGENT_EXTERNAL_TOOLS_DOCKER_IMAGE"
 _DEFAULT_DOCKER_IMAGE = "sec-review-bot-workspace:tools"

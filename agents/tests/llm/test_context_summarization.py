@@ -8,8 +8,10 @@ from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_gr
 from sec_review_agents.runtime.summarization_middleware import (
     create_summarization_middleware,
 )
-from tests.integration.llm.deployment_helpers import llm_test_deployment
-from tests.integration.llm.probe_helpers import llm_probe
+from tests.llm.deployment_helpers import llm_test_deployment
+from tests.llm.probe_helpers import llm_probe
+
+pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
 _LONG_REVIEW_CONTEXT = """
 ### Review Excerpt: Redirect Target Handling

@@ -13,6 +13,8 @@ from sec_review_agents.workflows.issue.analysis import analyze_issue
 from sec_review_agents.workflows.issue.verification import verify_issue
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 
+pytestmark = pytest.mark.integration
+
 
 def _docker_available() -> bool:
     return is_docker_runtime_available(default_docker_bin())

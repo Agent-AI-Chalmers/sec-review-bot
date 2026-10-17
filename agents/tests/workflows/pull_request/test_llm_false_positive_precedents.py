@@ -14,7 +14,9 @@ import pytest
 
 from sec_review_agents.workflows.pull_request.analysis import analyze_pull_request
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
-from tests.integration.llm.probe_helpers import llm_probe
+from tests.llm.probe_helpers import llm_probe
+
+pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
 
 def _confirmed_narratives(result: Mapping[str, Any]) -> list[dict[str, Any]]:

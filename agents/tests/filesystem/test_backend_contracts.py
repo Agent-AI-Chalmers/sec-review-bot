@@ -32,6 +32,8 @@ from sec_review_agents.agents.verification.repository import (
 from sec_review_agents.filesystem.bwrap_backend import BwrapSandboxBackend
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
 
+pytestmark = pytest.mark.integration
+
 
 def _routes_for(backend) -> dict:
     composite = getattr(backend, "composite", backend)

@@ -8,6 +8,8 @@ from botocore.config import Config  # type: ignore[import-untyped]
 
 from sec_review_agents.artifacts.input_storage import download_s3_input_bundle
 
+pytestmark = pytest.mark.integration
+
 
 def test_s3_input_download_round_trip(monkeypatch, tmp_path: Path) -> None:
     endpoint = os.getenv("SEC_REVIEW_TEST_S3_ENDPOINT")

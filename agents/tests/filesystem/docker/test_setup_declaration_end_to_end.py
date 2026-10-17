@@ -25,6 +25,8 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
 )
 
+pytestmark = pytest.mark.integration
+
 
 def _docker_available() -> bool:
     return is_docker_runtime_available(default_docker_bin())
