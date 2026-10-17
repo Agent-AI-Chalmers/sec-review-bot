@@ -220,6 +220,64 @@ def test_triage_workbench_state_rejects_unknown_group_kind_at_mutation_boundary(
     assert state.read_groups()["groups"][0]["summary"] == "Raw HTML sink"
 
 
+def test_triage_update_groups_rolls_back_late_failure() -> None:
+    state = TriageWorkbenchState.from_candidates(
+        [
+            {"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]},
+            {"candidate_id": "cand-b", "category": "xss", "evidence": ["b"]},
+        ]
+    )
+    create_result = state.create_groups(
+        groups=[
+            {
+                "kind": "suppress",
+                "reason": "First suppression.",
+                "item_ids": ["cand-a"],
+            },
+            {
+                "kind": "suppress",
+                "reason": "Second suppression.",
+                "item_ids": ["cand-b"],
+            },
+        ]
+    )
+    first_group_id, second_group_id = create_result["created_group_ids"]
+
+    with pytest.raises(ValueError, match="unknown group_id: missing"):
+        state.update_groups(
+            groups=[
+                {
+                    "group_id": first_group_id,
+                    "item_ids": ["cand-b"],
+                    "reason": "Changed suppression.",
+                },
+                {"group_id": "missing", "reason": "Fails late."},
+            ]
+        )
+
+    assert state.read_groups()["groups"] == [
+        {
+            "group_id": first_group_id,
+            "kind": "suppress",
+            "reason": "First suppression.",
+            "summary": None,
+            "category": None,
+            "evidence": [],
+            "item_ids": ["cand-a"],
+        },
+        {
+            "group_id": second_group_id,
+            "kind": "suppress",
+            "reason": "Second suppression.",
+            "summary": None,
+            "category": None,
+            "evidence": [],
+            "item_ids": ["cand-b"],
+        },
+    ]
+    assert state.edit_events == [{"operation": "create_groups"}]
+
+
 def test_triage_tool_schema_rejects_incomplete_create_metadata() -> None:
     state = TriageWorkbenchState.from_candidates(
         [{"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]}]
