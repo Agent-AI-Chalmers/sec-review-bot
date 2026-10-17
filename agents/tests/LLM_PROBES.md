@@ -1,6 +1,6 @@
-# LLM Tests
+# LLM Probes
 
-This directory owns shared LLM test helpers and model-runtime probes. Domain-specific probes live with their owning domain and import the common helpers from this directory.
+Real-model probes live with their owning test domains. Shared probe helpers and model-runtime probes live under `tests/llm/`.
 
 Real LLM probes are skipped by default and must be enabled one at a time with an explicit environment variable. There is intentionally no "run every LLM probe" switch because some probes use Docker, clone public repositories, or run full workflow agents.
 
@@ -57,7 +57,7 @@ These use real workflow agents and normal deployment bindings.
 
 | Probe | Enable with | Extra requirements | Purpose |
 | --- | --- | --- | --- |
-| Issue review narratives | `RUN_LLM_ISSUE_REVIEW_INTEGRATION=1` | issue analyzer binding | Runs the issue analyzer on small synthetic cases. |
+| Issue review narratives | `RUN_LLM_ISSUE_REVIEW_INTEGRATION=1` | issue analyzer binding | Runs the issue analyzer on small synthetic cases, including non-dataflow evidence-shape probes for concurrency, cryptography, delegated authority, and cancellation. |
 | False-positive precedent | `RUN_LLM_FALSE_POSITIVE_PRECEDENT_INTEGRATION=1` | pull-request analyzer binding | Checks precedent-guided false-positive handling. |
 | Delivery workbench | `RUN_LLM_DELIVERY_WORKBENCH_INTEGRATION=1` | delivery planning binding | Checks delivery planning workbench use. |
 | Triage workflow | `RUN_LLM_TRIAGE_WORKFLOW_INTEGRATION=1` | triage binding | Checks candidate retention and suppression on scanner-shaped input, including use of mounted guidance. |
@@ -69,6 +69,17 @@ cd agents
 RUN_LLM_ISSUE_REVIEW_INTEGRATION=1 \
 uv run pytest tests/workflows/issue/test_llm_mixed_claims.py -q -s
 ```
+
+The non-dataflow evidence-shape probe reads issue fixtures from `tests/workflows/issue/cases/`. Repeat every case and retain each analyzer result for comparison with:
+
+```bash
+cd agents
+RUN_LLM_ISSUE_REVIEW_INTEGRATION=1 \
+NON_DATAFLOW_EVIDENCE_PROBE_REPEATS=3 \
+uv run pytest tests/workflows/issue/test_llm_non_dataflow_evidence.py -q -s
+```
+
+Results are written under `.agent-artifacts/non-dataflow-evidence/` by default. Set `NON_DATAFLOW_EVIDENCE_OUTPUT_DIR` to use another directory. The repeat count must be between 1 and 10.
 
 ## Heavy Probes
 
