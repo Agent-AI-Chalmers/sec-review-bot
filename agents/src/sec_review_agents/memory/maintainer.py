@@ -32,6 +32,7 @@ from sec_review_agents.memory.middleware import (
 from sec_review_agents.memory.state import (
     OBSERVATION_STATUS_PENDING,
     ObservationRow,
+    fetch_observations_by_ids_and_status,
     fetch_observations_by_status,
     mark_observations_processed_if_unchanged,
     open_memory_state,
@@ -195,9 +196,16 @@ async def maintain_memory_with_result(
     memory_store_dir: Path | None = None,
     deployment: str | None = None,
     batch_size: int | None = None,
+    observation_ids: list[str] | None = None,
 ) -> MemoryMaintenanceResult:
     if batch_size is not None and batch_size < 1:
         raise ValueError("batch_size must be positive when provided.")
+    if batch_size is not None and observation_ids is not None:
+        raise ValueError("batch_size and observation_ids cannot be used together.")
+    if observation_ids is not None and len(observation_ids) != len(
+        set(observation_ids)
+    ):
+        raise ValueError("observation_ids must be unique.")
     memory_store_dir = resolve_memory_store_dir(memory_store_dir, required=True)
     initialize_memory_store(memory_store_dir)
 
@@ -208,6 +216,7 @@ async def maintain_memory_with_result(
             memory_store_dir=memory_store_dir,
             deployment=deployment,
             batch_size=batch_size,
+            observation_ids=observation_ids,
         )
 
 
@@ -216,6 +225,7 @@ async def _maintain_memory_with_result_locked(
     memory_store_dir: Path,
     deployment: str | None,
     batch_size: int | None,
+    observation_ids: list[str] | None,
 ) -> MemoryMaintenanceResult:
     selected_rows: list[ObservationRow] = []
     processed_count = 0
@@ -224,10 +234,18 @@ async def _maintain_memory_with_result_locked(
 
         with memory_store_lock(memory_store_dir, exclusive=True):
             with open_memory_state(memory_store_dir) as connection:
-                selected_rows = fetch_observations_by_status(
-                    connection,
-                    status=OBSERVATION_STATUS_PENDING,
-                    limit=batch_size,
+                selected_rows = (
+                    fetch_observations_by_ids_and_status(
+                        connection,
+                        observation_ids=observation_ids,
+                        status=OBSERVATION_STATUS_PENDING,
+                    )
+                    if observation_ids is not None
+                    else fetch_observations_by_status(
+                        connection,
+                        status=OBSERVATION_STATUS_PENDING,
+                        limit=batch_size,
+                    )
                 )
                 if not selected_rows:
                     # No-pending runs are often the only time index bloat is noticed.

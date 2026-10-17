@@ -173,7 +173,7 @@ async def main() -> int:
     result = await maintain_memory_with_result(
         memory_store_dir=memory_store_dir,
         deployment=args.deployment,
-        batch_size=None,
+        observation_ids=[path.stem for path in observation_paths],
     )
 
     print(result.summary)
