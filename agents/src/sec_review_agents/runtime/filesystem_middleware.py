@@ -12,6 +12,9 @@ def create_filesystem_middleware(
     # HumanMessage. Those inputs are authoritative, not casual chat history, so
     # oversized input should be budgeted by the stage instead of silently
     # offloaded to /conversation_history before the model sees it.
+    # Custom tool descriptions are useful when upstream guidance is inadequate.
+    # Re-evaluate each override when Deep Agents changes: adopt upstream
+    # improvements and remove or narrow local text that would mask them.
     return FilesystemMiddleware(
         backend=backend,
         system_prompt=system_prompt,
