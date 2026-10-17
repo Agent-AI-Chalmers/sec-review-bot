@@ -13,6 +13,7 @@ from pathlib import Path
 from sec_review_agents.memory.maintainer import maintain_memory_with_result
 from sec_review_agents.memory.state import (
     OBSERVATION_STATUS_PENDING,
+    fetch_observation_by_id,
     open_memory_state,
     upsert_observation,
 )
@@ -63,6 +64,14 @@ def _parse_args() -> argparse.Namespace:
         help="Observation Markdown file. May be repeated.",
     )
     parser.add_argument(
+        "--replace-existing",
+        action="store_true",
+        help=(
+            "Replace observation ids already present in the memory ledger and "
+            "mark them pending again."
+        ),
+    )
+    parser.add_argument(
         "--deployment",
         default=None,
         help="Optional LLM deployment override for the memory-maintainer agent.",
@@ -98,8 +107,9 @@ def _import_observations(
     observation_paths: list[Path],
     *,
     memory_store_dir: Path,
+    replace_existing: bool,
 ) -> None:
-    """Atomically publish observations and register them as pending ledger rows."""
+    """Publish new observations, rejecting existing ledger ids by default."""
     observations_root = memory_observations_dir(memory_store_dir)
     observation_ids = [source.stem for source in observation_paths]
     if len(observation_ids) != len(set(observation_ids)):
@@ -108,6 +118,18 @@ def _import_observations(
         memory_store_lock(memory_store_dir, exclusive=True),
         open_memory_state(memory_store_dir) as connection,
     ):
+        existing_ids = [
+            observation_id
+            for observation_id in observation_ids
+            if fetch_observation_by_id(connection, observation_id) is not None
+        ]
+        if existing_ids and not replace_existing:
+            formatted_ids = ", ".join(sorted(existing_ids))
+            raise FileExistsError(
+                "Observations already exist in the memory ledger: "
+                f"{formatted_ids}. Pass --replace-existing to replace them."
+            )
+
         for source in observation_paths:
             observation_id = source.stem
             target = observations_root / f"{observation_id}.md"
@@ -146,6 +168,7 @@ async def main() -> int:
     _import_observations(
         observation_paths,
         memory_store_dir=memory_store_dir,
+        replace_existing=args.replace_existing,
     )
     result = await maintain_memory_with_result(
         memory_store_dir=memory_store_dir,
