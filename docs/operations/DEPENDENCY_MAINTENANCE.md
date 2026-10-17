@@ -14,6 +14,12 @@ This page describes how this repository handles dependency updates for the GitHu
 
 Dependabot is configured in [`.github/dependabot.yml`](../../.github/dependabot.yml) for `npm`, `uv`, `pip`, and GitHub Actions. Dependabot PRs are useful update probes, but grouped PRs usually update target dependencies and the lockfile changes needed for those targets; they do not necessarily raise every compatible transitive dependency to the newest resolvable version.
 
+## Review Local Dependency Overrides
+
+Dependency maintenance also includes wrappers, adapters, prompts, and tool-description overrides that compensate for upstream behavior. When a direct dependency changes, compare each local override with both the old and current upstream implementation and history. Delete an override once upstream owns the same behavior; a full local replacement can otherwise hide later fixes and create a silent fork of the dependency contract.
+
+The Deep Agents `grep` description was one such case. The project added explicit literal-pattern guidance when the 0.6-era upstream description did not adequately prevent models from submitting regex-like patterns and interpreting the resulting empty matches as evidence. Deep Agents later added explicit literal guidance, recovery instructions for likely regex misses, backend-aware `rg` fallback guidance, and regression evaluations. Keeping the local replacement then hid newer upstream guidance such as `max_count`, offloaded results, and capability-aware fallback behavior, so the local `grep` override was deleted. The project-specific `execute` and `read_file` requirements remain local because upstream does not own those policies.
+
 ## Node Packages (pnpm)
 
 The Node packages use `pnpm`, each with its own manifest and lockfile:

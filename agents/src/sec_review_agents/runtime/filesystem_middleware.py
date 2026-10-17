@@ -19,26 +19,6 @@ Examples:
 - Bad: `pip install -e . 2>&1 | tail -5`
 """
 
-_GREP_TOOL_DESCRIPTION = """
-Search for a single literal text pattern across files.
-
-Usage notes:
-- `pattern` is plain text, not regex.
-- Do not use regex operators such as `|`, `.`, `*`, `+`, `?`, `^`, `$`, `()`, `[]`, or `{}` as pattern syntax.
-- Do not add regex-style escaping such as `\\.` or `\\w`; backslashes are treated as literal characters.
-- Search for the exact substring you want to find.
-- If you want to search for multiple alternatives like `foo` or `bar`, run separate grep calls for each pattern.
-
-Examples:
-- Good: `grep(pattern="WithUser", path="/workspace", output_mode="content")`
-- Good: `grep(pattern="WithAdditionalGids", path="/workspace", output_mode="content")`
-- Good: `grep(pattern="user.name", path="/workspace", output_mode="content")`
-- Good: `grep(pattern="safe", path="/workspace", output_mode="files_with_matches")`
-- Bad: `grep(pattern="WithUser|WithAdditionalGids", path="/workspace", output_mode="content")`
-- Bad: `grep(pattern="user\\.name", path="/workspace", output_mode="content")`
-- Bad: `grep(pattern="safe", path="/workspace", output_mode="files_with_match")`
-"""
-
 _READ_FILE_TOOL_DESCRIPTION = """
 Read file contents by line range.
 
@@ -72,7 +52,6 @@ def create_filesystem_middleware(
         human_message_token_limit_before_evict=human_message_token_limit_before_evict,
         custom_tool_descriptions={
             "execute": _EXECUTE_TOOL_TIMEOUT_DESCRIPTION,
-            "grep": _GREP_TOOL_DESCRIPTION,
             "read_file": _READ_FILE_TOOL_DESCRIPTION,
         },
     )
