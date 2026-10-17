@@ -98,14 +98,13 @@ def test_filesystem_middleware_can_still_enable_human_message_eviction() -> None
     assert middleware._human_message_token_limit_before_evict == 50_000
 
 
-def test_filesystem_middleware_leaves_grep_description_to_deepagents() -> None:
+def test_filesystem_middleware_leaves_tool_descriptions_to_deepagents() -> None:
     with patch(
         "sec_review_agents.runtime.filesystem_middleware.FilesystemMiddleware"
     ) as middleware_class:
         create_filesystem_middleware(backend=None)
 
-    descriptions = middleware_class.call_args.kwargs["custom_tool_descriptions"]
-    assert descriptions.keys() == {"execute", "read_file"}
+    assert "custom_tool_descriptions" not in middleware_class.call_args.kwargs
 
 
 @pytest.mark.asyncio

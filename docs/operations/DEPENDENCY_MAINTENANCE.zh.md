@@ -20,7 +20,7 @@ Dependabot 配置在 [`.github/dependabot.yml`](../../.github/dependabot.yml)，
 
 依赖维护也包括为了弥补上游行为而存在的 wrapper、adapter、prompt 和工具描述覆盖。直接依赖发生变化时，要把每个本地覆盖与上游的新旧实现及其历史进行比较。一旦上游已经负责同一行为，就删除本地覆盖；否则，完整替换上游内容可能遮蔽后续修复，并悄然形成一份依赖契约的本地分叉。
 
-Deep Agents 的 `grep` 描述就是一个例子。上游 0.6 时期的描述不足以阻止模型提交类似正则表达式的 pattern，并把因此产生的空匹配误当成证据，因此项目加入了明确的 literal-pattern 指引。后来 Deep Agents 增加了明确的 literal 指引、疑似正则误用时的恢复说明、感知 backend 能力的 `rg` fallback 指引，以及回归 eval。继续保留本地完整替换，反而会遮蔽 `max_count`、结果 offload 和感知能力的 fallback 等较新的上游说明，因此本地 `grep` 覆盖已被删除。项目特有的 `execute` 与 `read_file` 要求仍保留在本地，因为上游不负责这些策略。
+Deep Agents 的 filesystem 工具描述就是一个例子。这些覆盖针对截至 Deep Agents 0.6.12 仍存在的行为而写；当时的 `grep` 描述不足以阻止模型提交类似正则表达式的 pattern，并把因此产生的空匹配误当成证据。Deep Agents 0.7.0 通过 commit `b1dbf5e` 加入了明确的 literal 指引、疑似正则误用后的恢复说明，以及感知 backend 能力的 `rg` fallback 指引。当本仓库针对锁定的 Deep Agents 0.7.26 进行审查时，上游也已经负责 `max_count`、结果 offload 说明、完整的 `read_file` 分页与结果形状说明，以及以秒为单位并由 `max_execute_timeout` 强制限制上限的 `execute.timeout` schema。因此，本地的 `grep`、`read_file` 和 `execute` 完整替换都被删除。剩余的项目特有命令证据策略放在组合后的 agent prompt 中，而不再替换依赖的工具契约。
 
 ## Node Packages (pnpm)
 
