@@ -188,6 +188,8 @@ Core fields:
 | `TEMPORAL_ADDRESS` | Must use the host port exposed by `TEMPORAL_PORT` in the repository `.env`; the default is `127.0.0.1:7233`. |
 | `TEMPORAL_NAMESPACE`, `TEMPORAL_TASK_QUEUE` | Must match the same-named values in the repository `.env`. |
 | `AGENT_DOCKER_IMAGE` | Image used for Docker sandboxes; the default is a general-purpose image. |
+| `AGENT_JOERN_ENABLED`, `AGENT_PLAYWRIGHT_ENABLED` | Advertise the corresponding installed CLI to eligible agents; both default to `false`. |
+| `AGENT_MCP_ENABLED` | Enable configured MCP integrations; defaults to `false`. |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Read-only RustFS credential matching the runner values in the repository `.env`. |
 
@@ -227,21 +229,31 @@ Concurrency values limit only the number of in-flight requests. They are not TPM
 
 #### Docker Sandbox
 
-`deployment.env.sample` uses the general-purpose sandbox image and disables MCP by default:
+`deployment.env.sample` uses the general-purpose sandbox image and disables optional external-tool prompts and MCP by default:
 
 ```bash
 AGENT_SANDBOX_BACKEND=docker
 AGENT_DOCKER_IMAGE=mcr.microsoft.com/devcontainers/universal:6-noble
 AGENT_DOCKER_NETWORK_MODE=none
+AGENT_JOERN_ENABLED=false
+AGENT_PLAYWRIGHT_ENABLED=false
+AGENT_MCP_ENABLED=false
 ```
 
 With `AGENT_SANDBOX_BACKEND=docker`, the worker fails during startup when Docker is unavailable.
 
-To enable CodeGraph and Playwright MCP with the provided Docker image, build the workspace tools image and update the image and MCP settings:
+To expose the Joern and Playwright CLIs through the provided Docker image, build the workspace tools image and update `ops/systemd/deployment.env`:
 
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
 AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
+AGENT_JOERN_ENABLED=true
+AGENT_PLAYWRIGHT_ENABLED=true
+```
+
+The same image also supports the optional CodeGraph and Playwright MCP integrations. Enable them separately when required:
+
+```bash
 AGENT_MCP_ENABLED=true
 ```
 

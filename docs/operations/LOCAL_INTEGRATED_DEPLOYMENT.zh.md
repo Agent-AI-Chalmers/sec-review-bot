@@ -190,6 +190,8 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `TEMPORAL_ADDRESS` | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。 |
 | `TEMPORAL_NAMESPACE`、`TEMPORAL_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
 | `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
+| `AGENT_JOERN_ENABLED`、`AGENT_PLAYWRIGHT_ENABLED` | 向适用的 agent 提示镜像中已安装的相应 CLI；两者默认均为 `false`。 |
+| `AGENT_MCP_ENABLED` | 启用已配置的 MCP 集成；默认是 `false`。 |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
 | `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` | 与仓库 `.env` 中 runner 配置相匹配的 RustFS 只读凭据。 |
 
@@ -229,21 +231,31 @@ AGENT_CASE_PROCESSING_MAX_CONCURRENCY=1
 
 #### Docker sandbox
 
-`deployment.env.sample` 默认使用通用 sandbox 镜像并关闭 MCP：
+`deployment.env.sample` 默认使用通用 sandbox 镜像，并关闭可选 external-tool prompt 与 MCP：
 
 ```bash
 AGENT_SANDBOX_BACKEND=docker
 AGENT_DOCKER_IMAGE=mcr.microsoft.com/devcontainers/universal:6-noble
 AGENT_DOCKER_NETWORK_MODE=none
+AGENT_JOERN_ENABLED=false
+AGENT_PLAYWRIGHT_ENABLED=false
+AGENT_MCP_ENABLED=false
 ```
 
 执行节点使用 `AGENT_SANDBOX_BACKEND=docker` 后，Docker 不可用时 worker 会在启动阶段失败。
 
-要通过仓库提供的 Docker 镜像启用 CodeGraph 和 Playwright MCP，先构建 workspace tools 镜像，再修改镜像和 MCP 配置：
+要通过仓库提供的 Docker 镜像使用 Joern 和 Playwright CLI，先构建 workspace tools 镜像，再修改 `ops/systemd/deployment.env`：
 
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
 AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
+AGENT_JOERN_ENABLED=true
+AGENT_PLAYWRIGHT_ENABLED=true
+```
+
+同一镜像也支持可选的 CodeGraph 和 Playwright MCP 集成。需要时单独启用：
+
+```bash
 AGENT_MCP_ENABLED=true
 ```
 

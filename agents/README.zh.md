@@ -297,15 +297,15 @@ benchmark 和本地调试可以设置 `runtime.workspace_image`，指定承载�
 
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
-AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
-AGENT_JOERN_ENABLED=true
-AGENT_PLAYWRIGHT_ENABLED=true
+export AGENT_DOCKER_IMAGE=sec-review-bot-workspace:tools
+export AGENT_JOERN_ENABLED=true
+export AGENT_PLAYWRIGHT_ENABLED=true
 ```
 
 Joern 和 Playwright 计划通过 bash 和各自的 CLI 使用。现有 CodeGraph 和 Playwright MCP 集成仍然可用，但默认关闭；需要时显式开启：
 
 ```bash
-AGENT_MCP_ENABLED=true
+export AGENT_MCP_ENABLED=true
 ```
 
 工具及接入方式的选择见 [Agent 外部工具](../docs/agent/EXTERNAL_TOOLS.zh.md)。
