@@ -52,7 +52,10 @@ export type CreateReviewRunArgs = Pick<
   | 'runner_input'
   | 'ingress_kind'
   | 'ingress_key'
->
+> & {
+  preparation_input?: JsonObject
+  preparation_input_version?: string
+}
 
 /** Narrow the runner's loose artifact-storage type into the status-discriminated contract
  * shape. The runner's own contract types `artifact` loosely — `RunnerArtifactStorage` requires

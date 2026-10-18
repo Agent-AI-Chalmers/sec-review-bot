@@ -67,6 +67,25 @@ export interface components {
       created: boolean
       preparation_token: string | null
     }
+    PreparationWork: {
+      run_id: string
+      /** @enum {string} */
+      workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+      input_version: string
+      input: {
+        [key: string]: unknown
+      }
+      claim_token: string
+      attempt_count: number
+    }
+    PreparationFailureNoticeWork: {
+      run_id: string
+      input: {
+        [key: string]: unknown
+      }
+      failure_code: string | null
+      claim_token: string
+    }
     PublicationWork: {
       run_id: string
       /** @enum {string} */
@@ -328,6 +347,10 @@ export interface operations {
           runner_input?: {
             [key: string]: unknown
           }
+          preparation_input_version: string
+          preparation_input: {
+            [key: string]: unknown
+          }
           /** @enum {string} */
           ingress_kind: 'github_webhook' | 'github_actions_dispatch'
           ingress_key: string
@@ -488,6 +511,62 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
+  claimNextPreparation: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The claimed preparation, or null when none is available. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PreparationWork'] | null
+        }
+      }
+      401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
+    }
+  }
+  checkpointPreparationInput: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          token: string
+          input: {
+            [key: string]: unknown
+          }
+        }
+      }
+    }
+    responses: {
+      /** @description The checkpoint was persisted. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
   failPreparation: {
     parameters: {
       query?: never
@@ -506,16 +585,82 @@ export interface operations {
             code?: string | null
             message: string
           }
+          /** @default false */
+          retry?: boolean
+          /** @description Delay before the durable preparation is claimable again. */
+          retry_after_ms?: number
         }
       }
     }
     responses: {
-      /** @description Fail acknowledgement (empty). */
+      /** @description The preparation failure outcome. */
       200: {
         headers: {
           [name: string]: unknown
         }
-        content?: never
+        content: {
+          'application/json': {
+            /** @description False when the failure is terminal or exhausted its retry budget. */
+            retry_scheduled: boolean
+          }
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
+  claimNextPreparationFailureNotice: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The claimed failure notice, or null when none is available. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json':
+            components['schemas']['PreparationFailureNoticeWork'] | null
+        }
+      }
+      401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
+    }
+  }
+  completePreparationFailureNotice: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          token: string
+          delivered: boolean
+        }
+      }
+    }
+    responses: {
+      /** @description Whether the caller still owned the notice. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': boolean
+        }
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']

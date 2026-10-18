@@ -75,6 +75,8 @@ test('operations reject missing or wrong credentials with 401', async () => {
       payload: {
         workflow: 'issue-review',
         publish_context: {},
+        preparation_input_version: 'v1',
+        preparation_input: { kind: 'test' },
         ingress_kind: 'github_webhook',
         ingress_key: 'k'
       }
@@ -110,6 +112,8 @@ test('the two bearer tokens are not interchangeable', async () => {
       payload: {
         workflow: 'issue-review',
         publish_context: {},
+        preparation_input_version: 'v1',
+        preparation_input: { kind: 'test' },
         ingress_kind: 'github_webhook',
         ingress_key: 'k'
       }
@@ -293,6 +297,65 @@ test('an operation with no response body sends an empty 200, not a null body', a
     })
     assert.strictEqual(response.statusCode, 200)
     assert.strictEqual(response.body, '')
+  } finally {
+    await app.close()
+  }
+})
+
+test('a failure notice completion forwards an intentional skip through the HTTP route', async () => {
+  const completions: unknown[][] = []
+  const app = await buildApp({
+    completePreparationFailureNotice: async (...args: unknown[]) => {
+      completions.push(args)
+      return true
+    }
+  })
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/preparation/failure-notice/complete',
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: { token: 'notice-claim', delivered: false }
+    })
+    assert.strictEqual(response.statusCode, 200)
+    assert.strictEqual(response.json(), true)
+    assert.deepStrictEqual(completions, [
+      ['3f2504e0-4f89-41d3-9a0c-0305e82c3301', 'notice-claim', false]
+    ])
+  } finally {
+    await app.close()
+  }
+})
+
+test('a preparation input checkpoint is fenced by the HTTP route claim token', async () => {
+  const checkpoints: unknown[][] = []
+  const app = await buildApp({
+    checkpointPreparationInput: async (...args: unknown[]) => {
+      checkpoints.push(args)
+    }
+  })
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/preparation/checkpoint',
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: { token: 'preparation-claim', input: { resolved: true } }
+    })
+    assert.strictEqual(response.statusCode, 200, response.body)
+    assert.strictEqual(response.body, '')
+    assert.deepStrictEqual(checkpoints, [
+      [
+        '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+        'preparation-claim',
+        { resolved: true }
+      ]
+    ])
   } finally {
     await app.close()
   }

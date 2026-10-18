@@ -1,3 +1,5 @@
+// Defines the integration-side admission boundary: every accepted connector
+// request receives a Control Plane run identity and replayable preparation input.
 import type { components } from './control-plane-api.js'
 
 type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
@@ -6,6 +8,7 @@ interface ReviewRunAdmissionRequest {
   workflow: ReviewRunAdmission['record']['workflow']
   ingress_kind: 'github_webhook' | 'github_actions_dispatch'
   ingress_key: string
+  preparation_input: Record<string, unknown>
 }
 interface AdmittedReviewRun {
   run_id: string
@@ -21,6 +24,8 @@ export interface ReviewRunAdmissionStore {
     publish_context: Record<string, never>
     ingress_kind: ReviewRunAdmissionRequest['ingress_kind']
     ingress_key: string
+    preparation_input_version: string
+    preparation_input: Record<string, unknown>
   }) => ReviewRunAdmission | Promise<ReviewRunAdmission>
 }
 
@@ -37,7 +42,9 @@ export async function admitReviewRun(
     workflow: request.workflow,
     publish_context: {},
     ingress_kind: request.ingress_kind,
-    ingress_key: request.ingress_key
+    ingress_key: request.ingress_key,
+    preparation_input_version: 'v1',
+    preparation_input: request.preparation_input
   })
   return {
     run_id: admission.record.run_id,

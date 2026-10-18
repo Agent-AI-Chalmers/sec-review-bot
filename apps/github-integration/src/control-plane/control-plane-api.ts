@@ -106,6 +106,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/preparation/claims/next': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Claim one connector-owned preparation whose durable input is available. Returns null when no preparation is pending. */
+    post: operations['claimNextPreparation']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/runs/{runId}/preparation/checkpoint': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Replace the connector-owned durable preparation input while the caller still owns its preparation claim. Connectors use this to checkpoint data resolved during preparation so a later owner resumes the same work rather than resolving it again. */
+    post: operations['checkpointPreparationInput']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/runs/{runId}/preparation/failure': {
     parameters: {
       query?: never
@@ -115,8 +149,42 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** @description Record a terminal preparation failure for a run the caller still owns. */
+    /** @description Record a preparation failure for a run the caller still owns. A retryable failure remains preparing and becomes claimable after the requested delay; the finite Control Plane retry budget turns exhaustion into a terminal failure. */
     post: operations['failPreparation']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/preparation/failure-notices/claims/next': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Claim one connector-owned terminal preparation-failure notice. Returns null when no undelivered notice is available; an expired notice claim is eligible again. */
+    post: operations['claimNextPreparationFailureNotice']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/runs/{runId}/preparation/failure-notice/complete': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Complete a terminal preparation-failure notice the caller still owns. `delivered` is false when the connector intentionally has no user-visible target. */
+    post: operations['completePreparationFailureNotice']
     delete?: never
     options?: never
     head?: never
@@ -389,6 +457,25 @@ export interface components {
       created: boolean
       preparation_token: string | null
     }
+    PreparationWork: {
+      run_id: string
+      /** @enum {string} */
+      workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+      input_version: string
+      input: {
+        [key: string]: unknown
+      }
+      claim_token: string
+      attempt_count: number
+    }
+    PreparationFailureNoticeWork: {
+      run_id: string
+      input: {
+        [key: string]: unknown
+      }
+      failure_code: string | null
+      claim_token: string
+    }
     PublicationWork: {
       run_id: string
       /** @enum {string} */
@@ -650,6 +737,10 @@ export interface operations {
           runner_input?: {
             [key: string]: unknown
           }
+          preparation_input_version: string
+          preparation_input: {
+            [key: string]: unknown
+          }
           /** @enum {string} */
           ingress_kind: 'github_webhook' | 'github_actions_dispatch'
           ingress_key: string
@@ -810,6 +901,62 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
+  claimNextPreparation: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The claimed preparation, or null when none is available. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PreparationWork'] | null
+        }
+      }
+      401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
+    }
+  }
+  checkpointPreparationInput: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          token: string
+          input: {
+            [key: string]: unknown
+          }
+        }
+      }
+    }
+    responses: {
+      /** @description The checkpoint was persisted. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
   failPreparation: {
     parameters: {
       query?: never
@@ -828,16 +975,82 @@ export interface operations {
             code?: string | null
             message: string
           }
+          /** @default false */
+          retry?: boolean
+          /** @description Delay before the durable preparation is claimable again. */
+          retry_after_ms?: number
         }
       }
     }
     responses: {
-      /** @description Fail acknowledgement (empty). */
+      /** @description The preparation failure outcome. */
       200: {
         headers: {
           [name: string]: unknown
         }
-        content?: never
+        content: {
+          'application/json': {
+            /** @description False when the failure is terminal or exhausted its retry budget. */
+            retry_scheduled: boolean
+          }
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
+  claimNextPreparationFailureNotice: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The claimed failure notice, or null when none is available. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json':
+            components['schemas']['PreparationFailureNoticeWork'] | null
+        }
+      }
+      401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
+    }
+  }
+  completePreparationFailureNotice: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          token: string
+          delivered: boolean
+        }
+      }
+    }
+    responses: {
+      /** @description Whether the caller still owned the notice. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': boolean
+        }
       }
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
@@ -1244,8 +1457,21 @@ export const operationRoutes = {
     path: '/v1/runs/{runId}/preparation/claim',
     method: 'post'
   },
+  claimNextPreparation: { path: '/v1/preparation/claims/next', method: 'post' },
+  checkpointPreparationInput: {
+    path: '/v1/runs/{runId}/preparation/checkpoint',
+    method: 'post'
+  },
   failPreparation: {
     path: '/v1/runs/{runId}/preparation/failure',
+    method: 'post'
+  },
+  claimNextPreparationFailureNotice: {
+    path: '/v1/preparation/failure-notices/claims/next',
+    method: 'post'
+  },
+  completePreparationFailureNotice: {
+    path: '/v1/runs/{runId}/preparation/failure-notice/complete',
     method: 'post'
   },
   claimNextPublication: { path: '/v1/publication/claims/next', method: 'post' },

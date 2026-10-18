@@ -1,3 +1,5 @@
+// Implements Control Plane's durable review, preparation, and publication
+// state machines. Claim tokens here are the sole fencing authority for writes.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
@@ -34,6 +36,21 @@ export type {
 type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject
 
+export interface PreparationWork {
+  run_id: string
+  workflow: WorkflowName
+  input_version: string
+  input: JsonObject
+  claim_token: string
+  attempt_count: number
+}
+export interface PreparationFailureNoticeWork {
+  run_id: string
+  input: JsonObject
+  failure_code: string | null
+  claim_token: string
+}
+
 interface ReviewRunRow {
   run_id: string
   workflow: WorkflowName
@@ -57,6 +74,9 @@ interface ReviewRunRow {
 }
 
 const MAX_PUBLICATION_STEP_FAILURES = 3
+/** A finite budget turns persistent infrastructure trouble into an observable
+ * terminal state instead of an unbounded background loop. */
+const MAX_PREPARATION_ATTEMPTS = 8
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
 /** How often a waiting publication claim re-checks for work. The state is a local indexed
  * query, so this trades a cheap read against how quickly the caller starts publishing. */
@@ -209,8 +229,8 @@ export class ReviewRunStore {
     const preparationToken = crypto.randomUUID()
     await client.query(
       `INSERT INTO review_runs
-      (run_id,connector_id,workflow,publish_context,runner_input,runner_status,preparation_claim_token,preparation_claimed_at,ingress_kind,ingress_key)
-      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'preparing',$6,clock_timestamp(),$7,$8)`,
+      (run_id,connector_id,workflow,publish_context,runner_input,runner_status,ingress_kind,ingress_key)
+      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'preparing',$6,$7)`,
       [
         run.run_id,
         this.connectorId,
@@ -219,9 +239,20 @@ export class ReviewRunStore {
         run.runner_input === undefined
           ? null
           : JSON.stringify(run.runner_input),
-        preparationToken,
         run.ingress_kind ?? null,
         run.ingress_key ?? null
+      ]
+    )
+    await client.query(
+      `INSERT INTO preparations
+        (run_id,connector_id,input_version,input,status,claim_token,claimed_at,attempt_count)
+       VALUES ($1,$2,$3,$4::jsonb,'claimed',$5,clock_timestamp(),1)`,
+      [
+        run.run_id,
+        this.connectorId,
+        run.preparation_input_version ?? 'direct-v1',
+        JSON.stringify(run.preparation_input ?? {}),
+        preparationToken
       ]
     )
     await client.query(
@@ -260,26 +291,21 @@ export class ReviewRunStore {
         )
         const row = existing.rows[0]
         if (row === undefined) return await this.insertWith(client, run)
-        if (
-          row.runner_status === 'preparing' ||
-          (row.runner_status === 'failed' &&
-            row.runner_failure_code === 'PREPARATION_INTERRUPTED')
-        ) {
+        if (row.runner_status === 'preparing') {
           const token = crypto.randomUUID()
           const reclaimed = await client.query(
             `
-            UPDATE review_runs
-            SET runner_status='preparing', runner_failure_code=NULL, runner_failure_message=NULL,
-                preparation_claim_token=$2,
-                preparation_claimed_at=clock_timestamp(),
+            UPDATE preparations
+            SET status='claimed', claim_token=$2, claimed_at=clock_timestamp(),
+                attempt_count=attempt_count+1, failure_code=NULL, failure_message=NULL,
                 updated_at=clock_timestamp()
-            WHERE run_id=$1
+            WHERE run_id=$1 AND connector_id=$4
               AND (
-                (runner_status='preparing' AND preparation_claimed_at <= clock_timestamp()-($3*interval '1 millisecond'))
-                OR (runner_status='failed' AND runner_failure_code='PREPARATION_INTERRUPTED')
+                (status='pending' AND available_at <= clock_timestamp())
+                OR (status='claimed' AND claimed_at <= clock_timestamp()-($3*interval '1 millisecond'))
               )
           `,
-            [row.run_id, token, this.claimTimeoutMs]
+            [row.run_id, token, this.claimTimeoutMs, this.connectorId]
           )
           if (reclaimed.rowCount !== 1)
             return {
@@ -287,15 +313,6 @@ export class ReviewRunStore {
               created: false,
               preparation_token: null
             }
-          await client.query(
-            `
-            UPDATE publications
-            SET status='pending', claim_token=NULL, failure_code=NULL,
-                failure_message=NULL, updated_at=clock_timestamp()
-            WHERE run_id=$1 AND connector_id=$2 AND status='skipped'
-          `,
-            [row.run_id, this.connectorId]
-          )
           const record = await this.getWith(client, row.run_id)
           if (record === null)
             throw new Error(`Reclaimed review run was not found: ${row.run_id}`)
@@ -343,7 +360,12 @@ export class ReviewRunStore {
       UPDATE review_runs
       SET publish_context=$3::jsonb, runner_input=$4::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$5
-        AND runner_status='preparing' AND preparation_claim_token=$2
+        AND runner_status='preparing' AND EXISTS (
+          SELECT 1 FROM preparations
+          WHERE preparations.run_id=review_runs.run_id
+            AND preparations.connector_id=$5 AND preparations.status='claimed'
+            AND preparations.claim_token=$2
+        )
         AND workflow=$6
     `,
       [
@@ -364,15 +386,115 @@ export class ReviewRunStore {
     this.ready()
     const result = await this.pool.query(
       `
-      UPDATE review_runs
-      SET preparation_claimed_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-        AND runner_status='preparing' AND preparation_claim_token=$3
+      UPDATE preparations
+      SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
+      WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3
     `,
       [runId, this.connectorId, token]
     )
     // The token predicate is the fencing boundary: a stale preparer must not
     // extend a claim after another ingress replay has taken ownership.
+    return result.rowCount === 1
+  }
+  async claimNextPreparation(): Promise<PreparationWork | null> {
+    this.ready()
+    return await transaction(this.pool, async (client) => {
+      const candidate = await client.query<{
+        run_id: string
+        workflow: WorkflowName
+        input_version: string
+        input: JsonObject
+        attempt_count: number
+      }>(
+        `SELECT p.run_id,r.workflow,p.input_version,p.input,p.attempt_count
+         FROM preparations p JOIN review_runs r ON r.run_id=p.run_id
+         WHERE p.connector_id=$1 AND p.status='pending'
+           AND p.available_at <= clock_timestamp()
+           AND p.input_version IS NOT NULL AND p.input IS NOT NULL
+           AND r.runner_status='preparing'
+         ORDER BY p.updated_at,p.run_id
+         FOR UPDATE OF p SKIP LOCKED
+         LIMIT 1`,
+        [this.connectorId]
+      )
+      const work = candidate.rows[0]
+      if (work === undefined) return null
+      const token = crypto.randomUUID()
+      const claimed = await client.query(
+        `UPDATE preparations
+         SET status='claimed', claim_token=$2, claimed_at=clock_timestamp(),
+             attempt_count=attempt_count+1, failure_code=NULL, failure_message=NULL,
+             updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$3 AND status='pending'`,
+        [work.run_id, token, this.connectorId]
+      )
+      if (claimed.rowCount !== 1)
+        throw new Error(`Preparation ${work.run_id} could not be claimed.`)
+      return {
+        ...work,
+        claim_token: token,
+        attempt_count: work.attempt_count + 1
+      }
+    })
+  }
+  async checkpointPreparationInput(
+    runId: string,
+    token: string,
+    input: JsonObject
+  ): Promise<void> {
+    this.ready()
+    const result = await this.pool.query(
+      `UPDATE preparations SET input=$4::jsonb, updated_at=clock_timestamp()
+       WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3`,
+      [runId, this.connectorId, token, JSON.stringify(input)]
+    )
+    if (result.rowCount !== 1)
+      throw new Error(
+        `Preparation claim was lost before checkpointing input for ${runId}.`
+      )
+  }
+  async claimNextPreparationFailureNotice(): Promise<PreparationFailureNoticeWork | null> {
+    this.ready()
+    return await transaction(this.pool, async (client) => {
+      const candidate = await client.query<{
+        run_id: string
+        input: JsonObject
+        failure_code: string | null
+      }>(
+        `SELECT n.run_id,p.input,p.failure_code FROM preparation_failure_notices n
+         JOIN preparations p ON p.run_id=n.run_id
+         WHERE n.connector_id=$1 AND (
+           n.status='pending' OR (
+             n.status='claimed' AND n.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
+           )
+         ) ORDER BY n.updated_at,n.run_id FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
+        [this.connectorId, this.claimTimeoutMs]
+      )
+      const work = candidate.rows[0]
+      if (work === undefined) return null
+      const token = crypto.randomUUID()
+      await client.query(
+        `UPDATE preparation_failure_notices SET status='claimed', claim_token=$2,
+           claimed_at=clock_timestamp(), updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$3`,
+        [work.run_id, token, this.connectorId]
+      )
+      return { ...work, claim_token: token }
+    })
+  }
+  async completePreparationFailureNotice(
+    runId: string,
+    token: string,
+    delivered: boolean
+  ): Promise<boolean> {
+    this.ready()
+    const result = await this.pool.query(
+      `UPDATE preparation_failure_notices SET status=$4, claim_token=NULL,
+         claimed_at=NULL, updated_at=clock_timestamp()
+       WHERE run_id=$1 AND connector_id=$2 AND status='claimed'
+         AND claim_token=$3`,
+      [runId, this.connectorId, token, delivered ? 'delivered' : 'skipped']
+    )
     return result.rowCount === 1
   }
   preparationHeartbeatIntervalMs(): number {
@@ -385,25 +507,43 @@ export class ReviewRunStore {
     token: string,
     context: PublishContext
   ): Promise<void> {
-    const run = await this.getRun(runId)
-    if (run === null) throw new Error(`Review run does not exist: ${runId}`)
-    const result = await this.pool.query(
-      `
-      UPDATE review_runs
-      SET publish_context=$3::jsonb, runner_status='queued',
-          preparation_claim_token=NULL, preparation_claimed_at=NULL,
-          runner_failure_code=NULL, runner_failure_message=NULL,
-          updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$4
-        AND runner_status='preparing' AND preparation_claim_token=$2
-        AND workflow=$5
-    `,
-      [runId, token, JSON.stringify(context), this.connectorId, run.workflow]
-    )
-    if (result.rowCount !== 1)
-      throw new Error(
-        `Review run ${runId} cannot transition from preparing to queued.`
+    return await transaction(this.pool, async (client) => {
+      const run = await this.getWith(client, runId)
+      if (run === null) throw new Error(`Review run does not exist: ${runId}`)
+      const result = await client.query(
+        `
+        UPDATE review_runs
+        SET publish_context=$3::jsonb, runner_status='queued',
+            runner_failure_code=NULL, runner_failure_message=NULL,
+            updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$4
+          AND runner_status='preparing' AND EXISTS (
+            SELECT 1 FROM preparations
+            WHERE preparations.run_id=review_runs.run_id
+              AND preparations.connector_id=$4 AND preparations.status='claimed'
+              AND preparations.claim_token=$2
+          )
+          AND workflow=$5
+      `,
+        [runId, token, JSON.stringify(context), this.connectorId, run.workflow]
       )
+      if (result.rowCount !== 1)
+        throw new Error(
+          `Review run ${runId} cannot transition from preparing to queued.`
+        )
+      const completed = await client.query(
+        `UPDATE preparations
+         SET status='submitted', claim_token=NULL, claimed_at=NULL,
+             updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$2 AND status='claimed'
+           AND claim_token=$3`,
+        [runId, this.connectorId, token]
+      )
+      if (completed.rowCount !== 1)
+        throw new Error(
+          `Preparation ${runId} lost its claim before the queued transition completed.`
+        )
+    })
   }
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
     this.ready()
@@ -512,29 +652,52 @@ export class ReviewRunStore {
   }
   async expireStalePreparations(): Promise<number> {
     return await transaction(this.pool, async (client) => {
-      const expired = await client.query<{ run_id: string }>(
+      const expired = await client.query<{
+        run_id: string
+        status: 'pending' | 'failed'
+      }>(
         `
-        UPDATE review_runs
-        SET runner_status='failed', preparation_claim_token=NULL,
-            preparation_claimed_at=NULL, runner_failure_code='PREPARATION_INTERRUPTED',
-            runner_failure_message='Review preparation did not finish before its claim expired.',
+        UPDATE preparations
+        SET status=CASE WHEN attempt_count >= $3 THEN 'failed' ELSE 'pending' END,
+            claim_token=NULL, claimed_at=NULL, available_at=clock_timestamp(),
+            failure_code=CASE WHEN attempt_count >= $3 THEN 'PREPARATION_RETRY_EXHAUSTED' ELSE NULL END,
+            failure_message=CASE WHEN attempt_count >= $3
+              THEN 'Preparation claim lease expired after the retry budget was exhausted.'
+              ELSE NULL END,
             updated_at=clock_timestamp()
-        WHERE connector_id=$1 AND runner_status='preparing'
-          AND preparation_claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
-        RETURNING run_id
+        WHERE connector_id=$1 AND status='claimed'
+          AND claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
+        RETURNING run_id,status
       `,
-        [this.connectorId, this.claimTimeoutMs]
+        [this.connectorId, this.claimTimeoutMs, MAX_PREPARATION_ATTEMPTS]
       )
-      if (expired.rowCount === 0) return 0
+      const failedRunIds = expired.rows
+        .filter((row) => row.status === 'failed')
+        .map((row) => row.run_id)
+      if (failedRunIds.length === 0) return expired.rowCount ?? 0
+
+      const failedRuns = await client.query<{ run_id: string }>(
+        `UPDATE review_runs SET runner_status='failed',
+           runner_failure_code='PREPARATION_RETRY_EXHAUSTED',
+           runner_failure_message='Preparation claim lease expired after the retry budget was exhausted.',
+           updated_at=clock_timestamp()
+         WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND runner_status='preparing'
+         RETURNING run_id`,
+        [failedRunIds, this.connectorId]
+      )
+      if (failedRuns.rowCount !== failedRunIds.length)
+        throw new Error('Preparation expiry lost a terminal run transition.')
 
       await client.query(
-        `
-        UPDATE publications
-        SET status='skipped', claim_token=NULL,
-            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-        WHERE connector_id=$1 AND run_id=ANY($2::text[]) AND status='pending'
-      `,
-        [this.connectorId, expired.rows.map((row) => row.run_id)]
+        `UPDATE publications SET status='skipped', claim_token=NULL,
+           failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+         WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status='pending'`,
+        [failedRunIds, this.connectorId]
+      )
+      await client.query(
+        `INSERT INTO preparation_failure_notices (run_id,connector_id,status)
+         SELECT unnest($1::text[]),$2,'pending' ON CONFLICT (run_id) DO NOTHING`,
+        [failedRunIds, this.connectorId]
       )
       return expired.rowCount ?? 0
     })
@@ -1072,17 +1235,44 @@ export class ReviewRunStore {
   async failPreparation(
     runId: string,
     token: string,
-    error: { code?: string | null; message: string }
-  ): Promise<void> {
-    await transaction(this.pool, async (client) => {
+    error: { code?: string | null; message: string },
+    options: { retry: boolean; retryAfterMs?: number } = { retry: false }
+  ): Promise<{ retry_scheduled: boolean }> {
+    return await transaction(this.pool, async (client) => {
+      // A retry deliberately leaves the review in `preparing`. The same durable
+      // input will become claimable later, even when the original process died.
+      if (options.retry) {
+        const retry = await client.query(
+          `UPDATE preparations
+           SET status='pending', claim_token=NULL, claimed_at=NULL,
+               available_at=clock_timestamp() + ($4::bigint * interval '1 millisecond'),
+               failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
+           WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3
+             AND attempt_count < $7`,
+          [
+            runId,
+            this.connectorId,
+            token,
+            Math.max(0, options.retryAfterMs ?? 0),
+            error.code ?? null,
+            error.message,
+            MAX_PREPARATION_ATTEMPTS
+          ]
+        )
+        if (retry.rowCount === 1) return { retry_scheduled: true }
+      }
       const result = await client.query(
         `
         UPDATE review_runs
-        SET runner_status='failed', preparation_claim_token=NULL,
-            preparation_claimed_at=NULL, runner_failure_code=$4,
+        SET runner_status='failed', runner_failure_code=$4,
             runner_failure_message=$5, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
-          AND runner_status='preparing' AND preparation_claim_token=$3
+        AND runner_status='preparing' AND EXISTS (
+          SELECT 1 FROM preparations
+          WHERE preparations.run_id=review_runs.run_id
+            AND preparations.connector_id=$2 AND preparations.status='claimed'
+            AND preparations.claim_token=$3
+        )
       `,
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
@@ -1090,6 +1280,14 @@ export class ReviewRunStore {
         throw new Error(
           `Preparation claim was lost before failing review run ${runId}.`
         )
+      await client.query(
+        `UPDATE preparations
+         SET status='failed', claim_token=NULL, claimed_at=NULL,
+             failure_code=$4, failure_message=$5,
+             updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3`,
+        [runId, this.connectorId, token, error.code ?? null, error.message]
+      )
       await client.query(
         `
         UPDATE publications
@@ -1099,6 +1297,12 @@ export class ReviewRunStore {
       `,
         [runId, this.connectorId]
       )
+      await client.query(
+        `INSERT INTO preparation_failure_notices (run_id,connector_id,status)
+         VALUES ($1,$2,'pending') ON CONFLICT (run_id) DO NOTHING`,
+        [runId, this.connectorId]
+      )
+      return { retry_scheduled: false }
     })
   }
   async close(): Promise<void> {

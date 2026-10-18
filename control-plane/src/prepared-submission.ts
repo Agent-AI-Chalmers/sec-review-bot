@@ -1,11 +1,21 @@
+// Owns the narrow uncertainty boundary around Runner submission: persist the
+// replayable request before sending it, then commit the durable queued state.
 import type { ControlPlaneWorkflow } from './contracts.js'
 import type { ReviewRunStore } from './review-store.js'
 import { RunnerSubmissionUncertainError } from './runner-client.js'
 
 type Store = Pick<
   ReviewRunStore,
-  'getRun' | 'savePreparedSubmission' | 'markQueued' | 'failPreparation'
->
+  'getRun' | 'savePreparedSubmission' | 'markQueued'
+> & {
+  // Submission only needs best-effort terminal cleanup; callers may provide a
+  // narrow test double without observing the retry outcome.
+  failPreparation: (
+    runId: string,
+    token: string,
+    error: { code?: string | null; message: string }
+  ) => Promise<void | { retry_scheduled: boolean }>
+}
 
 /** Persists the replayable request before crossing the Runner uncertainty boundary. */
 export async function submitPreparedRun(
@@ -52,8 +62,8 @@ export async function submitPreparedRun(
     )
     return { run_id: args.runId, workflow: run.workflow, status: 'queued' }
   } catch (error) {
-    await store
-      .failPreparation(args.runId, args.preparationToken, {
+    try {
+      await store.failPreparation(args.runId, args.preparationToken, {
         code:
           runnerAccepted || error instanceof RunnerSubmissionUncertainError
             ? 'SUBMISSION_STATE_UNCERTAIN'
@@ -64,7 +74,9 @@ export async function submitPreparedRun(
               : 'REVIEW_START_FAILED',
         message: error instanceof Error ? error.message : String(error)
       })
-      .catch(() => {})
+    } catch {
+      // Preserve the original submission error when best-effort cleanup also fails.
+    }
     throw error
   }
 }

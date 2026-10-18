@@ -182,6 +182,60 @@ components:
           type:
             - string
             - "null"
+    PreparationWork:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - input_version
+        - input
+        - claim_token
+        - attempt_count
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        input_version:
+          type: string
+          minLength: 1
+        input:
+          type: object
+          additionalProperties: {}
+        claim_token:
+          type: string
+          minLength: 1
+        attempt_count:
+          type: integer
+          minimum: 1
+    PreparationFailureNoticeWork:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - input
+        - failure_code
+        - claim_token
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        input:
+          type: object
+          additionalProperties: {}
+        failure_code:
+          type:
+            - string
+            - "null"
+        claim_token:
+          type: string
+          minLength: 1
     PublicationWork:
       type: object
       additionalProperties: false
@@ -593,6 +647,8 @@ paths:
               required:
                 - workflow
                 - publish_context
+                - preparation_input_version
+                - preparation_input
                 - ingress_kind
                 - ingress_key
               properties:
@@ -606,6 +662,12 @@ paths:
                   type: object
                   additionalProperties: {}
                 runner_input:
+                  type: object
+                  additionalProperties: {}
+                preparation_input_version:
+                  type: string
+                  minLength: 1
+                preparation_input:
                   type: object
                   additionalProperties: {}
                 ingress_kind:
@@ -645,7 +707,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       responses:
         "200":
           description: Redacted run detail.
@@ -680,7 +742,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       responses:
         "200":
           description: Redacted publication-step summary.
@@ -721,7 +783,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       requestBody:
         required: true
         content:
@@ -790,7 +852,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       requestBody:
         required: true
         content:
@@ -819,11 +881,34 @@ paths:
           $ref: "#/components/responses/PayloadTooLarge"
         "500":
           $ref: "#/components/responses/InternalError"
-  /v1/runs/{runId}/preparation/failure:
+  /v1/preparation/claims/next:
     post:
-      operationId: failPreparation
+      operationId: claimNextPreparation
       description: >-
-        Record a terminal preparation failure for a run the caller still owns.
+        Claim one connector-owned preparation whose durable input is available. Returns null
+        when no preparation is pending.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: The claimed preparation, or null when none is available.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PreparationWork"
+                  - type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/preparation/checkpoint:
+    post:
+      operationId: checkpointPreparationInput
+      description: >-
+        Replace the connector-owned durable preparation input while the caller still owns its
+        preparation claim. Connectors use this to checkpoint data resolved during preparation
+        so a later owner resumes the same work rather than resolving it again.
       security:
         - serviceToken: []
       parameters:
@@ -833,7 +918,52 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - input
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                input:
+                  type: object
+                  additionalProperties: {}
+      responses:
+        "200":
+          description: The checkpoint was persisted.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/preparation/failure:
+    post:
+      operationId: failPreparation
+      description: >-
+        Record a preparation failure for a run the caller still owns. A retryable
+        failure remains preparing and becomes claimable after the requested delay;
+        the finite Control Plane retry budget turns exhaustion into a terminal failure.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       requestBody:
         required: true
         content:
@@ -860,9 +990,95 @@ paths:
                         - "null"
                     message:
                       type: string
+                retry:
+                  type: boolean
+                  default: false
+                retry_after_ms:
+                  type: integer
+                  minimum: 0
+                  description: Delay before the durable preparation is claimable again.
       responses:
         "200":
-          description: Fail acknowledgement (empty).
+          description: The preparation failure outcome.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - retry_scheduled
+                properties:
+                  retry_scheduled:
+                    type: boolean
+                    description: False when the failure is terminal or exhausted its retry budget.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/preparation/failure-notices/claims/next:
+    post:
+      operationId: claimNextPreparationFailureNotice
+      description: >-
+        Claim one connector-owned terminal preparation-failure notice. Returns null when no
+        undelivered notice is available; an expired notice claim is eligible again.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: The claimed failure notice, or null when none is available.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PreparationFailureNoticeWork"
+                  - type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/preparation/failure-notice/complete:
+    post:
+      operationId: completePreparationFailureNotice
+      description: >-
+        Complete a terminal preparation-failure notice the caller still owns. `delivered` is
+        false when the connector intentionally has no user-visible target.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - delivered
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                delivered:
+                  type: boolean
+      responses:
+        "200":
+          description: Whether the caller still owned the notice.
+          content:
+            application/json:
+              schema:
+                type: boolean
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "401":
@@ -922,7 +1138,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       requestBody:
         required: true
         content:
@@ -966,7 +1182,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       requestBody:
         required: true
         content:
@@ -1013,7 +1229,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         - in: path
           name: stepKey
           required: true
@@ -1061,7 +1277,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         - in: path
           name: stepKey
           required: true
@@ -1127,7 +1343,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         - in: path
           name: stepKey
           required: true
@@ -1192,7 +1408,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       requestBody:
         required: true
         content:
@@ -1235,7 +1451,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       requestBody:
         required: true
         content:
@@ -1295,7 +1511,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       responses:
         "200":
           description: Full run record (includes runner_input/publish_context).
@@ -1326,7 +1542,7 @@ paths:
           description: The run identifier Control Plane assigned at admission (a UUID).
           schema:
             type: string
-            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       responses:
         "200":
           description: Full publication-step records.
@@ -1380,4 +1596,3 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
-

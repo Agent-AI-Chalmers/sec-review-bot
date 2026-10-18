@@ -31,21 +31,23 @@ The service runs as an independent Node.js process on port `8090` by default. Po
 
 ## Run lifecycle
 
-A run begins in `preparing` immediately after admission. GitHub integration prepares and uploads the input bundle, then submits the replayable Runner input under the preparation claim. Control Plane records the input and moves the run to `queued` only after Runner accepts it.
+A run begins in `preparing` immediately after admission. Its separately persisted preparation work owns the claim that fences input construction. GitHub integration prepares and uploads the input bundle, then submits the replayable Runner input under that claim. Control Plane records the input and moves the run to `queued` only after Runner accepts it.
 
 Control Plane polls `queued` and `running` runs. A successful Runner result is stored as `succeeded` and becomes eligible for publication. The integration claims that work, performs the GitHub side effects, and records either `published`, a retryable publication failure, or a terminal publication failure.
 
-If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `skipped`.
+If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `skipped`. A terminal preparation failure also creates connector-owned notice work, so a connector can tell its user even when the preparation owner had already crashed.
 
 ## Persistence model
 
 Execution and publication are separate state machines:
 
-| Table               | Responsibility                                            | Status                                                                |
-| ------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
-| `review_runs`       | Admission, Runner observation, and terminal workflow data | `preparing`, `recovering`, `queued`, `running`, `succeeded`, `failed` |
-| `publications`      | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `skipped`             |
-| `publication_steps` | Recoverable individual connector side effects             | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`        |
+| Table                         | Responsibility                                            | Status                                                                |
+| ----------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| `review_runs`                 | Admission, Runner observation, and terminal workflow data | `preparing`, `recovering`, `queued`, `running`, `succeeded`, `failed` |
+| `preparations`                | Claimable input preparation                               | `pending`, `claimed`, `submitted`, `failed`                           |
+| `preparation_failure_notices` | Connector-owned terminal-failure acknowledgements         | `pending`, `claimed`, `delivered`, `skipped`                          |
+| `publications`                | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `skipped`             |
+| `publication_steps`           | Recoverable individual connector side effects             | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`        |
 
 ```mermaid
 flowchart LR
@@ -79,7 +81,9 @@ flowchart LR
 
 ## Claims and recovery
 
-Preparation, submission recovery, publication, and publication-step commits use claim tokens to fence stale owners. While input preparation is active, GitHub integration renews its preparation claim; genuinely abandoned preparation expires after the claim timeout. A timed-out owner may finish an external request, but it cannot commit state after another owner acquires a new token.
+Preparation, submission recovery, publication, publication-step commits, and terminal preparation notices use claim tokens to fence stale owners. While input preparation is active, GitHub integration renews its preparation claim. An expired preparation normally returns to `pending`; after the finite retry budget is exhausted, it fails the run, skips publication, and creates durable connector notice work. A timed-out owner may finish an external request, but it cannot commit state after another owner acquires a new token.
+
+For automatic preparation recovery, a connector includes its versioned, opaque preparation input at admission. Control Plane persists and returns that input to the connector which owns the work, but never interprets provider-specific fields. A connector that does not provide replayable input can still prepare synchronously, but its expired work cannot be claimed by the recovery worker.
 
 `run_id` is globally unique in PostgreSQL. `ingress_kind` and `ingress_key` provide connector-scoped ingress idempotency. `connector_id` fences reads, claims, publications, and publication steps. Durable-operation logs include both `connector_id` and `run_id`.
 
@@ -143,4 +147,4 @@ pnpm run test:integration
 
 The contract itself is linted (Spectral) and its projections are freshness-checked by the family tools under [`contracts/control-plane-api/tools`](../contracts/control-plane-api/tools/README.md).
 
-`pnpm run test:integration` requires `TEST_DATABASE_URL` or `DATABASE_URL` pointing to a disposable PostgreSQL database.
+`pnpm run test:integration` uses `TEST_DATABASE_URL` or `DATABASE_URL` when one is supplied; it must point to a disposable PostgreSQL database. Without either variable, the command starts a short-lived local Docker container from the PostgreSQL image declared in the repository-root `compose.yaml`, then removes it after the tests. Docker pulls that image when it is not local, so this fallback requires both Docker and registry access; set `TEST_POSTGRES_IMAGE` to use another image explicitly.

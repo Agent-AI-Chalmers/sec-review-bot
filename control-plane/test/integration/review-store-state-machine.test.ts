@@ -1,3 +1,5 @@
+// Exercises the PostgreSQL-backed coordination state machines, including their
+// claim fencing and cross-connector ownership rules.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -129,7 +131,7 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
   }
 })
 
-test('ReviewRunStore terminates preparation after its claim expires', async () => {
+test('ReviewRunStore returns an expired preparation to pending without failing its run', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-stale-preparation-${randomUUID()}`
   try {
@@ -141,10 +143,140 @@ test('ReviewRunStore terminates preparation after its claim expires', async () =
 
     assert.strictEqual(await store.expireStalePreparations(), 1)
     const run = await store.getRun(runId)
-    assert.strictEqual(run?.runner_status, 'failed')
-    assert.strictEqual(run?.failure_code, 'PREPARATION_INTERRUPTED')
+    assert.strictEqual(run?.runner_status, 'preparing')
+    assert.strictEqual(run?.failure_code, null)
     assert.strictEqual(await store.claimPublication(runId), null)
     assert.strictEqual(await store.expireStalePreparations(), 0)
+  } finally {
+    await store.close()
+  }
+})
+
+test('ReviewRunStore exhausts a preparation whose final claim lease expires', async () => {
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const observer = new Pool({ connectionString: requireTestDatabase() })
+  const runId = `run-exhausted-preparation-${randomUUID()}`
+  try {
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await observer.query(
+      `UPDATE preparations SET attempt_count=8,
+        claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [runId]
+    )
+    assert.strictEqual(await store.expireStalePreparations(), 1)
+    const run = await store.getRun(runId)
+    assert.strictEqual(run?.runner_status, 'failed')
+    assert.strictEqual(run?.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
+    assert.strictEqual(await store.claimNextPreparation(), null)
+    assert.strictEqual(await store.claimPublication(runId), null)
+    const notice = await store.claimNextPreparationFailureNotice()
+    assert.ok(notice)
+    assert.strictEqual(notice.run_id, runId)
+    assert.deepStrictEqual(notice.input, {})
+    assert.strictEqual(notice.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
+    assert.strictEqual(
+      await store.completePreparationFailureNotice(runId, randomUUID(), true),
+      false
+    )
+    assert.strictEqual(
+      await store.completePreparationFailureNotice(
+        runId,
+        notice.claim_token,
+        true
+      ),
+      true
+    )
+    assert.strictEqual(await store.claimNextPreparationFailureNotice(), null)
+  } finally {
+    await observer.end()
+    await store.close()
+  }
+})
+
+test('ReviewRunStore claims an expired preparation from its durable connector input', async () => {
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = `run-claimable-preparation-${randomUUID()}`
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {},
+      preparation_input_version: 'v1',
+      preparation_input: { kind: 'connector_issue_review', issue_number: 12 }
+    })
+    assert.ok(admission.preparation_token)
+    await store.checkpointPreparationInput(runId, admission.preparation_token, {
+      kind: 'connector_issue_review',
+      issue_number: 12,
+      resolved: true
+    })
+    assert.strictEqual(await store.expireStalePreparations(), 1)
+
+    const claimed = await store.claimNextPreparation()
+    assert.ok(claimed)
+    const token = claimed.claim_token
+    assert.deepStrictEqual(claimed, {
+      run_id: runId,
+      workflow: 'issue-review',
+      input_version: 'v1',
+      input: {
+        kind: 'connector_issue_review',
+        issue_number: 12,
+        resolved: true
+      },
+      claim_token: token,
+      attempt_count: 2
+    })
+    assert.notStrictEqual(token, admission.preparation_token)
+    assert.strictEqual(
+      await store.renewPreparationClaim(runId, admission.preparation_token),
+      false
+    )
+    assert.strictEqual(await store.renewPreparationClaim(runId, token), true)
+  } finally {
+    await store.close()
+  }
+})
+
+test('ReviewRunStore does not let ingress replay bypass preparation backoff', async () => {
+  const store = await createStore()
+  const runId = `run-preparation-backoff-${randomUUID()}`
+  try {
+    const admission = await store.admitReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {},
+      ingress_kind: 'github_webhook',
+      ingress_key: `delivery-${runId}`,
+      preparation_input_version: 'v1',
+      preparation_input: { kind: 'test' }
+    })
+    assert.ok(admission.preparation_token)
+    assert.deepStrictEqual(
+      await store.failPreparation(
+        runId,
+        admission.preparation_token,
+        { message: 'temporary' },
+        { retry: true, retryAfterMs: 60_000 }
+      ),
+      { retry_scheduled: true }
+    )
+    const replay = await store.admitReviewRun({
+      workflow: 'issue-review',
+      run_id: `other-${runId}`,
+      publish_context: {},
+      ingress_kind: 'github_webhook',
+      ingress_key: `delivery-${runId}`,
+      preparation_input_version: 'v1',
+      preparation_input: { kind: 'test' }
+    })
+    assert.strictEqual(replay.created, false)
+    assert.strictEqual(replay.preparation_token, null)
+    assert.strictEqual(await store.claimNextPreparation(), null)
   } finally {
     await store.close()
   }
@@ -163,7 +295,7 @@ test('ReviewRunStore renews only the current preparation owner', async () => {
     })
     assert.ok(admission.preparation_token)
     await observer.query(
-      `UPDATE review_runs SET preparation_claimed_at=clock_timestamp()-interval '1 hour'
+      `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour'
        WHERE run_id=$1`,
       [runId]
     )
@@ -179,7 +311,7 @@ test('ReviewRunStore renews only the current preparation owner', async () => {
     assert.strictEqual(await store.expireStalePreparations(), 0)
 
     await observer.query(
-      `UPDATE review_runs SET preparation_claimed_at=clock_timestamp()-interval '1 hour'
+      `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour'
        WHERE run_id=$1`,
       [runId]
     )
@@ -339,6 +471,14 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
     assert.strictEqual(takeover.record.run_id, first.record.run_id)
     assert.notStrictEqual(takeover.preparation_token, first.preparation_token)
 
+    await assert.rejects(
+      ownerA.checkpointPreparationInput(
+        first.record.run_id,
+        first.preparation_token,
+        { stale: true }
+      ),
+      /claim was lost before checkpointing input/
+    )
     await assert.rejects(
       ownerA.savePreparedSubmission(
         first.record.run_id,

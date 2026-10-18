@@ -11,8 +11,6 @@ CREATE TABLE review_runs (
   runner_failure_message text,
   artifact_storage jsonb,
   workflow_result jsonb,
-  preparation_claim_token uuid,
-  preparation_claimed_at timestamptz,
   recovery_claim_token uuid,
   ingress_kind text,
   ingress_key text,
@@ -43,10 +41,6 @@ COMMENT ON COLUMN review_runs.artifact_storage IS
   'Runner-reported terminal diagnostic artifact storage result and immutable object reference when available.';
 COMMENT ON COLUMN review_runs.workflow_result IS
   'Terminal successful workflow result returned by the Runner and consumed by the connector publisher.';
-COMMENT ON COLUMN review_runs.preparation_claim_token IS
-  'Fencing token held by the current input preparer; stale owners cannot save input or queue the run.';
-COMMENT ON COLUMN review_runs.preparation_claimed_at IS
-  'Last successful acquisition or renewal time for the current preparation claim, used to detect abandoned preparation.';
 COMMENT ON COLUMN review_runs.recovery_claim_token IS
   'Fencing token held while reconciling a Runner submission whose acceptance was uncertain.';
 COMMENT ON COLUMN review_runs.ingress_kind IS
@@ -60,6 +54,78 @@ COMMENT ON COLUMN review_runs.updated_at IS
 
 CREATE INDEX review_runs_runner_status_idx
   ON review_runs (runner_status, updated_at);
+
+-- Preparation is a separately claimable unit of work. Its protocol deliberately
+-- contains no provider-specific columns: connectors own the interpretation of
+-- their preparation inputs and the external side effects used to construct them.
+CREATE TABLE preparations (
+  run_id text PRIMARY KEY REFERENCES review_runs(run_id) ON DELETE CASCADE,
+  connector_id text NOT NULL,
+  input_version text NOT NULL,
+  input jsonb NOT NULL,
+  status text NOT NULL CHECK (status IN ('pending', 'claimed', 'submitted', 'failed')),
+  available_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  claim_token uuid,
+  claimed_at timestamptz,
+  attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  failure_code text,
+  failure_message text,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  CHECK (
+    (status = 'claimed' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (status <> 'claimed' AND claim_token IS NULL AND claimed_at IS NULL)
+  )
+);
+
+COMMENT ON TABLE preparations IS
+  'Provider-neutral, durable preparation work for one review run. Connectors own how work is reconstructed and executed.';
+COMMENT ON COLUMN preparations.run_id IS
+  'Review run whose Runner input is being prepared.';
+COMMENT ON COLUMN preparations.connector_id IS
+  'Connector namespace allowed to claim and complete this preparation.';
+COMMENT ON COLUMN preparations.input_version IS
+  'Connector-defined version of input. Control Plane treats the input as opaque.';
+COMMENT ON COLUMN preparations.input IS
+  'Connector-owned, replayable preparation input. It contains no Control Plane-defined provider fields.';
+COMMENT ON COLUMN preparations.status IS
+  'Preparation lifecycle. An expired claim normally returns to pending; expiry after the retry budget is exhausted is terminal.';
+COMMENT ON COLUMN preparations.available_at IS
+  'Earliest time a pending preparation may be claimed. Retry backoff is durable so a process restart cannot bypass it.';
+COMMENT ON COLUMN preparations.claim_token IS
+  'Fencing token held by the current preparer; stale owners cannot save input or queue the run.';
+COMMENT ON COLUMN preparations.claimed_at IS
+  'Last acquisition or renewal time for the current preparation claim.';
+COMMENT ON COLUMN preparations.attempt_count IS
+  'Number of successful claims. It is retained for connector retry policy and observability.';
+COMMENT ON COLUMN preparations.failure_code IS
+  'Connector-supplied machine-readable terminal preparation failure reason.';
+COMMENT ON COLUMN preparations.failure_message IS
+  'Connector-supplied operator-readable terminal preparation failure detail.';
+
+CREATE INDEX preparations_claimable_idx
+  ON preparations (connector_id, status, available_at, updated_at);
+
+-- A terminal preparation failure may need connector-facing acknowledgement after
+-- the preparer has died. This outbox is deliberately provider-neutral: it stores
+-- delivery ownership only, while connectors interpret the preparation input.
+CREATE TABLE preparation_failure_notices (
+  run_id text PRIMARY KEY REFERENCES preparations(run_id) ON DELETE CASCADE,
+  connector_id text NOT NULL,
+  status text NOT NULL CHECK (status IN ('pending', 'claimed', 'delivered', 'skipped')),
+  claim_token uuid,
+  claimed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  CHECK (
+    (status = 'claimed' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (status <> 'claimed' AND claim_token IS NULL AND claimed_at IS NULL)
+  )
+);
+COMMENT ON TABLE preparation_failure_notices IS
+  'Provider-neutral outbox for connector acknowledgement of terminal preparation failures.';
+CREATE INDEX preparation_failure_notices_claimable_idx
+  ON preparation_failure_notices (connector_id, status, updated_at);
 
 -- Every run has one publication row. Keeping this state separate means a
 -- successful review remains successful even if delivery to the connector fails.
