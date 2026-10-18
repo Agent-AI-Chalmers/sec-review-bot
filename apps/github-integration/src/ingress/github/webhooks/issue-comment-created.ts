@@ -1,3 +1,5 @@
+// Handles authorized GitHub issue-comment commands and starts the appropriate
+// durable review workflow without making webhook delivery own long-running work.
 import type { EmitterWebhookEvent } from '@octokit/webhooks'
 
 import { startIssueReviewCommand } from '../../../triggers/issue-review.js'
@@ -113,11 +115,20 @@ export async function handleIssueCommentCreatedWithDeps(
       const execution = startPullRequestReviewCommandFn({
         octokit,
         trusted_default_branch,
+        preparation_input: {
+          kind: 'github_pull_request_review',
+          pr_reference: {
+            owner_login: issue.owner_login,
+            repo_name: issue.repo_name,
+            pr_number: issue.issue_number
+          },
+          trusted_default_branch,
+          event_type: 'manual_review',
+          test_changes: command.test_changes
+        },
         event_type: 'manual_review',
         delivery_id: id,
         test_changes: command.test_changes,
-        // issue_comment only has issue-shaped PR identity. Resolve full refs and
-        // SHAs after the delivery has a durable run record.
         resolve_pr: async () =>
           await getPullRequestContextFn(octokit as GitHubAppOctokit, {
             owner_login: issue.owner_login,

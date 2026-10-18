@@ -1,3 +1,5 @@
+// Accepts repository-dispatch reviews, validates their local contract, and
+// prepares a durable Runner submission under a fenced preparation claim.
 import type { App } from 'octokit'
 import { admitReviewRun } from '../control-plane/admission.js'
 import {
@@ -19,6 +21,7 @@ import { repositoryReviewPublishContext } from '../control-plane/publish-context
 import { controlPlaneClient } from '../control-plane/client.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
+import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
 import { logInfo } from '../utils/logger.js'
 import { asErrorMessage } from '../utils/error-utils.js'
 
@@ -164,7 +167,9 @@ export async function resolveRepositoryReviewDispatch({
         })
 
   if (base_sha === head_sha) {
-    throw new Error('incremental scan requires base_sha != head_sha.')
+    throw new RepositoryReviewDispatchValidationError(
+      'incremental scan requires base_sha != head_sha.'
+    )
   }
 
   return {
@@ -190,6 +195,11 @@ export interface DispatchRepositoryReviewCommandArgs {
   app: App
   payload: RepositoryReviewDispatchPayload
   verified_repository: string
+  claimed_preparation?: {
+    run_id: string
+    token: string
+    attempt_count?: number
+  }
   on_admitted?: (admission: {
     run_id: string
     status: string
@@ -244,6 +254,7 @@ export async function dispatchRepositoryReview({
   app,
   payload,
   verified_repository,
+  claimed_preparation,
   on_admitted,
   deps = {}
 }: DispatchRepositoryReviewCommandArgs): Promise<DispatchedRepositoryReview> {
@@ -261,24 +272,35 @@ export async function dispatchRepositoryReview({
     throw new RepositoryReviewDispatchValidationError(asErrorMessage(error))
   }
   const { repo_full_name, correlation_id } = validated
-  const admission = await admitReviewRun(store, {
-    workflow: 'repository-review',
-    ingress_kind: 'github_actions_dispatch',
-    ingress_key: `${verified_repository}:${correlation_id}`
-  })
-  on_admitted?.({
-    run_id: admission.run_id,
-    status: admission.status,
-    replayed: !admission.created
-  })
-  if (!admission.created) {
-    return {
+  const admission =
+    claimed_preparation === undefined
+      ? await admitReviewRun(store, {
+          workflow: 'repository-review',
+          ingress_kind: 'github_actions_dispatch',
+          ingress_key: `${verified_repository}:${correlation_id}`,
+          preparation_input: {
+            kind: 'github_repository_review',
+            payload,
+            verified_repository
+          }
+        })
+      : null
+  if (admission !== null) {
+    on_admitted?.({
       run_id: admission.run_id,
-      replayed: true
+      status: admission.status,
+      replayed: !admission.created
+    })
+    if (!admission.created) {
+      return { run_id: admission.run_id, replayed: true }
     }
   }
-  const run_id = admission.run_id
-  const preparationToken = admission.preparation_token
+  const run_id = claimed_preparation?.run_id ?? admission?.run_id
+  const preparationToken =
+    claimed_preparation?.token ?? admission?.preparation_token
+  const preparationAttempt = claimed_preparation?.attempt_count ?? 1
+  if (run_id === undefined)
+    throw new Error('Preparation admission did not return a run id.')
   if (!preparationToken)
     throw new Error(
       `Newly admitted review run ${run_id} has no preparation claim.`
@@ -295,12 +317,27 @@ export async function dispatchRepositoryReview({
     octokit = await getInstallationOctokit(repo_full_name)
     resolved = await resolve_dispatch({ octokit, payload })
   } catch (error) {
+    const classification = classifyPreparationFailure(
+      error,
+      preparationAttempt,
+      error instanceof RepositoryReviewDispatchValidationError
+    )
     if (await heartbeat.stop()) {
-      await store.failPreparation(run_id, preparationToken, {
-        code: 'REVIEW_PREPARATION_FAILED',
-        message:
-          asErrorMessage(error) || 'Repository review preparation failed.'
-      })
+      await store.failPreparation(
+        run_id,
+        preparationToken,
+        {
+          code: 'REVIEW_PREPARATION_FAILED',
+          message:
+            asErrorMessage(error) || 'Repository review preparation failed.'
+        },
+        {
+          retry: classification.retry,
+          ...(classification.retryAfterMs === undefined
+            ? {}
+            : { retryAfterMs: classification.retryAfterMs })
+        }
+      )
     }
     throw new RepositoryReviewDispatchValidationError(
       asErrorMessage(error) || 'Repository review dispatch request is invalid.'
@@ -332,13 +369,28 @@ export async function dispatchRepositoryReview({
       !(error instanceof ControlPlaneSubmissionError) &&
       !(error instanceof PreparationClaimLostError)
     ) {
-      await store.failPreparation(run_id, preparationToken, {
-        code: isSetupDeclarationError(error)
-          ? 'SETUP_DECLARATION_INVALID'
-          : 'REVIEW_START_FAILED',
-        message:
-          asErrorMessage(error) || 'Repository review could not be started.'
-      })
+      const classification = classifyPreparationFailure(
+        error,
+        preparationAttempt,
+        isSetupDeclarationError(error)
+      )
+      await store.failPreparation(
+        run_id,
+        preparationToken,
+        {
+          code: isSetupDeclarationError(error)
+            ? 'SETUP_DECLARATION_INVALID'
+            : 'REVIEW_START_FAILED',
+          message:
+            asErrorMessage(error) || 'Repository review could not be started.'
+        },
+        {
+          retry: classification.retry,
+          ...(classification.retryAfterMs === undefined
+            ? {}
+            : { retryAfterMs: classification.retryAfterMs })
+        }
+      )
     }
     throw error
   } finally {

@@ -1,3 +1,5 @@
+// Covers repository-dispatch admission, preparation, and submission boundaries
+// with controlled connector and Control Plane dependencies.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { App } from 'octokit'
@@ -194,7 +196,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
       store: {
         ...preparationClaim,
         admitReviewRun: (run) => {
-          saved_runs.push(run)
+          saved_runs.push(withoutPreparationInput(run))
           return {
             record: { ...run, run_id: 'run-1', runner_status: 'preparing' },
             created: true,
@@ -334,7 +336,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', run])
+            transitions.push(['preparing', withoutPreparationInput(run)])
             return {
               record: {
                 ...run,
@@ -431,7 +433,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', run])
+            transitions.push(['preparing', withoutPreparationInput(run)])
             return {
               record: {
                 ...run,
@@ -550,3 +552,11 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
   assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
   assert.strictEqual(transitions.length, 1)
 })
+function withoutPreparationInput<
+  T extends { preparation_input?: unknown; preparation_input_version?: unknown }
+>(run: T): Omit<T, 'preparation_input' | 'preparation_input_version'> {
+  const rest = { ...run }
+  delete rest.preparation_input
+  delete rest.preparation_input_version
+  return rest
+}

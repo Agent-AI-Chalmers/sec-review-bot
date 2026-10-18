@@ -1,3 +1,5 @@
+// Covers issue and pull-request trigger behavior at the durable admission,
+// preparation-claim, and Runner-submission boundaries.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -112,7 +114,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
       store: {
         ...preparationClaim,
         admitReviewRun: (run) => {
-          transitions.push(['preparing', run])
+          transitions.push(['preparing', withoutPreparationInput(run)])
           return {
             record: { ...run, run_id: 'run-issue-1' },
             created: true,
@@ -195,7 +197,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
       store: {
         ...preparationClaim,
         admitReviewRun: (run) => {
-          transitions.push(['preparing', run])
+          transitions.push(['preparing', withoutPreparationInput(run)])
           return {
             record: { ...run, run_id: 'run-pr-1' },
             created: true,
@@ -260,7 +262,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', run])
+            transitions.push(['preparing', withoutPreparationInput(run)])
             return {
               record: { ...run, run_id: 'run-pr-failed' },
               created: true,
@@ -413,6 +415,17 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',
       delivery_id: 'delivery-context-failure',
+      preparation_input: {
+        kind: 'github_pull_request_review',
+        pr_reference: {
+          owner_login: 'octo',
+          repo_name: 'example',
+          pr_number: 7
+        },
+        trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+        event_type: 'manual_review',
+        test_changes: null
+      },
       resolve_pr: async () => {
         transitions.push(['context'])
         throw new Error('GitHub PR lookup failed')
@@ -451,6 +464,69 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
       'failed',
       'run-context-failure',
       { code: 'REVIEW_START_FAILED', message: 'GitHub PR lookup failed' }
+    ]
+  ])
+})
+
+test('startPullRequestReviewCommand checkpoints a resolved comment PR before preparation', async () => {
+  const pr = pullRequestContext()
+  const checkpoints: unknown[][] = []
+  await startPullRequestReviewCommand({
+    octokit: {},
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+    event_type: 'manual_review',
+    delivery_id: 'delivery-checkpoint',
+    preparation_input: {
+      kind: 'github_pull_request_review',
+      pr_reference: {
+        owner_login: 'octo',
+        repo_name: 'example-repo',
+        pr_number: 7
+      },
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+      event_type: 'manual_review',
+      test_changes: null
+    },
+    resolve_pr: async () => pr,
+    deps: {
+      start_review: async ({ pr: preparedPr }) => {
+        assert.strictEqual(preparedPr, pr)
+        assert.strictEqual(checkpoints.length, 1)
+        return { run_id: 'run-checkpoint' } as never
+      },
+      store: {
+        ...preparationClaim,
+        admitReviewRun: (run) =>
+          ({
+            record: { ...run, run_id: 'run-checkpoint' },
+            created: true,
+            preparation_token: 'claim'
+          }) as never,
+        checkpointPreparationInput: async (...args) => {
+          checkpoints.push(args)
+        },
+        submitPreparedRun: () =>
+          assert.fail('test preparation does not submit'),
+        failPreparation: () => assert.fail('checkpointed review must not fail')
+      }
+    }
+  })
+  assert.deepStrictEqual(checkpoints, [
+    [
+      'run-checkpoint',
+      'claim',
+      {
+        kind: 'github_pull_request_review',
+        pr_reference: {
+          owner_login: 'octo',
+          repo_name: 'example-repo',
+          pr_number: 7
+        },
+        trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+        event_type: 'manual_review',
+        test_changes: null,
+        pr
+      }
     ]
   ])
 })
@@ -616,3 +692,11 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
     ]
   ])
 })
+function withoutPreparationInput<
+  T extends { preparation_input?: unknown; preparation_input_version?: unknown }
+>(run: T): Omit<T, 'preparation_input' | 'preparation_input_version'> {
+  const rest = { ...run }
+  delete rest.preparation_input
+  delete rest.preparation_input_version
+  return rest
+}
