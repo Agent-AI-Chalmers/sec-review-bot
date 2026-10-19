@@ -9,7 +9,10 @@ import {
   repository_review_dispatch_path,
   webhook_path
 } from './config.js'
-import { setGitHubAppMetadata } from './github/github-app-metadata-service.js'
+import {
+  currentAppBotLogin,
+  setGitHubAppMetadata
+} from './github/github-app-metadata-service.js'
 import { createAppHttpHandler } from './ingress/http/app-http-handler.js'
 import { handleRepositoryReviewDispatch } from './ingress/github/actions/repository-review-http-handler.js'
 import { handleIssueCommentCreated } from './ingress/github/webhooks/issue-comment-created.js'
@@ -35,6 +38,16 @@ setGitHubAppMetadata({
   slug: data.slug,
   name: data.name
 })
+// The bot login - `<slug>[bot]` - is what decides whether a comment, review, or PR belongs to
+// this app, so every attribution check depends on it. Without a slug the app would still start,
+// but would be unable to answer "is this ours?": marker reuse would throw on the publication
+// path, and the webhook guard would silently drop every bot event. Refuse to start instead of
+// running in that state, where the only visible symptom is work that quietly never happens.
+if (currentAppBotLogin() === null) {
+  throw new Error(
+    'GitHub App metadata from /app has no slug; the app bot login cannot be determined.'
+  )
+}
 app.octokit.log.debug(`Authenticated as '${data.name}'`)
 
 app.webhooks.on('issue_comment.created', handleIssueCommentCreated)
