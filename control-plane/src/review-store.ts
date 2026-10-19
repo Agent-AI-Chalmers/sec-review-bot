@@ -523,8 +523,15 @@ export class ReviewRunStore {
   ): Promise<void> {
     const run = await this.getRun(runId)
     if (run === null) throw new Error(`Review run does not exist: ${runId}`)
-    const result = await this.pool.query(
-      `
+    // Both axes are written by one statement, but a single statement is not a transaction here:
+    // every data-modifying CTE runs, and the trailing `SELECT ... WHERE EXISTS` only decides how
+    // many rows are returned. So when the execution arm matches nothing, the publication arm has
+    // already changed `publications.input`, and checking `rowCount` on a bare `pool.query` would
+    // throw after that half-write had auto-committed. Wrapping the statement lets the same check
+    // roll the publication back, keeping the two axes atomic like every other cross-axis write.
+    await transaction(this.pool, async (client) => {
+      const result = await client.query(
+        `
       WITH updated_publication AS (
         UPDATE publications
         SET input=$3::jsonb, updated_at=clock_timestamp()
@@ -550,19 +557,20 @@ export class ReviewRunStore {
       SELECT run_id FROM updated_execution
       WHERE EXISTS (SELECT 1 FROM updated_publication)
     `,
-      [
-        runId,
-        token,
-        JSON.stringify(context),
-        JSON.stringify(input),
-        this.connectorId,
-        run.workflow
-      ]
-    )
-    if (result.rowCount !== 1)
-      throw new Error(
-        `Review run ${runId} cannot save prepared submission outside pending.`
+        [
+          runId,
+          token,
+          JSON.stringify(context),
+          JSON.stringify(input),
+          this.connectorId,
+          run.workflow
+        ]
       )
+      if (result.rowCount !== 1)
+        throw new Error(
+          `Review run ${runId} cannot save prepared submission outside pending.`
+        )
+    })
   }
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
     this.ready()

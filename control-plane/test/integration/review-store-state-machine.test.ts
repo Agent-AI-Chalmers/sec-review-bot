@@ -2304,3 +2304,60 @@ test('a preparation failure refuses to commit when its claim was taken mid-trans
     await store.close()
   }
 })
+
+test('savePreparedSubmission rolls the publication write back when the execution arm misses', async () => {
+  // The statement is one data-modifying CTE, but a single statement is not atomic across its
+  // arms: the publication UPDATE runs even when the execution UPDATE matches nothing, and the
+  // trailing SELECT only decides how many rows come back. Checking the row count on a bare
+  // `pool.query` therefore threw after the publication's new input had already committed,
+  // leaving a publication carrying input for a run whose execution never got it. The write is
+  // now wrapped in a transaction so the failed check undoes the publication arm too.
+  const store = await createStore()
+  const runId = `run-${randomUUID()}`
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: { target: 'original' }
+    })
+    assert.ok(admission.preparation_token)
+    // Make the execution arm miss while the publication arm still matches: the preparation is no
+    // longer `preparing`, so its EXISTS is false, but the run trunk still authorizes the update.
+    await pool.query(
+      `UPDATE preparations SET status='failed', claim_token=NULL, claimed_at=NULL,
+         failure_code='PREPARATION_FAILED', failure_message='x',
+         finished_at=clock_timestamp()
+       WHERE run_id=$1`,
+      [runId]
+    )
+    const before = await pool.query<{ input: Record<string, unknown> }>(
+      'SELECT input FROM publications WHERE run_id=$1',
+      [runId]
+    )
+
+    await assert.rejects(
+      store.savePreparedSubmission(
+        runId,
+        admission.preparation_token,
+        { target: 'overwritten' },
+        { contract_version: 'v6' }
+      ),
+      /cannot save prepared submission outside pending/,
+      'a missed execution arm must reject the save'
+    )
+
+    const after = await pool.query<{ input: Record<string, unknown> }>(
+      'SELECT input FROM publications WHERE run_id=$1',
+      [runId]
+    )
+    assert.deepStrictEqual(
+      after.rows[0]?.input,
+      before.rows[0]?.input,
+      'the rejected save must not leave the publication input half-written'
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
