@@ -10,7 +10,7 @@ flowchart TD
   storage[(Object Storage\ninput bundle + terminal artifact)]
   runner[agents/\nRunner and workflow execution]
   ui[apps/control-plane-ui\noperations console]
-  state[(PostgreSQL\nrun + publication state)]
+  state[(PostgreSQL\npreparation / execution / publication state)]
 
   github -->|1. webhook or Actions request| app
   app -->|2. validated request| cp
