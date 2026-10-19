@@ -441,7 +441,7 @@ test('ReviewRunStore atomically deduplicates concurrent ingress across connectio
   }
 })
 
-test('ReviewRunStore fences a stale preparation owner after ingress takeover', async () => {
+test('ReviewRunStore leaves ingress replay read-only and lets the coordinator take over preparation', async () => {
   const sharedConnector = connectorId()
   const ownerA = await createStore({
     connectorId: sharedConnector,
@@ -462,14 +462,20 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
       ...ingress,
       run_id: `run-${randomUUID()}`
     })
-    const takeover = await ownerB.admitReviewRun({
+    const replay = await ownerB.admitReviewRun({
       ...ingress,
       run_id: `run-${randomUUID()}`
     })
     assert.ok(first.preparation_token)
-    assert.ok(takeover.preparation_token)
-    assert.strictEqual(takeover.record.run_id, first.record.run_id)
-    assert.notStrictEqual(takeover.preparation_token, first.preparation_token)
+    assert.strictEqual(replay.created, false)
+    assert.strictEqual(replay.preparation_token, null)
+    assert.strictEqual(replay.record.run_id, first.record.run_id)
+
+    assert.strictEqual(await ownerB.expireStalePreparations(), 1)
+    const takeover = await ownerB.claimNextPreparation()
+    assert.ok(takeover)
+    assert.strictEqual(takeover.run_id, first.record.run_id)
+    assert.notStrictEqual(takeover.claim_token, first.preparation_token)
 
     await assert.rejects(
       ownerA.checkpointPreparationInput(
@@ -498,11 +504,7 @@ test('ReviewRunStore fences a stale preparation owner after ingress takeover', a
       }),
       /claim was lost/
     )
-    await ownerB.markQueued(
-      takeover.record.run_id,
-      takeover.preparation_token,
-      {}
-    )
+    await ownerB.markQueued(takeover.run_id, takeover.claim_token, {})
     assert.strictEqual(
       (await ownerA.getRun(first.record.run_id))?.runner_status,
       'queued'

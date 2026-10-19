@@ -291,33 +291,8 @@ export class ReviewRunStore {
         )
         const row = existing.rows[0]
         if (row === undefined) return await this.insertWith(client, run)
-        if (row.runner_status === 'preparing') {
-          const token = crypto.randomUUID()
-          const reclaimed = await client.query(
-            `
-            UPDATE preparations
-            SET status='claimed', claim_token=$2, claimed_at=clock_timestamp(),
-                attempt_count=attempt_count+1, failure_code=NULL, failure_message=NULL,
-                updated_at=clock_timestamp()
-            WHERE run_id=$1 AND connector_id=$4
-              AND (
-                (status='pending' AND available_at <= clock_timestamp())
-                OR (status='claimed' AND claimed_at <= clock_timestamp()-($3*interval '1 millisecond'))
-              )
-          `,
-            [row.run_id, token, this.claimTimeoutMs, this.connectorId]
-          )
-          if (reclaimed.rowCount !== 1)
-            return {
-              record: rowToRecord(row),
-              created: false,
-              preparation_token: null
-            }
-          const record = await this.getWith(client, row.run_id)
-          if (record === null)
-            throw new Error(`Reclaimed review run was not found: ${row.run_id}`)
-          return { record, created: true, preparation_token: token }
-        }
+        // Ingress replay is an idempotent read. The preparation coordinator is
+        // the sole owner of post-admission claims, including lease recovery.
         return {
           record: rowToRecord(row),
           created: false,
