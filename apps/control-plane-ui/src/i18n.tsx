@@ -252,6 +252,7 @@ export const messages = {
     edge_notice_delivering_failed: 'delivery was attempted and failed',
     stateMachinesTitle: 'State machines',
     failureNoticeDelivered: 'The requester was told this run failed',
+    viewFailureNotice: 'View the failure notice',
     failureNoticeNotDelivered:
       'The requester could not be told: the notice never reached GitHub',
     failureNoticeDelivering: 'Telling the requester that this run failed'
@@ -471,6 +472,7 @@ export const messages = {
     edge_notice_delivering_failed: '尝试投递但失败了',
     stateMachinesTitle: '状态机',
     failureNoticeDelivered: '已通知发起人这次运行失败',
+    viewFailureNotice: '查看失败通知',
     failureNoticeNotDelivered: '未能通知发起人：通知没能送达 GitHub',
     failureNoticeDelivering: '正在通知发起人这次运行失败'
   }

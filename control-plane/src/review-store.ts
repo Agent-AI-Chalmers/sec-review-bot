@@ -130,6 +130,7 @@ interface ReviewRunRow {
     failure_stage:
       NonNullable<ObservedRun['failure_notice']>['failure_stage'] | null
     failure_code: string | null
+    comment_url: string | null
   }
 }
 
@@ -199,7 +200,8 @@ const RUN_SELECT = `
     json_build_object(
       'status', n.status,
       'failure_stage', n.failure_stage,
-      'failure_code', n.failure_code
+      'failure_code', n.failure_code,
+      'comment_url', n.comment_url
     ) AS failure_notice
   FROM review_runs r
   JOIN publications p ON p.run_id = r.run_id AND p.connector_id = r.connector_id
@@ -310,7 +312,8 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
             // projection the join could not fill, which cannot happen for a present row.
             status: row.failure_notice.status,
             failure_stage: row.failure_notice.failure_stage ?? 'preparation',
-            failure_code: row.failure_notice.failure_code
+            failure_code: row.failure_notice.failure_code,
+            comment_url: row.failure_notice.comment_url
           },
     ...(trunk.ingress_kind ? { ingress_kind: trunk.ingress_kind } : {}),
     ...(trunk.ingress_key ? { ingress_key: trunk.ingress_key } : {})
@@ -675,13 +678,15 @@ export class ReviewRunStore {
   async completeRunFailureNotice(
     runId: string,
     token: string,
-    delivered: boolean
+    delivered: boolean,
+    commentUrl?: string | null
   ): Promise<boolean> {
     this.ready()
     return await this.preparations.completeFailureNotice(
       runId,
       token,
-      delivered
+      delivered,
+      commentUrl
     )
   }
   preparationHeartbeatIntervalMs(): number {

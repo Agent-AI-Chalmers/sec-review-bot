@@ -262,6 +262,7 @@ components:
         - status
         - failure_stage
         - failure_code
+        - comment_url
       properties:
         status:
           type: string
@@ -280,6 +281,13 @@ components:
           type:
             - string
             - "null"
+        comment_url:
+          description: >-
+            Where the requester can read the outcome, or null when they were never told.
+          type:
+            - string
+            - "null"
+          format: uri
     PublicationWork:
       type: object
       additionalProperties: false
@@ -1547,8 +1555,10 @@ paths:
     post:
       operationId: completeRunFailureNotice
       description: >-
-        Complete a terminal preparation-failure notice the caller still owns. `delivered` is
-        false when the connector intentionally has no user-visible target.
+        Complete a failure notice the caller still owns. `delivered` is true only when the
+        requester can actually read the outcome; `comment_url` is the comment that carries it
+        and is required in that case, so a delivered notice always points at something. Both
+        a delivery that failed and a run with no user-visible target record `delivered: false`.
       security:
         - serviceToken: []
       parameters:
@@ -1575,6 +1585,15 @@ paths:
                   minLength: 1
                 delivered:
                   type: boolean
+                comment_url:
+                  description: >-
+                    The comment the requester can read. Required when `delivered` is true and
+                    rejected when it is false, so "delivered" cannot claim a destination that
+                    does not exist.
+                  type:
+                    - string
+                    - "null"
+                  format: uri
       responses:
         "200":
           description: Whether the caller still owned the notice.

@@ -99,6 +99,11 @@ export interface components {
       /** @enum {string} */
       failure_stage: 'preparation' | 'execution' | 'publication'
       failure_code: string | null
+      /**
+       * Format: uri
+       * @description Where the requester can read the outcome, or null when they were never told.
+       */
+      comment_url: string | null
     }
     PublicationWork: {
       run_id: string

@@ -217,7 +217,7 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** @description Complete a terminal preparation-failure notice the caller still owns. `delivered` is false when the connector intentionally has no user-visible target. */
+    /** @description Complete a failure notice the caller still owns. `delivered` is true only when the requester can actually read the outcome; `comment_url` is the comment that carries it and is required in that case, so a delivered notice always points at something. Both a delivery that failed and a run with no user-visible target record `delivered: false`. */
     post: operations['completeRunFailureNotice']
     delete?: never
     options?: never
@@ -556,6 +556,11 @@ export interface components {
       /** @enum {string} */
       failure_stage: 'preparation' | 'execution' | 'publication'
       failure_code: string | null
+      /**
+       * Format: uri
+       * @description Where the requester can read the outcome, or null when they were never told.
+       */
+      comment_url: string | null
     }
     PublicationWork: {
       run_id: string
@@ -1278,6 +1283,11 @@ export interface operations {
         'application/json': {
           token: string
           delivered: boolean
+          /**
+           * Format: uri
+           * @description The comment the requester can read. Required when `delivered` is true and rejected when it is false, so "delivered" cannot claim a destination that does not exist.
+           */
+          comment_url?: string | null
         }
       }
     }

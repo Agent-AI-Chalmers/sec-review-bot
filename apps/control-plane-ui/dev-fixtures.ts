@@ -42,6 +42,7 @@ interface FixtureRun {
     status: NoticeStage
     failure_stage: 'preparation' | 'execution' | 'publication'
     failure_code: string | null
+    comment_url: string | null
   } | null
   execution: {
     status: ExecutionStatus
@@ -887,6 +888,18 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   }
 }
 
+/** A stand-in for the comment URL GitHub returns when the notice is delivered.
+ *
+ * Only a delivered notice has one: it is the comment the requester can open, and inventing one
+ * for a pending or failed delivery would show a link that goes nowhere.
+ */
+function noticeCommentUrl(status: NoticeStage): string | null {
+  if (status !== 'delivered') return null
+  // A fixed, obviously-example URL: the fixtures are not tied to a real issue, and a plausible
+  // link would invite someone to click it expecting a real comment.
+  return 'https://github.com/example/example/issues/1#issuecomment-1'
+}
+
 /** The acknowledgement a terminal failure queues, for whichever axis failed.
  *
  * Publication failures are excluded deliberately: a run whose result could not be delivered is
@@ -903,14 +916,16 @@ function failureNoticeFor(
     return {
       status: scenario.preparation_notice,
       failure_stage: 'preparation',
-      failure_code: preparation.failure_code
+      failure_code: preparation.failure_code,
+      comment_url: noticeCommentUrl(scenario.preparation_notice)
     }
   }
   if (execution === 'failed') {
     return {
       status: 'pending',
       failure_stage: 'execution',
-      failure_code: scenario.failure_code
+      failure_code: scenario.failure_code,
+      comment_url: null
     }
   }
   return null
@@ -1218,7 +1233,8 @@ export function devFixtures(): Plugin {
           run.failure_notice = {
             status: 'pending',
             failure_stage: 'preparation',
-            failure_code: 'PREPARATION_ABANDONED'
+            failure_code: 'PREPARATION_ABANDONED',
+            comment_url: null
           }
           run.preparation.finished_at = now
           run.preparation.expiry_blocked_reason = null

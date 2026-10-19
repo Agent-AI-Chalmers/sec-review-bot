@@ -456,9 +456,14 @@ export async function registerControlPlaneRoutes(
 
     completeRunFailureNotice: async (request) => {
       const { runId } = request.params as PathParams<'completeRunFailureNotice'>
-      const { token, delivered } =
+      const { token, delivered, comment_url } =
         request.body as RequestBody<'completeRunFailureNotice'>
-      return await store.completeRunFailureNotice(runId, token, delivered)
+      return await store.completeRunFailureNotice(
+        runId,
+        token,
+        delivered,
+        comment_url
+      )
     },
 
     claimNextPublication: async (request) => {

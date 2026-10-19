@@ -77,7 +77,8 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   const create = calls[2] as ['create', { body: string }]
   assert.match(create[1].body, /run-pr-reference/)
   assert.deepStrictEqual(completed, [
-    ['run-pr-reference', 'notice-token', true]
+    // The comment that was posted, so the console can link the requester to it.
+    ['run-pr-reference', 'notice-token', true, 'https://example.test/comment/9']
   ])
 })
 

@@ -227,15 +227,30 @@ export class PreparationStore {
   async completeFailureNotice(
     runId: string,
     token: string,
-    delivered: boolean
+    delivered: boolean,
+    /** The comment the requester can read. Required for a delivery, rejected without one. */
+    commentUrl?: string | null
   ): Promise<boolean> {
+    if (delivered && (commentUrl === undefined || commentUrl === null)) {
+      // A delivered notice with nowhere to point would claim the requester was told while giving
+      // no way to verify it, so the caller's mistake is surfaced instead of stored.
+      throw new Error(
+        `Failure notice ${runId} cannot be delivered without a comment_url.`
+      )
+    }
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
         `UPDATE run_failure_notices SET status=$4, claim_token=NULL,
-           claimed_at=NULL, updated_at=clock_timestamp()
+           claimed_at=NULL, comment_url=$5, updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='delivering' AND claim_token=$3`,
         // `failed`, not `skipped`: the connector attempted delivery and could not complete it.
-        [runId, this.connectorId, token, delivered ? 'delivered' : 'failed']
+        [
+          runId,
+          this.connectorId,
+          token,
+          delivered ? 'delivered' : 'failed',
+          delivered ? (commentUrl ?? null) : null
+        ]
       )
       if (result.rowCount !== 1) return false
       await appendEvent(client, {

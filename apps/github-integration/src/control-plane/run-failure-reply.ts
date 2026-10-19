@@ -45,6 +45,11 @@ const STAGE_SENTENCE: Record<RunFailureStage, string> = {
     'Security review completed but its result could not be delivered.'
 }
 
+export interface RunFailureReplyResult {
+  /** The comment that was posted (or already existed) on the requester's issue or pull request. */
+  comment_url: string
+}
+
 export async function sendRunFailureReply(
   octokit: GitHubAppOctokit,
   args: {
@@ -53,17 +58,19 @@ export async function sendRunFailureReply(
     failure_stage: RunFailureStage
     failure_code: string
   }
-): Promise<boolean> {
+): Promise<RunFailureReplyResult | null> {
   const target = replyTarget(args.input)
-  if (target === null) return false
+  // No issue or pull request to reply to: there is nowhere for the requester to read the
+  // outcome, which the caller records as a failed delivery.
+  if (target === null) return null
   // The marker keeps the comment idempotent per run. It names the run only, not the stage: a run
   // that fails once should not collect one comment per axis that happened to observe it.
   const marker = `<!-- sec-review-failed:${args.run_id} -->`
-  await createIssueCommentUnlessMarkerExists(octokit, {
+  const posted = await createIssueCommentUnlessMarkerExists(octokit, {
     ...target,
     marker,
     body: `${marker}\n\n${STAGE_SENTENCE[args.failure_stage]} Reference: \`${args.run_id}\`. Reason: \`${args.failure_code}\`.`,
     assert_publication_claim: async () => undefined
   })
-  return true
+  return { comment_url: posted.html_url }
 }

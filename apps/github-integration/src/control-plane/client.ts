@@ -275,12 +275,13 @@ class HttpControlPlaneClient {
   async completeRunFailureNotice(
     runId: string,
     token: string,
-    delivered: boolean
+    delivered: boolean,
+    commentUrl?: string
   ): Promise<boolean> {
     return await this.request(
       'completeRunFailureNotice',
       { runId },
-      { token, delivered }
+      { token, delivered, comment_url: commentUrl ?? null }
     )
   }
 

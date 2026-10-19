@@ -287,6 +287,9 @@ function FailureNoticeLine({
       : notice.status === 'failed'
         ? t('failureNoticeNotDelivered')
         : t('failureNoticeDelivering')
+  // Only a delivered notice has a comment to open; a failed or in-flight one has nothing to
+  // link to, which is exactly when the reader needs to know the requester was never told.
+  const href = notice.comment_url ?? undefined
   return (
     <Text
       className="failure-notice-line"
@@ -294,7 +297,19 @@ function FailureNoticeLine({
       c={notice.status === 'failed' ? 'red' : 'dimmed'}
       data-testid="failure-notice"
     >
-      {label}
+      {href === undefined ? (
+        label
+      ) : (
+        <Anchor
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          size="xs"
+          data-testid="failure-notice-link"
+        >
+          {t('viewFailureNotice')}
+        </Anchor>
+      )}
     </Text>
   )
 }

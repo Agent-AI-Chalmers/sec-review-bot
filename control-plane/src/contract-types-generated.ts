@@ -98,6 +98,11 @@ export interface components {
       /** @enum {string} */
       failure_stage: 'preparation' | 'execution' | 'publication'
       failure_code: string | null
+      /**
+       * Format: uri
+       * @description Where the requester can read the outcome, or null when they were never told.
+       */
+      comment_url: string | null
     }
     PublicationWork: {
       run_id: string
@@ -820,6 +825,11 @@ export interface operations {
         'application/json': {
           token: string
           delivered: boolean
+          /**
+           * Format: uri
+           * @description The comment the requester can read. Required when `delivered` is true and rejected when it is false, so "delivered" cannot claim a destination that does not exist.
+           */
+          comment_url?: string | null
         }
       }
     }

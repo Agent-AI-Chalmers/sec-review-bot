@@ -254,6 +254,10 @@ CREATE TABLE run_failure_notices (
   -- row is a live state machine that a later retry may rewrite, while the notice exists to report
   -- one specific conclusion.
   failure_code text,
+  -- Where the connector posted the acknowledgement. Recorded on delivery rather than derived:
+  -- the comment's URL is only known once GitHub answers, and a reader needs to open the exact
+  -- comment rather than the issue it sits on. Null while undelivered and when delivery failed.
+  comment_url text,
   claim_token uuid,
   claimed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),

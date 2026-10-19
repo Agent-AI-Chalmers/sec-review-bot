@@ -285,7 +285,8 @@
           "required": [
             "status",
             "failure_stage",
-            "failure_code"
+            "failure_code",
+            "comment_url"
           ],
           "properties": {
             "status": {
@@ -310,6 +311,14 @@
                 "string",
                 "null"
               ]
+            },
+            "comment_url": {
+              "description": "Where the requester can read the outcome, or null when they were never told.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri"
             }
           }
         }

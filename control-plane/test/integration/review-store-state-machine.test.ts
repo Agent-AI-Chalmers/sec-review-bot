@@ -536,11 +536,23 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
       'delivering'
     )
     assert.strictEqual(
-      await store.completeRunFailureNotice(runId, randomUUID(), true),
+      // A stale claim is rejected, not thrown at: the delivery is well-formed, it simply no
+      // longer owns the notice.
+      await store.completeRunFailureNotice(
+        runId,
+        randomUUID(),
+        true,
+        'https://github.com/example/example/issues/1#issuecomment-1'
+      ),
       false
     )
     assert.strictEqual(
-      await store.completeRunFailureNotice(runId, notice.claim_token, true),
+      await store.completeRunFailureNotice(
+        runId,
+        notice.claim_token,
+        true,
+        'https://github.com/example/example/issues/1#issuecomment-1'
+      ),
       true
     )
     assert.strictEqual(
@@ -1360,9 +1372,51 @@ test('ReviewRunStore records Runner execution failure without publication failur
       await store.completeRunFailureNotice(
         runId,
         notice?.claim_token ?? '',
-        true
+        true,
+        'https://github.com/example/example/issues/1#issuecomment-1'
       ),
       true
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('ReviewRunStore stores the comment a delivered notice points at', async () => {
+  const store = await createStore()
+  const runId = await createQueuedRun(store)
+  const commentUrl =
+    'https://github.com/example/example/issues/1#issuecomment-99'
+  try {
+    assert.strictEqual(
+      await store.failRunnerExecution(runId, {
+        code: 'RUNNER_EXECUTION_FAILED',
+        message: 'Agent execution failed.'
+      }),
+      true
+    )
+    const notice = await store.claimNextRunFailureNotice()
+    assert.ok(notice)
+
+    // A delivery has to name where the requester can read it. Storing `delivered` with no URL
+    // would claim someone was told while giving no way to check.
+    await assert.rejects(
+      store.completeRunFailureNotice(runId, notice.claim_token, true),
+      /cannot be delivered without a comment_url/
+    )
+
+    assert.strictEqual(
+      await store.completeRunFailureNotice(
+        runId,
+        notice.claim_token,
+        true,
+        commentUrl
+      ),
+      true
+    )
+    assert.strictEqual(
+      (await store.getRun(runId))?.failure_notice?.comment_url,
+      commentUrl
     )
   } finally {
     await store.close()

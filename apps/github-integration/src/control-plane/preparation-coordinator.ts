@@ -200,7 +200,7 @@ async function deliverNextRunFailureNotice({
           : null
     const delivered =
       repo === null
-        ? false
+        ? null
         : await sendRunFailureReply(
             (await installationOctokitForRepo(app, repo)) as never,
             {
@@ -218,7 +218,8 @@ async function deliverNextRunFailureNotice({
     await store.completeRunFailureNotice(
       notice.run_id,
       notice.claim_token,
-      delivered
+      delivered !== null,
+      delivered?.comment_url
     )
   } catch (error) {
     // Leave the notice claimed. Its lease makes it eligible for another connector

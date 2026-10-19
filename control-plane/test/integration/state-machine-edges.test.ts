@@ -91,12 +91,14 @@ async function claimNoticeFor(
     throw new Error(`no failure notice was queued for ${runId}`)
   } finally {
     // Put the others back so later paths still see them; a notice left in `delivering` would
-    // only become claimable again after its lease expires.
+    // only become claimable again after its lease expires. These are parked as failed rather
+    // than delivered: no reply was attempted for them, so claiming one was delivered would be a
+    // lie that the URL check now rejects.
     for (const other of deferred) {
       await store.completeRunFailureNotice(
         other.run_id,
         other.claim_token,
-        true
+        false
       )
     }
   }
@@ -177,7 +179,8 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     await store.completeRunFailureNotice(
       failedPreparation.runId,
       preparedNotice?.claim_token ?? '',
-      true
+      true,
+      'https://github.com/example/example/issues/1#issuecomment-1'
     )
 
     // notice: delivering -> delivering when the delivery lease expires and another worker
