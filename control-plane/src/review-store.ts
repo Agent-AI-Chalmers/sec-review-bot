@@ -74,41 +74,55 @@ export type {
   PreparationWork
 } from './preparation-store.js'
 
+/** One axis' columns as the SELECT returns them, before they are shaped for the record.
+ *
+ * The axes share a shape on purpose: `status`, `started_at`, `finished_at`, `updated_at`, and the
+ * failure pair mean the same thing on each. Grouping them here is what lets the type say which
+ * axis a timestamp belongs to, instead of a flat bag where `started_at` and
+ * `execution_finished_at` sit side by side with no way to tell whether the prefix matters. */
+interface AxisRowColumns<S> {
+  status: S
+  started_at: string | null
+  finished_at: string | null
+  updated_at: string | null
+  failure_code: string | null
+  failure_message: string | null
+}
+
+/** The row `RUN_SELECT` produces: the run trunk, its three axes, and the notice outbox.
+ *
+ * `executions` and `preparations` are LEFT JOINed, so their axes carry a `missing` flag rather
+ * than being nullable: a run with a missing axis row is corruption the projection must report,
+ * and a null axis would force every caller to re-decide what a missing axis means. `publications`
+ * is an inner join, so it has no such flag. */
 interface ReviewRunRow {
-  run_id: string
-  workflow: WorkflowName
-  publish_context: JsonObject
-  runner_input: JsonObject | null
-  execution_status: RunnerStatus
-  execution_failure_code: string | null
-  execution_failure_message: string | null
-  artifact_storage: RunnerArtifactStorage | null
-  workflow_result: unknown | null
-  publication_status: PublicationStatus
-  created_at: Date | string
-  created_at_cursor: string
-  execution_observed_at: Date | string | null
-  execution_missing: boolean
-  started_at: Date | string | null
-  execution_finished_at: Date | string | null
-  publication_started_at: Date | string | null
-  publication_finished_at: Date | string | null
-  publication_updated_at: Date | string
-  publication_failure_code: string | null
-  publication_failure_message: string | null
-  ingress_kind: 'github_webhook' | 'github_actions_dispatch' | null
-  ingress_key: string | null
-  preparation_missing: boolean
-  preparation_status: 'pending' | 'preparing' | 'submitted' | 'failed' | null
-  preparation_attempt_count: number | null
-  preparation_started_at: Date | string | null
-  preparation_updated_at: Date | string
-  preparation_finished_at: Date | string | null
-  preparation_failure_code: string | null
-  preparation_failure_message: string | null
-  preparation_expiry_blocked_reason: string | null
-  preparation_failure_notice_status:
-    'pending' | 'delivering' | 'delivered' | 'skipped' | null
+  trunk: {
+    run_id: string
+    workflow: WorkflowName
+    publish_context: JsonObject
+    created_at: string
+    created_at_cursor: string
+    ingress_kind: 'github_webhook' | 'github_actions_dispatch' | null
+    ingress_key: string | null
+  }
+  execution: AxisRowColumns<RunnerStatus> & {
+    missing: boolean
+    input: JsonObject | null
+    observed_at: string | null
+    artifact_storage: RunnerArtifactStorage | null
+    workflow_result: unknown | null
+  }
+  publication: AxisRowColumns<PublicationStatus>
+  preparation: AxisRowColumns<
+    'pending' | 'preparing' | 'submitted' | 'failed' | null
+  > & {
+    missing: boolean
+    attempt_count: number | null
+    expiry_blocked_reason: string | null
+    /** Absent (NULL) until a terminal failure queues a notice for the connector to deliver. */
+    failure_notice_status:
+      'pending' | 'delivering' | 'delivered' | 'skipped' | null
+  }
 }
 
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
@@ -129,26 +143,49 @@ const CLAIM_WAIT_INTERVAL_MS = 250
  * every read. `publications` is an inner join because publication is never optional.
  */
 const RUN_SELECT = `
-  SELECT r.run_id, r.workflow, p.input AS publish_context,
-    r.ingress_kind, r.ingress_key,
-    r.created_at,
-    to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_cursor,
-    e.input AS runner_input, e.status AS execution_status,
-    e.failure_code AS execution_failure_code, e.failure_message AS execution_failure_message,
-    e.artifact_storage, e.workflow_result,
-    e.observed_at AS execution_observed_at, e.started_at, e.finished_at AS execution_finished_at,
-    (e.run_id IS NULL) AS execution_missing,
-    p.status AS publication_status, p.started_at AS publication_started_at,
-    p.finished_at AS publication_finished_at, p.updated_at AS publication_updated_at,
-    p.failure_code AS publication_failure_code, p.failure_message AS publication_failure_message,
-    (pr.run_id IS NULL) AS preparation_missing,
-    pr.status AS preparation_status, pr.attempt_count AS preparation_attempt_count,
-    pr.started_at AS preparation_started_at, pr.finished_at AS preparation_finished_at,
-    pr.updated_at AS preparation_updated_at,
-    pr.failure_code AS preparation_failure_code,
-    pr.failure_message AS preparation_failure_message,
-    pr.expiry_blocked_reason AS preparation_expiry_blocked_reason,
-    n.status AS preparation_failure_notice_status
+  SELECT
+    json_build_object(
+      'run_id', r.run_id,
+      'workflow', r.workflow,
+      'publish_context', p.input,
+      'created_at', r.created_at,
+      'created_at_cursor', to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+      'ingress_kind', r.ingress_kind,
+      'ingress_key', r.ingress_key
+    ) AS trunk,
+    json_build_object(
+      'status', e.status,
+      'started_at', e.started_at,
+      'finished_at', e.finished_at,
+      'updated_at', e.observed_at,
+      'failure_code', e.failure_code,
+      'failure_message', e.failure_message,
+      'missing', (e.run_id IS NULL),
+      'input', e.input,
+      'observed_at', e.observed_at,
+      'artifact_storage', e.artifact_storage,
+      'workflow_result', e.workflow_result
+    ) AS execution,
+    json_build_object(
+      'status', p.status,
+      'started_at', p.started_at,
+      'finished_at', p.finished_at,
+      'updated_at', p.updated_at,
+      'failure_code', p.failure_code,
+      'failure_message', p.failure_message
+    ) AS publication,
+    json_build_object(
+      'status', pr.status,
+      'started_at', pr.started_at,
+      'finished_at', pr.finished_at,
+      'updated_at', pr.updated_at,
+      'failure_code', pr.failure_code,
+      'failure_message', pr.failure_message,
+      'missing', (pr.run_id IS NULL),
+      'attempt_count', pr.attempt_count,
+      'expiry_blocked_reason', pr.expiry_blocked_reason,
+      'failure_notice_status', n.status
+    ) AS preparation
   FROM review_runs r
   JOIN publications p ON p.run_id = r.run_id AND p.connector_id = r.connector_id
   LEFT JOIN executions e ON e.run_id = r.run_id AND e.connector_id = r.connector_id
@@ -158,107 +195,99 @@ const RUN_SELECT = `
     ON n.run_id = r.run_id AND n.connector_id = r.connector_id
 `
 
-function iso(value: Date | string): string {
-  return value instanceof Date
-    ? value.toISOString()
-    : new Date(value).toISOString()
+/** Normalize a timestamp the SELECT produced. `json_build_object` serializes timestamptz as an
+ * ISO string, so this only ever narrows the precision (microseconds to milliseconds) - it never
+ * receives a `Date`. Values come from `clock_timestamp()`, so parsing is exact. */
+function iso(value: string): string {
+  return new Date(value).toISOString()
+}
+/** `iso` for an axis timestamp that is meaningful only once the phase reaches it. */
+function isoOrNull(value: string | null): string | null {
+  return value === null ? null : iso(value)
 }
 function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
-  if (row.execution_missing) {
+  const { trunk, execution, publication, preparation } = row
+  if (execution.missing) {
     // A run without its execution row is corrupt, not a valid record. Throwing makes the
     // projection report it in `dropped` instead of silently omitting or misrepresenting it.
-    throw new Error(`run ${row.run_id} has no executions row`)
+    throw new Error(`run ${trunk.run_id} has no executions row`)
   }
-  if (row.preparation_missing) {
+  if (preparation.missing) {
     // Same rule as the execution axis: admission writes the run, its preparation, and its
     // execution in one transaction and nothing deletes an axis alone, so a missing preparation
     // row is corruption. Returning `preparation: null` would report it as a legitimate record,
     // which is exactly what the contract says null does *not* mean.
-    throw new Error(`run ${row.run_id} has no preparations row`)
+    throw new Error(`run ${trunk.run_id} has no preparations row`)
   }
-  // The guard above proves the row exists, but TypeScript only knows the summary columns are
-  // nullable because the query LEFT JOINs them. Narrowing with real checks (rather than `as`)
-  // means the type stays honest if a future column is added to the summary without a matching
-  // NOT NULL in the schema.
-  const preparationStatus = row.preparation_status
-  const preparationAttemptCount = row.preparation_attempt_count
-  if (preparationStatus === null || preparationAttemptCount === null) {
-    throw new Error(`run ${row.run_id} has an incomplete preparations row`)
+  // The guard above proves the row exists, but the axis columns are still typed nullable because
+  // the query LEFT JOINs them. Narrowing with real checks (rather than `as`) keeps the type
+  // honest if a future column is added to the summary without a matching NOT NULL in the schema.
+  if (preparation.status === null || preparation.attempt_count === null) {
+    throw new Error(`run ${trunk.run_id} has an incomplete preparations row`)
   }
-  const publicationFailure = row.publication_status === 'failed'
+  if (
+    execution.observed_at === null ||
+    preparation.updated_at === null ||
+    publication.updated_at === null
+  ) {
+    // These three are NOT NULL in the schema, so a null here can only mean the LEFT JOIN was
+    // somehow satisfied by a partial row. Checking rather than asserting keeps the type honest.
+    throw new Error(`run ${trunk.run_id} has an incomplete axis row`)
+  }
+  // The run-level failure code names the axis that actually stopped the run, in the order the
+  // phases run:
+  // - a `failed` publication is the terminal failure: report its own code, even when that code
+  //   is null. Falling back to the execution/preparation code here would attribute another
+  //   axis' reason to the publication that genuinely failed.
+  // - otherwise execution is next, then preparation. A skipped execution still reports the
+  //   preparation failure that caused it, and a publication skipped because execution failed
+  //   reports that execution reason, because publication itself never failed.
+  const publicationFailure = publication.status === 'failed'
   return {
-    run_id: row.run_id,
-    workflow: row.workflow,
-    publish_context: row.publish_context,
-    ...(row.runner_input === null ? {} : { runner_input: row.runner_input }),
-    // The guard above proves the row exists; every column is NOT NULL except the failure
-    // fields, so the summary is always present.
+    run_id: trunk.run_id,
+    workflow: trunk.workflow,
+    publish_context: trunk.publish_context,
+    ...(execution.input === null ? {} : { runner_input: execution.input }),
     preparation: {
-      status: preparationStatus,
-      attempt_count: preparationAttemptCount,
-      started_at:
-        row.preparation_started_at === null
-          ? null
-          : iso(row.preparation_started_at),
-      finished_at:
-        row.preparation_finished_at === null
-          ? null
-          : iso(row.preparation_finished_at),
-      updated_at: iso(row.preparation_updated_at),
-      failure_code: row.preparation_failure_code,
+      status: preparation.status,
+      attempt_count: preparation.attempt_count,
+      started_at: isoOrNull(preparation.started_at),
+      finished_at: isoOrNull(preparation.finished_at),
+      updated_at: iso(preparation.updated_at),
+      failure_code: preparation.failure_code,
       // Non-null means coordination stopped retrying this run: the persisted story contradicts
       // an expiry conclusion, so it needs an operator decision. Exposed here so the condition is
       // visible on the read surface instead of only in a log line.
-      expiry_blocked_reason: row.preparation_expiry_blocked_reason,
-      failure_notice_status: row.preparation_failure_notice_status
+      expiry_blocked_reason: preparation.expiry_blocked_reason,
+      failure_notice_status: preparation.failure_notice_status
     },
     // Each axis reports the same three instants under the same names: when it started, when it
-    // finished, and (for execution) when it was last observed. Keeping the shape identical
-    // across axes is what lets a reader treat a run as three phases rather than three schemas.
+    // finished, and (for execution) when it was last observed.
     execution: {
-      status: row.execution_status,
-      started_at: row.started_at === null ? null : iso(row.started_at),
-      finished_at:
-        row.execution_finished_at === null
-          ? null
-          : iso(row.execution_finished_at),
-      // The execution axis' observed_at: the last successful poll. The missing-execution guard
-      // above narrows it to a real timestamp.
-      updated_at: iso(row.execution_observed_at as Date | string)
+      status: execution.status,
+      started_at: isoOrNull(execution.started_at),
+      finished_at: isoOrNull(execution.finished_at),
+      updated_at: iso(execution.observed_at)
     },
     publication: {
-      status: row.publication_status,
-      started_at:
-        row.publication_started_at === null
-          ? null
-          : iso(row.publication_started_at),
-      finished_at:
-        row.publication_finished_at === null
-          ? null
-          : iso(row.publication_finished_at),
-      updated_at: iso(row.publication_updated_at)
+      status: publication.status,
+      started_at: isoOrNull(publication.started_at),
+      finished_at: isoOrNull(publication.finished_at),
+      updated_at: iso(publication.updated_at)
     },
-    created_at: iso(row.created_at),
-    // The run-level failure code names the axis that actually stopped the run, in the order
-    // the phases run:
-    // - a `failed` publication is the terminal failure: report its own code, even when that code
-    //   is null. Falling back to the execution/preparation code here would attribute another
-    //   axis' reason to the publication that genuinely failed.
-    // - otherwise execution is next, then preparation. A skipped execution still reports the
-    //   preparation failure that caused it, and a publication skipped because execution failed
-    //   reports that execution reason, because publication itself never failed.
+    created_at: iso(trunk.created_at),
     failure_code: publicationFailure
-      ? row.publication_failure_code
-      : (row.execution_failure_code ?? row.preparation_failure_code),
+      ? publication.failure_code
+      : (execution.failure_code ?? preparation.failure_code),
     failure_message: publicationFailure
-      ? row.publication_failure_message
-      : (row.execution_failure_message ?? row.preparation_failure_message),
+      ? publication.failure_message
+      : (execution.failure_message ?? preparation.failure_message),
     artifact_storage: normalizeArtifactStorage(
-      row.artifact_storage,
-      `run ${row.run_id}`
+      execution.artifact_storage,
+      `run ${trunk.run_id}`
     ),
-    ...(row.ingress_kind ? { ingress_kind: row.ingress_kind } : {}),
-    ...(row.ingress_key ? { ingress_key: row.ingress_key } : {})
+    ...(trunk.ingress_kind ? { ingress_kind: trunk.ingress_kind } : {}),
+    ...(trunk.ingress_key ? { ingress_key: trunk.ingress_key } : {})
   }
 }
 
@@ -287,7 +316,7 @@ function projectRunRows(rows: ReviewRunRow[]): RunRowsProjection {
     try {
       runs.push(rowToRecord(row))
     } catch (error) {
-      dropped.push({ run_id: row.run_id, error })
+      dropped.push({ run_id: row.trunk.run_id, error })
     }
   }
   return { runs, dropped }
@@ -741,7 +770,7 @@ export class ReviewRunStore {
     try {
       return rowToRecord(row)
     } catch (error) {
-      this.onDroppedRunRow({ run_id: row.run_id, error })
+      this.onDroppedRunRow({ run_id: row.trunk.run_id, error })
       return null
     }
   }
@@ -846,9 +875,9 @@ export class ReviewRunStore {
     const last = page.at(-1)
     const next_cursor =
       hasMore && last !== undefined
-        ? Buffer.from(`${last.created_at_cursor}|${last.run_id}`).toString(
-            'base64url'
-          )
+        ? Buffer.from(
+            `${last.trunk.created_at_cursor}|${last.trunk.run_id}`
+          ).toString('base64url')
         : null
     const { runs, dropped } = projectRunRows(page)
     return { runs, next_cursor, dropped }
@@ -1343,11 +1372,11 @@ export class ReviewRunStore {
         [runId, this.connectorId]
       )
       const row = result.rows[0]
-      if (row === undefined || row.workflow_result === null)
+      if (row === undefined || row.execution.workflow_result === null)
         throw new Error(`Claimed publication work is incomplete: ${runId}`)
       return {
         ...rowToRecord(row),
-        workflow_result: row.workflow_result,
+        workflow_result: row.execution.workflow_result,
         claim_token: token
       }
     })
