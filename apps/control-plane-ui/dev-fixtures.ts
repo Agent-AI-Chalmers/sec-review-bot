@@ -448,7 +448,9 @@ function eventsFor(run: FixtureRun): Array<{
         'preparation',
         'preparing',
         run.preparation.status,
-        run.preparation.finished_at ?? run.preparation.started_at ?? run.created_at,
+        run.preparation.finished_at ??
+          run.preparation.started_at ??
+          run.created_at,
         run.preparation.status === 'failed'
           ? run.preparation.failure_code
           : null
@@ -626,7 +628,6 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
     publication
   )
 
-
   // Each axis records a start and an end, and the fixture must respect the same rules the store
   // enforces: a start exists once the phase has begun, an end exists once it is terminal, and
   // neither may be present on a phase that never got that far.
@@ -641,7 +642,9 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   }
   if (
     (run.execution.finished_at !== null) !==
-    (execution === 'succeeded' || execution === 'failed' || execution === 'skipped')
+    (execution === 'succeeded' ||
+      execution === 'failed' ||
+      execution === 'skipped')
   ) {
     fail('execution_finished_at is set exactly when the execution is terminal')
   }
@@ -780,7 +783,10 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
       'a pending or skipped execution has no execution.started_at, and every other state has one'
     )
   }
-  if (run.execution.started_at !== null && run.execution.started_at < run.created_at) {
+  if (
+    run.execution.started_at !== null &&
+    run.execution.started_at < run.created_at
+  ) {
     fail('execution.started_at must not precede created_at')
   }
   if (
@@ -816,15 +822,21 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
       publication === 'publishing' &&
       run.publication.updated_at === run.publication.started_at
     ) {
-      fail('a running publication keeps being written, so updated_at moves past its start')
+      fail(
+        'a running publication keeps being written, so updated_at moves past its start'
+      )
     }
   }
   // A finished publication exists exactly for the terminal outcomes; a skipped one never
   // started, so it has an end but no start.
   const publicationFinished =
-    publication === 'published' || publication === 'failed' || publication === 'skipped'
+    publication === 'published' ||
+    publication === 'failed' ||
+    publication === 'skipped'
   if ((run.publication.finished_at !== null) !== publicationFinished) {
-    fail('publication_finished_at is set exactly when the publication is terminal')
+    fail(
+      'publication_finished_at is set exactly when the publication is terminal'
+    )
   }
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(

@@ -27,14 +27,14 @@ function admittedRecord(
     workflow: 'issue-review',
     publish_context: {},
     preparation: {
-    status: 'submitted',
-    attempt_count: 1,
-    started_at: '2026-01-01T00:00:01.000Z',
-    finished_at: '2026-01-01T00:00:02.000Z',
-    updated_at: '2026-01-01T00:00:03.000Z',
-    failure_code: null,
-    failure_notice_status: null
-  },
+      status: 'submitted',
+      attempt_count: 1,
+      started_at: '2026-01-01T00:00:01.000Z',
+      finished_at: '2026-01-01T00:00:02.000Z',
+      updated_at: '2026-01-01T00:00:03.000Z',
+      failure_code: null,
+      failure_notice_status: null
+    },
     execution: {
       status: 'pending',
       started_at: null,
@@ -377,7 +377,12 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               record: {
                 ...run,
                 run_id: 'run-uncertain',
-                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
+                execution: {
+                  status: 'pending',
+                  started_at: null,
+                  finished_at: null,
+                  updated_at: '2026-01-01T00:00:00.000Z'
+                }
               },
               created: true,
               preparation_token: 'claim'
@@ -431,7 +436,12 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
               record: {
                 ...run,
                 run_id: 'run-pr-uncertain',
-                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
+                execution: {
+                  status: 'pending',
+                  started_at: null,
+                  finished_at: null,
+                  updated_at: '2026-01-01T00:00:00.000Z'
+                }
               },
               created: true,
               preparation_token: 'claim'
@@ -485,7 +495,12 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
               record: {
                 ...run,
                 run_id: 'run-context-failure',
-                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
+                execution: {
+                  status: 'pending',
+                  started_at: null,
+                  finished_at: null,
+                  updated_at: '2026-01-01T00:00:00.000Z'
+                }
               },
               created: true,
               preparation_token: 'claim'
@@ -593,7 +608,15 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
         admitReviewRun: () => ({
           created: false,
           preparation_token: null,
-          record: admittedRecord({ run_id: 'run-original', execution: { status: 'queued', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' } })
+          record: admittedRecord({
+            run_id: 'run-original',
+            execution: {
+              status: 'queued',
+              started_at: null,
+              finished_at: null,
+              updated_at: '2026-01-01T00:00:00.000Z'
+            }
+          })
         }),
         submitPreparedRun: () =>
           assert.fail('replayed delivery must not queue again'),
@@ -625,7 +648,15 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
         admitReviewRun: () => ({
           created: false,
           preparation_token: null,
-          record: admittedRecord({ run_id: 'run-original', execution: { status: 'queued', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' } })
+          record: admittedRecord({
+            run_id: 'run-original',
+            execution: {
+              status: 'queued',
+              started_at: null,
+              finished_at: null,
+              updated_at: '2026-01-01T00:00:00.000Z'
+            }
+          })
         }),
         submitPreparedRun: () =>
           assert.fail('replayed delivery must not queue again'),
@@ -662,7 +693,10 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: admittedRecord({ ...run, run_id: 'run-pr-setup-invalid' }),
+              record: admittedRecord({
+                ...run,
+                run_id: 'run-pr-setup-invalid'
+              }),
               created: true,
               preparation_token: 'claim'
             }) as never,
@@ -711,7 +745,10 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: admittedRecord({ ...run, run_id: 'run-issue-setup-invalid' }),
+              record: admittedRecord({
+                ...run,
+                run_id: 'run-issue-setup-invalid'
+              }),
               created: true,
               preparation_token: 'claim'
             }) as never,

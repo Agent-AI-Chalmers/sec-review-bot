@@ -55,7 +55,9 @@ export function preparationTone(preparation: Run['preparation']): StatusTone {
   return 'waiting'
 }
 
-export function publicationTone(status: Run['publication']['status']): StatusTone {
+export function publicationTone(
+  status: Run['publication']['status']
+): StatusTone {
   if (status === 'publishing') return 'active'
   if (status === 'published') return 'complete'
   if (status === 'failed') return 'failed'

@@ -355,7 +355,8 @@ const messages = {
     edge_preparation_pending_preparing: '有执行者接手，开始准备输入',
     edge_preparation_preparing_submitted: '输入构造完成，已交给 Runner',
     edge_preparation_preparing_pending: '本次准备失败，稍后重试',
-    edge_preparation_preparing_failed: '准备失败（可能是重试次数用尽，也可能是不可重试的错误）',
+    edge_preparation_preparing_failed:
+      '准备失败（可能是重试次数用尽，也可能是不可重试的错误）',
     edge_runner_pending_queued: '准备好的输入已提交，Runner 接受了该任务',
     edge_runner_pending_skipped: '准备失败，因此执行不会发生',
     edge_publication_publishing_pending: '某步骤失败但可重试，回到等待后重试',
@@ -368,7 +369,8 @@ const messages = {
     edge_runner_uncertain_failed: '重放提交得到确定性失败，判定为失败',
     edge_runner_queued_running: '轮询观察到 Runner 开始执行',
     edge_runner_running_succeeded: '轮询观察到 Runner 执行成功',
-    edge_runner_queued_succeeded: '首次轮询时 Runner 已完成，未观察到执行中状态',
+    edge_runner_queued_succeeded:
+      '首次轮询时 Runner 已完成，未观察到执行中状态',
     edge_runner_queued_failed:
       '轮询得到确定性失败（报告失败、查不到 run、无结果或响应不合约定）',
     edge_runner_running_failed:

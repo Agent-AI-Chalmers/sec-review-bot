@@ -46,10 +46,13 @@ export function lastActivity(run: Run): string {
   // though the phase bounds (`started_at`, `finished_at`) intentionally do not. Preparation is
   // included because it is the only axis that moves while execution is still `pending`, and
   // without it a long preparation would freeze the column at the run's creation time.
-  return [run.preparation.updated_at, run.execution.updated_at, run.publication.updated_at]
-    .reduce((latest, value) =>
-      Date.parse(value) > Date.parse(latest) ? value : latest
-    )
+  return [
+    run.preparation.updated_at,
+    run.execution.updated_at,
+    run.publication.updated_at
+  ].reduce((latest, value) =>
+    Date.parse(value) > Date.parse(latest) ? value : latest
+  )
 }
 
 export function abbreviateDigest(digest: string): string {

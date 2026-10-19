@@ -28,14 +28,14 @@ function admittedRecord(
     workflow: 'issue-review',
     publish_context: {},
     preparation: {
-    status: 'submitted',
-    attempt_count: 1,
-    started_at: '2026-01-01T00:00:01.000Z',
-    finished_at: '2026-01-01T00:00:02.000Z',
-    updated_at: '2026-01-01T00:00:03.000Z',
-    failure_code: null,
-    failure_notice_status: null
-  },
+      status: 'submitted',
+      attempt_count: 1,
+      started_at: '2026-01-01T00:00:01.000Z',
+      finished_at: '2026-01-01T00:00:02.000Z',
+      updated_at: '2026-01-01T00:00:03.000Z',
+      failure_code: null,
+      failure_notice_status: null
+    },
     execution: {
       status: 'pending',
       started_at: null,
@@ -340,7 +340,15 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
         admitReviewRun: () => ({
           created: false,
           preparation_token: null,
-          record: admittedRecord({ run_id: 'run-original', execution: { status: 'running', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' } })
+          record: admittedRecord({
+            run_id: 'run-original',
+            execution: {
+              status: 'running',
+              started_at: null,
+              finished_at: null,
+              updated_at: '2026-01-01T00:00:00.000Z'
+            }
+          })
         }),
         submitPreparedRun: () =>
           assert.fail('replayed dispatch must not queue again'),
@@ -385,7 +393,12 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
               record: {
                 ...run,
                 run_id: 'run-invalid-window',
-                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
+                execution: {
+                  status: 'pending',
+                  started_at: null,
+                  finished_at: null,
+                  updated_at: '2026-01-01T00:00:00.000Z'
+                }
               },
               created: true,
               preparation_token: 'claim'
@@ -482,7 +495,12 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
               record: {
                 ...run,
                 run_id: 'run-repo-failed',
-                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
+                execution: {
+                  status: 'pending',
+                  started_at: null,
+                  finished_at: null,
+                  updated_at: '2026-01-01T00:00:00.000Z'
+                }
               },
               created: true,
               preparation_token: 'claim'
@@ -578,7 +596,12 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
               record: {
                 ...run,
                 run_id: 'run-repo-uncertain',
-                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
+                execution: {
+                  status: 'pending',
+                  started_at: null,
+                  finished_at: null,
+                  updated_at: '2026-01-01T00:00:00.000Z'
+                }
               },
               created: true,
               preparation_token: 'claim'
