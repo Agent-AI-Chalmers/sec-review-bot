@@ -205,7 +205,7 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 
 ## Bot 自身事件与发布边界
 
-Bot 自己创建的 comment、PR 或 push 可能会再次触发 webhook，形成自循环。系统在 webhook 入口检查 sender 是否为 Bot，命中后直接跳过，只跳过本 App 自己发出的回流事件。
+Bot 自己创建的 comment、PR 或 push 可能会再次触发 webhook，形成自循环。系统在 webhook 入口检查 sender 是否为 Bot，命中后直接跳过，只跳过本 App 自己发出的回流事件。当 App 自身的 login 未知时，该守卫会跳过所有 Bot 事件（无法区分自己与别人）；服务在该状态下拒绝启动，因此这只会影响绕过启动流程的调用方。
 
 手动 comment 命令解析也会忽略 Markdown blockquote 行，所以在回复里引用旧 bot 命令不会再次触发；新的命令必须写在引用文本之外。
 

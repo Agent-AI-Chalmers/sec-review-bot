@@ -62,7 +62,7 @@ flowchart LR
     preparing -->|重试耗尽| prepfailed[failed]
   end
 
-  subgraph runner[executions.status / execution_status]
+  subgraph runner[executions.status / execution.status]
     pending -->|提交 input| queued
     pending -->|准备失败| skipped
     pending -->|提交结果未确认| uncertain

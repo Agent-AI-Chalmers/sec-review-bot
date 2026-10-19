@@ -204,7 +204,7 @@ Additional notes:
 
 ## Bot-Originated Events And Publishing
 
-Comments, PRs, or pushes created by the bot itself may trigger webhooks again and create a loop. The webhook entrypoint checks whether the sender is the bot and skips matching events. Only events produced by this App itself are skipped.
+Comments, PRs, or pushes created by the bot itself may trigger webhooks again and create a loop. The webhook entrypoint checks whether the sender is the bot and skips matching events. Only events produced by this App itself are skipped. If the App's own login is unknown the guard skips every bot event, because it cannot tell its own from another's; the service refuses to start in that state, so this only affects callers that bypass startup.
 
 Manual comment command parsing also ignores Markdown blockquote lines, so quoting an older bot command in a reply does not retrigger that command. A new command must appear outside the quoted text.
 

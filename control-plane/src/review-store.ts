@@ -139,7 +139,7 @@ const RUN_SELECT = `
     pr.failure_message AS preparation_failure_message,
     n.status AS preparation_failure_notice_status
   FROM review_runs r
-  JOIN publications p ON p.run_id = r.run_id
+  JOIN publications p ON p.run_id = r.run_id AND p.connector_id = r.connector_id
   LEFT JOIN executions e ON e.run_id = r.run_id AND e.connector_id = r.connector_id
   LEFT JOIN preparations pr
     ON pr.run_id = r.run_id AND pr.connector_id = r.connector_id
@@ -493,7 +493,16 @@ export class ReviewRunStore {
         WHERE r.connector_id=$1 AND r.ingress_kind=$2 AND r.ingress_key=$3`,
         [this.connectorId, run.ingress_kind, run.ingress_key]
       )
-      if (existing.rows[0] === undefined) throw error
+      if (existing.rows[0] === undefined) {
+        // The unique violation came from a concurrent admission that is not visible afterwards,
+        // which means it rolled back. Re-throwing the raw 23505 would report a database
+        // constraint to a caller that asked for an idempotent admission, so say what happened.
+        throw new Error(
+          `ingress replay for ${run.ingress_kind}:${run.ingress_key} lost a concurrent ` +
+            `admission that rolled back; the request can be retried`,
+          { cause: error }
+        )
+      }
       return {
         record: rowToRecord(existing.rows[0]),
         created: false,

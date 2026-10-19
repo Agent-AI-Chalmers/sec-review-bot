@@ -67,6 +67,51 @@ test('an axis row cannot be written under a connector the trunk does not own', a
   }
 })
 
+test('the failure-notice outbox is fenced to the connector that owns its preparation', async () => {
+  // The notice is read by joining on connector_id, so a row stored under another connector would
+  // make `failure_notice_status` read as null — a notice that exists but is never delivered, with
+  // nothing to show it went wrong.
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `control-plane-test:${randomUUID()}`
+  })
+  await store.initialize()
+  const pool = new Pool({ connectionString: databaseUrl() })
+  try {
+    const runId = `run-${randomUUID()}`
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    // A terminal preparation failure is what creates the notice row.
+    await store.failPreparation(
+      runId,
+      admission.preparation_token,
+      { code: 'REVIEW_START_FAILED', message: 'boom' }
+    )
+    // Clear the real notice so the insert below cannot fail on the primary key; the connector is
+    // then the only thing left that can reject it.
+    await pool.query(
+      'DELETE FROM preparation_failure_notices WHERE run_id=$1',
+      [runId]
+    )
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO preparation_failure_notices (run_id, connector_id, status)
+         VALUES ($1, 'intruder', 'pending')`,
+        [runId]
+      ),
+      /violates foreign key constraint/,
+      'a notice must not name a connector its preparation does not belong to'
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
 test('admission creates exactly one executions row alongside the run trunk', async () => {
   const store = new ReviewRunStore({
     connectionString: databaseUrl(),

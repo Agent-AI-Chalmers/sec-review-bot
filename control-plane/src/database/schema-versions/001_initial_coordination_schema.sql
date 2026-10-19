@@ -152,7 +152,10 @@ CREATE TABLE preparations (
     END
   ),
   FOREIGN KEY (run_id, connector_id)
-    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE,
+  -- Foreign-key target for the failure-notice outbox, which belongs to the same connector as
+  -- the preparation it reports on.
+  UNIQUE (run_id, connector_id)
 );
 
 COMMENT ON TABLE preparations IS
@@ -201,7 +204,11 @@ CREATE TABLE preparation_failure_notices (
   CHECK (
     (status = 'delivering' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
     OR (status <> 'delivering' AND claim_token IS NULL AND claimed_at IS NULL)
-  )
+  ),
+  -- The notice is read by joining on connector_id, so a row stored under another connector would
+  -- make `failure_notice_status` quietly read as null instead of surfacing as a bad write.
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES preparations (run_id, connector_id) ON DELETE CASCADE
 );
 COMMENT ON TABLE preparation_failure_notices IS
   'Provider-neutral outbox for connector acknowledgement of terminal preparation failures.';

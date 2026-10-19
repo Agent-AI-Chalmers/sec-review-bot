@@ -60,7 +60,7 @@ flowchart LR
     preparing -->|retry exhausted| prepfailed[failed]
   end
 
-  subgraph runner[executions.status / execution_status]
+  subgraph runner[executions.status / execution.status]
     pending -->|input submitted| queued
     pending -->|preparation failed| skipped
     pending -->|submission unconfirmed| uncertain
