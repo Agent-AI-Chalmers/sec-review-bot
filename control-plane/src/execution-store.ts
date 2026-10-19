@@ -142,6 +142,12 @@ export class ExecutionStore {
     })
   }
 
+  /** Take the recovery claim for an uncertain submission.
+   *
+   * The claim is what paces retries: a replay whose outcome is unknown leaves it in place, so the
+   * run becomes claimable again only when this lease expires rather than on the next coordination
+   * tick. Clearing the claim on a failed replay would replay the same submission every tick.
+   */
   async claimSubmissionRecovery(runId: string): Promise<string | null> {
     const token = crypto.randomUUID()
     return await transaction(this.pool, async (client) => {
