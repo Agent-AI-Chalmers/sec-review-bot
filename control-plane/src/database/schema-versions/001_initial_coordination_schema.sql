@@ -204,7 +204,11 @@ CREATE INDEX preparations_claimable_idx
 -- the preparer has died. This outbox is deliberately provider-neutral: it stores
 -- delivery ownership only, while connectors interpret the preparation input.
 CREATE TABLE preparation_failure_notices (
-  run_id text PRIMARY KEY REFERENCES preparations(run_id) ON DELETE CASCADE,
+  -- `run_id` is the primary key, so there is at most one notice per run. It deliberately carries
+  -- no inline single-column foreign key: the composite one below already references `run_id`
+  -- together with `connector_id`, and declaring both would leave two overlapping constraints
+  -- where only the stricter one is meant to exist.
+  run_id text PRIMARY KEY,
   connector_id text NOT NULL,
   status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'skipped')),
   -- The reason is captured when the notice is created, not read back from `preparations` at
@@ -220,7 +224,9 @@ CREATE TABLE preparation_failure_notices (
     OR (status <> 'delivering' AND claim_token IS NULL AND claimed_at IS NULL)
   ),
   -- The notice is read by joining on connector_id, so a row stored under another connector would
-  -- make `failure_notice_status` quietly read as null instead of surfacing as a bad write.
+  -- make `failure_notice_status` quietly read as null instead of surfacing as a bad write. This is
+  -- the only foreign key on the table: it references `run_id` too, so a separate single-column
+  -- key would be redundant rather than an extra guard.
   FOREIGN KEY (run_id, connector_id)
     REFERENCES preparations (run_id, connector_id) ON DELETE CASCADE
 );
