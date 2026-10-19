@@ -248,7 +248,7 @@ export function StateMachineDiagram({
   } | null>(null)
 
   const columns = stateColumns(machine)
-  // States that only feed a long back-edge (e.g. recovering -> queued) are pulled under their
+  // States that only feed a long back-edge (e.g. uncertain -> queued) are pulled under their
   // loop target, so the loop is a short arc rather than one spanning the whole diagram. This
   // runs over a copy of the columns; the forward-layer order is unchanged for everything else.
   for (const edge of machine.transitions) {

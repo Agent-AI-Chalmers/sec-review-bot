@@ -19,6 +19,7 @@ import { api, ApiError, type Run } from './api.js'
 import { formatDate, useLanguage, useMessages } from './i18n.js'
 import { CopyAction, RefreshControls, useRefresh } from './App.js'
 import {
+  EXECUTION_STATUSES,
   ExecutionStatus,
   PREPARATION_STATUSES,
   PreparationStatus,
@@ -246,9 +247,7 @@ export function Runs(): React.JSX.Element {
               }
             >
               <option value="">{t('all')}</option>
-              {(
-                ['pending', 'queued', 'running', 'succeeded', 'failed'] as const
-              ).map((value) => (
+              {EXECUTION_STATUSES.map((value) => (
                 <option key={value} value={value}>
                   {executionStatusLabel(value, t)}
                 </option>

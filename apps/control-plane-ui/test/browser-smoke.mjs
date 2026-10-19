@@ -325,6 +325,29 @@ try {
         `${name} clearing the preparation filter must restore the list`
       )
 
+      // The Execution filter must offer every state the contract declares, including the
+      // two that are not part of the happy path. Otherwise an operator cannot isolate an
+      // unconfirmed submission or a run whose execution was skipped.
+      const execution = page.getByLabel('Execution')
+      const executionStates = await execution
+        .locator('option')
+        .evaluateAll((options) => options.map((option) => option.value))
+      assert.ok(
+        executionStates.includes('uncertain') &&
+          executionStates.includes('skipped'),
+        `${name} the Execution filter must include uncertain and skipped`
+      )
+      await execution.selectOption('uncertain')
+      await waitUntil(
+        async () => (await rows()).length < allRows,
+        `${name} the uncertain execution state must narrow the list`
+      )
+      await execution.selectOption('')
+      await waitUntil(
+        async () => (await rows()).length === allRows,
+        `${name} clearing the execution filter must restore the list`
+      )
+
       const firstPage = await rows()
       assert.ok(
         await previous.isDisabled(),

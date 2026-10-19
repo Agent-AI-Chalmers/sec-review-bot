@@ -158,6 +158,19 @@ export const PREPARATION_STATUSES = [
   'failed'
 ] as const
 
+/** Every execution state the contract declares, in lifecycle order. Like
+ * PREPARATION_STATUSES, the list filter is generated from one array so a state added to the
+ * contract cannot be silently missing from the filter. */
+export const EXECUTION_STATUSES = [
+  'pending',
+  'queued',
+  'running',
+  'uncertain',
+  'succeeded',
+  'skipped',
+  'failed'
+] as const satisfies readonly Run['execution_status'][]
+
 export function preparationStateLabel(
   status: NonNullable<Run['preparation']>['status'],
   t: ReturnType<typeof useMessages>
