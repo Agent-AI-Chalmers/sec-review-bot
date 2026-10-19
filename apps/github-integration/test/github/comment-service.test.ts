@@ -5,10 +5,15 @@ import {
   createIssueCommentUnlessMarkerExists,
   createPullRequestReviewUnlessMarkerExists
 } from '../../src/github/comment-service.js'
+import { setGitHubAppMetadata } from '../../src/github/github-app-metadata-service.js'
 import type { GitHubAppOctokit } from '../../src/github/octokit.js'
 import { PublicationClaimLostError } from '../../src/control-plane/publication-claim.js'
 
 const assertPublicationClaim = async (): Promise<void> => {}
+
+test.beforeEach(() => {
+  setGitHubAppMetadata({ slug: 'sec-review-bot' })
+})
 
 test('createIssueCommentUnlessMarkerExists skips creation when marker already exists', async () => {
   let createCalls = 0
@@ -21,7 +26,7 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
               id: 123,
               body: '<!-- sec-review-bot:repository-summary-run:run-1 -->\nold body',
               html_url: 'https://example.test/comment/123',
-              user: { type: 'Bot' }
+              user: { login: 'sec-review-bot[bot]', type: 'Bot' }
             }
           ]
         }),
@@ -50,6 +55,49 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
   assert.strictEqual(result.id, 123)
   assert.strictEqual(result.reused, true)
   assert.strictEqual(createCalls, 0)
+})
+
+test('createIssueCommentUnlessMarkerExists does not reuse another bot marker', async () => {
+  let createCalls = 0
+  const marker = '<!-- sec-review-bot:repository-summary-run:run-1 -->'
+  const octokit = {
+    rest: {
+      issues: {
+        listComments: async () => ({
+          data: [
+            {
+              id: 123,
+              body: `${marker}\nother bot body`,
+              html_url: 'https://example.test/comment/123',
+              user: { login: 'other-bot[bot]', type: 'Bot' }
+            }
+          ]
+        }),
+        createComment: async () => {
+          createCalls += 1
+          return {
+            data: {
+              id: 456,
+              html_url: 'https://example.test/comment/456'
+            }
+          }
+        }
+      }
+    }
+  } as unknown as GitHubAppOctokit
+
+  const result = await createIssueCommentUnlessMarkerExists(octokit, {
+    owner_login: 'octo',
+    repo_name: 'example',
+    issue_number: 1,
+    body: `${marker}\nnew body`,
+    marker,
+    assert_publication_claim: assertPublicationClaim
+  })
+
+  assert.strictEqual(result.id, 456)
+  assert.strictEqual(result.reused, false)
+  assert.strictEqual(createCalls, 1)
 })
 
 test('createIssueCommentUnlessMarkerExists creates when marker is absent', async () => {
@@ -132,7 +180,7 @@ test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', asy
               body: `${marker}\nold body`,
               html_url: 'https://example.test/review/123',
               state: 'CHANGES_REQUESTED',
-              user: { type: 'Bot' }
+              user: { login: 'sec-review-bot[bot]', type: 'Bot' }
             }
           ]
         }),

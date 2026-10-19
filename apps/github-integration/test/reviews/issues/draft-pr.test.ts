@@ -73,6 +73,7 @@ function createOctokitMock({
     >,
     commits: [] as Array<{ message: string; tree: string; parents: string[] }>,
     refs: [] as Array<{ ref: string; sha: string }>,
+    readRefs: [] as string[],
     updatedRefs: [] as Array<{ ref: string; sha: string; force: boolean }>,
     pulls: [] as Array<{
       title: string
@@ -97,7 +98,15 @@ function createOctokitMock({
           calls.blobs.push({ content, encoding })
           return { data: { sha: `blob-${calls.blobs.length}` } }
         },
-        getCommit: async () => ({ data: { tree: { sha: 'base-tree-sha' } } }),
+        getCommit: async ({ commit_sha }: { commit_sha: string }) => ({
+          data:
+            commit_sha === 'existing-commit-sha'
+              ? {
+                  tree: { sha: 'tree-sha' },
+                  parents: [{ sha: 'base-sha' }]
+                }
+              : { tree: { sha: 'base-tree-sha' } }
+        }),
         createTree: async ({
           tree
         }: {
@@ -129,6 +138,10 @@ function createOctokitMock({
             throw createRefError
           }
           return { data: {} }
+        },
+        getRef: async ({ ref }: { ref: string }) => {
+          calls.readRefs.push(ref)
+          return { data: { object: { sha: 'existing-commit-sha' } } }
         },
         updateRef: async ({
           ref,
@@ -214,7 +227,7 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
   assert.strictEqual(octokit.calls.commits.length, 0)
 })
 
-test('issue draft PR retry updates a branch left by a partial prior attempt', async () => {
+test('issue draft PR retry reuses a branch left by a partial prior attempt without overwriting it', async () => {
   const createRefError = Object.assign(new Error('Reference already exists'), {
     status: 422
   })
@@ -244,13 +257,54 @@ test('issue draft PR retry updates a branch left by a partial prior attempt', as
   })
 
   assert.strictEqual(result?.number, 1)
-  assert.deepStrictEqual(octokit.calls.updatedRefs, [
-    {
-      ref: 'heads/sec-review-bot/issue-42-12345678',
-      sha: 'commit-sha',
-      force: true
-    }
+  assert.deepStrictEqual(octokit.calls.readRefs, [
+    'heads/sec-review-bot/issue-42-12345678'
   ])
+  assert.deepStrictEqual(octokit.calls.updatedRefs, [])
+})
+
+test('issue draft PR does not create a PR from an existing branch with a different tree', async () => {
+  const createRefError = Object.assign(new Error('Reference already exists'), {
+    status: 422
+  })
+  const octokit = createOctokitMock({ createRefError })
+  const originalGetCommit = octokit.rest.git.getCommit
+  octokit.rest.git.getCommit = async ({ commit_sha }) => {
+    if (commit_sha === 'existing-commit-sha') {
+      return {
+        data: {
+          tree: { sha: 'different-tree-sha' },
+          parents: [{ sha: 'base-sha' }]
+        }
+      }
+    }
+    return await originalGetCommit({ commit_sha })
+  }
+
+  await assert.rejects(
+    createDraftPullRequestFromIssueReviewRecord({
+      octokit: octokit as unknown as CreateDraftPrOctokit,
+      issue: {
+        issue_number: 42,
+        owner_login: 'octo-org',
+        repo_name: 'example-repo'
+      },
+      run_id: 'run-12345678',
+      workspace_ref: 'base-sha',
+      review_record: reviewRecordWithMitigation({
+        file_changes: [
+          {
+            path: 'src/app.txt',
+            status: 'upsert',
+            content: 'fixed\n',
+            content_encoding: 'utf-8'
+          }
+        ]
+      })
+    }),
+    /Existing draft PR branch does not match/
+  )
+  assert.strictEqual(octokit.calls.pulls.length, 0)
 })
 
 test('issue draft PR stops before the next GitHub write after claim loss', async () => {

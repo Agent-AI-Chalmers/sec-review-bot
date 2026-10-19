@@ -80,7 +80,15 @@ function createOctokitMock({
           calls.blobs.push({ content, encoding })
           return { data: { sha: `blob-${calls.blobs.length}` } }
         },
-        getCommit: async () => ({ data: { tree: { sha: 'base-tree-sha' } } }),
+        getCommit: async ({ commit_sha }: { commit_sha: string }) => ({
+          data:
+            commit_sha === 'existing-commit-sha'
+              ? {
+                  tree: { sha: 'tree-sha' },
+                  parents: [{ sha: 'base-sha' }]
+                }
+              : { tree: { sha: 'base-tree-sha' } }
+        }),
         createTree: async ({
           tree
         }: {
@@ -110,6 +118,9 @@ function createOctokitMock({
           calls.refs.push({ ref, sha })
           return { data: {} }
         },
+        getRef: async () => ({
+          data: { object: { sha: 'existing-commit-sha' } }
+        }),
         updateRef: async () => ({ data: {} })
       },
       pulls: {
@@ -441,8 +452,9 @@ function minimalDelivery(deliveryId: string): RepositoryDelivery {
   }
 }
 
-test('delivery-draft-pr force-updates when createRef reports the ref already exists', async () => {
+test('delivery-draft-pr reads an existing ref without force-updating it', async () => {
   const octokit = createOctokitMock()
+  let getRefCalls = 0
   let updateRefCalls = 0
   octokit.rest.git.createRef = async () => {
     throw {
@@ -453,6 +465,10 @@ test('delivery-draft-pr force-updates when createRef reports the ref already exi
   octokit.rest.git.updateRef = async () => {
     updateRefCalls += 1
     return { data: {} }
+  }
+  octokit.rest.git.getRef = async () => {
+    getRefCalls += 1
+    return { data: { object: { sha: 'existing-commit-sha' } } }
   }
 
   await createRepositoryDeliveryDraftPr({
@@ -467,7 +483,46 @@ test('delivery-draft-pr force-updates when createRef reports the ref already exi
     delivery: minimalDelivery('delivery-ref-exists')
   })
 
-  assert.strictEqual(updateRefCalls, 1)
+  assert.strictEqual(getRefCalls, 1)
+  assert.strictEqual(updateRefCalls, 0)
+})
+
+test('delivery-draft-pr does not create a PR from an existing branch with a different tree', async () => {
+  const octokit = createOctokitMock()
+  const originalGetCommit = octokit.rest.git.getCommit
+  octokit.rest.git.createRef = async () => {
+    throw {
+      status: 422,
+      response: { status: 422, data: { message: 'Reference already exists' } }
+    }
+  }
+  octokit.rest.git.getCommit = async ({ commit_sha }) => {
+    if (commit_sha === 'existing-commit-sha') {
+      return {
+        data: {
+          tree: { sha: 'different-tree-sha' },
+          parents: [{ sha: 'base-sha' }]
+        }
+      }
+    }
+    return await originalGetCommit({ commit_sha })
+  }
+
+  await assert.rejects(
+    createRepositoryDeliveryDraftPr({
+      octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+      repo: {
+        owner_login: 'octo-org',
+        repo_name: 'example-repo',
+        default_branch: 'main'
+      },
+      run_id: 'run-ref-exists',
+      input: { workspace_ref: 'base-sha' },
+      delivery: minimalDelivery('delivery-ref-exists')
+    }),
+    /Existing delivery draft PR branch does not match/
+  )
+  assert.strictEqual(octokit.calls.pulls.length, 0)
 })
 
 test('delivery-draft-pr does not force-update a createRef 422 that is not "already exists"', async () => {

@@ -1,4 +1,5 @@
 import type { GitHubAppOctokit, GitHubPullRequestReview } from './octokit.js'
+import { getGitHubAppMetadata } from './github-app-metadata-service.js'
 import { asErrorWithResponse } from '../utils/error-utils.js'
 
 export type ReviewCommentSide = 'LEFT' | 'RIGHT'
@@ -21,6 +22,7 @@ interface IssueCommentSummary {
   body?: string | null
   html_url: string
   user?: {
+    login?: string
     type?: string
   } | null
 }
@@ -47,6 +49,35 @@ interface CreatePullRequestReviewArgs {
 interface CreatePullRequestReviewUnlessMarkerExistsArgs extends CreatePullRequestReviewArgs {
   marker: string
   assert_publication_claim: () => Promise<void>
+}
+
+function normalizeLogin(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== ''
+    ? value.trim().toLowerCase()
+    : null
+}
+
+function wasAuthoredByCurrentAppBot(
+  user:
+    | {
+        login?: string | null
+        type?: string | null
+      }
+    | null
+    | undefined
+): boolean {
+  const login = normalizeLogin(user?.login)
+  const metadata = getGitHubAppMetadata()
+  const expectedLogins = [
+    metadata.bot_login,
+    metadata.slug ? `${metadata.slug}-bot[bot]` : null
+  ]
+    .map(normalizeLogin)
+    .filter((candidate): candidate is string => candidate !== null)
+
+  return (
+    user?.type === 'Bot' && login !== null && expectedLogins.includes(login)
+  )
 }
 
 function isOwnPullRequestApprovalError(error: unknown): boolean {
@@ -121,7 +152,7 @@ async function findIssueCommentByMarker(
     }
 
     for (const comment of response.data) {
-      if (comment.user?.type !== 'Bot') {
+      if (!wasAuthoredByCurrentAppBot(comment.user)) {
         continue
       }
       if (typeof comment.body === 'string' && comment.body.includes(marker)) {
@@ -249,7 +280,7 @@ async function findPullRequestReviewByMarker(
     }
 
     for (const review of response.data) {
-      if (review.user?.type !== 'Bot') {
+      if (!wasAuthoredByCurrentAppBot(review.user)) {
         continue
       }
       if (typeof review.body === 'string' && review.body.includes(marker)) {

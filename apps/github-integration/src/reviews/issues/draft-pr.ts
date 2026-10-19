@@ -10,6 +10,7 @@ import type { FileChange, FileMode } from '../file-change.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import { asErrorWithResponse } from '../../utils/error-utils.js'
 import { resolveTrustedDefaultBranch } from '../../github/default-branch-service.js'
+import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 
 interface IssueContext {
   issue_number: number
@@ -259,19 +260,38 @@ export async function createDraftPullRequestFromIssueReviewRecord({
       sha: newCommitResponse.data.sha
     })
   } catch (error) {
-    if (asErrorWithResponse(error).status !== 422) {
+    const errorInfo = asErrorWithResponse(error)
+    if (errorInfo.status !== 422) {
       throw error
     }
-    // A previous attempt may have created the run-specific branch but failed
-    // before opening the PR. Reuse that branch as the retry checkpoint.
+    const message = String(
+      errorInfo.response?.data?.message ?? errorInfo.message
+    ).toLowerCase()
+    if (!message.includes('already exists')) {
+      throw error
+    }
+    // The existing run-specific branch is a recovery checkpoint only when it
+    // still represents this run's validated result. Do not overwrite it.
     await assert_publication_claim()
-    await octokit.rest.git.updateRef({
+    const existingRef = await octokit.rest.git.getRef({
       owner,
       repo,
-      ref: `heads/${branch_name}`,
-      sha: newCommitResponse.data.sha,
-      force: true
+      ref: `heads/${branch_name}`
     })
+    const existingCommit = await octokit.rest.git.getCommit({
+      owner,
+      repo,
+      commit_sha: existingRef.data.object.sha
+    })
+    if (
+      existingCommit.data.tree.sha !== treeResponse.data.sha ||
+      existingCommit.data.parents?.length !== 1 ||
+      existingCommit.data.parents[0]?.sha !== head_sha
+    ) {
+      throw new DeterministicRunnerPublishError(
+        `Existing draft PR branch does not match the validated result for run ${run_id}.`
+      )
+    }
   }
 
   await assert_publication_claim()

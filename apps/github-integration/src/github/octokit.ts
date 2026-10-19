@@ -111,7 +111,17 @@ export interface GitHubAppOctokit {
         owner: string
         repo: string
         commit_sha: string
-      }) => Promise<{ data: { tree: { sha: string } } }>
+      }) => Promise<{
+        data: {
+          tree: { sha: string }
+          parents?: Array<{ sha: string }>
+        }
+      }>
+      getRef: (args: {
+        owner: string
+        repo: string
+        ref: string
+      }) => Promise<{ data: { object: { sha: string } } }>
       updateRef: (args: {
         owner: string
         repo: string
