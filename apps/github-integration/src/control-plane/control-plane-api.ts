@@ -475,7 +475,7 @@ export interface components {
         | 'failed'
       /**
        * Format: date-time
-       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL while the run is still preparing; use it, not execution_updated_at, to time execution.
+       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL until then, i.e. while the run is still `pending` on the execution axis; preparation progress is on the separate `preparation` summary. Use it, not execution_updated_at, to time execution.
        */
       submitted_at: string | null
       /** @enum {string} */
@@ -541,7 +541,7 @@ export interface components {
         | 'failed'
       /**
        * Format: date-time
-       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL while the run is still preparing; use it, not execution_updated_at, to time execution.
+       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL until then, i.e. while the run is still `pending` on the execution axis; preparation progress is on the separate `preparation` summary. Use it, not execution_updated_at, to time execution.
        */
       submitted_at: string | null
       /** @enum {string} */
@@ -601,7 +601,7 @@ export interface components {
         | 'failed'
       /**
        * Format: date-time
-       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL while the run is still preparing; use it, not execution_updated_at, to time execution.
+       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL until then, i.e. while the run is still `pending` on the execution axis; preparation progress is on the separate `preparation` summary. Use it, not execution_updated_at, to time execution.
        */
       submitted_at: string | null
       /** @enum {string} */
