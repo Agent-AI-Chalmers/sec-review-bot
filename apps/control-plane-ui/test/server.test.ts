@@ -71,11 +71,21 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     await fetch(`${base}/api/runs/${runUuid}/events`, { headers: { cookie } })
     assert.strictEqual(upstreamPath, `/v1/runs/${runUuid}/events`)
     upstreamPath = ''
+    // The allow-list matches the contract's run-id shape after percent-decoding. It is
+    // deliberately shape-only, exactly like the contract's own `runId` pattern: rejecting a
+    // version/variant nibble here would make the BFF stricter than the contract it proxies.
+    // What it must never do is let a crafted segment reach a different upstream path, which is
+    // what the traversal and encoding cases below pin.
     for (const rejected of [
       '/api/runs/not-a-uuid',
       '/api/runs/not-a-uuid/events',
       '/api/runs/%2e%2e/publication-steps',
-      '/api/runs/0123abcd-4567-89ef-0123-456789abcdef/unknown-suffix'
+      '/api/runs/0123abcd-4567-89ef-0123-456789abcdef/unknown-suffix',
+      // Traversal hidden in the id segment: rejected before normalisation can reshape the path.
+      '/api/runs/0123abcd-4567-89ef-0123-456789abcdef/../..%2Fblocked-preparations',
+      '/api/runs/..%2F..%2Fblocked-preparations',
+      // A valid id with an encoded separator glued to it is not a sub-resource.
+      '/api/runs/0123abcd-4567-89ef-0123-456789abcdef%2Fevents'
     ]) {
       assert.strictEqual(
         (await fetch(`${base}${rejected}`, { headers: { cookie } })).status,

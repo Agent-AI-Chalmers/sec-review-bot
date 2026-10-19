@@ -755,6 +755,7 @@ export class ReviewRunStore {
     return result.rowCount === 1
   }
   async listEvents(runId: string): Promise<ReviewRunEvent[]> {
+    this.ready()
     return await listEvents(this.pool, runId, this.connectorId)
   }
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
