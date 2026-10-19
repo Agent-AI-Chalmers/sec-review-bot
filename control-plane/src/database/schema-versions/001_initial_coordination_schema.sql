@@ -6,7 +6,8 @@ CREATE TABLE review_runs (
   workflow text NOT NULL,
   publish_context jsonb NOT NULL,
   runner_input jsonb,
-  runner_status text NOT NULL CHECK (runner_status IN ('preparing', 'recovering', 'queued', 'running', 'succeeded', 'failed')),
+  runner_status text NOT NULL CHECK (runner_status IN ('pending', 'queued', 'running', 'uncertain', 'succeeded', 'skipped', 'failed')),
+  submitted_at timestamptz,
   runner_failure_code text,
   runner_failure_message text,
   artifact_storage jsonb,
@@ -32,7 +33,7 @@ COMMENT ON COLUMN review_runs.publish_context IS
 COMMENT ON COLUMN review_runs.runner_input IS
   'Prepared Runner request, including artifact references. It is retained so an uncertain submission can be replayed safely.';
 COMMENT ON COLUMN review_runs.runner_status IS
-  'Control Plane view of preparation, submission recovery, and Runner execution; publication progress is stored separately.';
+  'Runner-side lifecycle only: pending until the prepared input is submitted, then Runner execution. uncertain means a submission may have reached the Runner but its result could not be confirmed — it is not a failure; a recovery replays the same run_id under recovery_claim_token to resolve it, then the run becomes queued or failed. skipped means execution never ran because preparation failed. Preparation and publication keep their own state machines.';
 COMMENT ON COLUMN review_runs.runner_failure_code IS
   'Machine-readable reason for a preparation, submission, polling, or Runner execution failure.';
 COMMENT ON COLUMN review_runs.runner_failure_message IS
@@ -49,8 +50,10 @@ COMMENT ON COLUMN review_runs.ingress_key IS
   'Connector-supplied idempotency key for the external request, scoped by connector_id and ingress_kind.';
 COMMENT ON COLUMN review_runs.created_at IS
   'Time the Control Plane durably admitted the run.';
+COMMENT ON COLUMN review_runs.submitted_at IS
+  'Immutable instant the prepared Runner input was accepted and the run entered queued, i.e. when execution began. NULL until then. Distinct from updated_at, which also moves on input checkpoints and artifact writes and so cannot time a phase.';
 COMMENT ON COLUMN review_runs.updated_at IS
-  'Time the Runner-side lifecycle or retained Runner data last changed.';
+  'Row mtime: last time this row was touched for any reason, including input checkpoints, artifact writes, and the observation heartbeat that records a successful poll of an active run. It is not a phase start (use submitted_at to time execution) and it does not mean "state last changed" — use review_run_events for transitions.';
 
 CREATE INDEX review_runs_runner_status_idx
   ON review_runs (runner_status, updated_at);
@@ -63,7 +66,7 @@ CREATE TABLE preparations (
   connector_id text NOT NULL,
   input_version text NOT NULL,
   input jsonb NOT NULL,
-  status text NOT NULL CHECK (status IN ('pending', 'claimed', 'submitted', 'failed')),
+  status text NOT NULL CHECK (status IN ('pending', 'preparing', 'submitted', 'failed')),
   available_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   claim_token uuid,
   claimed_at timestamptz,
@@ -73,8 +76,8 @@ CREATE TABLE preparations (
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   CHECK (
-    (status = 'claimed' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
-    OR (status <> 'claimed' AND claim_token IS NULL AND claimed_at IS NULL)
+    (status = 'preparing' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (status <> 'preparing' AND claim_token IS NULL AND claimed_at IS NULL)
   )
 );
 
@@ -89,7 +92,7 @@ COMMENT ON COLUMN preparations.input_version IS
 COMMENT ON COLUMN preparations.input IS
   'Connector-owned, replayable preparation input. It contains no Control Plane-defined provider fields.';
 COMMENT ON COLUMN preparations.status IS
-  'Preparation lifecycle. An expired claim normally returns to pending; expiry after the retry budget is exhausted is terminal.';
+  'Preparation lifecycle: pending (waiting for a preparer), preparing (a preparer currently owns the claim), submitted (input handed to the Runner), failed (terminal). An expired claim normally returns to pending; expiry after the retry budget is exhausted is terminal.';
 COMMENT ON COLUMN preparations.available_at IS
   'Earliest time a pending preparation may be claimed. Retry backoff is durable so a process restart cannot bypass it.';
 COMMENT ON COLUMN preparations.claim_token IS
@@ -112,14 +115,14 @@ CREATE INDEX preparations_claimable_idx
 CREATE TABLE preparation_failure_notices (
   run_id text PRIMARY KEY REFERENCES preparations(run_id) ON DELETE CASCADE,
   connector_id text NOT NULL,
-  status text NOT NULL CHECK (status IN ('pending', 'claimed', 'delivered', 'skipped')),
+  status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'skipped')),
   claim_token uuid,
   claimed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   CHECK (
-    (status = 'claimed' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
-    OR (status <> 'claimed' AND claim_token IS NULL AND claimed_at IS NULL)
+    (status = 'delivering' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (status <> 'delivering' AND claim_token IS NULL AND claimed_at IS NULL)
   )
 );
 COMMENT ON TABLE preparation_failure_notices IS
@@ -207,3 +210,39 @@ COMMENT ON COLUMN publication_steps.created_at IS
   'Time the connector fixed the publication step set for this run.';
 COMMENT ON COLUMN publication_steps.updated_at IS
   'Time the step state, remote identity, or failure information last changed.';
+
+-- Append-only log of coordination-side state transitions, so an operator can see how a
+-- run reached its current state instead of reconstructing it from row mtimes or process
+-- logs. The live snapshot tables above remain the source of truth for "now"; this table is
+-- an audit trail. It deliberately records only Control Plane coordination axes: the Runner's
+-- own execution history lives in Temporal and is not duplicated here.
+CREATE TABLE review_run_events (
+  event_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  run_id text NOT NULL REFERENCES review_runs(run_id) ON DELETE CASCADE,
+  connector_id text NOT NULL,
+  axis text NOT NULL CHECK (axis IN ('runner', 'preparation', 'publication', 'notice')),
+  from_status text,
+  to_status text NOT NULL,
+  reason_code text,
+  occurred_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
+COMMENT ON TABLE review_run_events IS
+  'Append-only audit log of coordination-side state transitions. Read by operators; the snapshot tables remain the current-state truth.';
+COMMENT ON COLUMN review_run_events.run_id IS
+  'Review run whose coordination state changed.';
+COMMENT ON COLUMN review_run_events.connector_id IS
+  'Connector namespace that owns the run, kept so reads can be fenced per connector.';
+COMMENT ON COLUMN review_run_events.axis IS
+  'Which coordination state machine the transition belongs to: runner, preparation, publication, or notice.';
+COMMENT ON COLUMN review_run_events.from_status IS
+  'State before the transition; NULL for the first event on an axis (for example admission).';
+COMMENT ON COLUMN review_run_events.to_status IS
+  'State after the transition.';
+COMMENT ON COLUMN review_run_events.reason_code IS
+  'Machine-readable cause for a failure or reversion transition, when there is one.';
+COMMENT ON COLUMN review_run_events.occurred_at IS
+  'Time the transition was recorded, written in the same transaction as the snapshot update.';
+
+CREATE INDEX review_run_events_run_idx
+  ON review_run_events (run_id, occurred_at);

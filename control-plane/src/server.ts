@@ -13,7 +13,11 @@ import Fastify, {
 
 import { contractDigest } from './contract-digest.js'
 import { ReviewRunStore } from './review-store.js'
-import type { PublicationStatus, RunnerStatus } from './review-store.js'
+import type {
+  PreparationStatus,
+  PublicationStatus,
+  RunnerStatus
+} from './review-store.js'
 import { type ControlPlaneWorkflow } from './contracts.js'
 import {
   coordinateReviewRunsOnce,
@@ -186,6 +190,9 @@ function parseListQuery(url: URL): ListQueryOptions {
   const publicationStatus = url.searchParams.get('publication_status')
   if (publicationStatus !== null)
     options.publication_status = publicationStatus as PublicationStatus
+  const preparationStatus = url.searchParams.get('preparation_status')
+  if (preparationStatus !== null)
+    options.preparation_status = preparationStatus as PreparationStatus
   const workflow = url.searchParams.get('workflow')
   if (workflow !== null) options.workflow = workflow as ControlPlaneWorkflow
   for (const name of ['from', 'to'] as const) {
@@ -352,6 +359,13 @@ export async function registerControlPlaneRoutes(
       }
     },
 
+    listRunEvents: async (request, reply) => {
+      const { runId } = request.params as PathParams<'listRunEvents'>
+      const run = await store.getRun(runId)
+      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
+      const events = await store.listEvents(run.run_id)
+      return { run_id: run.run_id, events }
+    },
     admitRun: async (request) => {
       const body = request.body as RequestBody<'admitRun'>
       if (

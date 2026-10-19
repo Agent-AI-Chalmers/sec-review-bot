@@ -89,6 +89,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/runs/{runId}/events': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Read the append-only coordination event log for one run, oldest first. Each event is a state transition on one coordination axis (runner, preparation, publication, or notice). This is an audit trail over the snapshot tables, not the Runner's execution history, which lives in Temporal. Requires the read token. */
+    get: operations['listRunEvents']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/runs/{runId}/submission': {
     parameters: {
       query?: never
@@ -443,17 +460,24 @@ export interface components {
       runner_input?: {
         [key: string]: unknown
       }
+      preparation: components['schemas']['PreparationSummary']
       /** @enum {string} */
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
       /** @enum {string} */
       runner_status:
-        | 'preparing'
-        | 'recovering'
+        | 'pending'
         | 'queued'
         | 'running'
+        | 'uncertain'
         | 'succeeded'
+        | 'skipped'
         | 'failed'
+      /**
+       * Format: date-time
+       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL while the run is still preparing; use it, not execution_updated_at, to time execution.
+       */
+      submitted_at: string | null
       /** @enum {string} */
       publication_status:
         'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
@@ -508,12 +532,18 @@ export interface components {
       ingress_key?: string
       /** @enum {string} */
       runner_status:
-        | 'preparing'
-        | 'recovering'
+        | 'pending'
         | 'queued'
         | 'running'
+        | 'uncertain'
         | 'succeeded'
+        | 'skipped'
         | 'failed'
+      /**
+       * Format: date-time
+       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL while the run is still preparing; use it, not execution_updated_at, to time execution.
+       */
+      submitted_at: string | null
       /** @enum {string} */
       publication_status:
         'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
@@ -556,14 +586,24 @@ export interface components {
       run_id: string
       /** @enum {string} */
       workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
-      /** @enum {string} */
+      preparation: components['schemas']['PreparationSummary']
+      /**
+       * @description The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it to resolve the run to `queued` or `failed`, so it is not a failure.
+       * @enum {string}
+       */
       execution_status:
-        | 'preparing'
-        | 'recovering'
+        | 'pending'
         | 'queued'
         | 'running'
+        | 'uncertain'
         | 'succeeded'
+        | 'skipped'
         | 'failed'
+      /**
+       * Format: date-time
+       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL while the run is still preparing; use it, not execution_updated_at, to time execution.
+       */
+      submitted_at: string | null
       /** @enum {string} */
       publication_status:
         'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
@@ -578,6 +618,34 @@ export interface components {
       failure_code: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
     }
+    ReviewRunEvent: {
+      /** @description Monotonic identifier; also the tie-breaker within one occurred_at. */
+      event_id: number
+      /** @enum {string} */
+      axis: 'runner' | 'preparation' | 'publication' | 'notice'
+      /** @description State before the transition; null for the first event on an axis. */
+      from_status: string | null
+      to_status: string
+      /** @description Machine-readable cause for a failure or reversion, when there is one. */
+      reason_code: string | null
+      /** Format: date-time */
+      occurred_at: string
+    }
+    /** @description Durable preparation state, when the run has a preparation record. This is an operational summary only; it never exposes connector-owned preparation input. */
+    PreparationSummary: {
+      /**
+       * @description Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own "in progress" state and is unrelated to the Runner, which is only submitted to once preparation reaches `submitted`.
+       * @enum {string}
+       */
+      status: 'pending' | 'preparing' | 'submitted' | 'failed'
+      attempt_count: number
+      /** Format: date-time */
+      updated_at: string
+      failure_code: string | null
+      /** @enum {string|null} */
+      failure_notice_status:
+        'pending' | 'delivering' | 'delivered' | 'skipped' | null
+    } | null
     ArtifactStorage:
       | {
           /** @enum {string} */
@@ -731,15 +799,21 @@ export interface operations {
           cursor?: string
           /** @enum {string} */
           execution_status?:
-            | 'preparing'
-            | 'recovering'
+            | 'pending'
             | 'queued'
             | 'running'
+            | 'uncertain'
             | 'succeeded'
+            | 'skipped'
             | 'failed'
           /** @enum {string} */
           publication_status?:
             'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+          /**
+           * @description Matches the run's redacted preparation summary by state. Runs without a preparation record are not returned by this filter.
+           * @enum {string}
+           */
+          preparation_status?: 'pending' | 'preparing' | 'submitted' | 'failed'
           /** @enum {string} */
           workflow?:
             'issue-review' | 'pull-request-review' | 'repository-review'
@@ -866,6 +940,36 @@ export interface operations {
           'application/json': {
             run_id: string
             publication_steps: components['schemas']['ObservedPublicationStep'][]
+          }
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
+      500: components['responses']['InternalError']
+    }
+  }
+  listRunEvents: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The run's coordination events, oldest first. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            run_id: string
+            events: components['schemas']['ReviewRunEvent'][]
           }
         }
       }
@@ -1506,6 +1610,7 @@ export const operationRoutes = {
     path: '/v1/runs/{runId}/publication-steps',
     method: 'get'
   },
+  listRunEvents: { path: '/v1/runs/{runId}/events', method: 'get' },
   submitPreparedRun: { path: '/v1/runs/{runId}/submission', method: 'post' },
   renewPreparationClaim: {
     path: '/v1/runs/{runId}/preparation/claim',

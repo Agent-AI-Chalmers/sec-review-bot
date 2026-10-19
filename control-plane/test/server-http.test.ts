@@ -434,7 +434,7 @@ test('an undeclared body field is rejected, matching the contract', async () => 
         record: {
           run_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
           workflow: 'issue-review',
-          runner_status: 'preparing'
+          runner_status: 'pending'
         },
         created: true,
         preparation_token: 'token'

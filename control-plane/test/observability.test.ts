@@ -7,9 +7,17 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
   const observed = observeRun({
     run_id: 'run-1',
     workflow: 'issue-review',
+    preparation: {
+      status: 'submitted',
+      attempt_count: 1,
+      updated_at: '2026-01-01T00:00:30.000Z',
+      failure_code: null,
+      failure_notice_status: null
+    },
     runner_status: 'succeeded',
     publication_status: 'pending',
     created_at: '2026-01-01T00:00:00.000Z',
+    submitted_at: '2026-01-01T00:00:01.000Z',
     execution_updated_at: '2026-01-01T00:01:00.000Z',
     publication_updated_at: '2026-01-01T00:01:00.000Z',
     published_at: null,
@@ -22,9 +30,17 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
   assert.deepStrictEqual(observed, {
     run_id: 'run-1',
     workflow: 'issue-review',
+    preparation: {
+      status: 'submitted',
+      attempt_count: 1,
+      updated_at: '2026-01-01T00:00:30.000Z',
+      failure_code: null,
+      failure_notice_status: null
+    },
     execution_status: 'succeeded',
     publication_status: 'pending',
     created_at: '2026-01-01T00:00:00.000Z',
+    submitted_at: '2026-01-01T00:00:01.000Z',
     execution_updated_at: '2026-01-01T00:01:00.000Z',
     publication_updated_at: '2026-01-01T00:01:00.000Z',
     published_at: null,

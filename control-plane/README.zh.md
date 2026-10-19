@@ -33,7 +33,7 @@ GitHub integration 负责解析 GitHub 请求、准备 input 和执行 GitHub �
 
 ## Run 生命周期
 
-Run 在接纳后立即进入 `preparing`。其独立持久化的 preparation work 持有用于隔离 input 构造的 claim。GitHub integration 准备并上传 input bundle，再使用该 claim 提交可重放的 Runner input。Control Plane 记录 input，并且只在 Runner 接受请求后将 run 转为 `queued`。
+Run 在接纳后立即进入 `pending`：在 Runner 轴上表示其 input 尚未提交。准备进度单独记录在 `preparations` 中，其自身的 `preparing` 状态表示当前有 preparer 持有用于隔离 input 构造的 claim。GitHub integration 准备并上传 input bundle，再使用该 claim 提交可重放的 Runner input。Control Plane 记录 input，并且只在 Runner 接受请求后将 run 转为 `queued`。
 
 Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Plane 将结果保存为 `succeeded`，使其可以被领取并发布。Integration 领取该工作，执行 GitHub 副作用，再记录 `published`、可重试的 publication 失败或终态 publication 失败。
 
@@ -43,39 +43,50 @@ Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Pla
 
 执行和发布是两个分开的状态机：
 
-| 表                            | 职责                                  | 状态                                                                  |
-| ----------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
-| `review_runs`                 | 接纳、Runner 观察和终态 workflow 数据 | `preparing`、`recovering`、`queued`、`running`、`succeeded`、`failed` |
-| `preparations`                | 可领取的 input preparation            | `pending`、`claimed`、`submitted`、`failed`                           |
-| `preparation_failure_notices` | connector 所有的终态失败确认          | `pending`、`claimed`、`delivered`、`skipped`                          |
-| `publications`                | 整体发布的所有权和结果                | `pending`、`publishing`、`published`、`failed`、`skipped`             |
-| `publication_steps`           | 可恢复的单个 connector 副作用         | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`        |
+| 表                            | 职责                                  | 状态                                                                          |
+| ----------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
+| `review_runs`                 | 接纳、Runner 观察和终态 workflow 数据 | `pending`、`queued`、`running`、`uncertain`、`succeeded`、`skipped`、`failed` |
+| `preparations`                | 可领取的 input preparation            | `pending`、`preparing`、`submitted`、`failed`                                 |
+| `preparation_failure_notices` | connector 所有的终态失败确认          | `pending`、`delivering`、`delivered`、`skipped`                               |
+| `publications`                | 整体发布的所有权和结果                | `pending`、`publishing`、`published`、`failed`、`skipped`                     |
+| `publication_steps`           | 可恢复的单个 connector 副作用         | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`                |
 
 ```mermaid
 flowchart LR
-  subgraph runner[review_runs.runner_status]
-    preparing --> queued --> running --> runnersucceeded[succeeded]
-    preparing --> failed
-    failed -->|提交状态不确定| recovering --> queued
+  subgraph preparation[preparations.status]
+    prepending[pending] -->|领取| preparing
+    preparing -->|input 被接受| submitted
+    preparing -->|重试| prepending
+    preparing -->|重试耗尽| prepfailed[failed]
+  end
+
+  subgraph runner[review_runs.runner_status / execution_status]
+    pending -->|提交 input| queued
+    pending -->|准备失败| skipped
+    pending -->|提交结果未确认| uncertain
+    queued --> running --> succeeded
     queued --> failed
     running --> failed
+    uncertain -->|重放被接受| queued
+    uncertain -->|重放被拒绝| failed
   end
 
   subgraph publication[publications.status]
-    pending --> publishing --> published
-    publishing -->|可重试失败| pending
+    pubpending[pending] --> publishing --> published
+    publishing -->|可重试失败| pubpending
     publishing -->|终态失败| pubfailed[failed]
-    pending -->|执行失败| skipped
+    pubpending -->|执行失败| skipped
   end
 
   subgraph steps[publication_steps.status]
-    steppending[pending] --> runningstep[running] --> succeeded
+    steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
     runningstep --> stepfailed[failed]
     stepfailed --> runningstep
     stepfailed -->|达到失败次数上限| terminalfailed[terminal_failed]
   end
 
-  runnersucceeded -.->|result 变为可领取| pending
+  preparedsubmitted[submitted] -.->|提交 input| pending
+  succeeded -.->|result 变为可领取| pubpending
   publishing -.->|初始化副作用| steppending
 ```
 
@@ -107,7 +118,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 查询响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
-查询响应报告两个状态轴（`execution_status`、`publication_status`），筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。
+查询响应报告三条彼此独立的生命周期轴：脱敏的 `preparation` 摘要、`execution_status`（Runner 生命周期，保留既有公开名称）和 `publication_status`。preparation 摘要会给出状态、尝试次数、最后更新时间、终态失败码和 failure notice 状态，但绝不包含其 opaque input、claim token 或 connector identity。列表端点可沿三条轴筛选（`execution_status`、`publication_status` 与 `preparation_status`）；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是读取契约。
 
 `/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Control Plane healthcheck。Runner 与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
 

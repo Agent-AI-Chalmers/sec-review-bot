@@ -200,13 +200,38 @@ test('run queries apply status filters before pagination limits', async () => {
       })
     }
 
-    const { runs: failedRuns } = await store.listRunsPage({
-      execution_status: 'failed',
+    // The preparation failed before the Runner was called, so execution is `skipped`, not
+    // failed; the filter narrows to exactly that terminal run.
+    const { runs: skippedRuns } = await store.listRunsPage({
+      execution_status: 'skipped',
       limit: 1
     })
     assert.deepStrictEqual(
-      failedRuns.map((run) => run.run_id),
+      skippedRuns.map((run) => run.run_id),
       [failedRunId]
+    )
+
+    // `preparation_status` filters on the redacted preparation summary's state, which the
+    // run record exposes alongside the two status axes. The two waiting runs are still
+    // `preparing` (claimed); the failed one reached the terminal `failed` state.
+    const { runs: failedPreparations } = await store.listRunsPage({
+      preparation_status: 'failed',
+      limit: 10
+    })
+    assert.deepStrictEqual(
+      failedPreparations.map((run) => run.run_id),
+      [failedRunId]
+    )
+    assert.strictEqual(failedPreparations[0]?.preparation?.status, 'failed')
+    const { runs: preparingPreparations } = await store.listRunsPage({
+      preparation_status: 'preparing',
+      limit: 10
+    })
+    assert.strictEqual(preparingPreparations.length, 2)
+    assert.ok(
+      preparingPreparations.every(
+        (run) => run.preparation?.status === 'preparing'
+      )
     )
   } finally {
     await store.close()

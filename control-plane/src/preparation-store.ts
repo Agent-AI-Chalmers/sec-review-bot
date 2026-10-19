@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
 import type { ControlPlaneWorkflow as WorkflowName } from './contracts.js'
+import { appendEvent } from './review-run-events.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -53,7 +54,7 @@ export class PreparationStore {
   async renewClaim(runId: string, token: string): Promise<boolean> {
     const result = await this.pool.query(
       `UPDATE preparations SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
-       WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3`,
+       WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
       [runId, this.connectorId, token]
     )
     return result.rowCount === 1
@@ -73,7 +74,7 @@ export class PreparationStore {
          WHERE p.connector_id=$1 AND p.status='pending'
            AND p.available_at <= clock_timestamp()
            AND p.input_version IS NOT NULL AND p.input IS NOT NULL
-           AND r.runner_status='preparing'
+           AND r.runner_status='pending'
          ORDER BY p.updated_at,p.run_id FOR UPDATE OF p SKIP LOCKED LIMIT 1`,
         [this.connectorId]
       )
@@ -81,7 +82,7 @@ export class PreparationStore {
       if (work === undefined) return null
       const token = crypto.randomUUID()
       const claimed = await client.query(
-        `UPDATE preparations SET status='claimed', claim_token=$2, claimed_at=clock_timestamp(),
+        `UPDATE preparations SET status='preparing', claim_token=$2, claimed_at=clock_timestamp(),
            attempt_count=attempt_count+1, failure_code=NULL, failure_message=NULL,
            updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$3 AND status='pending'`,
@@ -89,6 +90,13 @@ export class PreparationStore {
       )
       if (claimed.rowCount !== 1)
         throw new Error(`Preparation ${work.run_id} could not be claimed.`)
+      await appendEvent(client, {
+        runId: work.run_id,
+        connectorId: this.connectorId,
+        axis: 'preparation',
+        fromStatus: 'pending',
+        toStatus: 'preparing'
+      })
       return {
         ...work,
         claim_token: token,
@@ -104,7 +112,7 @@ export class PreparationStore {
   ): Promise<void> {
     const result = await this.pool.query(
       `UPDATE preparations SET input=$4::jsonb, updated_at=clock_timestamp()
-       WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3`,
+       WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
       [runId, this.connectorId, token, JSON.stringify(input)]
     )
     if (result.rowCount !== 1)
@@ -119,23 +127,37 @@ export class PreparationStore {
         run_id: string
         input: JsonObject
         failure_code: string | null
+        status: 'pending' | 'delivering'
       }>(
-        `SELECT n.run_id,p.input,p.failure_code FROM preparation_failure_notices n
+        `SELECT n.run_id,p.input,p.failure_code,n.status AS status
+         FROM preparation_failure_notices n
          JOIN preparations p ON p.run_id=n.run_id
          WHERE n.connector_id=$1 AND (n.status='pending' OR
-           (n.status='claimed' AND n.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
+           (n.status='delivering' AND n.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
          ORDER BY n.updated_at,n.run_id FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
         [this.connectorId, this.claimTimeoutMs]
       )
       const work = candidate.rows[0]
       if (work === undefined) return null
       const token = crypto.randomUUID()
-      await client.query(
-        `UPDATE preparation_failure_notices SET status='claimed', claim_token=$2,
+      const claimedNotice = await client.query(
+        `UPDATE preparation_failure_notices SET status='delivering', claim_token=$2,
            claimed_at=clock_timestamp(), updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$3`,
         [work.run_id, token, this.connectorId]
       )
+      if (claimedNotice.rowCount !== 1)
+        throw new Error(`Failure notice ${work.run_id} could not be claimed.`)
+      // A notice is claimable while pending, or again once its delivery lease expired. The
+      // event must name the state it actually came from, not assume pending.
+      await appendEvent(client, {
+        runId: work.run_id,
+        connectorId: this.connectorId,
+        axis: 'notice',
+        fromStatus: work.status,
+        toStatus: 'delivering',
+        reasonCode: work.status === 'delivering' ? 'NOTICE_LEASE_EXPIRED' : null
+      })
       return { ...work, claim_token: token }
     })
   }
@@ -145,13 +167,23 @@ export class PreparationStore {
     token: string,
     delivered: boolean
   ): Promise<boolean> {
-    const result = await this.pool.query(
-      `UPDATE preparation_failure_notices SET status=$4, claim_token=NULL,
-         claimed_at=NULL, updated_at=clock_timestamp()
-       WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3`,
-      [runId, this.connectorId, token, delivered ? 'delivered' : 'skipped']
-    )
-    return result.rowCount === 1
+    return await transaction(this.pool, async (client) => {
+      const result = await client.query(
+        `UPDATE preparation_failure_notices SET status=$4, claim_token=NULL,
+           claimed_at=NULL, updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$2 AND status='delivering' AND claim_token=$3`,
+        [runId, this.connectorId, token, delivered ? 'delivered' : 'skipped']
+      )
+      if (result.rowCount !== 1) return false
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'notice',
+        fromStatus: 'delivering',
+        toStatus: delivered ? 'delivered' : 'skipped'
+      })
+      return true
+    })
   }
 
   heartbeatIntervalMs(): number {
@@ -171,20 +203,35 @@ export class PreparationStore {
              failure_message=CASE WHEN attempt_count >= $3 THEN
                'Preparation claim lease expired after the retry budget was exhausted.' ELSE NULL END,
              updated_at=clock_timestamp()
-         WHERE connector_id=$1 AND status='claimed'
+         WHERE connector_id=$1 AND status='preparing'
            AND claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
          RETURNING run_id,status`,
         [this.connectorId, this.claimTimeoutMs, MAX_PREPARATION_ATTEMPTS]
       )
+      // Preparation events for every expired row: a reversion to pending after the lease
+      // lapsed, or a terminal failure once the retry budget is spent.
+      for (const row of expired.rows) {
+        await appendEvent(client, {
+          runId: row.run_id,
+          connectorId: this.connectorId,
+          axis: 'preparation',
+          fromStatus: 'preparing',
+          toStatus: row.status,
+          reasonCode:
+            row.status === 'failed' ? 'PREPARATION_RETRY_EXHAUSTED' : null
+        })
+      }
       const failedRunIds = expired.rows
         .filter((row) => row.status === 'failed')
         .map((row) => row.run_id)
       if (failedRunIds.length === 0) return expired.rowCount ?? 0
+      // Execution never ran, so it is skipped, not failed. The failure reason stays on the
+      // preparation row (and is surfaced through the run's preparation summary).
       const failedRuns = await client.query<{ run_id: string }>(
-        `UPDATE review_runs SET runner_status='failed', runner_failure_code='PREPARATION_RETRY_EXHAUSTED',
-           runner_failure_message='Preparation claim lease expired after the retry budget was exhausted.',
+        `UPDATE review_runs SET runner_status='skipped',
+           runner_failure_code=NULL, runner_failure_message=NULL,
            updated_at=clock_timestamp()
-         WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND runner_status='preparing' RETURNING run_id`,
+         WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND runner_status='pending' RETURNING run_id`,
         [failedRunIds, this.connectorId]
       )
       if (failedRuns.rowCount !== failedRunIds.length)
@@ -200,6 +247,29 @@ export class PreparationStore {
          SELECT unnest($1::text[]),$2,'pending' ON CONFLICT (run_id) DO NOTHING`,
         [failedRunIds, this.connectorId]
       )
+      for (const failedRunId of failedRunIds) {
+        await appendEvent(client, {
+          runId: failedRunId,
+          connectorId: this.connectorId,
+          axis: 'runner',
+          fromStatus: 'pending',
+          toStatus: 'skipped'
+        })
+        await appendEvent(client, {
+          runId: failedRunId,
+          connectorId: this.connectorId,
+          axis: 'publication',
+          fromStatus: 'pending',
+          toStatus: 'skipped'
+        })
+        await appendEvent(client, {
+          runId: failedRunId,
+          connectorId: this.connectorId,
+          axis: 'notice',
+          fromStatus: null,
+          toStatus: 'pending'
+        })
+      }
       return expired.rowCount ?? 0
     })
   }
@@ -216,7 +286,7 @@ export class PreparationStore {
           `UPDATE preparations SET status='pending', claim_token=NULL, claimed_at=NULL,
              available_at=clock_timestamp() + ($4::bigint * interval '1 millisecond'),
              failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
-           WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3
+           WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3
              AND attempt_count < $7`,
           [
             runId,
@@ -228,16 +298,41 @@ export class PreparationStore {
             MAX_PREPARATION_ATTEMPTS
           ]
         )
-        if (retry.rowCount === 1) return { retry_scheduled: true }
+        if (retry.rowCount === 1) {
+          await appendEvent(client, {
+            runId,
+            connectorId: this.connectorId,
+            axis: 'preparation',
+            fromStatus: 'preparing',
+            toStatus: 'pending',
+            reasonCode: error.code ?? null
+          })
+          return { retry_scheduled: true }
+        }
       }
-      const result = await client.query(
-        `UPDATE review_runs SET runner_status='failed', runner_failure_code=$4,
-           runner_failure_message=$5, updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND runner_status='preparing' AND EXISTS (
-           SELECT 1 FROM preparations WHERE preparations.run_id=review_runs.run_id
-             AND preparations.connector_id=$2 AND preparations.status='claimed' AND preparations.claim_token=$3)`,
-        [runId, this.connectorId, token, error.code ?? null, error.message]
-      )
+      // Whether execution is "uncertain" or "skipped" depends on whether the Runner may have
+      // been reached. An uncertain submission may have been accepted but unconfirmed, so
+      // execution is `uncertain` (a recovery replays it) — not a failure. Any other terminal
+      // preparation failure means the Runner was never called, so execution is `skipped`.
+      const submissionUncertain = error.code === 'SUBMISSION_STATE_UNCERTAIN'
+      const result = submissionUncertain
+        ? await client.query(
+            `UPDATE review_runs SET runner_status='uncertain',
+               runner_failure_code=$4, runner_failure_message=$5, updated_at=clock_timestamp()
+             WHERE run_id=$1 AND connector_id=$2 AND runner_status='pending' AND EXISTS (
+               SELECT 1 FROM preparations WHERE preparations.run_id=review_runs.run_id
+                 AND preparations.connector_id=$2 AND preparations.status='preparing' AND preparations.claim_token=$3)`,
+            [runId, this.connectorId, token, error.code, error.message]
+          )
+        : await client.query(
+            `UPDATE review_runs SET runner_status='skipped',
+               runner_failure_code=NULL, runner_failure_message=NULL,
+               updated_at=clock_timestamp()
+             WHERE run_id=$1 AND connector_id=$2 AND runner_status='pending' AND EXISTS (
+               SELECT 1 FROM preparations WHERE preparations.run_id=review_runs.run_id
+                 AND preparations.connector_id=$2 AND preparations.status='preparing' AND preparations.claim_token=$3)`,
+            [runId, this.connectorId, token]
+          )
       if (result.rowCount !== 1)
         throw new Error(
           `Preparation claim was lost before failing review run ${runId}.`
@@ -245,7 +340,7 @@ export class PreparationStore {
       await client.query(
         `UPDATE preparations SET status='failed', claim_token=NULL, claimed_at=NULL,
            failure_code=$4, failure_message=$5, updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='claimed' AND claim_token=$3`,
+         WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
       await client.query(
@@ -259,6 +354,36 @@ export class PreparationStore {
          VALUES ($1,$2,'pending') ON CONFLICT (run_id) DO NOTHING`,
         [runId, this.connectorId]
       )
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'preparation',
+        fromStatus: 'preparing',
+        toStatus: 'failed',
+        reasonCode: error.code ?? null
+      })
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'runner',
+        fromStatus: 'pending',
+        toStatus: submissionUncertain ? 'uncertain' : 'skipped',
+        reasonCode: submissionUncertain ? 'SUBMISSION_STATE_UNCERTAIN' : null
+      })
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'publication',
+        fromStatus: 'pending',
+        toStatus: 'skipped'
+      })
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'notice',
+        fromStatus: null,
+        toStatus: 'pending'
+      })
       return { retry_scheduled: false }
     })
   }

@@ -16,8 +16,10 @@ import {
   type CreateReviewRunArgs,
   type PublicationStatus,
   type PublicationStepRecord,
+  type PreparationStatus,
   type PublicationWork,
   type ReviewRunAdmission,
+  type ReviewRunEvent,
   type ReviewRunRecord,
   type RunnerStatus
 } from './shapes.js'
@@ -27,9 +29,11 @@ import {
   type PreparationWork
 } from './preparation-store.js'
 import { PublicationStore } from './publication-store.js'
+import { appendEvent, listEvents } from './review-run-events.js'
 
 export type {
   CreateReviewRunArgs,
+  PreparationStatus,
   PublicationStatus,
   PublicationStepRecord,
   PublicationWork,
@@ -60,12 +64,20 @@ interface ReviewRunRow {
   created_at: Date | string
   created_at_cursor: string
   runner_updated_at: Date | string
+  submitted_at: Date | string | null
   publication_updated_at: Date | string
   published_at: Date | string | null
   publication_failure_code: string | null
   publication_failure_message: string | null
   ingress_kind: 'github_webhook' | 'github_actions_dispatch' | null
   ingress_key: string | null
+  preparation_status: 'pending' | 'preparing' | 'submitted' | 'failed' | null
+  preparation_attempt_count: number | null
+  preparation_updated_at: Date | string | null
+  preparation_failure_code: string | null
+  preparation_failure_message: string | null
+  preparation_failure_notice_status:
+    'pending' | 'delivering' | 'delivered' | 'skipped' | null
 }
 
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
@@ -77,7 +89,7 @@ const RUN_SELECT = `
   SELECT r.run_id, r.workflow, r.publish_context, r.runner_input, r.runner_status,
     r.runner_failure_code, r.runner_failure_message, r.artifact_storage, r.workflow_result,
     r.ingress_kind, r.ingress_key,
-    r.created_at, r.updated_at AS runner_updated_at,
+    r.created_at, r.updated_at AS runner_updated_at, r.submitted_at,
     -- Full-precision (microsecond) UTC timestamp for keyset cursors. node-pg maps
     -- created_at to a millisecond JS Date, so a cursor built from the truncated
     -- value skips every row in the same millisecond; this string keeps the
@@ -85,8 +97,16 @@ const RUN_SELECT = `
     to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_cursor,
     p.status AS publication_status, p.updated_at AS publication_updated_at,
     p.published_at,
-    p.failure_code AS publication_failure_code, p.failure_message AS publication_failure_message
+    p.failure_code AS publication_failure_code, p.failure_message AS publication_failure_message,
+    pr.status AS preparation_status, pr.attempt_count AS preparation_attempt_count,
+    pr.updated_at AS preparation_updated_at, pr.failure_code AS preparation_failure_code,
+    pr.failure_message AS preparation_failure_message,
+    n.status AS preparation_failure_notice_status
   FROM review_runs r JOIN publications p ON p.run_id = r.run_id
+  LEFT JOIN preparations pr
+    ON pr.run_id = r.run_id AND pr.connector_id = r.connector_id
+  LEFT JOIN preparation_failure_notices n
+    ON n.run_id = r.run_id AND n.connector_id = r.connector_id
 `
 
 function iso(value: Date | string): string {
@@ -101,18 +121,34 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     workflow: row.workflow,
     publish_context: row.publish_context,
     ...(row.runner_input === null ? {} : { runner_input: row.runner_input }),
+    preparation:
+      row.preparation_status === null ||
+      row.preparation_attempt_count === null ||
+      row.preparation_updated_at === null
+        ? null
+        : {
+            status: row.preparation_status,
+            attempt_count: row.preparation_attempt_count,
+            updated_at: iso(row.preparation_updated_at),
+            failure_code: row.preparation_failure_code,
+            failure_notice_status: row.preparation_failure_notice_status
+          },
     runner_status: row.runner_status,
     publication_status: row.publication_status,
     created_at: iso(row.created_at),
+    submitted_at: row.submitted_at === null ? null : iso(row.submitted_at),
     execution_updated_at: iso(row.runner_updated_at),
     publication_updated_at: iso(row.publication_updated_at),
     published_at: row.published_at === null ? null : iso(row.published_at),
+    // The run-level failure code names whichever axis actually failed: publication, then
+    // execution, then preparation. A skipped execution therefore still reports the
+    // preparation failure that caused it, without pretending execution itself failed.
     failure_code: publicationFailure
       ? row.publication_failure_code
-      : row.runner_failure_code,
+      : (row.runner_failure_code ?? row.preparation_failure_code),
     failure_message: publicationFailure
       ? row.publication_failure_message
-      : row.runner_failure_message,
+      : (row.runner_failure_message ?? row.preparation_failure_message),
     artifact_storage: normalizeArtifactStorage(
       row.artifact_storage,
       `run ${row.run_id}`
@@ -251,7 +287,7 @@ export class ReviewRunStore {
     await client.query(
       `INSERT INTO review_runs
       (run_id,connector_id,workflow,publish_context,runner_input,runner_status,ingress_kind,ingress_key)
-      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'preparing',$6,$7)`,
+      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'pending',$6,$7)`,
       [
         run.run_id,
         this.connectorId,
@@ -267,7 +303,7 @@ export class ReviewRunStore {
     await client.query(
       `INSERT INTO preparations
         (run_id,connector_id,input_version,input,status,claim_token,claimed_at,attempt_count)
-       VALUES ($1,$2,$3,$4::jsonb,'claimed',$5,clock_timestamp(),1)`,
+       VALUES ($1,$2,$3,$4::jsonb,'preparing',$5,clock_timestamp(),1)`,
       [
         run.run_id,
         this.connectorId,
@@ -283,6 +319,29 @@ export class ReviewRunStore {
     `,
       [run.run_id, this.connectorId]
     )
+    // Admission is the first transition on both axes: the runner starts `pending` (input not
+    // yet submitted) and a preparation row is created already owned by this admission's claim.
+    await appendEvent(client, {
+      runId: run.run_id,
+      connectorId: this.connectorId,
+      axis: 'runner',
+      fromStatus: null,
+      toStatus: 'pending'
+    })
+    await appendEvent(client, {
+      runId: run.run_id,
+      connectorId: this.connectorId,
+      axis: 'preparation',
+      fromStatus: null,
+      toStatus: 'preparing'
+    })
+    await appendEvent(client, {
+      runId: run.run_id,
+      connectorId: this.connectorId,
+      axis: 'publication',
+      fromStatus: null,
+      toStatus: 'pending'
+    })
     const record = await this.getWith(client, run.run_id)
     if (record === null)
       throw new Error(`Runner run was not persisted: ${run.run_id}`)
@@ -356,10 +415,10 @@ export class ReviewRunStore {
       UPDATE review_runs
       SET publish_context=$3::jsonb, runner_input=$4::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$5
-        AND runner_status='preparing' AND EXISTS (
+        AND runner_status='pending' AND EXISTS (
           SELECT 1 FROM preparations
           WHERE preparations.run_id=review_runs.run_id
-            AND preparations.connector_id=$5 AND preparations.status='claimed'
+            AND preparations.connector_id=$5 AND preparations.status='preparing'
             AND preparations.claim_token=$2
         )
         AND workflow=$6
@@ -375,7 +434,7 @@ export class ReviewRunStore {
     )
     if (result.rowCount !== 1)
       throw new Error(
-        `Review run ${runId} cannot save prepared submission outside preparing.`
+        `Review run ${runId} cannot save prepared submission outside pending.`
       )
   }
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
@@ -425,13 +484,14 @@ export class ReviewRunStore {
         `
         UPDATE review_runs
         SET publish_context=$3::jsonb, runner_status='queued',
+            submitted_at=COALESCE(submitted_at, clock_timestamp()),
             runner_failure_code=NULL, runner_failure_message=NULL,
             updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$4
-          AND runner_status='preparing' AND EXISTS (
+          AND runner_status='pending' AND EXISTS (
             SELECT 1 FROM preparations
             WHERE preparations.run_id=review_runs.run_id
-              AND preparations.connector_id=$4 AND preparations.status='claimed'
+              AND preparations.connector_id=$4 AND preparations.status='preparing'
               AND preparations.claim_token=$2
           )
           AND workflow=$5
@@ -440,13 +500,13 @@ export class ReviewRunStore {
       )
       if (result.rowCount !== 1)
         throw new Error(
-          `Review run ${runId} cannot transition from preparing to queued.`
+          `Review run ${runId} cannot transition from pending to queued.`
         )
       const completed = await client.query(
         `UPDATE preparations
          SET status='submitted', claim_token=NULL, claimed_at=NULL,
              updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='claimed'
+         WHERE run_id=$1 AND connector_id=$2 AND status='preparing'
            AND claim_token=$3`,
         [runId, this.connectorId, token]
       )
@@ -454,7 +514,24 @@ export class ReviewRunStore {
         throw new Error(
           `Preparation ${runId} lost its claim before the queued transition completed.`
         )
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'runner',
+        fromStatus: 'pending',
+        toStatus: 'queued'
+      })
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'preparation',
+        fromStatus: 'preparing',
+        toStatus: 'submitted'
+      })
     })
+  }
+  async listEvents(runId: string): Promise<ReviewRunEvent[]> {
+    return await listEvents(this.pool, runId, this.connectorId)
   }
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
     this.ready()
@@ -472,6 +549,7 @@ export class ReviewRunStore {
       cursor?: string
       execution_status?: RunnerStatus
       publication_status?: PublicationStatus
+      preparation_status?: PreparationStatus
       workflow?: WorkflowName
       from?: string
       to?: string
@@ -492,6 +570,9 @@ export class ReviewRunStore {
     }
     if (options.publication_status !== undefined) {
       clauses.push(`p.status=${add(options.publication_status)}`)
+    }
+    if (options.preparation_status !== undefined) {
+      clauses.push(`pr.status=${add(options.preparation_status)}`)
     }
     if (options.from !== undefined)
       clauses.push(`r.created_at>=${add(options.from)}`)
@@ -535,6 +616,7 @@ export class ReviewRunStore {
       cursor?: string
       execution_status?: RunnerStatus
       publication_status?: PublicationStatus
+      preparation_status?: PreparationStatus
       workflow?: WorkflowName
       from?: string
       to?: string
@@ -572,8 +654,10 @@ export class ReviewRunStore {
       `${RUN_SELECT}
       WHERE r.connector_id=$1
         AND (
-          (r.runner_status='failed' AND r.runner_failure_code='SUBMISSION_STATE_UNCERTAIN')
-          OR (r.runner_status='recovering' AND r.updated_at <= clock_timestamp()-($2*interval '1 millisecond'))
+          -- An uncertain submission is claimable when it has no live claim; the lease is the
+          -- row's updated_at, so a stalled recovery becomes claimable again.
+          (r.runner_status='uncertain' AND (r.recovery_claim_token IS NULL
+            OR r.updated_at <= clock_timestamp()-($2*interval '1 millisecond')))
         )
       ORDER BY r.updated_at`,
       [this.connectorId, this.claimTimeoutMs]
@@ -582,20 +666,32 @@ export class ReviewRunStore {
   }
   async claimSubmissionRecovery(runId: string): Promise<string | null> {
     const token = crypto.randomUUID()
-    const result = await this.pool.query<{ recovery_claim_token: string }>(
-      `
-      UPDATE review_runs
-      SET runner_status='recovering', recovery_claim_token=$2, updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$3
-        AND (
-          (runner_status='failed' AND runner_failure_code='SUBMISSION_STATE_UNCERTAIN')
-          OR (runner_status='recovering' AND updated_at <= clock_timestamp()-($4*interval '1 millisecond'))
-        )
-      RETURNING recovery_claim_token
-    `,
-      [runId, token, this.connectorId, this.claimTimeoutMs]
-    )
-    return result.rows[0]?.recovery_claim_token ?? null
+    return await transaction(this.pool, async (client) => {
+      const result = await client.query<{ recovery_claim_token: string }>(
+        `
+        UPDATE review_runs
+        SET recovery_claim_token=$2, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$3
+          AND runner_status='uncertain'
+          AND (recovery_claim_token IS NULL
+            OR updated_at <= clock_timestamp()-($4*interval '1 millisecond'))
+        RETURNING recovery_claim_token
+      `,
+        [runId, token, this.connectorId, this.claimTimeoutMs]
+      )
+      if (result.rows[0] === undefined) return null
+      // The state stays `uncertain`; taking the claim is not a transition, so record it as a
+      // self-event to keep the operator timeline showing when a replay started.
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'runner',
+        fromStatus: 'uncertain',
+        toStatus: 'uncertain',
+        reasonCode: 'SUBMISSION_RECOVERY_CLAIMED'
+      })
+      return result.rows[0].recovery_claim_token
+    })
   }
   async completeSubmissionRecovery(
     runId: string,
@@ -608,7 +704,7 @@ export class ReviewRunStore {
         SET runner_status='queued', recovery_claim_token=NULL,
             runner_failure_code=NULL, runner_failure_message=NULL, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
-          AND runner_status='recovering' AND recovery_claim_token=$3
+          AND runner_status='uncertain' AND recovery_claim_token=$3
       `,
         [runId, this.connectorId, token]
       )
@@ -622,6 +718,13 @@ export class ReviewRunStore {
       `,
         [runId, this.connectorId]
       )
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'runner',
+        fromStatus: 'uncertain',
+        toStatus: 'queued'
+      })
       return true
     })
   }
@@ -637,7 +740,7 @@ export class ReviewRunStore {
         SET runner_status='failed', recovery_claim_token=NULL,
             runner_failure_code=$4, runner_failure_message=$5, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
-          AND runner_status='recovering' AND recovery_claim_token=$3
+          AND runner_status='uncertain' AND recovery_claim_token=$3
       `,
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
@@ -651,6 +754,14 @@ export class ReviewRunStore {
       `,
         [runId, this.connectorId]
       )
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'runner',
+        fromStatus: 'uncertain',
+        toStatus: 'failed',
+        reasonCode: error.code ?? null
+      })
       return true
     })
   }
@@ -666,16 +777,42 @@ export class ReviewRunStore {
     )
     return projectRunRows(result.rows)
   }
-  async markRunning(runId: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `
-      UPDATE review_runs
-      SET runner_status='running', updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2 AND runner_status='queued'
-    `,
+  /** Record that the Runner was observed just now, without changing state.
+   *
+   * Polling learns a run's state by asking the Runner. When the answer matches the state
+   * already stored, nothing else would write, so the row's mtime would freeze and the console
+   * could not tell a fresh observation from a stale one. Touching `updated_at` on every
+   * successful observation of an active run keeps that signal honest; it is scoped to
+   * queued/running so it can never disturb the `uncertain` recovery lease, which also reads
+   * `updated_at` but only while the run is uncertain. */
+  async touchObservation(runId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE review_runs
+       SET updated_at=clock_timestamp()
+       WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')`,
       [runId, this.connectorId]
     )
-    return result.rowCount === 1
+  }
+  async markRunning(runId: string): Promise<boolean> {
+    return await transaction(this.pool, async (client) => {
+      const result = await client.query(
+        `
+        UPDATE review_runs
+        SET runner_status='running', updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$2 AND runner_status='queued'
+      `,
+        [runId, this.connectorId]
+      )
+      if (result.rowCount !== 1) return false
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'runner',
+        fromStatus: 'queued',
+        toStatus: 'running'
+      })
+      return true
+    })
   }
   async recordArtifactStorage(
     runId: string,
@@ -700,24 +837,43 @@ export class ReviewRunStore {
     workflowResult: unknown,
     storage: RunnerArtifactStorage | undefined
   ): Promise<boolean> {
-    const result = await this.pool.query(
-      `
-      UPDATE review_runs
-      SET runner_status='succeeded', workflow_result=$3::jsonb,
-          artifact_storage=$4::jsonb, runner_failure_code=NULL,
-          runner_failure_message=NULL, updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
-    `,
-      [
+    return await transaction(this.pool, async (client) => {
+      // RETURNING the previous status through a CTE gives the event a truthful from_status: the
+      // run may have been queued or running, and the log must say which.
+      const result = await client.query<{ from_status: string }>(
+        `
+        WITH previous AS (
+          SELECT run_id, runner_status FROM review_runs
+          WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
+          FOR UPDATE
+        )
+        UPDATE review_runs r
+        SET runner_status='succeeded', workflow_result=$3::jsonb,
+            artifact_storage=$4::jsonb, runner_failure_code=NULL,
+            runner_failure_message=NULL, updated_at=clock_timestamp()
+        FROM previous
+        WHERE r.run_id=previous.run_id
+        RETURNING previous.runner_status AS from_status
+      `,
+        [
+          runId,
+          this.connectorId,
+          JSON.stringify(workflowResult),
+          storage === undefined
+            ? null
+            : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
+        ]
+      )
+      if (result.rowCount !== 1) return false
+      await appendEvent(client, {
         runId,
-        this.connectorId,
-        JSON.stringify(workflowResult),
-        storage === undefined
-          ? null
-          : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
-      ]
-    )
-    return result.rowCount === 1
+        connectorId: this.connectorId,
+        axis: 'runner',
+        fromStatus: result.rows[0]?.from_status ?? null,
+        toStatus: 'succeeded'
+      })
+      return true
+    })
   }
   async failRunnerExecution(
     runId: string,
@@ -725,13 +881,21 @@ export class ReviewRunStore {
     storage?: RunnerArtifactStorage
   ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
-      const run = await client.query(
+      // As with success, capture the pre-update status so the event names the real origin.
+      const run = await client.query<{ from_status: string }>(
         `
-        UPDATE review_runs
+        WITH previous AS (
+          SELECT run_id, runner_status FROM review_runs
+          WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
+          FOR UPDATE
+        )
+        UPDATE review_runs r
         SET runner_status='failed', runner_failure_code=$3,
             runner_failure_message=$4, artifact_storage=$5::jsonb,
             updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
+        FROM previous
+        WHERE r.run_id=previous.run_id
+        RETURNING previous.runner_status AS from_status
       `,
         [
           runId,
@@ -755,6 +919,14 @@ export class ReviewRunStore {
       `,
         [runId, this.connectorId]
       )
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'runner',
+        fromStatus: run.rows[0]?.from_status ?? null,
+        toStatus: 'failed',
+        reasonCode: error.code ?? null
+      })
       return true
     })
   }

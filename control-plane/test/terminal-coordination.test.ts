@@ -7,9 +7,11 @@ const run: ReviewRunRecord = {
   run_id: 'run-1',
   workflow: 'issue-review',
   publish_context: {},
+  preparation: null,
   runner_status: 'queued',
   publication_status: 'pending',
   created_at: '2026-01-01T00:00:00.000Z',
+  submitted_at: '2026-01-01T00:00:01.000Z',
   execution_updated_at: '2026-01-01T00:00:00.000Z',
   publication_updated_at: '2026-01-01T00:00:00.000Z',
   published_at: null,
@@ -30,6 +32,9 @@ function store(events: unknown[][]): Parameters<typeof observeRunnerRun>[0] {
     async failRunnerExecution(id, failure, artifact) {
       events.push(['failed', id, failure, artifact])
       return true
+    },
+    async touchObservation(id) {
+      events.push(['touched', id])
     }
   }
 }

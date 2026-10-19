@@ -7,7 +7,9 @@
     "run_id",
     "workflow",
     "publish_context",
+    "preparation",
     "runner_status",
+    "submitted_at",
     "publication_status",
     "created_at",
     "execution_updated_at",
@@ -38,6 +40,60 @@
       "type": "object",
       "additionalProperties": {}
     },
+    "preparation": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Durable preparation state, when the run has a preparation record. This is an operational summary only; it never exposes connector-owned preparation input.",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "attempt_count",
+        "updated_at",
+        "failure_code",
+        "failure_notice_status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own \"in progress\" state and is unrelated to the Runner, which is only submitted to once preparation reaches `submitted`.",
+          "enum": [
+            "pending",
+            "preparing",
+            "submitted",
+            "failed"
+          ]
+        },
+        "attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "failure_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "failure_notice_status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "pending",
+            "delivering",
+            "delivered",
+            "skipped",
+            null
+          ]
+        }
+      }
+    },
     "ingress_kind": {
       "type": "string",
       "enum": [
@@ -51,13 +107,22 @@
     "runner_status": {
       "type": "string",
       "enum": [
-        "preparing",
-        "recovering",
+        "pending",
         "queued",
         "running",
+        "uncertain",
         "succeeded",
+        "skipped",
         "failed"
       ]
+    },
+    "submitted_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL while the run is still preparing; use it, not execution_updated_at, to time execution."
     },
     "publication_status": {
       "type": "string",

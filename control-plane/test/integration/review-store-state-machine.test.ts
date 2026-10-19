@@ -138,6 +138,155 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
   }
 })
 
+test('submitted_at marks the instant execution began and does not move afterwards', async () => {
+  const store = await createStore()
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: `run-${randomUUID()}`,
+      publish_context: {}
+    })
+    const runId = admission.record.run_id
+    assert.ok(admission.preparation_token)
+
+    // Before submission the run is still preparing: there is no execution start to report.
+    assert.strictEqual((await store.getRun(runId))?.submitted_at, null)
+
+    await store.markQueued(runId, admission.preparation_token, {})
+    const queued = await store.getRun(runId)
+    assert.ok(queued?.submitted_at)
+    const submittedAt = queued?.submitted_at
+
+    // A later, non-transitional write (the artifact mtime) must not move submitted_at.
+    await store.recordArtifactStorage(runId, { status: 'unavailable' })
+    const after = await store.getRun(runId)
+    assert.strictEqual(after?.submitted_at, submittedAt)
+    assert.ok(
+      Date.parse(after!.execution_updated_at) >= Date.parse(submittedAt!),
+      'the row mtime moves past the immutable execution start'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('runner termination events name the state they came from', async () => {
+  const store = await createStore()
+  try {
+    // running -> succeeded must record from_status 'running', not null. `null` is reserved for
+    // the first event on an axis, so a null here would make the timeline claim the run started
+    // at that point.
+    const succeededId = await createQueuedRun(store)
+    await store.markRunning(succeededId)
+    assert.strictEqual(
+      await store.recordRunnerSuccess(
+        succeededId,
+        { run_id: succeededId },
+        undefined
+      ),
+      true
+    )
+    const succeededEvents = (await store.listEvents(succeededId)).filter(
+      (event) => event.axis === 'runner'
+    )
+    assert.deepStrictEqual(
+      succeededEvents.map((event) => [event.from_status, event.to_status]),
+      [
+        [null, 'pending'],
+        ['pending', 'queued'],
+        ['queued', 'running'],
+        ['running', 'succeeded']
+      ]
+    )
+
+    // queued -> failed likewise records the real origin.
+    const failedId = await createQueuedRun(store)
+    assert.strictEqual(
+      await store.failRunnerExecution(failedId, {
+        code: 'RUNNER_EXECUTION_FAILED',
+        message: 'boom'
+      }),
+      true
+    )
+    const failedEvents = (await store.listEvents(failedId)).filter(
+      (event) => event.axis === 'runner'
+    )
+    assert.deepStrictEqual(
+      failedEvents.map((event) => [event.from_status, event.to_status]),
+      [
+        [null, 'pending'],
+        ['pending', 'queued'],
+        ['queued', 'failed']
+      ]
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('the coordination event log records each transition once, oldest first', async () => {
+  const store = await createStore()
+  try {
+    const runId = await createQueuedRun(store)
+    // At least the admission (runner pending, preparation preparing, publication pending)
+    // and the pending->queued + preparing->submitted transitions must be present.
+    const events = await store.listEvents(runId)
+    const axes = events.map((event) => `${event.axis}:${event.to_status}`)
+    assert.ok(axes.includes('runner:pending'))
+    assert.ok(axes.includes('preparation:preparing'))
+    assert.ok(axes.includes('publication:pending'))
+    assert.ok(axes.includes('runner:queued'))
+    assert.ok(axes.includes('preparation:submitted'))
+
+    // Oldest first, and each transition appears exactly once.
+    const times = events.map((event) => Date.parse(event.occurred_at))
+    assert.deepStrictEqual(
+      times,
+      [...times].sort((a, b) => a - b)
+    )
+    assert.strictEqual(
+      new Set(events.map((event) => event.event_id)).size,
+      events.length
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('touchObservation advances the row mtime without changing state', async () => {
+  const store = await createStore()
+  try {
+    const runId = await createQueuedRun(store)
+    const before = await store.getRun(runId)
+    assert.strictEqual(before?.runner_status, 'queued')
+    // The heartbeat must move the mtime forward even though the status is unchanged.
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await store.touchObservation(runId)
+    const after = await store.getRun(runId)
+    assert.strictEqual(after?.runner_status, 'queued', 'state is unchanged')
+    assert.ok(
+      Date.parse(after!.execution_updated_at) >
+        Date.parse(before!.execution_updated_at),
+      'the row mtime moved forward'
+    )
+    // It must not touch a run that is not being polled.
+    const admitted = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: `run-${randomUUID()}`,
+      publish_context: {}
+    })
+    const preparingBefore = admitted.record.execution_updated_at
+    await store.touchObservation(admitted.record.run_id)
+    assert.strictEqual(
+      (await store.getRun(admitted.record.run_id))?.execution_updated_at,
+      preparingBefore,
+      'a pending run is not touched'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
 test('ReviewRunStore returns an expired preparation to pending without failing its run', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-stale-preparation-${randomUUID()}`
@@ -150,8 +299,11 @@ test('ReviewRunStore returns an expired preparation to pending without failing i
 
     assert.strictEqual(await store.expireStalePreparations(), 1)
     const run = await store.getRun(runId)
-    assert.strictEqual(run?.runner_status, 'preparing')
+    assert.strictEqual(run?.runner_status, 'pending')
     assert.strictEqual(run?.failure_code, null)
+    assert.strictEqual(run?.preparation?.status, 'pending')
+    assert.strictEqual(run?.preparation?.attempt_count, 1)
+    assert.strictEqual(run?.preparation?.failure_notice_status, null)
     assert.strictEqual(await store.claimPublication(runId), null)
     assert.strictEqual(await store.expireStalePreparations(), 0)
   } finally {
@@ -176,8 +328,22 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
     )
     assert.strictEqual(await store.expireStalePreparations(), 1)
     const run = await store.getRun(runId)
-    assert.strictEqual(run?.runner_status, 'failed')
+    assert.strictEqual(run?.runner_status, 'skipped')
     assert.strictEqual(run?.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
+    assert.deepStrictEqual(
+      {
+        status: run?.preparation?.status,
+        attempt_count: run?.preparation?.attempt_count,
+        failure_code: run?.preparation?.failure_code,
+        failure_notice_status: run?.preparation?.failure_notice_status
+      },
+      {
+        status: 'failed',
+        attempt_count: 8,
+        failure_code: 'PREPARATION_RETRY_EXHAUSTED',
+        failure_notice_status: 'pending'
+      }
+    )
     assert.strictEqual(await store.claimNextPreparation(), null)
     assert.strictEqual(await store.claimPublication(runId), null)
     const notice = await store.claimNextPreparationFailureNotice()
@@ -185,6 +351,10 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
     assert.strictEqual(notice.run_id, runId)
     assert.deepStrictEqual(notice.input, {})
     assert.strictEqual(notice.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
+    assert.strictEqual(
+      (await store.getRun(runId))?.preparation?.failure_notice_status,
+      'delivering'
+    )
     assert.strictEqual(
       await store.completePreparationFailureNotice(runId, randomUUID(), true),
       false
@@ -197,7 +367,60 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
       ),
       true
     )
+    assert.strictEqual(
+      (await store.getRun(runId))?.preparation?.failure_notice_status,
+      'delivered'
+    )
     assert.strictEqual(await store.claimNextPreparationFailureNotice(), null)
+  } finally {
+    await observer.end()
+    await store.close()
+  }
+})
+
+test('re-claiming an expired notice records delivering -> delivering, not pending -> delivering', async () => {
+  const connector = `notice-lease:${randomUUID()}`
+  const store = await createStore({ connectorId: connector, claimTimeoutMs: 0 })
+  const observer = new Pool({ connectionString: requireTestDatabase() })
+  const runId = `run-notice-lease-${randomUUID()}`
+  try {
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    // Produce a terminal preparation failure so a notice exists.
+    await observer.query(
+      `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour',
+         attempt_count=8 WHERE run_id=$1`,
+      [runId]
+    )
+    await store.expireStalePreparations()
+
+    const first = await store.claimNextPreparationFailureNotice()
+    assert.ok(first)
+    // Expire its lease, then claim again: the notice was already `delivering`.
+    await observer.query(
+      `UPDATE preparation_failure_notices SET claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE run_id=$1`,
+      [runId]
+    )
+    const second = await store.claimNextPreparationFailureNotice()
+    assert.ok(second)
+
+    const noticeEvents = (await store.listEvents(runId)).filter(
+      (event) => event.axis === 'notice'
+    )
+    assert.deepStrictEqual(
+      noticeEvents.map((event) => [event.from_status, event.to_status]),
+      [
+        [null, 'pending'],
+        ['pending', 'delivering'],
+        ['delivering', 'delivering']
+      ],
+      'the re-claim comes from delivering, and is marked as a lease expiry'
+    )
+    assert.strictEqual(noticeEvents[2]?.reason_code, 'NOTICE_LEASE_EXPIRED')
   } finally {
     await observer.end()
     await store.close()
@@ -426,7 +649,7 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
     })
 
     const failed = await store.getRun(runId)
-    assert.strictEqual(failed?.runner_status, 'failed')
+    assert.strictEqual(failed?.runner_status, 'skipped')
     assert.strictEqual(failed?.ingress_kind, 'github_webhook')
     assert.strictEqual(failed?.ingress_key, ingressKey)
     assert.strictEqual(failed?.failure_code, 'REVIEW_START_FAILED')
@@ -491,7 +714,7 @@ test('ReviewRunStore initialization does not steal another replica preparation',
   const restarted = await createStore({ connectorId: sharedConnector })
   try {
     const record = await restarted.getRun(runId)
-    assert.strictEqual(record?.runner_status, 'preparing')
+    assert.strictEqual(record?.runner_status, 'pending')
     assert.strictEqual(record?.failure_code, null)
   } finally {
     await restarted.close()
@@ -668,7 +891,9 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
       ),
       RunnerSubmissionUncertainError
     )
-    assert.strictEqual((await owner.getRun(runId))?.runner_status, 'failed')
+    // An uncertain submission may have reached the Runner, so execution is `uncertain` (a
+    // later recovery replays it) rather than skipped or failed.
+    assert.strictEqual((await owner.getRun(runId))?.runner_status, 'uncertain')
   } finally {
     await owner.close()
   }

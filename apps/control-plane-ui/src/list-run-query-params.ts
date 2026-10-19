@@ -13,6 +13,7 @@ export const LIST_RUN_QUERY_PARAMS = [
   'cursor',
   'execution_status',
   'publication_status',
+  'preparation_status',
   'workflow',
   'from',
   'to'

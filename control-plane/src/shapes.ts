@@ -7,6 +7,7 @@
 // not part of that contract: the small vocabulary unions, the store's create args, and the
 // runner-artifact narrowing helper.
 import type { RunnerArtifactStorage } from './contracts.js'
+import type { components } from './contract-types-generated.js'
 import type {
   ObservedRun,
   ObservedStep,
@@ -15,6 +16,9 @@ import type {
   ReviewRunAdmission,
   ReviewRunRecord
 } from './contract-types-generated.js'
+
+/** One coordination state transition, as the read endpoint reports it. */
+export type ReviewRunEvent = components['schemas']['ReviewRunEvent']
 
 export type {
   ObservedRun,
@@ -29,9 +33,19 @@ export type WorkflowName =
   'issue-review' | 'pull-request-review' | 'repository-review'
 export type IngressKind = 'github_webhook' | 'github_actions_dispatch'
 export type RunnerStatus =
-  'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+  | 'pending'
+  | 'queued'
+  | 'running'
+  | 'uncertain'
+  | 'succeeded'
+  | 'skipped'
+  | 'failed'
 export type PublicationStatus =
   'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+/** The redacted preparation summary's state, as both the contract and the run record use it. */
+export type PreparationStatus = NonNullable<
+  ReviewRunRecord['preparation']
+>['status']
 export type JsonObject = Record<string, unknown>
 
 /** The durable record's artifact storage, narrowed from the runner's loose type. */

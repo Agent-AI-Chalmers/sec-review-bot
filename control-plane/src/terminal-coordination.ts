@@ -3,7 +3,10 @@ import type { RunnerRunStatus } from './runner-client.js'
 
 type ObservationStore = Pick<
   ReviewRunStore,
-  'markRunning' | 'recordRunnerSuccess' | 'failRunnerExecution'
+  | 'markRunning'
+  | 'recordRunnerSuccess'
+  | 'failRunnerExecution'
+  | 'touchObservation'
 >
 export type RunnerObservationResult =
   'active' | 'succeeded' | 'failed' | 'poll_retry'
@@ -68,7 +71,12 @@ export async function observeRunnerRun(
     return 'failed'
   }
   if (status.status === 'running') {
-    if (!(await store.markRunning(run.run_id))) return 'active'
+    // `markRunning` only writes on the queued -> running transition; when the run is already
+    // running we still record that it was observed just now.
+    if (!(await store.markRunning(run.run_id))) {
+      await store.touchObservation(run.run_id)
+      return 'active'
+    }
     onEvent({
       kind: 'runner_state_changed',
       run_id: run.run_id,
@@ -78,8 +86,10 @@ export async function observeRunnerRun(
     })
     return 'active'
   }
-  if (status.status !== 'succeeded' && status.status !== 'failed')
+  if (status.status !== 'succeeded' && status.status !== 'failed') {
+    await store.touchObservation(run.run_id)
     return 'active'
+  }
   if (status.status === 'failed') {
     const recorded = await store.failRunnerExecution(
       run.run_id,

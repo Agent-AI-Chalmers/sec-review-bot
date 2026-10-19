@@ -24,12 +24,13 @@ Both sides of a request are typed from the contract too, not only the response: 
 Consumers can rely on:
 
 - the field names and required fields of an observed run;
-- the two status axes, `execution_status` and `publication_status`, as separate values;
+- the three lifecycle axes: the redacted `preparation` summary, `execution_status` (the Runner lifecycle under its established field name), and `publication_status`;
 - the `artifact_storage` variants: absent; an error variant whose status is `unavailable` or `failed`, with optional `error_code` and `message`; or `available` with a stored bundle.
 
 The following are not part of this contract:
 
 - internal store records, such as the row shape persisted in Postgres;
+- connector-owned preparation input, claim tokens, connector identities, and full reconciliation identities;
 - anything the console derives for display, such as relative times or phase durations.
 
 ## Enforcement

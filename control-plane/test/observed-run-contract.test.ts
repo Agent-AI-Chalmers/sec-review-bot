@@ -90,9 +90,17 @@ function recordWith(
   return {
     run_id: 'run-contract',
     workflow: 'repository-review',
+    preparation: {
+      status: 'submitted',
+      attempt_count: 1,
+      updated_at: '2026-10-10T05:01:00.000Z',
+      failure_code: null,
+      failure_notice_status: null
+    },
     runner_status: 'succeeded',
     publication_status: 'published',
     created_at: '2026-10-10T05:00:00.000Z',
+    submitted_at: '2026-10-10T05:00:30.000Z',
     execution_updated_at: '2026-10-10T05:02:46.000Z',
     publication_updated_at: '2026-10-10T05:11:09.000Z',
     published_at: '2026-10-10T05:11:09.000Z',

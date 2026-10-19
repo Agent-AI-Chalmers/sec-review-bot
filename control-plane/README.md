@@ -31,7 +31,7 @@ The service runs as an independent Node.js process on port `8090` by default. Po
 
 ## Run lifecycle
 
-A run begins in `preparing` immediately after admission. Its separately persisted preparation work owns the claim that fences input construction. GitHub integration prepares and uploads the input bundle, then submits the replayable Runner input under that claim. Control Plane records the input and moves the run to `queued` only after Runner accepts it.
+A run begins in `pending` immediately after admission: on the Runner axis its input has not been submitted yet. Preparation progress is tracked separately in `preparations`, whose own `preparing` state means a preparer currently owns the claim that fences input construction. GitHub integration prepares and uploads the input bundle, then submits the replayable Runner input under that claim. Control Plane records the input and moves the run to `queued` only after Runner accepts it.
 
 Control Plane polls `queued` and `running` runs. A successful Runner result is stored as `succeeded` and becomes eligible for publication. The integration claims that work, performs the GitHub side effects, and records either `published`, a retryable publication failure, or a terminal publication failure.
 
@@ -41,39 +41,50 @@ If Runner submission may have succeeded but its response was lost, the run enter
 
 Execution and publication are separate state machines:
 
-| Table                         | Responsibility                                            | Status                                                                |
-| ----------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
-| `review_runs`                 | Admission, Runner observation, and terminal workflow data | `preparing`, `recovering`, `queued`, `running`, `succeeded`, `failed` |
-| `preparations`                | Claimable input preparation                               | `pending`, `claimed`, `submitted`, `failed`                           |
-| `preparation_failure_notices` | Connector-owned terminal-failure acknowledgements         | `pending`, `claimed`, `delivered`, `skipped`                          |
-| `publications`                | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `skipped`             |
-| `publication_steps`           | Recoverable individual connector side effects             | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`        |
+| Table                         | Responsibility                                            | Status                                                                        |
+| ----------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `review_runs`                 | Admission, Runner observation, and terminal workflow data | `pending`, `queued`, `running`, `uncertain`, `succeeded`, `skipped`, `failed` |
+| `preparations`                | Claimable input preparation                               | `pending`, `preparing`, `submitted`, `failed`                                 |
+| `preparation_failure_notices` | Connector-owned terminal-failure acknowledgements         | `pending`, `delivering`, `delivered`, `skipped`                               |
+| `publications`                | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `skipped`                     |
+| `publication_steps`           | Recoverable individual connector side effects             | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`                |
 
 ```mermaid
 flowchart LR
-  subgraph runner[review_runs.runner_status]
-    preparing --> queued --> running --> runnersucceeded[succeeded]
-    preparing --> failed
-    failed -->|submission state uncertain| recovering --> queued
+  subgraph preparation[preparations.status]
+    prepending[pending] -->|claimed| preparing
+    preparing -->|input accepted| submitted
+    preparing -->|retry| prepending
+    preparing -->|retry exhausted| prepfailed[failed]
+  end
+
+  subgraph runner[review_runs.runner_status / execution_status]
+    pending -->|input submitted| queued
+    pending -->|preparation failed| skipped
+    pending -->|submission unconfirmed| uncertain
+    queued --> running --> succeeded
     queued --> failed
     running --> failed
+    uncertain -->|replay accepted| queued
+    uncertain -->|replay rejected| failed
   end
 
   subgraph publication[publications.status]
-    pending --> publishing --> published
-    publishing -->|retryable failure| pending
+    pubpending[pending] --> publishing --> published
+    publishing -->|retryable failure| pubpending
     publishing -->|terminal failure| pubfailed[failed]
-    pending -->|execution failed| skipped
+    pubpending -->|execution failed| skipped
   end
 
   subgraph steps[publication_steps.status]
-    steppending[pending] --> runningstep[running] --> succeeded
+    steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
     runningstep --> stepfailed[failed]
     stepfailed --> runningstep
     stepfailed -->|failure limit reached| terminalfailed[terminal_failed]
   end
 
-  runnersucceeded -.->|result becomes claimable| pending
+  preparedsubmitted[submitted] -.->|submits input| pending
+  succeeded -.->|result becomes claimable| pubpending
   publishing -.->|initializes side effects| steppending
 ```
 
@@ -105,7 +116,7 @@ The contract is **enforced on requests**: routing, path/query/body validation, a
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
-Read responses report the two status axes (`execution_status`, `publication_status`), and filter on the same names; [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is their contract.
+Read responses report three independent lifecycle axes: the redacted `preparation` summary, `execution_status` (the Runner lifecycle, retained under its existing public name), and `publication_status`. The preparation summary exposes state, attempts, last update, terminal failure code, and failure-notice status, but never its opaque input, claim token, or connector identity. The list endpoint filters on all three axes (`execution_status`, `publication_status`, and `preparation_status`); [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is the read contract.
 
 `/healthz` only proves the HTTP process is alive. `/readyz` verifies that the current PostgreSQL pool can execute a schema-ledger query and that its complete version set exactly matches this application; it returns `503 {"status":"unavailable"}` without database details otherwise. Compose uses `/readyz` for its Control Plane healthcheck. Runner and GitHub are deliberately excluded: their transient reachability does not make durable admission, reads, or PostgreSQL-backed recovery unsafe, and their failures have separate state-machine recovery paths.
 

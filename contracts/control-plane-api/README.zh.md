@@ -26,12 +26,13 @@ GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图
 消费者可以依赖：
 
 - observed run 的字段名与必填字段；
-- 两条状态轴 `execution_status` 与 `publication_status`，它们是彼此独立的值；
+- 三条生命周期轴：脱敏的 `preparation` 摘要、`execution_status`（沿用既有字段名的 Runner 生命周期）以及 `publication_status`；
 - `artifact_storage` 的变体：不存在；状态为 `unavailable` 或 `failed` 的错误变体，可带 `error_code` 与 `message`；或 `available` 且带有已存储的 bundle。
 
 以下不属于本契约：
 
 - 内部存储记录，例如持久化在 Postgres 里的行形状；
+- connector-owned preparation input、claim token、connector identity 和完整 reconciliation identity；
 - 控制台为展示而派生的任何内容，例如相对时间或各阶段耗时。
 
 ## 执行方式

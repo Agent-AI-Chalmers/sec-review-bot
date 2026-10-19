@@ -1,9 +1,11 @@
 {
   "run_id": "5c1f0a52-3d4b-4e6f-8a91-0b2c3d4e5f60",
   "workflow": "repository-review",
+  "preparation": null,
   "execution_status": "succeeded",
   "publication_status": "published",
   "created_at": "2026-10-10T05:00:00.000Z",
+  "submitted_at": "2026-10-11T02:00:30.000Z",
   "execution_updated_at": "2026-10-10T05:02:46.000Z",
   "publication_updated_at": "2026-10-10T05:11:09.000Z",
   "published_at": "2026-10-10T05:11:09.000Z",

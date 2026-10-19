@@ -93,7 +93,9 @@ components:
         - run_id
         - workflow
         - publish_context
+        - preparation
         - runner_status
+        - submitted_at
         - publication_status
         - created_at
         - execution_updated_at
@@ -118,6 +120,8 @@ components:
         runner_input:
           type: object
           additionalProperties: {}
+        preparation:
+          $ref: "#/components/schemas/PreparationSummary"
         ingress_kind:
           type: string
           enum:
@@ -128,12 +132,22 @@ components:
         runner_status:
           type: string
           enum:
-            - preparing
-            - recovering
+            - pending
             - queued
             - running
+            - uncertain
             - succeeded
+            - skipped
             - failed
+        submitted_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant execution began (the prepared input was accepted and the run
+            entered queued). NULL while the run is still preparing; use it, not
+            execution_updated_at, to time execution.
         publication_status:
           type: string
           enum:
@@ -244,6 +258,7 @@ components:
         - workflow
         - publish_context
         - runner_status
+        - submitted_at
         - publication_status
         - created_at
         - execution_updated_at
@@ -280,12 +295,22 @@ components:
         runner_status:
           type: string
           enum:
-            - preparing
-            - recovering
+            - pending
             - queued
             - running
+            - uncertain
             - succeeded
+            - skipped
             - failed
+        submitted_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant execution began (the prepared input was accepted and the run
+            entered queued). NULL while the run is still preparing; use it, not
+            execution_updated_at, to time execution.
         publication_status:
           type: string
           enum:
@@ -409,7 +434,9 @@ components:
       required:
         - run_id
         - workflow
+        - preparation
         - execution_status
+        - submitted_at
         - publication_status
         - created_at
         - execution_updated_at
@@ -427,15 +454,35 @@ components:
             - issue-review
             - pull-request-review
             - repository-review
+        preparation:
+          $ref: "#/components/schemas/PreparationSummary"
         execution_status:
           type: string
+          description: >-
+            The Runner lifecycle, retained under its established public name. `pending` means
+            the run has been admitted but its prepared input has not yet been submitted to the
+            Runner; preparation progress is reported separately by `preparation`. `skipped`
+            means execution never ran because preparation failed; the reason is on
+            `preparation`, not here. `uncertain` means a submission may have reached the Runner
+            but its result could not be confirmed; a recovery replays it to resolve the run to
+            `queued` or `failed`, so it is not a failure.
           enum:
-            - preparing
-            - recovering
+            - pending
             - queued
             - running
+            - uncertain
             - succeeded
+            - skipped
             - failed
+        submitted_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant execution began (the prepared input was accepted and the run
+            entered queued). NULL while the run is still preparing; use it, not
+            execution_updated_at, to time execution.
         publication_status:
           type: string
           enum:
@@ -464,6 +511,88 @@ components:
             - "null"
         artifact_storage:
           $ref: "#/components/schemas/ArtifactStorage"
+    ReviewRunEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - event_id
+        - axis
+        - from_status
+        - to_status
+        - reason_code
+        - occurred_at
+      properties:
+        event_id:
+          type: integer
+          description: Monotonic identifier; also the tie-breaker within one occurred_at.
+        axis:
+          type: string
+          enum:
+            - runner
+            - preparation
+            - publication
+            - notice
+        from_status:
+          type:
+            - string
+            - "null"
+          description: State before the transition; null for the first event on an axis.
+        to_status:
+          type: string
+        reason_code:
+          type:
+            - string
+            - "null"
+          description: Machine-readable cause for a failure or reversion, when there is one.
+        occurred_at:
+          type: string
+          format: date-time
+    PreparationSummary:
+      type:
+        - object
+        - "null"
+      description: >-
+        Durable preparation state, when the run has a preparation record. This is
+        an operational summary only; it never exposes connector-owned preparation input.
+      additionalProperties: false
+      required:
+        - status
+        - attempt_count
+        - updated_at
+        - failure_code
+        - failure_notice_status
+      properties:
+        status:
+          type: string
+          description: >-
+            Preparation lifecycle. `preparing` means a preparer currently owns the claim;
+            it is the preparation axis's own "in progress" state and is unrelated to the
+            Runner, which is only submitted to once preparation reaches `submitted`.
+          enum:
+            - pending
+            - preparing
+            - submitted
+            - failed
+        attempt_count:
+          type: integer
+          minimum: 0
+        updated_at:
+          type: string
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_notice_status:
+          type:
+            - string
+            - "null"
+          enum:
+            - pending
+            - delivering
+            - delivered
+            - skipped
+            - null
     ArtifactStorage:
       oneOf:
         - type: object
@@ -518,6 +647,150 @@ components:
                   type: integer
                   minimum: 0
         - type: "null"
+
+# State machine definitions. These are the single source of truth for the coordination
+# lifecycles: the console renders its state-machine and history views from a module generated
+# out of this block, and a test asserts every state here is an enum value on the corresponding
+# schema (and vice versa), so the diagram and the contract cannot drift apart. They are not part
+# of the HTTP surface; they describe the transitions the write paths perform.
+x-state-machines:
+  preparation:
+    order: 1
+    title: Preparation
+    # Which observed field carries this axis' current state.
+    field: preparation.status
+    initial: pending
+    terminal: [submitted, failed]
+    states:
+      pending:
+        label: Pending
+        description: Admitted, but no preparer has claimed the work yet.
+      preparing:
+        label: Preparing
+        description: A coordinator currently owns the claim and is building the Runner input.
+      submitted:
+        label: Submitted
+        description: The input was accepted and handed to the Runner; preparation is done.
+      failed:
+        label: Failed
+        description: >-
+          Preparation failed permanently (retry budget exhausted or input could not be built).
+          The Runner was never handed input, so execution is skipped.
+    transitions:
+      - { from: pending, to: preparing, label: claimed}
+      - { from: preparing, to: submitted, label: input accepted}
+      - { from: preparing, to: pending, label: retry}
+      - { from: preparing, to: failed, reason: PREPARATION_RETRY_EXHAUSTED, label: retry exhausted}
+  runner:
+    order: 2
+    title: Execution
+    field: execution_status
+    initial: pending
+    terminal: [succeeded, skipped, failed]
+    states:
+      pending:
+        label: Pending
+        description: Admitted, but its prepared input has not been submitted to the Runner yet.
+      queued:
+        label: Queued
+        description: The Runner accepted the submission; polling has not yet seen it start.
+      running:
+        label: Running
+        description: >-
+          Polling observed that the Runner is executing this run. A transient network blip while
+          polling does not change this state: the run keeps the last observed value and is polled
+          again, so this state may be slightly out of date.
+      succeeded:
+        label: Succeeded
+        description: The Runner returned a result; it now becomes eligible for publication.
+      skipped:
+        label: Skipped
+        description: >-
+          Execution never ran because preparation failed. This is not an execution failure; the
+          reason is on the preparation axis.
+      uncertain:
+        label: Unconfirmed
+        description: >-
+          The task was submitted, but no response arrived, so it is unknown whether the Runner
+          accepted it. This is not a failure: the submission is replayed under the same run_id,
+          and the run becomes queued if accepted or failed if it keeps failing.
+      failed:
+        label: Failed
+        description: >-
+          A definite failure, in one of two ways: (1) polling produced a conclusive answer that
+          the task cannot succeed — the Runner reported it failed, or the run could not be found,
+          returned no result, or the response broke the protocol; (2) a retried submission failed
+          conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not
+          a definite failure.
+    transitions:
+      # Submission (a write). `uncertain` only ever comes from a submission whose acceptance
+      # could not be confirmed — never from a run that was already queued or running.
+      - { from: pending, to: queued, label: input submitted}
+      - { from: pending, to: skipped, label: preparation failed}
+      - { from: pending, to: uncertain, reason: SUBMISSION_STATE_UNCERTAIN, label: submission unconfirmed }
+      - { from: uncertain, to: queued, label: replay accepted}
+      - { from: uncertain, to: failed, label: replay rejected }
+      # Observation (a read): the console learns the Runner's progress by polling.
+      - { from: queued, to: running, label: runner started }
+      - { from: running, to: succeeded, label: runner succeeded }
+      - { from: queued, to: failed, label: polling concluded failure }
+      - { from: running, to: failed, label: polling concluded failure }
+  publication:
+    order: 3
+    title: Publication
+    field: publication_status
+    initial: pending
+    terminal: [published, failed, skipped]
+    states:
+      pending:
+        label: Pending
+        description: Waiting for a successful execution result before publishing.
+      publishing:
+        label: Publishing
+        description: A coordinator owns the publication claim and is performing the side effects.
+      published:
+        label: Published
+        description: All publication steps succeeded; the result is visible.
+      failed:
+        label: Failed
+        description: The publication failed after its retry budget was exhausted.
+      skipped:
+        label: Skipped
+        description: There was nothing to publish because execution did not succeed.
+    transitions:
+      - { from: pending, to: publishing, label: publishing started }
+      - { from: publishing, to: published, label: published }
+      - { from: publishing, to: pending, label: retryable failure }
+      - { from: publishing, to: failed, label: terminal failure}
+      - { from: pending, to: skipped, label: execution not published}
+  # The failure-notice outbox has its own lifecycle, written to the event log on the `notice`
+  # axis. It is declared like any other state machine so the contract-consistency test covers its
+  # states against `PreparationSummary.failure_notice_status`. Whether the console draws it is a
+  # presentation decision and lives in the console, not here.
+  notice:
+    order: 4
+    title: Failure notice
+    field: preparation.failure_notice_status
+    initial: pending
+    terminal: [delivered, skipped]
+    states:
+      pending:
+        label: Pending
+        description: A terminal preparation failure happened and the user still has to be told.
+      delivering:
+        label: Delivering
+        description: The failure notice is being delivered to the user.
+      delivered:
+        label: Delivered
+        description: The user-visible failure notice was delivered.
+      skipped:
+        label: Skipped
+        description: No notice will be delivered for this failure.
+    transitions:
+      - { from: pending, to: delivering, label: notice claimed }
+      - { from: delivering, to: delivering, reason: NOTICE_LEASE_EXPIRED, label: delivery lease expired }
+      - { from: delivering, to: delivered, label: notice delivered }
+      - { from: delivering, to: skipped, label: notice skipped }
 
 paths:
   /healthz:
@@ -614,11 +887,12 @@ paths:
               execution_status:
                 type: string
                 enum:
-                  - preparing
-                  - recovering
+                  - pending
                   - queued
                   - running
+                  - uncertain
                   - succeeded
+                  - skipped
                   - failed
               publication_status:
                 type: string
@@ -628,6 +902,16 @@ paths:
                   - published
                   - failed
                   - skipped
+              preparation_status:
+                type: string
+                description: >-
+                  Matches the run's redacted preparation summary by state. Runs without a
+                  preparation record are not returned by this filter.
+                enum:
+                  - pending
+                  - preparing
+                  - submitted
+                  - failed
               workflow:
                 type: string
                 enum:
@@ -795,6 +1079,49 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ObservedPublicationStep"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/events:
+    get:
+      operationId: listRunEvents
+      description: >-
+        Read the append-only coordination event log for one run, oldest first. Each event is
+        a state transition on one coordination axis (runner, preparation, publication, or
+        notice). This is an audit trail over the snapshot tables, not the Runner's execution
+        history, which lives in Temporal. Requires the read token.
+      security:
+        - readToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      responses:
+        "200":
+          description: The run's coordination events, oldest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run_id
+                  - events
+                properties:
+                  run_id:
+                    type: string
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewRunEvent"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "401":

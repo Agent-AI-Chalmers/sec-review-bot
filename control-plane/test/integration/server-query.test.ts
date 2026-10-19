@@ -67,6 +67,17 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       ((await invalidPublicationStatus.json()) as { code?: string }).code,
       'INVALID_QUERY'
     )
+    const invalidPreparationStatus = await fetch(
+      `${base}/v1/runs?preparation_status=typo`,
+      {
+        headers: readAuth
+      }
+    )
+    assert.strictEqual(invalidPreparationStatus.status, 400)
+    assert.strictEqual(
+      ((await invalidPreparationStatus.json()) as { code?: string }).code,
+      'INVALID_QUERY'
+    )
     const invalidWorkflow = await fetch(`${base}/v1/runs?workflow=typo`, {
       headers: readAuth
     })

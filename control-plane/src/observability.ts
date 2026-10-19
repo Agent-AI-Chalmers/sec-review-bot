@@ -7,9 +7,11 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
   return {
     run_id: run.run_id,
     workflow: run.workflow,
+    preparation: run.preparation,
     execution_status: run.runner_status,
     publication_status: run.publication_status,
     created_at: run.created_at,
+    submitted_at: run.submitted_at,
     execution_updated_at: run.execution_updated_at,
     publication_updated_at: run.publication_updated_at,
     published_at: run.published_at,
