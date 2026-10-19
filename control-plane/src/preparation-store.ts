@@ -140,7 +140,8 @@ export class PreparationStore {
       }>(
         `SELECT n.run_id,p.input,n.failure_code,n.status AS status
          FROM preparation_failure_notices n
-         JOIN preparations p ON p.run_id=n.run_id
+         JOIN preparations p
+           ON p.run_id=n.run_id AND p.connector_id=n.connector_id
          WHERE n.connector_id=$1 AND (n.status='pending' OR
            (n.status='delivering' AND n.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
          ORDER BY n.updated_at,n.run_id FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
