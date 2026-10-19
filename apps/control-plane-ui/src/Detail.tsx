@@ -397,7 +397,7 @@ export function Detail(): React.JSX.Element {
         <>
           <div className="run-heading">
             <Group gap="xs" align="center" wrap="nowrap">
-              <Title order={1} className="run-id">
+              <Title order={1} className="run-id" ff="monospace">
                 {run.run_id}
               </Title>
               <CopyAction

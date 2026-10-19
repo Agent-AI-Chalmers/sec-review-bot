@@ -384,6 +384,11 @@ export function Runs(): React.JSX.Element {
                       <Group gap={4} align="center" wrap="nowrap">
                         <Tooltip label={run.run_id}>
                           <Link
+                            // A hex id reads far better in a monospaced face: proportional
+                            // digits make `0`/`O` and `1`/`l` ambiguous at 12px.
+                            style={{
+                              fontFamily: 'var(--mantine-font-family-monospace)'
+                            }}
                             to={`/runs/${encodeURIComponent(run.run_id)}`}
                             state={{ listSearch: search.toString() }}
                           >

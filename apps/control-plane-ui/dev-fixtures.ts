@@ -963,10 +963,35 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
   }
 })
 
-// Derive the operator queue instead of modelling it as a scenario. A blocked run keeps its
-// preparation at `preparing` while its execution has advanced - the contradiction coordination
-// refuses to resolve on its own - so the marker is applied after the fact and leaves every other
-// run's scenario/workflow pairing untouched.
+// The operator queue, shaped exactly as coordination would leave it. `EXECUTION_ALREADY_ADVANCED`
+// means an expired preparation lease could not be concluded because execution had already moved
+// past `pending`: writing "the Runner never ran" would overwrite a real result. So the two runs
+// below are put into that contradictory state - preparation still `preparing`, execution advanced,
+// publication still waiting - rather than just being labelled with the code. A marker on a run
+// whose axes are consistent would teach the console a state the Control Plane cannot produce.
+const BLOCKED_RUN_COUNT = 2
+for (const run of runs.slice(0, BLOCKED_RUN_COUNT)) {
+  const startedAt = run.execution.updated_at
+  run.preparation.status = 'preparing'
+  // A run in this state has necessarily been claimed at least once, so the phase has a start.
+  if (run.preparation.started_at === null)
+    run.preparation.started_at = run.created_at
+  run.preparation.finished_at = null
+  run.preparation.failure_code = null
+  run.preparation.failure_notice_status = null
+  run.preparation.expiry_blocked_reason = 'EXECUTION_ALREADY_ADVANCED'
+  // Execution reached a terminal result, which is what makes the expiry conclusion impossible.
+  run.execution.status = 'succeeded'
+  run.execution.started_at = startedAt
+  run.execution.finished_at = startedAt
+  // Publication never started, because execution success is what would have started it.
+  run.publication.status = 'pending'
+  run.publication.started_at = null
+  run.publication.finished_at = null
+  // A run-level failure code would contradict a succeeded execution.
+  run.failure_code = null
+}
+
 const stepsByRun = new Map<string, FixtureStep[]>(
   runs.map((run, index) => [
     run.run_id,
