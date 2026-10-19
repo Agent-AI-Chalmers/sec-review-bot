@@ -2361,3 +2361,58 @@ test('savePreparedSubmission rolls the publication write back when the execution
     await store.close()
   }
 })
+
+test('a publisher that died mid-publication is taken over once its lease expires', async () => {
+  // A publication is not stranded by a crashed publisher: `publishing` with an expired
+  // `claimed_at` is claimable again, which is the only reason the claim token exists. This pins
+  // that self-healing path - including the takeover event and the stale owner being fenced out -
+  // because it is what makes an operator repair unnecessary in the common case.
+  const store = await createStore({ claimTimeoutMs: 50 })
+  const runId = await createSuccessfulRun(store)
+  try {
+    const firstToken = await store.claimPublication(runId)
+    assert.ok(firstToken)
+    // The lease is still fresh, so nobody else may take it.
+    assert.strictEqual(await store.claimPublication(runId), null)
+
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    const secondToken = await store.claimPublication(runId)
+    assert.ok(secondToken, 'an expired lease must be reclaimable')
+    assert.notStrictEqual(secondToken, firstToken)
+
+    // The old owner is fenced out at every write.
+    assert.strictEqual(
+      await store.completePublication(runId, firstToken),
+      false
+    )
+    await assert.rejects(
+      store.requirePublicationStepClaim(runId, firstToken, 'x')
+    )
+
+    // The new owner finishes the publication.
+    await store.initializePublicationSteps(runId, secondToken, ['x'])
+    await store.requirePublicationStepClaim(runId, secondToken, 'x')
+    await store.completePublicationStep(runId, secondToken, 'x')
+    assert.strictEqual(
+      await store.completePublication(runId, secondToken),
+      true
+    )
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.status,
+      'published'
+    )
+
+    // The takeover is auditable, not silent.
+    const publicationEvents = (await store.listEvents(runId))
+      .filter((event) => event.axis === 'publication')
+      .map((event) => `${event.from_status}->${event.to_status}`)
+    assert.deepStrictEqual(publicationEvents, [
+      'null->pending',
+      'pending->publishing',
+      'publishing->publishing',
+      'publishing->published'
+    ])
+  } finally {
+    await store.close()
+  }
+})

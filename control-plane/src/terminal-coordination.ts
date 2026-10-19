@@ -118,6 +118,13 @@ export async function observeRunnerRun(
     })
     return 'failed'
   }
+  // Only a missing field is checked here, not a null one. A top-level `null` cannot arrive:
+  // the Runner validates the result against the v6 contract before it reports `succeeded`
+  // (`temporal_gateway.py`), and its response model serializes with `exclude_none`, so a null
+  // would be omitted rather than sent as `"result": null`. Checking for null here would be
+  // defensive code for an unreachable input. It matters that the assumption stays true: a
+  // stored JSON `null` would be excluded by the `jsonb_typeof(...) <> 'null'` guard on every
+  // publication claim, stranding the run with a publication no claim can pick up.
   if (!Object.hasOwn(status, 'result')) {
     await store.failRunnerExecution(run.run_id, {
       code: 'RUNNER_RESULT_MISSING',
