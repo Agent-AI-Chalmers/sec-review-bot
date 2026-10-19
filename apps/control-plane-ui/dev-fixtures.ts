@@ -1004,6 +1004,14 @@ export function devFixtures(): Plugin {
       // straight back into the run list. Starts signed in: `dev:fixtures` exists to show
       // the console's real screens without an access token.
       let signedIn = true
+      // Runs the operator abandoned while this dev server has been running. Remembering them is
+      // what makes the abandon button actually work locally: the queue shrinks and the detail
+      // page stops offering the decision, instead of the button being permanently inert.
+      const abandoned = new Set<string>()
+      // The two runs standing in for the operator queue. Fixed rather than derived, because a
+      // blocked run's shape cannot be produced by any scenario.
+      const blockedRunIds = (): string[] =>
+        runs.slice(0, 2).map((run) => run.run_id)
       server.middlewares.use((request, response, next) => {
         if (!request.url?.startsWith('/api/')) return next()
         response.setHeader('content-type', 'application/json')
@@ -1101,15 +1109,39 @@ export function devFixtures(): Plugin {
         }
         // Before the run-detail match below, which would otherwise read this fixed segment as a
         // run id. Mirrors `GET /v1/runs/blocked-preparations`.
+        const abandonMatch = /^\/api\/admin\/runs\/([^/?]+)\/abandon$/.exec(
+          request.url
+        )
+        if (request.method === 'POST' && abandonMatch !== null) {
+          // Mirrors the real endpoint's contract closely enough for local use: an operator token
+          // is required, the run must be in the queue, and success removes it from the queue.
+          if (request.headers['x-control-plane-admin-token'] === undefined) {
+            response.statusCode = 401
+            response.end(JSON.stringify({ error: 'admin_token_required' }))
+            return
+          }
+          const runId = decodeURIComponent(abandonMatch[1] ?? '')
+          if (!blockedRunIds().includes(runId)) {
+            response.statusCode = 409
+            response.end(JSON.stringify({ error: 'not_blocked' }))
+            return
+          }
+          abandoned.add(runId)
+          const run = runs.find((item) => item.run_id === runId)
+          response.end(JSON.stringify({ run }))
+          return
+        }
         if (request.url === '/api/runs/blocked-preparations') {
           // Synthetic: a blocked run is not a lifecycle stage any scenario can describe (it is
           // the contradictory shape coordination refuses to resolve), so it is invented here
           // rather than mutating a real run. The ids are real, so following one opens a detail
           // page that loads.
-          const blocks = runs.slice(0, 2).map((run) => ({
-            run_id: run.run_id,
-            reason: 'EXECUTION_ALREADY_ADVANCED'
-          }))
+          const blocks = blockedRunIds()
+            .filter((runId) => !abandoned.has(runId))
+            .map((runId) => ({
+              run_id: runId,
+              reason: 'EXECUTION_ALREADY_ADVANCED'
+            }))
           response.end(JSON.stringify({ blocks }))
           return
         }
@@ -1145,7 +1177,23 @@ export function devFixtures(): Plugin {
           const runId = decodeURIComponent(runMatch[1] ?? '')
           const run = runs.find((item) => item.run_id === runId)
           if (run) {
-            response.end(JSON.stringify({ run }))
+            response.end(
+              JSON.stringify({
+                run: {
+                  ...run,
+                  preparation: {
+                    ...run.preparation,
+                    // The queue is synthetic, so the detail read has to agree with it: a run
+                    // still in the queue reports the marker, an abandoned one does not.
+                    expiry_blocked_reason:
+                      blockedRunIds().includes(run.run_id) &&
+                      !abandoned.has(run.run_id)
+                        ? 'EXECUTION_ALREADY_ADVANCED'
+                        : null
+                  }
+                }
+              })
+            )
             return
           }
         }

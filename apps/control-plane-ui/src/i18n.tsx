@@ -77,6 +77,9 @@ export const messages = {
     runHistory: 'History',
     runHistoryEmpty: 'No recorded transitions yet',
     cancel: 'Cancel',
+    blockedRunTitle: 'This run is stuck',
+    blockedRunBody:
+      'Nothing will move it forward on its own. Decide whether to abandon it, which closes the run and keeps whatever result was recorded.',
     abandonRun: 'Abandon',
     abandonTitle: 'Abandon this run',
     abandonExplainer:
@@ -306,6 +309,9 @@ export const messages = {
     runHistory: '历史',
     runHistoryEmpty: '暂无记录的变更',
     cancel: '取消',
+    blockedRunTitle: '这个 run 卡住了',
+    blockedRunBody:
+      '系统不会自行推进它了。请判断是否放弃：放弃会结束这个 run，已记录的结果会保留。',
     abandonRun: '放弃',
     abandonTitle: '放弃这个 run',
     abandonExplainer:

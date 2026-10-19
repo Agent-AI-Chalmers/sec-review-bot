@@ -6,9 +6,12 @@ import {
   Button,
   Container,
   Group,
+  Modal,
   Paper,
   Stack,
   Text,
+  Textarea,
+  TextInput,
   Timeline,
   Title
 } from '@mantine/core'
@@ -22,6 +25,7 @@ import {
   IconDownload
 } from '@tabler/icons-react'
 import {
+  abandonBlockedRun,
   api,
   ApiError,
   type ArtifactStorage,
@@ -159,6 +163,106 @@ function Artifact({
   )
 }
 
+/** The operator decision for one blocked run.
+ *
+ * The admin token is entered here, held only in this component's state, and sent with the single
+ * request. The console backend forwards it and keeps no copy, so closing the dialog (or the tab)
+ * leaves nothing behind that could act later. Asking again for every abandonment is deliberate:
+ * the action concludes a run and cannot be undone.
+ */
+function AbandonDialog({
+  runId,
+  opened,
+  onClose,
+  onDone
+}: {
+  runId: string
+  opened: boolean
+  onClose: () => void
+  onDone: () => void | Promise<void>
+}): React.JSX.Element {
+  const t = useMessages()
+  const [reason, setReason] = React.useState('')
+  const [adminToken, setAdminToken] = React.useState('')
+  const [submitting, setSubmitting] = React.useState(false)
+  const [failure, setFailure] = React.useState<string | null>(null)
+
+  // Reset whenever the dialog opens for a different run, so a token typed for one decision is
+  // never silently reused for the next.
+  React.useEffect(() => {
+    if (!opened) return
+    setReason('')
+    setAdminToken('')
+    setFailure(null)
+    setSubmitting(false)
+  }, [opened, runId])
+
+  const submit = async (): Promise<void> => {
+    setSubmitting(true)
+    setFailure(null)
+    try {
+      await abandonBlockedRun(runId, reason.trim(), adminToken.trim())
+      await onDone()
+    } catch (error) {
+      setFailure(
+        error instanceof ApiError && error.status === 401
+          ? t('abandonWrongToken')
+          : t('abandonFailed')
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal opened={opened} onClose={onClose} title={t('abandonTitle')} centered>
+      <Stack gap="sm">
+        <Text size="sm">{t('abandonExplainer')}</Text>
+        <Text size="xs" ff="monospace" c="dimmed">
+          {runId}
+        </Text>
+        <Textarea
+          label={t('abandonReasonLabel')}
+          description={t('abandonReasonHint')}
+          value={reason}
+          onChange={(event) => setReason(event.currentTarget.value)}
+          autosize
+          minRows={2}
+          required
+        />
+        <TextInput
+          label={t('abandonTokenLabel')}
+          description={t('abandonTokenHint')}
+          type="password"
+          value={adminToken}
+          onChange={(event) => setAdminToken(event.currentTarget.value)}
+          required
+        />
+        {failure !== null && (
+          <Text role="alert" c="red" size="sm">
+            {failure}
+          </Text>
+        )}
+        <Group justify="flex-end" gap="xs">
+          <Button variant="default" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button
+            color="red"
+            loading={submitting}
+            disabled={reason.trim() === '' || adminToken.trim() === ''}
+            onClick={() => {
+              void submit()
+            }}
+          >
+            {t('abandonConfirm')}
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
 export function Detail(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
@@ -182,6 +286,7 @@ export function Detail(): React.JSX.Element {
     runId: string
     error: unknown
   }>()
+  const [abandoning, setAbandoning] = React.useState(false)
   const run = loaded?.runId === runId ? loaded.run : undefined
   const steps = loaded?.runId === runId ? loaded.steps : []
   const events = loaded?.runId === runId ? loaded.events : []
@@ -346,6 +451,47 @@ export function Detail(): React.JSX.Element {
                 {t('refreshFailed')}
                 {failureReason(error, t) && ` ${failureReason(error, t)}`}
               </Text>
+            )}
+            <AbandonDialog
+              runId={run.run_id}
+              opened={abandoning}
+              onClose={() => setAbandoning(false)}
+              onDone={async () => {
+                setAbandoning(false)
+                await load()
+              }}
+            />
+            {run.preparation.expiry_blocked_reason !== null && (
+              <Paper
+                component="section"
+                withBorder
+                radius="sm"
+                p="md"
+                className="blocked-run"
+                data-testid="blocked-run"
+              >
+                <Group justify="space-between" align="flex-start" gap="md">
+                  <div>
+                    <Title order={2} mb={4}>
+                      {t('blockedRunTitle')}
+                    </Title>
+                    <Text size="sm" mb={4}>
+                      {t('blockedRunBody')}
+                    </Text>
+                    <Text size="xs" c="dimmed" ff="monospace">
+                      {run.preparation.expiry_blocked_reason}
+                    </Text>
+                  </div>
+                  <Button
+                    color="red"
+                    variant="light"
+                    onClick={() => setAbandoning(true)}
+                    data-testid="abandon-run"
+                  >
+                    {t('abandonRun')}
+                  </Button>
+                </Group>
+              </Paper>
             )}
             <Paper component="section" withBorder radius="sm" p="md">
               <Title order={2} mb="lg">
