@@ -678,6 +678,20 @@ export class ReviewRunStore {
       })
     })
   }
+  /** Whether this connector owns a run trunk row with this id.
+   *
+   * The event log lives on the trunk, so answering "does this run exist?" must not go through the
+   * full record projection: that projection treats an unrepresentable axis row as a corrupt run
+   * and returns `null`, which would make the events endpoint answer 404 for a run whose history
+   * is in fact readable. */
+  async runExists(runId: string): Promise<boolean> {
+    this.ready()
+    const result = await this.pool.query(
+      'SELECT 1 FROM review_runs WHERE run_id=$1 AND connector_id=$2',
+      [runId, this.connectorId]
+    )
+    return result.rowCount === 1
+  }
   async listEvents(runId: string): Promise<ReviewRunEvent[]> {
     return await listEvents(this.pool, runId, this.connectorId)
   }

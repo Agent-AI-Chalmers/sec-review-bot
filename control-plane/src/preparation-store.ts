@@ -5,7 +5,7 @@ import { Pool, type PoolClient } from 'pg'
 
 import type { ControlPlaneWorkflow as WorkflowName } from './contracts.js'
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
-import { appendEvent } from './review-run-events.js'
+import { appendEvent, appendEvents } from './review-run-events.js'
 import type { PublicationStatus } from './shapes.js'
 
 type JsonObject = Record<string, unknown>
@@ -241,19 +241,19 @@ export class PreparationStore {
         [this.connectorId, this.claimTimeoutMs, MAX_PREPARATION_ATTEMPTS]
       )
       // Preparation events for every expired row: a reversion to pending after the lease
-      // lapsed, or a terminal failure once the retry budget is spent.
-      for (const row of expired.rows) {
-        // The event names the code the row now carries, which is the last real reason when a
-        // previous attempt recorded one.
-        await appendEvent(client, {
+      // lapsed, or a terminal failure once the retry budget is spent. The event names the code the
+      // row now carries, which is the last real reason when a previous attempt recorded one.
+      await appendEvents(
+        client,
+        expired.rows.map((row) => ({
           runId: row.run_id,
           connectorId: this.connectorId,
-          axis: 'preparation',
+          axis: 'preparation' as const,
           fromStatus: 'preparing',
           toStatus: row.status,
           reasonCode: row.status === 'failed' ? row.failure_code : null
-        })
-      }
+        }))
+      )
       const failedRunIds = expired.rows
         .filter((row) => row.status === 'failed')
         .map((row) => row.run_id)
@@ -287,29 +287,32 @@ export class PreparationStore {
          ON CONFLICT (run_id) DO NOTHING`,
         [failedRunIds, this.connectorId]
       )
-      for (const failedRunId of failedRunIds) {
-        await appendEvent(client, {
-          runId: failedRunId,
-          connectorId: this.connectorId,
-          axis: 'runner',
-          fromStatus: 'pending',
-          toStatus: 'skipped'
-        })
-        await appendEvent(client, {
-          runId: failedRunId,
-          connectorId: this.connectorId,
-          axis: 'publication',
-          fromStatus: 'pending',
-          toStatus: 'skipped'
-        })
-        await appendEvent(client, {
-          runId: failedRunId,
-          connectorId: this.connectorId,
-          axis: 'notice',
-          fromStatus: null,
-          toStatus: 'pending'
-        })
-      }
+      await appendEvents(
+        client,
+        failedRunIds.flatMap((failedRunId) => [
+          {
+            runId: failedRunId,
+            connectorId: this.connectorId,
+            axis: 'runner' as const,
+            fromStatus: 'pending',
+            toStatus: 'skipped'
+          },
+          {
+            runId: failedRunId,
+            connectorId: this.connectorId,
+            axis: 'publication' as const,
+            fromStatus: 'pending',
+            toStatus: 'skipped'
+          },
+          {
+            runId: failedRunId,
+            connectorId: this.connectorId,
+            axis: 'notice' as const,
+            fromStatus: null,
+            toStatus: 'pending'
+          }
+        ])
+      )
       return expired.rowCount ?? 0
     })
   }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { Pool } from 'pg'
 
 function databaseUrl(): string {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -246,6 +247,42 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       ((await invalidFrom.json()) as { code?: string }).code,
       'INVALID_QUERY'
     )
+
+    // The event log belongs to the run trunk, so a run whose axis row is unrepresentable still
+    // has a readable history. Before this used the full record projection, which reports that
+    // corruption as "not found", hiding the very timeline an operator needs to diagnose it.
+    const corruptRunId = runIds[1]
+    const writePool = new Pool({ connectionString: databaseUrl() })
+    try {
+      await writePool.query('DELETE FROM executions WHERE run_id=$1', [
+        corruptRunId
+      ])
+      const corruptDetail = await fetch(`${base}/v1/runs/${corruptRunId}`, {
+        headers: readAuth
+      })
+      assert.strictEqual(
+        corruptDetail.status,
+        404,
+        'the record read still treats the corrupt run as unrepresentable'
+      )
+      const corruptEvents = await fetch(
+        `${base}/v1/runs/${corruptRunId}/events`,
+        { headers: readAuth }
+      )
+      assert.strictEqual(
+        corruptEvents.status,
+        200,
+        'the event log stays readable for a corrupt run'
+      )
+      const corruptBody = (await corruptEvents.json()) as {
+        run_id: string
+        events: unknown[]
+      }
+      assert.strictEqual(corruptBody.run_id, corruptRunId)
+      assert.ok(corruptBody.events.length > 0)
+    } finally {
+      await writePool.end()
+    }
 
     await server.close()
     server = await startControlPlaneServer()

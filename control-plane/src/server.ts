@@ -364,10 +364,11 @@ export async function registerControlPlaneRoutes(
 
     listRunEvents: async (request, reply) => {
       const { runId } = request.params as PathParams<'listRunEvents'>
-      const run = await store.getRun(runId)
-      if (run === null) return reply.code(404).send({ error: 'run_not_found' })
-      const events = await store.listEvents(run.run_id)
-      return { run_id: run.run_id, events }
+      // Only the trunk has to exist: the events are trunk-owned, so a readable history must not
+      // be hidden behind the record projection that reports an axis-row fault as "not found".
+      if (!(await store.runExists(runId)))
+        return reply.code(404).send({ error: 'run_not_found' })
+      return { run_id: runId, events: await store.listEvents(runId) }
     },
     admitRun: async (request) => {
       const body = request.body as RequestBody<'admitRun'>
