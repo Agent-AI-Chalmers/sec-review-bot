@@ -26,7 +26,7 @@ GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图
 消费者可以依赖：
 
 - observed run 的字段名与必填字段；
-- 以嵌套对象报告的三条生命周期轴：脱敏的 `preparation` 摘要，以及 `execution` / `publication`。每组各自报告 `status`、`started_at` 与 `finished_at`，后两者另报告该轴的 `updated_at`；用于筛选它们的查询参数沿用既有的 `*_status` 拼写；
+- 以嵌套对象报告的三条生命周期轴：脱敏的 `preparation` 摘要，以及 `execution` / `publication`。每组各自报告 `status`、`started_at`、`finished_at` 与该轴的 `updated_at`（最后一次写入时间，不是阶段边界）；用于筛选它们的查询参数沿用既有的 `*_status` 拼写；
 - `artifact_storage` 的变体：不存在；状态为 `unavailable` 或 `failed` 的错误变体，可带 `error_code` 与 `message`；或 `available` 且带有已存储的 bundle。
 
 以下不属于本契约：

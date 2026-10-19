@@ -120,7 +120,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 查询响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
-查询响应以形状一致的三组嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at` 与 `finished_at`；`execution` 与 `publication` 另有 `updated_at`，表示该轴最后一次被写入的时间。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code` / `failure_notice_status`，但绝不包含其 opaque input、claim token 或 connector identity。列表端点通过查询参数沿三条轴筛选（`preparation_status`、`execution_status` 与 `publication_status`；参数名沿用既有拼写）；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是读取契约。
+查询响应以形状一致的三组嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at`、`finished_at` 与 `updated_at` —— 后者表示该轴最后一次被写入的时间，是界面展示的活动新鲜度，刻意不用作阶段边界。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code` / `failure_notice_status`，但绝不包含其 opaque input、claim token 或 connector identity。列表端点通过查询参数沿三条轴筛选（`preparation_status`、`execution_status` 与 `publication_status`；参数名沿用既有拼写）；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是读取契约。
 
 `/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Control Plane healthcheck。Runner 与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
 
