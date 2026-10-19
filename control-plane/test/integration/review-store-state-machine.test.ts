@@ -2224,3 +2224,83 @@ test('markQueued refuses to submit into a publication that already ended', async
     await store.close()
   }
 })
+
+test('a preparation failure refuses to commit when its claim was taken mid-transaction', async () => {
+  // `failPreparation` asserts the claim with an EXISTS in the executions update, then writes the
+  // preparation row. Under READ COMMITTED the preparation row is not locked between the two, so
+  // an expired lease in another writer (`expireStale`) can replace it in between. Without a
+  // rowCount check the transaction would keep going and record `preparing -> failed` while the
+  // snapshot says something else: the audit log and the state would disagree.
+  //
+  // A trigger stands in for that concurrent writer by taking the claim away right after the
+  // executions row changes, which is exactly the window the two statements leave open. A normal
+  // call cannot produce this interleaving, so the trigger is what makes the race deterministic.
+  const store = await createStore()
+  const runId = `run-${randomUUID()}`
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION test_steal_preparation_claim() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.status = 'skipped' AND OLD.status = 'pending' THEN
+          UPDATE preparations
+             SET status='failed', claim_token=NULL, claimed_at=NULL,
+                 failure_code='LEASE_EXPIRED', finished_at=clock_timestamp()
+           WHERE run_id = NEW.run_id;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `)
+    await pool.query(`
+      CREATE TRIGGER test_steal_preparation_claim_trigger
+      AFTER UPDATE ON executions
+      FOR EACH ROW EXECUTE FUNCTION test_steal_preparation_claim();
+    `)
+    try {
+      await assert.rejects(
+        store.failPreparation(
+          runId,
+          admission.preparation_token,
+          { code: 'PREPARATION_INPUT_INVALID', message: 'cannot build input' },
+          { retry: false }
+        ),
+        /lost its claim before it could be marked failed/,
+        'a claim lost between the two statements must abort the failure'
+      )
+      // Throwing rolls the entire cross-axis failure back, including the row the competing
+      // writer took: the call committed neither the `failed` snapshot nor an audit event that
+      // would describe a transition this transaction never truly made. The preparation is still
+      // owned by the (now stale) claim, so the caller can report a lost claim and let the real
+      // owner - the lease expiry - decide the outcome.
+      const record = await store.getRun(runId)
+      assert.strictEqual(
+        record?.preparation.status,
+        'preparing',
+        'a lost claim must not be recorded as a terminal failure'
+      )
+      assert.strictEqual(record?.execution.status, 'pending')
+      assert.deepStrictEqual(
+        (await store.listEvents(runId)).map(
+          (event) => `${event.axis}:${event.to_status}`
+        ),
+        ['runner:pending', 'preparation:preparing', 'publication:pending'],
+        'the refused failure must not append a misleading event'
+      )
+    } finally {
+      await pool.query(
+        'DROP TRIGGER IF EXISTS test_steal_preparation_claim_trigger ON executions'
+      )
+      await pool.query('DROP FUNCTION IF EXISTS test_steal_preparation_claim()')
+    }
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})

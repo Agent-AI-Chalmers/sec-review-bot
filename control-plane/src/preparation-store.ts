@@ -390,7 +390,13 @@ export class PreparationStore {
         throw new Error(
           `Preparation claim was lost before failing review run ${runId}.`
         )
-      await client.query(
+      // The executions update above proves the claim was live when it ran, but the preparation
+      // row is only read through an EXISTS there, not locked. Under READ COMMITTED another writer
+      // (an expired lease in `expireStale`) can still replace the row between the two statements.
+      // Without this check the transaction would keep going and record `preparing -> failed` while
+      // the snapshot says something else, so the log and the state would disagree. Throwing rolls
+      // back the whole cross-axis failure instead of committing it on a stale claim.
+      const prepared = await client.query(
         `UPDATE preparations SET status='failed', claim_token=NULL, claimed_at=NULL,
            failure_code=$4, failure_message=$5,
            last_failure_code=$4, last_failure_message=$5,
@@ -398,6 +404,10 @@ export class PreparationStore {
          WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
+      if (prepared.rowCount !== 1)
+        throw new Error(
+          `Preparation ${runId} lost its claim before it could be marked failed.`
+        )
       // Publication is only "not applicable" once execution is conclusively skipped. An
       // uncertain submission may still be accepted, so its publication stays `pending`: ruling
       // it out early would require a later skipped -> pending reversion just to undo this.
