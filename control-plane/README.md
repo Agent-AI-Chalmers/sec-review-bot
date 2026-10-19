@@ -137,8 +137,8 @@ Read responses report three independent lifecycle axes as nested objects of the 
 | Variable                                   | Required                             | Purpose                                                                                   |
 | ------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                             | Yes                                  | PostgreSQL connection string                                                              |
-| `CONTROL_PLANE_SERVICE_TOKEN`              | Yes                                  | Internal mutation and coordination authentication                                         |
-| `CONTROL_PLANE_READ_TOKEN`                 | Yes                                  | Query API authentication                                                                  |
+| `CONTROL_PLANE_READ_TOKEN`                 | Yes                                  | Redacted read API; the console backend and any read-only consumer use this one            |
+| `CONTROL_PLANE_SERVICE_TOKEN`              | Yes                                  | Component coordination (admission, claims, terminal outcomes); cannot reach `/v1/admin`   |
 | `CONTROL_PLANE_ADMIN_TOKEN`                | No                                   | Operator authentication for `/v1/admin/*`; when unset the whole admin surface answers 404 |
 | `AGENT_RUNNER_SERVICE_URL`                 | Yes                                  | Runner service base URL                                                                   |
 | `AGENT_RUNNER_SERVICE_TOKEN`               | For non-loopback or protected Runner | Runner authentication                                                                     |

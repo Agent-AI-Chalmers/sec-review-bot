@@ -139,8 +139,8 @@ service token 用于协调 run 的各个组件，read token 用于脱敏读取�
 | 变量                                       | 是否必需                           | 用途                                                    |
 | ------------------------------------------ | ---------------------------------- | ------------------------------------------------------- |
 | `DATABASE_URL`                             | 是                                 | PostgreSQL connection string                            |
-| `CONTROL_PLANE_SERVICE_TOKEN`              | 是                                 | 内部 mutation 和协调认证                                |
-| `CONTROL_PLANE_READ_TOKEN`                 | 是                                 | 查询 API 认证                                           |
+| `CONTROL_PLANE_READ_TOKEN`                 | 是                                 | 脱敏读 API；控制台后端与任何只读消费方都用它            |
+| `CONTROL_PLANE_SERVICE_TOKEN`              | 是                                 | 组件协调（接纳、领取、终态）；无法访问 `/v1/admin`      |
 | `CONTROL_PLANE_ADMIN_TOKEN`                | 否                                 | `/v1/admin/*` 的运维认证；未配置时整个 admin 面返回 404 |
 | `AGENT_RUNNER_SERVICE_URL`                 | 是                                 | Runner service base URL                                 |
 | `AGENT_RUNNER_SERVICE_TOKEN`               | 非 loopback 或受保护的 Runner 必需 | Runner 认证                                             |
