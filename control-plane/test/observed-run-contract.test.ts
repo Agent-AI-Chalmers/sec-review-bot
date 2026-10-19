@@ -84,6 +84,37 @@ test('the shared fixtures match or violate the schema exactly as the manifest cl
   }
 })
 
+test('a comment_url must be an absolute URI, not just any string', () => {
+  // `format` keywords are only enforced because `ajv-formats` is installed, and a schema that
+  // merely said `type: string` would accept "not a url". This pins the constraint itself rather
+  // than relying on the negative fixture to fail for the right reason by luck.
+  const base = fixture('observed-run.json') as Record<string, unknown>
+  const withUrl = (url: unknown): unknown => ({
+    ...base,
+    failure_notice: {
+      ...(base.failure_notice as Record<string, unknown>),
+      comment_url: url
+    }
+  })
+  assert.strictEqual(
+    validate('observed-run.schema.json', withUrl('https://example.test/c/1')),
+    true,
+    'an absolute https URI is accepted'
+  )
+  for (const bad of ['not a url', '', 'example.test/c/1', 42]) {
+    assert.strictEqual(
+      validate('observed-run.schema.json', withUrl(bad)),
+      false,
+      `${JSON.stringify(bad)} must not be accepted as a comment_url`
+    )
+  }
+  assert.strictEqual(
+    validate('observed-run.schema.json', withUrl(null)),
+    true,
+    'null stays valid: it is how "nobody was told" is reported'
+  )
+})
+
 /** Every key path in `value`, so two fixtures can be compared by shape alone. */
 function paths(value: unknown, prefix = ''): string[] {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {

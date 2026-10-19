@@ -34,5 +34,10 @@
     }
   },
   "failure_code": null,
-  "failure_notice": null
+  "failure_notice": {
+    "status": "delivered",
+    "failure_stage": "preparation",
+    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+    "comment_url": "https://github.com/example/example/issues/1#issuecomment-1"
+  }
 }

@@ -339,12 +339,16 @@
               ]
             },
             "comment_url": {
-              "description": "Where the requester can read the outcome, or null when they were never told.",
-              "type": [
-                "string",
-                "null"
-              ],
-              "format": "uri"
+              "description": "Where the requester can read the outcome. Always an absolute URI when present, and null only when no message reached them.",
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "format": "uri"
+                }
+              ]
             }
           }
         }

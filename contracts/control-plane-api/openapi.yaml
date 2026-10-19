@@ -283,11 +283,12 @@ components:
             - "null"
         comment_url:
           description: >-
-            Where the requester can read the outcome, or null when they were never told.
-          type:
-            - string
-            - "null"
-          format: uri
+            Where the requester can read the outcome. Always an absolute URI when present, and
+            null only when no message reached them.
+          oneOf:
+            - type: "null"
+            - type: string
+              format: uri
     PublicationWork:
       type: object
       additionalProperties: false
@@ -1590,10 +1591,10 @@ paths:
                     The comment the requester can read. Required when `delivered` is true and
                     rejected when it is false, so "delivered" cannot claim a destination that
                     does not exist.
-                  type:
-                    - string
-                    - "null"
-                  format: uri
+                  oneOf:
+                    - type: "null"
+                    - type: string
+                      format: uri
       responses:
         "200":
           description: Whether the caller still owned the notice.

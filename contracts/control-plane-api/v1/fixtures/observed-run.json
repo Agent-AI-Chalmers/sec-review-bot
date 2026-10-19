@@ -2,12 +2,12 @@
   "run_id": "5c1f0a52-3d4b-4e6f-8a91-0b2c3d4e5f60",
   "workflow": "repository-review",
   "preparation": {
-    "status": "submitted",
+    "status": "failed",
     "attempt_count": 1,
     "started_at": "2026-10-10T05:00:10.000Z",
     "finished_at": "2026-10-10T05:00:30.000Z",
     "updated_at": "2026-10-10T05:00:30.000Z",
-    "failure_code": null,
+    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
     "expiry_blocked_reason": null
   },
   "execution": {
@@ -33,6 +33,11 @@
       "size_bytes": 12345
     }
   },
-  "failure_code": null,
-  "failure_notice": null
+  "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+  "failure_notice": {
+    "status": "delivered",
+    "failure_stage": "preparation",
+    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+    "comment_url": "https://github.com/example/example/issues/1#issuecomment-1"
+  }
 }
