@@ -214,11 +214,19 @@ export class PublicationStore {
     const result = await this.pool.query(
       `
       UPDATE publication_steps s
-      SET status='running', attempt_count=s.attempt_count+1,
+      SET status='running', claimed_by=$4, attempt_count=s.attempt_count+1,
           last_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
       FROM publications p
       WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
-        AND (s.status IN ('pending','running') OR (s.status='failed' AND s.failure_count<$5))
+        AND (
+          s.status='pending'
+          -- A step left running belongs to an owner that may have died mid-effect. Only a
+          -- different token may take it over: the same owner claiming its own running step
+          -- would start a second attempt for one side effect, which is precisely what the
+          -- attempt count is supposed to make visible rather than corrupt.
+          OR (s.status='running' AND s.claimed_by IS DISTINCT FROM $4::uuid)
+          OR (s.status='failed' AND s.failure_count<$5)
+        )
         AND p.run_id=s.run_id AND p.connector_id=s.connector_id
         AND p.status='publishing' AND p.claim_token=$4
     `,
@@ -272,7 +280,8 @@ export class PublicationStore {
     const result = await this.pool.query(
       `
       UPDATE publication_steps s
-      SET status='succeeded', remote_object_id=$5, remote_object_url=$6,
+      SET status='succeeded', claimed_by=NULL,
+          remote_object_id=$5, remote_object_url=$6,
           failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
       FROM publications p
       WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
@@ -300,7 +309,7 @@ export class PublicationStore {
     const result = await this.pool.query(
       `
       UPDATE publication_steps s
-      SET status=$7, failure_count=s.failure_count+1,
+      SET status=$7, claimed_by=NULL, failure_count=s.failure_count+1,
           failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
       FROM publications p
       WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'

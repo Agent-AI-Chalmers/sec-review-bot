@@ -572,8 +572,6 @@ export class ReviewRunStore {
     context: PublishContext,
     input: JsonObject
   ): Promise<void> {
-    const run = await this.getRun(runId)
-    if (run === null) throw new Error(`Review run does not exist: ${runId}`)
     // Both axes are written by one statement, but a single statement is not a transaction here:
     // every data-modifying CTE runs, and the trailing `SELECT ... WHERE EXISTS` only decides how
     // many rows are returned. So when the execution arm matches nothing, the publication arm has
@@ -581,6 +579,11 @@ export class ReviewRunStore {
     // throw after that half-write had auto-committed. Wrapping the statement lets the same check
     // roll the publication back, keeping the two axes atomic like every other cross-axis write.
     await transaction(this.pool, async (client) => {
+      // Read the workflow inside the transaction, not before it: the value feeds a predicate the
+      // writes below depend on, and a read outside would be a separate snapshot from the one that
+      // decides whether they match.
+      const run = await this.getWith(client, runId)
+      if (run === null) throw new Error(`Review run does not exist: ${runId}`)
       const result = await client.query(
         `
       WITH updated_publication AS (

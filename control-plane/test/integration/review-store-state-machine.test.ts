@@ -2741,3 +2741,36 @@ test('abandoning a blocked run concludes its open axes and keeps the execution e
     await store.close()
   }
 })
+
+test('an owner cannot claim a publication step it already holds', async () => {
+  // A step left `running` may belong to a publisher that died mid-effect, so a *different*
+  // publication token must be able to take it over. The same token must not: it would start a
+  // second attempt for one side effect, inflating the attempt count that reconciliation reads to
+  // decide whether an earlier owner already ran. Before `claimed_by` existed the two cases were
+  // indistinguishable, and claiming twice under one token silently incremented the count.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await store.initializePublicationSteps(runId, token, ['s'])
+
+    await store.requirePublicationStepClaim(runId, token, 's')
+    assert.strictEqual(
+      (await store.listPublicationSteps(runId))[0]?.attempt_count,
+      1
+    )
+    await assert.rejects(
+      store.requirePublicationStepClaim(runId, token, 's'),
+      /not claimable/,
+      'the holder must not start a second attempt on its own running step'
+    )
+    assert.strictEqual(
+      (await store.listPublicationSteps(runId))[0]?.attempt_count,
+      1,
+      'the refused claim must not touch the attempt count'
+    )
+  } finally {
+    await store.close()
+  }
+})

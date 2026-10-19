@@ -342,6 +342,13 @@ CREATE TABLE publication_steps (
   -- diagnostics, not a lease: publication ownership still comes from `publications.claim_token`.
   attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
   last_attempt_at timestamptz,
+  -- The publication token that took the current attempt, so a reclaim can tell "a different
+  -- owner is taking over a step the previous owner left running" from "this owner is claiming the
+  -- step it already holds". Without it the second case would look identical to the first: a step
+  -- left `running` is claimable, so the same owner calling twice would silently start a second
+  -- attempt and corrupt the attempt count that reconciliation depends on. NULL while the step has
+  -- not been claimed, or once it reached a terminal state.
+  claimed_by uuid,
   failure_count integer NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
   remote_object_id text,
   remote_object_url text,
@@ -367,6 +374,8 @@ COMMENT ON COLUMN publication_steps.step_key IS
   'Stable connector-defined identity of one publication side effect within the run.';
 COMMENT ON COLUMN publication_steps.status IS
   'Step lifecycle; terminal_failed means the retry budget was exhausted or retry was explicitly forbidden.';
+COMMENT ON COLUMN publication_steps.claimed_by IS
+  'Publication token that owns the current running attempt. A step may be reclaimed only when this differs from the caller''s token, so an owner cannot start a second attempt on a step it already holds.';
 COMMENT ON COLUMN publication_steps.attempt_count IS
   'How many times this step has been claimed and started. More than one means an earlier owner began the side effect, so a new owner must reconcile against the remote object instead of assuming nothing happened.';
 COMMENT ON COLUMN publication_steps.last_attempt_at IS
