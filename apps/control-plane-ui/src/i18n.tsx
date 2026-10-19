@@ -174,6 +174,8 @@ const messages = {
       'execution was found to have failed while publishing, so the publication was abandoned',
     edge_runner_pending_uncertain:
       'the submission got no response, so acceptance is unknown',
+    edge_runner_uncertain_uncertain:
+      'a recovery claim was taken to replay the unconfirmed submission',
     edge_runner_uncertain_queued:
       'the replayed submission was accepted, so the task is queued',
     edge_runner_uncertain_failed:
@@ -188,6 +190,8 @@ const messages = {
       'polling reached a definite failure (reported failure, run not found, no result, or bad response)',
     edge_publication_pending_publishing:
       'a worker started publishing the result',
+    edge_publication_publishing_publishing:
+      'the publishing claim expired and was taken over to resume publishing',
     edge_publication_publishing_published: 'every publication step succeeded',
     state_notice_pending_label: 'Pending',
     state_notice_pending_desc:
@@ -365,6 +369,7 @@ const messages = {
     edge_publication_publishing_skipped:
       '发布过程中发现执行已失败，因此放弃发布',
     edge_runner_pending_uncertain: '提交没有收到响应，无法确认是否被接受',
+    edge_runner_uncertain_uncertain: '取得恢复认领，开始重放这次未确认的提交',
     edge_runner_uncertain_queued: '重放的提交被接受，任务进入队列',
     edge_runner_uncertain_failed: '重放提交得到确定性失败，判定为失败',
     edge_runner_queued_running: '轮询观察到 Runner 开始执行',
@@ -376,6 +381,8 @@ const messages = {
     edge_runner_running_failed:
       '轮询得到确定性失败（报告失败、查不到 run、无结果或响应不合约定）',
     edge_publication_pending_publishing: '开始发布结果',
+    edge_publication_publishing_publishing:
+      '发布认领过期，被重新接管以继续发布',
     edge_publication_publishing_published: '所有发布步骤均成功',
     state_notice_pending_label: '等待中',
     state_notice_pending_desc: '准备阶段已终态失败，还需要通知用户。',

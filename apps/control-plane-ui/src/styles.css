@@ -632,6 +632,12 @@ a {
   stroke-dasharray: 4 3;
 }
 
+/* A self-loop repeats a state rather than moving to another one. It keeps the dashed
+   back-edge treatment so it reads as "this can happen again", not as forward progress. */
+.state-machine-edge.is-self-loop .state-machine-edge-path {
+  stroke-dasharray: 4 3;
+}
+
 /* The invisible hover/focus target over an edge: a wide transparent stroke that makes the thin
    line easy to point at, and a faint ring when focused from the keyboard. */
 .state-machine-edge-hit {

@@ -153,12 +153,15 @@ function longestForwardPath(
   return path
 }
 
-/** Whether an edge points back to a state at or before its source, i.e. it closes a loop. */
+/** Whether an edge points back to a state strictly before its source, i.e. it closes a loop
+ * between two different nodes. A self-edge (`from === to`) is not a reverting edge: it has its
+ * own arc geometry, and treating it as a back-edge would let it pull its own node around. */
 function isReverting(
   columns: Map<string, number>,
   from: string,
   to: string
 ): boolean {
+  if (from === to) return false
   return (columns.get(to) ?? 0) <= (columns.get(from) ?? 0)
 }
 
@@ -215,6 +218,43 @@ function revertGeometry(
     d: `M${from.x},${sy} Q${cx},${cy} ${to.x},${ty}`,
     labelAt: { x: cx + 4, y: cy }
   }
+}
+
+/** A self-loop: an edge from a state back to itself, drawn as a small arc hugging the node.
+ *
+ * A self-loop has one node, so the two-node geometry cannot describe it: `from` and `to` are the
+ * same point and a quadratic through them collapses into a line sitting on the node's own edge.
+ * Instead the path leaves one edge of the node off-centre, bows outward and comes back onto the
+ * same edge, with the arrowhead pointing back into the node.
+ *
+ * The arc faces away from the diagram's occupied rows: `side` is chosen by the caller from the
+ * node's position. A node on the bottom row loops downward into empty space, while a node with a
+ * branch row beneath it loops upward, because a downward arc there would cut through the sibling
+ * nodes and the edges crossing to them.
+ */
+function selfLoopGeometry(
+  from: { x: number; y: number },
+  side: 'above' | 'below'
+): {
+  d: string
+  labelAt: { x: number; y: number }
+} {
+  // Anchor the two ends on the node's facing edge, straddling the centre so the loop is symmetric.
+  const half = 14
+  const sx = from.x - half
+  const ex = from.x + half
+  const direction = side === 'below' ? 1 : -1
+  const y = from.y + (direction * NODE_H) / 2
+  // Keep the arc within the space reserved above/below the grid so it never clips.
+  const bulge = 18 * direction
+  const apex = y + bulge
+  // Two cubic segments meeting at the arc's apex give a round, even loop. Both control points
+  // pull outward on the chosen side, so the widest point clears the node's edge.
+  const d =
+    `M${sx},${y} ` +
+    `C${sx - 10},${apex} ${from.x - 10},${apex} ${from.x},${apex} ` +
+    `C${from.x + 10},${apex} ${ex + 10},${apex} ${ex},${y}`
+  return { d, labelAt: { x: from.x, y: apex + 4 * direction } }
 }
 
 const NODE_W = 118
@@ -340,22 +380,32 @@ export function StateMachineDiagram({
           const to = center(edge.to)
           const key = `${edge.from}->${edge.to}`
           const emphasised = traversed.has(key)
+          const selfLoop = edge.from === edge.to
           const revert = isReverting(columns, edge.from, edge.to)
           const className = [
             'state-machine-edge',
-            revert ? 'is-revert' : '',
+            selfLoop ? 'is-self-loop' : revert ? 'is-revert' : '',
             emphasised ? 'is-traversed' : ''
           ]
             .filter(Boolean)
             .join(' ')
 
-          const { d } = revert
-            ? revertGeometry(
+          // A self-loop needs its own arc: the two-node geometries put both ends at the same
+          // point and collapse into a line on the node's own edge. It faces into empty space: a
+          // branch node on the last row loops downward, anything with a row below loops upward so
+          // the arc cannot cross that row's nodes or their edges.
+          const { d } = selfLoop
+            ? selfLoopGeometry(
                 from,
-                to,
-                revertSide(machine.axis, edge.from, edge.to)
+                (rows.get(edge.from) ?? 0) === maxRows - 1 ? 'below' : 'above'
               )
-            : forwardGeometry(from, to)
+            : revert
+              ? revertGeometry(
+                  from,
+                  to,
+                  revertSide(machine.axis, edge.from, edge.to)
+                )
+              : forwardGeometry(from, to)
 
           const label = edgeLabel(machine, edge, t)
           return (
