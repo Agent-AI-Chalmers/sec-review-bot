@@ -130,8 +130,14 @@ CREATE TABLE preparations (
   claim_token uuid,
   claimed_at timestamptz,
   attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  -- The failure fields describe the current attempt while it is in flight and the reason the
+  -- row cannot continue once it is terminal. A claim clears them for the new attempt, so they
+  -- cannot be the place a lease expiry looks for "what went wrong last time"; that is
+  -- last_failure_code / last_failure_message below.
   failure_code text,
   failure_message text,
+  last_failure_code text,
+  last_failure_message text,
   started_at timestamptz,
   finished_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -179,9 +185,13 @@ COMMENT ON COLUMN preparations.claimed_at IS
 COMMENT ON COLUMN preparations.attempt_count IS
   'Number of successful claims. It is retained for connector retry policy and observability.';
 COMMENT ON COLUMN preparations.failure_code IS
-  'Connector-supplied machine-readable terminal preparation failure reason.';
+  'Machine-readable reason for the current failure: set by a retryable failure or by a terminal one, and cleared when the work is claimed again. NULL while an attempt is in flight and has not failed.';
 COMMENT ON COLUMN preparations.failure_message IS
-  'Connector-supplied operator-readable terminal preparation failure detail.';
+  'Operator-readable detail associated with failure_code. Cleared together with it on a new claim.';
+COMMENT ON COLUMN preparations.last_failure_code IS
+  'Most recent failure recorded by any attempt, kept across re-claims because a claim clears failure_code. A lease expiry that exhausts the retry budget reports this instead of the generic exhaustion code, so the last real reason survives the gap between a failure and the row dying on its next lease.';
+COMMENT ON COLUMN preparations.last_failure_message IS
+  'Operator-readable detail associated with last_failure_code, kept across re-claims for the same reason.';
 COMMENT ON COLUMN preparations.started_at IS
   'Immutable instant a preparer first claimed this work, i.e. the preparation phase began; NULL while it is still pending. Written once, so a retry that returns the row to pending and claims it again does not move it. Distinct from claimed_at, which is the current lease and is renewed on every heartbeat.';
 COMMENT ON COLUMN preparations.finished_at IS

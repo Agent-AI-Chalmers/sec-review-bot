@@ -215,34 +215,43 @@ export class PreparationStore {
       // phase still open, and an exhausted budget ends it as `failed`. Only the terminal branch
       // writes `finished_at`; omitting it there would leave a failed row that never recorded when
       // the phase ended.
+      //
+      // The terminal branch keeps a reason a previous attempt already recorded (for example
+      // GITHUB_RATE_LIMITED) instead of overwriting it with the generic lease-expiry code: the
+      // lease is what ended the phase, but the last real reason is what the user needs to see.
+      // COALESCE covers the case where no attempt ever recorded one.
       const expired = await client.query<{
         run_id: string
         status: 'pending' | 'failed'
+        failure_code: string | null
       }>(
         `UPDATE preparations
          SET status=CASE WHEN attempt_count >= $3 THEN 'failed' ELSE 'pending' END,
              claim_token=NULL, claimed_at=NULL, available_at=clock_timestamp(),
-             failure_code=CASE WHEN attempt_count >= $3 THEN 'PREPARATION_RETRY_EXHAUSTED' ELSE NULL END,
+             failure_code=CASE WHEN attempt_count >= $3 THEN
+               COALESCE(last_failure_code, 'PREPARATION_RETRY_EXHAUSTED') ELSE NULL END,
              failure_message=CASE WHEN attempt_count >= $3 THEN
-               'Preparation claim lease expired after the retry budget was exhausted.' ELSE NULL END,
+               COALESCE(last_failure_message,
+                 'Preparation claim lease expired after the retry budget was exhausted.') ELSE NULL END,
              finished_at=CASE WHEN attempt_count >= $3 THEN clock_timestamp() ELSE NULL END,
              updated_at=clock_timestamp()
          WHERE connector_id=$1 AND status='preparing'
            AND claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
-         RETURNING run_id,status`,
+         RETURNING run_id, status, failure_code`,
         [this.connectorId, this.claimTimeoutMs, MAX_PREPARATION_ATTEMPTS]
       )
       // Preparation events for every expired row: a reversion to pending after the lease
       // lapsed, or a terminal failure once the retry budget is spent.
       for (const row of expired.rows) {
+        // The event names the code the row now carries, which is the last real reason when a
+        // previous attempt recorded one.
         await appendEvent(client, {
           runId: row.run_id,
           connectorId: this.connectorId,
           axis: 'preparation',
           fromStatus: 'preparing',
           toStatus: row.status,
-          reasonCode:
-            row.status === 'failed' ? 'PREPARATION_RETRY_EXHAUSTED' : null
+          reasonCode: row.status === 'failed' ? row.failure_code : null
         })
       }
       const failedRunIds = expired.rows
@@ -267,9 +276,14 @@ export class PreparationStore {
          WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status='pending'`,
         [failedRunIds, this.connectorId]
       )
+      // The notice carries the reason the preparation row now holds, so a lease expiry after a
+      // real failure (for example rate limiting) reports that failure instead of the generic
+      // exhaustion code.
       await client.query(
         `INSERT INTO preparation_failure_notices (run_id,connector_id,status,failure_code)
-         SELECT unnest($1::text[]),$2,'pending','PREPARATION_RETRY_EXHAUSTED'
+         SELECT p.run_id,p.connector_id,'pending',p.failure_code
+         FROM preparations p
+         WHERE p.run_id=ANY($1::text[]) AND p.connector_id=$2
          ON CONFLICT (run_id) DO NOTHING`,
         [failedRunIds, this.connectorId]
       )
@@ -309,9 +323,13 @@ export class PreparationStore {
     return await transaction(this.pool, async (client) => {
       if (options.retry) {
         const retry = await client.query(
+          // A retry records the reason on the row (for the operator reading the current
+          // state) and in `last_failure_*` (for a later lease expiry, which outlives the claim
+          // that clears `failure_code`).
           `UPDATE preparations SET status='pending', claim_token=NULL, claimed_at=NULL,
              available_at=clock_timestamp() + ($4::bigint * interval '1 millisecond'),
-             failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
+             failure_code=$5, failure_message=$6,
+             last_failure_code=$5, last_failure_message=$6, updated_at=clock_timestamp()
            WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3
              AND attempt_count < $7`,
           [
@@ -372,6 +390,7 @@ export class PreparationStore {
       await client.query(
         `UPDATE preparations SET status='failed', claim_token=NULL, claimed_at=NULL,
            failure_code=$4, failure_message=$5,
+           last_failure_code=$4, last_failure_message=$5,
            finished_at=clock_timestamp(), updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
         [runId, this.connectorId, token, error.code ?? null, error.message]

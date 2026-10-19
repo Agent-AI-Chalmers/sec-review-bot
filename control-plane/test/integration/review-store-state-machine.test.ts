@@ -381,7 +381,10 @@ test('an observation heartbeat never extends the recovery lease', async () => {
       ),
       RunnerSubmissionUncertainError
     )
-    assert.strictEqual((await store.getRun(runId))?.execution.status, 'uncertain')
+    assert.strictEqual(
+      (await store.getRun(runId))?.execution.status,
+      'uncertain'
+    )
 
     const first = await store.claimSubmissionRecovery(runId)
     assert.ok(first)
@@ -433,7 +436,8 @@ test('a failure notice reports the reason captured when it was created', async (
     }
     const stillReported = await store.getRun(runId)
     assert.strictEqual(
-      (stillReported?.preparation as { failure_code: string | null }).failure_code,
+      (stillReported?.preparation as { failure_code: string | null })
+        .failure_code,
       null,
       'the preparation row really lost its code'
     )
@@ -454,7 +458,7 @@ test('a failure notice reports the reason captured when it was created', async (
     assert.strictEqual(
       reclaimed.failure_code,
       'REVIEW_START_FAILED',
-      'the notice carries its own reason, not the preparation row\'s current value'
+      "the notice carries its own reason, not the preparation row's current value"
     )
   } finally {
     await store.close()
@@ -1077,7 +1081,10 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
     )
     // An uncertain submission may have reached the Runner, so execution is `uncertain` (a
     // later recovery replays it) rather than skipped or failed.
-    assert.strictEqual((await owner.getRun(runId))?.execution.status, 'uncertain')
+    assert.strictEqual(
+      (await owner.getRun(runId))?.execution.status,
+      'uncertain'
+    )
   } finally {
     await owner.close()
   }
@@ -1108,7 +1115,10 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
     assert.deepStrictEqual(submissions, [
       { workflow: 'issue-review', run_id: runId, input }
     ])
-    assert.strictEqual((await restarted.getRun(runId))?.execution.status, 'queued')
+    assert.strictEqual(
+      (await restarted.getRun(runId))?.execution.status,
+      'queued'
+    )
   } finally {
     await restarted.close()
   }
@@ -1721,7 +1731,11 @@ test('each lifecycle axis records an immutable start and end', async () => {
     const admitted = await store.getRun(runId)
     assert.ok(admitted?.preparation?.started_at, 'admission starts preparation')
     assert.strictEqual(admitted?.preparation?.finished_at, null)
-    assert.strictEqual(admitted?.execution.started_at, null, 'execution has not begun')
+    assert.strictEqual(
+      admitted?.execution.started_at,
+      null,
+      'execution has not begun'
+    )
     assert.strictEqual(admitted?.execution.finished_at, null)
     assert.strictEqual(admitted?.publication.started_at, null)
 
@@ -1731,7 +1745,11 @@ test('each lifecycle axis records an immutable start and end', async () => {
     assert.strictEqual(queued?.preparation?.status, 'submitted')
     assert.ok(queued?.preparation?.finished_at, 'submission ends preparation')
     assert.ok(queued?.execution.started_at, 'submission starts execution')
-    assert.strictEqual(queued?.execution.finished_at, null, 'execution still in flight')
+    assert.strictEqual(
+      queued?.execution.finished_at,
+      null,
+      'execution still in flight'
+    )
     const preparationStart = queued?.preparation?.started_at
     const preparationEnd = queued?.preparation?.finished_at
     assert.ok(
@@ -1853,6 +1871,114 @@ test('a preparation retry does not move the phase start', async () => {
       'claiming again keeps the original start'
     )
   } finally {
+    await store.close()
+  }
+})
+
+test('an exhausted preparation keeps the last real failure reason instead of the lease code', async () => {
+  // Walks the real coordinator path, because the interesting step is the one a bare SQL fixture
+  // would skip: a retryable failure records the reason, then `claimNext` starts the next
+  // attempt and clears the per-attempt failure fields. If that attempt's lease expires on the
+  // final allowed attempt, the only surviving record of the real cause is
+  // `last_failure_code`; without it the user is told "lease expired" and loses the actionable
+  // reason.
+  const store = await createStore({ claimTimeoutMs: 1 })
+  const runId = `run-${randomUUID()}`
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await store.failPreparation(
+      runId,
+      admission.preparation_token,
+      { code: 'GITHUB_RATE_LIMITED', message: 'rate limited' },
+      { retry: true }
+    )
+
+    // The coordinator claims the retry. This is the step that erases `failure_code`.
+    const work = await store.claimNextPreparation()
+    assert.strictEqual(work?.run_id, runId)
+    const afterClaim = await pool.query<{
+      failure_code: string | null
+      last_failure_code: string | null
+    }>(
+      'SELECT failure_code, last_failure_code FROM preparations WHERE run_id=$1',
+      [runId]
+    )
+    assert.strictEqual(
+      afterClaim.rows[0]?.failure_code,
+      null,
+      'a new attempt starts without a current failure'
+    )
+    assert.strictEqual(
+      afterClaim.rows[0]?.last_failure_code,
+      'GITHUB_RATE_LIMITED',
+      'the durable reason must survive the claim that clears failure_code'
+    )
+
+    // That attempt dies on its final allowed lease.
+    await pool.query(
+      `UPDATE preparations
+         SET attempt_count=8, claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE run_id=$1`,
+      [runId]
+    )
+    await store.expireStalePreparations()
+
+    const preparation = await pool.query<{
+      status: string
+      failure_code: string | null
+      failure_message: string | null
+    }>(
+      'SELECT status, failure_code, failure_message FROM preparations WHERE run_id=$1',
+      [runId]
+    )
+    assert.strictEqual(preparation.rows[0]?.status, 'failed')
+    assert.strictEqual(
+      preparation.rows[0]?.failure_code,
+      'GITHUB_RATE_LIMITED',
+      'the real failure reason must survive the lease expiry'
+    )
+    assert.strictEqual(preparation.rows[0]?.failure_message, 'rate limited')
+
+    const notice = await store.claimNextPreparationFailureNotice()
+    assert.ok(notice)
+    assert.strictEqual(notice.failure_code, 'GITHUB_RATE_LIMITED')
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
+test('a preparation failure with no recorded reason still reports the exhaustion code', async () => {
+  // The complement of the test above: when no attempt ever recorded a code, the generic
+  // exhaustion reason is the honest answer.
+  const store = await createStore({ claimTimeoutMs: 1 })
+  const runId = `run-${randomUUID()}`
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await pool.query(
+      `UPDATE preparations
+         SET attempt_count=8, claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE run_id=$1`,
+      [runId]
+    )
+    await store.expireStalePreparations()
+
+    const notice = await store.claimNextPreparationFailureNotice()
+    assert.ok(notice)
+    assert.strictEqual(notice.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
+  } finally {
+    await pool.end()
     await store.close()
   }
 })

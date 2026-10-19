@@ -713,8 +713,7 @@ export async function startControlPlaneServer(): Promise<{
 }> {
   const token = requiredEnv('CONTROL_PLANE_SERVICE_TOKEN')
   const readToken = requiredEnv('CONTROL_PLANE_READ_TOKEN')
-  const connectorId =
-    process.env.CONNECTOR_ID?.trim() || 'github-app:default'
+  const connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
   const store = new ReviewRunStore({
     connectionString: requiredEnv('DATABASE_URL'),
     connectorId,
