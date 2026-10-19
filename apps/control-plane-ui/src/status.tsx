@@ -182,14 +182,30 @@ export function preparationStateLabel(
   return t('statusFailed')
 }
 
+/** Human label for a coordination axis.
+ *
+ * An unrecognised axis renders as its raw value rather than as some other axis' label. The
+ * previous fallback returned "Failure notice" for anything it did not match, so an axis the
+ * console did not know about - including a stored event written before the axis was renamed -
+ * was silently presented as a notice. Showing the value makes the mismatch visible instead of
+ * inventing a plausible-looking history.
+ */
 export function axisLabel(
   axis: 'execution' | 'preparation' | 'publication' | 'notice',
   t: ReturnType<typeof useMessages>
 ): string {
-  if (axis === 'execution') return t('axisExecution')
-  if (axis === 'preparation') return t('axisPreparation')
-  if (axis === 'publication') return t('axisPublication')
-  return t('axisNotice')
+  switch (axis) {
+    case 'execution':
+      return t('axisExecution')
+    case 'preparation':
+      return t('axisPreparation')
+    case 'publication':
+      return t('axisPublication')
+    case 'notice':
+      return t('axisNotice')
+    default:
+      return String(axis)
+  }
 }
 
 export function failureNoticeStatusLabel(

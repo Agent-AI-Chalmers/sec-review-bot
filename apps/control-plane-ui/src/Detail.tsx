@@ -13,7 +13,8 @@ import {
   Textarea,
   TextInput,
   Timeline,
-  Title
+  Title,
+  Tooltip
 } from '@mantine/core'
 import {
   IconArrowLeft,
@@ -56,6 +57,7 @@ import {
 } from './status.js'
 import {
   abbreviateDigest,
+  failureCodeLabel,
   failureReason,
   formatBytes,
   formatDuration,
@@ -263,6 +265,36 @@ function AbandonDialog({
   )
 }
 
+/** A failure code, with its meaning on hover when the console knows one.
+ *
+ * The code stays visible either way: it is what the logs and the Runner use, and an operator
+ * searching for it must not have to reconstruct it from a tooltip. A code the console does not
+ * recognise renders plainly rather than being guessed at.
+ */
+function ExplainedCode({
+  code,
+  className
+}: {
+  code: string
+  className?: string
+}): React.JSX.Element {
+  const t = useMessages()
+  const { explanation } = failureCodeLabel(code, t)
+  const label = (
+    <span className={className}>
+      <Text component="span" c="red" size="xs" ff="monospace">
+        {code}
+      </Text>
+    </span>
+  )
+  if (explanation === null) return label
+  return (
+    <Tooltip label={explanation} multiline w={280} withArrow>
+      {label}
+    </Tooltip>
+  )
+}
+
 export function Detail(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
@@ -438,9 +470,7 @@ export function Detail(): React.JSX.Element {
                   <Text c="dimmed" size="xs">
                     {t('failureCode')}:
                   </Text>
-                  <Text c="red" size="xs" ff="monospace">
-                    {run.failure_code}
-                  </Text>
+                  <ExplainedCode code={run.failure_code} />
                 </Group>
               )}
             </Group>
@@ -732,9 +762,10 @@ export function Detail(): React.JSX.Element {
                           {event.to_status}
                         </span>
                         {event.reason_code !== null && (
-                          <span className="run-history-reason">
-                            {event.reason_code}
-                          </span>
+                          <ExplainedCode
+                            code={event.reason_code}
+                            className="run-history-reason"
+                          />
                         )}
                       </li>
                     ))}

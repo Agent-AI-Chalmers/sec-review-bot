@@ -76,6 +76,24 @@ export const messages = {
     runProgress: 'Run progress',
     runHistory: 'History',
     runHistoryEmpty: 'No recorded transitions yet',
+    failureCodePreparationRetryExhausted:
+      'Preparation kept failing and ran out of retries.',
+    failureCodePreparationAbandoned:
+      'An operator chose to stop working on this run.',
+    failureCodeExecutionAlreadyAdvanced:
+      'Preparation gave up after the Runner had already started, so it was left for a person to sort out.',
+    failureCodeSubmissionUncertain:
+      'The Runner never confirmed whether it accepted the task; the submission can be sent again.',
+    failureCodeRunnerExecutionFailed:
+      'The Runner reported that the task failed.',
+    failureCodeRunnerResultMissing:
+      'The Runner reported success without a usable result.',
+    failureCodePublicationAbandoned:
+      'Publishing stopped because the run will not produce a result.',
+    failureCodePublicationStepRetryExhausted:
+      'One publishing step kept failing and ran out of retries.',
+    failureCodeGithubValidationRejected:
+      'GitHub rejected the content this run tried to publish.',
     cancel: 'Cancel',
     blockedRunTitle: 'This run is stuck',
     blockedRunBody:
@@ -308,6 +326,17 @@ export const messages = {
     runProgress: 'Run 进度',
     runHistory: '历史',
     runHistoryEmpty: '暂无记录的变更',
+    failureCodePreparationRetryExhausted: '准备阶段反复失败，重试次数已用完。',
+    failureCodePreparationAbandoned: '有人选择不再继续处理这个 run。',
+    failureCodeExecutionAlreadyAdvanced:
+      '准备阶段放弃时 Runner 已经开始执行，因此留待人工判断。',
+    failureCodeSubmissionUncertain: 'Runner 没有确认是否接单，可以重新提交。',
+    failureCodeRunnerExecutionFailed: 'Runner 报告任务执行失败。',
+    failureCodeRunnerResultMissing: 'Runner 报告成功，但没有可用的结果。',
+    failureCodePublicationAbandoned: '这个 run 不会产出结果，发布已停止。',
+    failureCodePublicationStepRetryExhausted:
+      '某个发布步骤反复失败，重试次数已用完。',
+    failureCodeGithubValidationRejected: 'GitHub 拒绝了这次尝试发布的内容。',
     cancel: '取消',
     blockedRunTitle: '这个 run 卡住了',
     blockedRunBody:

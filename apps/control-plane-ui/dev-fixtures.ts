@@ -408,7 +408,7 @@ function artifactFor(
  */
 function eventsFor(run: FixtureRun): Array<{
   event_id: number
-  axis: 'runner' | 'preparation' | 'publication' | 'notice'
+  axis: 'execution' | 'preparation' | 'publication' | 'notice'
   from_status: string | null
   to_status: string
   reason_code: string | null
@@ -416,7 +416,7 @@ function eventsFor(run: FixtureRun): Array<{
 }> {
   let eventId = 0
   const push = (
-    axis: 'runner' | 'preparation' | 'publication' | 'notice',
+    axis: 'execution' | 'preparation' | 'publication' | 'notice',
     from: string | null,
     to: string,
     at: string,
@@ -430,7 +430,7 @@ function eventsFor(run: FixtureRun): Array<{
     occurred_at: at
   })
   const events = [
-    push('runner', null, 'pending', run.created_at),
+    push('execution', null, 'pending', run.created_at),
     push('preparation', null, 'preparing', run.created_at),
     push('publication', null, 'pending', run.created_at)
   ]
@@ -455,7 +455,7 @@ function eventsFor(run: FixtureRun): Array<{
     // resolves it to `queued` or `failed`, which is why this originates at `pending`.
     events.push(
       push(
-        'runner',
+        'execution',
         'pending',
         'uncertain',
         run.execution.updated_at,
@@ -463,11 +463,13 @@ function eventsFor(run: FixtureRun): Array<{
       )
     )
   } else if (run.execution.started_at !== null) {
-    events.push(push('runner', 'pending', 'queued', run.execution.started_at))
+    events.push(
+      push('execution', 'pending', 'queued', run.execution.started_at)
+    )
     if (run.execution.status !== 'queued') {
       events.push(
         push(
-          'runner',
+          'execution',
           'queued',
           run.execution.status,
           run.execution.updated_at,
@@ -478,26 +480,23 @@ function eventsFor(run: FixtureRun): Array<{
   } else if (run.execution.status === 'skipped') {
     // The Runner was never called: execution was skipped because preparation failed, so no
     // failure reason rides on the runner axis.
-    events.push(push('runner', 'pending', 'skipped', run.execution.updated_at))
+    events.push(
+      push('execution', 'pending', 'skipped', run.execution.updated_at)
+    )
   }
   if (run.preparation?.failure_notice_status) {
-    events.push(
-      push(
-        'notice',
-        null,
-        'pending',
-        run.preparation.finished_at ?? run.created_at
-      )
-    )
-    if (run.preparation.failure_notice_status !== 'pending') {
-      events.push(
-        push(
-          'notice',
-          'pending',
-          run.preparation.failure_notice_status,
-          run.preparation.finished_at ?? run.created_at
-        )
-      )
+    // The outbox has its own lifecycle, and the history must show the same edges the store
+    // writes: a notice is claimed (`pending -> delivering`) before it is delivered or skipped.
+    // Emitting only `null -> pending -> <final>` would hide the claim and teach the diagram an
+    // edge that does not exist.
+    const noticeAt = run.preparation.finished_at ?? run.created_at
+    const stage = run.preparation.failure_notice_status
+    events.push(push('notice', null, 'pending', noticeAt))
+    if (stage !== 'pending') {
+      events.push(push('notice', 'pending', 'delivering', noticeAt))
+      if (stage !== 'delivering') {
+        events.push(push('notice', 'delivering', stage, noticeAt))
+      }
     }
   }
   if (['publishing', 'published', 'failed'].includes(run.publication.status)) {

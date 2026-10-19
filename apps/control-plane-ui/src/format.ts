@@ -68,6 +68,36 @@ export function isDownloadableArtifact(
   return value?.status === 'available'
 }
 
+/** The failure codes coordination itself assigns, and what each one means for the operator.
+ *
+ * The set is open: a connector may report its own code, and those are shown verbatim because the
+ * console cannot know what they mean. These are the ones the Control Plane writes, so leaving
+ * them unexplained would make an operator read `PREPARATION_RETRY_EXHAUSTED` as jargon when the
+ * console already knows the sentence behind it. */
+const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
+  PREPARATION_RETRY_EXHAUSTED: 'failureCodePreparationRetryExhausted',
+  PREPARATION_ABANDONED: 'failureCodePreparationAbandoned',
+  EXECUTION_ALREADY_ADVANCED: 'failureCodeExecutionAlreadyAdvanced',
+  SUBMISSION_STATE_UNCERTAIN: 'failureCodeSubmissionUncertain',
+  RUNNER_EXECUTION_FAILED: 'failureCodeRunnerExecutionFailed',
+  RUNNER_RESULT_MISSING: 'failureCodeRunnerResultMissing',
+  PUBLICATION_ABANDONED: 'failureCodePublicationAbandoned',
+  PUBLICATION_STEP_RETRY_EXHAUSTED: 'failureCodePublicationStepRetryExhausted',
+  GITHUB_VALIDATION_REJECTED: 'failureCodeGithubValidationRejected'
+}
+
+/** Explain a failure code, or return the code itself when it is not one coordination assigns. */
+export function failureCodeLabel(
+  code: string,
+  t: Translator
+): { code: string; explanation: string | null } {
+  const key = KNOWN_FAILURE_CODE_KEYS[code]
+  return {
+    code,
+    explanation: key === undefined ? null : t(key)
+  }
+}
+
 /** Names the failure when the backend distinguished it, instead of reporting every
  * failure as one generic sentence. */
 export function failureReason(
