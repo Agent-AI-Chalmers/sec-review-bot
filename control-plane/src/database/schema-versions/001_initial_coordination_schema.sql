@@ -303,7 +303,7 @@ CREATE TABLE publication_steps (
   connector_id text NOT NULL,
   run_id text NOT NULL,
   step_key text NOT NULL,
-  status text NOT NULL CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'terminal_failed')),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'terminal_failed')),
   failure_count integer NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
   remote_object_id text,
   remote_object_url text,
