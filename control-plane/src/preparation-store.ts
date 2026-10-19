@@ -6,7 +6,11 @@ import { Pool, type PoolClient } from 'pg'
 import type { ControlPlaneWorkflow as WorkflowName } from './contracts.js'
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 import { appendEvent, appendEvents } from './review-run-events.js'
-import { abandonInFlightPublication } from './publication-abandon.js'
+import {
+  abandonInFlightPublication,
+  abandonInFlightPublications
+} from './publication-abandon.js'
+import { skipPendingExecutions } from './execution-skip.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -261,22 +265,17 @@ export class PreparationStore {
       if (failedRunIds.length === 0) return expired.rowCount ?? 0
       // Execution never ran, so it is skipped, not failed. The failure reason stays on the
       // preparation row (and is surfaced through the run's preparation summary).
-      const failedRuns = await client.query<{ run_id: string }>(
-        `UPDATE executions SET status='skipped',
-           failure_code=NULL, failure_message=NULL,
-           finished_at=clock_timestamp(),
-           observed_at=clock_timestamp(), updated_at=clock_timestamp()
-         WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status='pending' RETURNING run_id`,
-        [failedRunIds, this.connectorId]
+      const skippedRuns = await skipPendingExecutions(
+        client,
+        this.connectorId,
+        failedRunIds
       )
-      if (failedRuns.rowCount !== failedRunIds.length)
+      if (skippedRuns.length !== failedRunIds.length)
         throw new Error('Preparation expiry lost a terminal run transition.')
-      await client.query(
-        `UPDATE publications SET status='skipped', claim_token=NULL, failure_code=NULL,
-           failure_message=NULL, finished_at=clock_timestamp(), updated_at=clock_timestamp()
-         WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status='pending'`,
-        [failedRunIds, this.connectorId]
-      )
+      // Publication is not applicable either. This uses the same helper as the single-run
+      // failure path, so a publication already in flight is converged here too instead of only
+      // `pending` being touched.
+      await abandonInFlightPublications(client, this.connectorId, failedRunIds)
       // The notice carries the reason the preparation row now holds, so a lease expiry after a
       // real failure (for example rate limiting) reports that failure instead of the generic
       // exhaustion code.
@@ -364,39 +363,11 @@ export class PreparationStore {
       // preparation failure means the Runner was never called, so execution is `skipped`.
       // Matching the shared constant keeps this in step with the submission paths that stamp it.
       const submissionUncertain = error.code === SUBMISSION_STATE_UNCERTAIN
-      // An `uncertain` execution deliberately keeps `started_at` NULL: the submission may never
-      // have been accepted, so the phase has not provably begun. `completeSubmissionRecovery`
-      // fills the start once a replay is accepted; do not set it here.
-      const result = submissionUncertain
-        ? await client.query(
-            `UPDATE executions SET status='uncertain',
-               failure_code=$4, failure_message=$5,
-               observed_at=clock_timestamp(), updated_at=clock_timestamp()
-             WHERE run_id=$1 AND connector_id=$2 AND status='pending' AND EXISTS (
-               SELECT 1 FROM preparations WHERE preparations.run_id=executions.run_id
-                 AND preparations.connector_id=$2 AND preparations.status='preparing' AND preparations.claim_token=$3)`,
-            [runId, this.connectorId, token, error.code, error.message]
-          )
-        : await client.query(
-            `UPDATE executions SET status='skipped',
-               failure_code=NULL, failure_message=NULL,
-               finished_at=clock_timestamp(),
-               observed_at=clock_timestamp(), updated_at=clock_timestamp()
-             WHERE run_id=$1 AND connector_id=$2 AND status='pending' AND EXISTS (
-               SELECT 1 FROM preparations WHERE preparations.run_id=executions.run_id
-                 AND preparations.connector_id=$2 AND preparations.status='preparing' AND preparations.claim_token=$3)`,
-            [runId, this.connectorId, token]
-          )
-      if (result.rowCount !== 1)
-        throw new Error(
-          `Preparation claim was lost before failing review run ${runId}.`
-        )
-      // The executions update above proves the claim was live when it ran, but the preparation
-      // row is only read through an EXISTS there, not locked. Under READ COMMITTED another writer
-      // (an expired lease in `expireStale`) can still replace the row between the two statements.
-      // Without this check the transaction would keep going and record `preparing -> failed` while
-      // the snapshot says something else, so the log and the state would disagree. Throwing rolls
-      // back the whole cross-axis failure instead of committing it on a stale claim.
+      // Close the preparation row first. This UPDATE is also the claim check: it only matches
+      // while the row is still `preparing` under our token, so a lease that expired between the
+      // claim and here makes it match nothing. Doing it before the execution write means the
+      // execution write no longer has to repeat the claim EXISTS, and a lost claim aborts before
+      // any other axis is touched.
       const prepared = await client.query(
         `UPDATE preparations SET status='failed', claim_token=NULL, claimed_at=NULL,
            failure_code=$4, failure_message=$5,
@@ -409,6 +380,35 @@ export class PreparationStore {
         throw new Error(
           `Preparation ${runId} lost its claim before it could be marked failed.`
         )
+      // An `uncertain` execution deliberately keeps `started_at` NULL: the submission may never
+      // have been accepted, so the phase has not provably begun. `completeSubmissionRecovery`
+      // fills the start once a replay is accepted; do not set it here.
+      const result = submissionUncertain
+        ? await client.query(
+            `UPDATE executions SET status='uncertain',
+               failure_code=$3, failure_message=$4,
+               observed_at=clock_timestamp(), updated_at=clock_timestamp()
+             WHERE run_id=$1 AND connector_id=$2 AND status='pending'`,
+            [runId, this.connectorId, error.code, error.message]
+          )
+        : undefined
+      if (submissionUncertain) {
+        if (result?.rowCount !== 1)
+          throw new Error(
+            `Preparation claim was lost before failing review run ${runId}.`
+          )
+      } else {
+        // Execution never ran, so it is skipped rather than failed. The reason stays on the
+        // preparation row. Comparing the returned ids against the request makes a run that was
+        // no longer `pending` surface as a lost transition instead of passing silently.
+        const skipped = await skipPendingExecutions(client, this.connectorId, [
+          runId
+        ])
+        if (skipped.length !== 1)
+          throw new Error(
+            `Execution for ${runId} was not pending when preparation failed.`
+          )
+      }
       // Publication is only "not applicable" once execution is conclusively skipped. An
       // uncertain submission may still be accepted, so its publication stays `pending`: ruling
       // it out early would require a later skipped -> pending reversion just to undo this.

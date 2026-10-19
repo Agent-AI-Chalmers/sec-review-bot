@@ -47,3 +47,28 @@ export async function abandonInFlightPublication(
   )
   return result.rows[0]?.from_status ?? null
 }
+
+/** The batch form of `abandonInFlightPublication`, for a caller concluding many runs at once.
+ *
+ * It applies the same eligibility (`pending` or `publishing`) as the single-run form on purpose:
+ * the two used to differ - the batch path only touched `pending` - so "the same" transition
+ * quietly meant two things. Returns the run ids whose publication this call moved, so the caller
+ * can tell an already-concluded publication from one it just abandoned. */
+export async function abandonInFlightPublications(
+  client: Pick<PoolClient, 'query'>,
+  connectorId: string,
+  runIds: readonly string[]
+): Promise<string[]> {
+  if (runIds.length === 0) return []
+  const result = await client.query<{ run_id: string }>(
+    `UPDATE publications
+     SET status='skipped', claim_token=NULL, claimed_at=NULL,
+         finished_at=clock_timestamp(),
+         failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+     WHERE run_id=ANY($1::text[]) AND connector_id=$2
+       AND status IN ('pending','publishing')
+     RETURNING run_id`,
+    [runIds, connectorId]
+  )
+  return result.rows.map((row) => row.run_id)
+}
