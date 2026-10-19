@@ -79,9 +79,9 @@ export const messages = {
     failureCodePreparationRetryExhausted:
       'Preparation kept failing and ran out of retries.',
     failureCodePreparationAbandoned:
-      'An operator chose to stop working on this run.',
+      'An operator ended this run on purpose. Its preparation is recorded as failed, nothing will be published, and the execution result that was already recorded is kept. This cannot be undone.',
     failureCodeExecutionAlreadyAdvanced:
-      'Preparation gave up after the Runner had already started, so it was left for a person to sort out.',
+      'Preparation is still in progress while execution already finished — a combination no legal transition sequence produces. Concluding the preparation would declare the task never ran and discard the result it did produce, so coordination stopped and left the run for a person.',
     failureCodeSubmissionUncertain:
       'The Runner never confirmed whether it accepted the task; the submission can be sent again.',
     failureCodeRunnerExecutionFailed:
@@ -95,9 +95,9 @@ export const messages = {
     failureCodeGithubValidationRejected:
       'GitHub rejected the content this run tried to publish.',
     cancel: 'Cancel',
-    blockedRunTitle: 'This run is stuck',
+    blockedRunTitle: 'This run needs your review',
     blockedRunBody:
-      'Nothing will move it forward on its own. Decide whether to abandon it, which closes the run and keeps whatever result was recorded.',
+      'This run is in a state combination that cannot legally occur: preparation is still in progress, yet execution already finished. Normally preparation completes before execution begins, so both cannot be true at once. The system cannot tell which side to trust and has stopped until someone examines it.',
     abandonRun: 'Abandon',
     abandonTitle: 'Abandon this run',
     abandonExplainer:
@@ -109,9 +109,9 @@ export const messages = {
     abandonConfirm: 'Abandon run',
     abandonWrongToken: 'That admin token was rejected.',
     abandonFailed: 'The run could not be abandoned.',
-    blockedPreparationsTitle: 'These runs are stuck',
+    blockedPreparationsTitle: 'These runs need your review',
     blockedPreparationsBody:
-      'The system cannot finish them on its own, so it has stopped trying. Someone has to look at each one and decide what should happen.',
+      'Each of them is in a state combination that cannot legally occur, so the system cannot finish them on its own. Someone has to examine each one and decide what should happen.',
     axisExecution: 'Execution',
     axisPreparation: 'Preparation',
     axisPublication: 'Publication',
@@ -327,9 +327,10 @@ export const messages = {
     runHistory: '历史',
     runHistoryEmpty: '暂无记录的变更',
     failureCodePreparationRetryExhausted: '准备阶段反复失败，重试次数已用完。',
-    failureCodePreparationAbandoned: '有人选择不再继续处理这个 run。',
+    failureCodePreparationAbandoned:
+      '有人主动结束了这个 run：准备阶段记为失败，不会再发布，已经记录的执行结果保留。此操作不可撤销。',
     failureCodeExecutionAlreadyAdvanced:
-      '准备阶段放弃时 Runner 已经开始执行，因此留待人工判断。',
+      '准备阶段仍未结束，执行却已经完成——没有任何合法状态迁移能产生这种组合。若把准备阶段收尾，就等于宣称任务从未执行并丢弃已产出的结果，因此协调已停止，等待人工处理。',
     failureCodeSubmissionUncertain: 'Runner 没有确认是否接单，可以重新提交。',
     failureCodeRunnerExecutionFailed: 'Runner 报告任务执行失败。',
     failureCodeRunnerResultMissing: 'Runner 报告成功，但没有可用的结果。',
@@ -338,9 +339,9 @@ export const messages = {
       '某个发布步骤反复失败，重试次数已用完。',
     failureCodeGithubValidationRejected: 'GitHub 拒绝了这次尝试发布的内容。',
     cancel: '取消',
-    blockedRunTitle: '这个 run 卡住了',
+    blockedRunTitle: '这个 run 需要你审计',
     blockedRunBody:
-      '系统不会自行推进它了。请判断是否放弃：放弃会结束这个 run，已记录的结果会保留。',
+      '这个 run 处于一种不可能出现的状态组合：准备阶段还停在"准备中"，执行却已经完成。正常流程里准备完成才会开始执行，两者不可能同时成立。系统无法判断该按哪一边收尾，停在这里等你审计。',
     abandonRun: '放弃',
     abandonTitle: '放弃这个 run',
     abandonExplainer:
@@ -352,9 +353,9 @@ export const messages = {
     abandonConfirm: '放弃',
     abandonWrongToken: 'Admin token 被拒绝。',
     abandonFailed: '放弃失败。',
-    blockedPreparationsTitle: '这些 run 卡住了',
+    blockedPreparationsTitle: '这些 run 需要你审计',
     blockedPreparationsBody:
-      '系统无法自行处理，已经不再重试。需要有人逐个查看并决定怎么处理。',
+      '它们各自处于一种不可能出现的状态组合，系统无法自行收尾。需要有人逐个查看，判断该怎么处理。',
     axisExecution: '执行',
     axisPreparation: '准备',
     axisPublication: '发布',

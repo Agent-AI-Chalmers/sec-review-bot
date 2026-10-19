@@ -317,6 +317,18 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* A run coordination refused to conclude on its own. Mantine's Alert supplies the surface and
+   the accent; these rules only keep the explanation readable at a wide viewport. */
+.blocked-run .blocked-run-body {
+  max-width: 62ch;
+}
+
+/* The decision sits beside the explanation rather than after it, so it is visible without
+   reading to the end, and it does not wrap onto its own line at a narrow width. */
+.blocked-run .blocked-run-action {
+  flex-shrink: 0;
+}
+
 .run-heading {
   margin-bottom: 32px;
   padding: 22px 24px;

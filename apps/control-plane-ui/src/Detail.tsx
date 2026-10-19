@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import {
+  Alert,
   Anchor,
   Badge,
   Button,
@@ -16,6 +17,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { IconAlertTriangle } from '@tabler/icons-react'
 import {
   IconArrowLeft,
   IconArrowUpRight,
@@ -273,23 +275,39 @@ function AbandonDialog({
  */
 function ExplainedCode({
   code,
-  className
+  className,
+  tone = 'error'
 }: {
   code: string
   className?: string
+  /** `error` for a failure code, `neutral` for a state marker that is not itself a failure. */
+  tone?: 'error' | 'neutral'
 }): React.JSX.Element {
   const t = useMessages()
   const { explanation } = failureCodeLabel(code, t)
   const label = (
     <span className={className}>
-      <Text component="span" c="red" size="xs" ff="monospace">
+      <Text
+        component="span"
+        c={tone === 'error' ? 'red' : 'dimmed'}
+        size="xs"
+        ff="monospace"
+      >
         {code}
       </Text>
     </span>
   )
   if (explanation === null) return label
   return (
-    <Tooltip label={explanation} multiline w={280} withArrow>
+    <Tooltip
+      label={explanation}
+      multiline
+      w={360}
+      withArrow
+      position="bottom-start"
+      // Long enough to wrap to several lines; the default delay would make it feel broken.
+      openDelay={150}
+    >
       {label}
     </Tooltip>
   )
@@ -492,36 +510,48 @@ export function Detail(): React.JSX.Element {
               }}
             />
             {run.preparation.expiry_blocked_reason !== null && (
-              <Paper
-                component="section"
-                withBorder
+              <Alert
+                // A run the system refused to conclude. `Alert` rather than `Paper`: this is a
+                // call to act, and it must not look like another content card on the page.
+                color="orange"
+                variant="light"
                 radius="sm"
-                p="md"
+                p="lg"
+                icon={<IconAlertTriangle size={22} />}
+                title={t('blockedRunTitle')}
                 className="blocked-run"
                 data-testid="blocked-run"
               >
-                <Group justify="space-between" align="flex-start" gap="md">
-                  <div>
-                    <Title order={2} mb={4}>
-                      {t('blockedRunTitle')}
-                    </Title>
-                    <Text size="sm" mb={4}>
+                <Stack gap="sm">
+                  {/* The button centres on the explanation alone. The code sits outside this
+                      row: it is a reference value, and letting it lengthen the row would drag
+                      the button below the middle of the sentence it belongs to. */}
+                  <Group
+                    justify="space-between"
+                    align="center"
+                    gap="lg"
+                    wrap="nowrap"
+                  >
+                    <Text size="sm" className="blocked-run-body">
                       {t('blockedRunBody')}
                     </Text>
-                    <Text size="xs" c="dimmed" ff="monospace">
-                      {run.preparation.expiry_blocked_reason}
-                    </Text>
-                  </div>
-                  <Button
-                    color="red"
-                    variant="light"
-                    onClick={() => setAbandoning(true)}
-                    data-testid="abandon-run"
-                  >
-                    {t('abandonRun')}
-                  </Button>
-                </Group>
-              </Paper>
+                    <Button
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      onClick={() => setAbandoning(true)}
+                      data-testid="abandon-run"
+                      className="blocked-run-action"
+                    >
+                      {t('abandonRun')}
+                    </Button>
+                  </Group>
+                  <ExplainedCode
+                    code={run.preparation.expiry_blocked_reason}
+                    tone="neutral"
+                  />
+                </Stack>
+              </Alert>
             )}
             <Paper component="section" withBorder radius="sm" p="md">
               <Title order={2} mb="lg">
