@@ -16,6 +16,57 @@ function databaseUrl() {
   return value
 }
 
+test('an axis row cannot be written under a connector the trunk does not own', async () => {
+  // Reads join each axis on `connector_id`, and publication is an inner join. A row stored under
+  // the wrong connector would therefore be invisible to those reads: the run would look like it
+  // had a missing axis and be reported as corrupt, or vanish entirely, long after the bad write.
+  // The composite foreign key turns that into a rejected write instead.
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `control-plane-test:${randomUUID()}`
+  })
+  await store.initialize()
+  const pool = new Pool({ connectionString: databaseUrl() })
+  try {
+    const runId = `run-${randomUUID()}`
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    // Delete the axis rows first so the insert below cannot fail on the primary key; the only
+    // thing left to reject it is the connector the trunk owns.
+    for (const table of ['executions', 'preparations', 'publications'] as const) {
+      await pool.query(`DELETE FROM ${table} WHERE run_id=$1`, [runId])
+    }
+    for (const table of ['executions', 'preparations', 'publications'] as const) {
+      await assert.rejects(
+        pool.query(
+          `INSERT INTO ${table} (run_id, connector_id, status${
+            table === 'publications'
+              ? ', input'
+              : table === 'preparations'
+                ? ', input_version, input'
+                : ''
+          }) VALUES ($1, 'intruder', 'pending'${
+            table === 'publications'
+              ? ", '{}'::jsonb"
+              : table === 'preparations'
+                ? ", 'v1', '{}'::jsonb"
+                : ''
+          })`,
+          [runId]
+        ),
+        /violates foreign key constraint/,
+        `${table} must reject a connector its trunk does not own`
+      )
+    }
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
 test('admission creates exactly one executions row alongside the run trunk', async () => {
   const store = new ReviewRunStore({
     connectionString: databaseUrl(),

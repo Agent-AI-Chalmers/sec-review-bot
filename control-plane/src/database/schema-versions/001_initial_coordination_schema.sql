@@ -9,7 +9,11 @@ CREATE TABLE review_runs (
   ingress_key text,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  UNIQUE (connector_id, ingress_kind, ingress_key)
+  UNIQUE (connector_id, ingress_kind, ingress_key),
+  -- Redundant as a key (run_id is already unique) but required as a foreign-key target: the axis
+  -- tables reference (run_id, connector_id) together so an axis row cannot claim a connector the
+  -- trunk does not own.
+  UNIQUE (run_id, connector_id)
 );
 
 COMMENT ON TABLE review_runs IS
@@ -70,7 +74,12 @@ CREATE TABLE executions (
       WHEN 'running' THEN started_at IS NOT NULL AND finished_at IS NULL
       ELSE finished_at IS NOT NULL
     END
-  )
+  ),
+  -- An axis row belongs to the connector that owns its run. Without this, a row written under the
+  -- wrong connector would be invisible to the reads that join on connector_id, and would surface
+  -- as a "missing axis" corruption instead of a rejected write.
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
 );
 
 COMMENT ON TABLE executions IS
@@ -141,7 +150,9 @@ CREATE TABLE preparations (
       WHEN 'preparing' THEN started_at IS NOT NULL AND finished_at IS NULL
       ELSE started_at IS NOT NULL AND finished_at IS NOT NULL
     END
-  )
+  ),
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
 );
 
 COMMENT ON TABLE preparations IS
@@ -222,7 +233,11 @@ CREATE TABLE publications (
       WHEN 'skipped' THEN finished_at IS NOT NULL
       ELSE started_at IS NOT NULL AND finished_at IS NOT NULL
     END
-  )
+  ),
+  -- Publication is read with an inner join, so a row under the wrong connector would drop the
+  -- whole run from every read rather than merely hiding the axis.
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
 );
 
 COMMENT ON TABLE publications IS
