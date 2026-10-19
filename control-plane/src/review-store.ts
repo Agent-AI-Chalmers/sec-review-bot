@@ -43,6 +43,7 @@ import {
 } from './shapes.js'
 import {
   PreparationStore,
+  type PreparationExpiryResult,
   type PreparationFailureNoticeWork,
   type PreparationWork
 } from './preparation-store.js'
@@ -66,6 +67,8 @@ type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject
 
 export type {
+  PreparationExpiryBlocked,
+  PreparationExpiryResult,
   PreparationFailureNoticeWork,
   PreparationWork
 } from './preparation-store.js'
@@ -843,7 +846,7 @@ export class ReviewRunStore {
     const { runs, dropped } = projectRunRows(page)
     return { runs, next_cursor, dropped }
   }
-  async expireStalePreparations(): Promise<number> {
+  async expireStalePreparations(): Promise<PreparationExpiryResult> {
     this.ready()
     return await this.preparations.expireStale()
   }

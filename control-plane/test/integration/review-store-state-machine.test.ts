@@ -475,7 +475,7 @@ test('ReviewRunStore returns an expired preparation to pending without failing i
       publish_context: {}
     })
 
-    assert.strictEqual(await store.expireStalePreparations(), 1)
+    assert.strictEqual((await store.expireStalePreparations()).concluded, 1)
     const run = await store.getRun(runId)
     assert.strictEqual(run?.execution.status, 'pending')
     assert.strictEqual(run?.failure_code, null)
@@ -483,7 +483,7 @@ test('ReviewRunStore returns an expired preparation to pending without failing i
     assert.strictEqual(run?.preparation?.attempt_count, 1)
     assert.strictEqual(run?.preparation?.failure_notice_status, null)
     assert.strictEqual(await store.claimPublication(runId), null)
-    assert.strictEqual(await store.expireStalePreparations(), 0)
+    assert.strictEqual((await store.expireStalePreparations()).concluded, 0)
   } finally {
     await store.close()
   }
@@ -504,7 +504,7 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
       [runId]
     )
-    assert.strictEqual(await store.expireStalePreparations(), 1)
+    assert.strictEqual((await store.expireStalePreparations()).concluded, 1)
     const run = await store.getRun(runId)
     assert.strictEqual(run?.execution.status, 'skipped')
     assert.strictEqual(run?.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
@@ -629,7 +629,7 @@ test('concurrent failure notice consumers cannot own the same outbox work', asyn
         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
       [runId]
     )
-    assert.strictEqual(await producer.expireStalePreparations(), 1)
+    assert.strictEqual((await producer.expireStalePreparations()).concluded, 1)
 
     const claims = await Promise.all([
       first.claimNextPreparationFailureNotice(),
@@ -663,7 +663,7 @@ test('ReviewRunStore claims an expired preparation from its durable connector in
       issue_number: 12,
       resolved: true
     })
-    assert.strictEqual(await store.expireStalePreparations(), 1)
+    assert.strictEqual((await store.expireStalePreparations()).concluded, 1)
 
     const claimed = await store.claimNextPreparation()
     assert.ok(claimed)
@@ -713,7 +713,7 @@ test('concurrent preparation consumers cannot own the same recovered work', asyn
       preparation_input: { kind: 'connector_issue_review' }
     })
     assert.ok(admission.preparation_token)
-    assert.strictEqual(await first.expireStalePreparations(), 1)
+    assert.strictEqual((await first.expireStalePreparations()).concluded, 1)
 
     const claims = await Promise.all([
       first.claimNextPreparation(),
@@ -791,14 +791,14 @@ test('ReviewRunStore renews only the current preparation owner', async () => {
       await store.renewPreparationClaim(runId, randomUUID()),
       false
     )
-    assert.strictEqual(await store.expireStalePreparations(), 0)
+    assert.strictEqual((await store.expireStalePreparations()).concluded, 0)
 
     await observer.query(
       `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour'
        WHERE run_id=$1`,
       [runId]
     )
-    assert.strictEqual(await store.expireStalePreparations(), 1)
+    assert.strictEqual((await store.expireStalePreparations()).concluded, 1)
   } finally {
     await observer.end()
     await store.close()
@@ -954,7 +954,7 @@ test('ReviewRunStore leaves ingress replay read-only and lets the coordinator ta
     assert.strictEqual(replay.preparation_token, null)
     assert.strictEqual(replay.record.run_id, first.record.run_id)
 
-    assert.strictEqual(await ownerB.expireStalePreparations(), 1)
+    assert.strictEqual((await ownerB.expireStalePreparations()).concluded, 1)
     const takeover = await ownerB.claimNextPreparation()
     assert.ok(takeover)
     assert.strictEqual(takeover.run_id, first.record.run_id)
@@ -1109,6 +1109,9 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
       async observeActiveRun() {},
       onDroppedRunRow(dropped) {
         throw dropped.error
+      },
+      onBlockedPreparationExpiry(blocked) {
+        throw new Error(`unexpected blocked expiry: ${blocked.reason}`)
       }
     })
 
@@ -2468,6 +2471,158 @@ test('reclaiming a running publication step records that another attempt started
     )
     assert.strictEqual(second?.status, 'running')
     assert.notStrictEqual(second?.last_attempt_at, null)
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
+test('an unreconcilable expiry blocks one run instead of aborting the pass forever', async () => {
+  // A run whose execution already reached a terminal state while its preparation still holds an
+  // expired `preparing` lease cannot be concluded: a preparation failure would have to overwrite
+  // a real Runner result. The old behaviour threw from inside the shared expiry transaction, and
+  // because coordination expires preparations *first*, every pass rolled back before recovering
+  // submissions or observing active runs. One corrupt run therefore starved every other run, on
+  // every tick, with the same error. This pins the fix: the bad run is marked and skipped, the
+  // healthy run is still concluded, and the next pass does not retry the bad one.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  const corruptRunId = `run-corrupt-${randomUUID()}`
+  const healthyRunId = `run-healthy-${randomUUID()}`
+  try {
+    for (const runId of [corruptRunId, healthyRunId]) {
+      await store.createPreparingReviewRun({
+        workflow: 'issue-review',
+        run_id: runId,
+        publish_context: {}
+      })
+      await pool.query(
+        `UPDATE preparations SET attempt_count=8,
+           claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+        [runId]
+      )
+    }
+    // Give the corrupt run an execution that preparation failure can no longer explain. Its
+    // publication is left in flight too, so a naive repair would also have to fence it.
+    await pool.query(
+      `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+         finished_at=clock_timestamp(), workflow_result='{"ok":true}'::jsonb
+       WHERE run_id=$1`,
+      [corruptRunId]
+    )
+    const livePublicationToken = randomUUID()
+    await pool.query(
+      `UPDATE publications SET status='publishing', claim_token=$2,
+         claimed_at=clock_timestamp(), started_at=clock_timestamp() WHERE run_id=$1`,
+      [corruptRunId, livePublicationToken]
+    )
+
+    const first = await store.expireStalePreparations()
+    assert.strictEqual(first.concluded, 1, 'the healthy run is still concluded')
+    assert.deepStrictEqual(first.blocked, [
+      { run_id: corruptRunId, reason: 'EXECUTION_ALREADY_ADVANCED' }
+    ])
+
+    // The healthy run is fully concluded even though a sibling failed.
+    const healthy = await store.getRun(healthyRunId)
+    assert.strictEqual(healthy?.preparation?.status, 'failed')
+    assert.strictEqual(healthy?.execution.status, 'skipped')
+    assert.strictEqual(healthy?.publication.status, 'skipped')
+
+    // The corrupt run's story is left exactly as it was, contradiction intact and repairable.
+    const corrupt = await store.getRun(corruptRunId)
+    assert.strictEqual(corrupt?.preparation?.status, 'preparing')
+    assert.strictEqual(corrupt?.execution.status, 'succeeded')
+    assert.strictEqual(corrupt?.publication.status, 'publishing')
+
+    // The block is durable: a later pass neither retries nor re-reports the same row. Without
+    // this, every tick would repeat the failing transition forever.
+    const second = await store.expireStalePreparations()
+    assert.strictEqual(second.concluded, 0)
+    assert.deepStrictEqual(second.blocked, [])
+
+    const marker = await pool.query<{
+      expiry_blocked_reason: string | null
+      expiry_blocked_at: Date | null
+    }>(
+      `SELECT expiry_blocked_reason, expiry_blocked_at FROM preparations WHERE run_id=$1`,
+      [corruptRunId]
+    )
+    assert.strictEqual(
+      marker.rows[0]?.expiry_blocked_reason,
+      'EXECUTION_ALREADY_ADVANCED'
+    )
+    assert.notStrictEqual(marker.rows[0]?.expiry_blocked_at, null)
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
+test('a blocked expiry does not stop the rest of the coordination pass', async () => {
+  // The expiry call is the first step of a pass. Before per-row isolation it could throw, which
+  // took submission recovery and active observation down with it. This drives a real pass with a
+  // blocked run present and asserts the pass still reaches the later steps.
+  const sharedConnector = `blocked-pass:${randomUUID()}`
+  const store = await createStore({
+    connectorId: sharedConnector,
+    claimTimeoutMs: 0
+  })
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  const corruptRunId = `run-corrupt-${randomUUID()}`
+  const activeRunId = `run-active-${randomUUID()}`
+  try {
+    // Keep the active run's admission token: `claimNextPreparation` would hand back whichever
+    // run sorted first, and the corrupt one must stay unclaimed to keep its expiry pending.
+    const activeAdmission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: activeRunId,
+      publish_context: {}
+    })
+    await store.markQueued(activeRunId, activeAdmission.preparation_token!, {})
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: corruptRunId,
+      publish_context: {}
+    })
+    await pool.query(
+      `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+         finished_at=clock_timestamp(), workflow_result='{"ok":true}'::jsonb
+       WHERE run_id=$1`,
+      [corruptRunId]
+    )
+    await pool.query(
+      `UPDATE preparations SET attempt_count=8,
+         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [corruptRunId]
+    )
+
+    const blocked: string[] = []
+    const observed: string[] = []
+    await coordinateReviewRunsOnce(store, {
+      async recoverSubmission() {},
+      async readRunnerStatuses() {
+        return { runs: [], missing: [], byRunId: new Map() }
+      },
+      async observeActiveRun(run) {
+        observed.push(run.run_id)
+      },
+      onDroppedRunRow(dropped) {
+        throw dropped.error
+      },
+      onBlockedPreparationExpiry(report) {
+        blocked.push(`${report.run_id}:${report.reason}`)
+      }
+    })
+
+    assert.deepStrictEqual(blocked, [
+      `${corruptRunId}:EXECUTION_ALREADY_ADVANCED`
+    ])
+    assert.deepStrictEqual(
+      observed,
+      [activeRunId],
+      'the pass still observes active runs after a blocked expiry'
+    )
   } finally {
     await pool.end()
     await store.close()

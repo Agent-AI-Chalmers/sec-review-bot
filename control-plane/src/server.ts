@@ -231,6 +231,23 @@ function logDroppedRunRow(
   })
 }
 
+/** Report a run whose expired preparation could not be concluded.
+ *
+ * This is the escape hatch that keeps such a run from becoming a silent, permanent stall: the
+ * store marks it durably and stops retrying it, and this line is what tells an operator which run
+ * to repair. It is deliberately one event per blocked run with a stable `reason` code, so it can
+ * be alarmed on without scraping English out of an error string. */
+function logBlockedPreparationExpiry(
+  connectorId: string,
+  blocked: { run_id: string; reason: string }
+): void {
+  logEvent('control_plane_preparation_expiry_blocked', {
+    connector_id: connectorId,
+    run_id: blocked.run_id,
+    reason: blocked.reason
+  })
+}
+
 /** Compare a bearer credential in constant time.
  *
  * The equality check runs for every request, so `!==` would let an attacker recover a token
@@ -770,6 +787,11 @@ export async function startControlPlaneServer(): Promise<{
         // read-side failure used to lack.
         onDroppedRunRow: (dropped) => {
           logDroppedRunRow(store.connectorId, dropped)
+        },
+        // The store already stopped retrying this run, so the pass keeps coordinating the
+        // others; this line is the operator's cue to repair the contradiction by hand.
+        onBlockedPreparationExpiry: (blocked) => {
+          logBlockedPreparationExpiry(store.connectorId, blocked)
         },
         observeActiveRun: async (run, statuses) => {
           await observeRunnerRun(

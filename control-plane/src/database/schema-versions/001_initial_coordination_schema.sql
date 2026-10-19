@@ -150,6 +150,16 @@ CREATE TABLE preparations (
   last_failure_message text,
   started_at timestamptz,
   finished_at timestamptz,
+  -- Set when an expired lease could not be concluded because the run's persisted story is
+  -- self-contradictory (see `expiry_blocked_reason`). It is a durable "do not retry this by
+  -- itself" marker: without it, every coordination pass would select the same row, fail the same
+  -- way, and roll back, so a single corrupt run would starve every other run in the pass. The
+  -- row is left otherwise untouched so the contradiction stays visible for repair.
+  expiry_blocked_reason text,
+  expiry_blocked_at timestamptz,
+  CHECK (
+    (expiry_blocked_reason IS NULL) = (expiry_blocked_at IS NULL)
+  ),
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   CHECK (
@@ -206,9 +216,19 @@ COMMENT ON COLUMN preparations.started_at IS
   'Immutable instant a preparer first claimed this work, i.e. the preparation phase began; NULL while it is still pending. Written once, so a retry that returns the row to pending and claims it again does not move it. Distinct from claimed_at, which is the current lease and is renewed on every heartbeat.';
 COMMENT ON COLUMN preparations.finished_at IS
   'Immutable instant the preparation axis reached a terminal state (submitted or failed); NULL while it is pending or preparing. Written once, in the same UPDATE that sets the terminal status. Distinct from updated_at, which also moves on claim heartbeats and input checkpoints and therefore cannot mark the phase end.';
+COMMENT ON COLUMN preparations.expiry_blocked_reason IS
+  'Why an expired preparation lease could not be concluded: the execution axis had already moved past `pending`, which a preparation failure can no longer explain. Non-NULL means coordination deliberately skips this row instead of retrying a transition that must keep failing. Cleared only by a repair that makes the run''s story consistent again.';
+COMMENT ON COLUMN preparations.expiry_blocked_at IS
+  'When the row was first blocked by an unreconcilable expiry, so operators can order the repair work.';
 
 CREATE INDEX preparations_claimable_idx
   ON preparations (connector_id, status, available_at, updated_at);
+
+-- A blocked row is excluded from the claimable index's predicate; this one finds the rows an
+-- operator still has to repair, without scanning every pending preparation.
+CREATE INDEX preparations_expiry_blocked_idx
+  ON preparations (connector_id, expiry_blocked_at)
+  WHERE expiry_blocked_reason IS NOT NULL;
 
 -- A terminal preparation failure may need connector-facing acknowledgement after
 -- the preparer has died. This outbox is deliberately provider-neutral: it stores

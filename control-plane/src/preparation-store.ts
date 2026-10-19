@@ -5,7 +5,7 @@ import { Pool, type PoolClient } from 'pg'
 
 import type { ControlPlaneWorkflow as WorkflowName } from './contracts.js'
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
-import { appendEvent, appendEvents } from './review-run-events.js'
+import { appendEvent } from './review-run-events.js'
 import {
   abandonInFlightPublication,
   abandonInFlightPublications
@@ -28,6 +28,36 @@ export interface PreparationFailureNoticeWork {
   input: JsonObject
   failure_code: string | null
   claim_token: string
+}
+
+/** One run whose expired lease could not be concluded, and why.
+ *
+ * `reason` is a stable code, not a sentence, so a log consumer or alert can group these rows
+ * without parsing English. Today the only case is an execution axis that already left `pending`,
+ * which a preparation failure can no longer explain. */
+export interface PreparationExpiryBlocked {
+  run_id: string
+  reason: 'EXECUTION_ALREADY_ADVANCED'
+}
+
+/** Outcome of one expiry pass: rows concluded, and rows durably marked as needing repair. */
+export interface PreparationExpiryResult {
+  concluded: number
+  blocked: PreparationExpiryBlocked[]
+}
+
+/** Raised inside a per-row savepoint when the row's persisted story is self-contradictory.
+ *
+ * It is not a transient fault: retrying the same row would fail identically forever, so the
+ * caller rolls the savepoint back, records the block, and lets the rest of the pass proceed. */
+class ExpiryUnreconcilableError extends Error {
+  constructor(
+    readonly reason: PreparationExpiryBlocked['reason'],
+    message: string
+  ) {
+    super(message)
+    this.name = 'ExpiryUnreconcilableError'
+  }
 }
 
 const MAX_PREPARATION_ATTEMPTS = 8
@@ -214,121 +244,169 @@ export class PreparationStore {
     return Math.max(1, Math.min(60_000, Math.floor(this.claimTimeoutMs / 3)))
   }
 
-  async expireStale(): Promise<number> {
+  /** Conclude preparation leases that have expired.
+   *
+   * Each expired row is processed in its own savepoint so one unreconcilable run cannot abort
+   * the whole pass. Before this, a single row whose persisted story contradicted itself made the
+   * shared transaction throw, and since coordination calls this first, *every* pass rolled back
+   * before recovering submissions or observing active runs: one corrupt run starved all the
+   * others, forever, with the same error on each tick.
+   *
+   * Returns the number of rows whose expiry was concluded, plus the rows that were skipped
+   * because they could not be reconciled. The skipped ones are durably marked
+   * (`expiry_blocked_reason`) so later passes do not retry a transition that must keep failing;
+   * they stay visible for repair instead of silently disappearing. */
+  async expireStale(): Promise<PreparationExpiryResult> {
     return await transaction(this.pool, async (client) => {
-      // One statement covers both expired outcomes: a retry returns the row to `pending` with the
-      // phase still open, and an exhausted budget ends it as `failed`. Only the terminal branch
-      // writes `finished_at`; omitting it there would leave a failed row that never recorded when
-      // the phase ended.
-      //
-      // The terminal branch keeps a reason a previous attempt already recorded (for example
-      // GITHUB_RATE_LIMITED) instead of overwriting it with the generic lease-expiry code: the
-      // lease is what ended the phase, but the last real reason is what the user needs to see.
-      // COALESCE covers the case where no attempt ever recorded one.
-      const expired = await client.query<{
+      // Candidate selection is deliberately separate from the conclusion below: the conclusion
+      // needs a per-row savepoint to isolate failures, which a single set-based UPDATE cannot
+      // provide.
+      const candidates = await client.query<{
         run_id: string
-        status: 'pending' | 'failed'
-        failure_code: string | null
+        attempt_count: number
       }>(
-        `UPDATE preparations
-         SET status=CASE WHEN attempt_count >= $3 THEN 'failed' ELSE 'pending' END,
-             claim_token=NULL, claimed_at=NULL, available_at=clock_timestamp(),
-             failure_code=CASE WHEN attempt_count >= $3 THEN
-               COALESCE(last_failure_code, 'PREPARATION_RETRY_EXHAUSTED') ELSE NULL END,
-             failure_message=CASE WHEN attempt_count >= $3 THEN
-               COALESCE(last_failure_message,
-                 'Preparation claim lease expired after the retry budget was exhausted.') ELSE NULL END,
-             finished_at=CASE WHEN attempt_count >= $3 THEN clock_timestamp() ELSE NULL END,
-             updated_at=clock_timestamp()
+        `SELECT run_id, attempt_count FROM preparations
          WHERE connector_id=$1 AND status='preparing'
+           AND expiry_blocked_reason IS NULL
            AND claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
-         RETURNING run_id, status, failure_code`,
-        [this.connectorId, this.claimTimeoutMs, MAX_PREPARATION_ATTEMPTS]
+         ORDER BY updated_at, run_id
+         FOR UPDATE SKIP LOCKED`,
+        [this.connectorId, this.claimTimeoutMs]
       )
-      // Preparation events for every expired row: a reversion to pending after the lease
-      // lapsed, or a terminal failure once the retry budget is spent. The event names the code the
-      // row now carries, which is the last real reason when a previous attempt recorded one.
-      await appendEvents(
-        client,
-        expired.rows.map((row) => ({
-          runId: row.run_id,
-          connectorId: this.connectorId,
-          axis: 'preparation' as const,
-          fromStatus: 'preparing',
-          toStatus: row.status,
-          reasonCode: row.status === 'failed' ? row.failure_code : null
-        }))
+
+      let concluded = 0
+      const blocked: PreparationExpiryBlocked[] = []
+      for (const candidate of candidates.rows) {
+        const savepoint = `expire_${candidate.run_id.replace(/[^a-zA-Z0-9_]/g, '_')}`
+        await client.query(`SAVEPOINT ${savepoint}`)
+        try {
+          await this.concludeExpiry(
+            client,
+            candidate.run_id,
+            candidate.attempt_count
+          )
+          await client.query(`RELEASE SAVEPOINT ${savepoint}`)
+          concluded += 1
+        } catch (error) {
+          if (!(error instanceof ExpiryUnreconcilableError)) throw error
+          // Roll the row's partial writes back before recording why it was left alone. The block
+          // marker itself must survive, which is why it is written after the rollback rather than
+          // inside the aborted savepoint.
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`)
+          await client.query(
+            `UPDATE preparations
+             SET expiry_blocked_reason=$3, expiry_blocked_at=clock_timestamp(),
+                 updated_at=clock_timestamp()
+             WHERE run_id=$1 AND connector_id=$2 AND expiry_blocked_reason IS NULL`,
+            [candidate.run_id, this.connectorId, error.reason]
+          )
+          blocked.push({ run_id: candidate.run_id, reason: error.reason })
+          await client.query(`RELEASE SAVEPOINT ${savepoint}`)
+        }
+      }
+      return { concluded, blocked }
+    })
+  }
+
+  /** Conclude one expired preparation row, in the caller's transaction.
+   *
+   * Throws `ExpiryUnreconcilableError` when the execution axis has moved past `pending`: that is
+   * the case a preparation failure can no longer explain, because the input did reach the Runner
+   * after all. Writing the "execution never ran" conclusion then would overwrite a real result,
+   * so the caller rolls this row back and marks it blocked instead. */
+  private async concludeExpiry(
+    client: PoolClient,
+    runId: string,
+    attemptCount: number
+  ): Promise<void> {
+    const exhausted = attemptCount >= MAX_PREPARATION_ATTEMPTS
+    // One statement covers both expired outcomes: a retry returns the row to `pending` with the
+    // phase still open, and an exhausted budget ends it as `failed`. Only the terminal branch
+    // writes `finished_at` and a reason. The terminal reason keeps whatever a previous attempt
+    // recorded (for example GITHUB_RATE_LIMITED) instead of overwriting it with the generic
+    // exhaustion code: the lease is what ended the phase, but the last real reason is what the
+    // user needs to see.
+    const expired = await client.query<{
+      run_id: string
+      status: 'pending' | 'failed'
+      failure_code: string | null
+    }>(
+      `UPDATE preparations
+       SET status=CASE WHEN $3 THEN 'failed' ELSE 'pending' END,
+           claim_token=NULL, claimed_at=NULL, available_at=clock_timestamp(),
+           failure_code=CASE WHEN $3 THEN
+             COALESCE(last_failure_code, 'PREPARATION_RETRY_EXHAUSTED') ELSE NULL END,
+           failure_message=CASE WHEN $3 THEN
+             COALESCE(last_failure_message,
+               'Preparation claim lease expired after the retry budget was exhausted.') ELSE NULL END,
+           finished_at=CASE WHEN $3 THEN clock_timestamp() ELSE NULL END,
+           updated_at=clock_timestamp()
+       WHERE run_id=$1 AND connector_id=$2 AND status='preparing'
+       RETURNING run_id, status, failure_code`,
+      [runId, this.connectorId, exhausted]
+    )
+    const row = expired.rows[0]
+    if (row === undefined)
+      throw new Error(`Expired preparation ${runId} could not be concluded.`)
+    await appendEvent(client, {
+      runId,
+      connectorId: this.connectorId,
+      axis: 'preparation',
+      fromStatus: 'preparing',
+      toStatus: row.status,
+      reasonCode: row.status === 'failed' ? row.failure_code : null
+    })
+    if (row.status !== 'failed') return
+
+    // Execution never ran, so it is skipped, not failed. The failure reason stays on the
+    // preparation row (and is surfaced through the run's preparation summary). A run whose
+    // execution already left `pending` contradicts that premise: refuse to overwrite it.
+    const skippedRuns = await skipPendingExecutions(client, this.connectorId, [
+      runId
+    ])
+    if (skippedRuns.length !== 1)
+      throw new ExpiryUnreconcilableError(
+        'EXECUTION_ALREADY_ADVANCED',
+        `preparation ${runId} expired with its execution no longer pending`
       )
-      const failedRunIds = expired.rows
-        .filter((row) => row.status === 'failed')
-        .map((row) => row.run_id)
-      if (failedRunIds.length === 0) return expired.rowCount ?? 0
-      // Execution never ran, so it is skipped, not failed. The failure reason stays on the
-      // preparation row (and is surfaced through the run's preparation summary).
-      const skippedRuns = await skipPendingExecutions(
-        client,
-        this.connectorId,
-        failedRunIds
-      )
-      if (skippedRuns.length !== failedRunIds.length)
-        throw new Error('Preparation expiry lost a terminal run transition.')
-      // Publication is not applicable either. This uses the same helper as the single-run
-      // failure path, so a publication already in flight is converged here too instead of only
-      // `pending` being touched.
-      const abandonedPublications = await abandonInFlightPublications(
-        client,
-        this.connectorId,
-        failedRunIds
-      )
-      // The notice carries the reason the preparation row now holds, so a lease expiry after a
-      // real failure (for example rate limiting) reports that failure instead of the generic
-      // exhaustion code.
-      await client.query(
-        `INSERT INTO preparation_failure_notices (run_id,connector_id,status,failure_code)
-         SELECT p.run_id,p.connector_id,'pending',p.failure_code
-         FROM preparations p
-         WHERE p.run_id=ANY($1::text[]) AND p.connector_id=$2
-         ON CONFLICT (run_id) DO NOTHING`,
-        [failedRunIds, this.connectorId]
-      )
-      // Each event names the state the row actually left. The execution transition is known to
-      // be from `pending` because `skipPendingExecutions` only matches that state, but the
-      // publication one is not: an in-flight publication is converged too, so its origin comes
-      // back from the helper rather than being assumed.
-      await appendEvents(
-        client,
-        failedRunIds.flatMap((failedRunId) => {
-          const publicationFrom = abandonedPublications.get(failedRunId)
-          return [
-            {
-              runId: failedRunId,
-              connectorId: this.connectorId,
-              axis: 'runner' as const,
-              fromStatus: 'pending',
-              toStatus: 'skipped'
-            },
-            ...(publicationFrom === undefined
-              ? []
-              : [
-                  {
-                    runId: failedRunId,
-                    connectorId: this.connectorId,
-                    axis: 'publication' as const,
-                    fromStatus: publicationFrom,
-                    toStatus: 'skipped'
-                  }
-                ]),
-            {
-              runId: failedRunId,
-              connectorId: this.connectorId,
-              axis: 'notice' as const,
-              fromStatus: null,
-              toStatus: 'pending'
-            }
-          ]
-        })
-      )
-      return expired.rowCount ?? 0
+    // Publication is not applicable either; the helper converges an in-flight publication too.
+    const abandoned = await abandonInFlightPublications(
+      client,
+      this.connectorId,
+      [runId]
+    )
+    // The notice carries the reason the preparation row now holds, so a lease expiry after a
+    // real failure (for example rate limiting) reports that failure instead of the generic
+    // exhaustion code.
+    await client.query(
+      `INSERT INTO preparation_failure_notices (run_id,connector_id,status,failure_code)
+       VALUES ($1,$2,'pending',$3) ON CONFLICT (run_id) DO NOTHING`,
+      [runId, this.connectorId, row.failure_code]
+    )
+    await appendEvent(client, {
+      runId,
+      connectorId: this.connectorId,
+      axis: 'runner',
+      fromStatus: 'pending',
+      toStatus: 'skipped'
+    })
+    const publicationFrom = abandoned.get(runId)
+    if (publicationFrom !== undefined) {
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'publication',
+        fromStatus: publicationFrom,
+        toStatus: 'skipped',
+        reasonCode: 'PUBLICATION_ABANDONED'
+      })
+    }
+    await appendEvent(client, {
+      runId,
+      connectorId: this.connectorId,
+      axis: 'notice',
+      fromStatus: null,
+      toStatus: 'pending'
     })
   }
 

@@ -2,6 +2,7 @@ import { clearImmediate, clearInterval } from 'node:timers'
 
 import type {
   DroppedRunRow,
+  PreparationExpiryBlocked,
   ReviewRunRecord,
   ReviewRunStore
 } from './review-store.js'
@@ -25,13 +26,22 @@ export interface ReviewRunCoordinationHandlers {
   /** Report a stored row the contract cannot represent. The pass continues without it, so a
    * single corrupt row degrades one run's coordination instead of stopping the whole pass. */
   onDroppedRunRow: (dropped: DroppedRunRow) => void
+  /** Report a run whose expired preparation could not be concluded. Coordination cannot repair
+   * it and deliberately does not retry it, so this is the operator's signal to intervene. Like a
+   * dropped row it must not abort the pass: the other runs still need coordinating. */
+  onBlockedPreparationExpiry: (blocked: PreparationExpiryBlocked) => void
 }
 
 export async function coordinateReviewRunsOnce(
   store: CoordinationStore,
   handlers: ReviewRunCoordinationHandlers
 ): Promise<void> {
-  await store.expireStalePreparations()
+  // Expiry isolates each row, so a run whose story contradicts itself no longer aborts the pass
+  // before recovery and observation get to run. It is reported and skipped instead.
+  const expiry = await store.expireStalePreparations()
+  for (const blocked of expiry.blocked) {
+    handlers.onBlockedPreparationExpiry(blocked)
+  }
 
   // Both reads are fan-outs: a stored row the contract cannot represent would otherwise
   // abort the read (and so the whole pass) for every run. Report the bad row and carry on.

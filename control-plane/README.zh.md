@@ -102,6 +102,8 @@ flowchart LR
 
 Preparation、submission recovery、publication、publication step 提交和终态 preparation notice 都使用 claim token 隔离过期 owner。Input preparation 活跃期间，GitHub integration 会续租 preparation claim。过期的 preparation 通常会回到 `pending`；在有限重试预算耗尽后，它会使 run 失败、跳过 publication，并创建持久化的 connector notice work。超时 owner 可以完成已发出的外部请求，但在新 owner 获得 token 后不能再提交状态。
 
+过期处理按 run 隔离。如果某个 run 的持久化状态与过期结论自相矛盾——`preparing` 租约已过期，但 execution 早已离开 `pending`——那么结论一旦写入就会覆盖 Runner 的真实结果。这类行会被回滚、打上 `expiry_blocked_reason` 标记（当前只有 `EXECUTION_ALREADY_ADVANCED`）并记录 `control_plane_preparation_expiry_blocked` 事件，后续每一轮协调都会跳过它，而不是反复重试一个必然失败的转换。其余 run 的协调不受影响；这个标记就是交给运维修复该矛盾的信号，只有把 run 修复到前后一致后才会被清除。
+
 若要自动恢复 preparation，connector 会在 admission 时提交版本化、opaque 的 preparation input。Control Plane 只持久化并返还该 input 给拥有工作的一方，绝不解释其中任何 provider 专属字段。没有提供可重放 input 的 connector 仍可同步 prepare，但其过期工作不能由恢复 worker 领取。
 
 `run_id` 在 PostgreSQL 中全局唯一。`ingress_kind` 和 `ingress_key` 提供 connector 范围的入口幂等。`connector_id` 隔离读取、claim、publication 和 publication step。持久化操作日志同时包含 `connector_id` 和 `run_id`。
