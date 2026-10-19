@@ -1,63 +1,15 @@
-export interface ArtifactStorage {
-  status: 'available' | 'unavailable' | 'failed'
-  artifact?: {
-    kind: 'diagnostic_bundle'
-    /** Where the Runner stored the bundle. The contract requires it. */
-    uri: string
-    media_type: string
-    digest: string
-    size_bytes: number
-  }
-  error_code?: string
-  message?: string
-}
-export interface RunEvent {
-  event_id: number
-  axis: 'runner' | 'preparation' | 'publication' | 'notice'
-  from_status: string | null
-  to_status: string
-  reason_code: string | null
-  occurred_at: string
-}
+// The response shapes come from the generated contract projection rather than hand-written
+// interfaces: `ArtifactStorage` is a discriminated union in the contract, and a flattened copy
+// could not tell `available` (which requires `artifact`) apart from the other statuses.
+import type {
+  ArtifactStorage,
+  PublicationStep,
+  Run,
+  RunEvent
+} from './control-plane-api-types.js'
 
-export interface Run {
-  run_id: string
-  workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
-  preparation: {
-    status: 'pending' | 'preparing' | 'submitted' | 'failed'
-    attempt_count: number
-    started_at: string | null
-    finished_at: string | null
-    updated_at: string
-    failure_code: string | null
-    failure_notice_status:
-      'pending' | 'delivering' | 'delivered' | 'skipped' | null
-  }
-  // The three axes share one shape: where each phase started, where it ended, and — for
-  // execution only — when it was last observed. A `skipped` phase has an end and no start.
-  execution: {
-    status:
-      | 'pending'
-      | 'queued'
-      | 'running'
-      | 'uncertain'
-      | 'succeeded'
-      | 'skipped'
-      | 'failed'
-    started_at: string | null
-    finished_at: string | null
-    updated_at: string
-  }
-  publication: {
-    status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
-    started_at: string | null
-    finished_at: string | null
-    updated_at: string
-  }
-  created_at: string
-  failure_code: string | null
-  artifact_storage: ArtifactStorage | null
-}
+export type { ArtifactStorage, PublicationStep, Run, RunEvent }
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,

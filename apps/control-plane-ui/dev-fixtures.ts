@@ -1,6 +1,6 @@
 import type { Plugin } from 'vite'
 
-import type { Run } from './src/api.js'
+import type { ArtifactStorage, Run } from './src/api.js'
 
 import { LIST_RUN_QUERY_PARAMS } from './src/list-run-query-params.js'
 
@@ -21,18 +21,9 @@ type ArtifactStatus = 'available' | 'unavailable' | 'failed'
 type StepStatus =
   'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
 
-interface FixtureArtifact {
-  status: ArtifactStatus
-  artifact?: {
-    kind: 'diagnostic_bundle'
-    uri: string
-    media_type: string
-    digest: string
-    size_bytes: number
-  }
-  error_code?: string
-  message?: string
-}
+// The contract's own artifact union, not a look-alike: `available` is the only status that may
+// carry `artifact`, and the fixtures must satisfy the same shape the console renders.
+type FixtureArtifact = NonNullable<ArtifactStorage>
 
 interface FixtureRun {
   run_id: string

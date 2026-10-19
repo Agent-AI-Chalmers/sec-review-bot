@@ -222,7 +222,7 @@ export function runPublicationStatusLabel(
 }
 
 export function artifactStatusLabel(
-  status: ArtifactStorage['status'],
+  status: NonNullable<ArtifactStorage>['status'],
   t: ReturnType<typeof useMessages>
 ): string {
   if (status === 'available') return t('artifactAvailable')
@@ -230,7 +230,9 @@ export function artifactStatusLabel(
   return t('statusFailed')
 }
 
-export function artifactStatusColor(status: ArtifactStorage['status']): string {
+export function artifactStatusColor(
+  status: NonNullable<ArtifactStorage>['status']
+): string {
   if (status === 'available') return 'green'
   if (status === 'unavailable') return 'yellow'
   return 'red'

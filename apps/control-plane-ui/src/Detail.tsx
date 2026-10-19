@@ -77,13 +77,16 @@ function Artifact({
   storage,
   runId
 }: {
-  storage: ArtifactStorage
+  // Non-null: the caller only renders this when the run actually reported a storage record.
+  storage: NonNullable<ArtifactStorage>
   runId: string
 }): React.ReactNode {
   const t = useMessages()
   const [expanded, setExpanded] = React.useState(false)
-  const artifact = storage.artifact
-  if (artifact === undefined) {
+  // The contract makes this a discriminated union: `available` always carries the artifact, and
+  // the other statuses never do. Narrowing on the status is what the type system can check, so a
+  // missing artifact can no longer be silently rendered as an empty panel.
+  if (storage.status !== 'available') {
     if (!storage.message && !storage.error_code) return null
     return (
       <div className="artifact-state">
@@ -100,6 +103,7 @@ function Artifact({
       </div>
     )
   }
+  const artifact = storage.artifact
   const hex = artifact.digest.replace(/^sha256:/, '')
   return (
     <div className="artifact-panel">

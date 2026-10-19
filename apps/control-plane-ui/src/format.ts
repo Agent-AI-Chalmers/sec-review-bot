@@ -59,13 +59,13 @@ export function abbreviateDigest(digest: string): string {
   return abbreviate(digest.replace(/^sha256:/, ''), 12, 12)
 }
 
+/** Narrows a run's artifact record to the `available` arm of the contract's union, where the
+ * artifact reference is guaranteed. The contract makes `available` the only status that carries
+ * `artifact`, so the predicate can rely on the status alone. */
 export function isDownloadableArtifact(
   value: ArtifactStorage | null
-): value is ArtifactStorage & {
-  status: 'available'
-  artifact: NonNullable<ArtifactStorage['artifact']>
-} {
-  return value?.status === 'available' && value.artifact !== undefined
+): value is Extract<NonNullable<ArtifactStorage>, { status: 'available' }> {
+  return value?.status === 'available'
 }
 
 /** Names the failure when the backend distinguished it, instead of reporting every

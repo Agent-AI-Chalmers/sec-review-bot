@@ -37,6 +37,7 @@ contract-tools:
   - 'control-plane/src/runner-api-schema.ts'
   - 'apps/github-integration/src/control-plane/control-plane-api.ts'
   - 'apps/control-plane-ui/src/list-run-query-params.ts'
+  - 'apps/control-plane-ui/src/control-plane-api-types.ts'
   # CI tooling.
   - '.github/ci/**'
   - '.github/workflows/ci.yml'

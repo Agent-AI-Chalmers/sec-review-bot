@@ -336,12 +336,58 @@ ${entries}
   })
 }
 
+/** The console reads the Control Plane through the BFF, so it needs the same response shapes
+ * the server produces - above all `ArtifactStorage`, whose contract is a discriminated union
+ * (`available` requires `artifact`; the other two forbid it). A hand-written copy flattened
+ * that union, which let the console type-check code that reads a missing artifact. This
+ * projects the shapes the console imports from one generated file instead. */
+export const UI_TYPES_PATH = path.resolve(
+  REPO_ROOT,
+  'apps',
+  'control-plane-ui',
+  'src',
+  'control-plane-api-types.ts'
+)
+
+const UI_SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
+  ['ArtifactStorage', 'ArtifactStorage'],
+  ['Run', 'ObservedRun'],
+  ['RunEvent', 'ReviewRunEvent'],
+  ['PublicationStep', 'ObservedPublicationStep']
+]
+
+/** The committed content of `apps/control-plane-ui/src/control-plane-api-types.ts`. */
+export async function renderUiContractTypes(): Promise<string> {
+  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
+  const ast = await openapiTS(spec)
+  const components = astToString(interfaceNode(ast, 'components'))
+  const lines = UI_SHAPE_ALIASES.map(
+    ([alias, schema]) =>
+      `export type ${alias} = components['schemas']['${schema}']`
+  )
+  const body =
+    headerComment() +
+    `//
+// The shapes the console reads. The console has no access to the server's source, so it imports
+// these aliases rather than restating the contract: a hand-written copy would drift silently,
+// and a flattened copy of a discriminated union (ArtifactStorage) cannot express which fields a
+// given status requires.
+
+${components}
+
+${lines.join('\n')}
+`
+  const options = await prettier.resolveConfig(UI_TYPES_PATH)
+  return await prettier.format(body, { ...options, filepath: UI_TYPES_PATH })
+}
+
 /** This generator's outputs as the shared descriptor the checker walks. */
 export function generatedArtifacts(): GeneratedArtifact[] {
   return [
     { output: OUTPUT_PATH, render: renderControlPlaneApiTypes },
     { output: ERROR_CODES_PATH, render: renderErrorCodeTypes },
     { output: CONTRACT_TYPES_PATH, render: renderContractTypes },
-    { output: LIST_RUN_QUERY_PARAMS_PATH, render: renderListRunQueryParams }
+    { output: LIST_RUN_QUERY_PARAMS_PATH, render: renderListRunQueryParams },
+    { output: UI_TYPES_PATH, render: renderUiContractTypes }
   ]
 }
