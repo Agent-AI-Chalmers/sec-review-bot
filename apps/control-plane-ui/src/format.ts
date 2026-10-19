@@ -42,12 +42,14 @@ export function abbreviate(value: string, head: number, tail: number): string {
 
 export function lastActivity(run: Run): string {
   // Whichever axis was written most recently. Each axis reports its own write time, so a
-  // publication that is still running keeps advancing here even though its phase bounds
-  // (`started_at`, `finished_at`) intentionally do not.
-  return Date.parse(run.publication.updated_at) >
-    Date.parse(run.execution.updated_at)
-    ? run.publication.updated_at
-    : run.execution.updated_at
+  // preparation being built or a publication that is still running keeps advancing here even
+  // though the phase bounds (`started_at`, `finished_at`) intentionally do not. Preparation is
+  // included because it is the only axis that moves while execution is still `pending`, and
+  // without it a long preparation would freeze the column at the run's creation time.
+  return [run.preparation.updated_at, run.execution.updated_at, run.publication.updated_at]
+    .reduce((latest, value) =>
+      Date.parse(value) > Date.parse(latest) ? value : latest
+    )
 }
 
 export function abbreviateDigest(digest: string): string {

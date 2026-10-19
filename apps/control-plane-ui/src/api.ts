@@ -28,6 +28,7 @@ export interface Run {
     attempt_count: number
     started_at: string | null
     finished_at: string | null
+    updated_at: string
     failure_code: string | null
     failure_notice_status:
       'pending' | 'delivering' | 'delivered' | 'skipped' | null

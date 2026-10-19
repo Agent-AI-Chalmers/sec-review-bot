@@ -42,6 +42,7 @@ interface FixtureRun {
     attempt_count: number
     started_at: string | null
     finished_at: string | null
+    updated_at: string
     failure_code: string | null
     failure_notice_status: NoticeStage | null
   }
@@ -557,6 +558,13 @@ function preparationFor(
     attempt_count: status === 'failed' ? 8 : 1,
     started_at: startedAt === null ? null : iso(startedAt),
     finished_at: finishedAt === null ? null : iso(finishedAt),
+    // The axis keeps being written while a preparer owns it (claim heartbeats, input
+    // checkpoints), so its write time is the phase end once terminal and "just now" while live.
+    updated_at: iso(
+      status === 'preparing'
+        ? Date.now() - Math.min(5_000, scenario.executionMs)
+        : (finishedAt ?? createdAt)
+    ),
     failure_code: status === 'failed' ? scenario.failure_code : null,
     failure_notice_status:
       status === 'failed' ? scenario.preparation_notice : null
@@ -672,6 +680,12 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
     Date.parse(preparation.finished_at) < Date.parse(preparation.started_at)
   ) {
     fail('preparation must not end before it started')
+  }
+  if (
+    preparation.started_at !== null &&
+    Date.parse(preparation.updated_at) < Date.parse(preparation.started_at)
+  ) {
+    fail('preparation.updated_at must not precede preparation.started_at')
   }
   if (
     run.execution.started_at !== null &&

@@ -93,6 +93,7 @@ interface ReviewRunRow {
   preparation_status: 'pending' | 'preparing' | 'submitted' | 'failed' | null
   preparation_attempt_count: number | null
   preparation_started_at: Date | string | null
+  preparation_updated_at: Date | string
   preparation_finished_at: Date | string | null
   preparation_failure_code: string | null
   preparation_failure_message: string | null
@@ -133,6 +134,7 @@ const RUN_SELECT = `
     (pr.run_id IS NULL) AS preparation_missing,
     pr.status AS preparation_status, pr.attempt_count AS preparation_attempt_count,
     pr.started_at AS preparation_started_at, pr.finished_at AS preparation_finished_at,
+    pr.updated_at AS preparation_updated_at,
     pr.failure_code AS preparation_failure_code,
     pr.failure_message AS preparation_failure_message,
     n.status AS preparation_failure_notice_status
@@ -184,6 +186,7 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
         row.preparation_finished_at === null
           ? null
           : iso(row.preparation_finished_at),
+      updated_at: iso(row.preparation_updated_at),
       failure_code: row.preparation_failure_code,
       failure_notice_status: row.preparation_failure_notice_status
     },

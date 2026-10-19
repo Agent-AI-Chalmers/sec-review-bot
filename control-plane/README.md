@@ -76,7 +76,6 @@ flowchart LR
     publishing -->|retryable failure| pubpending
     publishing -->|terminal failure| pubfailed[failed]
     pubpending -->|execution not publishable| skipped
-    skipped -->|replay accepted| pubpending
   end
 
   subgraph steps[publication_steps.status]
@@ -119,7 +118,7 @@ The contract is **enforced on requests**: routing, path/query/body validation, a
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
-Read responses report three independent lifecycle axes: the redacted `preparation` summary, `execution_status` (the Runner lifecycle, retained under its existing public name), and `publication_status`. The preparation summary exposes state, attempts, last update, terminal failure code, and failure-notice status, but never its opaque input, claim token, or connector identity. The list endpoint filters on all three axes (`execution_status`, `publication_status`, and `preparation_status`); [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is the read contract.
+Read responses report three independent lifecycle axes as nested objects of the same shape: `preparation`, `execution`, and `publication`. Each carries its own `status`, `started_at`, and `finished_at`; `execution` and `publication` also carry the `updated_at` that says when that axis was last written. The preparation summary adds `attempt_count` and the terminal `failure_code` / `failure_notice_status`, but never its opaque input, claim token, or connector identity. The list endpoint filters on the three axes by query parameter (`preparation_status`, `execution_status`, and `publication_status`; the parameter names keep their established spelling); [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is the read contract.
 
 `/healthz` only proves the HTTP process is alive. `/readyz` verifies that the current PostgreSQL pool can execute a schema-ledger query and that its complete version set exactly matches this application; it returns `503 {"status":"unavailable"}` without database details otherwise. Compose uses `/readyz` for its Control Plane healthcheck. Runner and GitHub are deliberately excluded: their transient reachability does not make durable admission, reads, or PostgreSQL-backed recovery unsafe, and their failures have separate state-machine recovery paths.
 

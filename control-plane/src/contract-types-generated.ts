@@ -208,6 +208,11 @@ export interface components {
        * @description Immutable instant the preparation phase reached a terminal state (`submitted` or `failed`); null while it is pending or preparing. Distinct from `updated_at`, which also moves on claim heartbeats and input checkpoints and cannot mark the phase end.
        */
       finished_at: string | null
+      /**
+       * Format: date-time
+       * @description Last time the preparation axis was written, including claim heartbeats and input checkpoints. This is the activity freshness the console reports, not a phase bound — use `started_at` and `finished_at` for that. A preparation that is still being built keeps advancing here even though its bounds do not.
+       */
+      updated_at: string
       failure_code: string | null
       /** @enum {string|null} */
       failure_notice_status:

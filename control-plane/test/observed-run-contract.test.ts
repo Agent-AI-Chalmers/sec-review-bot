@@ -84,6 +84,48 @@ test('the shared fixtures match or violate the schema exactly as the manifest cl
   }
 })
 
+/** Every key path in `value`, so two fixtures can be compared by shape alone. */
+function paths(value: unknown, prefix = ''): string[] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return [prefix]
+  }
+  return Object.entries(value as Record<string, unknown>).flatMap(
+    ([key, child]) => paths(child, prefix === '' ? key : `${prefix}.${key}`)
+  )
+}
+
+test('each invalid fixture differs from its valid counterpart only where it intends', () => {
+  // A negative fixture proves nothing if it is rejected for the wrong reason. These were
+  // hand-copied, so adding a required field to the contract kept them failing — but on the
+  // missing field rather than on the defect each one is named for, which silently retired the
+  // whole negative suite. Requiring the key skeleton to match the valid fixture prevents that:
+  // a new required field has to be added here too, and the only remaining difference is the
+  // defect itself.
+  const pairs: Array<[string, string]> = [
+    ['observed-run.json', 'invalid-observed-run'],
+    ['review-run-record.json', 'invalid-review-run-record']
+  ]
+  for (const [valid, prefix] of pairs) {
+    const expected = paths(fixture(valid)).sort()
+    for (const name of Object.keys(manifest.invalid_schema_fixtures)) {
+      if (!name.startsWith(prefix)) continue
+      // Only a fixture whose name says a field is missing may omit valid paths. Every other one
+      // has to carry the complete valid shape and differ by value (or by one stray field), so a
+      // required field added to the contract forces all of them to be updated instead of quietly
+      // turning every negative case into "rejected for the missing field".
+      const actual = paths(fixture(name)).sort()
+      const extra = actual.filter((item) => !expected.includes(item))
+      const missing = expected.filter((item) => !actual.includes(item))
+      const mayOmit = name.includes('missing-') || name.includes('without-')
+      assert.ok(
+        extra.length <= 1 && (mayOmit || missing.length === 0),
+        `${name} must keep the shape of ${valid} so it fails on its own defect ` +
+          `(unexpected: ${extra.join(', ') || 'none'}; missing: ${missing.join(', ') || 'none'})`
+      )
+    }
+  }
+})
+
 function recordWith(
   artifactStorage: ReviewRunRecord['artifact_storage']
 ): ReviewRunRecord {
@@ -95,6 +137,7 @@ function recordWith(
       attempt_count: 1,
       started_at: '2026-01-01T00:00:10.000Z',
       finished_at: '2026-01-01T00:00:30.000Z',
+      updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
       failure_notice_status: null
     },

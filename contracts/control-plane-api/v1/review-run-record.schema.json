@@ -45,6 +45,7 @@
         "attempt_count",
         "started_at",
         "finished_at",
+        "updated_at",
         "failure_code",
         "failure_notice_status"
       ],
@@ -78,6 +79,11 @@
           ],
           "format": "date-time",
           "description": "Immutable instant the preparation phase reached a terminal state (`submitted` or `failed`); null while it is pending or preparing. Distinct from `updated_at`, which also moves on claim heartbeats and input checkpoints and cannot mark the phase end."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the preparation axis was written, including claim heartbeats and input checkpoints. This is the activity freshness the console reports, not a phase bound — use `started_at` and `finished_at` for that. A preparation that is still being built keeps advancing here even though its bounds do not."
         },
         "failure_code": {
           "type": [
