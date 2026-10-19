@@ -22,11 +22,11 @@ export function safeExternalUrl(value: string | null): string | undefined {
 
 export function isRunTerminal(run: Run): boolean {
   // `uncertain` is not terminal: a recovery will resolve it to queued or failed.
-  if (run.execution_status === 'failed' || run.execution_status === 'skipped')
+  if (run.execution.status === 'failed' || run.execution.status === 'skipped')
     return true
   return (
-    run.execution_status === 'succeeded' &&
-    ['published', 'failed', 'skipped'].includes(run.publication_status)
+    run.execution.status === 'succeeded' &&
+    ['published', 'failed', 'skipped'].includes(run.publication.status)
   )
 }
 
@@ -41,10 +41,13 @@ export function abbreviate(value: string, head: number, tail: number): string {
 }
 
 export function lastActivity(run: Run): string {
-  return Date.parse(run.publication_updated_at) >
-    Date.parse(run.execution_updated_at)
-    ? run.publication_updated_at
-    : run.execution_updated_at
+  // Whichever axis was written most recently. Each axis reports its own write time, so a
+  // publication that is still running keeps advancing here even though its phase bounds
+  // (`started_at`, `finished_at`) intentionally do not.
+  return Date.parse(run.publication.updated_at) >
+    Date.parse(run.execution.updated_at)
+    ? run.publication.updated_at
+    : run.execution.updated_at
 }
 
 export function abbreviateDigest(digest: string): string {
@@ -79,7 +82,7 @@ export function failureReason(
 /** Elapsed time of a phase measured from its real start.
  *
  * `endAt` is the phase's completion time, or null while it is still running. The start is the
- * phase's own start (execution: the run's submitted_at, not created_at), so a phase that has
+ * phase's own start (execution: `execution.started_at`, not `created_at`), so a phase that has
  * not begun is never timed and a running phase counts from when it actually began. */
 export function phaseElapsed(
   startAt: string,
@@ -93,16 +96,16 @@ export function phaseElapsed(
 
 /** How long ago the run's state was last observed, for the states that are learned by polling.
  *
- * While a run is `queued` or `running`, the only writer of `execution_updated_at` is the
+ * While a run is `queued` or `running`, the only writer of `execution.updated_at` is the
  * observation heartbeat, so its age is how long ago we last confirmed the state. Outside those
  * states nothing is polling, so there is no freshness to report and this returns null. */
 export function observationAgeMs(
   run: Run,
   now: number = Date.now()
 ): number | null {
-  if (run.execution_status !== 'queued' && run.execution_status !== 'running')
+  if (run.execution.status !== 'queued' && run.execution.status !== 'running')
     return null
-  return Math.max(0, now - Date.parse(run.execution_updated_at))
+  return Math.max(0, now - Date.parse(run.execution.updated_at))
 }
 
 /** A polled state is stale once we have not confirmed it for a while (the coordinator polls

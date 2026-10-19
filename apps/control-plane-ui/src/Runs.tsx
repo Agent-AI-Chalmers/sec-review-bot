@@ -348,10 +348,10 @@ export function Runs(): React.JSX.Element {
                       <PreparationStatus preparation={run.preparation} />
                     </Table.Td>
                     <Table.Td>
-                      <ExecutionStatus status={run.execution_status} />
+                      <ExecutionStatus status={run.execution.status} />
                     </Table.Td>
                     <Table.Td>
-                      <PublicationStatus status={run.publication_status} />
+                      <PublicationStatus status={run.publication.status} />
                     </Table.Td>
                     <Table.Td>
                       <Tooltip label={formatDate(lastActivity(run), language)}>

@@ -115,7 +115,8 @@ export class ExecutionStore {
         UPDATE executions e
         SET status='succeeded', workflow_result=$3::jsonb,
             artifact_storage=$4::jsonb, failure_code=NULL,
-            failure_message=NULL, observed_at=clock_timestamp(), updated_at=clock_timestamp()
+            failure_message=NULL, finished_at=clock_timestamp(),
+            observed_at=clock_timestamp(), updated_at=clock_timestamp()
         FROM previous
         WHERE e.run_id=previous.run_id
         RETURNING previous.status AS from_status

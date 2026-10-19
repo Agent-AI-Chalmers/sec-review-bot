@@ -59,7 +59,8 @@ export class PublicationStore {
   async complete(runId: string, token: string): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
-        `UPDATE publications SET status='published', claim_token=NULL, published_at=clock_timestamp(),
+        `UPDATE publications SET status='published', claim_token=NULL,
+           finished_at=clock_timestamp(),
            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='publishing' AND claim_token=$3
            AND NOT EXISTS (SELECT 1 FROM publication_steps
@@ -78,6 +79,11 @@ export class PublicationStore {
     })
   }
 
+  /** Record a publication failure.
+   *
+   * Only a terminal failure ends the phase, so only it writes `finished_at`; a retryable failure
+   * returns the row to `pending` to be claimed again, and clearing the end keeps "this phase has
+   * not finished" true. */
   async fail(
     runId: string,
     token: string,
@@ -88,7 +94,9 @@ export class PublicationStore {
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
         `UPDATE publications SET status=$4, claim_token=NULL, failure_code=$5,
-           failure_message=$6, updated_at=clock_timestamp()
+           failure_message=$6,
+           finished_at=CASE WHEN $4='failed' THEN clock_timestamp() ELSE NULL END,
+           updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='publishing' AND claim_token=$3`,
         [
           runId,

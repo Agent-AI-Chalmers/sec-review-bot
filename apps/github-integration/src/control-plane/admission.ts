@@ -49,7 +49,7 @@ export async function admitReviewRun(
   return {
     run_id: admission.record.run_id,
     workflow: admission.record.workflow,
-    status: admission.record.runner_status,
+    status: admission.record.execution.status,
     created: admission.created,
     preparation_token: admission.preparation_token
   }

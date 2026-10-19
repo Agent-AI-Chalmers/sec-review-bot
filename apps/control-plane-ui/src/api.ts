@@ -26,26 +26,34 @@ export interface Run {
   preparation: {
     status: 'pending' | 'preparing' | 'submitted' | 'failed'
     attempt_count: number
-    updated_at: string
+    started_at: string | null
+    finished_at: string | null
     failure_code: string | null
     failure_notice_status:
       'pending' | 'delivering' | 'delivered' | 'skipped' | null
-  } | null
-  execution_status:
-    | 'pending'
-    | 'queued'
-    | 'running'
-    | 'uncertain'
-    | 'succeeded'
-    | 'skipped'
-    | 'failed'
-  publication_status:
-    'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+  }
+  // The three axes share one shape: where each phase started, where it ended, and — for
+  // execution only — when it was last observed. A `skipped` phase has an end and no start.
+  execution: {
+    status:
+      | 'pending'
+      | 'queued'
+      | 'running'
+      | 'uncertain'
+      | 'succeeded'
+      | 'skipped'
+      | 'failed'
+    started_at: string | null
+    finished_at: string | null
+    updated_at: string
+  }
+  publication: {
+    status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+    started_at: string | null
+    finished_at: string | null
+    updated_at: string
+  }
   created_at: string
-  submitted_at: string | null
-  execution_updated_at: string
-  publication_updated_at: string
-  published_at: string | null
   failure_code: string | null
   artifact_storage: ArtifactStorage | null
 }

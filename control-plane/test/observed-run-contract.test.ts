@@ -93,17 +93,28 @@ function recordWith(
     preparation: {
       status: 'submitted',
       attempt_count: 1,
-      updated_at: '2026-10-10T05:01:00.000Z',
+      started_at: '2026-01-01T00:00:10.000Z',
+      finished_at: '2026-01-01T00:00:30.000Z',
       failure_code: null,
       failure_notice_status: null
     },
-    runner_status: 'succeeded',
-    publication_status: 'published',
+    // The fixtures describe states the store can actually produce. `succeeded` means the
+    // execution ran and ended, and `published` means the publication started and ended; a
+    // fixture that pairs a terminal status with absent timestamps would teach the schema test
+    // that an impossible record is acceptable.
+    execution: {
+      status: 'succeeded',
+      started_at: '2026-01-01T00:00:01.000Z',
+      finished_at: '2026-01-01T00:01:00.000Z',
+      updated_at: '2026-01-01T00:01:00.000Z'
+    },
+    publication: {
+      status: 'published',
+      started_at: '2026-01-01T00:02:00.000Z',
+      finished_at: '2026-01-01T00:03:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
     created_at: '2026-10-10T05:00:00.000Z',
-    submitted_at: '2026-10-10T05:00:30.000Z',
-    execution_updated_at: '2026-10-10T05:02:46.000Z',
-    publication_updated_at: '2026-10-10T05:11:09.000Z',
-    published_at: '2026-10-10T05:11:09.000Z',
     failure_code: null,
     failure_message: null,
     artifact_storage: artifactStorage,

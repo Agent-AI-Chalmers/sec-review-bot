@@ -10,6 +10,49 @@ import type { PullRequestContext } from '../../src/github/pull-request-service.j
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
+import type { ReviewRunRecord } from '../../src/control-plane/client.js'
+
+/** An admitted run record as the Control Plane returns it, with the axis shapes spelled once.
+ *
+ * The tests below stub `admitReviewRun`, and each stub used to write out the whole record shape
+ * and then cast it with `as never`. That cast switched off every check on the shape, so a field
+ * added to the contract (or moved between axes) left these stubs compiling while returning
+ * something the real service never would. Building the record here keeps one definition and
+ * lets the `ReviewRunRecord` type police it.
+ */
+function admittedRecord(
+  overrides: Partial<ReviewRunRecord> & { run_id: string }
+): ReviewRunRecord {
+  return {
+    workflow: 'issue-review',
+    publish_context: {},
+    preparation: {
+    status: 'submitted',
+    attempt_count: 1,
+    started_at: '2026-01-01T00:00:01.000Z',
+    finished_at: '2026-01-01T00:00:02.000Z',
+    failure_code: null,
+    failure_notice_status: null
+  },
+    execution: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publication: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    created_at: '2026-01-01T00:00:00.000Z',
+    failure_code: null,
+    failure_message: null,
+    artifact_storage: null,
+    ...overrides
+  }
+}
 
 const TRUSTED_DEFAULT_BRANCH = {
   default_branch: 'main',
@@ -116,10 +159,10 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
         admitReviewRun: (run) => {
           transitions.push(['pending', withoutPreparationInput(run)])
           return {
-            record: { ...run, run_id: 'run-issue-1' },
+            record: admittedRecord({ ...run, run_id: 'run-issue-1' }),
             created: true,
             preparation_token: 'claim'
-          } as never
+          }
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
@@ -199,10 +242,10 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
         admitReviewRun: (run) => {
           transitions.push(['pending', withoutPreparationInput(run)])
           return {
-            record: { ...run, run_id: 'run-pr-1' },
+            record: admittedRecord({ ...run, run_id: 'run-pr-1' }),
             created: true,
             preparation_token: 'claim'
-          } as never
+          }
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
@@ -264,10 +307,10 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
           admitReviewRun: (run) => {
             transitions.push(['pending', withoutPreparationInput(run)])
             return {
-              record: { ...run, run_id: 'run-pr-failed' },
+              record: admittedRecord({ ...run, run_id: 'run-pr-failed' }),
               created: true,
               preparation_token: 'claim'
-            } as never
+            }
           },
           submitPreparedRun: () =>
             assert.fail('failed review must not be queued'),
@@ -333,7 +376,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               record: {
                 ...run,
                 run_id: 'run-uncertain',
-                runner_status: 'pending'
+                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
               },
               created: true,
               preparation_token: 'claim'
@@ -387,7 +430,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
               record: {
                 ...run,
                 run_id: 'run-pr-uncertain',
-                runner_status: 'pending'
+                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
               },
               created: true,
               preparation_token: 'claim'
@@ -441,7 +484,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
               record: {
                 ...run,
                 run_id: 'run-context-failure',
-                runner_status: 'pending'
+                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
               },
               created: true,
               preparation_token: 'claim'
@@ -498,7 +541,7 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
         ...preparationClaim,
         admitReviewRun: (run) =>
           ({
-            record: { ...run, run_id: 'run-checkpoint' },
+            record: admittedRecord({ ...run, run_id: 'run-checkpoint' }),
             created: true,
             preparation_token: 'claim'
           }) as never,
@@ -549,7 +592,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
         admitReviewRun: () => ({
           created: false,
           preparation_token: null,
-          record: { run_id: 'run-original', runner_status: 'queued' } as never
+          record: admittedRecord({ run_id: 'run-original', execution: { status: 'queued', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' } })
         }),
         submitPreparedRun: () =>
           assert.fail('replayed delivery must not queue again'),
@@ -581,7 +624,7 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
         admitReviewRun: () => ({
           created: false,
           preparation_token: null,
-          record: { run_id: 'run-original', runner_status: 'queued' } as never
+          record: admittedRecord({ run_id: 'run-original', execution: { status: 'queued', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' } })
         }),
         submitPreparedRun: () =>
           assert.fail('replayed delivery must not queue again'),
@@ -618,7 +661,7 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, run_id: 'run-pr-setup-invalid' },
+              record: admittedRecord({ ...run, run_id: 'run-pr-setup-invalid' }),
               created: true,
               preparation_token: 'claim'
             }) as never,
@@ -667,7 +710,7 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, run_id: 'run-issue-setup-invalid' },
+              record: admittedRecord({ ...run, run_id: 'run-issue-setup-invalid' }),
               created: true,
               preparation_token: 'claim'
             }) as never,

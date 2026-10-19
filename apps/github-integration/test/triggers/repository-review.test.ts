@@ -13,11 +13,54 @@ import {
 import type { GitHubAppOctokit } from '../../src/github/octokit.js'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 
+/** An admitted run record as the Control Plane returns it, with the axis shapes spelled once.
+ *
+ * The tests below stub `admitReviewRun`, and each stub used to write out the whole record shape
+ * and then cast it with `as never`. That cast switched off every check on the shape, so a field
+ * added to the contract (or moved between axes) left these stubs compiling while returning
+ * something the real service never would. Building the record here keeps one definition and
+ * lets the `ReviewRunRecord` type police it.
+ */
+function admittedRecord(
+  overrides: Partial<ReviewRunRecord> & { run_id: string }
+): ReviewRunRecord {
+  return {
+    workflow: 'issue-review',
+    publish_context: {},
+    preparation: {
+    status: 'submitted',
+    attempt_count: 1,
+    started_at: '2026-01-01T00:00:01.000Z',
+    finished_at: '2026-01-01T00:00:02.000Z',
+    failure_code: null,
+    failure_notice_status: null
+  },
+    execution: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publication: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    created_at: '2026-01-01T00:00:00.000Z',
+    failure_code: null,
+    failure_message: null,
+    artifact_storage: null,
+    ...overrides
+  }
+}
+
 const preparationClaim = {
   renewPreparationClaim: async () => true,
   preparationHeartbeatIntervalMs: async () => 60_000
 }
 import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
+import type { ReviewRunRecord } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 
 function fakeApp(): App {
@@ -198,7 +241,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
         admitReviewRun: (run) => {
           saved_runs.push(withoutPreparationInput(run))
           return {
-            record: { ...run, run_id: 'run-1', runner_status: 'pending' },
+            record: admittedRecord({ ...run, run_id: 'run-1' }),
             created: true,
             preparation_token: 'claim'
           } as never
@@ -296,7 +339,7 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
         admitReviewRun: () => ({
           created: false,
           preparation_token: null,
-          record: { run_id: 'run-original', runner_status: 'running' } as never
+          record: admittedRecord({ run_id: 'run-original', execution: { status: 'running', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' } })
         }),
         submitPreparedRun: () =>
           assert.fail('replayed dispatch must not queue again'),
@@ -341,7 +384,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
               record: {
                 ...run,
                 run_id: 'run-invalid-window',
-                runner_status: 'pending'
+                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
               },
               created: true,
               preparation_token: 'claim'
@@ -438,7 +481,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
               record: {
                 ...run,
                 run_id: 'run-repo-failed',
-                runner_status: 'pending'
+                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
               },
               created: true,
               preparation_token: 'claim'
@@ -534,7 +577,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
               record: {
                 ...run,
                 run_id: 'run-repo-uncertain',
-                runner_status: 'pending'
+                execution: { status: 'pending', started_at: null, finished_at: null, updated_at: '2026-01-01T00:00:00.000Z' }
               },
               created: true,
               preparation_token: 'claim'

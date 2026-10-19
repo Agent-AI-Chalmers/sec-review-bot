@@ -4,17 +4,16 @@ import type { ObservedRun, PublicationStepSummary } from './shapes.js'
 export type { ObservedRun, PublicationStepSummary } from './shapes.js'
 
 export function observeRun(run: ReviewRunRecord): ObservedRun {
+  // The record and observed-run shapes now agree on every axis, so this is a redaction rather
+  // than a projection: it drops the connector-owned context, the Runner input, the connector
+  // identity, and the failure detail, and keeps the rest verbatim.
   return {
     run_id: run.run_id,
     workflow: run.workflow,
     preparation: run.preparation,
-    execution_status: run.runner_status,
-    publication_status: run.publication_status,
+    execution: run.execution,
+    publication: run.publication,
     created_at: run.created_at,
-    submitted_at: run.submitted_at,
-    execution_updated_at: run.execution_updated_at,
-    publication_updated_at: run.publication_updated_at,
-    published_at: run.published_at,
     failure_code: run.failure_code,
     // `artifact_storage` is already normalized to the discriminated union in
     // `rowToRecord`, so it passes through unchanged here.

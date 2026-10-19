@@ -7,7 +7,7 @@
 // Every check compares key sets rather than values, and the direction matters:
 //
 // - TypeScript widens JSON strings to `string`, so assigning a fixture to `Run` would
-//   reject a perfectly correct example that carries `"execution_status": "succeeded"`
+//   reject a perfectly correct example that carries `"status": "succeeded"`
 //   instead of the narrower union.
 // - An optional field appears in the schema's properties but not in every example, so
 //   equality is the wrong relation between an example and the schema. Each check below

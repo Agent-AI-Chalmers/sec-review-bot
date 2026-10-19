@@ -13,15 +13,28 @@ function run(
     run_id: 'run-1',
     workflow: 'issue-review',
     publish_context: {},
-    preparation: null,
+    preparation: {
+      status: 'submitted',
+      attempt_count: 1,
+      started_at: '2026-01-01T00:00:01.000Z',
+      finished_at: '2026-01-01T00:00:02.000Z',
+      failure_code: null,
+      failure_notice_status: null
+    },
     ...(input === null ? {} : { runner_input: input }),
-    runner_status: 'uncertain',
-    publication_status: 'pending',
+    execution: {
+      status: 'uncertain',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publication: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
     created_at: '2026-01-01T00:00:00.000Z',
-    submitted_at: '2026-01-01T00:00:01.000Z',
-    execution_updated_at: '2026-01-01T00:00:00.000Z',
-    publication_updated_at: '2026-01-01T00:00:00.000Z',
-    published_at: null,
     failure_code: null,
     failure_message: null,
     artifact_storage: null

@@ -7,13 +7,9 @@
     "run_id",
     "workflow",
     "preparation",
-    "execution_status",
-    "submitted_at",
-    "publication_status",
+    "execution",
+    "publication",
     "created_at",
-    "execution_updated_at",
-    "publication_updated_at",
-    "published_at",
     "failure_code",
     "artifact_storage"
   ],
@@ -31,16 +27,14 @@
       ]
     },
     "preparation": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "description": "Durable preparation state, when the run has a preparation record. This is an operational summary only; it never exposes connector-owned preparation input.",
+      "type": "object",
+      "description": "Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — the Control Plane drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary.",
       "additionalProperties": false,
       "required": [
         "status",
         "attempt_count",
-        "updated_at",
+        "started_at",
+        "finished_at",
         "failure_code",
         "failure_notice_status"
       ],
@@ -59,9 +53,21 @@
           "type": "integer",
           "minimum": 0
         },
-        "updated_at": {
-          "type": "string",
-          "format": "date-time"
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Immutable instant the preparation phase began (a preparer first claimed the work); null while it is still pending. A retry that returns the row to pending and claims it again does not move it, so it is a safe start bound for the phase."
+        },
+        "finished_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Immutable instant the preparation phase reached a terminal state (`submitted` or `failed`); null while it is pending or preparing. Distinct from `updated_at`, which also moves on claim heartbeats and input checkpoints and cannot mark the phase end."
         },
         "failure_code": {
           "type": [
@@ -84,54 +90,97 @@
         }
       }
     },
-    "execution_status": {
-      "type": "string",
-      "description": "The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it to resolve the run to `queued` or `failed`, so it is not a failure.",
-      "enum": [
-        "pending",
-        "queued",
-        "running",
-        "uncertain",
-        "succeeded",
-        "skipped",
-        "failed"
-      ]
-    },
-    "submitted_at": {
-      "type": [
-        "string",
-        "null"
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "started_at",
+        "finished_at",
+        "updated_at"
       ],
-      "format": "date-time",
-      "description": "Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL until then, i.e. while the run is still `pending` on the execution axis; preparation progress is on the separate `preparation` summary. Use it, not execution_updated_at, to time execution."
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it to resolve the run to `queued` or `failed`, so it is not a failure.",
+          "enum": [
+            "pending",
+            "queued",
+            "running",
+            "uncertain",
+            "succeeded",
+            "skipped",
+            "failed"
+          ]
+        },
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Immutable instant the prepared Runner input was accepted and execution began; null while the run is still pending, and also null for `skipped`, which is concluded without ever having started. Written once, so a recovery replay does not move it."
+        },
+        "finished_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Immutable instant the execution axis reached a terminal state (`succeeded`, `failed`, or `skipped`); null while it is pending, queued, running, or uncertain. Together with `started_at` it times the phase (only when `started_at` is non-null, since `skipped` has an end without a start)."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the execution axis was written: a polling confirmation, a state transition, or a submission/recovery write. This is the observation freshness the console reports (\"observed Ns ago\"), not a phase bound — use `started_at` and `finished_at` for that."
+        }
+      }
     },
-    "publication_status": {
-      "type": "string",
-      "enum": [
-        "pending",
-        "publishing",
-        "published",
-        "failed",
-        "skipped"
-      ]
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "started_at",
+        "finished_at",
+        "updated_at"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "publishing",
+            "published",
+            "failed",
+            "skipped"
+          ]
+        },
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Immutable instant the publication phase began (the work was first claimed); null while it is pending, and null for `skipped`, which is concluded without ever having started. A retryable failure that returns the row to pending and claims it again does not move it."
+        },
+        "finished_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Immutable instant the publication axis reached a terminal state (`published`, `failed`, or `skipped`); null while it is pending or publishing. It is set for every terminal outcome. The instant the result became visible is this field read together with `status: published`."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the publication axis was written, including claim heartbeats. This is the activity freshness the console reports, not a phase bound — use `started_at` and `finished_at` for that. Unlike them it keeps advancing while a long publication runs."
+        }
+      }
     },
     "created_at": {
       "type": "string",
-      "format": "date-time"
-    },
-    "execution_updated_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "publication_updated_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "published_at": {
-      "type": [
-        "string",
-        "null"
-      ],
       "format": "date-time"
     },
     "failure_code": {

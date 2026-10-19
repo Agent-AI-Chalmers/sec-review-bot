@@ -89,7 +89,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
     axis: 'runner',
     order: 2,
     title: 'Execution',
-    field: 'execution_status',
+    field: 'execution.status',
     initial: 'pending',
     terminal: ['succeeded', 'skipped', 'failed'],
     states: [
@@ -191,7 +191,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
     axis: 'publication',
     order: 3,
     title: 'Publication',
-    field: 'publication_status',
+    field: 'publication.status',
     initial: 'pending',
     terminal: ['published', 'failed', 'skipped'],
     states: ['pending', 'publishing', 'published', 'failed', 'skipped'],

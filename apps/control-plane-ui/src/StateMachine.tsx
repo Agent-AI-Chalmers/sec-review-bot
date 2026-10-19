@@ -18,9 +18,9 @@ import {
 
 /** The current state of one axis, read from the run. Preparation is nested. */
 function currentState(run: Run, axis: StateAxis): string | null {
-  if (axis === 'runner') return run.execution_status
-  if (axis === 'publication') return run.publication_status
-  return run.preparation?.status ?? null
+  if (axis === 'runner') return run.execution.status
+  if (axis === 'publication') return run.publication.status
+  return run.preparation.status
 }
 
 /** i18n key for a state's label or hover description. The contract carries the English text
@@ -473,7 +473,7 @@ export function RunStateMachines({
   events: RunEvent[]
 }): React.JSX.Element {
   const t = useMessages()
-  const notice = run.preparation?.failure_notice_status ?? null
+  const notice = run.preparation.failure_notice_status
   return (
     // Collapsed by default, like History: the diagrams are reference material rather than the
     // run's own status, so they stay out of the way until the reader asks for them.
@@ -497,7 +497,7 @@ export function RunStateMachines({
             events={events}
           />
         ))}
-        {run.preparation?.status === 'failed' && notice !== null && (
+        {run.preparation.status === 'failed' && notice !== null && (
           <Text className="failure-notice-line" size="xs" c="dimmed">
             {t('failureNoticeLine')}: {noticeLabel(notice, t)}
           </Text>

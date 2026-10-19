@@ -24,19 +24,16 @@ function enumFor(spec: Spec, field: string): string[] {
     { properties?: Record<string, unknown> } | undefined
   const props = observed?.properties
   if (props === undefined) throw new Error('ObservedRun has no properties')
-  if (
-    field === 'preparation.status' ||
-    field === 'preparation.failure_notice_status'
-  ) {
-    // `preparation` is a `$ref` to PreparationSummary, so its properties are not inlined
-    // here; resolve the ref to the component it names.
-    const ref = props.preparation as { $ref?: string } | undefined
+  // An axis field is `<axis>.<member>` (preparation.status, execution.status,
+  // publication.status, ...). Each axis is a `$ref` to its summary schema, so its properties
+  // are not inlined here; resolve the ref to the component it names.
+  if (field.includes('.')) {
+    const [axis, key = ''] = field.split('.')
+    const ref = props[axis as string] as { $ref?: string } | undefined
     const target = ref?.$ref?.replace('#/components/schemas/', '')
-    const preparation = spec.components?.schemas?.[target ?? ''] as
+    const summary = spec.components?.schemas?.[target ?? ''] as
       { properties?: Record<string, { enum?: unknown }> } | undefined
-    const key = field.split('.')[1] ?? ''
-    const node = preparation?.properties?.[key]
-    return asEnum(node?.enum, field)
+    return asEnum(summary?.properties?.[key]?.enum, field)
   }
   const node = props[field] as { enum?: unknown } | undefined
   return asEnum(node?.enum, field)

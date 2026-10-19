@@ -13,14 +13,27 @@ const preparingRun: ReviewRunRecord = {
   run_id: 'run-1',
   workflow: 'repository-review',
   publish_context: {},
-  preparation: null,
-  runner_status: 'pending',
-  publication_status: 'pending',
+  preparation: {
+    status: 'submitted',
+    attempt_count: 1,
+    started_at: '2026-01-01T00:00:01.000Z',
+    finished_at: '2026-01-01T00:00:02.000Z',
+    failure_code: null,
+    failure_notice_status: null
+  },
+  execution: {
+    status: 'pending',
+    started_at: null,
+    finished_at: null,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  },
+  publication: {
+    status: 'pending',
+    started_at: null,
+    finished_at: null,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  },
   created_at: '2026-10-07T00:00:00.000Z',
-  submitted_at: null,
-  execution_updated_at: '2026-10-07T00:00:00.000Z',
-  publication_updated_at: '2026-10-07T00:00:00.000Z',
-  published_at: null,
   failure_code: null,
   failure_message: null,
   artifact_storage: null,
@@ -99,7 +112,7 @@ test('repository preparation can replace the admitted empty publish context', as
     preparation_input_version: 'v1',
     preparation_input: { kind: 'test' }
   })
-  assert.strictEqual(admission.record.runner_status, 'pending')
+  assert.strictEqual(admission.record.execution.status, 'pending')
 
   await controlPlaneClient.submitPreparedRun(
     'run-1',
@@ -201,7 +214,6 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
       ) {
         return Response.json({
           ...preparingRun,
-          publication_status: 'publishing',
           workflow_result: {},
           claim_token: 'claim-1',
           publish_context: {}

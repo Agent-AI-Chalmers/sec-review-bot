@@ -33,12 +33,12 @@ test('admission creates exactly one executions row alongside the run trunk', asy
     // The split keeps execution state out of the trunk table, so every run must have exactly
     // one execution-row or a JOIN read would silently drop it.
     const executions = await pool.query(
-      'SELECT status, submitted_at, claim_token, claimed_at FROM executions WHERE run_id=$1',
+      'SELECT status, started_at, claim_token, claimed_at FROM executions WHERE run_id=$1',
       [runId]
     )
     assert.strictEqual(executions.rowCount, 1)
     assert.strictEqual(executions.rows[0].status, 'pending')
-    assert.strictEqual(executions.rows[0].submitted_at, null)
+    assert.strictEqual(executions.rows[0].started_at, null)
     assert.strictEqual(executions.rows[0].claim_token, null)
     assert.strictEqual(executions.rows[0].claimed_at, null)
 
@@ -65,7 +65,7 @@ test('admission creates exactly one executions row alongside the run trunk', asy
       'artifact_storage',
       'workflow_result',
       'recovery_claim_token',
-      'submitted_at',
+      'started_at',
       'publish_context'
     ]) {
       assert.ok(
@@ -79,38 +79,72 @@ test('admission creates exactly one executions row alongside the run trunk', asy
   }
 })
 
-test('a run missing its execution axis is reported, not silently dropped', async () => {
-  const store = new ReviewRunStore({
-    connectionString: databaseUrl(),
-    connectorId: `control-plane-test:${randomUUID()}`
-  })
-  await store.initialize()
-  const pool = new Pool({ connectionString: databaseUrl() })
-  try {
-    const runId = `run-${randomUUID()}`
-    await store.createPreparingReviewRun({
-      workflow: 'issue-review',
-      run_id: runId,
-      publish_context: {}
+for (const axis of ['executions', 'preparations'] as const) {
+  test(`a run missing its ${axis} row is reported, not silently returned`, async () => {
+    // Admission writes the trunk and both axis rows in one transaction, so a missing axis means
+    // a corrupt or partially restored database rather than a legitimate record. The read must
+    // report it instead of returning a row that merely looks like it has no such axis: for
+    // preparation that would be indistinguishable from a valid `preparation: null`.
+    const dropped: Array<{ run_id: string; error: unknown }> = []
+    const store = new ReviewRunStore({
+      connectionString: databaseUrl(),
+      connectorId: `control-plane-test:${randomUUID()}`,
+      onDroppedRunRow: (entry) => dropped.push(entry)
     })
-    // Simulate a corrupt/migrated row: delete the execution axis. Reads must surface this as a
-    // dropped row (contract cannot represent it) rather than omit the run with no trace.
-    await pool.query('DELETE FROM executions WHERE run_id=$1', [runId])
-    const page = await store.listRunsPage({ limit: 10 })
-    assert.ok(
-      page.dropped.some((entry) => entry.run_id === runId),
-      'the corrupt run is reported in dropped'
-    )
-    assert.ok(
-      !page.runs.some((run) => run.run_id === runId),
-      'the corrupt run is not returned as a valid record'
-    )
-    assert.strictEqual(await store.getRun(runId), null)
-  } finally {
-    await pool.end()
-    await store.close()
-  }
-})
+    await store.initialize()
+    const pool = new Pool({ connectionString: databaseUrl() })
+    try {
+      const runId = `run-${randomUUID()}`
+      await store.createPreparingReviewRun({
+        workflow: 'issue-review',
+        run_id: runId,
+        publish_context: {}
+      })
+      // Simulate a corrupt or partially restored database: delete one axis row and commit, so
+      // the read (which runs on its own pooled connection) sees it. The row is removed by the
+      // fixture cleanup below, so this never leaks into another test.
+      await pool.query(`DELETE FROM ${axis} WHERE run_id=$1`, [runId])
+
+      const page = await store.listRunsPage({ limit: 10 })
+      assert.ok(
+        page.dropped.some((entry) => entry.run_id === runId),
+        'the corrupt run is reported in dropped'
+      )
+      assert.ok(
+        !page.runs.some((run) => run.run_id === runId),
+        'the corrupt run is not returned as a valid record'
+      )
+      // A status filter must not be what hides corruption. A newly admitted run's preparation is
+      // `preparing`, so filtering on that state still has to surface the row as dropped: the
+      // filter selects on a value, and a corrupt row must be reported rather than filtered away.
+      const matching = await store.listRunsPage({
+        preparation_status: 'preparing',
+        limit: 10
+      })
+      assert.ok(
+        !matching.runs.some((run) => run.run_id === runId) &&
+          matching.dropped.some((entry) => entry.run_id === runId),
+        'a status filter reports the corrupt row instead of hiding it'
+      )
+      // The single-run read answers `null`, the same as an unknown id, so it reports the fault
+      // through the callback rather than leaving corruption to look like a missing run.
+      // An unknown id must NOT report corruption; only a stored row that fails to project does.
+      assert.strictEqual(await store.getRun(`run-unknown-${randomUUID()}`), null)
+      assert.ok(
+        !dropped.some((entry) => entry.run_id.startsWith('run-unknown-')),
+        'an unknown run id is not reported as corruption'
+      )
+      assert.strictEqual(await store.getRun(runId), null)
+      assert.ok(
+        dropped.some((entry) => entry.run_id === runId),
+        'the single-run read reports the corrupt row'
+      )
+    } finally {
+      await pool.end()
+      await store.close()
+    }
+  })
+}
 
 test('Control Plane store initializes its schema and deduplicates ingress', async () => {
   const store = new ReviewRunStore({

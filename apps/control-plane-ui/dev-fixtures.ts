@@ -1,5 +1,7 @@
 import type { Plugin } from 'vite'
 
+import type { Run } from './src/api.js'
+
 import { LIST_RUN_QUERY_PARAMS } from './src/list-run-query-params.js'
 
 type Workflow = 'issue-review' | 'pull-request-review' | 'repository-review'
@@ -38,20 +40,45 @@ interface FixtureRun {
   preparation: {
     status: PreparationStatus
     attempt_count: number
-    updated_at: string
+    started_at: string | null
+    finished_at: string | null
     failure_code: string | null
     failure_notice_status: NoticeStage | null
   }
-  execution_status: ExecutionStatus
-  publication_status: PublicationStatus
+  execution: {
+    status: ExecutionStatus
+    started_at: string | null
+    finished_at: string | null
+    updated_at: string
+  }
+  publication: {
+    status: PublicationStatus
+    started_at: string | null
+    finished_at: string | null
+    updated_at: string
+  }
   created_at: string
-  submitted_at: string | null
-  execution_updated_at: string
-  publication_updated_at: string
-  published_at: string | null
   failure_code: string | null
   artifact_storage: FixtureArtifact | null
 }
+
+/**
+ * The fixtures are served as the console's own read responses, so their shape must be the
+ * console's `Run` type exactly — not a hand-maintained look-alike that drifts from it.
+ *
+ * `validateRun` below checks that a fixture is internally *consistent* (a phase may not end
+ * before it starts, a skipped run never started, and so on). That is a different question from
+ * whether it is the *right shape*, and consistency alone silently tolerated a fixture that had
+ * not been migrated to the nested axis objects: every field was still reachable, so nothing
+ * failed, but the console rendered `undefined`. This alias makes the shape a compile-time fact:
+ * widening, narrowing, or renaming a field on either side stops compiling here.
+ */
+type FixtureMatchesRun = FixtureRun extends Run ? true : false
+type RunMatchesFixture = Run extends FixtureRun ? true : false
+const _fixtureMatchesRun: FixtureMatchesRun = true
+const _runMatchesFixture: RunMatchesFixture = true
+void _fixtureMatchesRun
+void _runMatchesFixture
 
 interface FixtureStep {
   step_key: string
@@ -420,14 +447,14 @@ function eventsFor(run: FixtureRun): Array<{
         'preparation',
         'preparing',
         run.preparation.status,
-        run.preparation.updated_at,
+        run.preparation.finished_at ?? run.preparation.started_at ?? run.created_at,
         run.preparation.status === 'failed'
           ? run.preparation.failure_code
           : null
       )
     )
   }
-  if (run.execution_status === 'uncertain') {
+  if (run.execution.status === 'uncertain') {
     // An unresolved submission never reached `queued`: Control Plane moves `pending` straight to
     // `uncertain` when the Runner call's acceptance could not be confirmed. The recovery then
     // resolves it to `queued` or `failed`, which is why this originates at `pending`.
@@ -436,54 +463,68 @@ function eventsFor(run: FixtureRun): Array<{
         'runner',
         'pending',
         'uncertain',
-        run.execution_updated_at,
+        run.execution.updated_at,
         'SUBMISSION_STATE_UNCERTAIN'
       )
     )
-  } else if (run.submitted_at !== null) {
-    events.push(push('runner', 'pending', 'queued', run.submitted_at))
-    if (run.execution_status !== 'queued') {
+  } else if (run.execution.started_at !== null) {
+    events.push(push('runner', 'pending', 'queued', run.execution.started_at))
+    if (run.execution.status !== 'queued') {
       events.push(
         push(
           'runner',
           'queued',
-          run.execution_status,
-          run.execution_updated_at,
-          run.execution_status === 'failed' ? run.failure_code : null
+          run.execution.status,
+          run.execution.updated_at,
+          run.execution.status === 'failed' ? run.failure_code : null
         )
       )
     }
-  } else if (run.execution_status === 'skipped') {
+  } else if (run.execution.status === 'skipped') {
     // The Runner was never called: execution was skipped because preparation failed, so no
     // failure reason rides on the runner axis.
-    events.push(push('runner', 'pending', 'skipped', run.execution_updated_at))
+    events.push(push('runner', 'pending', 'skipped', run.execution.updated_at))
   }
   if (run.preparation?.failure_notice_status) {
-    events.push(push('notice', null, 'pending', run.preparation.updated_at))
+    events.push(
+      push(
+        'notice',
+        null,
+        'pending',
+        run.preparation.finished_at ?? run.created_at
+      )
+    )
     if (run.preparation.failure_notice_status !== 'pending') {
       events.push(
         push(
           'notice',
           'pending',
           run.preparation.failure_notice_status,
-          run.preparation.updated_at
+          run.preparation.finished_at ?? run.created_at
         )
       )
     }
   }
-  if (['publishing', 'published', 'failed'].includes(run.publication_status)) {
+  if (['publishing', 'published', 'failed'].includes(run.publication.status)) {
     events.push(
       push(
         'publication',
         'pending',
-        run.publication_status,
-        run.publication_updated_at,
-        run.publication_status === 'failed' ? run.failure_code : null
+        run.publication.status,
+        run.publication.finished_at ??
+          run.publication.started_at ??
+          run.created_at,
+        run.publication.status === 'failed' ? run.failure_code : null
       )
     )
-  } else if (run.publication_status === 'skipped') {
+  } else if (run.publication.status === 'skipped') {
     events.push(
-      push('publication', 'pending', 'skipped', run.publication_updated_at)
+      push(
+        'publication',
+        'pending',
+        'skipped',
+        run.publication.finished_at ?? run.created_at
+      )
     )
   }
   return events.sort(
@@ -504,10 +545,18 @@ function preparationFor(
   createdAt: number
 ): FixtureRun['preparation'] {
   const status = scenario.preparation_status
+  // `pending` has not been claimed yet, so the phase has no start; every other state was
+  // reached by a claim. `submitted` and `failed` are terminal, so they also have an end.
+  const startedAt = status === 'pending' ? null : createdAt
+  const finishedAt =
+    status === 'submitted' || status === 'failed'
+      ? createdAt + Math.min(scenario.executionMs, 60_000)
+      : null
   return {
     status,
     attempt_count: status === 'failed' ? 8 : 1,
-    updated_at: iso(createdAt + Math.min(scenario.executionMs, 60_000)),
+    started_at: startedAt === null ? null : iso(startedAt),
+    finished_at: finishedAt === null ? null : iso(finishedAt),
     failure_code: status === 'failed' ? scenario.failure_code : null,
     failure_notice_status:
       status === 'failed' ? scenario.preparation_notice : null
@@ -562,18 +611,74 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
       `dev fixture ${run.run_id} describes an unreachable run: ${reason}`
     )
   }
-  const execution = run.execution_status
+  const execution = run.execution.status
   const preparation = run.preparation
-  const publication = run.publication_status
+  const publication = run.publication.status
   const startedPublication = ['publishing', 'published', 'failed'].includes(
     publication
   )
 
-  if ((run.published_at !== null) !== (publication === 'published')) {
-    fail('published_at is set exactly when the publication is published')
+
+  // Each axis records a start and an end, and the fixture must respect the same rules the store
+  // enforces: a start exists once the phase has begun, an end exists once it is terminal, and
+  // neither may be present on a phase that never got that far.
+  const preparationStarted = preparation.status !== 'pending'
+  if ((preparation.started_at !== null) !== preparationStarted) {
+    fail('preparation.started_at is set exactly when the phase has begun')
   }
+  const preparationFinished =
+    preparation.status === 'submitted' || preparation.status === 'failed'
+  if ((preparation.finished_at !== null) !== preparationFinished) {
+    fail('preparation.finished_at is set exactly when the phase is terminal')
+  }
+  if (
+    (run.execution.finished_at !== null) !==
+    (execution === 'succeeded' || execution === 'failed' || execution === 'skipped')
+  ) {
+    fail('execution_finished_at is set exactly when the execution is terminal')
+  }
+  // `skipped` ends the axis without starting it: preparation failed before the Runner was ever
+  // called, so there is an end but no `execution.started_at`. Every other terminal state ran.
+  if (run.execution.finished_at !== null && execution !== 'skipped') {
+    if (run.execution.started_at === null) {
+      fail('an execution that ran to a terminal state must also have started')
+    }
+  }
+  if (execution === 'skipped' && run.execution.started_at !== null) {
+    fail('a skipped execution was never submitted, so it has no start')
+  }
+  if ((run.publication.started_at !== null) !== startedPublication) {
+    fail('publication_started_at is set exactly when the publication has begun')
+  }
+
   if (startedPublication && execution !== 'succeeded') {
     fail(`publication ${publication} requires a succeeded execution`)
+  }
+  const startedAt = Date.parse(run.created_at)
+  for (const [name, value] of [
+    ['preparation.started_at', preparation.started_at],
+    ['preparation.finished_at', preparation.finished_at],
+    ['execution.started_at', run.execution.started_at],
+    ['execution_finished_at', run.execution.finished_at],
+    ['publication_started_at', run.publication.started_at]
+  ] as const) {
+    if (value !== null && Date.parse(value) < startedAt) {
+      fail(`${name} must not precede created_at`)
+    }
+  }
+  if (
+    preparation.started_at !== null &&
+    preparation.finished_at !== null &&
+    Date.parse(preparation.finished_at) < Date.parse(preparation.started_at)
+  ) {
+    fail('preparation must not end before it started')
+  }
+  if (
+    run.execution.started_at !== null &&
+    run.execution.finished_at !== null &&
+    Date.parse(run.execution.finished_at) < Date.parse(run.execution.started_at)
+  ) {
+    fail('execution must not end before it was submitted')
   }
   if (execution === 'succeeded' && publication === 'skipped') {
     fail('a succeeded execution always has a publication to perform')
@@ -650,40 +755,62 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
       'only a terminal failure or an uncertain submission carries a failure code'
     )
   }
-  if (run.created_at > run.execution_updated_at) {
-    fail('execution_updated_at must not precede created_at')
+  if (run.created_at > run.execution.updated_at) {
+    fail('execution.updated_at must not precede created_at')
   }
   if (
     (execution === 'pending' || execution === 'skipped') !==
-    (run.submitted_at === null)
+    (run.execution.started_at === null)
   ) {
     fail(
-      'a pending or skipped execution has no submitted_at, and every other state has one'
+      'a pending or skipped execution has no execution.started_at, and every other state has one'
     )
   }
-  if (run.submitted_at !== null && run.submitted_at < run.created_at) {
-    fail('submitted_at must not precede created_at')
+  if (run.execution.started_at !== null && run.execution.started_at < run.created_at) {
+    fail('execution.started_at must not precede created_at')
   }
   if (
-    run.submitted_at !== null &&
-    run.submitted_at > run.execution_updated_at
+    run.execution.started_at !== null &&
+    run.execution.started_at > run.execution.updated_at
   ) {
-    fail('submitted_at must not follow the execution mtime')
+    fail('execution.started_at must not follow execution.updated_at')
   }
-  if (run.created_at > run.publication_updated_at) {
-    fail('publication_updated_at must not precede created_at')
+  if (run.publication.finished_at !== null) {
+    if (run.publication.finished_at < run.created_at) {
+      fail('publication_finished_at must not precede created_at')
+    }
+    if (
+      run.publication.started_at !== null &&
+      run.publication.finished_at < run.publication.started_at
+    ) {
+      fail('a publication must not end before it started')
+    }
   }
   if (
-    publication !== 'pending' &&
-    run.execution_updated_at > run.publication_updated_at
+    run.publication.started_at !== null &&
+    run.publication.started_at < run.execution.updated_at
   ) {
-    fail('a started publication must not precede the execution')
+    fail('a started publication must not precede the execution it publishes')
   }
-  if (
-    run.published_at !== null &&
-    run.published_at !== run.publication_updated_at
-  ) {
-    fail('published_at is the completion time of the publication')
+  // `updated_at` is the axis' write time, so it can never precede the start it moved past, and
+  // it is what a running publication advances while its bounds stay fixed.
+  if (run.publication.started_at !== null) {
+    if (run.publication.updated_at < run.publication.started_at) {
+      fail('publication.updated_at must not precede publication.started_at')
+    }
+    if (
+      publication === 'publishing' &&
+      run.publication.updated_at === run.publication.started_at
+    ) {
+      fail('a running publication keeps being written, so updated_at moves past its start')
+    }
+  }
+  // A finished publication exists exactly for the terminal outcomes; a skipped one never
+  // started, so it has an end but no start.
+  const publicationFinished =
+    publication === 'published' || publication === 'failed' || publication === 'skipped'
+  if ((run.publication.finished_at !== null) !== publicationFinished) {
+    fail('publication_finished_at is set exactly when the publication is terminal')
   }
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
@@ -742,33 +869,62 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
     scenario.publicationMs === undefined
       ? createdAt
       : createdAt + scenario.publicationMs
-  const published = scenario.publication_status === 'published'
   // A run is only submitted to the Runner once preparation completes; `pending` is exactly
-  // the state before that, so its submitted_at stays null and the UI must not time execution.
+  // the state before that, so its `execution.started_at` stays null and the UI must not time it.
   const executionNeverRan =
     scenario.execution_status === 'pending' ||
     scenario.execution_status === 'skipped'
   const submittedAt = executionNeverRan
     ? null
     : createdAt + Math.min(scenario.executionMs, 60_000)
+  // Execution ends on a terminal state; `uncertain` is explicitly not terminal.
+  const executionFinished =
+    scenario.execution_status === 'succeeded' ||
+    scenario.execution_status === 'failed' ||
+    scenario.execution_status === 'skipped'
+  // Publication begins when its work is first claimed, i.e. once execution succeeded and the
+  // publication has moved past `pending`. A `skipped` publication never started.
+  const publicationFinished =
+    scenario.publication_status === 'published' ||
+    scenario.publication_status === 'failed' ||
+    scenario.publication_status === 'skipped'
+  const publicationStarted =
+    scenario.publication_status === 'publishing' ||
+    scenario.publication_status === 'published' ||
+    scenario.publication_status === 'failed'
+  // The publication cannot start before execution ended. Halfway between those two instants
+  // keeps the fixture's own ordering honest without inventing a separate scenario field.
+  const publicationStartedAt = publicationStarted
+    ? Math.round((executionUpdatedAt + publicationUpdatedAt) / 2)
+    : null
   return {
     run_id,
     workflow,
     preparation: preparationFor(scenario, createdAt),
-    execution_status: scenario.execution_status,
-    publication_status: scenario.publication_status,
     created_at: iso(createdAt),
-    submitted_at: submittedAt === null ? null : iso(submittedAt),
-    // An active run is polled continuously, so its row mtime is "just now"; a terminal run
-    // keeps the instant it finished. This lets the console show a realistic "observed Ns ago".
-    execution_updated_at: iso(
-      scenario.execution_status === 'queued' ||
-        scenario.execution_status === 'running'
-        ? Date.now() - Math.min(5_000, scenario.executionMs)
-        : executionUpdatedAt
-    ),
-    publication_updated_at: iso(publicationUpdatedAt),
-    published_at: published ? iso(publicationUpdatedAt) : null,
+    execution: {
+      status: scenario.execution_status,
+      started_at: submittedAt === null ? null : iso(submittedAt),
+      finished_at: executionFinished ? iso(executionUpdatedAt) : null,
+      // An active run is polled continuously, so its last observation is "just now"; a terminal
+      // run keeps the instant it finished. This lets the console show a realistic
+      // "observed Ns ago".
+      updated_at: iso(
+        scenario.execution_status === 'queued' ||
+          scenario.execution_status === 'running'
+          ? Date.now() - Math.min(5_000, scenario.executionMs)
+          : executionUpdatedAt
+      )
+    },
+    publication: {
+      status: scenario.publication_status,
+      started_at:
+        publicationStartedAt === null ? null : iso(publicationStartedAt),
+      // Every terminal publication outcome has an end; `skipped` is terminal without having
+      // started, and `pending`/`publishing` have not finished yet.
+      finished_at: publicationFinished ? iso(publicationUpdatedAt) : null,
+      updated_at: iso(publicationUpdatedAt)
+    },
     failure_code: scenario.failure_code,
     artifact_storage: artifactFor(run_id, scenario.artifact)
   }
@@ -879,11 +1035,13 @@ export function devFixtures(): Plugin {
           const filtered = runs.filter(
             (run) =>
               (executionStatus === null ||
-                run.execution_status === executionStatus) &&
+                run.execution.status === executionStatus) &&
               (publicationStatus === null ||
-                run.publication_status === publicationStatus) &&
+                run.publication.status === publicationStatus) &&
+              // Fixtures always carry a preparation summary (see `validateRun`), matching the
+              // store, which never returns a run without one.
               (preparationStatus === null ||
-                run.preparation.status === preparationStatus) &&
+                run.preparation?.status === preparationStatus) &&
               (from === null || run.created_at >= from) &&
               (to === null || run.created_at < to) &&
               (workflow === null || run.workflow === workflow) &&

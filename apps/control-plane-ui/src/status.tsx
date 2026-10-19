@@ -36,7 +36,7 @@ function StatusText({
   )
 }
 
-export function executionTone(status: Run['execution_status']): StatusTone {
+export function executionTone(status: Run['execution']['status']): StatusTone {
   if (status === 'running') return 'active'
   // uncertain means a recovery is resolving a submission whose result is unknown.
   if (status === 'uncertain') return 'waiting'
@@ -49,14 +49,13 @@ export function executionTone(status: Run['execution_status']): StatusTone {
 }
 
 export function preparationTone(preparation: Run['preparation']): StatusTone {
-  if (preparation === null) return 'neutral'
   if (preparation.status === 'preparing') return 'active'
   if (preparation.status === 'submitted') return 'complete'
   if (preparation.status === 'failed') return 'failed'
   return 'waiting'
 }
 
-export function publicationTone(status: Run['publication_status']): StatusTone {
+export function publicationTone(status: Run['publication']['status']): StatusTone {
   if (status === 'publishing') return 'active'
   if (status === 'published') return 'complete'
   if (status === 'failed') return 'failed'
@@ -67,7 +66,7 @@ export function publicationTone(status: Run['publication_status']): StatusTone {
 export function ExecutionStatus({
   status
 }: {
-  status: Run['execution_status']
+  status: Run['execution']['status']
 }): React.JSX.Element {
   const t = useMessages()
   return (
@@ -95,7 +94,7 @@ export function PreparationStatus({
 export function PublicationStatus({
   status
 }: {
-  status: Run['publication_status']
+  status: Run['publication']['status']
 }): React.JSX.Element {
   const t = useMessages()
   return (
@@ -136,7 +135,7 @@ export function publicationStatusColor(status: PublicationStepStatus): string {
 }
 
 export function executionStatusLabel(
-  status: Run['execution_status'],
+  status: Run['execution']['status'],
   t: ReturnType<typeof useMessages>
 ): string {
   if (status === 'pending') return t('statusPending')
@@ -169,7 +168,7 @@ export const EXECUTION_STATUSES = [
   'succeeded',
   'skipped',
   'failed'
-] as const satisfies readonly Run['execution_status'][]
+] as const satisfies readonly Run['execution']['status'][]
 
 export function preparationStateLabel(
   status: NonNullable<Run['preparation']>['status'],
@@ -206,12 +205,11 @@ export function preparationStatusLabel(
   preparation: Run['preparation'],
   t: ReturnType<typeof useMessages>
 ): string {
-  if (preparation === null) return t('preparationNotRecorded')
   return preparationStateLabel(preparation.status, t)
 }
 
 export function runPublicationStatusLabel(
-  status: Run['publication_status'],
+  status: Run['publication']['status'],
   t: ReturnType<typeof useMessages>
 ): string {
   if (status === 'pending') return t('statusPending')

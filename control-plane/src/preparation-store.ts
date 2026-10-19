@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
 import type { ControlPlaneWorkflow as WorkflowName } from './contracts.js'
+import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 import { appendEvent } from './review-run-events.js'
 
 type JsonObject = Record<string, unknown>
@@ -87,6 +88,7 @@ export class PreparationStore {
       const claimed = await client.query(
         `UPDATE preparations SET status='preparing', claim_token=$2, claimed_at=clock_timestamp(),
            attempt_count=attempt_count+1, failure_code=NULL, failure_message=NULL,
+           started_at=COALESCE(started_at, clock_timestamp()),
            updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$3 AND status='pending'`,
         [work.run_id, token, this.connectorId]
@@ -195,6 +197,10 @@ export class PreparationStore {
 
   async expireStale(): Promise<number> {
     return await transaction(this.pool, async (client) => {
+      // One statement covers both expired outcomes: a retry returns the row to `pending` with the
+      // phase still open, and an exhausted budget ends it as `failed`. Only the terminal branch
+      // writes `finished_at`; omitting it there would leave a failed row that never recorded when
+      // the phase ended.
       const expired = await client.query<{
         run_id: string
         status: 'pending' | 'failed'
@@ -205,6 +211,7 @@ export class PreparationStore {
              failure_code=CASE WHEN attempt_count >= $3 THEN 'PREPARATION_RETRY_EXHAUSTED' ELSE NULL END,
              failure_message=CASE WHEN attempt_count >= $3 THEN
                'Preparation claim lease expired after the retry budget was exhausted.' ELSE NULL END,
+             finished_at=CASE WHEN attempt_count >= $3 THEN clock_timestamp() ELSE NULL END,
              updated_at=clock_timestamp()
          WHERE connector_id=$1 AND status='preparing'
            AND claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
@@ -233,6 +240,7 @@ export class PreparationStore {
       const failedRuns = await client.query<{ run_id: string }>(
         `UPDATE executions SET status='skipped',
            failure_code=NULL, failure_message=NULL,
+           finished_at=clock_timestamp(),
            observed_at=clock_timestamp(), updated_at=clock_timestamp()
          WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status='pending' RETURNING run_id`,
         [failedRunIds, this.connectorId]
@@ -241,7 +249,7 @@ export class PreparationStore {
         throw new Error('Preparation expiry lost a terminal run transition.')
       await client.query(
         `UPDATE publications SET status='skipped', claim_token=NULL, failure_code=NULL,
-           failure_message=NULL, updated_at=clock_timestamp()
+           failure_message=NULL, finished_at=clock_timestamp(), updated_at=clock_timestamp()
          WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status='pending'`,
         [failedRunIds, this.connectorId]
       )
@@ -317,7 +325,11 @@ export class PreparationStore {
       // been reached. An uncertain submission may have been accepted but unconfirmed, so
       // execution is `uncertain` (a recovery replays it) — not a failure. Any other terminal
       // preparation failure means the Runner was never called, so execution is `skipped`.
-      const submissionUncertain = error.code === 'SUBMISSION_STATE_UNCERTAIN'
+      // Matching the shared constant keeps this in step with the submission paths that stamp it.
+      const submissionUncertain = error.code === SUBMISSION_STATE_UNCERTAIN
+      // An `uncertain` execution deliberately keeps `started_at` NULL: the submission may never
+      // have been accepted, so the phase has not provably begun. `completeSubmissionRecovery`
+      // fills the start once a replay is accepted; do not set it here.
       const result = submissionUncertain
         ? await client.query(
             `UPDATE executions SET status='uncertain',
@@ -331,6 +343,7 @@ export class PreparationStore {
         : await client.query(
             `UPDATE executions SET status='skipped',
                failure_code=NULL, failure_message=NULL,
+               finished_at=clock_timestamp(),
                observed_at=clock_timestamp(), updated_at=clock_timestamp()
              WHERE run_id=$1 AND connector_id=$2 AND status='pending' AND EXISTS (
                SELECT 1 FROM preparations WHERE preparations.run_id=executions.run_id
@@ -343,7 +356,8 @@ export class PreparationStore {
         )
       await client.query(
         `UPDATE preparations SET status='failed', claim_token=NULL, claimed_at=NULL,
-           failure_code=$4, failure_message=$5, updated_at=clock_timestamp()
+           failure_code=$4, failure_message=$5,
+           finished_at=clock_timestamp(), updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
@@ -354,7 +368,8 @@ export class PreparationStore {
         ? undefined
         : await client.query(
             `UPDATE publications SET status='skipped', claim_token=NULL,
-               failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+               failure_code=NULL, failure_message=NULL,
+               finished_at=clock_timestamp(), updated_at=clock_timestamp()
              WHERE run_id=$1 AND connector_id=$2 AND status='pending'
              RETURNING run_id`,
             [runId, this.connectorId]
@@ -378,7 +393,7 @@ export class PreparationStore {
         axis: 'runner',
         fromStatus: 'pending',
         toStatus: submissionUncertain ? 'uncertain' : 'skipped',
-        reasonCode: submissionUncertain ? 'SUBMISSION_STATE_UNCERTAIN' : null
+        reasonCode: submissionUncertain ? SUBMISSION_STATE_UNCERTAIN : null
       })
       if (skippedPublication?.rowCount === 1) {
         await appendEvent(client, {

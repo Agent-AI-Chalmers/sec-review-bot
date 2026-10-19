@@ -742,6 +742,18 @@ try {
       /so far/,
       `${name} an in-flight phase must read as still running`
     )
+    // Preparation is timed from its own start to its own end, not from a row mtime: a run whose
+    // preparation has finished must therefore report a duration, and a run still preparing must
+    // read as in flight rather than showing an end it does not have.
+    assert.match(
+      preparation.body,
+      /\d+[dhms]/,
+      `${name} the Preparation phase must report its elapsed time`
+    )
+    assert.ok(
+      /(took|so far)/.test(preparation.body),
+      `${name} the Preparation phase must read as either finished or in flight`
+    )
     await page.getByRole('button', { name: 'Copy run ID' }).click()
     await waitUntil(
       async () =>

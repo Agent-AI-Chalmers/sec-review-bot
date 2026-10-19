@@ -15,7 +15,7 @@ export interface RunnerObservationEvent {
     'runner_poll_retry' | 'runner_state_changed' | 'runner_terminal_recorded'
   run_id: string
   workflow: ReviewRunRecord['workflow']
-  from: ReviewRunRecord['runner_status']
+  from: ReviewRunRecord['execution']['status']
   to: RunnerObservationResult
   error_code?: string
 }
@@ -54,7 +54,7 @@ export async function observeRunnerRun(
         kind: 'runner_poll_retry',
         run_id: run.run_id,
         workflow: run.workflow,
-        from: run.runner_status,
+        from: run.execution.status,
         to: 'poll_retry'
       })
       return 'poll_retry'
@@ -64,7 +64,7 @@ export async function observeRunnerRun(
       kind: 'runner_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
-      from: run.runner_status,
+      from: run.execution.status,
       to: 'failed',
       error_code: errorInfo(error).code
     })
@@ -72,7 +72,7 @@ export async function observeRunnerRun(
   }
   if (status.status === 'running') {
     // `markRunning` only writes on the queued -> running transition; when the run is already
-    // running, retry the heartbeat so `execution_updated_at` keeps advancing. If the store has
+    // running, retry the heartbeat so `execution.updated_at` keeps advancing. If the store has
     // already seen a different state, the UPDATE matches nothing and the run stays as observed.
     if (!(await store.markRunning(run.run_id))) {
       await store.touchObservation(run.run_id)
@@ -82,7 +82,7 @@ export async function observeRunnerRun(
       kind: 'runner_state_changed',
       run_id: run.run_id,
       workflow: run.workflow,
-      from: run.runner_status,
+      from: run.execution.status,
       to: 'active'
     })
     return 'active'
@@ -112,7 +112,7 @@ export async function observeRunnerRun(
       kind: 'runner_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
-      from: run.runner_status,
+      from: run.execution.status,
       to: 'failed',
       error_code: status.error?.code ?? 'RUNNER_EXECUTION_FAILED'
     })
@@ -127,7 +127,7 @@ export async function observeRunnerRun(
       kind: 'runner_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
-      from: run.runner_status,
+      from: run.execution.status,
       to: 'failed',
       error_code: 'RUNNER_RESULT_MISSING'
     })
@@ -146,7 +146,7 @@ export async function observeRunnerRun(
     kind: 'runner_terminal_recorded',
     run_id: run.run_id,
     workflow: run.workflow,
-    from: run.runner_status,
+    from: run.execution.status,
     to: 'succeeded'
   })
   return 'succeeded'

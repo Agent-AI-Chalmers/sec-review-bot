@@ -132,7 +132,7 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
       publish_context: {}
     })
     const queued = await store.getRun(queuedId)
-    assert.strictEqual(queued?.runner_status, 'queued')
+    assert.strictEqual(queued?.execution.status, 'queued')
     assert.deepStrictEqual(queued?.artifact_storage, artifactStorage)
     assert.deepStrictEqual(
       (await store.listActiveRuns()).runs.map((entry) => entry.run_id),
@@ -143,7 +143,7 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
   }
 })
 
-test('submitted_at marks the instant execution began and does not move afterwards', async () => {
+test('execution.started_at marks the instant execution began and does not move afterwards', async () => {
   const store = await createStore()
   try {
     const admission = await store.createPreparingReviewRun({
@@ -155,19 +155,19 @@ test('submitted_at marks the instant execution began and does not move afterward
     assert.ok(admission.preparation_token)
 
     // Before submission the run is still preparing: there is no execution start to report.
-    assert.strictEqual((await store.getRun(runId))?.submitted_at, null)
+    assert.strictEqual((await store.getRun(runId))?.execution.started_at, null)
 
     await store.markQueued(runId, admission.preparation_token, {})
     const queued = await store.getRun(runId)
-    assert.ok(queued?.submitted_at)
-    const submittedAt = queued?.submitted_at
+    assert.ok(queued?.execution.started_at)
+    const submittedAt = queued?.execution.started_at
 
-    // A later, non-transitional write (the artifact mtime) must not move submitted_at.
+    // A later, non-transitional write (the artifact mtime) must not move the start.
     await store.recordArtifactStorage(runId, { status: 'unavailable' })
     const after = await store.getRun(runId)
-    assert.strictEqual(after?.submitted_at, submittedAt)
+    assert.strictEqual(after?.execution.started_at, submittedAt)
     assert.ok(
-      Date.parse(after!.execution_updated_at) >= Date.parse(submittedAt!),
+      Date.parse(after!.execution.updated_at) >= Date.parse(submittedAt!),
       'the row mtime moves past the immutable execution start'
     )
   } finally {
@@ -263,15 +263,15 @@ test('touchObservation advances the row mtime without changing state', async () 
   try {
     const runId = await createQueuedRun(store)
     const before = await store.getRun(runId)
-    assert.strictEqual(before?.runner_status, 'queued')
+    assert.strictEqual(before?.execution.status, 'queued')
     // The heartbeat must move the mtime forward even though the status is unchanged.
     await new Promise((resolve) => setTimeout(resolve, 10))
     await store.touchObservation(runId)
     const after = await store.getRun(runId)
-    assert.strictEqual(after?.runner_status, 'queued', 'state is unchanged')
+    assert.strictEqual(after?.execution.status, 'queued', 'state is unchanged')
     assert.ok(
-      Date.parse(after!.execution_updated_at) >
-        Date.parse(before!.execution_updated_at),
+      Date.parse(after!.execution.updated_at) >
+        Date.parse(before!.execution.updated_at),
       'the row mtime moved forward'
     )
     // It must not touch a run that is not being polled.
@@ -280,10 +280,10 @@ test('touchObservation advances the row mtime without changing state', async () 
       run_id: `run-${randomUUID()}`,
       publish_context: {}
     })
-    const preparingBefore = admitted.record.execution_updated_at
+    const preparingBefore = admitted.record.execution.updated_at
     await store.touchObservation(admitted.record.run_id)
     assert.strictEqual(
-      (await store.getRun(admitted.record.run_id))?.execution_updated_at,
+      (await store.getRun(admitted.record.run_id))?.execution.updated_at,
       preparingBefore,
       'a pending run is not touched'
     )
@@ -381,7 +381,7 @@ test('an observation heartbeat never extends the recovery lease', async () => {
       ),
       RunnerSubmissionUncertainError
     )
-    assert.strictEqual((await store.getRun(runId))?.runner_status, 'uncertain')
+    assert.strictEqual((await store.getRun(runId))?.execution.status, 'uncertain')
 
     const first = await store.claimSubmissionRecovery(runId)
     assert.ok(first)
@@ -412,7 +412,7 @@ test('ReviewRunStore returns an expired preparation to pending without failing i
 
     assert.strictEqual(await store.expireStalePreparations(), 1)
     const run = await store.getRun(runId)
-    assert.strictEqual(run?.runner_status, 'pending')
+    assert.strictEqual(run?.execution.status, 'pending')
     assert.strictEqual(run?.failure_code, null)
     assert.strictEqual(run?.preparation?.status, 'pending')
     assert.strictEqual(run?.preparation?.attempt_count, 1)
@@ -441,7 +441,7 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
     )
     assert.strictEqual(await store.expireStalePreparations(), 1)
     const run = await store.getRun(runId)
-    assert.strictEqual(run?.runner_status, 'skipped')
+    assert.strictEqual(run?.execution.status, 'skipped')
     assert.strictEqual(run?.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
     assert.deepStrictEqual(
       {
@@ -762,7 +762,7 @@ test('ReviewRunStore keeps an admitted run queryable after preparation fails', a
     })
 
     const failed = await store.getRun(runId)
-    assert.strictEqual(failed?.runner_status, 'skipped')
+    assert.strictEqual(failed?.execution.status, 'skipped')
     assert.strictEqual(failed?.ingress_kind, 'github_webhook')
     assert.strictEqual(failed?.ingress_key, ingressKey)
     assert.strictEqual(failed?.failure_code, 'REVIEW_START_FAILED')
@@ -827,7 +827,7 @@ test('ReviewRunStore initialization does not steal another replica preparation',
   const restarted = await createStore({ connectorId: sharedConnector })
   try {
     const record = await restarted.getRun(runId)
-    assert.strictEqual(record?.runner_status, 'pending')
+    assert.strictEqual(record?.execution.status, 'pending')
     assert.strictEqual(record?.failure_code, null)
   } finally {
     await restarted.close()
@@ -924,7 +924,7 @@ test('ReviewRunStore leaves ingress replay read-only and lets the coordinator ta
     )
     await ownerB.markQueued(takeover.run_id, takeover.claim_token, {})
     assert.strictEqual(
-      (await ownerA.getRun(first.record.run_id))?.runner_status,
+      (await ownerA.getRun(first.record.run_id))?.execution.status,
       'queued'
     )
   } finally {
@@ -965,7 +965,17 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
       await store.completeSubmissionRecovery(runId, currentToken),
       true
     )
-    assert.strictEqual((await store.getRun(runId))?.runner_status, 'queued')
+    const recovered = await store.getRun(runId)
+    assert.strictEqual(recovered?.execution.status, 'queued')
+    // An accepted replay proves the Runner did take the submission, so the execution phase
+    // began then. `uncertain` deliberately left `started_at` NULL (acceptance was unknown);
+    // resolving it without filling the start would leave a `queued` run with no beginning,
+    // which no other path can produce and which silently breaks phase timing.
+    assert.ok(
+      recovered?.execution.started_at,
+      'an accepted replay records when execution began'
+    )
+    assert.strictEqual(recovered?.execution.finished_at, null)
     assert.strictEqual(
       (await store.listActiveRuns()).runs.some(
         (entry) => entry.run_id === runId
@@ -1006,7 +1016,7 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
     )
     // An uncertain submission may have reached the Runner, so execution is `uncertain` (a
     // later recovery replays it) rather than skipped or failed.
-    assert.strictEqual((await owner.getRun(runId))?.runner_status, 'uncertain')
+    assert.strictEqual((await owner.getRun(runId))?.execution.status, 'uncertain')
   } finally {
     await owner.close()
   }
@@ -1037,7 +1047,7 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
     assert.deepStrictEqual(submissions, [
       { workflow: 'issue-review', run_id: runId, input }
     ])
-    assert.strictEqual((await restarted.getRun(runId))?.runner_status, 'queued')
+    assert.strictEqual((await restarted.getRun(runId))?.execution.status, 'queued')
   } finally {
     await restarted.close()
   }
@@ -1078,7 +1088,7 @@ test('ReviewRunStore fences a stale publisher after another connection takes ove
       true
     )
     const record = await ownerA.getRun(runId)
-    assert.strictEqual(record?.publication_status, 'published')
+    assert.strictEqual(record?.publication.status, 'published')
   } finally {
     await Promise.all([ownerA.close(), ownerB.close()])
   }
@@ -1097,7 +1107,7 @@ test('ReviewRunStore does not publish while a required step is incomplete', asyn
     assert.strictEqual(step?.failure_count, 0)
     assert.strictEqual(await store.completePublication(runId, token), false)
     assert.strictEqual(
-      (await store.getRun(runId))?.publication_status,
+      (await store.getRun(runId))?.publication.status,
       'publishing'
     )
   } finally {
@@ -1111,6 +1121,12 @@ test('ReviewRunStore spends retry budget only for the current publication owner'
   try {
     const token = await store.claimPublication(runId)
     assert.ok(token)
+    const claimed = await store.getRun(runId)
+    assert.strictEqual(claimed?.publication.status, 'publishing')
+    const publicationStart = claimed?.publication.started_at
+    assert.ok(publicationStart, 'the claim starts the publication phase')
+    assert.strictEqual(claimed?.publication.finished_at, null)
+
     assert.strictEqual(
       await store.failPublication(
         runId,
@@ -1121,7 +1137,21 @@ test('ReviewRunStore spends retry budget only for the current publication owner'
       true
     )
     const record = await store.getRun(runId)
-    assert.strictEqual(record?.runner_status, 'succeeded')
+    assert.strictEqual(record?.execution.status, 'succeeded')
+    // A retryable failure returns the row to pending, so the phase has not ended. `finished_at`
+    // is the one timestamp that is cleared rather than only ever set: leaving it behind would
+    // report a still-running publication as completed. The start, by contrast, must not move.
+    assert.strictEqual(record?.publication.status, 'pending')
+    assert.strictEqual(
+      record?.publication.finished_at,
+      null,
+      'a retryable failure must not leave a phase end behind'
+    )
+    assert.strictEqual(
+      record?.publication.started_at,
+      publicationStart,
+      'a retry keeps the original publication start'
+    )
     assert.deepStrictEqual((await store.listActiveRuns()).runs, [])
   } finally {
     await store.close()
@@ -1242,7 +1272,7 @@ test('ReviewRunStore records Runner execution failure without publication failur
       true
     )
     const record = await store.getRun(runId)
-    assert.strictEqual(record?.runner_status, 'failed')
+    assert.strictEqual(record?.execution.status, 'failed')
     assert.strictEqual(record?.failure_code, 'RUNNER_EXECUTION_FAILED')
     assert.strictEqual(await store.claimPublication(runId), null)
   } finally {
@@ -1563,7 +1593,7 @@ test('every publication transition writes exactly one audit event', async () => 
       { retry: false }
     )
     assert.strictEqual(
-      (await store.getRun(recoveredRun))?.publication_status,
+      (await store.getRun(recoveredRun))?.publication.status,
       'pending',
       'an uncertain submission must not skip publication'
     )
@@ -1604,6 +1634,163 @@ test('every publication transition writes exactly one audit event', async () => 
       'null->pending',
       'pending->skipped'
     ])
+  } finally {
+    await store.close()
+  }
+})
+
+test('each lifecycle axis records an immutable start and end', async () => {
+  // The three axes used to borrow times: preparation had no end (its `updated_at` also moved on
+  // heartbeats and input checkpoints), execution had no explicit end (its `observed_at` happened
+  // to freeze), and publication had no start at all (the console borrowed the execution end).
+  // Every phase is now timed by two fields that are written once, so this test pins the one
+  // property that makes them usable: they never move after being set.
+  const store = await createStore()
+  const runId = `run-${randomUUID()}`
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+
+    // Admitted but not claimed again: the preparation claim taken at admission started the
+    // phase, and nothing has ended yet.
+    const admitted = await store.getRun(runId)
+    assert.ok(admitted?.preparation?.started_at, 'admission starts preparation')
+    assert.strictEqual(admitted?.preparation?.finished_at, null)
+    assert.strictEqual(admitted?.execution.started_at, null, 'execution has not begun')
+    assert.strictEqual(admitted?.execution.finished_at, null)
+    assert.strictEqual(admitted?.publication.started_at, null)
+
+    // Preparation ends when the input is handed over; execution starts at the same moment.
+    await store.markQueued(runId, admission.preparation_token, {})
+    const queued = await store.getRun(runId)
+    assert.strictEqual(queued?.preparation?.status, 'submitted')
+    assert.ok(queued?.preparation?.finished_at, 'submission ends preparation')
+    assert.ok(queued?.execution.started_at, 'submission starts execution')
+    assert.strictEqual(queued?.execution.finished_at, null, 'execution still in flight')
+    const preparationStart = queued?.preparation?.started_at
+    const preparationEnd = queued?.preparation?.finished_at
+    assert.ok(
+      Date.parse(preparationEnd!) >= Date.parse(preparationStart!),
+      'preparation end is not before its start'
+    )
+
+    // Execution ends on the terminal result; publication has not started, so it has no start.
+    assert.strictEqual(
+      await store.recordRunnerSuccess(
+        runId,
+        { run_id: runId },
+        { status: 'unavailable' }
+      ),
+      true
+    )
+    const succeeded = await store.getRun(runId)
+    assert.ok(succeeded?.execution.finished_at, 'success ends execution')
+    assert.strictEqual(succeeded?.publication.started_at, null)
+    // `observed_at` and `finished_at` are written in the same UPDATE, so the end of the phase
+    // and the last observation agree at this instant.
+    assert.strictEqual(
+      succeeded?.execution.finished_at,
+      succeeded?.execution.updated_at
+    )
+
+    // Publication starts on the first claim, and a retryable failure that re-pends the row and
+    // claims it again must not move the start.
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    const publishing = await store.getRun(runId)
+    assert.strictEqual(publishing?.publication.status, 'publishing')
+    const publicationStart = publishing?.publication.started_at
+    assert.ok(publicationStart, 'first claim starts publication')
+
+    await store.initializePublicationSteps(runId, token, ['repository:comment'])
+    assert.strictEqual(
+      await store.failPublication(
+        runId,
+        token,
+        { code: 'GITHUB_RATE_LIMITED', message: 'slow down' },
+        { retry: true }
+      ),
+      true
+    )
+    const retried = await store.getRun(runId)
+    assert.strictEqual(retried?.publication.status, 'pending')
+    assert.strictEqual(
+      retried?.publication.started_at,
+      publicationStart,
+      'a retryable failure keeps the original publication start'
+    )
+
+    const secondToken = await store.claimPublication(runId)
+    assert.ok(secondToken)
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.started_at,
+      publicationStart,
+      're-claiming keeps the original publication start'
+    )
+
+    // The end of each phase is stable across later writes.
+    const before = await store.getRun(runId)
+    await store.touchObservation(runId)
+    await store.recordArtifactStorage(runId, { status: 'unavailable' })
+    const after = await store.getRun(runId)
+    assert.strictEqual(
+      after?.execution.finished_at,
+      before?.execution.finished_at
+    )
+    assert.strictEqual(
+      after?.preparation?.finished_at,
+      before?.preparation?.finished_at
+    )
+    assert.strictEqual(
+      after?.publication.started_at,
+      before?.publication.started_at
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('a preparation retry does not move the phase start', async () => {
+  // `started_at` answers "when did this phase begin", not "when was it last claimed". A retry
+  // returns the row to pending and it is claimed again; moving the start there would silently
+  // shrink every retried preparation's measured duration.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = `run-${randomUUID()}`
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    const started = (await store.getRun(runId))?.preparation?.started_at
+    assert.ok(started)
+
+    // A retryable failure returns the row to pending for another attempt.
+    const result = await store.failPreparation(
+      runId,
+      admission.preparation_token,
+      { code: 'PREPARATION_TRANSIENT', message: 'try again' },
+      { retry: true, retryAfterMs: 0 }
+    )
+    assert.deepStrictEqual(result, { retry_scheduled: true })
+    assert.strictEqual(
+      (await store.getRun(runId))?.preparation?.started_at,
+      started,
+      'a re-pend keeps the original start'
+    )
+
+    const next = await store.claimNextPreparation()
+    assert.ok(next)
+    assert.strictEqual(
+      (await store.getRun(runId))?.preparation?.started_at,
+      started,
+      'claiming again keeps the original start'
+    )
   } finally {
     await store.close()
   }

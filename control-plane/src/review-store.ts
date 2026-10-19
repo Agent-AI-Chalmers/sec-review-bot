@@ -7,8 +7,12 @@
 // - `preparation-store.ts` / `publication-store.ts` own their own axes.
 // - This store owns the run trunk, the full-record projection (`RUN_SELECT`/`rowToRecord`),
 //   and cross-axis transitions (submit -> queued, execution failure -> publication skipped,
-//   recovery -> publication re-pending). A cross-axis transition is owned by the axis that
+//   rejected replay -> publication skipped). A cross-axis transition is owned by the axis that
 //   initiates it; preparations initiating an execution skip is therefore in that store.
+//
+// Publication has no reversion into it: an uncertain submission leaves publication `pending`
+// rather than skipping it, so neither an accepted nor a rejected replay has a publication
+// transition to undo.
 // Claim tokens here are the sole fencing authority for writes.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
@@ -76,16 +80,20 @@ interface ReviewRunRow {
   created_at_cursor: string
   runner_updated_at: Date | string | null
   execution_missing: boolean
-  submitted_at: Date | string | null
+  started_at: Date | string | null
+  execution_finished_at: Date | string | null
+  publication_started_at: Date | string | null
+  publication_finished_at: Date | string | null
   publication_updated_at: Date | string
-  published_at: Date | string | null
   publication_failure_code: string | null
   publication_failure_message: string | null
   ingress_kind: 'github_webhook' | 'github_actions_dispatch' | null
   ingress_key: string | null
+  preparation_missing: boolean
   preparation_status: 'pending' | 'preparing' | 'submitted' | 'failed' | null
   preparation_attempt_count: number | null
-  preparation_updated_at: Date | string | null
+  preparation_started_at: Date | string | null
+  preparation_finished_at: Date | string | null
   preparation_failure_code: string | null
   preparation_failure_message: string | null
   preparation_failure_notice_status:
@@ -97,31 +105,39 @@ const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
  * query, so this trades a cheap read against how quickly the caller starts publishing. */
 const CLAIM_WAIT_INTERVAL_MS = 250
 
+/**
+ * The full cross-axis read: one run trunk row joined to its three axis rows.
+ *
+ * `created_at_cursor` carries the full-precision (microsecond) UTC timestamp for keyset
+ * pagination. node-pg maps `created_at` to a millisecond JS Date, so a cursor built from the
+ * truncated value would skip every row in the same millisecond; this string keeps the
+ * microseconds for an exact `(created_at, run_id) < boundary`.
+ *
+ * `executions`, `preparations`, and the failure notice are LEFT JOINed so a run that somehow
+ * lacks one of those rows is surfaced and reported by the projection, not silently dropped from
+ * every read. `publications` is an inner join because publication is never optional.
+ */
 const RUN_SELECT = `
   SELECT r.run_id, r.workflow, p.input AS publish_context,
     r.ingress_kind, r.ingress_key,
     r.created_at,
-    -- Full-precision (microsecond) UTC timestamp for keyset cursors. node-pg maps
-    -- created_at to a millisecond JS Date, so a cursor built from the truncated
-    -- value skips every row in the same millisecond; this string keeps the
-    -- microseconds for an exact (created_at, run_id) < boundary.
     to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_cursor,
     e.input AS runner_input, e.status AS runner_status,
     e.failure_code AS runner_failure_code, e.failure_message AS runner_failure_message,
     e.artifact_storage, e.workflow_result,
-    e.observed_at AS runner_updated_at, e.submitted_at,
+    e.observed_at AS runner_updated_at, e.started_at, e.finished_at AS execution_finished_at,
     (e.run_id IS NULL) AS execution_missing,
-    p.status AS publication_status, p.updated_at AS publication_updated_at,
-    p.published_at,
+    p.status AS publication_status, p.started_at AS publication_started_at,
+    p.finished_at AS publication_finished_at, p.updated_at AS publication_updated_at,
     p.failure_code AS publication_failure_code, p.failure_message AS publication_failure_message,
+    (pr.run_id IS NULL) AS preparation_missing,
     pr.status AS preparation_status, pr.attempt_count AS preparation_attempt_count,
-    pr.updated_at AS preparation_updated_at, pr.failure_code AS preparation_failure_code,
+    pr.started_at AS preparation_started_at, pr.finished_at AS preparation_finished_at,
+    pr.failure_code AS preparation_failure_code,
     pr.failure_message AS preparation_failure_message,
     n.status AS preparation_failure_notice_status
   FROM review_runs r
   JOIN publications p ON p.run_id = r.run_id
-  -- LEFT JOIN so a run that somehow lacks its execution row is surfaced (and reported), not
-  -- silently dropped from every read.
   LEFT JOIN executions e ON e.run_id = r.run_id AND e.connector_id = r.connector_id
   LEFT JOIN preparations pr
     ON pr.run_id = r.run_id AND pr.connector_id = r.connector_id
@@ -140,33 +156,64 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     // projection report it in `dropped` instead of silently omitting or misrepresenting it.
     throw new Error(`run ${row.run_id} has no executions row`)
   }
+  if (row.preparation_missing) {
+    // Same rule as the execution axis: admission writes the run, its preparation, and its
+    // execution in one transaction and nothing deletes an axis alone, so a missing preparation
+    // row is corruption. Returning `preparation: null` would report it as a legitimate record,
+    // which is exactly what the contract says null does *not* mean.
+    throw new Error(`run ${row.run_id} has no preparations row`)
+  }
   const publicationFailure = row.publication_status === 'failed'
   return {
     run_id: row.run_id,
     workflow: row.workflow,
     publish_context: row.publish_context,
     ...(row.runner_input === null ? {} : { runner_input: row.runner_input }),
-    preparation:
-      row.preparation_status === null ||
-      row.preparation_attempt_count === null ||
-      row.preparation_updated_at === null
-        ? null
-        : {
-            status: row.preparation_status,
-            attempt_count: row.preparation_attempt_count,
-            updated_at: iso(row.preparation_updated_at),
-            failure_code: row.preparation_failure_code,
-            failure_notice_status: row.preparation_failure_notice_status
-          },
-    runner_status: row.runner_status,
-    publication_status: row.publication_status,
+    // The guard above proves the row exists; every column is NOT NULL except the failure
+    // fields, so the summary is always present.
+    preparation: {
+      status: row.preparation_status as NonNullable<
+        ReviewRunRow['preparation_status']
+      >,
+      attempt_count: row.preparation_attempt_count as number,
+      started_at:
+        row.preparation_started_at === null
+          ? null
+          : iso(row.preparation_started_at),
+      finished_at:
+        row.preparation_finished_at === null
+          ? null
+          : iso(row.preparation_finished_at),
+      failure_code: row.preparation_failure_code,
+      failure_notice_status: row.preparation_failure_notice_status
+    },
+    // Each axis reports the same three instants under the same names: when it started, when it
+    // finished, and (for execution) when it was last observed. Keeping the shape identical
+    // across axes is what lets a reader treat a run as three phases rather than three schemas.
+    execution: {
+      status: row.runner_status,
+      started_at: row.started_at === null ? null : iso(row.started_at),
+      finished_at:
+        row.execution_finished_at === null
+          ? null
+          : iso(row.execution_finished_at),
+      // `runner_updated_at` is the execution axis' observed_at; the missing-execution guard
+      // above narrows it to a real timestamp.
+      updated_at: iso(row.runner_updated_at as Date | string)
+    },
+    publication: {
+      status: row.publication_status,
+      started_at:
+        row.publication_started_at === null
+          ? null
+          : iso(row.publication_started_at),
+      finished_at:
+        row.publication_finished_at === null
+          ? null
+          : iso(row.publication_finished_at),
+      updated_at: iso(row.publication_updated_at)
+    },
     created_at: iso(row.created_at),
-    submitted_at: row.submitted_at === null ? null : iso(row.submitted_at),
-    // `runner_updated_at` is the execution axis' observed_at; the missing-execution guard
-    // above narrows it to a real timestamp.
-    execution_updated_at: iso(row.runner_updated_at as Date | string),
-    publication_updated_at: iso(row.publication_updated_at),
-    published_at: row.published_at === null ? null : iso(row.published_at),
     // The run-level failure code names whichever axis actually failed: publication, then
     // execution, then preparation. A skipped execution therefore still reports the
     // preparation failure that caused it, without pretending execution itself failed.
@@ -240,19 +287,26 @@ export class ReviewRunStore {
   private readonly preparations: PreparationStore
   private readonly publications: PublicationStore
   private readonly executions: ExecutionStore
+  private readonly onDroppedRunRow: (dropped: DroppedRunRow) => void
   private initialized = false
 
   constructor({
     connectionString,
     connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default',
     claimTimeoutMs = DEFAULT_CLAIM_TIMEOUT_MS,
-    pool
+    pool,
+    onDroppedRunRow = () => {}
   }: {
     connectionString?: string
     connectorId?: string
     claimTimeoutMs?: number
     pool?: Pool
+    /** Reports a stored row the record contract cannot represent. Fan-out reads already return
+     * those in `dropped` for the caller to report; this covers the single-run read, which has no
+     * such list and would otherwise discard the fault silently. */
+    onDroppedRunRow?: (dropped: DroppedRunRow) => void
   } = {}) {
+    this.onDroppedRunRow = onDroppedRunRow
     this.pool = pool ?? new Pool({ connectionString })
     this.connectorId = connectorId
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
@@ -339,10 +393,13 @@ export class ReviewRunStore {
         run.runner_input === undefined ? null : JSON.stringify(run.runner_input)
       ]
     )
+    // Admission itself takes the first preparation claim, so the preparation phase starts here
+    // as well as in `claimNext`: a run admitted and prepared in one request must not show a null
+    // start just because it never went back through the pending queue.
     await client.query(
       `INSERT INTO preparations
-        (run_id,connector_id,input_version,input,status,claim_token,claimed_at,attempt_count)
-       VALUES ($1,$2,$3,$4::jsonb,'preparing',$5,clock_timestamp(),1)`,
+        (run_id,connector_id,input_version,input,status,claim_token,claimed_at,attempt_count,started_at)
+       VALUES ($1,$2,$3,$4::jsonb,'preparing',$5,clock_timestamp(),1,clock_timestamp())`,
       [
         run.run_id,
         this.connectorId,
@@ -548,7 +605,7 @@ export class ReviewRunStore {
       const queued = await client.query(
         `
         UPDATE executions
-        SET status='queued', submitted_at=COALESCE(submitted_at, clock_timestamp()),
+        SET status='queued', started_at=COALESCE(started_at, clock_timestamp()),
             failure_code=NULL, failure_message=NULL,
             observed_at=clock_timestamp(), updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$3
@@ -568,7 +625,7 @@ export class ReviewRunStore {
       const completed = await client.query(
         `UPDATE preparations
          SET status='submitted', claim_token=NULL, claimed_at=NULL,
-             updated_at=clock_timestamp()
+             finished_at=clock_timestamp(), updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='preparing'
            AND claim_token=$3`,
         [runId, this.connectorId, token]
@@ -605,11 +662,14 @@ export class ReviewRunStore {
     )
     const row = result.rows[0]
     if (row === undefined) return null
-    // A row the record contract cannot represent (e.g. a run missing its execution axis) is
-    // treated as absent, matching the list projection that reports it in `dropped`.
+    // A row the record contract cannot represent (e.g. a run missing one of its axis rows) is
+    // treated as absent, matching the list projection that reports it in `dropped`. Unlike a
+    // genuinely unknown run id, this is corruption, so it is reported before being hidden
+    // behind the same `null`.
     try {
       return rowToRecord(row)
-    } catch {
+    } catch (error) {
+      this.onDroppedRunRow({ run_id: row.run_id, error })
       return null
     }
   }
@@ -636,14 +696,21 @@ export class ReviewRunStore {
     }
     if (options.workflow !== undefined)
       clauses.push(`r.workflow=${add(options.workflow)}`)
+    // An axis filter selects on that axis' state, but must not hide a row whose axis is missing:
+    // such a row is corrupt, and the projection reports it in `dropped`. Filtering it out here
+    // instead would make the filter the only reason corruption went unnoticed.
     if (options.execution_status !== undefined) {
-      clauses.push(`e.status=${add(options.execution_status)}`)
+      const status = add(options.execution_status)
+      clauses.push(`(e.status=${status} OR e.run_id IS NULL)`)
     }
     if (options.publication_status !== undefined) {
+      // Publication is an inner join, so a "missing" publication row means the whole row is
+      // absent from the read; only the LEFT JOINed axes can be reported this way.
       clauses.push(`p.status=${add(options.publication_status)}`)
     }
     if (options.preparation_status !== undefined) {
-      clauses.push(`pr.status=${add(options.preparation_status)}`)
+      const status = add(options.preparation_status)
+      clauses.push(`(pr.status=${status} OR pr.run_id IS NULL)`)
     }
     if (options.from !== undefined)
       clauses.push(`r.created_at>=${add(options.from)}`)
@@ -719,16 +786,17 @@ export class ReviewRunStore {
     return await this.preparations.expireStale()
   }
   /** Recoverable runs, as a projection rather than a bare array: a row the contract cannot
-   * represent is returned in `dropped` instead of aborting the read. */
+   * represent is returned in `dropped` instead of aborting the read.
+   *
+   * An uncertain submission is recoverable when it has no live claim, or when its claim has
+   * expired, so a stalled recovery becomes claimable again. The lease is `claimed_at`; the
+   * observation heartbeat writes `observed_at` only, so it can never extend this lease. */
   async listSubmissionRecoveries(): Promise<RunRowsProjection> {
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE r.connector_id=$1
         AND e.status='uncertain'
         AND (
-          -- An uncertain submission is claimable when it has no live claim; the lease is
-          -- claimed_at, so a stalled recovery becomes claimable again. Observation writes
-          -- observed_at only, so a heartbeat can never extend this lease.
           e.claim_token IS NULL
           OR e.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
         )
@@ -740,6 +808,12 @@ export class ReviewRunStore {
   async claimSubmissionRecovery(runId: string): Promise<string | null> {
     return await this.executions.claimSubmissionRecovery(runId)
   }
+  /** Commit an accepted replay: the submission is confirmed, so execution is now queued.
+   *
+   * `started_at` is filled here, not when the run entered `uncertain`: that state records an
+   * unconfirmed submission, so it deliberately has no start. A resolved replay means the Runner
+   * did accept it, making this the instant execution actually began. Leaving it NULL would
+   * produce a `queued` run with no start, a state no other path can reach. */
   async completeSubmissionRecovery(
     runId: string,
     token: string
@@ -749,6 +823,7 @@ export class ReviewRunStore {
         `
         UPDATE executions
         SET status='queued', claim_token=NULL, claimed_at=NULL,
+            started_at=COALESCE(started_at, clock_timestamp()),
             failure_code=NULL, failure_message=NULL,
             observed_at=clock_timestamp(), updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
@@ -781,6 +856,7 @@ export class ReviewRunStore {
         UPDATE executions
         SET status='failed', claim_token=NULL, claimed_at=NULL,
             failure_code=$4, failure_message=$5,
+            finished_at=clock_timestamp(),
             observed_at=clock_timestamp(), updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
           AND status='uncertain' AND claim_token=$3
@@ -792,6 +868,7 @@ export class ReviewRunStore {
         `
         UPDATE publications
         SET status='skipped', claim_token=NULL,
+            finished_at=clock_timestamp(),
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND status='pending'
         RETURNING run_id
@@ -873,6 +950,7 @@ export class ReviewRunStore {
         UPDATE executions e
         SET status='failed', failure_code=$3,
             failure_message=$4, artifact_storage=$5::jsonb,
+            finished_at=clock_timestamp(),
             observed_at=clock_timestamp(), updated_at=clock_timestamp()
         FROM previous
         WHERE e.run_id=previous.run_id
@@ -895,6 +973,7 @@ export class ReviewRunStore {
         `
         UPDATE publications
         SET status='skipped', claim_token=NULL,
+            finished_at=clock_timestamp(),
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND status='pending'
         RETURNING run_id
@@ -927,7 +1006,15 @@ export class ReviewRunStore {
    *
    * Inlined here rather than forwarded to `PublicationStore`: the claim condition reads the
    * execution axis (`executions.status='succeeded'` and a non-null workflow_result), so it is
-   * cross-axis orchestration, not a single-axis publication write. */
+   * cross-axis orchestration, not a single-axis publication write.
+   *
+   * A claimable run must have a JSON result that is not the JSON value `null`: `IS NOT NULL`
+   * accepts a stored JSON `null`, but node-pg reads it back as JS `null`, which would poison
+   * the claim path. Excluding it keeps a null-result run from blocking publication for every
+   * other run behind it.
+   *
+   * `started_at` is set on the first claim only: a retryable failure returns the row to
+   * pending and it is claimed again, and that must not move when the publication phase began. */
   async claimPublication(runId: string): Promise<string | null> {
     const token = crypto.randomUUID()
     return await transaction(this.pool, async (client) => {
@@ -945,14 +1032,11 @@ export class ReviewRunStore {
         )
         UPDATE publications p
         SET status='publishing', claim_token=$2, claimed_at=clock_timestamp(),
+            started_at=COALESCE(p.started_at, clock_timestamp()),
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         FROM previous, executions e
         WHERE p.run_id=previous.run_id AND previous.run_id=$1 AND p.connector_id=$3
           AND e.run_id=p.run_id AND e.connector_id=p.connector_id
-          -- A JSON 'null' result satisfies 'IS NOT NULL' (it is stored as the JSON
-          -- value null, not SQL NULL), yet node-pg reads it back as JS null, which
-          -- would poison the claim path. Exclude it so a null-result run is never
-          -- claimed, instead of blocking every other publication head-of-line.
           AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
           AND (
             previous.status='pending'
@@ -1008,6 +1092,14 @@ export class ReviewRunStore {
     }
   }
 
+  /** Claim the oldest publishable run for this connector.
+   *
+   * The SELECT applies the same JSON-`null` guard as `claimPublication`: a stored JSON `null`
+   * result must not be selected as claimable work, or the claim would throw and roll back on the
+   * same row on every poll.
+   *
+   * `started_at` is written with `COALESCE` so only the first claim marks when the publication
+   * phase began; a retryable failure returns the row to pending and is claimed again. */
   private async claimNextPublicationOnce(): Promise<PublicationWork | null> {
     return await transaction(this.pool, async (client) => {
       const candidate = await client.query<{
@@ -1019,9 +1111,6 @@ export class ReviewRunStore {
         FROM publications p
         JOIN executions e ON e.run_id=p.run_id AND e.connector_id=p.connector_id
         WHERE p.connector_id=$1
-          -- Same JSON-null guard as claimPublication: a JSON 'null' result must not
-          -- be selected as claimable work, or claimNextPublication would throw and
-          -- roll back on the same row every poll.
           AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
           AND (p.status='pending' OR
             (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
@@ -1044,7 +1133,9 @@ export class ReviewRunStore {
       const claimed = await client.query(
         `
         UPDATE publications SET status='publishing', claim_token=$3,
-          claimed_at=clock_timestamp(), failure_code=NULL, failure_message=NULL,
+          claimed_at=clock_timestamp(),
+          started_at=COALESCE(started_at, clock_timestamp()),
+          failure_code=NULL, failure_message=NULL,
           updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND status=$4
       `,

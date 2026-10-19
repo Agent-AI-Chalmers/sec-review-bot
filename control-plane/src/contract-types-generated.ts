@@ -40,31 +40,10 @@ export interface components {
       /** @enum {string} */
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
-      /** @enum {string} */
-      runner_status:
-        | 'pending'
-        | 'queued'
-        | 'running'
-        | 'uncertain'
-        | 'succeeded'
-        | 'skipped'
-        | 'failed'
-      /**
-       * Format: date-time
-       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL until then, i.e. while the run is still `pending` on the execution axis; preparation progress is on the separate `preparation` summary. Use it, not execution_updated_at, to time execution.
-       */
-      submitted_at: string | null
-      /** @enum {string} */
-      publication_status:
-        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      execution: components['schemas']['ExecutionSummary']
+      publication: components['schemas']['PublicationSummary']
       /** Format: date-time */
       created_at: string
-      /** Format: date-time */
-      execution_updated_at: string
-      /** Format: date-time */
-      publication_updated_at: string
-      /** Format: date-time */
-      published_at: string | null
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
@@ -103,34 +82,14 @@ export interface components {
       runner_input?: {
         [key: string]: unknown
       }
+      preparation: components['schemas']['PreparationSummary']
       /** @enum {string} */
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
-      /** @enum {string} */
-      runner_status:
-        | 'pending'
-        | 'queued'
-        | 'running'
-        | 'uncertain'
-        | 'succeeded'
-        | 'skipped'
-        | 'failed'
-      /**
-       * Format: date-time
-       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL until then, i.e. while the run is still `pending` on the execution axis; preparation progress is on the separate `preparation` summary. Use it, not execution_updated_at, to time execution.
-       */
-      submitted_at: string | null
-      /** @enum {string} */
-      publication_status:
-        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      execution: components['schemas']['ExecutionSummary']
+      publication: components['schemas']['PublicationSummary']
       /** Format: date-time */
       created_at: string
-      /** Format: date-time */
-      execution_updated_at: string
-      /** Format: date-time */
-      publication_updated_at: string
-      /** Format: date-time */
-      published_at: string | null
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
@@ -163,11 +122,19 @@ export interface components {
       /** @enum {string} */
       workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
       preparation: components['schemas']['PreparationSummary']
+      execution: components['schemas']['ExecutionSummary']
+      publication: components['schemas']['PublicationSummary']
+      /** Format: date-time */
+      created_at: string
+      failure_code: string | null
+      artifact_storage: components['schemas']['ArtifactStorage']
+    }
+    ExecutionSummary: {
       /**
        * @description The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it to resolve the run to `queued` or `failed`, so it is not a failure.
        * @enum {string}
        */
-      execution_status:
+      status:
         | 'pending'
         | 'queued'
         | 'running'
@@ -177,22 +144,38 @@ export interface components {
         | 'failed'
       /**
        * Format: date-time
-       * @description Immutable instant execution began (the prepared input was accepted and the run entered queued). NULL until then, i.e. while the run is still `pending` on the execution axis; preparation progress is on the separate `preparation` summary. Use it, not execution_updated_at, to time execution.
+       * @description Immutable instant the prepared Runner input was accepted and execution began; null while the run is still pending, and also null for `skipped`, which is concluded without ever having started. Written once, so a recovery replay does not move it.
        */
-      submitted_at: string | null
+      started_at: string | null
+      /**
+       * Format: date-time
+       * @description Immutable instant the execution axis reached a terminal state (`succeeded`, `failed`, or `skipped`); null while it is pending, queued, running, or uncertain. Together with `started_at` it times the phase (only when `started_at` is non-null, since `skipped` has an end without a start).
+       */
+      finished_at: string | null
+      /**
+       * Format: date-time
+       * @description Last time the execution axis was written: a polling confirmation, a state transition, or a submission/recovery write. This is the observation freshness the console reports ("observed Ns ago"), not a phase bound — use `started_at` and `finished_at` for that.
+       */
+      updated_at: string
+    }
+    PublicationSummary: {
       /** @enum {string} */
-      publication_status:
-        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
-      /** Format: date-time */
-      created_at: string
-      /** Format: date-time */
-      execution_updated_at: string
-      /** Format: date-time */
-      publication_updated_at: string
-      /** Format: date-time */
-      published_at: string | null
-      failure_code: string | null
-      artifact_storage: components['schemas']['ArtifactStorage']
+      status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      /**
+       * Format: date-time
+       * @description Immutable instant the publication phase began (the work was first claimed); null while it is pending, and null for `skipped`, which is concluded without ever having started. A retryable failure that returns the row to pending and claims it again does not move it.
+       */
+      started_at: string | null
+      /**
+       * Format: date-time
+       * @description Immutable instant the publication axis reached a terminal state (`published`, `failed`, or `skipped`); null while it is pending or publishing. It is set for every terminal outcome. The instant the result became visible is this field read together with `status: published`.
+       */
+      finished_at: string | null
+      /**
+       * Format: date-time
+       * @description Last time the publication axis was written, including claim heartbeats. This is the activity freshness the console reports, not a phase bound — use `started_at` and `finished_at` for that. Unlike them it keeps advancing while a long publication runs.
+       */
+      updated_at: string
     }
     ReviewRunEvent: {
       /** @description Monotonic identifier; also the tie-breaker within one occurred_at. */
@@ -207,7 +190,7 @@ export interface components {
       /** Format: date-time */
       occurred_at: string
     }
-    /** @description Durable preparation state, when the run has a preparation record. This is an operational summary only; it never exposes connector-owned preparation input. */
+    /** @description Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — the Control Plane drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary. */
     PreparationSummary: {
       /**
        * @description Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own "in progress" state and is unrelated to the Runner, which is only submitted to once preparation reaches `submitted`.
@@ -215,13 +198,21 @@ export interface components {
        */
       status: 'pending' | 'preparing' | 'submitted' | 'failed'
       attempt_count: number
-      /** Format: date-time */
-      updated_at: string
+      /**
+       * Format: date-time
+       * @description Immutable instant the preparation phase began (a preparer first claimed the work); null while it is still pending. A retry that returns the row to pending and claims it again does not move it, so it is a safe start bound for the phase.
+       */
+      started_at: string | null
+      /**
+       * Format: date-time
+       * @description Immutable instant the preparation phase reached a terminal state (`submitted` or `failed`); null while it is pending or preparing. Distinct from `updated_at`, which also moves on claim heartbeats and input checkpoints and cannot mark the phase end.
+       */
+      finished_at: string | null
       failure_code: string | null
       /** @enum {string|null} */
       failure_notice_status:
         'pending' | 'delivering' | 'delivered' | 'skipped' | null
-    } | null
+    }
     ArtifactStorage:
       | {
           /** @enum {string} */
@@ -386,7 +377,7 @@ export interface operations {
           publication_status?:
             'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
           /**
-           * @description Matches the run's redacted preparation summary by state. Runs without a preparation record are not returned by this filter.
+           * @description Matches the run's redacted preparation summary by state. Every readable run carries that summary, so the filter never has to decide what a missing one means: a stored run that lacks its preparation row is corrupt, is dropped from list reads, and therefore cannot appear under any value of this filter.
            * @enum {string}
            */
           preparation_status?: 'pending' | 'preparing' | 'submitted' | 'failed'

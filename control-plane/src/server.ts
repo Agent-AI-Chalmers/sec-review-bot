@@ -713,9 +713,14 @@ export async function startControlPlaneServer(): Promise<{
 }> {
   const token = requiredEnv('CONTROL_PLANE_SERVICE_TOKEN')
   const readToken = requiredEnv('CONTROL_PLANE_READ_TOKEN')
+  const connectorId =
+    process.env.CONNECTOR_ID?.trim() || 'github-app:default'
   const store = new ReviewRunStore({
     connectionString: requiredEnv('DATABASE_URL'),
-    connectorId: process.env.CONNECTOR_ID?.trim() || 'github-app:default'
+    connectorId,
+    // The single-run read turns an unrepresentable row into `null` (the same answer as an
+    // unknown id), so report it here; otherwise corruption would only ever surface as a 404.
+    onDroppedRunRow: (dropped) => logDroppedRunRow(connectorId, dropped)
   })
   await store.initialize()
   const configuredIntervalMs = Number.parseInt(

@@ -94,13 +94,9 @@ components:
         - workflow
         - publish_context
         - preparation
-        - runner_status
-        - submitted_at
-        - publication_status
+        - execution
+        - publication
         - created_at
-        - execution_updated_at
-        - publication_updated_at
-        - published_at
         - failure_code
         - failure_message
         - artifact_storage
@@ -129,47 +125,12 @@ components:
             - github_actions_dispatch
         ingress_key:
           type: string
-        runner_status:
-          type: string
-          enum:
-            - pending
-            - queued
-            - running
-            - uncertain
-            - succeeded
-            - skipped
-            - failed
-        submitted_at:
-          type:
-            - string
-            - "null"
-          format: date-time
-          description: >-
-            Immutable instant execution began (the prepared input was accepted and the run
-            entered queued). NULL until then, i.e. while the run is still `pending` on the
-            execution axis; preparation progress is on the separate `preparation` summary. Use
-            it, not execution_updated_at, to time execution.
-        publication_status:
-          type: string
-          enum:
-            - pending
-            - publishing
-            - published
-            - failed
-            - skipped
+        execution:
+          $ref: "#/components/schemas/ExecutionSummary"
+        publication:
+          $ref: "#/components/schemas/PublicationSummary"
         created_at:
           type: string
-          format: date-time
-        execution_updated_at:
-          type: string
-          format: date-time
-        publication_updated_at:
-          type: string
-          format: date-time
-        published_at:
-          type:
-            - string
-            - "null"
           format: date-time
         failure_code:
           type:
@@ -258,13 +219,10 @@ components:
         - run_id
         - workflow
         - publish_context
-        - runner_status
-        - submitted_at
-        - publication_status
+        - preparation
+        - execution
+        - publication
         - created_at
-        - execution_updated_at
-        - publication_updated_at
-        - published_at
         - failure_code
         - failure_message
         - artifact_storage
@@ -286,6 +244,8 @@ components:
         runner_input:
           type: object
           additionalProperties: {}
+        preparation:
+          $ref: "#/components/schemas/PreparationSummary"
         ingress_kind:
           type: string
           enum:
@@ -293,47 +253,12 @@ components:
             - github_actions_dispatch
         ingress_key:
           type: string
-        runner_status:
-          type: string
-          enum:
-            - pending
-            - queued
-            - running
-            - uncertain
-            - succeeded
-            - skipped
-            - failed
-        submitted_at:
-          type:
-            - string
-            - "null"
-          format: date-time
-          description: >-
-            Immutable instant execution began (the prepared input was accepted and the run
-            entered queued). NULL until then, i.e. while the run is still `pending` on the
-            execution axis; preparation progress is on the separate `preparation` summary. Use
-            it, not execution_updated_at, to time execution.
-        publication_status:
-          type: string
-          enum:
-            - pending
-            - publishing
-            - published
-            - failed
-            - skipped
+        execution:
+          $ref: "#/components/schemas/ExecutionSummary"
+        publication:
+          $ref: "#/components/schemas/PublicationSummary"
         created_at:
           type: string
-          format: date-time
-        execution_updated_at:
-          type: string
-          format: date-time
-        publication_updated_at:
-          type: string
-          format: date-time
-        published_at:
-          type:
-            - string
-            - "null"
           format: date-time
         failure_code:
           type:
@@ -437,13 +362,9 @@ components:
         - run_id
         - workflow
         - preparation
-        - execution_status
-        - submitted_at
-        - publication_status
+        - execution
+        - publication
         - created_at
-        - execution_updated_at
-        - publication_updated_at
-        - published_at
         - failure_code
         - artifact_storage
       properties:
@@ -458,7 +379,29 @@ components:
             - repository-review
         preparation:
           $ref: "#/components/schemas/PreparationSummary"
-        execution_status:
+        execution:
+          $ref: "#/components/schemas/ExecutionSummary"
+        publication:
+          $ref: "#/components/schemas/PublicationSummary"
+        created_at:
+          type: string
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          $ref: "#/components/schemas/ArtifactStorage"
+    ExecutionSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - started_at
+        - finished_at
+        - updated_at
+      properties:
+        status:
           type: string
           description: >-
             The Runner lifecycle, retained under its established public name. `pending` means
@@ -476,17 +419,43 @@ components:
             - succeeded
             - skipped
             - failed
-        submitted_at:
+        started_at:
           type:
             - string
             - "null"
           format: date-time
           description: >-
-            Immutable instant execution began (the prepared input was accepted and the run
-            entered queued). NULL until then, i.e. while the run is still `pending` on the
-            execution axis; preparation progress is on the separate `preparation` summary. Use
-            it, not execution_updated_at, to time execution.
-        publication_status:
+            Immutable instant the prepared Runner input was accepted and execution began; null
+            while the run is still pending, and also null for `skipped`, which is concluded
+            without ever having started. Written once, so a recovery replay does not move it.
+        finished_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant the execution axis reached a terminal state (`succeeded`,
+            `failed`, or `skipped`); null while it is pending, queued, running, or uncertain.
+            Together with `started_at` it times the phase (only when `started_at` is non-null,
+            since `skipped` has an end without a start).
+        updated_at:
+          type: string
+          format: date-time
+          description: >-
+            Last time the execution axis was written: a polling confirmation, a state
+            transition, or a submission/recovery write. This is the observation freshness the
+            console reports ("observed Ns ago"), not a phase bound — use `started_at` and
+            `finished_at` for that.
+    PublicationSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - started_at
+        - finished_at
+        - updated_at
+      properties:
+        status:
           type: string
           enum:
             - pending
@@ -494,26 +463,33 @@ components:
             - published
             - failed
             - skipped
-        created_at:
-          type: string
-          format: date-time
-        execution_updated_at:
-          type: string
-          format: date-time
-        publication_updated_at:
-          type: string
-          format: date-time
-        published_at:
+        started_at:
           type:
             - string
             - "null"
           format: date-time
-        failure_code:
+          description: >-
+            Immutable instant the publication phase began (the work was first claimed); null
+            while it is pending, and null for `skipped`, which is concluded without ever having
+            started. A retryable failure that returns the row to pending and claims it again
+            does not move it.
+        finished_at:
           type:
             - string
             - "null"
-        artifact_storage:
-          $ref: "#/components/schemas/ArtifactStorage"
+          format: date-time
+          description: >-
+            Immutable instant the publication axis reached a terminal state (`published`,
+            `failed`, or `skipped`); null while it is pending or publishing. It is set for every
+            terminal outcome. The instant the result became visible is this field read together
+            with `status: published`.
+        updated_at:
+          type: string
+          format: date-time
+          description: >-
+            Last time the publication axis was written, including claim heartbeats. This is the
+            activity freshness the console reports, not a phase bound — use `started_at` and
+            `finished_at` for that. Unlike them it keeps advancing while a long publication runs.
     ReviewRunEvent:
       type: object
       additionalProperties: false
@@ -551,17 +527,21 @@ components:
           type: string
           format: date-time
     PreparationSummary:
-      type:
-        - object
-        - "null"
+      type: object
       description: >-
-        Durable preparation state, when the run has a preparation record. This is
-        an operational summary only; it never exposes connector-owned preparation input.
+        Durable preparation state for the run's preparation axis. This is an operational
+        summary only; it never exposes connector-owned preparation input. It is not nullable:
+        admission creates a run, its preparation, and its execution in one transaction and
+        nothing deletes an axis on its own, so every readable run carries a summary. A row whose
+        preparation is missing is corrupt — the Control Plane drops it from list reads and
+        answers 404 for a single-run read, logging the fault — rather than reported with a null
+        summary.
       additionalProperties: false
       required:
         - status
         - attempt_count
-        - updated_at
+        - started_at
+        - finished_at
         - failure_code
         - failure_notice_status
       properties:
@@ -579,9 +559,24 @@ components:
         attempt_count:
           type: integer
           minimum: 0
-        updated_at:
-          type: string
+        started_at:
+          type:
+            - string
+            - "null"
           format: date-time
+          description: >-
+            Immutable instant the preparation phase began (a preparer first claimed the work);
+            null while it is still pending. A retry that returns the row to pending and claims it
+            again does not move it, so it is a safe start bound for the phase.
+        finished_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant the preparation phase reached a terminal state (`submitted` or
+            `failed`); null while it is pending or preparing. Distinct from `updated_at`, which
+            also moves on claim heartbeats and input checkpoints and cannot mark the phase end.
         failure_code:
           type:
             - string
@@ -687,7 +682,7 @@ x-state-machines:
   runner:
     order: 2
     title: Execution
-    field: execution_status
+    field: execution.status
     initial: pending
     terminal: [succeeded, skipped, failed]
     states:
@@ -741,7 +736,7 @@ x-state-machines:
   publication:
     order: 3
     title: Publication
-    field: publication_status
+    field: publication.status
     initial: pending
     terminal: [published, failed, skipped]
     states:
@@ -908,8 +903,10 @@ paths:
               preparation_status:
                 type: string
                 description: >-
-                  Matches the run's redacted preparation summary by state. Runs without a
-                  preparation record are not returned by this filter.
+                  Matches the run's redacted preparation summary by state. Every readable run
+                  carries that summary, so the filter never has to decide what a missing one
+                  means: a stored run that lacks its preparation row is corrupt, is dropped from
+                  list reads, and therefore cannot appear under any value of this filter.
                 enum:
                   - pending
                   - preparing

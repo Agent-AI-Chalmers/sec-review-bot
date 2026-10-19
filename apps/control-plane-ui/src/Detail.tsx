@@ -42,6 +42,7 @@ import {
   axisLabel,
   executionStatusLabel,
   executionTone,
+  preparationStateLabel,
   preparationTone,
   publicationStatusColor,
   publicationStatusLabel,
@@ -259,16 +260,16 @@ export function Detail(): React.JSX.Element {
   )
   const publicationIndex = 3
   const timelineActive =
-    run?.publication_status === 'pending'
+    run?.publication.status === 'pending'
       ? publicationIndex - 1
       : publicationIndex
-  // `publication_updated_at` is the publication row's `updated_at`, and that row is
-  // written when the run is admitted. It only means "the publication happened" once
-  // the publication has actually started, so never present it before then — a run
-  // that is still `pending`, or whose publication was ruled out, has no such moment.
+  // A publication timestamp only exists once the phase has begun: `publication.started_at`
+  // is written on the first claim and `publication.finished_at` when it reaches a terminal
+  // state. A run that is still `pending`, or whose publication was ruled out as `skipped`,
+  // never started, so it has no such moment to present.
   const publicationStarted =
     run !== undefined &&
-    ['publishing', 'published', 'failed'].includes(run.publication_status)
+    ['publishing', 'published', 'failed'].includes(run.publication.status)
   return (
     <Container size="lg" py="xl">
       <Button
@@ -315,13 +316,13 @@ export function Detail(): React.JSX.Element {
                 <Text c="dimmed" size="xs">
                   {t('execution')}
                 </Text>
-                <ExecutionStatus status={run.execution_status} />
+                <ExecutionStatus status={run.execution.status} />
               </Group>
               <Group gap={6} align="center">
                 <Text c="dimmed" size="xs">
                   {t('publication')}
                 </Text>
-                <PublicationStatus status={run.publication_status} />
+                <PublicationStatus status={run.publication.status} />
               </Group>
               {run.failure_code && (
                 <Group gap={6} wrap="wrap">
@@ -365,43 +366,63 @@ export function Detail(): React.JSX.Element {
                   color={statusToneColor(preparationTone(run.preparation))}
                   title={<Text fw={500}>{t('preparation')}</Text>}
                 >
-                  {run.preparation !== null && (
-                    <Text c="dimmed" size="sm">
-                      {formatDate(run.preparation.updated_at, language)} ·{' '}
-                      {t('preparationAttempts')}:{' '}
-                      {run.preparation.attempt_count}
-                      {run.preparation.failure_notice_status !== null && (
-                        <>
-                          {' · '}
-                          {t('preparationNotice')}:{' '}
-                          {failureNoticeStatusLabel(
-                            run.preparation.failure_notice_status,
-                            t
-                          )}
-                        </>
-                      )}
-                    </Text>
-                  )}
+                  {/* A pending preparation has not begun, so there is no timestamp to show and
+                      nothing to time. `started_at` is the phase start and `finished_at` its end;
+                      `updated_at` also moves on claim heartbeats and input checkpoints and so
+                      cannot time the phase. */}
+                  <Text c="dimmed" size="sm">
+                    {run.preparation.started_at === null
+                      ? preparationStateLabel(run.preparation.status, t)
+                      : formatDate(run.preparation.started_at, language)}
+                    {run.preparation.started_at !== null && (
+                      <>
+                        {' · '}
+                        {phaseElapsed(
+                          run.preparation.started_at,
+                          run.preparation.finished_at,
+                          t
+                        )}
+                      </>
+                    )}
+                    {' · '}
+                    {t('preparationAttempts')}: {run.preparation.attempt_count}
+                    {run.preparation.failure_notice_status !== null && (
+                      <>
+                        {' · '}
+                        {t('preparationNotice')}:{' '}
+                        {failureNoticeStatusLabel(
+                          run.preparation.failure_notice_status,
+                          t
+                        )}
+                      </>
+                    )}
+                  </Text>
                 </Timeline.Item>
                 <Timeline.Item
-                  bullet={statusBullet(executionTone(run.execution_status))}
-                  color={statusToneColor(executionTone(run.execution_status))}
+                  bullet={statusBullet(executionTone(run.execution.status))}
+                  color={statusToneColor(executionTone(run.execution.status))}
                   title={<Text fw={500}>{t('execution')}</Text>}
                 >
-                  {run.submitted_at === null ? (
-                    // Execution has not begun: preparation has not handed the input to the
-                    // Runner yet, so there is nothing to time.
+                  {run.execution.started_at === null ? (
+                    // Execution has not begun: either preparation has not handed the input to the
+                    // Runner yet (nothing to time), or it never will because preparation failed
+                    // and the axis was concluded as `skipped`. The latter has an end without a
+                    // start, so report when it was concluded rather than a duration it never had.
                     <Text c="dimmed" size="sm">
-                      {executionStatusLabel(run.execution_status, t)}
+                      {executionStatusLabel(run.execution.status, t)}
+                      {run.execution.finished_at !== null &&
+                        ` · ${formatDate(run.execution.finished_at, language)}`}
                     </Text>
                   ) : (
                     <Text c="dimmed" size="sm">
-                      {formatDate(run.submitted_at, language)} ·{' '}
+                      {formatDate(run.execution.started_at, language)} ·{' '}
                       {phaseElapsed(
-                        run.submitted_at,
-                        ['succeeded', 'failed'].includes(run.execution_status)
-                          ? run.execution_updated_at
-                          : null,
+                        run.execution.started_at,
+                        // The phase end is its own field, not the observation heartbeat: the two
+                        // agree for now because polling stops at a terminal state, but only
+                        // `execution_finished_at` promises it. `skipped` has an end without ever
+                        // having been submitted, so it takes the other branch above.
+                        run.execution.finished_at,
                         t
                       )}
                     </Text>
@@ -428,26 +449,32 @@ export function Detail(): React.JSX.Element {
                   )}
                 </Timeline.Item>
                 <Timeline.Item
-                  bullet={statusBullet(publicationTone(run.publication_status))}
+                  bullet={statusBullet(publicationTone(run.publication.status))}
                   color={statusToneColor(
-                    publicationTone(run.publication_status)
+                    publicationTone(run.publication.status)
                   )}
                   title={<Text fw={500}>{t('publication')}</Text>}
                 >
                   <div className="publication-summary">
                     {publicationStarted && (
                       <Text c="dimmed" size="sm">
+                        {/* The publication phase starts when the work is first claimed, not
+                            when execution ended: the gap between the two is the coordinator's
+                            polling wait and is not publishing time. `publicationStarted` above
+                            already guarantees a start and, for a terminal status, an end. */}
                         {formatDate(
-                          run.published_at ?? run.publication_updated_at,
+                          run.publication.finished_at ??
+                            run.publication.started_at ??
+                            run.created_at,
                           language
                         )}{' '}
                         ·{' '}
                         {phaseElapsed(
-                          run.execution_updated_at,
+                          run.publication.started_at ?? run.created_at,
                           ['published', 'failed', 'skipped'].includes(
-                            run.publication_status
+                            run.publication.status
                           )
-                            ? (run.published_at ?? run.publication_updated_at)
+                            ? run.publication.finished_at
                             : null,
                           t
                         )}
