@@ -8,8 +8,7 @@
     "finished_at": "2026-10-10T05:00:30.000Z",
     "updated_at": "2026-10-10T05:00:30.000Z",
     "failure_code": null,
-    "expiry_blocked_reason": null,
-    "failure_notice_status": null
+    "expiry_blocked_reason": null
   },
   "execution": {
     "status": "succeeded",
@@ -37,5 +36,6 @@
   "failure_code": null,
   "workflow_result": {
     "review_record": {}
-  }
+  },
+  "failure_notice": null
 }

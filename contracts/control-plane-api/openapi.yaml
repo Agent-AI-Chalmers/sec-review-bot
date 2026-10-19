@@ -116,6 +116,7 @@ components:
         - failure_code
         - failure_message
         - artifact_storage
+        - failure_notice
       properties:
         run_id:
           type: string
@@ -158,6 +159,14 @@ components:
             - "null"
         artifact_storage:
           $ref: "#/components/schemas/ArtifactStorage"
+        failure_notice:
+          description: |
+            Whether the requester has been told this run failed, or null when no notice exists.
+            It sits on the run rather than on an axis because any axis can end a run, and the
+            delivery status is a property of the run's whole outcome.
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/RunFailureNoticeSummary"
     ReviewRunAdmission:
       type: object
       additionalProperties: false
@@ -206,12 +215,18 @@ components:
         attempt_count:
           type: integer
           minimum: 1
-    PreparationFailureNoticeWork:
+    RunFailureNoticeWork:
+      description: |
+        One pending notice that a run failed, claimed by the component that can tell the
+        requester. Any lifecycle axis can produce one; `failure_stage` says which, so the
+        delivery side can word the reply accurately instead of always reporting that the
+        review never started.
       type: object
       additionalProperties: false
       required:
         - run_id
         - input
+        - failure_stage
         - failure_code
         - claim_token
       properties:
@@ -221,6 +236,16 @@ components:
         input:
           type: object
           additionalProperties: {}
+        failure_stage:
+          description: |
+            The axis whose failure ended the run. `preparation` means nothing ran and the
+            review never started; `execution` means the Runner ran but did not finish;
+            `publication` means the work completed but its result could not be delivered.
+          type: string
+          enum:
+            - preparation
+            - execution
+            - publication
         failure_code:
           type:
             - string
@@ -228,6 +253,33 @@ components:
         claim_token:
           type: string
           minLength: 1
+    RunFailureNoticeSummary:
+      description: |
+        Delivery state of the one acknowledgement a failed run produces.
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - failure_stage
+        - failure_code
+      properties:
+        status:
+          type: string
+          enum:
+            - pending
+            - delivering
+            - delivered
+            - failed
+        failure_stage:
+          type: string
+          enum:
+            - preparation
+            - execution
+            - publication
+        failure_code:
+          type:
+            - string
+            - "null"
     PublicationWork:
       type: object
       additionalProperties: false
@@ -402,6 +454,7 @@ components:
         - created_at
         - failure_code
         - artifact_storage
+        - failure_notice
       properties:
         run_id:
           type: string
@@ -427,6 +480,13 @@ components:
             - "null"
         artifact_storage:
           $ref: "#/components/schemas/ArtifactStorage"
+        failure_notice:
+          description: |
+            Whether the requester has been told this run failed, or null when no notice exists.
+            It sits on the run rather than on an axis because any axis can end a run.
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/RunFailureNoticeSummary"
     ExecutionSummary:
       type: object
       additionalProperties: false
@@ -594,7 +654,6 @@ components:
         - updated_at
         - failure_code
         - expiry_blocked_reason
-        - failure_notice_status
       properties:
         status:
           type: string
@@ -652,16 +711,6 @@ components:
           type:
             - string
             - "null"
-        failure_notice_status:
-          type:
-            - string
-            - "null"
-          enum:
-            - pending
-            - delivering
-            - delivered
-            - skipped
-            - null
     ArtifactStorage:
       oneOf:
         - type: object
@@ -852,32 +901,35 @@ x-state-machines:
       - { from: publishing, to: skipped, reason: PUBLICATION_ABANDONED, label: execution failed}
   # The failure-notice outbox has its own lifecycle, written to the event log on the `notice`
   # axis. It is declared like any other state machine so the contract-consistency test covers its
-  # states against `PreparationSummary.failure_notice_status`. Whether the console draws it is a
-  # presentation decision and lives in the console, not here.
+  # states against `RunFailureNoticeSummary.status`. It hangs off the run rather than off
+  # preparation because an execution or publication failure produces one too. Whether the console
+  # draws it is a presentation decision and lives in the console, not here.
   notice:
     order: 4
     title: Failure notice
-    field: preparation.failure_notice_status
+    field: failure_notice.status
     initial: pending
-    terminal: [delivered, skipped]
+    terminal: [delivered, failed]
     states:
       pending:
         label: Pending
-        description: A terminal preparation failure happened and the user still has to be told.
+        description: A run ended on some axis and the requester still has to be told.
       delivering:
         label: Delivering
-        description: The failure notice is being delivered to the user.
+        description: The failure notice is being delivered to the requester.
       delivered:
         label: Delivered
-        description: The user-visible failure notice was delivered.
-      skipped:
-        label: Skipped
-        description: No notice will be delivered for this failure.
+        description: The requester was told the run failed.
+      failed:
+        label: Delivery failed
+        description: >-
+          Delivery was attempted and did not succeed, most often because the provider could not
+          be reached. The notice is retained as the record that the requester was never told.
     transitions:
       - { from: pending, to: delivering, label: notice claimed }
       - { from: delivering, to: delivering, reason: NOTICE_LEASE_EXPIRED, label: delivery lease expired }
       - { from: delivering, to: delivered, label: notice delivered }
-      - { from: delivering, to: skipped, label: notice skipped }
+      - { from: delivering, to: failed, label: delivery failed }
 
 paths:
   /healthz:
@@ -1470,9 +1522,9 @@ paths:
           $ref: "#/components/responses/PayloadTooLarge"
         "500":
           $ref: "#/components/responses/InternalError"
-  /v1/preparation/failure-notices/claims/next:
+  /v1/run-failure-notices/claims/next:
     post:
-      operationId: claimNextPreparationFailureNotice
+      operationId: claimNextRunFailureNotice
       description: >-
         Claim one connector-owned terminal preparation-failure notice. Returns null when no
         undelivered notice is available; an expired notice claim is eligible again.
@@ -1485,15 +1537,15 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/PreparationFailureNoticeWork"
+                  - $ref: "#/components/schemas/RunFailureNoticeWork"
                   - type: "null"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
-  /v1/runs/{runId}/preparation/failure-notice/complete:
+  /v1/runs/{runId}/failure-notice/complete:
     post:
-      operationId: completePreparationFailureNotice
+      operationId: completeRunFailureNotice
       description: >-
         Complete a terminal preparation-failure notice the caller still owns. `delivered` is
         false when the connector intentionally has no user-visible target.

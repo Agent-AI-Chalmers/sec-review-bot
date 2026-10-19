@@ -523,7 +523,6 @@ export function RunStateMachines({
   events: RunEvent[]
 }): React.JSX.Element {
   const t = useMessages()
-  const notice = run.preparation.failure_notice_status
   return (
     // Collapsed by default, like History: the diagrams are reference material rather than the
     // run's own status, so they stay out of the way until the reader asks for them.
@@ -547,24 +546,7 @@ export function RunStateMachines({
             events={events}
           />
         ))}
-        {run.preparation.status === 'failed' && notice !== null && (
-          <Text className="failure-notice-line" size="xs" c="dimmed">
-            {t('failureNoticeLine')}: {noticeLabel(notice, t)}
-          </Text>
-        )}
       </div>
     </details>
   )
-}
-
-/** Localized label for the failure-notice stage, shown only on a failed preparation. */
-function noticeLabel(
-  notice: NonNullable<Run['preparation']>['failure_notice_status'],
-  t: (key: Message) => string
-): string {
-  if (notice === 'pending') return t('statusPending')
-  if (notice === 'delivering') return t('statusDelivering')
-  if (notice === 'delivered') return t('statusDelivered')
-  if (notice === 'skipped') return t('statusSkipped')
-  return ''
 }

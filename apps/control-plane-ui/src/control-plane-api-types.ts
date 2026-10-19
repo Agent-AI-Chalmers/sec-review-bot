@@ -48,6 +48,12 @@ export interface components {
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
+      /**
+       * @description Whether the requester has been told this run failed, or null when no notice exists.
+       *     It sits on the run rather than on an axis because any axis can end a run, and the
+       *     delivery status is a property of the run's whole outcome.
+       */
+      failure_notice: null | components['schemas']['RunFailureNoticeSummary']
     }
     ReviewRunAdmission: {
       record: components['schemas']['ReviewRunRecord']
@@ -65,13 +71,34 @@ export interface components {
       claim_token: string
       attempt_count: number
     }
-    PreparationFailureNoticeWork: {
+    /**
+     * @description One pending notice that a run failed, claimed by the component that can tell the
+     *     requester. Any lifecycle axis can produce one; `failure_stage` says which, so the
+     *     delivery side can word the reply accurately instead of always reporting that the
+     *     review never started.
+     */
+    RunFailureNoticeWork: {
       run_id: string
       input: {
         [key: string]: unknown
       }
+      /**
+       * @description The axis whose failure ended the run. `preparation` means nothing ran and the
+       *     review never started; `execution` means the Runner ran but did not finish;
+       *     `publication` means the work completed but its result could not be delivered.
+       * @enum {string}
+       */
+      failure_stage: 'preparation' | 'execution' | 'publication'
       failure_code: string | null
       claim_token: string
+    }
+    /** @description Delivery state of the one acknowledgement a failed run produces. */
+    RunFailureNoticeSummary: {
+      /** @enum {string} */
+      status: 'pending' | 'delivering' | 'delivered' | 'failed'
+      /** @enum {string} */
+      failure_stage: 'preparation' | 'execution' | 'publication'
+      failure_code: string | null
     }
     PublicationWork: {
       run_id: string
@@ -136,6 +163,11 @@ export interface components {
       created_at: string
       failure_code: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
+      /**
+       * @description Whether the requester has been told this run failed, or null when no notice exists.
+       *     It sits on the run rather than on an axis because any axis can end a run.
+       */
+      failure_notice: null | components['schemas']['RunFailureNoticeSummary']
     }
     ExecutionSummary: {
       /**
@@ -229,9 +261,6 @@ export interface components {
        */
       updated_at: string
       failure_code: string | null
-      /** @enum {string|null} */
-      failure_notice_status:
-        'pending' | 'delivering' | 'delivered' | 'skipped' | null
     }
     ArtifactStorage:
       | {

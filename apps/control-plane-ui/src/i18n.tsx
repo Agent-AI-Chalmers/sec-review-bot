@@ -50,6 +50,7 @@ export const messages = {
     statusPublished: 'Published',
     statusDelivering: 'Delivering',
     statusDelivered: 'Delivered',
+    statusDeliveryFailed: 'Delivery failed',
     statusSkipped: 'Skipped',
     statusUncertain: 'Uncertain',
     observedAgo: 'observed',
@@ -240,18 +241,18 @@ export const messages = {
     state_notice_delivered_label: 'Delivered',
     state_notice_delivered_desc:
       'The user-visible failure notice was delivered.',
-    state_notice_skipped_label: 'Skipped',
-    state_notice_skipped_desc: 'No notice will be delivered for this failure.',
+    state_notice_failed_label: 'Delivery failed',
+    state_notice_failed_desc:
+      'Delivery was attempted and did not succeed, usually because the provider could not be reached.',
     edge_notice_pending_delivering:
       'the failure notice was claimed for delivery',
     edge_notice_delivering_delivering:
       'the delivery lease expired, so delivery is retried',
     edge_notice_delivering_delivered:
       'the failure notice was delivered to the user',
-    edge_notice_delivering_skipped:
-      'no notice will be delivered for this failure',
+    edge_notice_delivering_failed: 'delivery was attempted and failed',
     stateMachinesTitle: 'State machines',
-    failureNoticeLine: 'Failure notice'
+    failureNotice: 'Failure notice'
   },
   zh: {
     language: '语言',
@@ -300,6 +301,7 @@ export const messages = {
     statusPublished: '已发布',
     statusDelivering: '投递中',
     statusDelivered: '已送达',
+    statusDeliveryFailed: '投递失败',
     statusSkipped: '已跳过',
     statusUncertain: '待确认',
     observedAgo: '观察到',
@@ -460,14 +462,14 @@ export const messages = {
     state_notice_delivering_desc: '正在把失败通知投递给用户。',
     state_notice_delivered_label: '已送达',
     state_notice_delivered_desc: '用户可见的失败通知已送达。',
-    state_notice_skipped_label: '已跳过',
-    state_notice_skipped_desc: '这次失败不会投递通知。',
+    state_notice_failed_label: '投递失败',
+    state_notice_failed_desc: '尝试投递但没有成功，通常是联系不上对应平台。',
     edge_notice_pending_delivering: '失败通知被领取，开始投递',
     edge_notice_delivering_delivering: '投递租约过期，重新投递',
     edge_notice_delivering_delivered: '失败通知已送达用户',
-    edge_notice_delivering_skipped: '这次失败不投递通知',
+    edge_notice_delivering_failed: '尝试投递但失败了',
     stateMachinesTitle: '状态机',
-    failureNoticeLine: '失败通知'
+    failureNotice: '失败通知'
   }
 } as const
 export type Message = keyof typeof messages.en

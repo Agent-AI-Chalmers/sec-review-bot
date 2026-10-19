@@ -306,26 +306,39 @@ export class PublicationStore {
     error: { code?: string | null; message: string },
     options: { retry?: boolean } = {}
   ): Promise<boolean> {
-    const result = await this.pool.query(
-      `
-      UPDATE publication_steps s
-      SET status=$7, claimed_by=NULL, failure_count=s.failure_count+1,
-          failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
-      FROM publications p
-      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
-        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-        AND p.status='publishing' AND p.claim_token=$4
-    `,
-      [
-        runId,
-        this.connectorId,
-        stepKey,
-        token,
-        error.code ?? null,
-        error.message,
-        options.retry === false ? 'terminal_failed' : 'failed'
-      ]
-    )
-    return result.rowCount === 1
+    const terminal = options.retry === false
+    return await transaction(this.pool, async (client) => {
+      const result = await client.query(
+        `
+        UPDATE publication_steps s
+        SET status=$7, claimed_by=NULL, failure_count=s.failure_count+1,
+            failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
+        FROM publications p
+        WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
+          AND p.run_id=s.run_id AND p.connector_id=s.connector_id
+          AND p.status='publishing' AND p.claim_token=$4
+      `,
+        [
+          runId,
+          this.connectorId,
+          stepKey,
+          token,
+          error.code ?? null,
+          error.message,
+          terminal ? 'terminal_failed' : 'failed'
+        ]
+      )
+      if (result.rowCount !== 1) return false
+      // Only a terminal step failure ends the run. A step that is going to be retried is not
+      // news for the requester yet, and announcing it would produce a reply per attempt.
+      if (terminal) {
+        await client.query(
+          `INSERT INTO run_failure_notices (run_id,connector_id,status,failure_stage,failure_code)
+           VALUES ($1,$2,'pending','publication',$3) ON CONFLICT (run_id) DO NOTHING`,
+          [runId, this.connectorId, error.code ?? null]
+        )
+      }
+      return true
+    })
   }
 }

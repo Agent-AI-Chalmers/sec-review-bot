@@ -10,8 +10,7 @@ import {
 export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
 export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
 export type PublicationWork = components['schemas']['PublicationWork']
-export type PreparationFailureNoticeWork =
-  components['schemas']['PreparationFailureNoticeWork']
+export type RunFailureNoticeWork = components['schemas']['RunFailureNoticeWork']
 export type PublicationStepRecord =
   components['schemas']['PublicationStepRecord']
 
@@ -269,21 +268,17 @@ class HttpControlPlaneClient {
     )
   }
 
-  async claimNextPreparationFailureNotice(): Promise<PreparationFailureNoticeWork | null> {
-    return await this.request(
-      'claimNextPreparationFailureNotice',
-      {},
-      undefined
-    )
+  async claimNextRunFailureNotice(): Promise<RunFailureNoticeWork | null> {
+    return await this.request('claimNextRunFailureNotice', {}, undefined)
   }
 
-  async completePreparationFailureNotice(
+  async completeRunFailureNotice(
     runId: string,
     token: string,
     delivered: boolean
   ): Promise<boolean> {
     return await this.request(
-      'completePreparationFailureNotice',
+      'completeRunFailureNotice',
       { runId },
       { token, delivered }
     )
@@ -477,8 +472,8 @@ export type ControlPlaneClient = Pick<
   | 'renewPreparationClaim'
   | 'claimNextPreparation'
   | 'checkpointPreparationInput'
-  | 'claimNextPreparationFailureNotice'
-  | 'completePreparationFailureNotice'
+  | 'claimNextRunFailureNotice'
+  | 'completeRunFailureNotice'
   | 'preparationHeartbeatIntervalMs'
   | 'renewPublicationClaim'
   | 'publicationHeartbeatIntervalMs'

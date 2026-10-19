@@ -33,6 +33,7 @@ import {
   normalizeArtifactStorage,
   type CreateReviewRunArgs,
   type PublicationStatus,
+  type ObservedRun,
   type PublicationStepRecord,
   type PreparationStatus,
   type PublicationWork,
@@ -45,7 +46,7 @@ import {
   PreparationStore,
   type PreparationExpiryBlocked,
   type PreparationExpiryResult,
-  type PreparationFailureNoticeWork,
+  type RunFailureNoticeWork,
   type PreparationWork
 } from './preparation-store.js'
 import { PublicationStore } from './publication-store.js'
@@ -70,7 +71,7 @@ export type PublishContext = JsonObject
 export type {
   PreparationExpiryBlocked,
   PreparationExpiryResult,
-  PreparationFailureNoticeWork,
+  RunFailureNoticeWork,
   PreparationWork
 } from './preparation-store.js'
 
@@ -119,9 +120,16 @@ interface ReviewRunRow {
     missing: boolean
     attempt_count: number | null
     expiry_blocked_reason: string | null
-    /** Absent (NULL) until a terminal failure queues a notice for the connector to deliver. */
-    failure_notice_status:
-      'pending' | 'delivering' | 'delivered' | 'skipped' | null
+  }
+  /** Written on any axis' terminal failure; `status` is null when no notice exists.
+   *
+   * Taken from the read contract rather than restated, so a state added to the notice machine
+   * (or one renamed, as `skipped` became `failed`) cannot leave this row type behind. */
+  failure_notice: {
+    status: NonNullable<ObservedRun['failure_notice']>['status'] | null
+    failure_stage:
+      NonNullable<ObservedRun['failure_notice']>['failure_stage'] | null
+    failure_code: string | null
   }
 }
 
@@ -183,15 +191,22 @@ const RUN_SELECT = `
       'failure_message', pr.failure_message,
       'missing', (pr.run_id IS NULL),
       'attempt_count', pr.attempt_count,
-      'expiry_blocked_reason', pr.expiry_blocked_reason,
-      'failure_notice_status', n.status
-    ) AS preparation
+      'expiry_blocked_reason', pr.expiry_blocked_reason
+    ) AS preparation,
+    -- The notice belongs to the run, not to any one axis: an execution or publication failure
+    -- queues one too, so projecting it through the preparation object would have hidden
+    -- two thirds of them.
+    json_build_object(
+      'status', n.status,
+      'failure_stage', n.failure_stage,
+      'failure_code', n.failure_code
+    ) AS failure_notice
   FROM review_runs r
   JOIN publications p ON p.run_id = r.run_id AND p.connector_id = r.connector_id
   LEFT JOIN executions e ON e.run_id = r.run_id AND e.connector_id = r.connector_id
   LEFT JOIN preparations pr
     ON pr.run_id = r.run_id AND pr.connector_id = r.connector_id
-  LEFT JOIN preparation_failure_notices n
+  LEFT JOIN run_failure_notices n
     ON n.run_id = r.run_id AND n.connector_id = r.connector_id
 `
 
@@ -258,8 +273,7 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
       // Non-null means coordination stopped retrying this run: the persisted story contradicts
       // an expiry conclusion, so it needs an operator decision. Exposed here so the condition is
       // visible on the read surface instead of only in a log line.
-      expiry_blocked_reason: preparation.expiry_blocked_reason,
-      failure_notice_status: preparation.failure_notice_status
+      expiry_blocked_reason: preparation.expiry_blocked_reason
     },
     // Each axis reports the same three instants under the same names: when it started, when it
     // finished, and (for execution) when it was last observed.
@@ -286,6 +300,18 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
       execution.artifact_storage,
       `run ${trunk.run_id}`
     ),
+    // Always present, null when no notice exists: the read contract requires the field, so a
+    // consumer never has to distinguish "never failed" from "the server forgot to send it".
+    failure_notice:
+      row.failure_notice.status === null
+        ? null
+        : {
+            // The stage is NOT NULL whenever a notice row exists, so the fallback only covers a
+            // projection the join could not fill, which cannot happen for a present row.
+            status: row.failure_notice.status,
+            failure_stage: row.failure_notice.failure_stage ?? 'preparation',
+            failure_code: row.failure_notice.failure_code
+          },
     ...(trunk.ingress_kind ? { ingress_kind: trunk.ingress_kind } : {}),
     ...(trunk.ingress_key ? { ingress_key: trunk.ingress_key } : {})
   }
@@ -642,11 +668,11 @@ export class ReviewRunStore {
     this.ready()
     await this.preparations.checkpointInput(runId, token, input)
   }
-  async claimNextPreparationFailureNotice(): Promise<PreparationFailureNoticeWork | null> {
+  async claimNextRunFailureNotice(): Promise<RunFailureNoticeWork | null> {
     this.ready()
     return await this.preparations.claimNextFailureNotice()
   }
-  async completePreparationFailureNotice(
+  async completeRunFailureNotice(
     runId: string,
     token: string,
     delivered: boolean
@@ -1186,6 +1212,14 @@ export class ReviewRunStore {
         ]
       )
       if (run.rowCount !== 1) return false
+      // A terminal execution failure ends the run, so the requester is told about it. The notice is
+      // keyed by the run rather than by preparation: this failure is not a preparation failure,
+      // and leaving it unannounced meant a run could stop partway with no reply ever posted.
+      await client.query(
+        `INSERT INTO run_failure_notices (run_id,connector_id,status,failure_stage,failure_code)
+         VALUES ($1,$2,'pending','execution',$3) ON CONFLICT (run_id) DO NOTHING`,
+        [runId, this.connectorId, error.code ?? null]
+      )
       // A terminal Runner failure has no result to publish. Keep the publication row only as the
       // durable declaration that publication is not applicable, converging an in-flight one too.
       const fromStatus = await abandonInFlightPublication(

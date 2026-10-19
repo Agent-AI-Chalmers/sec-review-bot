@@ -23,7 +23,7 @@ import {
   classifyPreparationFailure,
   InvalidPreparationInputError
 } from './preparation-failure.js'
-import { sendPreparationTerminalReply } from './preparation-terminal-reply.js'
+import { sendRunFailureReply } from './run-failure-reply.js'
 
 interface PreparationCoordinator {
   stop: () => Promise<void>
@@ -180,14 +180,14 @@ async function executeClaimedPreparation({
   )
 }
 
-async function deliverNextPreparationFailureNotice({
+async function deliverNextRunFailureNotice({
   app,
   store
 }: {
   app: App
   store: ControlPlaneClient
 }): Promise<boolean> {
-  const notice = await store.claimNextPreparationFailureNotice()
+  const notice = await store.claimNextRunFailureNotice()
   if (notice === null) return false
   try {
     const input = requireRecord(notice.input, 'object')
@@ -201,15 +201,21 @@ async function deliverNextPreparationFailureNotice({
     const delivered =
       repo === null
         ? false
-        : await sendPreparationTerminalReply(
+        : await sendRunFailureReply(
             (await installationOctokitForRepo(app, repo)) as never,
             {
               run_id: notice.run_id,
               input,
-              failure_code: notice.failure_code ?? 'PREPARATION_FAILED'
+              failure_stage: notice.failure_stage,
+              // A notice always names the stage; only the reason can be missing. The fallback
+              // keeps the reply readable without inventing a preparation failure for a run that
+              // actually failed later.
+              failure_code:
+                notice.failure_code ??
+                `${notice.failure_stage.toUpperCase()}_FAILED`
             }
           )
-    await store.completePreparationFailureNotice(
+    await store.completeRunFailureNotice(
       notice.run_id,
       notice.claim_token,
       delivered
@@ -240,7 +246,7 @@ export async function prepareReviewRunsOnce({
 }): Promise<boolean> {
   if (
     preferFailureNotice &&
-    (await deliverNextPreparationFailureNotice({ app, store }))
+    (await deliverNextRunFailureNotice({ app, store }))
   )
     return true
   const work = await store.claimNextPreparation()
@@ -285,7 +291,7 @@ export async function prepareReviewRunsOnce({
   // so this fallback never becomes a hot retry loop.
   return preferFailureNotice
     ? false
-    : await deliverNextPreparationFailureNotice({ app, store })
+    : await deliverNextRunFailureNotice({ app, store })
 }
 
 export function startPreparationCoordinator({

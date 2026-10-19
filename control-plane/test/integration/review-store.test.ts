@@ -98,7 +98,7 @@ test('an axis row cannot be written under a connector the trunk does not own', a
 
 test('the failure-notice outbox is fenced to the connector that owns its preparation', async () => {
   // The notice is read by joining on connector_id, so a row stored under another connector would
-  // make `failure_notice_status` read as null — a notice that exists but is never delivered, with
+  // make the run report no notice — a notice that exists but is never delivered, with
   // nothing to show it went wrong.
   const store = new ReviewRunStore({
     connectionString: databaseUrl(),
@@ -121,37 +121,31 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
     })
     // Clear the real notice so the insert below cannot fail on the primary key; the connector is
     // then the only thing left that can reject it.
-    await pool.query(
-      'DELETE FROM preparation_failure_notices WHERE run_id=$1',
-      [runId]
-    )
+    await pool.query('DELETE FROM run_failure_notices WHERE run_id=$1', [runId])
     await assert.rejects(
       pool.query(
-        `INSERT INTO preparation_failure_notices (run_id, connector_id, status)
-         VALUES ($1, 'intruder', 'pending')`,
+        `INSERT INTO run_failure_notices (run_id, connector_id, status, failure_stage)
+         VALUES ($1, 'intruder', 'pending', 'preparation')`,
         [runId]
       ),
       /violates foreign key constraint/,
-      'a notice must not name a connector its preparation does not belong to'
+      'a notice must not name a connector its run does not belong to'
     )
 
     // The reason this matters: the notice is joined on connector_id, so a row under another
-    // connector is simply not found and `failure_notice_status` reads as null — a notice that
+    // connector is simply not found and the notice reads as absent — a notice that
     // exists, is never delivered, and leaves nothing visible to explain why. Asserting the
     // symptom, not just the rejection, is what makes the constraint's purpose checkable.
-    await pool.query(
-      'DELETE FROM preparation_failure_notices WHERE run_id=$1',
-      [runId]
-    )
+    await pool.query('DELETE FROM run_failure_notices WHERE run_id=$1', [runId])
     await pool
       .query(
-        `INSERT INTO preparation_failure_notices (run_id, connector_id, status)
-         VALUES ($1, 'intruder', 'pending')`,
+        `INSERT INTO run_failure_notices (run_id, connector_id, status, failure_stage)
+         VALUES ($1, 'intruder', 'pending', 'preparation')`,
         [runId]
       )
       .catch(() => undefined)
     const stored = await pool.query(
-      'SELECT connector_id FROM preparation_failure_notices WHERE run_id=$1',
+      'SELECT connector_id FROM run_failure_notices WHERE run_id=$1',
       [runId]
     )
     assert.strictEqual(
@@ -160,7 +154,7 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
       'the wrong-connector notice was never stored'
     )
     assert.strictEqual(
-      (await store.getRun(runId))?.preparation?.failure_notice_status,
+      (await store.getRun(runId))?.failure_notice,
       null,
       'and so the run reports no notice rather than a phantom one'
     )

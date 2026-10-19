@@ -20,6 +20,9 @@ import type {
 /** One coordination state transition, as the read endpoint reports it. */
 export type ReviewRunEvent = components['schemas']['ReviewRunEvent']
 
+/** A queued failure acknowledgement, as the connector receives it. */
+export type RunFailureNoticeWork = components['schemas']['RunFailureNoticeWork']
+
 export type {
   ObservedRun,
   ObservedStep,

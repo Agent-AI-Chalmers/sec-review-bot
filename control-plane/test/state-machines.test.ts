@@ -29,8 +29,14 @@ function enumFor(spec: Spec, field: string): string[] {
   // are not inlined here; resolve the ref to the component it names.
   if (field.includes('.')) {
     const [axis, key = ''] = field.split('.')
-    const ref = props[axis as string] as { $ref?: string } | undefined
-    const target = ref?.$ref?.replace('#/components/schemas/', '')
+    // The member may be declared directly as a `$ref`, or (for an optional object such as the
+    // failure notice) as a `oneOf` that admits null alongside the ref. Resolve either form to the
+    // component it names, so the machine is still checked against the real enum.
+    const node = props[axis as string] as
+      { $ref?: string; oneOf?: Array<{ $ref?: string }> } | undefined
+    const target = (
+      node?.$ref ?? node?.oneOf?.find((entry) => entry.$ref !== undefined)?.$ref
+    )?.replace('#/components/schemas/', '')
     const summary = spec.components?.schemas?.[target ?? ''] as
       { properties?: Record<string, { enum?: unknown }> } | undefined
     return asEnum(summary?.properties?.[key]?.enum, field)

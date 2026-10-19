@@ -43,6 +43,7 @@ import {
   PreparationStatus,
   PublicationStatus,
   failureNoticeStatusLabel,
+  failureStageLabel,
   type PublicationStepStatus,
   artifactStatusColor,
   artifactStatusLabel,
@@ -602,16 +603,6 @@ export function Detail(): React.JSX.Element {
                     )}
                     {' · '}
                     {t('preparationAttempts')}: {run.preparation.attempt_count}
-                    {run.preparation.failure_notice_status !== null && (
-                      <>
-                        {' · '}
-                        {t('preparationNotice')}:{' '}
-                        {failureNoticeStatusLabel(
-                          run.preparation.failure_notice_status,
-                          t
-                        )}
-                      </>
-                    )}
                   </Text>
                 </Timeline.Item>
                 <Timeline.Item
@@ -767,6 +758,21 @@ export function Detail(): React.JSX.Element {
                   )}
                 </Timeline.Item>
               </Timeline>
+              {run.failure_notice != null && (
+                // On the run, not on the preparation timeline: any axis can end a run, so
+                // showing this under `preparation` presented an execution or publication
+                // failure as though preparation had caused it.
+                <Text
+                  className="failure-notice-line"
+                  size="xs"
+                  c="dimmed"
+                  data-testid="failure-notice"
+                >
+                  {t('failureNotice')} (
+                  {failureStageLabel(run.failure_notice.failure_stage, t)}):{' '}
+                  {failureNoticeStatusLabel(run.failure_notice.status, t)}
+                </Text>
+              )}
               <RunStateMachines run={run} events={events} />
               {events.length > 0 && (
                 // A native disclosure keeps this operator detail out of the way until asked

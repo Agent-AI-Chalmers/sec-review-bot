@@ -18,7 +18,7 @@ export {
   type PublicationStepRecord,
   type PublicationWork,
   type PreparationWork,
-  type PreparationFailureNoticeWork,
+  type RunFailureNoticeWork,
   type PublishContext,
   type ReviewRunAdmission,
   type ReviewRunRecord,

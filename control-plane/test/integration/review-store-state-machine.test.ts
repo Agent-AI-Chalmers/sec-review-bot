@@ -420,7 +420,7 @@ test('a failure notice reports the reason captured when it was created', async (
       code: 'REVIEW_START_FAILED',
       message: 'preparation could not start'
     })
-    const notice = await store.claimNextPreparationFailureNotice()
+    const notice = await store.claimNextRunFailureNotice()
     assert.ok(notice)
     assert.strictEqual(notice.failure_code, 'REVIEW_START_FAILED')
 
@@ -446,14 +446,14 @@ test('a failure notice reports the reason captured when it was created', async (
     const pool2 = new Pool({ connectionString: requireTestDatabase() })
     try {
       await pool2.query(
-        `UPDATE preparation_failure_notices
+        `UPDATE run_failure_notices
            SET status='pending', claim_token=NULL, claimed_at=NULL WHERE run_id=$1`,
         [runId]
       )
     } finally {
       await pool2.end()
     }
-    const reclaimed = await store.claimNextPreparationFailureNotice()
+    const reclaimed = await store.claimNextRunFailureNotice()
     assert.ok(reclaimed)
     assert.strictEqual(
       reclaimed.failure_code,
@@ -481,7 +481,7 @@ test('ReviewRunStore returns an expired preparation to pending without failing i
     assert.strictEqual(run?.failure_code, null)
     assert.strictEqual(run?.preparation?.status, 'pending')
     assert.strictEqual(run?.preparation?.attempt_count, 1)
-    assert.strictEqual(run?.preparation?.failure_notice_status, null)
+    assert.strictEqual(run?.failure_notice, null)
     assert.strictEqual(await store.claimPublication(runId), null)
     assert.strictEqual((await store.expireStalePreparations()).concluded, 0)
   } finally {
@@ -513,43 +513,41 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
         status: run?.preparation?.status,
         attempt_count: run?.preparation?.attempt_count,
         failure_code: run?.preparation?.failure_code,
-        failure_notice_status: run?.preparation?.failure_notice_status
+        notice_status: run?.failure_notice?.status,
+        notice_stage: run?.failure_notice?.failure_stage
       },
       {
         status: 'failed',
         attempt_count: 8,
         failure_code: 'PREPARATION_RETRY_EXHAUSTED',
-        failure_notice_status: 'pending'
+        notice_status: 'pending',
+        notice_stage: 'preparation'
       }
     )
     assert.strictEqual(await store.claimNextPreparation(), null)
     assert.strictEqual(await store.claimPublication(runId), null)
-    const notice = await store.claimNextPreparationFailureNotice()
+    const notice = await store.claimNextRunFailureNotice()
     assert.ok(notice)
     assert.strictEqual(notice.run_id, runId)
     assert.deepStrictEqual(notice.input, {})
     assert.strictEqual(notice.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
     assert.strictEqual(
-      (await store.getRun(runId))?.preparation?.failure_notice_status,
+      (await store.getRun(runId))?.failure_notice?.status,
       'delivering'
     )
     assert.strictEqual(
-      await store.completePreparationFailureNotice(runId, randomUUID(), true),
+      await store.completeRunFailureNotice(runId, randomUUID(), true),
       false
     )
     assert.strictEqual(
-      await store.completePreparationFailureNotice(
-        runId,
-        notice.claim_token,
-        true
-      ),
+      await store.completeRunFailureNotice(runId, notice.claim_token, true),
       true
     )
     assert.strictEqual(
-      (await store.getRun(runId))?.preparation?.failure_notice_status,
+      (await store.getRun(runId))?.failure_notice?.status,
       'delivered'
     )
-    assert.strictEqual(await store.claimNextPreparationFailureNotice(), null)
+    assert.strictEqual(await store.claimNextRunFailureNotice(), null)
   } finally {
     await observer.end()
     await store.close()
@@ -575,15 +573,15 @@ test('re-claiming an expired notice records delivering -> delivering, not pendin
     )
     await store.expireStalePreparations()
 
-    const first = await store.claimNextPreparationFailureNotice()
+    const first = await store.claimNextRunFailureNotice()
     assert.ok(first)
     // Expire its lease, then claim again: the notice was already `delivering`.
     await observer.query(
-      `UPDATE preparation_failure_notices SET claimed_at=clock_timestamp()-interval '1 hour'
+      `UPDATE run_failure_notices SET claimed_at=clock_timestamp()-interval '1 hour'
        WHERE run_id=$1`,
       [runId]
     )
-    const second = await store.claimNextPreparationFailureNotice()
+    const second = await store.claimNextRunFailureNotice()
     assert.ok(second)
 
     const noticeEvents = (await store.listEvents(runId)).filter(
@@ -632,8 +630,8 @@ test('concurrent failure notice consumers cannot own the same outbox work', asyn
     assert.strictEqual((await producer.expireStalePreparations()).concluded, 1)
 
     const claims = await Promise.all([
-      first.claimNextPreparationFailureNotice(),
-      second.claimNextPreparationFailureNotice()
+      first.claimNextRunFailureNotice(),
+      second.claimNextRunFailureNotice()
     ])
     assert.strictEqual(claims.filter((claim) => claim !== null).length, 1)
   } finally {
@@ -1349,6 +1347,123 @@ test('ReviewRunStore records Runner execution failure without publication failur
     assert.strictEqual(record?.execution.status, 'failed')
     assert.strictEqual(record?.failure_code, 'RUNNER_EXECUTION_FAILED')
     assert.strictEqual(await store.claimPublication(runId), null)
+
+    // An execution failure ends the run, so the requester has to be told. The notice names the
+    // axis that failed, because the reply says the review started but could not finish rather
+    // than claiming it never started.
+    const notice = await store.claimNextRunFailureNotice()
+    assert.notStrictEqual(notice, null)
+    assert.strictEqual(notice?.run_id, runId)
+    assert.strictEqual(notice?.failure_stage, 'execution')
+    assert.strictEqual(notice?.failure_code, 'RUNNER_EXECUTION_FAILED')
+    assert.strictEqual(
+      await store.completeRunFailureNotice(
+        runId,
+        notice?.claim_token ?? '',
+        true
+      ),
+      true
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('ReviewRunStore records an undeliverable notice as failed, not skipped', async () => {
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = await createQueuedRun(store)
+  try {
+    assert.strictEqual(
+      await store.failRunnerExecution(runId, {
+        code: 'RUNNER_EXECUTION_FAILED',
+        message: 'Agent execution failed.'
+      }),
+      true
+    )
+    const notice = await store.claimNextRunFailureNotice()
+    assert.ok(notice)
+    // The connector could not reach the provider. That is a failed delivery, not a decision to
+    // skip one, and the two must not share a state: an operator reading `skipped` would think
+    // nothing was attempted.
+    assert.strictEqual(
+      await store.completeRunFailureNotice(runId, notice.claim_token, false),
+      true
+    )
+    assert.strictEqual(
+      (await store.getRun(runId))?.failure_notice?.status,
+      'failed'
+    )
+    // The notice stays terminal: nothing retries it, by design. Reaching the provider is an
+    // operator problem, not one this loop can solve by trying again.
+    assert.strictEqual(await store.claimNextRunFailureNotice(), null)
+  } finally {
+    await store.close()
+  }
+})
+
+test('ReviewRunStore announces only a publication failure that ends the run', async () => {
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await store.initializePublicationSteps(runId, token, [
+      'issue:summary-comment'
+    ])
+    await store.requirePublicationStepClaim(
+      runId,
+      token,
+      'issue:summary-comment'
+    )
+    // A step that will be retried is not yet news for the requester: announcing it would post a
+    // reply per attempt for a run that may still succeed.
+    assert.strictEqual(
+      await store.failPublicationStep(
+        runId,
+        token,
+        'issue:summary-comment',
+        { code: 'GITHUB_RATE_LIMITED', message: 'slow down' },
+        { retry: true }
+      ),
+      true
+    )
+    assert.strictEqual(
+      await store.failPublication(
+        runId,
+        token,
+        { message: 'slow down' },
+        { retry: true }
+      ),
+      true
+    )
+    assert.strictEqual(
+      await store.claimNextRunFailureNotice(),
+      null,
+      'a retryable step failure must not produce a notice'
+    )
+
+    // The same step failing for a reason that cannot be retried ends the run, so it does.
+    const terminalToken = await store.claimPublication(runId)
+    assert.ok(terminalToken)
+    await store.requirePublicationStepClaim(
+      runId,
+      terminalToken,
+      'issue:summary-comment'
+    )
+    assert.strictEqual(
+      await store.failPublicationStep(
+        runId,
+        terminalToken,
+        'issue:summary-comment',
+        { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
+        { retry: false }
+      ),
+      true
+    )
+    const notice = await store.claimNextRunFailureNotice()
+    assert.strictEqual(notice?.run_id, runId)
+    assert.strictEqual(notice?.failure_stage, 'publication')
+    assert.strictEqual(notice?.failure_code, 'GITHUB_VALIDATION_REJECTED')
   } finally {
     await store.close()
   }
@@ -1962,7 +2077,7 @@ test('an exhausted preparation keeps the last real failure reason instead of the
       'pending->skipped'
     ])
 
-    const notice = await store.claimNextPreparationFailureNotice()
+    const notice = await store.claimNextRunFailureNotice()
     assert.ok(notice)
     assert.strictEqual(notice.failure_code, 'GITHUB_RATE_LIMITED')
   } finally {
@@ -1991,7 +2106,7 @@ test('a preparation failure with no recorded reason still reports the exhaustion
     )
     await store.expireStalePreparations()
 
-    const notice = await store.claimNextPreparationFailureNotice()
+    const notice = await store.claimNextRunFailureNotice()
     assert.ok(notice)
     assert.strictEqual(notice.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
   } finally {

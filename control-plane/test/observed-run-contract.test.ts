@@ -139,8 +139,7 @@ function recordWith(
       finished_at: '2026-01-01T00:00:30.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
-      expiry_blocked_reason: null,
-      failure_notice_status: null
+      expiry_blocked_reason: null
     },
     // The fixtures describe states the store can actually produce. `succeeded` means the
     // execution ran and ended, and `published` means the publication started and ended; a
@@ -162,6 +161,7 @@ function recordWith(
     failure_code: null,
     failure_message: null,
     artifact_storage: artifactStorage,
+    failure_notice: null,
     runner_input: { must: 'not leak' },
     publish_context: { repository: 'octo/example' }
   } as ReviewRunRecord

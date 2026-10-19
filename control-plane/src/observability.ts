@@ -17,7 +17,10 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
     failure_code: run.failure_code,
     // `artifact_storage` is already normalized to the discriminated union in
     // `rowToRecord`, so it passes through unchanged here.
-    artifact_storage: run.artifact_storage
+    artifact_storage: run.artifact_storage,
+    // Whether the requester has been told is an operator concern, not connector-owned state, so
+    // it survives redaction. It reports the axis and reason, never the delivery internals.
+    failure_notice: run.failure_notice
   }
 }
 

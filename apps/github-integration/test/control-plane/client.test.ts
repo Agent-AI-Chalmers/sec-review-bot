@@ -20,8 +20,7 @@ const preparingRun: ReviewRunRecord = {
     finished_at: '2026-01-01T00:00:02.000Z',
     updated_at: '2026-01-01T00:00:03.000Z',
     failure_code: null,
-    expiry_blocked_reason: null,
-    failure_notice_status: null
+    expiry_blocked_reason: null
   },
   execution: {
     status: 'pending',
@@ -39,6 +38,7 @@ const preparingRun: ReviewRunRecord = {
   failure_code: null,
   failure_message: null,
   artifact_storage: null,
+  failure_notice: null,
   ingress_kind: 'github_actions_dispatch',
   ingress_key: 'octo/example:dispatch-1'
 }

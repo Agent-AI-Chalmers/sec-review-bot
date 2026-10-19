@@ -39,21 +39,21 @@ Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Pla
 
 重复接纳一个已经见过的 ingress 身份是一次只读重放：它返回既有的 run，不会去 claim 它的 preparation。接纳时创建的 preparation 行是 `preparing`，只由最初的接纳方持有，因此在中途崩溃的进程是靠租约过期恢复的，而不是靠重放请求。在默认 claim 超时下，这意味着一次重放最多要等十分钟才能推进——所以客户端不能把"请求返回了"当成"工作已继续"。
 
-如果 Runner submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。Preparation 或 Runner 的终态失败会将 publication 标为 `skipped`。终态 preparation 失败还会创建 connector 所有的 notice work，因此即使原 preparation owner 已崩溃，connector 仍可告知用户。
+如果 Runner submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。Preparation 或 Runner 的终态失败会将 publication 标为 `skipped`。任一轴的终态失败都会创建 connector 所有的 notice work，因此即使观察到失败的进程已崩溃，connector 仍可告知用户；notice 会记录失败发生在哪一轴，回复便可说明 run 实际走到了哪一步。
 
 ## 持久化模型
 
 run 主干和三条生命周期轴分别存放在不同的表中。`review_runs` 只保存被接纳的身份；每条轴各自保存自己的状态和输入：
 
-| 表                            | 职责                                 | 状态                                                                          |
-| ----------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
-| `review_runs`                 | 所有轴共享的接纳身份（没有更新路径） | —                                                                             |
-| `preparations`                | 可领取的 input preparation           | `pending`、`preparing`、`submitted`、`failed`                                 |
-| `preparation_failure_notices` | connector 所有的终态失败确认         | `pending`、`delivering`、`delivered`、`skipped`                               |
-| `executions`                  | Runner 提交、观察和终态结果          | `pending`、`queued`、`running`、`uncertain`、`succeeded`、`skipped`、`failed` |
-| `publications`                | 整体发布的所有权和结果               | `pending`、`publishing`、`published`、`failed`、`skipped`                     |
-| `publication_steps`           | 可恢复的单个 connector 副作用        | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`                |
-| `review_run_events`           | 每条轴状态转换的只追加审计日志       | —                                                                             |
+| 表                    | 职责                                 | 状态                                                                          |
+| --------------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
+| `review_runs`         | 所有轴共享的接纳身份（没有更新路径） | —                                                                             |
+| `preparations`        | 可领取的 input preparation           | `pending`、`preparing`、`submitted`、`failed`                                 |
+| `run_failure_notices` | connector 所有的 run 失败确认        | `pending`、`delivering`、`delivered`、`skipped`                               |
+| `executions`          | Runner 提交、观察和终态结果          | `pending`、`queued`、`running`、`uncertain`、`succeeded`、`skipped`、`failed` |
+| `publications`        | 整体发布的所有权和结果               | `pending`、`publishing`、`published`、`failed`、`skipped`                     |
+| `publication_steps`   | 可恢复的单个 connector 副作用        | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`                |
+| `review_run_events`   | 每条轴状态转换的只追加审计日志       | —                                                                             |
 
 ```mermaid
 flowchart LR
@@ -100,7 +100,7 @@ flowchart LR
 
 ## Claim 和恢复
 
-Preparation、submission recovery、publication、publication step 提交和终态 preparation notice 都使用 claim token 隔离过期 owner。Input preparation 活跃期间，GitHub integration 会续租 preparation claim。过期的 preparation 通常会回到 `pending`；在有限重试预算耗尽后，它会使 run 失败、跳过 publication，并创建持久化的 connector notice work。超时 owner 可以完成已发出的外部请求，但在新 owner 获得 token 后不能再提交状态。
+Preparation、submission recovery、publication、publication step 提交和 run 失败 notice 都使用 claim token 隔离过期 owner。Input preparation 活跃期间，GitHub integration 会续租 preparation claim。过期的 preparation 通常会回到 `pending`；在有限重试预算耗尽后，它会使 run 失败、跳过 publication，并创建持久化的 connector notice work。超时 owner 可以完成已发出的外部请求，但在新 owner 获得 token 后不能再提交状态。
 
 过期处理按 run 隔离。如果某个 run 的持久化状态与过期结论自相矛盾——`preparing` 租约已过期，但 execution 早已离开 `pending`——那么结论一旦写入就会覆盖 Runner 的真实结果。这类行会被回滚、打上 `expiry_blocked_reason` 标记（当前只有 `EXECUTION_ALREADY_ADVANCED`）并记录 `control_plane_preparation_expiry_blocked` 事件，后续每一轮协调都会跳过它，而不是反复重试一个必然失败的转换。其余 run 的协调不受影响；这个标记就是交给运维修复该矛盾的信号，只有把 run 修复到前后一致后才会被清除。
 
@@ -130,7 +130,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 service token 用于协调 run 的各个组件，read token 用于脱敏读取，第三个可选的 admin token 用于 `/v1/admin` 下的运维面。三者刻意不构成包含关系：持有 service token 无法访问 admin 路由，admin token 也不能接纳 run 或让 run 走正常生命周期。只有在配置了 `CONTROL_PLANE_ADMIN_TOKEN` 时 `/v1/admin` 才存在——否则这些路径返回 404 而不是 401，因此未配置的部署不会暴露任何运维面。查看 blocked-preparation 队列只需要 read token，因为"知道某个 run 卡住了"并不属于特权；只有"决定放弃它"才需要 admin token。
 
-查询响应以形状一致的三组嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at`、`finished_at` 与 `updated_at` —— 后者表示该轴最后一次被写入的时间，是界面展示的活动新鲜度，刻意不用作阶段边界。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code` / `failure_notice_status`，但绝不包含其 opaque input、claim token 或 connector identity。列表端点通过查询参数沿三条轴筛选（`preparation_status`、`execution_status` 与 `publication_status`；参数名沿用既有拼写）；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是读取契约。
+查询响应以形状一致的三组嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at`、`finished_at` 与 `updated_at` —— 后者表示该轴最后一次被写入的时间，是界面展示的活动新鲜度，刻意不用作阶段边界。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code`，但绝不包含其 opaque input、claim token 或 connector identity。用户是否已被告知 run 失败，只在 run 上以 `failure_notice` 报告一次，因为任一轴都可能结束一个 run。列表端点通过查询参数沿三条轴筛选（`preparation_status`、`execution_status` 与 `publication_status`；参数名沿用既有拼写）；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是读取契约。
 
 `/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Control Plane healthcheck。Runner 与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
 

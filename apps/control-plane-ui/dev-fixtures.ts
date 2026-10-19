@@ -16,7 +16,7 @@ type ExecutionStatus =
 type PublicationStatus =
   'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
 type PreparationStatus = 'pending' | 'preparing' | 'submitted' | 'failed'
-type NoticeStage = 'pending' | 'delivering' | 'delivered' | 'skipped'
+type NoticeStage = 'pending' | 'delivering' | 'delivered' | 'failed'
 type ArtifactStatus = 'available' | 'unavailable' | 'failed'
 type StepStatus =
   'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
@@ -36,8 +36,13 @@ interface FixtureRun {
     updated_at: string
     failure_code: string | null
     expiry_blocked_reason: string | null
-    failure_notice_status: NoticeStage | null
   }
+  /** Null until a terminal failure queues a connector acknowledgement. */
+  failure_notice: {
+    status: NoticeStage
+    failure_stage: 'preparation' | 'execution' | 'publication'
+    failure_code: string | null
+  } | null
   execution: {
     status: ExecutionStatus
     started_at: string | null
@@ -271,8 +276,8 @@ const SCENARIOS: readonly Scenario[] = [
   },
   // A run whose preparation exhausted its retries fails before execution, so the publication
   // is skipped. The failure-notice outbox is what the connector eventually delivers to the
-  // user, and it walks pending -> delivering -> delivered (or `skipped` when a notice is ruled
-  // out); each stage is a distinct operational moment, so each gets its own scenario. The
+  // user, and it walks pending -> delivering -> delivered (or `failed` when delivery could not
+  // complete); each stage is a distinct operational moment, so each gets its own scenario. The
   // state and the notice stage are the only free choices here; the attempt count and failure
   // code are derived, so an exhausted preparation cannot be written as "attempted once".
   {
@@ -317,7 +322,7 @@ const SCENARIOS: readonly Scenario[] = [
     publicationMs: 601_000,
     step: null,
     preparation_status: 'failed',
-    preparation_notice: 'skipped'
+    preparation_notice: 'failed'
   },
   {
     // A freshly queued run: a plain in-flight state with no failure branch.
@@ -484,13 +489,13 @@ function eventsFor(run: FixtureRun): Array<{
       push('execution', 'pending', 'skipped', run.execution.updated_at)
     )
   }
-  if (run.preparation?.failure_notice_status) {
+  if (run.failure_notice != null) {
     // The outbox has its own lifecycle, and the history must show the same edges the store
-    // writes: a notice is claimed (`pending -> delivering`) before it is delivered or skipped.
+    // writes: a notice is claimed (`pending -> delivering`) before it is delivered or fails.
     // Emitting only `null -> pending -> <final>` would hide the claim and teach the diagram an
     // edge that does not exist.
     const noticeAt = run.preparation.finished_at ?? run.created_at
-    const stage = run.preparation.failure_notice_status
+    const stage = run.failure_notice.status
     events.push(push('notice', null, 'pending', noticeAt))
     if (stage !== 'pending') {
       events.push(push('notice', 'pending', 'delivering', noticeAt))
@@ -562,9 +567,7 @@ function preparationFor(
     // Set by the derivation below, not by a scenario: a blocked run is not a lifecycle stage, it
     // is an operator queue entry, and adding it as a scenario would shift every other run's
     // (scenario, workflow) pairing.
-    expiry_blocked_reason: null,
-    failure_notice_status:
-      status === 'failed' ? scenario.preparation_notice : null
+    expiry_blocked_reason: null
   }
 }
 
@@ -728,17 +731,29 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   // `preparation_notice` is only meaningful while preparation is failed, exactly as `step`
   // is only meaningful once a publication has started: a scenario may name either without
   // the other, so the pairing is checked here rather than in the type.
-  if (
-    preparation.status === 'failed' &&
-    preparation.failure_notice_status === null
-  ) {
-    fail('a failed preparation names the stage its failure notice reached')
+  // A notice is queued by whichever axis ended the run, so the pairing is with the run being
+  // over, not with preparation having failed. A run whose execution failed carries an execution
+  // notice even though its preparation completed normally.
+  const failedAxis =
+    preparation.status === 'failed'
+      ? 'preparation'
+      : execution === 'failed'
+        ? 'execution'
+        : null
+  if (failedAxis !== null && run.failure_notice === null) {
+    fail(
+      'a run that failed on an axis names the stage its failure notice reached'
+    )
+  }
+  if (failedAxis === null && run.failure_notice !== null) {
+    fail('only a run that failed on some axis has a failure notice')
   }
   if (
-    preparation.status !== 'failed' &&
-    preparation.failure_notice_status !== null
+    run.failure_notice !== null &&
+    failedAxis !== null &&
+    run.failure_notice.failure_stage !== failedAxis
   ) {
-    fail('only a failed preparation has a failure notice')
+    fail('a failure notice names the axis that actually failed')
   }
   if (
     preparation.status === 'submitted' &&
@@ -872,6 +887,35 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   }
 }
 
+/** The acknowledgement a terminal failure queues, for whichever axis failed.
+ *
+ * Publication failures are excluded deliberately: a run whose result could not be delivered is
+ * still `failed` on that axis, but the fixture's scenario table does not distinguish "the step
+ * failed" from "the run is over", and guessing would put a notice on runs the real store would
+ * leave alone.
+ */
+function failureNoticeFor(
+  scenario: Scenario,
+  preparation: { status: PreparationStatus; failure_code: string | null },
+  execution: ExecutionStatus
+): FixtureRun['failure_notice'] {
+  if (preparation.status === 'failed' && scenario.preparation_notice !== null) {
+    return {
+      status: scenario.preparation_notice,
+      failure_stage: 'preparation',
+      failure_code: preparation.failure_code
+    }
+  }
+  if (execution === 'failed') {
+    return {
+      status: 'pending',
+      failure_stage: 'execution',
+      failure_code: scenario.failure_code
+    }
+  }
+  return null
+}
+
 const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
   const scenario = SCENARIOS[index % SCENARIOS.length]!
   // Rotate the workflow offset as scenarios advance, so every (scenario, workflow) pair occurs
@@ -929,13 +973,15 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
   const publicationStartedAt = publicationStarted
     ? Math.round((executionUpdatedAt + publicationUpdatedAt) / 2)
     : null
+  const preparation = preparationFor(scenario, createdAt)
+  const execution = scenario.execution_status
   return {
     run_id,
     workflow,
-    preparation: preparationFor(scenario, createdAt),
+    preparation,
     created_at: iso(createdAt),
     execution: {
-      status: scenario.execution_status,
+      status: execution,
       started_at: submittedAt === null ? null : iso(submittedAt),
       finished_at: executionFinished ? iso(executionUpdatedAt) : null,
       // An active run is polled continuously, so its last observation is "just now"; a terminal
@@ -958,7 +1004,14 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
       updated_at: iso(publicationUpdatedAt)
     },
     failure_code: scenario.failure_code,
-    artifact_storage: artifactFor(run_id, scenario.artifact)
+    artifact_storage: artifactFor(run_id, scenario.artifact),
+    // A failed preparation queues the acknowledgement the connector delivers. Derived here rather
+    // than stored on the scenario: the notice is a consequence of the failure, not an independent
+    // choice the fixture should make.
+    // Any axis that ends a run queues a notice, so the fixture derives one from whichever axis
+    // actually failed. Modelling only the preparation case taught the console a narrower world
+    // than the Control Plane produces.
+    failure_notice: failureNoticeFor(scenario, preparation, execution)
   }
 })
 
@@ -977,7 +1030,7 @@ for (const run of runs.slice(0, BLOCKED_RUN_COUNT)) {
     run.preparation.started_at = run.created_at
   run.preparation.finished_at = null
   run.preparation.failure_code = null
-  run.preparation.failure_notice_status = null
+  run.failure_notice = null
   run.preparation.expiry_blocked_reason = 'EXECUTION_ALREADY_ADVANCED'
   // Execution reached a terminal result, which is what makes the expiry conclusion impossible.
   run.execution.status = 'succeeded'
@@ -1162,7 +1215,11 @@ export function devFixtures(): Plugin {
           const now = new Date().toISOString()
           run.preparation.status = 'failed'
           run.preparation.failure_code = 'PREPARATION_ABANDONED'
-          run.preparation.failure_notice_status = null
+          run.failure_notice = {
+            status: 'pending',
+            failure_stage: 'preparation',
+            failure_code: 'PREPARATION_ABANDONED'
+          }
           run.preparation.finished_at = now
           run.preparation.expiry_blocked_reason = null
           if (

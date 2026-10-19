@@ -38,7 +38,7 @@ COMMENT ON COLUMN review_runs.updated_at IS
 -- fences replay of an uncertain submission. It deliberately mirrors the axis shape:
 -- run_id + connector_id + status + failure + claim/lease + timestamps.
 CREATE TABLE executions (
-  run_id text PRIMARY KEY REFERENCES review_runs(run_id) ON DELETE CASCADE,
+  run_id text PRIMARY KEY,
   connector_id text NOT NULL,
   status text NOT NULL CHECK (status IN ('pending', 'queued', 'running', 'uncertain', 'succeeded', 'skipped', 'failed')),
   input jsonb,
@@ -233,17 +233,26 @@ CREATE INDEX preparations_expiry_blocked_idx
 -- A terminal preparation failure may need connector-facing acknowledgement after
 -- the preparer has died. This outbox is deliberately provider-neutral: it stores
 -- delivery ownership only, while connectors interpret the preparation input.
-CREATE TABLE preparation_failure_notices (
-  -- `run_id` is the primary key, so there is at most one notice per run. It deliberately carries
-  -- no inline single-column foreign key: the composite one below already references `run_id`
-  -- together with `connector_id`, and declaring both would leave two overlapping constraints
-  -- where only the stricter one is meant to exist.
-  run_id text PRIMARY KEY,
+CREATE TABLE run_failure_notices (
+  -- `run_id` is the primary key, so there is at most one notice per run.
+  --
+  -- The notice belongs to the run, not to any one lifecycle axis: preparation, execution, and
+  -- publication can each end a run, and the requester has to hear about all three. Keying it to
+  -- `preparations` would have made an execution or publication failure unannounced, and would
+  -- have tied delivery to a row that a successful axis may have already finished.
+  run_id text PRIMARY KEY REFERENCES review_runs(run_id) ON DELETE CASCADE,
   connector_id text NOT NULL,
-  status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'skipped')),
-  -- The reason is captured when the notice is created, not read back from `preparations` at
-  -- delivery time: the preparation row is the live state machine and may be rewritten (a retry
-  -- clears its failure fields), while the notice exists to report one specific conclusion.
+  -- `failed` rather than `skipped` for a delivery that did not happen: the connector tried and
+  -- could not reach the provider, which is a failure, not a decision to skip. Sharing `skipped`
+  -- with the other axes made it indistinguishable from "this notice did not apply".
+  status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'failed')),
+  -- Which axis failed, so the reply can say "never started" for a preparation failure and
+  -- "started but could not finish" for an execution one. Without it every notice reads the same
+  -- regardless of how far the run got.
+  failure_stage text NOT NULL CHECK (failure_stage IN ('preparation', 'execution', 'publication')),
+  -- The reason is captured when the notice is created, not read back at delivery time: the axis
+  -- row is a live state machine that a later retry may rewrite, while the notice exists to report
+  -- one specific conclusion.
   failure_code text,
   claim_token uuid,
   claimed_at timestamptz,
@@ -253,19 +262,21 @@ CREATE TABLE preparation_failure_notices (
     (status = 'delivering' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
     OR (status <> 'delivering' AND claim_token IS NULL AND claimed_at IS NULL)
   ),
-  -- The notice is read by joining on connector_id, so a row stored under another connector would
-  -- make `failure_notice_status` quietly read as null instead of surfacing as a bad write. This is
-  -- the only foreign key on the table: it references `run_id` too, so a separate single-column
-  -- key would be redundant rather than an extra guard.
+  -- The notice is read by joining on connector_id, so a notice stored under a connector the run
+  -- does not belong to would make `failure_notice_status` read as null instead of surfacing as a
+  -- bad write. The composite key below replaces the single-column one above for this purpose:
+  -- `run_id` alone would already be satisfied, and the pair is what the join actually means.
   FOREIGN KEY (run_id, connector_id)
-    REFERENCES preparations (run_id, connector_id) ON DELETE CASCADE
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
 );
-COMMENT ON TABLE preparation_failure_notices IS
-  'Provider-neutral outbox for connector acknowledgement of terminal preparation failures.';
-COMMENT ON COLUMN preparation_failure_notices.failure_code IS
-  'The terminal preparation failure reason captured when the notice was created. The delivery path reports this instead of re-reading preparations.failure_code, which the preparation state machine may have rewritten since.';
-CREATE INDEX preparation_failure_notices_claimable_idx
-  ON preparation_failure_notices (connector_id, status, updated_at);
+COMMENT ON TABLE run_failure_notices IS
+  'Provider-neutral outbox for connector acknowledgement that a run failed on some axis.';
+COMMENT ON COLUMN run_failure_notices.failure_stage IS
+  'Which axis failed. Delivery uses it to describe how far the run got, instead of always reporting that the review never started.';
+COMMENT ON COLUMN run_failure_notices.failure_code IS
+  'The terminal failure reason captured when the notice was created, so delivery reports the original conclusion rather than re-reading a row the state machine may have rewritten.';
+CREATE INDEX run_failure_notices_claimable_idx
+  ON run_failure_notices (connector_id, status, updated_at);
 
 -- Every run has one publication row. Keeping this state separate means a
 -- successful review remains successful even if delivery to the connector fails.

@@ -37,21 +37,21 @@ Control Plane polls `queued` and `running` runs. A successful Runner result is s
 
 Re-admitting an already-observed ingress identity is a read-only replay: it returns the existing run and does not claim its preparation. Admission creates that row as `preparing`, which only the original admitter owns, so a process that died mid-preparation is recovered through lease expiry rather than by the replayed request. With the default claim timeout this means a replay can take up to ten minutes to make progress — long enough that a client must not treat "the request returned" as "the work resumed".
 
-If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `skipped`. A terminal preparation failure also creates connector-owned notice work, so a connector can tell its user even when the preparation owner had already crashed.
+If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `skipped`. A terminal failure on any axis creates connector-owned notice work, so a connector can tell its user even when the process that observed the failure had already crashed; the notice records which axis failed so the reply describes how far the run actually got.
 
 ## Persistence model
 
 The run trunk and the three lifecycle axes are separate tables. `review_runs` holds only the admitted identity; each axis keeps its own state and its own input:
 
-| Table                         | Responsibility                                         | Status                                                                        |
-| ----------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| `review_runs`                 | Admission identity shared by all axes (no update path) | —                                                                             |
-| `preparations`                | Claimable input preparation                            | `pending`, `preparing`, `submitted`, `failed`                                 |
-| `preparation_failure_notices` | Connector-owned terminal-failure acknowledgements      | `pending`, `delivering`, `delivered`, `skipped`                               |
-| `executions`                  | Runner submission, observation, and terminal result    | `pending`, `queued`, `running`, `uncertain`, `succeeded`, `skipped`, `failed` |
-| `publications`                | Whole-publication ownership and outcome                | `pending`, `publishing`, `published`, `failed`, `skipped`                     |
-| `publication_steps`           | Recoverable individual connector side effects          | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`                |
-| `review_run_events`           | Append-only audit log of transitions on every axis     | —                                                                             |
+| Table                 | Responsibility                                         | Status                                                                        |
+| --------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `review_runs`         | Admission identity shared by all axes (no update path) | —                                                                             |
+| `preparations`        | Claimable input preparation                            | `pending`, `preparing`, `submitted`, `failed`                                 |
+| `run_failure_notices` | Connector-owned acknowledgements that a run failed     | `pending`, `delivering`, `delivered`, `skipped`                               |
+| `executions`          | Runner submission, observation, and terminal result    | `pending`, `queued`, `running`, `uncertain`, `succeeded`, `skipped`, `failed` |
+| `publications`        | Whole-publication ownership and outcome                | `pending`, `publishing`, `published`, `failed`, `skipped`                     |
+| `publication_steps`   | Recoverable individual connector side effects          | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`                |
+| `review_run_events`   | Append-only audit log of transitions on every axis     | —                                                                             |
 
 ```mermaid
 flowchart LR
@@ -98,7 +98,7 @@ flowchart LR
 
 ## Claims and recovery
 
-Preparation, submission recovery, publication, publication-step commits, and terminal preparation notices use claim tokens to fence stale owners. While input preparation is active, GitHub integration renews its preparation claim. An expired preparation normally returns to `pending`; after the finite retry budget is exhausted, it fails the run, skips publication, and creates durable connector notice work. A timed-out owner may finish an external request, but it cannot commit state after another owner acquires a new token.
+Preparation, submission recovery, publication, publication-step commits, and run failure notices use claim tokens to fence stale owners. While input preparation is active, GitHub integration renews its preparation claim. An expired preparation normally returns to `pending`; after the finite retry budget is exhausted, it fails the run, skips publication, and creates durable connector notice work. A timed-out owner may finish an external request, but it cannot commit state after another owner acquires a new token.
 
 Expiry is isolated per run. A run whose persisted story contradicts an expiry conclusion — an expired `preparing` lease while its execution has already left `pending` — cannot be concluded without overwriting a real Runner result. Such a row is rolled back, marked with `expiry_blocked_reason` (currently `EXECUTION_ALREADY_ADVANCED`) and reported as `control_plane_preparation_expiry_blocked`, and every later pass skips it instead of retrying a transition that must keep failing. Coordination keeps running for all other runs; the marker is the operator's cue to repair the contradiction, and it is cleared only by a repair that makes the run consistent again.
 
@@ -128,7 +128,7 @@ Read responses omit `runner_input` and `publish_context`. The UI BFF holds the r
 
 The service token authenticates components coordinating a run; the read token authenticates redacted reads; a third, optional admin token authenticates the operator surface under `/v1/admin`. The three are deliberately not nested: holding the service token does not reach an admin route, and the admin token cannot admit runs or move a run through its normal lifecycle. `/v1/admin` exists only when `CONTROL_PLANE_ADMIN_TOKEN` is configured — otherwise the paths answer 404 rather than 401, so an unconfigured deployment does not advertise an operator surface at all. Reading the blocked-preparation queue needs only the read token, because knowing a run is stuck is not privileged; only the decision to abandon it is.
 
-Read responses report three independent lifecycle axes as nested objects of the same shape: `preparation`, `execution`, and `publication`. Each carries its own `status`, `started_at`, `finished_at`, and `updated_at` — the last write to that axis, which is the activity freshness the console shows and is deliberately not a phase bound. The preparation summary adds `attempt_count` and the terminal `failure_code` / `failure_notice_status`, but never its opaque input, claim token, or connector identity. The list endpoint filters on the three axes by query parameter (`preparation_status`, `execution_status`, and `publication_status`; the parameter names keep their established spelling); [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is the read contract.
+Read responses report three independent lifecycle axes as nested objects of the same shape: `preparation`, `execution`, and `publication`. Each carries its own `status`, `started_at`, `finished_at`, and `updated_at` — the last write to that axis, which is the activity freshness the console shows and is deliberately not a phase bound. The preparation summary adds `attempt_count` and its terminal `failure_code`, but never its opaque input, claim token, or connector identity. Whether the requester has been told the run failed is reported once, on the run itself as `failure_notice`, because any axis can end a run. The list endpoint filters on the three axes by query parameter (`preparation_status`, `execution_status`, and `publication_status`; the parameter names keep their established spelling); [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is the read contract.
 
 `/healthz` only proves the HTTP process is alive. `/readyz` verifies that the current PostgreSQL pool can execute a schema-ledger query and that its complete version set exactly matches this application; it returns `503 {"status":"unavailable"}` without database details otherwise. Compose uses `/readyz` for its Control Plane healthcheck. Runner and GitHub are deliberately excluded: their transient reachability does not make durable admission, reads, or PostgreSQL-backed recovery unsafe, and their failures have separate state-machine recovery paths.
 

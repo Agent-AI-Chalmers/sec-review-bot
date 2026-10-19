@@ -439,8 +439,8 @@ export async function registerControlPlaneRoutes(
       await store.checkpointPreparationInput(runId, token, input)
     },
 
-    claimNextPreparationFailureNotice: async () =>
-      await store.claimNextPreparationFailureNotice(),
+    claimNextRunFailureNotice: async () =>
+      await store.claimNextRunFailureNotice(),
 
     failPreparation: async (request) => {
       const { runId } = request.params as PathParams<'failPreparation'>
@@ -454,16 +454,11 @@ export async function registerControlPlaneRoutes(
       })
     },
 
-    completePreparationFailureNotice: async (request) => {
-      const { runId } =
-        request.params as PathParams<'completePreparationFailureNotice'>
+    completeRunFailureNotice: async (request) => {
+      const { runId } = request.params as PathParams<'completeRunFailureNotice'>
       const { token, delivered } =
-        request.body as RequestBody<'completePreparationFailureNotice'>
-      return await store.completePreparationFailureNotice(
-        runId,
-        token,
-        delivered
-      )
+        request.body as RequestBody<'completeRunFailureNotice'>
+      return await store.completeRunFailureNotice(runId, token, delivered)
     },
 
     claimNextPublication: async (request) => {

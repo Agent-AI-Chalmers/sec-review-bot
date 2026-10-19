@@ -25,8 +25,7 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
       finished_at: '2026-01-01T00:00:02.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
-      expiry_blocked_reason: null,
-      failure_notice_status: null
+      expiry_blocked_reason: null
     },
     execution: {
       status: 'succeeded',
@@ -111,8 +110,7 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
       finished_at: '2026-01-01T00:00:02.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
-      expiry_blocked_reason: null,
-      failure_notice_status: null
+      expiry_blocked_reason: null
     },
     execution: {
       status: 'succeeded',

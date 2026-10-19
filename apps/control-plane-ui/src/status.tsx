@@ -208,15 +208,32 @@ export function axisLabel(
   }
 }
 
-export function failureNoticeStatusLabel(
-  status: NonNullable<Run['preparation']>['failure_notice_status'],
+/** The axis a failure notice was produced for, in the same words the axis labels use. */
+export function failureStageLabel(
+  stage: 'preparation' | 'execution' | 'publication',
   t: ReturnType<typeof useMessages>
 ): string {
-  if (status === 'pending') return t('statusPending')
-  if (status === 'delivering') return t('statusDelivering')
-  if (status === 'delivered') return t('statusDelivered')
-  if (status === 'skipped') return t('statusSkipped')
-  return ''
+  return axisLabel(stage, t)
+}
+
+export function failureNoticeStatusLabel(
+  status: NonNullable<Run['failure_notice']>['status'],
+  t: ReturnType<typeof useMessages>
+): string {
+  // An exhaustive switch rather than a chain ending in `return ''`: a state added to the notice
+  // machine makes this fail to compile instead of rendering a blank label nobody notices.
+  switch (status) {
+    case 'pending':
+      return t('statusPending')
+    case 'delivering':
+      return t('statusDelivering')
+    case 'delivered':
+      return t('statusDelivered')
+    case 'failed':
+      // Deliberately not `statusSkipped`: delivery was attempted and did not succeed, and
+      // "skipped" would read as a decision nobody made.
+      return t('statusDeliveryFailed')
+  }
 }
 
 export function preparationStatusLabel(

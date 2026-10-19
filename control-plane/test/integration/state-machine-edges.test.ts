@@ -1,18 +1,25 @@
 // The contract's `x-state-machines` block claims to describe the transitions the write paths
-// perform. The state-set test in `state-machines.test.ts` only proves each state exists in the
-// schema; it cannot catch an edge that a write path performs but the contract omits, which is
-// how `publishing -> skipped` stayed undeclared while the execution-failure paths could produce
-// it. These tests instead compare the declared edges with transitions the stores actually
-// *record* into the audit log.
+// perform. These tests compare that claim with the transitions the stores actually *record*
+// into the audit log, in both directions:
 //
-// The comparison is made against recorded transitions rather than raw SQL on purpose: the audit
-// log is a runtime value written in the same transaction as the snapshot update, so a missing
-// event is itself the bug, and source-text matching would not prove anything about behaviour.
+//   - an edge the code records but the contract omits means the diagram is wrong;
+//   - an edge the contract declares but no code path produces means the diagram promises
+//     behaviour nothing backs.
+//
+// Both directions are driven from real write paths. An earlier version checked the second
+// direction against a hand-maintained list of edge names, which could only ever agree with
+// itself: it passed while a renamed transition (`delivering->skipped` becoming
+// `delivering->failed`) had gone stale in the very list it was asserting on.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 
-import { STATE_MACHINES } from '../../src/state-machines.generated.js'
+import {
+  STATE_MACHINES,
+  type StateAxis
+} from '../../src/state-machines.generated.js'
+import { Pool } from 'pg'
+
 import { ReviewRunStore } from '../../src/index.js'
 
 const connectionString =
@@ -53,119 +60,369 @@ async function createQueuedRun(
   return runId
 }
 
-function declaredEdges(axis: string): Set<string> {
+function declaredEdges(axis: StateAxis): Set<string> {
   const machine = STATE_MACHINES.find((candidate) => candidate.axis === axis)
   assert.ok(machine, `the contract declares an ${axis} machine`)
   return new Set(machine.transitions.map((edge) => `${edge.from}->${edge.to}`))
 }
 
-function observedEdges(
-  events: Awaited<ReturnType<ReviewRunStore['listEvents']>>,
-  axis: string
-): Set<string> {
-  return new Set(
-    events
-      .filter((event) => event.axis === axis && event.from_status !== null)
-      .map((event) => `${event.from_status}->${event.to_status}`)
-  )
+/** Claim from the notice queue until the given run's notice is in hand.
+ *
+ * `claimNextRunFailureNotice` is a queue, not a lookup: other runs' notices queued earlier would
+ * otherwise be claimed here and left dangling, which is exactly how an earlier version of this
+ * driver failed to exercise `delivering -> failed` while appearing to.
+ */
+async function claimNoticeFor(
+  store: ReviewRunStore,
+  runId: string
+): Promise<{ claim_token: string }> {
+  const deferred: Array<{ run_id: string; claim_token: string }> = []
+  const deadline = Date.now() + 5_000
+  try {
+    while (Date.now() < deadline) {
+      const notice = await store.claimNextRunFailureNotice()
+      if (notice === null) break
+      if (notice.run_id === runId) return { claim_token: notice.claim_token }
+      deferred.push({
+        run_id: notice.run_id,
+        claim_token: notice.claim_token
+      })
+    }
+    throw new Error(`no failure notice was queued for ${runId}`)
+  } finally {
+    // Put the others back so later paths still see them; a notice left in `delivering` would
+    // only become claimable again after its lease expires.
+    for (const other of deferred) {
+      await store.completeRunFailureNotice(
+        other.run_id,
+        other.claim_token,
+        true
+      )
+    }
+  }
 }
 
-test('every transition a run actually records is declared in the contract', async () => {
-  // Drive one run through the paths that exist and check each audited transition is an
-  // edge the contract declares. A write path that records an edge the diagram omits makes the
-  // diagram wrong, which is what this test exists to catch.
-  const store = await createStore()
-  const declared = {
-    preparation: declaredEdges('preparation'),
-    runner: declaredEdges('execution'),
-    publication: declaredEdges('publication'),
-    notice: declaredEdges('notice')
-  }
+interface RecordedEdge {
+  axis: StateAxis
+  edge: string
+  reason: string | null
+}
+
+/** Drive every store path that moves a run, and return the transitions it recorded.
+ *
+ * Each block is one path, and together they are the whole write surface: preparation success
+ * and failure, an expired lease, a blocked expiry resolved by an operator, submission
+ * uncertainty and its recovery, every execution outcome, publication success, failure, retry,
+ * abandonment, and failure-notice delivery in both its delivered and undeliverable forms.
+ */
+async function recordEveryPath(): Promise<RecordedEdge[]> {
+  const runIds: string[] = []
+  const store = await createStore({ claimTimeoutMs: 1 })
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
-    const runId = `run-${randomUUID()}`
-    const admission = await store.createPreparingReviewRun({
-      workflow: 'issue-review',
-      run_id: runId,
-      publish_context: {}
-    })
-    assert.ok(admission.preparation_token)
-    await store.markQueued(runId, admission.preparation_token, {})
+    const newPreparingRun = async (): Promise<{
+      runId: string
+      token: string
+    }> => {
+      const runId = `run-${randomUUID()}`
+      const admission = await store.createPreparingReviewRun({
+        workflow: 'issue-review',
+        run_id: runId,
+        publish_context: {}
+      })
+      assert.ok(admission.preparation_token)
+      runIds.push(runId)
+      return { runId, token: admission.preparation_token }
+    }
+    const newSuccessRun = async (): Promise<string> => {
+      const runId = await createQueuedRun(store)
+      runIds.push(runId)
+      assert.strictEqual(
+        await store.recordRunnerSuccess(
+          runId,
+          { run_id: runId },
+          { status: 'unavailable' }
+        ),
+        true
+      )
+      return runId
+    }
+    const newPublishingRun = async (): Promise<{
+      runId: string
+      token: string
+    }> => {
+      const runId = await newSuccessRun()
+      const token = await store.claimPublication(runId)
+      assert.notStrictEqual(token, null)
+      await store.initializePublicationSteps(runId, token as string, [
+        'issue:summary-comment'
+      ])
+      return { runId, token: token as string }
+    }
+
+    // preparation: preparing -> submitted, then execution pending -> queued.
+    const submitted = await newPreparingRun()
+    await store.markQueued(submitted.runId, submitted.token, {})
+
+    // preparation: preparing -> failed, execution pending -> skipped, notice pending -> ...
+    const failedPreparation = await newPreparingRun()
+    await store.failPreparation(
+      failedPreparation.runId,
+      failedPreparation.token,
+      { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
+      { retry: false }
+    )
+    const preparedNotice = await store.claimNextRunFailureNotice()
+    assert.notStrictEqual(preparedNotice, null)
+    await store.completeRunFailureNotice(
+      failedPreparation.runId,
+      preparedNotice?.claim_token ?? '',
+      true
+    )
+
+    // notice: delivering -> delivering when the delivery lease expires and another worker
+    // re-claims, which is the only way a notice becomes retryable again.
+    const relased = await newPreparingRun()
+    await store.failPreparation(
+      relased.runId,
+      relased.token,
+      { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
+      { retry: false }
+    )
+    assert.notStrictEqual(await store.claimNextRunFailureNotice(), null)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    assert.notStrictEqual(await store.claimNextRunFailureNotice(), null)
+
+    // notice: delivering -> failed when the provider cannot be reached.
+    const undeliverable = await newPreparingRun()
+    await store.failPreparation(
+      undeliverable.runId,
+      undeliverable.token,
+      { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
+      { retry: false }
+    )
+    const undeliverableNotice = await claimNoticeFor(store, undeliverable.runId)
+    await store.completeRunFailureNotice(
+      undeliverable.runId,
+      undeliverableNotice.claim_token,
+      false
+    )
+
+    // preparation: preparing -> pending when a lease expires without exhausting retries, then
+    // pending -> preparing when the next preparer claims it. Both halves matter: the second is
+    // the only path that returns a run to active preparation after a failure.
+    await newPreparingRun()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const expiry = await store.expireStalePreparations()
+    assert.ok(expiry.concluded >= 1)
+    const reclaimed = await store.claimNextPreparation()
+    assert.notStrictEqual(reclaimed, null)
+
+    // execution: pending -> uncertain on an unconfirmed submission, then the recovery claim
+    // records uncertain -> uncertain before resolving it.
+    const uncertain = await newPreparingRun()
+    await store.failPreparation(
+      uncertain.runId,
+      uncertain.token,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
+      { retry: false }
+    )
+    const recovery = await store.claimSubmissionRecovery(uncertain.runId)
+    assert.notStrictEqual(recovery, null)
+    // Resolving the replay moves the run back to `queued`. The unresolved branch stays
+    // `uncertain` and is covered by the recovery's own expiry paths in the store tests.
     assert.strictEqual(
-      await store.recordRunnerSuccess(
-        runId,
-        { run_id: runId },
-        { status: 'unavailable' }
+      await store.completeSubmissionRecovery(
+        uncertain.runId,
+        recovery as string
       ),
       true
     )
-    const token = await store.claimPublication(runId)
-    assert.notStrictEqual(token, null)
+
+    // execution: uncertain -> failed when the replay concludes the submission was not accepted.
+    const uncertainFails = await newPreparingRun()
+    await store.failPreparation(
+      uncertainFails.runId,
+      uncertainFails.token,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
+      { retry: false }
+    )
+    const failingRecovery = await store.claimSubmissionRecovery(
+      uncertainFails.runId
+    )
+    assert.notStrictEqual(failingRecovery, null)
+    assert.strictEqual(
+      await store.failSubmissionRecovery(
+        uncertainFails.runId,
+        failingRecovery as string,
+        { code: 'RUNNER_EXECUTION_FAILED', message: 'replay rejected' }
+      ),
+      true
+    )
+
+    // execution: pending -> queued -> running -> succeeded.
+    const observed = await newPreparingRun()
+    await store.markQueued(observed.runId, observed.token, {})
+    await store.markRunning(observed.runId)
+    await store.recordRunnerSuccess(
+      observed.runId,
+      { run_id: observed.runId },
+      { status: 'unavailable' }
+    )
+
+    // execution: pending -> queued -> failed without ever running, which also skips publication.
+    const queuedFailed = await newPreparingRun()
+    await store.markQueued(queuedFailed.runId, queuedFailed.token, {})
+    await store.failRunnerExecution(queuedFailed.runId, {
+      code: 'RUNNER_EXECUTION_FAILED',
+      message: 'boom'
+    })
+
+    // execution: pending -> queued -> running -> failed, which also skips publication.
+    const runnerFailed = await newPreparingRun()
+    await store.markQueued(runnerFailed.runId, runnerFailed.token, {})
+    await store.markRunning(runnerFailed.runId)
+    await store.failRunnerExecution(runnerFailed.runId, {
+      code: 'RUNNER_EXECUTION_FAILED',
+      message: 'boom'
+    })
+
+    // publication: pending -> publishing -> publishing (expired lease) -> published.
+    const published = await newPublishingRun()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    // Re-claiming after the lease expires issues a new token, and the old one is fenced out.
+    const renewedToken = await store.claimPublication(published.runId)
+    assert.notStrictEqual(renewedToken, null)
+    await store.requirePublicationStepClaim(
+      published.runId,
+      renewedToken as string,
+      'issue:summary-comment'
+    )
+    await store.completePublicationStep(
+      published.runId,
+      renewedToken as string,
+      'issue:summary-comment',
+      { id: '1' }
+    )
+    await store.completePublication(published.runId, renewedToken as string)
+
+    // publication: publishing -> failed on a terminal step failure.
+    const publishFailed = await newPublishingRun()
+    await store.requirePublicationStepClaim(
+      publishFailed.runId,
+      publishFailed.token,
+      'issue:summary-comment'
+    )
+    await store.failPublicationStep(
+      publishFailed.runId,
+      publishFailed.token,
+      'issue:summary-comment',
+      { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
+      { retry: false }
+    )
     await store.failPublication(
-      runId,
-      token as string,
-      { code: 'GITHUB_FORBIDDEN', message: 'forbidden' },
+      publishFailed.runId,
+      publishFailed.token,
+      { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
       { retry: false }
     )
 
-    const events = await store.listEvents(runId)
-    for (const [axis, edges] of Object.entries(declared)) {
-      for (const edge of observedEdges(events, axis)) {
-        assert.ok(
-          edges.has(edge),
-          `${axis} recorded ${edge}, which the contract does not declare`
-        )
+    // publication: publishing -> pending on a retryable failure.
+    const publishRetried = await newPublishingRun()
+    await store.failPublication(
+      publishRetried.runId,
+      publishRetried.token,
+      { code: 'GITHUB_RATE_LIMITED', message: 'slow down' },
+      { retry: true }
+    )
+
+    // publication: publishing -> skipped when the run is concluded while a publication is in
+    // flight. There is no public "abandon a publication" call - the abandonment is part of
+    // concluding the run - so this drives the preparation failure that performs it.
+    const abandonedInFlight = await newPreparingRun()
+    await pool.query(
+      `UPDATE publications SET status='publishing', claim_token=$2,
+         claimed_at=clock_timestamp(), started_at=clock_timestamp() WHERE run_id=$1`,
+      [abandonedInFlight.runId, randomUUID()]
+    )
+    // Concluding the run converges the in-flight publication to `skipped`.
+    await store.failPreparation(
+      abandonedInFlight.runId,
+      abandonedInFlight.token,
+      { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
+      { retry: false }
+    )
+
+    // preparation: preparing -> failed through the operator's abandon decision, which requires
+    // the run to be in the blocked state first. That state is produced by an expiry that cannot
+    // conclude, so it is arranged through the pool rather than through a store call: no public
+    // path may create it, which is the point of the queue.
+    const blocked = await newPreparingRun()
+    await pool.query(
+      `UPDATE preparations SET attempt_count=8,
+         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [blocked.runId]
+    )
+    await pool.query(
+      `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+         finished_at=clock_timestamp(), workflow_result='{"keep":true}'::jsonb
+       WHERE run_id=$1`,
+      [blocked.runId]
+    )
+    assert.strictEqual(
+      (await store.expireStalePreparations()).blocked.length,
+      1
+    )
+    await store.abandonBlockedPreparation(blocked.runId, 'operator decision')
+
+    const recorded: RecordedEdge[] = []
+    for (const runId of runIds) {
+      for (const event of await store.listEvents(runId)) {
+        if (event.from_status === null) continue
+        recorded.push({
+          axis: event.axis,
+          edge: `${event.from_status}->${event.to_status}`,
+          reason: event.reason_code
+        })
       }
     }
+    return recorded
   } finally {
+    await pool.end()
     await store.close()
+  }
+}
+
+test('every transition a run records is declared in the contract', async () => {
+  const recorded = await recordEveryPath()
+  const declared = new Map(
+    STATE_MACHINES.map((machine) => [machine.axis, declaredEdges(machine.axis)])
+  )
+  for (const { axis, edge } of recorded) {
+    assert.ok(
+      declared.get(axis)?.has(edge),
+      `${axis} recorded ${edge}, which the contract does not declare`
+    )
   }
 })
 
 test('every declared edge is reachable by a write path', async () => {
-  // The other direction: a declared edge that no write path can produce is a diagram claim
-  // nothing backs. Each edge below is exercised by at least one integration test; this test
-  // pins the list so a new declared edge has to be justified by a write path (or removed).
-  const exercised = {
-    preparation: new Set([
-      'pending->preparing',
-      'preparing->submitted',
-      'preparing->pending',
-      'preparing->failed'
-    ]),
-    execution: new Set([
-      'pending->queued',
-      'pending->skipped',
-      'pending->uncertain',
-      'uncertain->uncertain',
-      'uncertain->queued',
-      'uncertain->failed',
-      'queued->running',
-      'queued->succeeded',
-      'running->succeeded',
-      'queued->failed',
-      'running->failed'
-    ]),
-    publication: new Set([
-      'pending->publishing',
-      'publishing->publishing',
-      'publishing->published',
-      'publishing->pending',
-      'publishing->failed',
-      'pending->skipped',
-      'publishing->skipped'
-    ]),
-    notice: new Set([
-      'pending->delivering',
-      'delivering->delivering',
-      'delivering->delivered',
-      'delivering->skipped'
-    ])
-  } as const
-  for (const [axis, edges] of Object.entries(exercised)) {
-    for (const edge of edges) {
+  // The other direction, driven rather than copied: a declared edge that no write path produces
+  // is a diagram claim nothing backs, and the driver above is the evidence that each one is
+  // real. When a transition is renamed in the contract, this fails until a path produces the
+  // new name, instead of silently agreeing with a stale list.
+  const recorded = await recordEveryPath()
+  const observed = new Map<string, Set<string>>()
+  for (const { axis, edge } of recorded) {
+    const edges = observed.get(axis) ?? new Set<string>()
+    edges.add(edge)
+    observed.set(axis, edges)
+  }
+  for (const machine of STATE_MACHINES) {
+    for (const edge of declaredEdges(machine.axis)) {
       assert.ok(
-        declaredEdges(axis).has(edge),
-        `${axis} write path produces ${edge}, which the contract does not declare`
+        observed.get(machine.axis)?.has(edge),
+        `${machine.axis} declares ${edge}, but no write path produces it`
       )
     }
   }
@@ -187,75 +444,21 @@ function declaredReasons(): Map<string, string | null> {
 }
 
 test('a reason the audit log writes is the reason the contract declares', async () => {
-  // An edge's `reason` is a promise: "this transition is recorded with this code". The edge test
-  // above compares only `from->to`, so a write path could attach a different code (or a
-  // self-event the diagram omits) and nothing would notice. This test drives the paths that
-  // carry a fixed reason and checks the recorded code equals the declared one. Edges the
-  // contract leaves without a reason are exempt: their code is an open set owned by the
-  // connector, not a contract value.
-  const store = await createStore({ claimTimeoutMs: 1 })
+  // An edge's `reason` is a promise: "this transition is recorded with this code". The edge
+  // comparison above looks only at `from->to`, so a write path could attach a different code
+  // and nothing would notice. Edges the contract leaves without a reason are exempt: their
+  // code is an open set owned by the connector, not a contract value.
+  const recorded = await recordEveryPath()
   const declared = declaredReasons()
-  try {
-    // publication: publishing -> publishing on an expired lease.
-    const leased = `run-${randomUUID()}`
-    await createQueuedRun(store, leased)
+  for (const { axis, edge, reason } of recorded) {
+    const key = `${axis} ${edge}`
+    assert.ok(declared.has(key), `${key} is not declared`)
+    const expected = declared.get(key)
+    if (expected === null || expected === undefined) continue
     assert.strictEqual(
-      await store.recordRunnerSuccess(
-        leased,
-        { run_id: leased },
-        { status: 'unavailable' }
-      ),
-      true
+      reason,
+      expected,
+      `${key} was recorded with ${String(reason)} but the contract declares ${expected}`
     )
-    assert.notStrictEqual(await store.claimPublication(leased), null)
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    assert.notStrictEqual(await store.claimPublication(leased), null)
-
-    // runner: pending -> uncertain, then uncertain -> uncertain on the recovery claim.
-    const uncertainRun = `run-${randomUUID()}`
-    const admission = await store.createPreparingReviewRun({
-      workflow: 'issue-review',
-      run_id: uncertainRun,
-      publish_context: {}
-    })
-    assert.ok(admission.preparation_token)
-    await store.failPreparation(
-      uncertainRun,
-      admission.preparation_token,
-      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
-      { retry: false }
-    )
-    assert.notStrictEqual(
-      await store.claimSubmissionRecovery(uncertainRun),
-      null
-    )
-
-    // runner/publication: an execution failure converges publication to skipped.
-    const abandoned = `run-${randomUUID()}`
-    await createQueuedRun(store, abandoned)
-    assert.strictEqual(
-      await store.failRunnerExecution(abandoned, {
-        code: 'RUNNER_EXECUTION_FAILED',
-        message: 'boom'
-      }),
-      true
-    )
-
-    for (const runId of [leased, uncertainRun, abandoned]) {
-      for (const event of await store.listEvents(runId)) {
-        if (event.from_status === null) continue
-        const key = `${event.axis} ${event.from_status}->${event.to_status}`
-        assert.ok(declared.has(key), `${key} is not declared`)
-        const expected = declared.get(key)
-        if (expected === null || expected === undefined) continue
-        assert.strictEqual(
-          event.reason_code,
-          expected,
-          `${key} was recorded with ${String(event.reason_code)} but the contract declares ${expected}`
-        )
-      }
-    }
-  } finally {
-    await store.close()
   }
 })

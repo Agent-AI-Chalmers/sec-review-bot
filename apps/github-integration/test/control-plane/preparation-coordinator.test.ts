@@ -37,7 +37,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   }
   const completed: unknown[] = []
   const store = {
-    claimNextPreparationFailureNotice: async () => ({
+    claimNextRunFailureNotice: async () => ({
       run_id: 'run-pr-reference',
       input: {
         kind: 'github_pull_request_review',
@@ -50,7 +50,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
       failure_code: 'PREPARATION_RETRY_EXHAUSTED',
       claim_token: 'notice-token'
     }),
-    completePreparationFailureNotice: async (...args: unknown[]) => {
+    completeRunFailureNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
     },
@@ -88,7 +88,7 @@ test('preparation-first scheduling falls back to a terminal notice when no prepa
       calls.push('preparation')
       return null
     },
-    claimNextPreparationFailureNotice: async () => {
+    claimNextRunFailureNotice: async () => {
       calls.push('notice')
       return {
         run_id: 'run-without-reply-target',
@@ -97,7 +97,7 @@ test('preparation-first scheduling falls back to a terminal notice when no prepa
         claim_token: 'notice-claim'
       }
     },
-    completePreparationFailureNotice: async () => {
+    completeRunFailureNotice: async () => {
       calls.push('complete-notice')
       return true
     }

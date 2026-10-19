@@ -20,8 +20,7 @@ function run(
       finished_at: '2026-01-01T00:00:02.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
-      expiry_blocked_reason: null,
-      failure_notice_status: null
+      expiry_blocked_reason: null
     },
     ...(input === null ? {} : { runner_input: input }),
     execution: {
@@ -39,7 +38,8 @@ function run(
     created_at: '2026-01-01T00:00:00.000Z',
     failure_code: null,
     failure_message: null,
-    artifact_storage: null
+    artifact_storage: null,
+    failure_notice: null
   }
 }
 

@@ -8,8 +8,7 @@
     "finished_at": "2026-10-11T02:00:30.000Z",
     "updated_at": "2026-10-11T02:00:30.000Z",
     "failure_code": null,
-    "expiry_blocked_reason": null,
-    "failure_notice_status": null
+    "expiry_blocked_reason": null
   },
   "execution": {
     "status": "succeeded",
@@ -45,5 +44,6 @@
       "size_bytes": 4096
     },
     "error_code": "ARTIFACT_UPLOAD_FAILED"
-  }
+  },
+  "failure_notice": null
 }

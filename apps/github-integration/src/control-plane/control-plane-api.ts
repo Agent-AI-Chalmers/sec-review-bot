@@ -191,7 +191,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/v1/preparation/failure-notices/claims/next': {
+  '/v1/run-failure-notices/claims/next': {
     parameters: {
       query?: never
       header?: never
@@ -201,14 +201,14 @@ export interface paths {
     get?: never
     put?: never
     /** @description Claim one connector-owned terminal preparation-failure notice. Returns null when no undelivered notice is available; an expired notice claim is eligible again. */
-    post: operations['claimNextPreparationFailureNotice']
+    post: operations['claimNextRunFailureNotice']
     delete?: never
     options?: never
     head?: never
     patch?: never
     trace?: never
   }
-  '/v1/runs/{runId}/preparation/failure-notice/complete': {
+  '/v1/runs/{runId}/failure-notice/complete': {
     parameters: {
       query?: never
       header?: never
@@ -218,7 +218,7 @@ export interface paths {
     get?: never
     put?: never
     /** @description Complete a terminal preparation-failure notice the caller still owns. `delivered` is false when the connector intentionally has no user-visible target. */
-    post: operations['completePreparationFailureNotice']
+    post: operations['completeRunFailureNotice']
     delete?: never
     options?: never
     head?: never
@@ -505,6 +505,12 @@ export interface components {
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
+      /**
+       * @description Whether the requester has been told this run failed, or null when no notice exists.
+       *     It sits on the run rather than on an axis because any axis can end a run, and the
+       *     delivery status is a property of the run's whole outcome.
+       */
+      failure_notice: null | components['schemas']['RunFailureNoticeSummary']
     }
     ReviewRunAdmission: {
       record: components['schemas']['ReviewRunRecord']
@@ -522,13 +528,34 @@ export interface components {
       claim_token: string
       attempt_count: number
     }
-    PreparationFailureNoticeWork: {
+    /**
+     * @description One pending notice that a run failed, claimed by the component that can tell the
+     *     requester. Any lifecycle axis can produce one; `failure_stage` says which, so the
+     *     delivery side can word the reply accurately instead of always reporting that the
+     *     review never started.
+     */
+    RunFailureNoticeWork: {
       run_id: string
       input: {
         [key: string]: unknown
       }
+      /**
+       * @description The axis whose failure ended the run. `preparation` means nothing ran and the
+       *     review never started; `execution` means the Runner ran but did not finish;
+       *     `publication` means the work completed but its result could not be delivered.
+       * @enum {string}
+       */
+      failure_stage: 'preparation' | 'execution' | 'publication'
       failure_code: string | null
       claim_token: string
+    }
+    /** @description Delivery state of the one acknowledgement a failed run produces. */
+    RunFailureNoticeSummary: {
+      /** @enum {string} */
+      status: 'pending' | 'delivering' | 'delivered' | 'failed'
+      /** @enum {string} */
+      failure_stage: 'preparation' | 'execution' | 'publication'
+      failure_code: string | null
     }
     PublicationWork: {
       run_id: string
@@ -593,6 +620,11 @@ export interface components {
       created_at: string
       failure_code: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
+      /**
+       * @description Whether the requester has been told this run failed, or null when no notice exists.
+       *     It sits on the run rather than on an axis because any axis can end a run.
+       */
+      failure_notice: null | components['schemas']['RunFailureNoticeSummary']
     }
     ExecutionSummary: {
       /**
@@ -686,9 +718,6 @@ export interface components {
        */
       updated_at: string
       failure_code: string | null
-      /** @enum {string|null} */
-      failure_notice_status:
-        'pending' | 'delivering' | 'delivered' | 'skipped' | null
     }
     ArtifactStorage:
       | {
@@ -1211,7 +1240,7 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
-  claimNextPreparationFailureNotice: {
+  claimNextRunFailureNotice: {
     parameters: {
       query?: never
       header?: never
@@ -1227,14 +1256,14 @@ export interface operations {
         }
         content: {
           'application/json':
-            components['schemas']['PreparationFailureNoticeWork'] | null
+            components['schemas']['RunFailureNoticeWork'] | null
         }
       }
       401: components['responses']['Unauthorized']
       500: components['responses']['InternalError']
     }
   }
-  completePreparationFailureNotice: {
+  completeRunFailureNotice: {
     parameters: {
       query?: never
       header?: never
@@ -1738,12 +1767,12 @@ export const operationRoutes = {
     path: '/v1/runs/{runId}/preparation/failure',
     method: 'post'
   },
-  claimNextPreparationFailureNotice: {
-    path: '/v1/preparation/failure-notices/claims/next',
+  claimNextRunFailureNotice: {
+    path: '/v1/run-failure-notices/claims/next',
     method: 'post'
   },
-  completePreparationFailureNotice: {
-    path: '/v1/runs/{runId}/preparation/failure-notice/complete',
+  completeRunFailureNotice: {
+    path: '/v1/runs/{runId}/failure-notice/complete',
     method: 'post'
   },
   claimNextPublication: { path: '/v1/publication/claims/next', method: 'post' },

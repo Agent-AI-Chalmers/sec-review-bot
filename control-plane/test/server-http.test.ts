@@ -336,7 +336,7 @@ test('an operation with no response body sends an empty 200, not a null body', a
 test('a failure notice completion forwards an intentional skip through the HTTP route', async () => {
   const completions: unknown[][] = []
   const app = await buildApp({
-    completePreparationFailureNotice: async (...args: unknown[]) => {
+    completeRunFailureNotice: async (...args: unknown[]) => {
       completions.push(args)
       return true
     }
@@ -344,7 +344,7 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
   try {
     const response = await app.inject({
       method: 'POST',
-      url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/preparation/failure-notice/complete',
+      url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/failure-notice/complete',
       headers: {
         authorization: `Bearer ${SERVICE_TOKEN}`,
         'content-type': 'application/json'
@@ -701,8 +701,7 @@ test('the admin surface is absent unless an admin token is configured', async ()
         started_at: null,
         finished_at: null,
         updated_at: '2026-01-01T00:00:00.000Z',
-        failure_code: 'PREPARATION_ABANDONED',
-        failure_notice_status: null
+        failure_code: 'PREPARATION_ABANDONED'
       },
       execution: {
         status: 'succeeded',
@@ -720,7 +719,8 @@ test('the admin surface is absent unless an admin token is configured', async ()
       created_at: '2026-01-01T00:00:00.000Z',
       failure_code: null,
       failure_message: null,
-      artifact_storage: null
+      artifact_storage: null,
+      failure_notice: null
     })
   }
   const configured = await buildApp(store, adminToken)

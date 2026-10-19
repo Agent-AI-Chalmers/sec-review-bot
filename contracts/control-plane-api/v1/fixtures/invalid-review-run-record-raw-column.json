@@ -8,8 +8,7 @@
     "finished_at": "2026-10-11T02:00:30.000Z",
     "updated_at": "2026-10-11T02:00:30.000Z",
     "failure_code": null,
-    "expiry_blocked_reason": null,
-    "failure_notice_status": null
+    "expiry_blocked_reason": null
   },
   "execution": {
     "status": "succeeded",
@@ -45,5 +44,6 @@
       "size_bytes": 4096
     }
   },
-  "runner_updated_at": "2026-10-11T02:04:31.000Z"
+  "runner_updated_at": "2026-10-11T02:04:31.000Z",
+  "failure_notice": null
 }

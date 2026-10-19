@@ -11,6 +11,7 @@ import {
   abandonInFlightPublications
 } from './publication-abandon.js'
 import { skipPendingExecutions } from './execution-skip.js'
+import type { RunFailureNoticeWork } from './shapes.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -23,12 +24,9 @@ export interface PreparationWork {
   attempt_count: number
 }
 
-export interface PreparationFailureNoticeWork {
-  run_id: string
-  input: JsonObject
-  failure_code: string | null
-  claim_token: string
-}
+// The notice is a cross-service message, so its field set belongs to the contract and is
+// re-exported rather than restated; a local copy would drift from the schema the connector reads.
+export type { RunFailureNoticeWork }
 
 /** One run whose expired lease could not be concluded, and why.
  *
@@ -164,18 +162,28 @@ export class PreparationStore {
       )
   }
 
-  async claimNextFailureNotice(): Promise<PreparationFailureNoticeWork | null> {
+  async claimNextFailureNotice(): Promise<RunFailureNoticeWork | null> {
     return await transaction(this.pool, async (client) => {
       const candidate = await client.query<{
         run_id: string
         input: JsonObject
+        failure_stage: 'preparation' | 'execution' | 'publication'
         failure_code: string | null
         status: 'pending' | 'delivering'
       }>(
-        `SELECT n.run_id,p.input,n.failure_code,n.status AS status
-         FROM preparation_failure_notices n
-         JOIN preparations p
+        // The run's input is taken from whichever axis row still holds it. A notice can now be
+        // produced by an execution or publication failure, and those runs may have a preparation
+        // row with no input left, so joining `preparations` alone would silently drop them.
+        `SELECT n.run_id,
+                COALESCE(p.input, e.input, b.input) AS input,
+                n.failure_stage,n.failure_code,n.status AS status
+         FROM run_failure_notices n
+         LEFT JOIN preparations p
            ON p.run_id=n.run_id AND p.connector_id=n.connector_id
+         LEFT JOIN executions e
+           ON e.run_id=n.run_id AND e.connector_id=n.connector_id
+         LEFT JOIN publications b
+           ON b.run_id=n.run_id AND b.connector_id=n.connector_id
          WHERE n.connector_id=$1 AND (n.status='pending' OR
            (n.status='delivering' AND n.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
          ORDER BY n.updated_at,n.run_id FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
@@ -192,7 +200,7 @@ export class PreparationStore {
       const claimedNotice = await client.query<{
         status: 'pending' | 'delivering'
       }>(
-        `UPDATE preparation_failure_notices
+        `UPDATE run_failure_notices
          SET status='delivering', claim_token=$2,
              claimed_at=clock_timestamp(), updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$3 AND status=$4
@@ -223,10 +231,11 @@ export class PreparationStore {
   ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
-        `UPDATE preparation_failure_notices SET status=$4, claim_token=NULL,
+        `UPDATE run_failure_notices SET status=$4, claim_token=NULL,
            claimed_at=NULL, updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='delivering' AND claim_token=$3`,
-        [runId, this.connectorId, token, delivered ? 'delivered' : 'skipped']
+        // `failed`, not `skipped`: the connector attempted delivery and could not complete it.
+        [runId, this.connectorId, token, delivered ? 'delivered' : 'failed']
       )
       if (result.rowCount !== 1) return false
       await appendEvent(client, {
@@ -234,7 +243,7 @@ export class PreparationStore {
         connectorId: this.connectorId,
         axis: 'notice',
         fromStatus: 'delivering',
-        toStatus: delivered ? 'delivered' : 'skipped'
+        toStatus: delivered ? 'delivered' : 'failed'
       })
       return true
     })
@@ -379,8 +388,8 @@ export class PreparationStore {
     // real failure (for example rate limiting) reports that failure instead of the generic
     // exhaustion code.
     await client.query(
-      `INSERT INTO preparation_failure_notices (run_id,connector_id,status,failure_code)
-       VALUES ($1,$2,'pending',$3) ON CONFLICT (run_id) DO NOTHING`,
+      `INSERT INTO run_failure_notices (run_id,connector_id,status,failure_stage,failure_code)
+       VALUES ($1,$2,'pending','preparation',$3) ON CONFLICT (run_id) DO NOTHING`,
       [runId, this.connectorId, row.failure_code]
     )
     await appendEvent(client, {
@@ -509,8 +518,8 @@ export class PreparationStore {
         ? null
         : await abandonInFlightPublication(client, this.connectorId, runId)
       await client.query(
-        `INSERT INTO preparation_failure_notices (run_id,connector_id,status,failure_code)
-         VALUES ($1,$2,'pending',$3) ON CONFLICT (run_id) DO NOTHING`,
+        `INSERT INTO run_failure_notices (run_id,connector_id,status,failure_stage,failure_code)
+         VALUES ($1,$2,'pending','preparation',$3) ON CONFLICT (run_id) DO NOTHING`,
         [runId, this.connectorId, error.code ?? null]
       )
       await appendEvent(client, {

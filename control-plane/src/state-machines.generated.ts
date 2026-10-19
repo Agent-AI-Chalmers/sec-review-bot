@@ -275,27 +275,28 @@ export const STATE_MACHINES: readonly StateMachine[] = [
     axis: 'notice',
     order: 4,
     title: 'Failure notice',
-    field: 'preparation.failure_notice_status',
+    field: 'failure_notice.status',
     initial: 'pending',
-    terminal: ['delivered', 'skipped'],
-    states: ['pending', 'delivering', 'delivered', 'skipped'],
+    terminal: ['delivered', 'failed'],
+    states: ['pending', 'delivering', 'delivered', 'failed'],
     details: {
       pending: {
         label: 'Pending',
         description:
-          'A terminal preparation failure happened and the user still has to be told.'
+          'A run ended on some axis and the requester still has to be told.'
       },
       delivering: {
         label: 'Delivering',
-        description: 'The failure notice is being delivered to the user.'
+        description: 'The failure notice is being delivered to the requester.'
       },
       delivered: {
         label: 'Delivered',
-        description: 'The user-visible failure notice was delivered.'
+        description: 'The requester was told the run failed.'
       },
-      skipped: {
-        label: 'Skipped',
-        description: 'No notice will be delivered for this failure.'
+      failed: {
+        label: 'Delivery failed',
+        description:
+          'Delivery was attempted and did not succeed, most often because the provider could not be reached. The notice is retained as the record that the requester was never told.'
       }
     },
     transitions: [
@@ -317,8 +318,8 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       },
       {
         from: 'delivering',
-        to: 'skipped',
-        label: 'notice skipped'
+        to: 'failed',
+        label: 'delivery failed'
       }
     ]
   }
