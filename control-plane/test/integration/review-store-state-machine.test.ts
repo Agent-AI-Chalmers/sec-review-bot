@@ -5,7 +5,14 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
 
-import { ReviewRunStore, type RunnerArtifactStorage } from '../../src/index.js'
+import {
+  coordinateReviewRunsOnce,
+  recoverReviewRunSubmission,
+  ReviewRunStore,
+  submitPreparedRun,
+  type RunnerArtifactStorage
+} from '../../src/index.js'
+import { RunnerSubmissionUncertainError } from '../../src/runner-client.js'
 
 const connectionString =
   process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -197,6 +204,47 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
   }
 })
 
+test('concurrent failure notice consumers cannot own the same outbox work', async () => {
+  // The notice is created by the same terminal preparation transition production
+  // uses. Its `FOR UPDATE ... SKIP LOCKED` claim must give only one connector
+  // process the acknowledgement work.
+  const sharedConnector = `notice:${randomUUID()}`
+  const producer = await createStore({
+    connectorId: sharedConnector,
+    claimTimeoutMs: 0
+  })
+  const first = await createStore({ connectorId: sharedConnector })
+  const second = await createStore({ connectorId: sharedConnector })
+  const observer = new Pool({ connectionString: requireTestDatabase() })
+  const runId = `run-concurrent-notice-${randomUUID()}`
+  try {
+    await producer.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await observer.query(
+      `UPDATE preparations SET attempt_count=8,
+        claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [runId]
+    )
+    assert.strictEqual(await producer.expireStalePreparations(), 1)
+
+    const claims = await Promise.all([
+      first.claimNextPreparationFailureNotice(),
+      second.claimNextPreparationFailureNotice()
+    ])
+    assert.strictEqual(claims.filter((claim) => claim !== null).length, 1)
+  } finally {
+    await Promise.all([
+      observer.end(),
+      producer.close(),
+      first.close(),
+      second.close()
+    ])
+  }
+})
+
 test('ReviewRunStore claims an expired preparation from its durable connector input', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-claimable-preparation-${randomUUID()}`
@@ -239,6 +287,40 @@ test('ReviewRunStore claims an expired preparation from its durable connector in
     assert.strictEqual(await store.renewPreparationClaim(runId, token), true)
   } finally {
     await store.close()
+  }
+})
+
+test('concurrent preparation consumers cannot own the same recovered work', async () => {
+  // Preparation recovery is a connector work queue just like publication. Its
+  // `FOR UPDATE ... SKIP LOCKED` claim must give one of two real connections the
+  // recovered input and leave the other empty.
+  const sharedConnector = `preparer:${randomUUID()}`
+  const first = await createStore({
+    connectorId: sharedConnector,
+    claimTimeoutMs: 0
+  })
+  const second = await createStore({
+    connectorId: sharedConnector,
+    claimTimeoutMs: 0
+  })
+  try {
+    const admission = await first.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: `run-concurrent-preparation-${randomUUID()}`,
+      publish_context: {},
+      preparation_input_version: 'v1',
+      preparation_input: { kind: 'connector_issue_review' }
+    })
+    assert.ok(admission.preparation_token)
+    assert.strictEqual(await first.expireStalePreparations(), 1)
+
+    const claims = await Promise.all([
+      first.claimNextPreparation(),
+      second.claimNextPreparation()
+    ])
+    assert.strictEqual(claims.filter((claim) => claim !== null).length, 1)
+  } finally {
+    await Promise.all([first.close(), second.close()])
   }
 })
 
@@ -556,6 +638,70 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
     )
   } finally {
     await store.close()
+  }
+})
+
+test('a restarted coordinator replays persisted uncertain submission input', async () => {
+  const sharedConnector = `recovery:${randomUUID()}`
+  const runId = `run-restarted-recovery-${randomUUID()}`
+  const input = { contract_version: 'v6', replay: true }
+  const owner = await createStore({ connectorId: sharedConnector })
+  try {
+    const admission = await owner.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await assert.rejects(
+      submitPreparedRun(
+        owner,
+        {
+          runId,
+          preparationToken: admission.preparation_token,
+          publishContext: {},
+          input
+        },
+        async () => {
+          throw new RunnerSubmissionUncertainError('response lost')
+        }
+      ),
+      RunnerSubmissionUncertainError
+    )
+    assert.strictEqual((await owner.getRun(runId))?.runner_status, 'failed')
+  } finally {
+    await owner.close()
+  }
+
+  const restarted = await createStore({ connectorId: sharedConnector })
+  const submissions: Array<Record<string, unknown>> = []
+  try {
+    await coordinateReviewRunsOnce(restarted, {
+      recoverSubmission: async (run) => {
+        await recoverReviewRunSubmission(restarted, run, {
+          async submit(request) {
+            submissions.push(request)
+          },
+          classifyError: (error) => {
+            throw error
+          }
+        })
+      },
+      async readRunnerStatuses() {
+        return { runs: [], missing: [], byRunId: new Map() }
+      },
+      async observeActiveRun() {},
+      onDroppedRunRow(dropped) {
+        throw dropped.error
+      }
+    })
+
+    assert.deepStrictEqual(submissions, [
+      { workflow: 'issue-review', run_id: runId, input }
+    ])
+    assert.strictEqual((await restarted.getRun(runId))?.runner_status, 'queued')
+  } finally {
+    await restarted.close()
   }
 })
 
@@ -927,6 +1073,26 @@ test('claimNextPublication returns the persisted result, context, and artifact',
     assert.deepStrictEqual(work?.publish_context, context)
   } finally {
     await store.close()
+  }
+})
+
+test('a restarted publisher can claim persisted publication work', async () => {
+  const sharedConnector = `publisher-restart:${randomUUID()}`
+  const runId = `run-restarted-publication-${randomUUID()}`
+  const first = await createStore({ connectorId: sharedConnector })
+  try {
+    await createSuccessfulRun(first, runId)
+  } finally {
+    await first.close()
+  }
+
+  const restarted = await createStore({ connectorId: sharedConnector })
+  try {
+    const work = await restarted.claimNextPublication()
+    assert.strictEqual(work?.run_id, runId)
+    assert.ok(work?.claim_token)
+  } finally {
+    await restarted.close()
   }
 })
 
