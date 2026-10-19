@@ -11,6 +11,10 @@ const SCHEMA_VERSIONS = [
   }
 ] as const
 
+export const KNOWN_SCHEMA_VERSIONS = SCHEMA_VERSIONS.map(
+  ({ version }) => version
+)
+
 interface AppliedSchemaVersion {
   version: number
   name: string

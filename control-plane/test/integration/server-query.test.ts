@@ -116,7 +116,9 @@ test('authenticated run queries are redacted, paginated, and survive a server re
           workflow: 'issue-review',
           ingress_kind: 'github_webhook',
           ingress_key: ingressKey,
-          publish_context: { secret: 'must-not-leak' }
+          publish_context: { secret: 'must-not-leak' },
+          preparation_input_version: 'v1',
+          preparation_input: { kind: 'test' }
         })
       })
       assert.strictEqual(admitted.status, 200)

@@ -1,3 +1,5 @@
+// Provides the typed HTTP boundary to Control Plane and keeps wire-level
+// contract details out of GitHub workflows and coordinators.
 import { operationRoutes } from './control-plane-api.js'
 import type { components, operations } from './control-plane-api.js'
 import {
@@ -8,6 +10,8 @@ import {
 export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
 export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
 export type PublicationWork = components['schemas']['PublicationWork']
+export type PreparationFailureNoticeWork =
+  components['schemas']['PreparationFailureNoticeWork']
 export type PublicationStepRecord =
   components['schemas']['PublicationStepRecord']
 
@@ -200,6 +204,8 @@ class HttpControlPlaneClient {
     runner_input?: JsonObject
     ingress_kind: 'github_webhook' | 'github_actions_dispatch'
     ingress_key: string
+    preparation_input_version: string
+    preparation_input: Record<string, unknown>
   }): Promise<ReviewRunAdmission> {
     return await this.request('admitRun', {}, run)
   }
@@ -243,6 +249,44 @@ class HttpControlPlaneClient {
 
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
     return await this.request('renewPreparationClaim', { runId }, { token })
+  }
+
+  async claimNextPreparation(): Promise<
+    components['schemas']['PreparationWork'] | null
+  > {
+    return await this.request('claimNextPreparation', {}, undefined)
+  }
+
+  async checkpointPreparationInput(
+    runId: string,
+    token: string,
+    input: JsonObject
+  ): Promise<void> {
+    await this.request(
+      'checkpointPreparationInput',
+      { runId },
+      { token, input }
+    )
+  }
+
+  async claimNextPreparationFailureNotice(): Promise<PreparationFailureNoticeWork | null> {
+    return await this.request(
+      'claimNextPreparationFailureNotice',
+      {},
+      undefined
+    )
+  }
+
+  async completePreparationFailureNotice(
+    runId: string,
+    token: string,
+    delivered: boolean
+  ): Promise<boolean> {
+    return await this.request(
+      'completePreparationFailureNotice',
+      { runId },
+      { token, delivered }
+    )
   }
 
   async preparationHeartbeatIntervalMs(): Promise<number> {
@@ -406,14 +450,19 @@ class HttpControlPlaneClient {
   async failPreparation(
     runId: string,
     token: string,
-    failure: { code?: string | null; message: string }
-  ): Promise<void> {
-    await this.request(
+    failure: { code?: string | null; message: string },
+    options: { retry: boolean; retryAfterMs?: number } = { retry: false }
+  ): Promise<{ retry_scheduled: boolean }> {
+    return await this.request(
       'failPreparation',
       { runId },
       {
         token,
-        failure
+        failure,
+        retry: options.retry,
+        ...(options.retryAfterMs === undefined
+          ? {}
+          : { retry_after_ms: options.retryAfterMs })
       }
     )
   }
@@ -426,6 +475,10 @@ export type ControlPlaneClient = Pick<
   | 'submitPreparedRun'
   | 'getRun'
   | 'renewPreparationClaim'
+  | 'claimNextPreparation'
+  | 'checkpointPreparationInput'
+  | 'claimNextPreparationFailureNotice'
+  | 'completePreparationFailureNotice'
   | 'preparationHeartbeatIntervalMs'
   | 'renewPublicationClaim'
   | 'publicationHeartbeatIntervalMs'

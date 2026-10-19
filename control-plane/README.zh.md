@@ -33,21 +33,23 @@ GitHub integration 负责解析 GitHub 请求、准备 input 和执行 GitHub �
 
 ## Run 生命周期
 
-Run 在接纳后立即进入 `preparing`。GitHub integration 准备并上传 input bundle，再使用 preparation claim 提交可重放的 Runner input。Control Plane 记录 input，并且只在 Runner 接受请求后将 run 转为 `queued`。
+Run 在接纳后立即进入 `preparing`。其独立持久化的 preparation work 持有用于隔离 input 构造的 claim。GitHub integration 准备并上传 input bundle，再使用该 claim 提交可重放的 Runner input。Control Plane 记录 input，并且只在 Runner 接受请求后将 run 转为 `queued`。
 
 Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Plane 将结果保存为 `succeeded`，使其可以被领取并发布。Integration 领取该工作，执行 GitHub 副作用，再记录 `published`、可重试的 publication 失败或终态 publication 失败。
 
-如果 Runner submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。Preparation 或 Runner 的终态失败会将 publication 标为 `skipped`。
+如果 Runner submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。Preparation 或 Runner 的终态失败会将 publication 标为 `skipped`。终态 preparation 失败还会创建 connector 所有的 notice work，因此即使原 preparation owner 已崩溃，connector 仍可告知用户。
 
 ## 持久化模型
 
 执行和发布是两个分开的状态机：
 
-| 表                  | 职责                                  | 状态                                                                  |
-| ------------------- | ------------------------------------- | --------------------------------------------------------------------- |
-| `review_runs`       | 接纳、Runner 观察和终态 workflow 数据 | `preparing`、`recovering`、`queued`、`running`、`succeeded`、`failed` |
-| `publications`      | 整体发布的所有权和结果                | `pending`、`publishing`、`published`、`failed`、`skipped`             |
-| `publication_steps` | 可恢复的单个 connector 副作用         | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`        |
+| 表                            | 职责                                  | 状态                                                                  |
+| ----------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
+| `review_runs`                 | 接纳、Runner 观察和终态 workflow 数据 | `preparing`、`recovering`、`queued`、`running`、`succeeded`、`failed` |
+| `preparations`                | 可领取的 input preparation            | `pending`、`claimed`、`submitted`、`failed`                           |
+| `preparation_failure_notices` | connector 所有的终态失败确认          | `pending`、`claimed`、`delivered`、`skipped`                          |
+| `publications`                | 整体发布的所有权和结果                | `pending`、`publishing`、`published`、`failed`、`skipped`             |
+| `publication_steps`           | 可恢复的单个 connector 副作用         | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`        |
 
 ```mermaid
 flowchart LR
@@ -81,7 +83,9 @@ flowchart LR
 
 ## Claim 和恢复
 
-Preparation、submission recovery、publication 和 publication step 提交使用 claim token 隔离过期 owner。Input preparation 活跃期间，GitHub integration 会续租 preparation claim；只有真正被遗弃的 preparation 才会在 claim timeout 后过期。超时 owner 可以完成已发出的外部请求，但在新 owner 获得 token 后不能再提交状态。
+Preparation、submission recovery、publication、publication step 提交和终态 preparation notice 都使用 claim token 隔离过期 owner。Input preparation 活跃期间，GitHub integration 会续租 preparation claim。过期的 preparation 通常会回到 `pending`；在有限重试预算耗尽后，它会使 run 失败、跳过 publication，并创建持久化的 connector notice work。超时 owner 可以完成已发出的外部请求，但在新 owner 获得 token 后不能再提交状态。
+
+若要自动恢复 preparation，connector 会在 admission 时提交版本化、opaque 的 preparation input。Control Plane 只持久化并返还该 input 给拥有工作的一方，绝不解释其中任何 provider 专属字段。没有提供可重放 input 的 connector 仍可同步 prepare，但其过期工作不能由恢复 worker 领取。
 
 `run_id` 在 PostgreSQL 中全局唯一。`ingress_kind` 和 `ingress_key` 提供 connector 范围的入口幂等。`connector_id` 隔离读取、claim、publication 和 publication step。持久化操作日志同时包含 `connector_id` 和 `run_id`。
 
@@ -92,6 +96,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 | Endpoint                                 | 认证                       | 用途                              |
 | ---------------------------------------- | -------------------------- | --------------------------------- |
 | `GET /healthz`                           | 无                         | 进程健康检查                      |
+| `GET /readyz`                            | 无                         | PostgreSQL 支持的协调就绪检查     |
 | `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | 支持过滤和 cursor 分页的 run 列表 |
 | `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | 脱敏的 run 详情                   |
 | `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication step 摘要             |
@@ -103,6 +108,8 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 查询响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
 查询响应报告两个状态轴（`execution_status`、`publication_status`），筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。
+
+`/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Control Plane healthcheck。Runner 与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
 
 ## 配置
 
@@ -145,4 +152,4 @@ pnpm run test:integration
 
 契约本身由族工具（位于 [`contracts/control-plane-api/tools`](../contracts/control-plane-api/tools/README.md)）用 Spectral 检查，其投影也由该工具做新鲜度校验。
 
-`pnpm run test:integration` 需要 `TEST_DATABASE_URL` 或 `DATABASE_URL` 指向可清空的 PostgreSQL 数据库。
+`pnpm run test:integration` 在提供 `TEST_DATABASE_URL` 或 `DATABASE_URL` 时使用该地址；它必须指向可清空的 PostgreSQL 数据库。两个变量都未提供时，该命令会用仓库根目录 `compose.yaml` 声明的 PostgreSQL 镜像启动一个短生命周期本地 Docker 容器，并在测试完成后删除。Docker 在本地缺少该镜像时会拉取，因此此回退方式要求 Docker 可用且能访问镜像仓库；可通过 `TEST_POSTGRES_IMAGE` 显式使用其他镜像。

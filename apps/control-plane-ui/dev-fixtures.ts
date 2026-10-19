@@ -197,7 +197,7 @@ const SCENARIOS: readonly Scenario[] = [
   {
     execution_status: 'failed',
     publication_status: 'skipped',
-    failure_code: 'PREPARATION_INTERRUPTED',
+    failure_code: 'PREPARATION_RETRY_EXHAUSTED',
     artifact: null,
     executionMs: 601_000,
     publicationMs: 601_000,

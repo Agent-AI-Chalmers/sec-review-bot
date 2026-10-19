@@ -1,3 +1,5 @@
+// Turns a pull-request review request into a durable run and preserves enough
+// connector input to resume preparation after an integration restart.
 import { admitReviewRun } from '../control-plane/admission.js'
 import {
   PreparationClaimLostError,
@@ -11,6 +13,7 @@ import { controlPlaneClient } from '../control-plane/client.js'
 import type { TestChangesPolicy } from '../runner/input.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
+import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
 import {
   startPullRequestReviewRun,
   type SubmittedPullRequestReviewRun
@@ -25,6 +28,9 @@ type PullRequestReviewControlPlaneClient = {
   ) =>
     | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
     | ReturnType<typeof controlPlaneClient.admitReviewRun>
+  checkpointPreparationInput?: (
+    ...args: Parameters<typeof controlPlaneClient.checkpointPreparationInput>
+  ) => Promise<void>
   failPreparation: (
     ...args: Parameters<typeof controlPlaneClient.failPreparation>
   ) => unknown
@@ -53,6 +59,12 @@ interface StartPullRequestReviewCommandArgs {
   // patch-level test-changes constraint stays meaningful here.
   test_changes?: TestChangesPolicy | null
   delivery_id: string
+  preparation_input?: Record<string, unknown>
+  claimed_preparation?: {
+    run_id: string
+    token: string
+    attempt_count?: number
+  }
   on_admitted?: (admission: {
     run_id: string
     status: string
@@ -73,6 +85,8 @@ export async function startPullRequestReviewCommand({
   event_type,
   test_changes = null,
   delivery_id,
+  preparation_input,
+  claimed_preparation,
   on_admitted,
   deps = {}
 }: StartPullRequestReviewCommandArgs): Promise<StartedPullRequestReview> {
@@ -80,21 +94,42 @@ export async function startPullRequestReviewCommand({
     start_review = startPullRequestReviewRun,
     store = controlPlaneClient
   } = deps
-  const admission = await admitReviewRun(store, {
-    workflow: 'pull-request-review',
-    ingress_kind: 'github_webhook',
-    ingress_key: delivery_id
-  })
-  on_admitted?.({
-    run_id: admission.run_id,
-    status: admission.status,
-    replayed: !admission.created
-  })
-  if (!admission.created) {
-    return { run_id: admission.run_id }
+  const durableInput =
+    preparation_input ??
+    (pr === undefined
+      ? undefined
+      : {
+          kind: 'github_pull_request_review',
+          pr,
+          trusted_default_branch,
+          event_type,
+          test_changes
+        })
+  if (durableInput === undefined)
+    throw new Error('Pull request preparation input is required for admission.')
+  const admission =
+    claimed_preparation === undefined
+      ? await admitReviewRun(store, {
+          workflow: 'pull-request-review',
+          ingress_kind: 'github_webhook',
+          ingress_key: delivery_id,
+          preparation_input: durableInput
+        })
+      : null
+  if (admission !== null) {
+    on_admitted?.({
+      run_id: admission.run_id,
+      status: admission.status,
+      replayed: !admission.created
+    })
+    if (!admission.created) return { run_id: admission.run_id }
   }
-  const run_id = admission.run_id
-  const preparationToken = admission.preparation_token
+  const run_id = claimed_preparation?.run_id ?? admission?.run_id
+  const preparationToken =
+    claimed_preparation?.token ?? admission?.preparation_token
+  const preparationAttempt = claimed_preparation?.attempt_count ?? 1
+  if (run_id === undefined)
+    throw new Error('Preparation admission did not return a run id.')
   if (!preparationToken)
     throw new Error(
       `Newly admitted review run ${run_id} has no preparation claim.`
@@ -113,6 +148,17 @@ export async function startPullRequestReviewCommand({
     const resolvedPr = pr ?? (await resolve_pr?.())
     if (resolvedPr === undefined) {
       throw new Error('Pull request context is missing after admission.')
+    }
+    if (durableInput.pr === undefined) {
+      // The initial comment webhook has only a PR reference. Once that reference
+      // resolves, checkpoint the full connector input before expensive preparation
+      // so a crash resumes this PR snapshot instead of resolving a newer head.
+      if (store.checkpointPreparationInput === undefined)
+        throw new Error('Preparation input checkpointing is unavailable.')
+      await store.checkpointPreparationInput(run_id, preparationToken, {
+        ...durableInput,
+        pr: resolvedPr
+      })
     }
     submitted = await start_review({
       octokit,
@@ -140,12 +186,27 @@ export async function startPullRequestReviewCommand({
       !(error instanceof ControlPlaneSubmissionError) &&
       !(error instanceof PreparationClaimLostError)
     ) {
-      await store.failPreparation(run_id, preparationToken, {
-        code: isSetupDeclarationError(error)
-          ? 'SETUP_DECLARATION_INVALID'
-          : 'REVIEW_START_FAILED',
-        message: error instanceof Error ? error.message : String(error)
-      })
+      const classification = classifyPreparationFailure(
+        error,
+        preparationAttempt,
+        isSetupDeclarationError(error)
+      )
+      await store.failPreparation(
+        run_id,
+        preparationToken,
+        {
+          code: isSetupDeclarationError(error)
+            ? 'SETUP_DECLARATION_INVALID'
+            : 'REVIEW_START_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        },
+        {
+          retry: classification.retry,
+          ...(classification.retryAfterMs === undefined
+            ? {}
+            : { retryAfterMs: classification.retryAfterMs })
+        }
+      )
     }
     throw error
   } finally {

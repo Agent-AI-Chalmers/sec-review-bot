@@ -15,7 +15,7 @@
     "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:schema && pnpm run copy:spec",
     "server": "pnpm run build && node dist/server.js",
     "test": "pnpm run build && node --import tsx --test test/*.test.ts",
-    "test:integration": "pnpm run build && node --import tsx --test test/integration/*.test.ts",
+    "test:integration": "node --import tsx scripts/postgres-integration-test-launcher.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

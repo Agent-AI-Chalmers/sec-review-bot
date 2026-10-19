@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import Fastify from 'fastify'
 import { Pool } from 'pg'
 
 import { ReviewRunStore } from '../../src/index.js'
+
+process.env.NODE_ENV = 'test'
+const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } =
+  await import(new URL('../../dist/server.js', import.meta.url).href)
 
 function databaseUrl() {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -39,6 +44,58 @@ test('Control Plane store initializes its schema and deduplicates ingress', asyn
     assert.strictEqual(replay.record.run_id, first.record.run_id)
   } finally {
     await store.close()
+  }
+})
+
+test('Control Plane readiness route rejects a schema ledger from a newer application', async () => {
+  const schema = `readiness_${randomUUID().replaceAll('-', '')}`
+  const observer = new Pool({ connectionString: databaseUrl() })
+  await observer.query(`CREATE SCHEMA ${schema}`)
+  const pool = new Pool({
+    connectionString: databaseUrl(),
+    options: `-c search_path=${schema},public`
+  })
+  const store = new ReviewRunStore({
+    pool,
+    connectorId: `control-plane-test:${randomUUID()}`
+  })
+  const app = Fastify(CONTROL_PLANE_FASTIFY_OPTIONS)
+  let poolClosed = false
+  try {
+    await store.initialize()
+    await registerControlPlaneRoutes(app, {
+      store,
+      serviceToken: 'service-token',
+      readToken: 'read-token'
+    })
+    await app.ready()
+    const ready = await app.inject({ method: 'GET', url: '/readyz' })
+    assert.strictEqual(ready.statusCode, 200)
+    assert.deepStrictEqual(ready.json(), { status: 'ok' })
+    await pool.query(
+      `INSERT INTO schema_versions (version,name,checksum)
+       VALUES (999999, 'newer_application', '0000000000000000000000000000000000000000000000000000000000000000')`
+    )
+    const unavailable = await app.inject({ method: 'GET', url: '/readyz' })
+    assert.strictEqual(unavailable.statusCode, 503)
+    assert.deepStrictEqual(unavailable.json(), { status: 'unavailable' })
+
+    await pool.query('DELETE FROM schema_versions WHERE version=999999')
+    await pool.query('DELETE FROM schema_versions WHERE version=1')
+    const missingSchema = await app.inject({ method: 'GET', url: '/readyz' })
+    assert.strictEqual(missingSchema.statusCode, 503)
+    assert.deepStrictEqual(missingSchema.json(), { status: 'unavailable' })
+
+    await pool.end()
+    poolClosed = true
+    const unavailablePool = await app.inject({ method: 'GET', url: '/readyz' })
+    assert.strictEqual(unavailablePool.statusCode, 503)
+    assert.deepStrictEqual(unavailablePool.json(), { status: 'unavailable' })
+  } finally {
+    await app.close()
+    if (!poolClosed) await store.close()
+    await observer.query(`DROP SCHEMA ${schema} CASCADE`)
+    await observer.end()
   }
 })
 

@@ -1,3 +1,5 @@
+// Builds the authenticated Control Plane HTTP surface from the OpenAPI contract
+// and connects transport operations to the durable coordination store.
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -306,6 +308,19 @@ export async function registerControlPlaneRoutes(
   > = {
     getHealth: async () => ({ status: 'ok' }),
 
+    getReadiness: async (_request, reply) => {
+      try {
+        await store.checkReadiness()
+        return { status: 'ok' }
+      } catch (error) {
+        logEvent('control_plane_readiness_failed', {
+          connector_id: store.connectorId,
+          message: error instanceof Error ? error.message : String(error)
+        })
+        return reply.code(503).send({ status: 'unavailable' })
+      }
+    },
+
     listRuns: async (request) => {
       const url = new URL(request.url ?? '/', 'http://control-plane.local')
       const listOptions = parseListQuery(url)
@@ -339,9 +354,19 @@ export async function registerControlPlaneRoutes(
 
     admitRun: async (request) => {
       const body = request.body as RequestBody<'admitRun'>
+      if (
+        body.preparation_input === undefined ||
+        body.preparation_input_version === undefined
+      )
+        throw new Error('Preparation input is required for run admission.')
       // `run_id` last, so a body field of the same name (today the contract forbids one)
       // could never override the id Control Plane assigns.
-      return await store.admitReviewRun({ ...body, run_id: randomUUID() })
+      return await store.admitReviewRun({
+        ...body,
+        preparation_input: body.preparation_input,
+        preparation_input_version: body.preparation_input_version,
+        run_id: randomUUID()
+      })
     },
 
     submitPreparedRun: async (request) => {
@@ -366,12 +391,41 @@ export async function registerControlPlaneRoutes(
       return await store.renewPreparationClaim(runId, token)
     },
 
-    failPreparation: async (request, reply) => {
+    claimNextPreparation: async () => await store.claimNextPreparation(),
+
+    checkpointPreparationInput: async (request) => {
+      const { runId } =
+        request.params as PathParams<'checkpointPreparationInput'>
+      const { token, input } =
+        request.body as RequestBody<'checkpointPreparationInput'>
+      await store.checkpointPreparationInput(runId, token, input)
+    },
+
+    claimNextPreparationFailureNotice: async () =>
+      await store.claimNextPreparationFailureNotice(),
+
+    failPreparation: async (request) => {
       const { runId } = request.params as PathParams<'failPreparation'>
-      const { token, failure } = request.body as RequestBody<'failPreparation'>
-      await store.failPreparation(runId, token, failure)
-      // The contract declares no body; send an empty 200 rather than a literal `null`.
-      return reply.code(200).send()
+      const { token, failure, retry, retry_after_ms } =
+        request.body as RequestBody<'failPreparation'>
+      return await store.failPreparation(runId, token, failure, {
+        retry: retry ?? false,
+        ...(retry_after_ms === undefined
+          ? {}
+          : { retryAfterMs: retry_after_ms })
+      })
+    },
+
+    completePreparationFailureNotice: async (request) => {
+      const { runId } =
+        request.params as PathParams<'completePreparationFailureNotice'>
+      const { token, delivered } =
+        request.body as RequestBody<'completePreparationFailureNotice'>
+      return await store.completePreparationFailureNotice(
+        runId,
+        token,
+        delivered
+      )
     },
 
     claimNextPublication: async (request) => {

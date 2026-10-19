@@ -1,3 +1,5 @@
+// Verifies the integration's typed Control Plane client at its HTTP and
+// contract boundary, without involving connector workflow behavior.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -91,7 +93,9 @@ test('repository preparation can replace the admitted empty publish context', as
     workflow: 'repository-review',
     publish_context: {},
     ingress_kind: 'github_actions_dispatch',
-    ingress_key: 'octo/example:dispatch-1'
+    ingress_key: 'octo/example:dispatch-1',
+    preparation_input_version: 'v1',
+    preparation_input: { kind: 'test' }
   })
   assert.strictEqual(admission.record.runner_status, 'preparing')
 
@@ -228,7 +232,7 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
 })
 
 test('void operations accept the empty 200 body the real server sends', async (t) => {
-  // Three operations (`failPreparation`, `initializePublicationSteps`,
+  // Four operations (`checkpointPreparationInput`, `failPreparation`, `initializePublicationSteps`,
   // `requirePublicationStepClaim`) declare a 200 with no content, and the server answers
   // `reply.code(200).send()` — a zero-byte body. Every other mock in this file uses
   // `Response.json(...)`, which always has a body, so `request()` parsing the success
@@ -265,6 +269,12 @@ test('void operations accept the empty 200 body the real server sends', async (t
       'claim-1',
       'a'
     ),
+    undefined
+  )
+  assert.strictEqual(
+    await controlPlaneClient.checkpointPreparationInput('run-1', 'prep-1', {
+      resolved: true
+    }),
     undefined
   )
   assert.strictEqual(

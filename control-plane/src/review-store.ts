@@ -1,3 +1,5 @@
+// Implements Control Plane's durable review, preparation, and publication
+// state machines. Claim tokens here are the sole fencing authority for writes.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
@@ -5,11 +7,10 @@ import type {
   ControlPlaneWorkflow as WorkflowName,
   RunnerArtifactStorage
 } from './contracts.js'
-import { applySchemaVersions } from './database/schema-version-runner.js'
 import {
-  DeterministicControlPlaneError,
-  PUBLICATION_STEP_ERROR_CODES
-} from './errors.js'
+  applySchemaVersions,
+  KNOWN_SCHEMA_VERSIONS
+} from './database/schema-version-runner.js'
 import {
   normalizeArtifactStorage,
   type CreateReviewRunArgs,
@@ -20,6 +21,12 @@ import {
   type ReviewRunRecord,
   type RunnerStatus
 } from './shapes.js'
+import {
+  PreparationStore,
+  type PreparationFailureNoticeWork,
+  type PreparationWork
+} from './preparation-store.js'
+import { PublicationStore } from './publication-store.js'
 
 export type {
   CreateReviewRunArgs,
@@ -33,6 +40,11 @@ export type {
 
 type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject
+
+export type {
+  PreparationFailureNoticeWork,
+  PreparationWork
+} from './preparation-store.js'
 
 interface ReviewRunRow {
   run_id: string
@@ -56,7 +68,6 @@ interface ReviewRunRow {
   ingress_key: string | null
 }
 
-const MAX_PUBLICATION_STEP_FAILURES = 3
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
 /** How often a waiting publication claim re-checks for work. The state is a local indexed
  * query, so this trades a cheap read against how quickly the caller starts publishing. */
@@ -163,6 +174,8 @@ export class ReviewRunStore {
   private readonly pool: Pool
   readonly connectorId: string
   private readonly claimTimeoutMs: number
+  private readonly preparations: PreparationStore
+  private readonly publications: PublicationStore
   private initialized = false
 
   constructor({
@@ -179,6 +192,16 @@ export class ReviewRunStore {
     this.pool = pool ?? new Pool({ connectionString })
     this.connectorId = connectorId
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
+    this.preparations = new PreparationStore(
+      this.pool,
+      this.connectorId,
+      this.claimTimeoutMs
+    )
+    this.publications = new PublicationStore(
+      this.pool,
+      this.connectorId,
+      this.claimTimeoutMs
+    )
   }
 
   async initialize(): Promise<void> {
@@ -186,6 +209,24 @@ export class ReviewRunStore {
     await applySchemaVersions(this.pool)
     this.initialized = true
   }
+
+  /** Verify the dependency boundary required to accept coordination requests. */
+  async checkReadiness(): Promise<void> {
+    this.ready()
+    const result = await this.pool.query<{ version: number }>(
+      'SELECT version FROM schema_versions ORDER BY version'
+    )
+    const appliedVersions = result.rows.map(({ version }) => version)
+    if (
+      appliedVersions.length !== KNOWN_SCHEMA_VERSIONS.length ||
+      appliedVersions.some(
+        (version, index) => version !== KNOWN_SCHEMA_VERSIONS[index]
+      )
+    ) {
+      throw new Error('Control Plane schema ledger is not current.')
+    }
+  }
+
   private ready(): void {
     if (!this.initialized)
       throw new Error('ReviewRunStore.initialize() must complete before use.')
@@ -209,8 +250,8 @@ export class ReviewRunStore {
     const preparationToken = crypto.randomUUID()
     await client.query(
       `INSERT INTO review_runs
-      (run_id,connector_id,workflow,publish_context,runner_input,runner_status,preparation_claim_token,preparation_claimed_at,ingress_kind,ingress_key)
-      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'preparing',$6,clock_timestamp(),$7,$8)`,
+      (run_id,connector_id,workflow,publish_context,runner_input,runner_status,ingress_kind,ingress_key)
+      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'preparing',$6,$7)`,
       [
         run.run_id,
         this.connectorId,
@@ -219,9 +260,20 @@ export class ReviewRunStore {
         run.runner_input === undefined
           ? null
           : JSON.stringify(run.runner_input),
-        preparationToken,
         run.ingress_kind ?? null,
         run.ingress_key ?? null
+      ]
+    )
+    await client.query(
+      `INSERT INTO preparations
+        (run_id,connector_id,input_version,input,status,claim_token,claimed_at,attempt_count)
+       VALUES ($1,$2,$3,$4::jsonb,'claimed',$5,clock_timestamp(),1)`,
+      [
+        run.run_id,
+        this.connectorId,
+        run.preparation_input_version ?? 'direct-v1',
+        JSON.stringify(run.preparation_input ?? {}),
+        preparationToken
       ]
     )
     await client.query(
@@ -260,47 +312,8 @@ export class ReviewRunStore {
         )
         const row = existing.rows[0]
         if (row === undefined) return await this.insertWith(client, run)
-        if (
-          row.runner_status === 'preparing' ||
-          (row.runner_status === 'failed' &&
-            row.runner_failure_code === 'PREPARATION_INTERRUPTED')
-        ) {
-          const token = crypto.randomUUID()
-          const reclaimed = await client.query(
-            `
-            UPDATE review_runs
-            SET runner_status='preparing', runner_failure_code=NULL, runner_failure_message=NULL,
-                preparation_claim_token=$2,
-                preparation_claimed_at=clock_timestamp(),
-                updated_at=clock_timestamp()
-            WHERE run_id=$1
-              AND (
-                (runner_status='preparing' AND preparation_claimed_at <= clock_timestamp()-($3*interval '1 millisecond'))
-                OR (runner_status='failed' AND runner_failure_code='PREPARATION_INTERRUPTED')
-              )
-          `,
-            [row.run_id, token, this.claimTimeoutMs]
-          )
-          if (reclaimed.rowCount !== 1)
-            return {
-              record: rowToRecord(row),
-              created: false,
-              preparation_token: null
-            }
-          await client.query(
-            `
-            UPDATE publications
-            SET status='pending', claim_token=NULL, failure_code=NULL,
-                failure_message=NULL, updated_at=clock_timestamp()
-            WHERE run_id=$1 AND connector_id=$2 AND status='skipped'
-          `,
-            [row.run_id, this.connectorId]
-          )
-          const record = await this.getWith(client, row.run_id)
-          if (record === null)
-            throw new Error(`Reclaimed review run was not found: ${row.run_id}`)
-          return { record, created: true, preparation_token: token }
-        }
+        // Ingress replay is an idempotent read. The preparation coordinator is
+        // the sole owner of post-admission claims, including lease recovery.
         return {
           record: rowToRecord(row),
           created: false,
@@ -343,7 +356,12 @@ export class ReviewRunStore {
       UPDATE review_runs
       SET publish_context=$3::jsonb, runner_input=$4::jsonb, updated_at=clock_timestamp()
       WHERE run_id=$1 AND connector_id=$5
-        AND runner_status='preparing' AND preparation_claim_token=$2
+        AND runner_status='preparing' AND EXISTS (
+          SELECT 1 FROM preparations
+          WHERE preparations.run_id=review_runs.run_id
+            AND preparations.connector_id=$5 AND preparations.status='claimed'
+            AND preparations.claim_token=$2
+        )
         AND workflow=$6
     `,
       [
@@ -362,48 +380,81 @@ export class ReviewRunStore {
   }
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
     this.ready()
-    const result = await this.pool.query(
-      `
-      UPDATE review_runs
-      SET preparation_claimed_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-        AND runner_status='preparing' AND preparation_claim_token=$3
-    `,
-      [runId, this.connectorId, token]
+    return await this.preparations.renewClaim(runId, token)
+  }
+  async claimNextPreparation(): Promise<PreparationWork | null> {
+    this.ready()
+    return await this.preparations.claimNext()
+  }
+  async checkpointPreparationInput(
+    runId: string,
+    token: string,
+    input: JsonObject
+  ): Promise<void> {
+    this.ready()
+    await this.preparations.checkpointInput(runId, token, input)
+  }
+  async claimNextPreparationFailureNotice(): Promise<PreparationFailureNoticeWork | null> {
+    this.ready()
+    return await this.preparations.claimNextFailureNotice()
+  }
+  async completePreparationFailureNotice(
+    runId: string,
+    token: string,
+    delivered: boolean
+  ): Promise<boolean> {
+    this.ready()
+    return await this.preparations.completeFailureNotice(
+      runId,
+      token,
+      delivered
     )
-    // The token predicate is the fencing boundary: a stale preparer must not
-    // extend a claim after another ingress replay has taken ownership.
-    return result.rowCount === 1
   }
   preparationHeartbeatIntervalMs(): number {
-    // The lease owner defines this cadence so clients cannot silently drift
-    // beyond a deployment-specific preparation timeout.
-    return Math.max(1, Math.min(60_000, Math.floor(this.claimTimeoutMs / 3)))
+    return this.preparations.heartbeatIntervalMs()
   }
   async markQueued(
     runId: string,
     token: string,
     context: PublishContext
   ): Promise<void> {
-    const run = await this.getRun(runId)
-    if (run === null) throw new Error(`Review run does not exist: ${runId}`)
-    const result = await this.pool.query(
-      `
-      UPDATE review_runs
-      SET publish_context=$3::jsonb, runner_status='queued',
-          preparation_claim_token=NULL, preparation_claimed_at=NULL,
-          runner_failure_code=NULL, runner_failure_message=NULL,
-          updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$4
-        AND runner_status='preparing' AND preparation_claim_token=$2
-        AND workflow=$5
-    `,
-      [runId, token, JSON.stringify(context), this.connectorId, run.workflow]
-    )
-    if (result.rowCount !== 1)
-      throw new Error(
-        `Review run ${runId} cannot transition from preparing to queued.`
+    return await transaction(this.pool, async (client) => {
+      const run = await this.getWith(client, runId)
+      if (run === null) throw new Error(`Review run does not exist: ${runId}`)
+      const result = await client.query(
+        `
+        UPDATE review_runs
+        SET publish_context=$3::jsonb, runner_status='queued',
+            runner_failure_code=NULL, runner_failure_message=NULL,
+            updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$4
+          AND runner_status='preparing' AND EXISTS (
+            SELECT 1 FROM preparations
+            WHERE preparations.run_id=review_runs.run_id
+              AND preparations.connector_id=$4 AND preparations.status='claimed'
+              AND preparations.claim_token=$2
+          )
+          AND workflow=$5
+      `,
+        [runId, token, JSON.stringify(context), this.connectorId, run.workflow]
       )
+      if (result.rowCount !== 1)
+        throw new Error(
+          `Review run ${runId} cannot transition from preparing to queued.`
+        )
+      const completed = await client.query(
+        `UPDATE preparations
+         SET status='submitted', claim_token=NULL, claimed_at=NULL,
+             updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$2 AND status='claimed'
+           AND claim_token=$3`,
+        [runId, this.connectorId, token]
+      )
+      if (completed.rowCount !== 1)
+        throw new Error(
+          `Preparation ${runId} lost its claim before the queued transition completed.`
+        )
+    })
   }
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
     this.ready()
@@ -511,33 +562,8 @@ export class ReviewRunStore {
     return { runs, next_cursor, dropped }
   }
   async expireStalePreparations(): Promise<number> {
-    return await transaction(this.pool, async (client) => {
-      const expired = await client.query<{ run_id: string }>(
-        `
-        UPDATE review_runs
-        SET runner_status='failed', preparation_claim_token=NULL,
-            preparation_claimed_at=NULL, runner_failure_code='PREPARATION_INTERRUPTED',
-            runner_failure_message='Review preparation did not finish before its claim expired.',
-            updated_at=clock_timestamp()
-        WHERE connector_id=$1 AND runner_status='preparing'
-          AND preparation_claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
-        RETURNING run_id
-      `,
-        [this.connectorId, this.claimTimeoutMs]
-      )
-      if (expired.rowCount === 0) return 0
-
-      await client.query(
-        `
-        UPDATE publications
-        SET status='skipped', claim_token=NULL,
-            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-        WHERE connector_id=$1 AND run_id=ANY($2::text[]) AND status='pending'
-      `,
-        [this.connectorId, expired.rows.map((row) => row.run_id)]
-      )
-      return expired.rowCount ?? 0
-    })
+    this.ready()
+    return await this.preparations.expireStale()
   }
   /** Recoverable runs, as a projection rather than a bare array: a row the contract cannot
    * represent is returned in `dropped` instead of aborting the read. */
@@ -829,142 +855,34 @@ export class ReviewRunStore {
     })
   }
   publicationHeartbeatIntervalMs(): number {
-    return Math.max(100, Math.min(30_000, Math.floor(this.claimTimeoutMs / 3)))
+    return this.publications.heartbeatIntervalMs()
   }
   async renewPublicationClaim(runId: string, token: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `
-      UPDATE publications
-      SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-        AND status='publishing' AND claim_token=$3
-    `,
-      [runId, this.connectorId, token]
-    )
-    return result.rowCount === 1
+    return await this.publications.renewClaim(runId, token)
   }
   async initializePublicationSteps(
     runId: string,
     token: string,
     stepKeys: string[]
   ): Promise<void> {
-    const uniqueKeys = [...new Set(stepKeys)].sort()
-    if (uniqueKeys.length !== stepKeys.length)
-      throw new DeterministicControlPlaneError(
-        `Publication ${runId} contains duplicate step keys.`,
-        PUBLICATION_STEP_ERROR_CODES.set_duplicate
-      )
-    await transaction(this.pool, async (client) => {
-      const owner = await client.query(
-        `
-        SELECT 1 FROM publications
-        WHERE run_id=$1 AND connector_id=$2
-          AND status='publishing' AND claim_token=$3
-        FOR UPDATE
-      `,
-        [runId, this.connectorId, token]
-      )
-      if (owner.rowCount !== 1)
-        throw new Error(
-          `Publication claim was lost before steps were initialized: ${runId}`
-        )
-      const existing = await client.query<{ step_key: string }>(
-        `
-        SELECT step_key FROM publication_steps
-        WHERE run_id=$1 AND connector_id=$2
-        ORDER BY step_key
-      `,
-        [runId, this.connectorId]
-      )
-      if (existing.rowCount === 0) {
-        for (const stepKey of uniqueKeys) {
-          await client.query(
-            `
-            INSERT INTO publication_steps (connector_id,run_id,step_key,status)
-            VALUES ($1,$2,$3,'pending')
-          `,
-            [this.connectorId, runId, stepKey]
-          )
-        }
-        return
-      }
-      const persisted = existing.rows.map((row) => row.step_key).sort()
-      if (JSON.stringify(persisted) !== JSON.stringify(uniqueKeys)) {
-        throw new DeterministicControlPlaneError(
-          `Publication step set changed for run ${runId}.`,
-          PUBLICATION_STEP_ERROR_CODES.set_changed
-        )
-      }
-    })
+    return await this.publications.initializePublicationSteps(
+      runId,
+      token,
+      stepKeys
+    )
   }
   async listPublicationSteps(runId: string): Promise<PublicationStepRecord[]> {
-    const result = await this.pool.query<PublicationStepRecord>(
-      `
-      SELECT step_key,status,failure_count,remote_object_id,remote_object_url,
-             failure_code,failure_message
-      FROM publication_steps
-      WHERE run_id=$1 AND connector_id=$2
-      ORDER BY step_key
-    `,
-      [runId, this.connectorId]
-    )
-    return result.rows
-  }
-  private async claimPublicationStep(
-    runId: string,
-    token: string,
-    stepKey: string
-  ): Promise<boolean> {
-    // A running step may belong to the expired publication owner. The new
-    // owner reclaims it under the new publication token, then reconciles the
-    // stable remote identity before issuing another side effect.
-    const result = await this.pool.query(
-      `
-      UPDATE publication_steps s
-      SET status='running', updated_at=clock_timestamp()
-      FROM publications p
-      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
-        AND (s.status IN ('pending','running') OR (s.status='failed' AND s.failure_count<$5))
-        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-        AND p.status='publishing' AND p.claim_token=$4
-    `,
-      [runId, this.connectorId, stepKey, token, MAX_PUBLICATION_STEP_FAILURES]
-    )
-    return result.rowCount === 1
+    return await this.publications.listPublicationSteps(runId)
   }
   async requirePublicationStepClaim(
     runId: string,
     token: string,
     stepKey: string
   ): Promise<void> {
-    if (await this.claimPublicationStep(runId, token, stepKey)) return
-
-    // Retry exhaustion is a persisted step outcome, not merely an exception
-    // observed by one publisher. The current publication owner records it once.
-    await this.pool.query(
-      `
-      UPDATE publication_steps s
-      SET status='terminal_failed', updated_at=clock_timestamp()
-      FROM publications p
-      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
-        AND s.status='failed' AND s.failure_count>=$5
-        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-        AND p.status='publishing' AND p.claim_token=$4
-    `,
-      [runId, this.connectorId, stepKey, token, MAX_PUBLICATION_STEP_FAILURES]
-    )
-    const step = (await this.listPublicationSteps(runId)).find(
-      (item) => item.step_key === stepKey
-    )
-    if (step?.status === 'terminal_failed') {
-      throw new DeterministicControlPlaneError(
-        `Publication step exhausted its retry budget: ${stepKey}`,
-        PUBLICATION_STEP_ERROR_CODES.retry_exhausted
-      )
-    }
-    throw new DeterministicControlPlaneError(
-      `Publication step is not claimable: ${stepKey}`,
-      PUBLICATION_STEP_ERROR_CODES.not_claimable
+    return await this.publications.requirePublicationStepClaim(
+      runId,
+      token,
+      stepKey
     )
   }
   async completePublicationStep(
@@ -973,28 +891,12 @@ export class ReviewRunStore {
     stepKey: string,
     remote: { id?: string | null; url?: string | null } = {}
   ): Promise<boolean> {
-    // A publication token fences every step commit, not only the final run
-    // state. This prevents a timed-out worker from recording stale remote data.
-    const result = await this.pool.query(
-      `
-      UPDATE publication_steps s
-      SET status='succeeded', remote_object_id=$5, remote_object_url=$6,
-          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-      FROM publications p
-      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
-        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-        AND p.status='publishing' AND p.claim_token=$4
-    `,
-      [
-        runId,
-        this.connectorId,
-        stepKey,
-        token,
-        remote.id ?? null,
-        remote.url ?? null
-      ]
+    return await this.publications.completePublicationStep(
+      runId,
+      token,
+      stepKey,
+      remote
     )
-    return result.rowCount === 1
   }
   async failPublicationStep(
     runId: string,
@@ -1003,44 +905,16 @@ export class ReviewRunStore {
     error: { code?: string | null; message: string },
     options: { retry?: boolean } = {}
   ): Promise<boolean> {
-    const result = await this.pool.query(
-      `
-      UPDATE publication_steps s
-      SET status=$7, failure_count=s.failure_count+1,
-          failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
-      FROM publications p
-      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
-        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-        AND p.status='publishing' AND p.claim_token=$4
-    `,
-      [
-        runId,
-        this.connectorId,
-        stepKey,
-        token,
-        error.code ?? null,
-        error.message,
-        options.retry === false ? 'terminal_failed' : 'failed'
-      ]
+    return await this.publications.failPublicationStep(
+      runId,
+      token,
+      stepKey,
+      error,
+      options
     )
-    return result.rowCount === 1
   }
   async completePublication(runId: string, token: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `
-      UPDATE publications
-      SET status='published', claim_token=NULL, published_at=clock_timestamp(),
-          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-        AND status='publishing' AND claim_token=$3
-        AND NOT EXISTS (
-          SELECT 1 FROM publication_steps
-          WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded'
-        )
-    `,
-      [runId, this.connectorId, token]
-    )
-    return result.rowCount === 1
+    return await this.publications.complete(runId, token)
   }
   async failPublication(
     runId: string,
@@ -1048,58 +922,16 @@ export class ReviewRunStore {
     error: { code?: string | null; message: string },
     options: { retry: boolean }
   ): Promise<boolean> {
-    // Only the current owner may spend the publication budget or write a final
-    // state. A stale worker can finish its HTTP call, but it cannot commit here.
-    const result = await this.pool.query(
-      `
-      UPDATE publications
-      SET status=$4, claim_token=NULL, failure_code=$5,
-          failure_message=$6, updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-        AND status='publishing' AND claim_token=$3
-    `,
-      [
-        runId,
-        this.connectorId,
-        token,
-        options.retry ? 'pending' : 'failed',
-        error.code ?? null,
-        error.message
-      ]
-    )
-    return result.rowCount === 1
+    return await this.publications.fail(runId, token, error, options)
   }
   async failPreparation(
     runId: string,
     token: string,
-    error: { code?: string | null; message: string }
-  ): Promise<void> {
-    await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `
-        UPDATE review_runs
-        SET runner_status='failed', preparation_claim_token=NULL,
-            preparation_claimed_at=NULL, runner_failure_code=$4,
-            runner_failure_message=$5, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2
-          AND runner_status='preparing' AND preparation_claim_token=$3
-      `,
-        [runId, this.connectorId, token, error.code ?? null, error.message]
-      )
-      if (result.rowCount !== 1)
-        throw new Error(
-          `Preparation claim was lost before failing review run ${runId}.`
-        )
-      await client.query(
-        `
-        UPDATE publications
-        SET status='skipped', claim_token=NULL,
-            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2 AND status='pending'
-      `,
-        [runId, this.connectorId]
-      )
-    })
+    error: { code?: string | null; message: string },
+    options: { retry: boolean; retryAfterMs?: number } = { retry: false }
+  ): Promise<{ retry_scheduled: boolean }> {
+    this.ready()
+    return await this.preparations.fail(runId, token, error, options)
   }
   async close(): Promise<void> {
     await this.pool.end()

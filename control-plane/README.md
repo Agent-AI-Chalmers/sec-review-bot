@@ -31,21 +31,23 @@ The service runs as an independent Node.js process on port `8090` by default. Po
 
 ## Run lifecycle
 
-A run begins in `preparing` immediately after admission. GitHub integration prepares and uploads the input bundle, then submits the replayable Runner input under the preparation claim. Control Plane records the input and moves the run to `queued` only after Runner accepts it.
+A run begins in `preparing` immediately after admission. Its separately persisted preparation work owns the claim that fences input construction. GitHub integration prepares and uploads the input bundle, then submits the replayable Runner input under that claim. Control Plane records the input and moves the run to `queued` only after Runner accepts it.
 
 Control Plane polls `queued` and `running` runs. A successful Runner result is stored as `succeeded` and becomes eligible for publication. The integration claims that work, performs the GitHub side effects, and records either `published`, a retryable publication failure, or a terminal publication failure.
 
-If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `skipped`.
+If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `skipped`. A terminal preparation failure also creates connector-owned notice work, so a connector can tell its user even when the preparation owner had already crashed.
 
 ## Persistence model
 
 Execution and publication are separate state machines:
 
-| Table               | Responsibility                                            | Status                                                                |
-| ------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
-| `review_runs`       | Admission, Runner observation, and terminal workflow data | `preparing`, `recovering`, `queued`, `running`, `succeeded`, `failed` |
-| `publications`      | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `skipped`             |
-| `publication_steps` | Recoverable individual connector side effects             | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`        |
+| Table                         | Responsibility                                            | Status                                                                |
+| ----------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| `review_runs`                 | Admission, Runner observation, and terminal workflow data | `preparing`, `recovering`, `queued`, `running`, `succeeded`, `failed` |
+| `preparations`                | Claimable input preparation                               | `pending`, `claimed`, `submitted`, `failed`                           |
+| `preparation_failure_notices` | Connector-owned terminal-failure acknowledgements         | `pending`, `claimed`, `delivered`, `skipped`                          |
+| `publications`                | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `skipped`             |
+| `publication_steps`           | Recoverable individual connector side effects             | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`        |
 
 ```mermaid
 flowchart LR
@@ -79,7 +81,9 @@ flowchart LR
 
 ## Claims and recovery
 
-Preparation, submission recovery, publication, and publication-step commits use claim tokens to fence stale owners. While input preparation is active, GitHub integration renews its preparation claim; genuinely abandoned preparation expires after the claim timeout. A timed-out owner may finish an external request, but it cannot commit state after another owner acquires a new token.
+Preparation, submission recovery, publication, publication-step commits, and terminal preparation notices use claim tokens to fence stale owners. While input preparation is active, GitHub integration renews its preparation claim. An expired preparation normally returns to `pending`; after the finite retry budget is exhausted, it fails the run, skips publication, and creates durable connector notice work. A timed-out owner may finish an external request, but it cannot commit state after another owner acquires a new token.
+
+For automatic preparation recovery, a connector includes its versioned, opaque preparation input at admission. Control Plane persists and returns that input to the connector which owns the work, but never interprets provider-specific fields. A connector that does not provide replayable input can still prepare synchronously, but its expired work cannot be claimed by the recovery worker.
 
 `run_id` is globally unique in PostgreSQL. `ingress_kind` and `ingress_key` provide connector-scoped ingress idempotency. `connector_id` fences reads, claims, publications, and publication steps. Durable-operation logs include both `connector_id` and `run_id`.
 
@@ -87,12 +91,13 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 
 ## HTTP API
 
-| Endpoint                                 | Authentication             | Purpose                             |
-| ---------------------------------------- | -------------------------- | ----------------------------------- |
-| `GET /healthz`                           | None                       | Process health                      |
-| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | Filtered, cursor-paginated run list |
-| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | Redacted run detail                 |
-| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication-step summary            |
+| Endpoint                                 | Authentication             | Purpose                                  |
+| ---------------------------------------- | -------------------------- | ---------------------------------------- |
+| `GET /healthz`                           | None                       | Process health                           |
+| `GET /readyz`                            | None                       | PostgreSQL-backed coordination readiness |
+| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | Filtered, cursor-paginated run list      |
+| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | Redacted run detail                      |
+| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication-step summary                 |
 
 The write surface — admission, submission, preparation and publication claims and their terminal outcomes — is a set of REST routes whose request/response shapes, security, and error codes are the hand-written [openapi.yaml](../contracts/control-plane-api/openapi.yaml) contract; that document is the single source of truth for the whole surface, not this table.
 
@@ -101,6 +106,8 @@ The contract is **enforced on requests**: routing, path/query/body validation, a
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
 Read responses report the two status axes (`execution_status`, `publication_status`), and filter on the same names; [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is their contract.
+
+`/healthz` only proves the HTTP process is alive. `/readyz` verifies that the current PostgreSQL pool can execute a schema-ledger query and that its complete version set exactly matches this application; it returns `503 {"status":"unavailable"}` without database details otherwise. Compose uses `/readyz` for its Control Plane healthcheck. Runner and GitHub are deliberately excluded: their transient reachability does not make durable admission, reads, or PostgreSQL-backed recovery unsafe, and their failures have separate state-machine recovery paths.
 
 ## Configuration
 
@@ -143,4 +150,4 @@ pnpm run test:integration
 
 The contract itself is linted (Spectral) and its projections are freshness-checked by the family tools under [`contracts/control-plane-api/tools`](../contracts/control-plane-api/tools/README.md).
 
-`pnpm run test:integration` requires `TEST_DATABASE_URL` or `DATABASE_URL` pointing to a disposable PostgreSQL database.
+`pnpm run test:integration` uses `TEST_DATABASE_URL` or `DATABASE_URL` when one is supplied; it must point to a disposable PostgreSQL database. Without either variable, the command starts a short-lived local Docker container from the PostgreSQL image declared in the repository-root `compose.yaml`, then removes it after the tests. Docker pulls that image when it is not local, so this fallback requires both Docker and registry access; set `TEST_POSTGRES_IMAGE` to use another image explicitly.

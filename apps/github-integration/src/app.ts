@@ -1,3 +1,5 @@
+// Boots the GitHub integration process and connects ingress handlers with its
+// background coordination loops; domain workflows remain in their own modules.
 import http from 'http'
 import { createNodeMiddleware } from '@octokit/webhooks'
 
@@ -18,6 +20,7 @@ import { handlePullRequestSynchronize } from './ingress/github/webhooks/pull-req
 import { verifyGitWorkspaceRuntime } from './artifacts/git-workspace.js'
 import { verifyContractSchemasLoadable } from './runner/contract-schema.js'
 import { startPublicationCoordinator } from './control-plane/publication-coordinator.js'
+import { startPreparationCoordinator } from './control-plane/preparation-coordinator.js'
 import { backgroundPreparations } from './reviews/background-preparations.js'
 import { logError, logInfo } from './utils/logger.js'
 
@@ -43,6 +46,7 @@ app.webhooks.on(
 )
 app.webhooks.on('pull_request.synchronize', handlePullRequestSynchronize)
 const publicationCoordinator = startPublicationCoordinator({ app })
+const preparationCoordinator = startPreparationCoordinator({ app })
 
 app.webhooks.onError((error) => {
   if (error.name === 'AggregateError') {
@@ -107,6 +111,7 @@ async function shutdown(signal: ShutdownSignal): Promise<void> {
     ...serverResult,
     ...(await Promise.allSettled([
       publicationCoordinator.stop(),
+      preparationCoordinator.stop(),
       backgroundPreparations.stop()
     ]))
   ]

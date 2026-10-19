@@ -1,3 +1,5 @@
+// Exposes Control Plane's supported coordination building blocks without making
+// callers import its storage, transport, or generated-contract internals directly.
 export type {
   ControlPlaneWorkflow,
   RunnerArtifactStorage
@@ -15,6 +17,8 @@ export {
   type DroppedRunRow,
   type PublicationStepRecord,
   type PublicationWork,
+  type PreparationWork,
+  type PreparationFailureNoticeWork,
   type PublishContext,
   type ReviewRunAdmission,
   type ReviewRunRecord,

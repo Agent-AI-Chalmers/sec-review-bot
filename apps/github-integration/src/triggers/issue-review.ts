@@ -1,3 +1,5 @@
+// Turns an issue review request into a durable run, fencing preparation until
+// the Runner submission boundary has been crossed.
 import { admitReviewRun } from '../control-plane/admission.js'
 import {
   PreparationClaimLostError,
@@ -15,6 +17,7 @@ import type { TestChangesPolicy } from '../runner/input.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
+import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
 
 type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
@@ -49,6 +52,11 @@ interface StartIssueReviewCommandArgs {
   test_changes?: TestChangesPolicy | null
   open_pr?: boolean | null
   delivery_id: string
+  claimed_preparation?: {
+    run_id: string
+    token: string
+    attempt_count?: number
+  }
   on_admitted?: (admission: {
     run_id: string
     status: string
@@ -70,26 +78,43 @@ export async function startIssueReviewCommand({
   test_changes = null,
   open_pr = false,
   delivery_id,
+  claimed_preparation,
   on_admitted,
   deps = {}
 }: StartIssueReviewCommandArgs): Promise<StartedIssueReview> {
   const { start_review = startIssueReviewRun, store = controlPlaneClient } =
     deps
-  const admission = await admitReviewRun(store, {
-    workflow: 'issue-review',
-    ingress_kind: 'github_webhook',
-    ingress_key: delivery_id
-  })
-  on_admitted?.({
-    run_id: admission.run_id,
-    status: admission.status,
-    replayed: !admission.created
-  })
-  if (!admission.created) {
-    return { run_id: admission.run_id }
+  const admission =
+    claimed_preparation === undefined
+      ? await admitReviewRun(store, {
+          workflow: 'issue-review',
+          ingress_kind: 'github_webhook',
+          ingress_key: delivery_id,
+          preparation_input: {
+            kind: 'github_issue_review',
+            issue,
+            trusted_default_branch,
+            event_type,
+            review_objective,
+            test_changes,
+            open_pr
+          }
+        })
+      : null
+  if (admission !== null) {
+    on_admitted?.({
+      run_id: admission.run_id,
+      status: admission.status,
+      replayed: !admission.created
+    })
+    if (!admission.created) return { run_id: admission.run_id }
   }
-  const run_id = admission.run_id
-  const preparationToken = admission.preparation_token
+  const run_id = claimed_preparation?.run_id ?? admission?.run_id
+  const preparationToken =
+    claimed_preparation?.token ?? admission?.preparation_token
+  const preparationAttempt = claimed_preparation?.attempt_count ?? 1
+  if (run_id === undefined)
+    throw new Error('Preparation admission did not return a run id.')
   if (!preparationToken)
     throw new Error(
       `Newly admitted review run ${run_id} has no preparation claim.`
@@ -131,12 +156,27 @@ export async function startIssueReviewCommand({
       !(error instanceof ControlPlaneSubmissionError) &&
       !(error instanceof PreparationClaimLostError)
     ) {
-      await store.failPreparation(run_id, preparationToken, {
-        code: isSetupDeclarationError(error)
-          ? 'SETUP_DECLARATION_INVALID'
-          : 'REVIEW_START_FAILED',
-        message: error instanceof Error ? error.message : String(error)
-      })
+      const classification = classifyPreparationFailure(
+        error,
+        preparationAttempt,
+        isSetupDeclarationError(error)
+      )
+      await store.failPreparation(
+        run_id,
+        preparationToken,
+        {
+          code: isSetupDeclarationError(error)
+            ? 'SETUP_DECLARATION_INVALID'
+            : 'REVIEW_START_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        },
+        {
+          retry: classification.retry,
+          ...(classification.retryAfterMs === undefined
+            ? {}
+            : { retryAfterMs: classification.retryAfterMs })
+        }
+      )
     }
     throw error
   } finally {

@@ -347,6 +347,14 @@ curl -sS http://127.0.0.1:8000/healthz \
   -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
 ```
 
+Check whether Control Plane can safely accept coordination requests:
+
+```bash
+curl -sS http://127.0.0.1:8090/readyz
+```
+
+`/healthz` is process liveness only. `/readyz` returns `503` when PostgreSQL, its connection pool, or a schema ledger whose complete version set does not match this application is unavailable; it intentionally does not include Runner or GitHub reachability.
+
 ### Component-Level Operations
 
 For troubleshooting or updating one component, restart the control plane or worker separately:
