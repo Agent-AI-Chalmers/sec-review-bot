@@ -52,23 +52,35 @@ export async function abandonInFlightPublication(
  *
  * It applies the same eligibility (`pending` or `publishing`) as the single-run form on purpose:
  * the two used to differ - the batch path only touched `pending` - so "the same" transition
- * quietly meant two things. Returns the run ids whose publication this call moved, so the caller
- * can tell an already-concluded publication from one it just abandoned. */
+ * quietly meant two things.
+ *
+ * It returns each moved run with the status it had before, not just its id: a publication can be
+ * abandoned from either state, so the caller cannot know which without being told, and an audit
+ * event that assumes `pending` would misreport every in-flight publication it converged. */
 export async function abandonInFlightPublications(
   client: Pick<PoolClient, 'query'>,
   connectorId: string,
   runIds: readonly string[]
-): Promise<string[]> {
-  if (runIds.length === 0) return []
-  const result = await client.query<{ run_id: string }>(
-    `UPDATE publications
+): Promise<Map<string, PublicationStatus>> {
+  if (runIds.length === 0) return new Map()
+  const result = await client.query<{
+    run_id: string
+    from_status: PublicationStatus
+  }>(
+    `WITH previous AS (
+       SELECT run_id, status FROM publications
+       WHERE run_id=ANY($1::text[]) AND connector_id=$2
+         AND status IN ('pending','publishing')
+       FOR UPDATE
+     )
+     UPDATE publications p
      SET status='skipped', claim_token=NULL, claimed_at=NULL,
          finished_at=clock_timestamp(),
          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-     WHERE run_id=ANY($1::text[]) AND connector_id=$2
-       AND status IN ('pending','publishing')
-     RETURNING run_id`,
+     FROM previous
+     WHERE p.run_id=previous.run_id
+     RETURNING p.run_id, previous.status AS from_status`,
     [runIds, connectorId]
   )
-  return result.rows.map((row) => row.run_id)
+  return new Map(result.rows.map((row) => [row.run_id, row.from_status]))
 }

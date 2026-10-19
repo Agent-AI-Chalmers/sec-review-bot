@@ -75,15 +75,15 @@ interface ReviewRunRow {
   workflow: WorkflowName
   publish_context: JsonObject
   runner_input: JsonObject | null
-  runner_status: RunnerStatus
-  runner_failure_code: string | null
-  runner_failure_message: string | null
+  execution_status: RunnerStatus
+  execution_failure_code: string | null
+  execution_failure_message: string | null
   artifact_storage: RunnerArtifactStorage | null
   workflow_result: unknown | null
   publication_status: PublicationStatus
   created_at: Date | string
   created_at_cursor: string
-  runner_updated_at: Date | string | null
+  execution_observed_at: Date | string | null
   execution_missing: boolean
   started_at: Date | string | null
   execution_finished_at: Date | string | null
@@ -128,10 +128,10 @@ const RUN_SELECT = `
     r.ingress_kind, r.ingress_key,
     r.created_at,
     to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_cursor,
-    e.input AS runner_input, e.status AS runner_status,
-    e.failure_code AS runner_failure_code, e.failure_message AS runner_failure_message,
+    e.input AS runner_input, e.status AS execution_status,
+    e.failure_code AS execution_failure_code, e.failure_message AS execution_failure_message,
     e.artifact_storage, e.workflow_result,
-    e.observed_at AS runner_updated_at, e.started_at, e.finished_at AS execution_finished_at,
+    e.observed_at AS execution_observed_at, e.started_at, e.finished_at AS execution_finished_at,
     (e.run_id IS NULL) AS execution_missing,
     p.status AS publication_status, p.started_at AS publication_started_at,
     p.finished_at AS publication_finished_at, p.updated_at AS publication_updated_at,
@@ -206,15 +206,15 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     // finished, and (for execution) when it was last observed. Keeping the shape identical
     // across axes is what lets a reader treat a run as three phases rather than three schemas.
     execution: {
-      status: row.runner_status,
+      status: row.execution_status,
       started_at: row.started_at === null ? null : iso(row.started_at),
       finished_at:
         row.execution_finished_at === null
           ? null
           : iso(row.execution_finished_at),
-      // `runner_updated_at` is the execution axis' observed_at; the missing-execution guard
+      // The execution axis' observed_at: the last successful poll. The missing-execution guard
       // above narrows it to a real timestamp.
-      updated_at: iso(row.runner_updated_at as Date | string)
+      updated_at: iso(row.execution_observed_at as Date | string)
     },
     publication: {
       status: row.publication_status,
@@ -239,10 +239,10 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     //   reports that execution reason, because publication itself never failed.
     failure_code: publicationFailure
       ? row.publication_failure_code
-      : (row.runner_failure_code ?? row.preparation_failure_code),
+      : (row.execution_failure_code ?? row.preparation_failure_code),
     failure_message: publicationFailure
       ? row.publication_failure_message
-      : (row.runner_failure_message ?? row.preparation_failure_message),
+      : (row.execution_failure_message ?? row.preparation_failure_message),
     artifact_storage: normalizeArtifactStorage(
       row.artifact_storage,
       `run ${row.run_id}`

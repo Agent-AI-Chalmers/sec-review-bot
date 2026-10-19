@@ -431,10 +431,11 @@ test('an undeclared body field is rejected, matching the contract', async () => 
     admitReviewRun: async () => {
       handlerCalls += 1
       return {
+        // This test only needs body validation to reject the request before the handler's
+        // result is read, so the record is the minimum the shape needs.
         record: {
           run_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
-          workflow: 'issue-review',
-          runner_status: 'pending'
+          workflow: 'issue-review'
         },
         created: true,
         preparation_token: 'token'

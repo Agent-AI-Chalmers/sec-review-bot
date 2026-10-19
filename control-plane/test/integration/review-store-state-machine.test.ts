@@ -1945,6 +1945,20 @@ test('an exhausted preparation keeps the last real failure reason instead of the
     )
     assert.strictEqual(preparation.rows[0]?.failure_message, 'rate limited')
 
+    // The publication axis moved in the same pass, and its event names the state it actually
+    // left. On this path that is always `pending`: a publication only reaches `publishing` after
+    // execution succeeded, and this pass only concludes runs whose execution is still pending.
+    // The helper still reports the origin instead of assuming it, so an in-flight publication
+    // converged through some other write path cannot be misreported - but that case is not
+    // reachable here, so this assertion pins the reachable behaviour only.
+    const publicationEvents = (await store.listEvents(runId))
+      .filter((event) => event.axis === 'publication')
+      .map((event) => `${event.from_status}->${event.to_status}`)
+    assert.deepStrictEqual(publicationEvents, [
+      'null->pending',
+      'pending->skipped'
+    ])
+
     const notice = await store.claimNextPreparationFailureNotice()
     assert.ok(notice)
     assert.strictEqual(notice.failure_code, 'GITHUB_RATE_LIMITED')

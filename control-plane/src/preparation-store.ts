@@ -275,7 +275,11 @@ export class PreparationStore {
       // Publication is not applicable either. This uses the same helper as the single-run
       // failure path, so a publication already in flight is converged here too instead of only
       // `pending` being touched.
-      await abandonInFlightPublications(client, this.connectorId, failedRunIds)
+      const abandonedPublications = await abandonInFlightPublications(
+        client,
+        this.connectorId,
+        failedRunIds
+      )
       // The notice carries the reason the preparation row now holds, so a lease expiry after a
       // real failure (for example rate limiting) reports that failure instead of the generic
       // exhaustion code.
@@ -287,31 +291,42 @@ export class PreparationStore {
          ON CONFLICT (run_id) DO NOTHING`,
         [failedRunIds, this.connectorId]
       )
+      // Each event names the state the row actually left. The execution transition is known to
+      // be from `pending` because `skipPendingExecutions` only matches that state, but the
+      // publication one is not: an in-flight publication is converged too, so its origin comes
+      // back from the helper rather than being assumed.
       await appendEvents(
         client,
-        failedRunIds.flatMap((failedRunId) => [
-          {
-            runId: failedRunId,
-            connectorId: this.connectorId,
-            axis: 'runner' as const,
-            fromStatus: 'pending',
-            toStatus: 'skipped'
-          },
-          {
-            runId: failedRunId,
-            connectorId: this.connectorId,
-            axis: 'publication' as const,
-            fromStatus: 'pending',
-            toStatus: 'skipped'
-          },
-          {
-            runId: failedRunId,
-            connectorId: this.connectorId,
-            axis: 'notice' as const,
-            fromStatus: null,
-            toStatus: 'pending'
-          }
-        ])
+        failedRunIds.flatMap((failedRunId) => {
+          const publicationFrom = abandonedPublications.get(failedRunId)
+          return [
+            {
+              runId: failedRunId,
+              connectorId: this.connectorId,
+              axis: 'runner' as const,
+              fromStatus: 'pending',
+              toStatus: 'skipped'
+            },
+            ...(publicationFrom === undefined
+              ? []
+              : [
+                  {
+                    runId: failedRunId,
+                    connectorId: this.connectorId,
+                    axis: 'publication' as const,
+                    fromStatus: publicationFrom,
+                    toStatus: 'skipped'
+                  }
+                ]),
+            {
+              runId: failedRunId,
+              connectorId: this.connectorId,
+              axis: 'notice' as const,
+              fromStatus: null,
+              toStatus: 'pending'
+            }
+          ]
+        })
       )
       return expired.rowCount ?? 0
     })
