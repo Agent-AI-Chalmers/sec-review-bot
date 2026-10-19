@@ -64,6 +64,30 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       (await fetch(`${base}/api/store`, { headers: { cookie } })).status,
       404
     )
+    // The run-id segment must be the contract's UUID shape. A catch-all would still be safe
+    // today (Control Plane answers 400), but it would forward any future path shape upstream,
+    // so the allow-list rejects a non-UUID id here instead of relaying it.
+    const runUuid = '0123abcd-4567-89ef-0123-456789abcdef'
+    await fetch(`${base}/api/runs/${runUuid}/events`, { headers: { cookie } })
+    assert.strictEqual(upstreamPath, `/v1/runs/${runUuid}/events`)
+    upstreamPath = ''
+    for (const rejected of [
+      '/api/runs/not-a-uuid',
+      '/api/runs/not-a-uuid/events',
+      '/api/runs/%2e%2e/publication-steps',
+      '/api/runs/0123abcd-4567-89ef-0123-456789abcdef/unknown-suffix'
+    ]) {
+      assert.strictEqual(
+        (await fetch(`${base}${rejected}`, { headers: { cookie } })).status,
+        404,
+        `${rejected} must not be proxied upstream`
+      )
+    }
+    assert.strictEqual(
+      upstreamPath,
+      '',
+      'a rejected path must never reach the upstream Control Plane'
+    )
     const oversizedLogin = await fetch(`${base}/api/session`, {
       method: 'POST',
       body: JSON.stringify({ token: 'x'.repeat(1024 * 1024) })

@@ -87,8 +87,35 @@ function forwardedPath(bffUrl: string): string {
   return `${url.pathname.slice('/api'.length)}${query === '' ? '' : `?${query}`}`
 }
 
-const allowed =
-  /^\/api\/runs(?:\?.*)?$|^\/api\/runs\/[^/?]+(?:\/(?:publication-steps|events))?$/
+/** The UUID a Control Plane run id is (see the contract's `runId` path parameter). */
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/** Whether this BFF path is one of the reads the console may proxy upstream.
+ *
+ * The run-id segment is matched against the contract's UUID shape after percent-decoding, not
+ * with a catch-all. A catch-all would still be safe today - Control Plane rejects a malformed id
+ * with a 400 - but it widens the reachable surface to whatever path a future upstream read
+ * endpoint might parse, so the allow-list states the exact shape it means.
+ */
+function isAllowedReadPath(bffUrl: string): boolean {
+  const url = new URL(bffUrl, 'http://control-plane-ui.local')
+  if (url.pathname === '/api/runs') return true
+  const segments = url.pathname.split('/')
+  // ['', 'api', 'runs', '<runId>', ...optional suffix]
+  if (segments.length < 4 || segments[1] !== 'api' || segments[2] !== 'runs')
+    return false
+  let runId: string
+  try {
+    runId = decodeURIComponent(segments[3] ?? '')
+  } catch {
+    // A malformed escape (`%zz`) is not a path this BFF proxies.
+    return false
+  }
+  if (!RUN_ID.test(runId)) return false
+  if (segments.length === 4) return true
+  if (segments.length !== 5) return false
+  return segments[4] === 'publication-steps' || segments[4] === 'events'
+}
 
 function sendJson(
   response: ServerResponse,
@@ -459,7 +486,7 @@ export function createControlPlaneUiServer({
         }
         return
       }
-      if (request.method !== 'GET' || !allowed.test(request.url)) {
+      if (request.method !== 'GET' || !isAllowedReadPath(request.url ?? '')) {
         response.writeHead(404)
         response.end()
         return
