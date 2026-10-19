@@ -42,8 +42,6 @@ import {
   ExecutionStatus,
   PreparationStatus,
   PublicationStatus,
-  failureNoticeStatusLabel,
-  failureStageLabel,
   type PublicationStepStatus,
   artifactStatusColor,
   artifactStatusLabel,
@@ -265,6 +263,39 @@ function AbandonDialog({
         </Group>
       </Stack>
     </Modal>
+  )
+}
+
+/** How the requester was told the run failed, shown inside the phase that failed.
+ *
+ * The notice belongs to the phase, not to the run's footer: "the user was told" is part of what
+ * happened in preparation, execution, or publication, and a separate line at the bottom detached
+ * it from the evidence above it. A delivery that could not be completed is reported here too,
+ * because its absence is the operator's problem to notice.
+ */
+function FailureNoticeLine({
+  notice
+}: {
+  notice: NonNullable<Run['failure_notice']>
+}): React.JSX.Element {
+  const t = useMessages()
+  // Phrased as "who knows", not as "a notice was delivered/failed": "Failure notice: delivery
+  // failed" says the same thing twice and still leaves the reader asking whether anyone was told.
+  const label =
+    notice.status === 'delivered'
+      ? t('failureNoticeDelivered')
+      : notice.status === 'failed'
+        ? t('failureNoticeNotDelivered')
+        : t('failureNoticeDelivering')
+  return (
+    <Text
+      className="failure-notice-line"
+      size="xs"
+      c={notice.status === 'failed' ? 'red' : 'dimmed'}
+      data-testid="failure-notice"
+    >
+      {label}
+    </Text>
   )
 }
 
@@ -604,6 +635,9 @@ export function Detail(): React.JSX.Element {
                     {' · '}
                     {t('preparationAttempts')}: {run.preparation.attempt_count}
                   </Text>
+                  {run.failure_notice?.failure_stage === 'preparation' && (
+                    <FailureNoticeLine notice={run.failure_notice} />
+                  )}
                 </Timeline.Item>
                 <Timeline.Item
                   bullet={statusBullet(executionTone(run.execution.status))}
@@ -645,6 +679,9 @@ export function Detail(): React.JSX.Element {
                       {formatDuration(observationAgeMs(run) ?? 0, t)}
                       {isObservationStale(run) && ` · ${t('observationStale')}`}
                     </Text>
+                  )}
+                  {run.failure_notice?.failure_stage === 'execution' && (
+                    <FailureNoticeLine notice={run.failure_notice} />
                   )}
                   {run.artifact_storage !== null && (
                     <div className="artifact-section">
@@ -756,23 +793,11 @@ export function Detail(): React.JSX.Element {
                       })}
                     </div>
                   )}
+                  {run.failure_notice?.failure_stage === 'publication' && (
+                    <FailureNoticeLine notice={run.failure_notice} />
+                  )}
                 </Timeline.Item>
               </Timeline>
-              {run.failure_notice != null && (
-                // On the run, not on the preparation timeline: any axis can end a run, so
-                // showing this under `preparation` presented an execution or publication
-                // failure as though preparation had caused it.
-                <Text
-                  className="failure-notice-line"
-                  size="xs"
-                  c="dimmed"
-                  data-testid="failure-notice"
-                >
-                  {t('failureNotice')} (
-                  {failureStageLabel(run.failure_notice.failure_stage, t)}):{' '}
-                  {failureNoticeStatusLabel(run.failure_notice.status, t)}
-                </Text>
-              )}
               <RunStateMachines run={run} events={events} />
               {events.length > 0 && (
                 // A native disclosure keeps this operator detail out of the way until asked

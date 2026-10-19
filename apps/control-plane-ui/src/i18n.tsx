@@ -50,7 +50,6 @@ export const messages = {
     statusPublished: 'Published',
     statusDelivering: 'Delivering',
     statusDelivered: 'Delivered',
-    statusDeliveryFailed: 'Delivery failed',
     statusSkipped: 'Skipped',
     statusUncertain: 'Uncertain',
     observedAgo: 'observed',
@@ -252,7 +251,10 @@ export const messages = {
       'the failure notice was delivered to the user',
     edge_notice_delivering_failed: 'delivery was attempted and failed',
     stateMachinesTitle: 'State machines',
-    failureNotice: 'Failure notice'
+    failureNoticeDelivered: 'The requester was told this run failed',
+    failureNoticeNotDelivered:
+      'The requester could not be told: the notice never reached GitHub',
+    failureNoticeDelivering: 'Telling the requester that this run failed'
   },
   zh: {
     language: '语言',
@@ -301,7 +303,6 @@ export const messages = {
     statusPublished: '已发布',
     statusDelivering: '投递中',
     statusDelivered: '已送达',
-    statusDeliveryFailed: '投递失败',
     statusSkipped: '已跳过',
     statusUncertain: '待确认',
     observedAgo: '观察到',
@@ -469,7 +470,9 @@ export const messages = {
     edge_notice_delivering_delivered: '失败通知已送达用户',
     edge_notice_delivering_failed: '尝试投递但失败了',
     stateMachinesTitle: '状态机',
-    failureNotice: '失败通知'
+    failureNoticeDelivered: '已通知发起人这次运行失败',
+    failureNoticeNotDelivered: '未能通知发起人：通知没能送达 GitHub',
+    failureNoticeDelivering: '正在通知发起人这次运行失败'
   }
 } as const
 export type Message = keyof typeof messages.en
