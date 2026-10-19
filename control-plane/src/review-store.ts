@@ -27,6 +27,7 @@ import {
   type PreparationFailureNoticeWork,
   type PreparationWork
 } from './preparation-store.js'
+import { PublicationStore } from './publication-store.js'
 
 export type {
   CreateReviewRunArgs,
@@ -176,6 +177,7 @@ export class ReviewRunStore {
   readonly connectorId: string
   private readonly claimTimeoutMs: number
   private readonly preparations: PreparationStore
+  private readonly publications: PublicationStore
   private initialized = false
 
   constructor({
@@ -193,6 +195,11 @@ export class ReviewRunStore {
     this.connectorId = connectorId
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
     this.preparations = new PreparationStore(
+      this.pool,
+      this.connectorId,
+      this.claimTimeoutMs
+    )
+    this.publications = new PublicationStore(
       this.pool,
       this.connectorId,
       this.claimTimeoutMs
@@ -857,19 +864,10 @@ export class ReviewRunStore {
     })
   }
   publicationHeartbeatIntervalMs(): number {
-    return Math.max(100, Math.min(30_000, Math.floor(this.claimTimeoutMs / 3)))
+    return this.publications.heartbeatIntervalMs()
   }
   async renewPublicationClaim(runId: string, token: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `
-      UPDATE publications
-      SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-        AND status='publishing' AND claim_token=$3
-    `,
-      [runId, this.connectorId, token]
-    )
-    return result.rowCount === 1
+    return await this.publications.renewClaim(runId, token)
   }
   async initializePublicationSteps(
     runId: string,
@@ -1054,21 +1052,7 @@ export class ReviewRunStore {
     return result.rowCount === 1
   }
   async completePublication(runId: string, token: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `
-      UPDATE publications
-      SET status='published', claim_token=NULL, published_at=clock_timestamp(),
-          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-        AND status='publishing' AND claim_token=$3
-        AND NOT EXISTS (
-          SELECT 1 FROM publication_steps
-          WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded'
-        )
-    `,
-      [runId, this.connectorId, token]
-    )
-    return result.rowCount === 1
+    return await this.publications.complete(runId, token)
   }
   async failPublication(
     runId: string,
@@ -1076,26 +1060,7 @@ export class ReviewRunStore {
     error: { code?: string | null; message: string },
     options: { retry: boolean }
   ): Promise<boolean> {
-    // Only the current owner may spend the publication budget or write a final
-    // state. A stale worker can finish its HTTP call, but it cannot commit here.
-    const result = await this.pool.query(
-      `
-      UPDATE publications
-      SET status=$4, claim_token=NULL, failure_code=$5,
-          failure_message=$6, updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-        AND status='publishing' AND claim_token=$3
-    `,
-      [
-        runId,
-        this.connectorId,
-        token,
-        options.retry ? 'pending' : 'failed',
-        error.code ?? null,
-        error.message
-      ]
-    )
-    return result.rowCount === 1
+    return await this.publications.fail(runId, token, error, options)
   }
   async failPreparation(
     runId: string,
