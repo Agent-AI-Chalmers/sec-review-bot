@@ -400,6 +400,67 @@ test('an observation heartbeat never extends the recovery lease', async () => {
   }
 })
 
+test('a failure notice reports the reason captured when it was created', async () => {
+  // The delivery path used to read `preparations.failure_code` at claim time. That row is the
+  // live state machine and a retry clears its failure fields, so the user-visible reason could
+  // degrade to a generic fallback depending on later writes. The outbox now stores its own copy.
+  const store = await createStore()
+  const runId = `run-${randomUUID()}`
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await store.failPreparation(runId, admission.preparation_token, {
+      code: 'REVIEW_START_FAILED',
+      message: 'preparation could not start'
+    })
+    const notice = await store.claimNextPreparationFailureNotice()
+    assert.ok(notice)
+    assert.strictEqual(notice.failure_code, 'REVIEW_START_FAILED')
+
+    // Rewriting the preparation row must not change what the notice reports.
+    const pool = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      await pool.query(
+        'UPDATE preparations SET failure_code=NULL WHERE run_id=$1',
+        [runId]
+      )
+    } finally {
+      await pool.end()
+    }
+    const stillReported = await store.getRun(runId)
+    assert.strictEqual(
+      (stillReported?.preparation as { failure_code: string | null }).failure_code,
+      null,
+      'the preparation row really lost its code'
+    )
+    // The notice already claimed above keeps its own copy; a fresh claim after the lease expires
+    // must also report it rather than the now-null preparation field.
+    const pool2 = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      await pool2.query(
+        `UPDATE preparation_failure_notices
+           SET status='pending', claim_token=NULL, claimed_at=NULL WHERE run_id=$1`,
+        [runId]
+      )
+    } finally {
+      await pool2.end()
+    }
+    const reclaimed = await store.claimNextPreparationFailureNotice()
+    assert.ok(reclaimed)
+    assert.strictEqual(
+      reclaimed.failure_code,
+      'REVIEW_START_FAILED',
+      'the notice carries its own reason, not the preparation row\'s current value'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
 test('ReviewRunStore returns an expired preparation to pending without failing its run', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-stale-preparation-${randomUUID()}`

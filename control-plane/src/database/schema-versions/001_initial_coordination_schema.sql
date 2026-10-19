@@ -197,6 +197,10 @@ CREATE TABLE preparation_failure_notices (
   run_id text PRIMARY KEY REFERENCES preparations(run_id) ON DELETE CASCADE,
   connector_id text NOT NULL,
   status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'skipped')),
+  -- The reason is captured when the notice is created, not read back from `preparations` at
+  -- delivery time: the preparation row is the live state machine and may be rewritten (a retry
+  -- clears its failure fields), while the notice exists to report one specific conclusion.
+  failure_code text,
   claim_token uuid,
   claimed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -212,6 +216,8 @@ CREATE TABLE preparation_failure_notices (
 );
 COMMENT ON TABLE preparation_failure_notices IS
   'Provider-neutral outbox for connector acknowledgement of terminal preparation failures.';
+COMMENT ON COLUMN preparation_failure_notices.failure_code IS
+  'The terminal preparation failure reason captured when the notice was created. The delivery path reports this instead of re-reading preparations.failure_code, which the preparation state machine may have rewritten since.';
 CREATE INDEX preparation_failure_notices_claimable_idx
   ON preparation_failure_notices (connector_id, status, updated_at);
 

@@ -134,7 +134,7 @@ export class PreparationStore {
         failure_code: string | null
         status: 'pending' | 'delivering'
       }>(
-        `SELECT n.run_id,p.input,p.failure_code,n.status AS status
+        `SELECT n.run_id,p.input,n.failure_code,n.status AS status
          FROM preparation_failure_notices n
          JOIN preparations p ON p.run_id=n.run_id
          WHERE n.connector_id=$1 AND (n.status='pending' OR
@@ -254,8 +254,9 @@ export class PreparationStore {
         [failedRunIds, this.connectorId]
       )
       await client.query(
-        `INSERT INTO preparation_failure_notices (run_id,connector_id,status)
-         SELECT unnest($1::text[]),$2,'pending' ON CONFLICT (run_id) DO NOTHING`,
+        `INSERT INTO preparation_failure_notices (run_id,connector_id,status,failure_code)
+         SELECT unnest($1::text[]),$2,'pending','PREPARATION_RETRY_EXHAUSTED'
+         ON CONFLICT (run_id) DO NOTHING`,
         [failedRunIds, this.connectorId]
       )
       for (const failedRunId of failedRunIds) {
@@ -375,9 +376,9 @@ export class PreparationStore {
             [runId, this.connectorId]
           )
       await client.query(
-        `INSERT INTO preparation_failure_notices (run_id,connector_id,status)
-         VALUES ($1,$2,'pending') ON CONFLICT (run_id) DO NOTHING`,
-        [runId, this.connectorId]
+        `INSERT INTO preparation_failure_notices (run_id,connector_id,status,failure_code)
+         VALUES ($1,$2,'pending',$3) ON CONFLICT (run_id) DO NOTHING`,
+        [runId, this.connectorId, error.code ?? null]
       )
       await appendEvent(client, {
         runId,

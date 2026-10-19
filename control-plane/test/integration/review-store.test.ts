@@ -106,6 +106,36 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
       /violates foreign key constraint/,
       'a notice must not name a connector its preparation does not belong to'
     )
+
+    // The reason this matters: the notice is joined on connector_id, so a row under another
+    // connector is simply not found and `failure_notice_status` reads as null — a notice that
+    // exists, is never delivered, and leaves nothing visible to explain why. Asserting the
+    // symptom, not just the rejection, is what makes the constraint's purpose checkable.
+    await pool.query(
+      'DELETE FROM preparation_failure_notices WHERE run_id=$1',
+      [runId]
+    )
+    await pool
+      .query(
+        `INSERT INTO preparation_failure_notices (run_id, connector_id, status)
+         VALUES ($1, 'intruder', 'pending')`,
+        [runId]
+      )
+      .catch(() => undefined)
+    const stored = await pool.query(
+      'SELECT connector_id FROM preparation_failure_notices WHERE run_id=$1',
+      [runId]
+    )
+    assert.strictEqual(
+      stored.rowCount,
+      0,
+      'the wrong-connector notice was never stored'
+    )
+    assert.strictEqual(
+      (await store.getRun(runId))?.preparation?.failure_notice_status,
+      null,
+      'and so the run reports no notice rather than a phantom one'
+    )
   } finally {
     await pool.end()
     await store.close()
