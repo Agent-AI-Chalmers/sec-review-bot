@@ -42,6 +42,25 @@ test('Control Plane store initializes its schema and deduplicates ingress', asyn
   }
 })
 
+test('Control Plane readiness rejects a schema ledger from a newer application', async () => {
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `control-plane-test:${randomUUID()}`
+  })
+  const observer = new Pool({ connectionString: databaseUrl() })
+  try {
+    await store.initialize()
+    await observer.query(
+      `INSERT INTO schema_versions (version,name,checksum)
+       VALUES (999999, 'newer_application', '0000000000000000000000000000000000000000000000000000000000000000')`
+    )
+    await assert.rejects(store.checkReadiness(), /schema ledger is not current/)
+  } finally {
+    await observer.query('DELETE FROM schema_versions WHERE version=999999')
+    await Promise.all([observer.end(), store.close()])
+  }
+})
+
 test('Control Plane store fences reads by connector', async () => {
   const runId = `run-${randomUUID()}`
   const first = new ReviewRunStore({

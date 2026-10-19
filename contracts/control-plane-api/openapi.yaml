@@ -543,6 +543,41 @@ paths:
                     type: string
         "500":
           $ref: "#/components/responses/InternalError"
+  /readyz:
+    get:
+      operationId: getReadiness
+      description: >-
+        Report whether this instance can safely accept coordination requests. Requires no credential.
+      security: []
+      responses:
+        "200":
+          description: PostgreSQL is reachable through the pool and the startup schema is present.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+        "503":
+          description: PostgreSQL, the connection pool, or the applied startup schema is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - unavailable
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/runs:
     get:
       operationId: listRuns

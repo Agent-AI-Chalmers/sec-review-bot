@@ -349,6 +349,14 @@ curl -sS http://127.0.0.1:8000/healthz \
   -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
 ```
 
+验证 Control Plane 是否可以安全接收协调请求：
+
+```bash
+curl -sS http://127.0.0.1:8090/readyz
+```
+
+`/healthz` 仅表示进程存活。PostgreSQL、连接池或完整版本集合与本应用不一致的 schema ledger 不可用时，`/readyz` 返回 `503`；它有意不包含 Runner 或 GitHub 的可达性。
+
 ### 组件级操作
 
 排障或只更新一个组件时，可以单独重启控制平面或 worker：

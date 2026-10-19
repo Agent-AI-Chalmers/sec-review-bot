@@ -279,6 +279,42 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
+  getReadiness: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description PostgreSQL is reachable through the pool and the startup schema is present. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            status: 'ok'
+          }
+        }
+      }
+      500: components['responses']['InternalError']
+      /** @description PostgreSQL, the connection pool, or the applied startup schema is unavailable. */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            status: 'unavailable'
+          }
+        }
+      }
+    }
+  }
   listRuns: {
     parameters: {
       query?: {

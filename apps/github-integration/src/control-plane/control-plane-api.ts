@@ -20,6 +20,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/readyz': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Report whether this instance can safely accept coordination requests. Requires no credential. */
+    get: operations['getReadiness']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/runs': {
     parameters: {
       query?: never
@@ -667,6 +684,42 @@ export interface operations {
         }
       }
       500: components['responses']['InternalError']
+    }
+  }
+  getReadiness: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description PostgreSQL is reachable through the pool and the startup schema is present. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            status: 'ok'
+          }
+        }
+      }
+      500: components['responses']['InternalError']
+      /** @description PostgreSQL, the connection pool, or the applied startup schema is unavailable. */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            status: 'unavailable'
+          }
+        }
+      }
     }
   }
   listRuns: {
@@ -1445,6 +1498,7 @@ export interface operations {
  * the operation, and the URL is looked up, never passed in. */
 export const operationRoutes = {
   getHealth: { path: '/healthz', method: 'get' },
+  getReadiness: { path: '/readyz', method: 'get' },
   listRuns: { path: '/v1/runs', method: 'get' },
   admitRun: { path: '/v1/runs', method: 'post' },
   getRun: { path: '/v1/runs/{runId}', method: 'get' },

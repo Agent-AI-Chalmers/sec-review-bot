@@ -96,6 +96,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 | Endpoint                                 | 认证                       | 用途                              |
 | ---------------------------------------- | -------------------------- | --------------------------------- |
 | `GET /healthz`                           | 无                         | 进程健康检查                      |
+| `GET /readyz`                            | 无                         | PostgreSQL 支持的协调就绪检查     |
 | `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | 支持过滤和 cursor 分页的 run 列表 |
 | `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | 脱敏的 run 详情                   |
 | `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication step 摘要             |
@@ -107,6 +108,8 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 查询响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
 查询响应报告两个状态轴（`execution_status`、`publication_status`），筛选参数同名；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是它们的契约。
+
+`/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Control Plane healthcheck。Runner 与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
 
 ## 配置
 

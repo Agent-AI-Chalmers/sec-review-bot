@@ -7,7 +7,10 @@ import type {
   ControlPlaneWorkflow as WorkflowName,
   RunnerArtifactStorage
 } from './contracts.js'
-import { applySchemaVersions } from './database/schema-version-runner.js'
+import {
+  applySchemaVersions,
+  KNOWN_SCHEMA_VERSIONS
+} from './database/schema-version-runner.js'
 import {
   normalizeArtifactStorage,
   type CreateReviewRunArgs,
@@ -206,6 +209,24 @@ export class ReviewRunStore {
     await applySchemaVersions(this.pool)
     this.initialized = true
   }
+
+  /** Verify the dependency boundary required to accept coordination requests. */
+  async checkReadiness(): Promise<void> {
+    this.ready()
+    const result = await this.pool.query<{ version: number }>(
+      'SELECT version FROM schema_versions ORDER BY version'
+    )
+    const appliedVersions = result.rows.map(({ version }) => version)
+    if (
+      appliedVersions.length !== KNOWN_SCHEMA_VERSIONS.length ||
+      appliedVersions.some(
+        (version, index) => version !== KNOWN_SCHEMA_VERSIONS[index]
+      )
+    ) {
+      throw new Error('Control Plane schema ledger is not current.')
+    }
+  }
+
   private ready(): void {
     if (!this.initialized)
       throw new Error('ReviewRunStore.initialize() must complete before use.')

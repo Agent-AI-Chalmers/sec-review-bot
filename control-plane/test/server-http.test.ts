@@ -51,6 +51,36 @@ test('the compiled server registers the contract from any working directory', as
   }
 })
 
+test('readiness requires a usable PostgreSQL store without exposing its failure', async () => {
+  const ready = await buildApp({
+    connectorId: 'github-app:test',
+    checkReadiness: async () => {}
+  })
+  const unavailable = await buildApp({
+    connectorId: 'github-app:test',
+    checkReadiness: async () => {
+      throw new Error('database connection refused')
+    }
+  })
+  try {
+    const readyResponse = await ready.inject({ method: 'GET', url: '/readyz' })
+    assert.strictEqual(readyResponse.statusCode, 200)
+    assert.deepStrictEqual(readyResponse.json(), { status: 'ok' })
+
+    const unavailableResponse = await unavailable.inject({
+      method: 'GET',
+      url: '/readyz'
+    })
+    assert.strictEqual(unavailableResponse.statusCode, 503)
+    assert.deepStrictEqual(unavailableResponse.json(), {
+      status: 'unavailable'
+    })
+  } finally {
+    await ready.close()
+    await unavailable.close()
+  }
+})
+
 test('unknown routes return the not-found envelope', async () => {
   const app = await buildApp({})
   try {

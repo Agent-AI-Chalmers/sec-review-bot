@@ -91,12 +91,13 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 
 ## HTTP API
 
-| Endpoint                                 | Authentication             | Purpose                             |
-| ---------------------------------------- | -------------------------- | ----------------------------------- |
-| `GET /healthz`                           | None                       | Process health                      |
-| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | Filtered, cursor-paginated run list |
-| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | Redacted run detail                 |
-| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication-step summary            |
+| Endpoint                                 | Authentication             | Purpose                                  |
+| ---------------------------------------- | -------------------------- | ---------------------------------------- |
+| `GET /healthz`                           | None                       | Process health                           |
+| `GET /readyz`                            | None                       | PostgreSQL-backed coordination readiness |
+| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | Filtered, cursor-paginated run list      |
+| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | Redacted run detail                      |
+| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication-step summary                 |
 
 The write surface — admission, submission, preparation and publication claims and their terminal outcomes — is a set of REST routes whose request/response shapes, security, and error codes are the hand-written [openapi.yaml](../contracts/control-plane-api/openapi.yaml) contract; that document is the single source of truth for the whole surface, not this table.
 
@@ -105,6 +106,8 @@ The contract is **enforced on requests**: routing, path/query/body validation, a
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
 Read responses report the two status axes (`execution_status`, `publication_status`), and filter on the same names; [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is their contract.
+
+`/healthz` only proves the HTTP process is alive. `/readyz` verifies that the current PostgreSQL pool can execute a schema-ledger query and that its complete version set exactly matches this application; it returns `503 {"status":"unavailable"}` without database details otherwise. Compose uses `/readyz` for its Control Plane healthcheck. Runner and GitHub are deliberately excluded: their transient reachability does not make durable admission, reads, or PostgreSQL-backed recovery unsafe, and their failures have separate state-machine recovery paths.
 
 ## Configuration
 

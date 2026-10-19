@@ -308,6 +308,19 @@ export async function registerControlPlaneRoutes(
   > = {
     getHealth: async () => ({ status: 'ok' }),
 
+    getReadiness: async (_request, reply) => {
+      try {
+        await store.checkReadiness()
+        return { status: 'ok' }
+      } catch (error) {
+        logEvent('control_plane_readiness_failed', {
+          connector_id: store.connectorId,
+          message: error instanceof Error ? error.message : String(error)
+        })
+        return reply.code(503).send({ status: 'unavailable' })
+      }
+    },
+
     listRuns: async (request) => {
       const url = new URL(request.url ?? '/', 'http://control-plane.local')
       const listOptions = parseListQuery(url)
