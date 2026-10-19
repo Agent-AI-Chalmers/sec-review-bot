@@ -100,6 +100,11 @@ test('ReviewRunStore prevents cross-connector access to a globally unique run id
     )
     assert.notStrictEqual(await first.claimPublication(runId), null)
     assert.strictEqual(await second.claimPublication(runId), null)
+    // The event log is fenced by the same connector as every other read. A second connector
+    // reading the identity it cannot own must get an empty list, not another tenant's
+    // transitions, so the history view can never cross a connector boundary.
+    assert.ok((await first.listEvents(runId)).length > 0)
+    assert.deepStrictEqual(await second.listEvents(runId), [])
   } finally {
     await first.close()
     await second.close()

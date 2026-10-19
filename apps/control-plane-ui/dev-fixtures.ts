@@ -237,13 +237,14 @@ const SCENARIOS: readonly Scenario[] = [
     preparation_notice: null
   },
   {
-    // Submission result unknown: not a failure, a recovery will resolve it.
+    // Submission result unknown: not a failure, a recovery will resolve it. Publication stays
+    // `pending` because an accepted submission could still produce a publishable result; only a
+    // conclusive non-publishable outcome may skip it.
     execution_status: 'uncertain',
-    publication_status: 'skipped',
+    publication_status: 'pending',
     failure_code: 'SUBMISSION_STATE_UNCERTAIN',
     artifact: null,
     executionMs: 143_000,
-    publicationMs: 143_000,
     step: null,
     preparation_status: 'submitted',
     preparation_notice: null
@@ -426,20 +427,22 @@ function eventsFor(run: FixtureRun): Array<{
       )
     )
   }
-  if (run.submitted_at !== null) {
-    events.push(push('runner', 'pending', 'queued', run.submitted_at))
-    if (run.execution_status === 'uncertain') {
-      // The submission result was unknown, so execution became uncertain (not failed).
-      events.push(
-        push(
-          'runner',
-          'queued',
-          'uncertain',
-          run.execution_updated_at,
-          'SUBMISSION_STATE_UNCERTAIN'
-        )
+  if (run.execution_status === 'uncertain') {
+    // An unresolved submission never reached `queued`: Control Plane moves `pending` straight to
+    // `uncertain` when the Runner call's acceptance could not be confirmed. The recovery then
+    // resolves it to `queued` or `failed`, which is why this originates at `pending`.
+    events.push(
+      push(
+        'runner',
+        'pending',
+        'uncertain',
+        run.execution_updated_at,
+        'SUBMISSION_STATE_UNCERTAIN'
       )
-    } else if (run.execution_status !== 'queued') {
+    )
+  } else if (run.submitted_at !== null) {
+    events.push(push('runner', 'pending', 'queued', run.submitted_at))
+    if (run.execution_status !== 'queued') {
       events.push(
         push(
           'runner',
@@ -583,6 +586,12 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   }
   if (execution === 'skipped' && preparation.status !== 'failed') {
     fail('execution is skipped only when preparation failed before it ran')
+  }
+  if (execution === 'uncertain' && publication !== 'pending') {
+    // An unconfirmed submission may still be accepted, so it is not yet a conclusion that
+    // nothing is publishable. Publication must stay `pending`; only a conclusive failure may
+    // skip it, and the state machine has no `skipped -> pending` edge to undo an early skip.
+    fail('an uncertain submission keeps its publication pending')
   }
   if (
     preparation.status !== 'submitted' &&

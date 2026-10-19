@@ -1035,15 +1035,25 @@ export class ReviewRunStore {
       if (candidateRow === undefined) return null
       const runId = candidateRow.run_id
       const token = crypto.randomUUID()
-      await client.query(
+      // Restate the claimable condition instead of relying on the SELECT's row lock alone.
+      // The lock makes this safe today; repeating the predicate keeps it safe if the two
+      // statements are ever split, and it guarantees the UPDATE cannot silently overwrite a
+      // terminal publication state that the SELECT could no longer have selected. The
+      // `status` equality pins the row the event's `from_status` was captured from, so the
+      // audit log cannot claim an origin the row no longer had.
+      const claimed = await client.query(
         `
         UPDATE publications SET status='publishing', claim_token=$3,
           claimed_at=clock_timestamp(), failure_code=NULL, failure_message=NULL,
           updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2
+        WHERE run_id=$1 AND connector_id=$2 AND status=$4
       `,
-        [runId, this.connectorId, token]
+        [runId, this.connectorId, token, candidateRow.status]
       )
+      if (claimed.rowCount !== 1)
+        throw new Error(
+          `Publication work changed while being claimed: ${runId}`
+        )
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,

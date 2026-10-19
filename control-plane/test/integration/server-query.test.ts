@@ -164,6 +164,58 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     assert.strictEqual(secondBody.runs.length, 1)
     assert.notStrictEqual(secondBody.runs[0]?.run_id, firstBody.runs[0]?.run_id)
 
+    // The coordination event log is the operator timeline the console renders. Its read path
+    // is new, so pin the whole HTTP surface: authentication, the admission events, oldest-first
+    // ordering, and a run id this connector cannot see reading as 404 rather than empty.
+    const unauthorizedEvents = await fetch(
+      `${base}/v1/runs/${runIds[0]}/events`
+    )
+    assert.strictEqual(unauthorizedEvents.status, 401)
+    const events = await fetch(`${base}/v1/runs/${runIds[0]}/events`, {
+      headers: readAuth
+    })
+    assert.strictEqual(events.status, 200)
+    const eventsBody = (await events.json()) as {
+      run_id: string
+      events: Array<{
+        event_id: number
+        axis: string
+        from_status: string | null
+        to_status: string
+        occurred_at: string
+      }>
+    }
+    assert.strictEqual(eventsBody.run_id, runIds[0])
+    // Admission writes one event per axis inside the admitting transaction.
+    assert.deepStrictEqual(
+      eventsBody.events.map((event) => `${event.axis}:${event.to_status}`),
+      ['runner:pending', 'preparation:preparing', 'publication:pending']
+    )
+    const occurredAt = eventsBody.events.map((event) =>
+      Date.parse(event.occurred_at)
+    )
+    assert.deepStrictEqual(
+      occurredAt,
+      [...occurredAt].sort((left, right) => left - right),
+      'events are returned oldest first'
+    )
+    const unknownRunEvents = await fetch(
+      `${base}/v1/runs/${randomUUID()}/events`,
+      { headers: readAuth }
+    )
+    assert.strictEqual(unknownRunEvents.status, 404)
+    assert.deepStrictEqual(await unknownRunEvents.json(), {
+      error: 'run_not_found'
+    })
+    // The path parameter is contract-validated like every other run id.
+    const malformedRunEvents = await fetch(
+      `${base}/v1/runs/not-a-uuid/events`,
+      {
+        headers: readAuth
+      }
+    )
+    assert.strictEqual(malformedRunEvents.status, 400)
+
     // The created-at range was accepted by the API but never covered, so a broken
     // bound would have filtered silently.
     const past = encodeURIComponent('2000-01-01T00:00:00.000Z')
