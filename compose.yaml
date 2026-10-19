@@ -114,6 +114,8 @@ services:
       CONTROL_PLANE_PORT: "8090"
       CONTROL_PLANE_SERVICE_TOKEN: "${CONTROL_PLANE_SERVICE_TOKEN:?CONTROL_PLANE_SERVICE_TOKEN is required}"
       CONTROL_PLANE_READ_TOKEN: "${CONTROL_PLANE_READ_TOKEN:?CONTROL_PLANE_READ_TOKEN is required}"
+      # Optional: an empty value disables the /v1/admin surface entirely (it answers 404).
+      CONTROL_PLANE_ADMIN_TOKEN: "${CONTROL_PLANE_ADMIN_TOKEN:-}"
       CONNECTOR_ID: "${CONNECTOR_ID:-github-app:default}"
       DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sec_review_bot}"
       AGENT_RUNNER_SERVICE_URL: "http://runner-service:8000"

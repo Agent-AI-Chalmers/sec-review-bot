@@ -110,13 +110,15 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 
 ## HTTP API
 
-| Endpoint                                 | Authentication             | Purpose                                  |
-| ---------------------------------------- | -------------------------- | ---------------------------------------- |
-| `GET /healthz`                           | None                       | Process health                           |
-| `GET /readyz`                            | None                       | PostgreSQL-backed coordination readiness |
-| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | Filtered, cursor-paginated run list      |
-| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | Redacted run detail                      |
-| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication-step summary                 |
+| Endpoint                                 | Authentication              | Purpose                                  |
+| ---------------------------------------- | --------------------------- | ---------------------------------------- |
+| `GET /healthz`                           | None                        | Process health                           |
+| `GET /readyz`                            | None                        | PostgreSQL-backed coordination readiness |
+| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN`  | Filtered, cursor-paginated run list      |
+| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN`  | Redacted run detail                      |
+| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`  | Publication-step summary                 |
+| `GET /v1/runs/blocked-preparations`      | `CONTROL_PLANE_READ_TOKEN`  | Runs coordination stopped retrying       |
+| `POST /v1/admin/runs/:run_id/abandon`    | `CONTROL_PLANE_ADMIN_TOKEN` | Operator decision on one blocked run     |
 
 The write surface — admission, submission, preparation and publication claims and their terminal outcomes — is a set of REST routes whose request/response shapes, security, and error codes are the hand-written [openapi.yaml](../contracts/control-plane-api/openapi.yaml) contract; that document is the single source of truth for the whole surface, not this table.
 
@@ -124,25 +126,28 @@ The contract is **enforced on requests**: routing, path/query/body validation, a
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
+The service token authenticates components coordinating a run; the read token authenticates redacted reads; a third, optional admin token authenticates the operator surface under `/v1/admin`. The three are deliberately not nested: holding the service token does not reach an admin route, and the admin token cannot admit runs or move a run through its normal lifecycle. `/v1/admin` exists only when `CONTROL_PLANE_ADMIN_TOKEN` is configured — otherwise the paths answer 404 rather than 401, so an unconfigured deployment does not advertise an operator surface at all. Reading the blocked-preparation queue needs only the read token, because knowing a run is stuck is not privileged; only the decision to abandon it is.
+
 Read responses report three independent lifecycle axes as nested objects of the same shape: `preparation`, `execution`, and `publication`. Each carries its own `status`, `started_at`, `finished_at`, and `updated_at` — the last write to that axis, which is the activity freshness the console shows and is deliberately not a phase bound. The preparation summary adds `attempt_count` and the terminal `failure_code` / `failure_notice_status`, but never its opaque input, claim token, or connector identity. The list endpoint filters on the three axes by query parameter (`preparation_status`, `execution_status`, and `publication_status`; the parameter names keep their established spelling); [observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) is the read contract.
 
 `/healthz` only proves the HTTP process is alive. `/readyz` verifies that the current PostgreSQL pool can execute a schema-ledger query and that its complete version set exactly matches this application; it returns `503 {"status":"unavailable"}` without database details otherwise. Compose uses `/readyz` for its Control Plane healthcheck. Runner and GitHub are deliberately excluded: their transient reachability does not make durable admission, reads, or PostgreSQL-backed recovery unsafe, and their failures have separate state-machine recovery paths.
 
 ## Configuration
 
-| Variable                                   | Required                             | Purpose                                              |
-| ------------------------------------------ | ------------------------------------ | ---------------------------------------------------- |
-| `DATABASE_URL`                             | Yes                                  | PostgreSQL connection string                         |
-| `CONTROL_PLANE_SERVICE_TOKEN`              | Yes                                  | Internal mutation and coordination authentication    |
-| `CONTROL_PLANE_READ_TOKEN`                 | Yes                                  | Query API authentication                             |
-| `AGENT_RUNNER_SERVICE_URL`                 | Yes                                  | Runner service base URL                              |
-| `AGENT_RUNNER_SERVICE_TOKEN`               | For non-loopback or protected Runner | Runner authentication                                |
-| `CONTROL_PLANE_PORT`                       | No                                   | Listen port; default `8090`                          |
-| `CONNECTOR_ID`                             | No                                   | Coordination namespace; default `github-app:default` |
-| `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` | No                                   | Coordinator interval; default `15000`                |
-| `AGENT_RUNNER_SERVICE_REQUEST_TIMEOUT_MS`  | No                                   | Runner request timeout; default `30000`              |
-| `AGENT_RUNNER_SERVICE_REQUEST_RETRIES`     | No                                   | Runner transport retries; default `2`                |
-| `AGENT_RUNNER_SERVICE_RETRY_BASE_DELAY_MS` | No                                   | Initial retry delay; default `500`                   |
+| Variable                                   | Required                             | Purpose                                                                                   |
+| ------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                             | Yes                                  | PostgreSQL connection string                                                              |
+| `CONTROL_PLANE_SERVICE_TOKEN`              | Yes                                  | Internal mutation and coordination authentication                                         |
+| `CONTROL_PLANE_READ_TOKEN`                 | Yes                                  | Query API authentication                                                                  |
+| `CONTROL_PLANE_ADMIN_TOKEN`                | No                                   | Operator authentication for `/v1/admin/*`; when unset the whole admin surface answers 404 |
+| `AGENT_RUNNER_SERVICE_URL`                 | Yes                                  | Runner service base URL                                                                   |
+| `AGENT_RUNNER_SERVICE_TOKEN`               | For non-loopback or protected Runner | Runner authentication                                                                     |
+| `CONTROL_PLANE_PORT`                       | No                                   | Listen port; default `8090`                                                               |
+| `CONNECTOR_ID`                             | No                                   | Coordination namespace; default `github-app:default`                                      |
+| `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` | No                                   | Coordinator interval; default `15000`                                                     |
+| `AGENT_RUNNER_SERVICE_REQUEST_TIMEOUT_MS`  | No                                   | Runner request timeout; default `30000`                                                   |
+| `AGENT_RUNNER_SERVICE_REQUEST_RETRIES`     | No                                   | Runner transport retries; default `2`                                                     |
+| `AGENT_RUNNER_SERVICE_RETRY_BASE_DELAY_MS` | No                                   | Initial retry delay; default `500`                                                        |
 
 ## Database schema
 

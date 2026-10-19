@@ -112,13 +112,15 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 ## HTTP API
 
-| Endpoint                                 | 认证                       | 用途                              |
-| ---------------------------------------- | -------------------------- | --------------------------------- |
-| `GET /healthz`                           | 无                         | 进程健康检查                      |
-| `GET /readyz`                            | 无                         | PostgreSQL 支持的协调就绪检查     |
-| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN` | 支持过滤和 cursor 分页的 run 列表 |
-| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN` | 脱敏的 run 详情                   |
-| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN` | Publication step 摘要             |
+| Endpoint                                 | 认证                        | 用途                              |
+| ---------------------------------------- | --------------------------- | --------------------------------- |
+| `GET /healthz`                           | 无                          | 进程健康检查                      |
+| `GET /readyz`                            | 无                          | PostgreSQL 支持的协调就绪检查     |
+| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN`  | 支持过滤和 cursor 分页的 run 列表 |
+| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN`  | 脱敏的 run 详情                   |
+| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`  | Publication step 摘要             |
+| `GET /v1/runs/blocked-preparations`      | `CONTROL_PLANE_READ_TOKEN`  | 协调已停止重试的 run 列表         |
+| `POST /v1/admin/runs/:run_id/abandon`    | `CONTROL_PLANE_ADMIN_TOKEN` | 对单个 blocked run 的运维决定     |
 
 写面——接纳、提交、准备与发布租约及其终态——是一组 REST 路由，其请求/响应形状、安全方案与错误码都来自手写的 [openapi.yaml](../contracts/control-plane-api/openapi.yaml) 契约；那份文档才是整个面的单一事实来源，而不是这张表。
 
@@ -126,25 +128,28 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 查询响应不包含 `runner_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Control Plane token。
 
+service token 用于协调 run 的各个组件，read token 用于脱敏读取，第三个可选的 admin token 用于 `/v1/admin` 下的运维面。三者刻意不构成包含关系：持有 service token 无法访问 admin 路由，admin token 也不能接纳 run 或让 run 走正常生命周期。只有在配置了 `CONTROL_PLANE_ADMIN_TOKEN` 时 `/v1/admin` 才存在——否则这些路径返回 404 而不是 401，因此未配置的部署不会暴露任何运维面。查看 blocked-preparation 队列只需要 read token，因为"知道某个 run 卡住了"并不属于特权；只有"决定放弃它"才需要 admin token。
+
 查询响应以形状一致的三组嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at`、`finished_at` 与 `updated_at` —— 后者表示该轴最后一次被写入的时间，是界面展示的活动新鲜度，刻意不用作阶段边界。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code` / `failure_notice_status`，但绝不包含其 opaque input、claim token 或 connector identity。列表端点通过查询参数沿三条轴筛选（`preparation_status`、`execution_status` 与 `publication_status`；参数名沿用既有拼写）；[observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json) 是读取契约。
 
 `/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Control Plane healthcheck。Runner 与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
 
 ## 配置
 
-| 变量                                       | 是否必需                           | 用途                                      |
-| ------------------------------------------ | ---------------------------------- | ----------------------------------------- |
-| `DATABASE_URL`                             | 是                                 | PostgreSQL connection string              |
-| `CONTROL_PLANE_SERVICE_TOKEN`              | 是                                 | 内部 mutation 和协调认证                  |
-| `CONTROL_PLANE_READ_TOKEN`                 | 是                                 | 查询 API 认证                             |
-| `AGENT_RUNNER_SERVICE_URL`                 | 是                                 | Runner service base URL                   |
-| `AGENT_RUNNER_SERVICE_TOKEN`               | 非 loopback 或受保护的 Runner 必需 | Runner 认证                               |
-| `CONTROL_PLANE_PORT`                       | 否                                 | 监听端口；默认 `8090`                     |
-| `CONNECTOR_ID`                             | 否                                 | 协调 namespace；默认 `github-app:default` |
-| `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` | 否                                 | Coordinator 间隔；默认 `15000`            |
-| `AGENT_RUNNER_SERVICE_REQUEST_TIMEOUT_MS`  | 否                                 | Runner 请求超时；默认 `30000`             |
-| `AGENT_RUNNER_SERVICE_REQUEST_RETRIES`     | 否                                 | Runner transport 重试次数；默认 `2`       |
-| `AGENT_RUNNER_SERVICE_RETRY_BASE_DELAY_MS` | 否                                 | 初始重试延迟；默认 `500`                  |
+| 变量                                       | 是否必需                           | 用途                                                    |
+| ------------------------------------------ | ---------------------------------- | ------------------------------------------------------- |
+| `DATABASE_URL`                             | 是                                 | PostgreSQL connection string                            |
+| `CONTROL_PLANE_SERVICE_TOKEN`              | 是                                 | 内部 mutation 和协调认证                                |
+| `CONTROL_PLANE_READ_TOKEN`                 | 是                                 | 查询 API 认证                                           |
+| `CONTROL_PLANE_ADMIN_TOKEN`                | 否                                 | `/v1/admin/*` 的运维认证；未配置时整个 admin 面返回 404 |
+| `AGENT_RUNNER_SERVICE_URL`                 | 是                                 | Runner service base URL                                 |
+| `AGENT_RUNNER_SERVICE_TOKEN`               | 非 loopback 或受保护的 Runner 必需 | Runner 认证                                             |
+| `CONTROL_PLANE_PORT`                       | 否                                 | 监听端口；默认 `8090`                                   |
+| `CONNECTOR_ID`                             | 否                                 | 协调 namespace；默认 `github-app:default`               |
+| `AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS` | 否                                 | Coordinator 间隔；默认 `15000`                          |
+| `AGENT_RUNNER_SERVICE_REQUEST_TIMEOUT_MS`  | 否                                 | Runner 请求超时；默认 `30000`                           |
+| `AGENT_RUNNER_SERVICE_REQUEST_RETRIES`     | 否                                 | Runner transport 重试次数；默认 `2`                     |
+| `AGENT_RUNNER_SERVICE_RETRY_BASE_DELAY_MS` | 否                                 | 初始重试延迟；默认 `500`                                |
 
 ## 数据库 schema
 
