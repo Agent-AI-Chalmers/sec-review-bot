@@ -100,6 +100,13 @@ export interface components {
       step_key: string
       /** @enum {string} */
       status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+      /** @description How many times this step has been claimed and started. More than one means an earlier owner began the side effect, so a reclaiming publisher must reconcile against the remote object (`remote_object_id`/`remote_object_url`) instead of assuming nothing happened. */
+      attempt_count: number
+      /**
+       * Format: date-time
+       * @description When the latest claim of this step started; null until the step is claimed once. Together with `attempt_count` it distinguishes a step that never started from one whose publisher died mid-effect.
+       */
+      last_attempt_at: string | null
       failure_count: number
       remote_object_id: string | null
       /** Format: uri */

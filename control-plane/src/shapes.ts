@@ -51,10 +51,13 @@ export type JsonObject = Record<string, unknown>
 /** The durable record's artifact storage, narrowed from the runner's loose type. */
 export type ArtifactStorage = ReviewRunRecord['artifact_storage']
 
-/** The observed step summary is the step record minus the reconciliation id. */
+/** The observed step summary is the step record minus the reconciliation id and the
+ * publisher's attempt bookkeeping. Those describe how Control Plane retried the step, which the
+ * console does not show; keeping them here would widen the redacted surface by accident whenever
+ * the durable record gains a diagnostic column. */
 export type PublicationStepSummary = Omit<
   PublicationStepRecord,
-  'remote_object_id'
+  'remote_object_id' | 'attempt_count' | 'last_attempt_at'
 >
 
 /** The arguments the store accepts for a new run. */

@@ -174,30 +174,48 @@ export class PublicationStore {
     })
   }
   async listPublicationSteps(runId: string): Promise<PublicationStepRecord[]> {
-    const result = await this.pool.query<PublicationStepRecord>(
+    const result = await this.pool.query<
+      Omit<PublicationStepRecord, 'last_attempt_at'> & {
+        last_attempt_at: Date | string | null
+      }
+    >(
       `
-      SELECT step_key,status,failure_count,remote_object_id,remote_object_url,
-             failure_code,failure_message
+      SELECT step_key,status,attempt_count,last_attempt_at,failure_count,
+             remote_object_id,remote_object_url,failure_code,failure_message
       FROM publication_steps
       WHERE run_id=$1 AND connector_id=$2
       ORDER BY step_key
     `,
       [runId, this.connectorId]
     )
-    return result.rows
+    // `last_attempt_at` is a timestamptz, which node-pg hands back as a Date; the contract
+    // declares it a date-time string like every other timestamp on the read surface.
+    return result.rows.map((row) => ({
+      ...row,
+      last_attempt_at:
+        row.last_attempt_at === null
+          ? null
+          : row.last_attempt_at instanceof Date
+            ? row.last_attempt_at.toISOString()
+            : row.last_attempt_at
+    }))
   }
   private async claimPublicationStep(
     runId: string,
     token: string,
     stepKey: string
   ): Promise<boolean> {
-    // A running step may belong to the expired publication owner. The new
-    // owner reclaims it under the new publication token, then reconciles the
-    // stable remote identity before issuing another side effect.
+    // A `running` step may belong to a publisher that died mid-effect. This update reclaims it
+    // under the new publication token but deliberately does NOT decide whether the side effect
+    // already happened: it cannot know. Instead it records that a new attempt started, so the
+    // caller can see `attempt_count > 1` and reconcile against the remote object before issuing
+    // another call. Assuming a reclaim means "nothing happened yet" is what would duplicate a
+    // comment or a pull request.
     const result = await this.pool.query(
       `
       UPDATE publication_steps s
-      SET status='running', updated_at=clock_timestamp()
+      SET status='running', attempt_count=s.attempt_count+1,
+          last_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
       FROM publications p
       WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
         AND (s.status IN ('pending','running') OR (s.status='failed' AND s.failure_count<$5))

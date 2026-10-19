@@ -2416,3 +2416,49 @@ test('a publisher that died mid-publication is taken over once its lease expires
     await store.close()
   }
 })
+
+test('reclaiming a running publication step records that another attempt started', async () => {
+  // A step found `running` belongs to a publisher that may have died mid-effect. Control Plane
+  // cannot know whether the side effect happened, so it must not let a reclaim look like a first
+  // attempt: `attempt_count` and `last_attempt_at` are what let the connector treat a reclaim as
+  // a retry and reconcile against the remote object instead of repeating the call blindly.
+  const store = await createStore({ claimTimeoutMs: 50 })
+  const runId = await createSuccessfulRun(store)
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await store.initializePublicationSteps(runId, token, ['comment'])
+    assert.strictEqual(
+      (await store.listPublicationSteps(runId))[0]?.attempt_count,
+      0,
+      'an untouched step has never been attempted'
+    )
+
+    await store.requirePublicationStepClaim(runId, token, 'comment')
+    const first = (await store.listPublicationSteps(runId))[0]
+    assert.strictEqual(first?.attempt_count, 1)
+    assert.ok(
+      first?.last_attempt_at,
+      'the first attempt records when it started'
+    )
+
+    // The publisher "dies" here: the step stays `running`. A new owner reclaims it once the
+    // publication lease expires.
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    const secondToken = await store.claimPublication(runId)
+    assert.ok(secondToken)
+    await store.requirePublicationStepClaim(runId, secondToken, 'comment')
+    const second = (await store.listPublicationSteps(runId))[0]
+    assert.strictEqual(
+      second?.attempt_count,
+      2,
+      'a reclaim must be visible as a second attempt, not a first one'
+    )
+    assert.strictEqual(second?.status, 'running')
+    assert.notStrictEqual(second?.last_attempt_at, null)
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})

@@ -69,6 +69,8 @@ test('publication step observation exposes operator outcomes without reconciliat
   const observed = observePublicationStep({
     step_key: 'issue:draft-pr',
     status: 'failed',
+    attempt_count: 3,
+    last_attempt_at: '2026-01-01T00:00:05.000Z',
     failure_count: 2,
     remote_object_id: '142',
     remote_object_url: 'https://github.com/octo/example/pull/142',

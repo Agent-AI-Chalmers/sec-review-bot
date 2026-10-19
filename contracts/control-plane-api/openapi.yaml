@@ -280,6 +280,8 @@ components:
       required:
         - step_key
         - status
+        - attempt_count
+        - last_attempt_at
         - failure_count
         - remote_object_id
         - remote_object_url
@@ -297,6 +299,23 @@ components:
             - succeeded
             - failed
             - terminal_failed
+        attempt_count:
+          type: integer
+          minimum: 0
+          description: >-
+            How many times this step has been claimed and started. More than one means an
+            earlier owner began the side effect, so a reclaiming publisher must reconcile
+            against the remote object (`remote_object_id`/`remote_object_url`) instead of
+            assuming nothing happened.
+        last_attempt_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: >-
+            When the latest claim of this step started; null until the step is claimed once.
+            Together with `attempt_count` it distinguishes a step that never started from one
+            whose publisher died mid-effect.
         failure_count:
           type: integer
           minimum: 0

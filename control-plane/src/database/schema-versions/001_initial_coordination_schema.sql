@@ -314,6 +314,14 @@ CREATE TABLE publication_steps (
   run_id text NOT NULL,
   step_key text NOT NULL,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'terminal_failed')),
+  -- How many times this step has been claimed, and when the latest claim began. A step that is
+  -- found `running` belongs to a publisher that died mid-effect: the new owner cannot tell from
+  -- the status alone whether the side effect already happened. These two columns make that
+  -- knowable (`attempt_count > 1` means an earlier owner started it), so the connector can
+  -- reconcile against the remote object instead of blindly repeating the call. They are
+  -- diagnostics, not a lease: publication ownership still comes from `publications.claim_token`.
+  attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  last_attempt_at timestamptz,
   failure_count integer NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
   remote_object_id text,
   remote_object_url text,
@@ -339,6 +347,10 @@ COMMENT ON COLUMN publication_steps.step_key IS
   'Stable connector-defined identity of one publication side effect within the run.';
 COMMENT ON COLUMN publication_steps.status IS
   'Step lifecycle; terminal_failed means the retry budget was exhausted or retry was explicitly forbidden.';
+COMMENT ON COLUMN publication_steps.attempt_count IS
+  'How many times this step has been claimed and started. More than one means an earlier owner began the side effect, so a new owner must reconcile against the remote object instead of assuming nothing happened.';
+COMMENT ON COLUMN publication_steps.last_attempt_at IS
+  'When the latest claim of this step started; NULL until it is claimed once. Together with attempt_count it distinguishes a never-started step from one whose owner died mid-effect.';
 COMMENT ON COLUMN publication_steps.failure_count IS
   'Number of failed executions recorded for this step; successful claims do not increment it.';
 COMMENT ON COLUMN publication_steps.remote_object_id IS

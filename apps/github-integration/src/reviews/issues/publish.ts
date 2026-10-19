@@ -177,6 +177,19 @@ async function publishIssueReviewResult({
         html_url: step.remote_object_url
       }
     } else {
+      // A step that was already claimed once may have created the pull request before its
+      // publisher died: `attempt_count > 1` means a previous owner started this side effect, so
+      // this run is a retry, not a first attempt. The creation path is idempotent on its own
+      // (the branch is run-specific and an existing branch is verified, then reused), but
+      // recording the fact keeps the log honest about why it may be recovering.
+      if (step !== undefined && step.attempt_count > 1) {
+        logInfo('draft_pr_creation_retry', {
+          event_type,
+          issue: issue.issue_number,
+          repo: issue.repo_full_name,
+          previous_attempts: step.attempt_count
+        })
+      }
       await store.requirePublicationStepClaim(
         run_id,
         claim_token,
