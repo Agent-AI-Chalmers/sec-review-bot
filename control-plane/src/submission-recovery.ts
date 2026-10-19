@@ -5,7 +5,6 @@ type SubmissionRecoveryStore = Pick<
   | 'claimSubmissionRecovery'
   | 'completeSubmissionRecovery'
   | 'failSubmissionRecovery'
-  | 'releaseSubmissionRecovery'
 >
 
 type SubmissionError = { code?: string | null; message: string }
@@ -60,10 +59,10 @@ export async function recoverReviewRunSubmission(
   } catch (error) {
     const classified = dependencies.classifyError(error)
     if (classified.uncertain) {
-      // The replay's outcome is unknown, which is exactly what `uncertain` already means. The
-      // submission may have been accepted, so concluding it would discard a run the Runner is
-      // still working on. Release the claim and leave the state alone.
-      await store.releaseSubmissionRecovery(run.run_id, claimToken)
+      // The replay's outcome is unknown, which is exactly what `uncertain` already means: the
+      // Runner may have accepted it, so nothing may be concluded. The claim is left in place so
+      // the run becomes claimable again when its lease expires, at the same pace it had before
+      // this path existed; clearing it here would replay the failing submission every tick.
       return { status: 'deferred', error }
     }
     await store.failSubmissionRecovery(run.run_id, claimToken, {

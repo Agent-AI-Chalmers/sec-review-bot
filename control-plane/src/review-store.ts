@@ -1104,13 +1104,6 @@ export class ReviewRunStore {
       return true
     })
   }
-  async releaseSubmissionRecovery(
-    runId: string,
-    token: string
-  ): Promise<boolean> {
-    this.ready()
-    return await this.executions.releaseSubmissionRecovery(runId, token)
-  }
   async failSubmissionRecovery(
     runId: string,
     token: string,

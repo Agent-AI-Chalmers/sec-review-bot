@@ -171,27 +171,4 @@ export class ExecutionStore {
       return result.rows[0].claim_token
     })
   }
-
-  /** Give up a recovery claim without concluding anything.
-   *
-   * A replay that failed for an unknown reason leaves the submission exactly as uncertain as it
-   * was: the Runner may have accepted it. Clearing the claim makes the run claimable again
-   * immediately rather than after the lease expires, and records no state transition because
-   * none happened.
-   */
-  async releaseSubmissionRecovery(
-    runId: string,
-    token: string
-  ): Promise<boolean> {
-    return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `UPDATE executions
-         SET claim_token=NULL, claimed_at=NULL, updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2
-           AND status='uncertain' AND claim_token=$3`,
-        [runId, this.connectorId, token]
-      )
-      return result.rowCount === 1
-    })
-  }
 }

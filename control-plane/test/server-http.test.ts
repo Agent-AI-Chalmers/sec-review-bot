@@ -312,6 +312,69 @@ test('schema validation names which part of the request failed', async () => {
   }
 })
 
+test('the completion route keeps the comment_url its branch requires', async () => {
+  // `oneOf` plus Fastify's default `removeAdditional: true` is a trap: ajv strips the fields a
+  // branch does not declare before deciding which branch matches, so `delivered:true` would lose
+  // its `comment_url`, fall through to the other branch, and the handler would then reject the
+  // call it just accepted. The server configures `removeAdditional: false` for exactly this
+  // reason; this test pins the consequence on the wire, which the store-level tests cannot see
+  // because they never go through schema validation.
+  const completed: unknown[][] = []
+  const app = await buildApp({
+    completeRunFailureNotice: async (...args: unknown[]) => {
+      completed.push(args)
+      return true
+    }
+  })
+  const runId = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
+  try {
+    const delivered = await app.inject({
+      method: 'POST',
+      url: `/v1/runs/${runId}/failure-notice/complete`,
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: {
+        token: 'notice-claim',
+        delivered: true,
+        comment_url: 'https://github.com/o/r/issues/1#issuecomment-9'
+      }
+    })
+    assert.strictEqual(delivered.statusCode, 200)
+    assert.deepStrictEqual(completed, [
+      [
+        runId,
+        'notice-claim',
+        true,
+        'https://github.com/o/r/issues/1#issuecomment-9'
+      ]
+    ])
+
+    // The other branch must reject a URL rather than silently dropping it.
+    const notDelivered = await app.inject({
+      method: 'POST',
+      url: `/v1/runs/${runId}/failure-notice/complete`,
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: {
+        token: 'notice-claim',
+        delivered: false,
+        comment_url: 'https://github.com/o/r/issues/1#issuecomment-9'
+      }
+    })
+    assert.strictEqual(
+      notDelivered.statusCode,
+      400,
+      'an undelivered notice must not carry a comment_url'
+    )
+  } finally {
+    await app.close()
+  }
+})
+
 test('an operation with no response body sends an empty 200, not a null body', async () => {
   // The contract declares no content for these; returning `null` produced a literal "null"
   // body that disagreed with the generated `void` type.
