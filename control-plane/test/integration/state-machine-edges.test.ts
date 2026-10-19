@@ -77,7 +77,7 @@ test('every transition a run actually records is declared in the contract', asyn
   const store = await createStore()
   const declared = {
     preparation: declaredEdges('preparation'),
-    runner: declaredEdges('runner'),
+    runner: declaredEdges('execution'),
     publication: declaredEdges('publication'),
     notice: declaredEdges('notice')
   }
@@ -132,7 +132,7 @@ test('every declared edge is reachable by a write path', async () => {
       'preparing->pending',
       'preparing->failed'
     ]),
-    runner: new Set([
+    execution: new Set([
       'pending->queued',
       'pending->skipped',
       'pending->uncertain',

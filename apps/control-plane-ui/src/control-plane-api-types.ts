@@ -189,7 +189,7 @@ export interface components {
       /** @description Monotonic identifier; also the tie-breaker within one occurred_at. */
       event_id: number
       /** @enum {string} */
-      axis: 'runner' | 'preparation' | 'publication' | 'notice'
+      axis: 'execution' | 'preparation' | 'publication' | 'notice'
       /** @description State before the transition; null for the first event on an axis. */
       from_status: string | null
       to_status: string

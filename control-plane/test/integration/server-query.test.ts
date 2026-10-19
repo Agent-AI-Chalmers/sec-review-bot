@@ -190,7 +190,7 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     // Admission writes one event per axis inside the admitting transaction.
     assert.deepStrictEqual(
       eventsBody.events.map((event) => `${event.axis}:${event.to_status}`),
-      ['runner:pending', 'preparation:preparing', 'publication:pending']
+      ['execution:pending', 'preparation:preparing', 'publication:pending']
     )
     const occurredAt = eventsBody.events.map((event) =>
       Date.parse(event.occurred_at)

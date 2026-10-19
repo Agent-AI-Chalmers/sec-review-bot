@@ -386,7 +386,7 @@ export class PreparationStore {
     await appendEvent(client, {
       runId,
       connectorId: this.connectorId,
-      axis: 'runner',
+      axis: 'execution',
       fromStatus: 'pending',
       toStatus: 'skipped'
     })
@@ -524,7 +524,7 @@ export class PreparationStore {
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
-        axis: 'runner',
+        axis: 'execution',
         fromStatus: 'pending',
         toStatus: submissionUncertain ? 'uncertain' : 'skipped',
         reasonCode: submissionUncertain ? SUBMISSION_STATE_UNCERTAIN : null

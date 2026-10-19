@@ -404,7 +404,7 @@ CREATE TABLE review_run_events (
   event_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   run_id text NOT NULL,
   connector_id text NOT NULL,
-  axis text NOT NULL CHECK (axis IN ('runner', 'preparation', 'publication', 'notice')),
+  axis text NOT NULL CHECK (axis IN ('execution', 'preparation', 'publication', 'notice')),
   from_status text,
   to_status text NOT NULL,
   reason_code text,

@@ -479,7 +479,7 @@ export class ReviewRunStore {
     await appendEvent(client, {
       runId: run.run_id,
       connectorId: this.connectorId,
-      axis: 'runner',
+      axis: 'execution',
       fromStatus: null,
       toStatus: 'pending'
     })
@@ -727,7 +727,7 @@ export class ReviewRunStore {
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
-        axis: 'runner',
+        axis: 'execution',
         fromStatus: 'pending',
         toStatus: 'queued'
       })
@@ -1057,7 +1057,7 @@ export class ReviewRunStore {
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
-        axis: 'runner',
+        axis: 'execution',
         fromStatus: 'uncertain',
         toStatus: 'queued'
       })
@@ -1093,7 +1093,7 @@ export class ReviewRunStore {
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
-        axis: 'runner',
+        axis: 'execution',
         fromStatus: 'uncertain',
         toStatus: 'failed',
         reasonCode: error.code ?? null
@@ -1196,7 +1196,7 @@ export class ReviewRunStore {
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
-        axis: 'runner',
+        axis: 'execution',
         fromStatus: run.rows[0]?.from_status ?? null,
         toStatus: 'failed',
         reasonCode: error.code ?? null

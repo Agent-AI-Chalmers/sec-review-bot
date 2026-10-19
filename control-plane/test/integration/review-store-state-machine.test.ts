@@ -192,7 +192,7 @@ test('runner termination events name the state they came from', async () => {
       true
     )
     const succeededEvents = (await store.listEvents(succeededId)).filter(
-      (event) => event.axis === 'runner'
+      (event) => event.axis === 'execution'
     )
     assert.deepStrictEqual(
       succeededEvents.map((event) => [event.from_status, event.to_status]),
@@ -214,7 +214,7 @@ test('runner termination events name the state they came from', async () => {
       true
     )
     const failedEvents = (await store.listEvents(failedId)).filter(
-      (event) => event.axis === 'runner'
+      (event) => event.axis === 'execution'
     )
     assert.deepStrictEqual(
       failedEvents.map((event) => [event.from_status, event.to_status]),
@@ -237,10 +237,10 @@ test('the coordination event log records each transition once, oldest first', as
     // and the pending->queued + preparing->submitted transitions must be present.
     const events = await store.listEvents(runId)
     const axes = events.map((event) => `${event.axis}:${event.to_status}`)
-    assert.ok(axes.includes('runner:pending'))
+    assert.ok(axes.includes('execution:pending'))
     assert.ok(axes.includes('preparation:preparing'))
     assert.ok(axes.includes('publication:pending'))
-    assert.ok(axes.includes('runner:queued'))
+    assert.ok(axes.includes('execution:queued'))
     assert.ok(axes.includes('preparation:submitted'))
 
     // Oldest first, and each transition appears exactly once.
@@ -2304,7 +2304,7 @@ test('a preparation failure refuses to commit when its claim was taken mid-trans
         (await store.listEvents(runId)).map(
           (event) => `${event.axis}:${event.to_status}`
         ),
-        ['runner:pending', 'preparation:preparing', 'publication:pending'],
+        ['execution:pending', 'preparation:preparing', 'publication:pending'],
         'the refused failure must not append a misleading event'
       )
     } finally {

@@ -19,7 +19,7 @@ const SPEC_PATH = path.resolve(
   'openapi.yaml'
 )
 
-export type StateAxis = 'preparation' | 'runner' | 'publication' | 'notice'
+export type StateAxis = 'preparation' | 'execution' | 'publication' | 'notice'
 
 export interface StateTransition {
   from: string
@@ -58,7 +58,7 @@ export interface StateMachine {
 
 const AXES: readonly StateAxis[] = [
   'preparation',
-  'runner',
+  'execution',
   'publication',
   'notice'
 ]

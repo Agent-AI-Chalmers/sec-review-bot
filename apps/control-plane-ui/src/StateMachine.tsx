@@ -16,9 +16,9 @@ import {
   revertSide
 } from './state-machine-layout.js'
 
-/** The current state of one axis, read from the run. Preparation is nested. */
+/** The current state of one axis, read from the run. */
 function currentState(run: Run, axis: StateAxis): string | null {
-  if (axis === 'runner') return run.execution.status
+  if (axis === 'execution') return run.execution.status
   if (axis === 'publication') return run.publication.status
   return run.preparation.status
 }

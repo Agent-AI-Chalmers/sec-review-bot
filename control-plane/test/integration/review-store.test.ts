@@ -84,7 +84,7 @@ test('an axis row cannot be written under a connector the trunk does not own', a
     await assert.rejects(
       pool.query(
         `INSERT INTO review_run_events (run_id, connector_id, axis, to_status)
-         VALUES ($1, 'intruder', 'runner', 'pending')`,
+         VALUES ($1, 'intruder', 'execution', 'pending')`,
         [runId]
       ),
       /violates foreign key constraint/,

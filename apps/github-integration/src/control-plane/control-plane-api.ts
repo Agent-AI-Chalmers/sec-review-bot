@@ -96,7 +96,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** @description Read the append-only coordination event log for one run, oldest first. Each event is a state transition on one coordination axis (runner, preparation, publication, or notice). This is an audit trail over the snapshot tables, not the Runner's execution history, which lives in Temporal. Requires the read token. */
+    /** @description Read the append-only coordination event log for one run, oldest first. Each event is a state transition on one coordination axis (execution, preparation, publication, or notice). This is an audit trail over the snapshot tables, not the Runner's execution history, which lives in Temporal. Requires the read token. */
     get: operations['listRunEvents']
     put?: never
     post?: never
@@ -646,7 +646,7 @@ export interface components {
       /** @description Monotonic identifier; also the tie-breaker within one occurred_at. */
       event_id: number
       /** @enum {string} */
-      axis: 'runner' | 'preparation' | 'publication' | 'notice'
+      axis: 'execution' | 'preparation' | 'publication' | 'notice'
       /** @description State before the transition; null for the first event on an axis. */
       from_status: string | null
       to_status: string

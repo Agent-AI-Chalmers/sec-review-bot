@@ -10,7 +10,7 @@ import type { PoolClient } from 'pg'
 import type { ReviewRunEvent } from './shapes.js'
 
 export type CoordinationAxis =
-  'runner' | 'preparation' | 'publication' | 'notice'
+  'execution' | 'preparation' | 'publication' | 'notice'
 
 export interface AppendEventArgs {
   runId: string

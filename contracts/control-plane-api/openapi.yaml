@@ -542,7 +542,7 @@ components:
         axis:
           type: string
           enum:
-            - runner
+            - execution
             - preparation
             - publication
             - notice
@@ -754,7 +754,7 @@ x-state-machines:
       # Only the second one carries a reason code, so the edge is declared without one; a
       # consumer filtering by reason would otherwise miss every explicit preparation failure.
       - { from: preparing, to: failed, label: failed}
-  runner:
+  execution:
     order: 2
     title: Execution
     field: execution.status
@@ -1181,7 +1181,7 @@ paths:
       operationId: listRunEvents
       description: >-
         Read the append-only coordination event log for one run, oldest first. Each event is
-        a state transition on one coordination axis (runner, preparation, publication, or
+        a state transition on one coordination axis (execution, preparation, publication, or
         notice). This is an audit trail over the snapshot tables, not the Runner's execution
         history, which lives in Temporal. Requires the read token.
       security:

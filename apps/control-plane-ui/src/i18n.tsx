@@ -76,7 +76,7 @@ const messages = {
     runProgress: 'Run progress',
     runHistory: 'History',
     runHistoryEmpty: 'No recorded transitions yet',
-    axisRunner: 'Execution',
+    axisExecution: 'Execution',
     axisPreparation: 'Preparation',
     axisPublication: 'Publication',
     axisNotice: 'Failure notice',
@@ -160,9 +160,9 @@ const messages = {
       'this attempt failed; it will be retried shortly',
     edge_preparation_preparing_failed:
       'preparation failed for good (retries exhausted, or an error that cannot be retried)',
-    edge_runner_pending_queued:
+    edge_execution_pending_queued:
       'the prepared input was submitted and the Runner accepted it',
-    edge_runner_pending_skipped:
+    edge_execution_pending_skipped:
       'preparation failed, so execution will never run',
     edge_publication_publishing_pending:
       'a step failed but can be retried, so publishing waits and retries',
@@ -172,21 +172,22 @@ const messages = {
       'execution did not succeed, so there is nothing to publish',
     edge_publication_publishing_skipped:
       'execution was found to have failed while publishing, so the publication was abandoned',
-    edge_runner_pending_uncertain:
+    edge_execution_pending_uncertain:
       'the submission got no response, so acceptance is unknown',
-    edge_runner_uncertain_uncertain:
+    edge_execution_uncertain_uncertain:
       'a recovery claim was taken to replay the unconfirmed submission',
-    edge_runner_uncertain_queued:
+    edge_execution_uncertain_queued:
       'the replayed submission was accepted, so the task is queued',
-    edge_runner_uncertain_failed:
+    edge_execution_uncertain_failed:
       'the replayed submission failed conclusively, so the run is failed',
-    edge_runner_queued_running: 'polling saw the Runner start the task',
-    edge_runner_running_succeeded: 'polling saw the Runner finish successfully',
-    edge_runner_queued_succeeded:
+    edge_execution_queued_running: 'polling saw the Runner start the task',
+    edge_execution_running_succeeded:
+      'polling saw the Runner finish successfully',
+    edge_execution_queued_succeeded:
       'polling saw the Runner finish before it was ever seen running',
-    edge_runner_queued_failed:
+    edge_execution_queued_failed:
       'polling reached a definite failure (reported failure, run not found, no result, or bad response)',
-    edge_runner_running_failed:
+    edge_execution_running_failed:
       'polling reached a definite failure (reported failure, run not found, no result, or bad response)',
     edge_publication_pending_publishing:
       'a worker started publishing the result',
@@ -288,7 +289,7 @@ const messages = {
     runProgress: 'Run 进度',
     runHistory: '历史',
     runHistoryEmpty: '暂无记录的变更',
-    axisRunner: '执行',
+    axisExecution: '执行',
     axisPreparation: '准备',
     axisPublication: '发布',
     axisNotice: '失败通知',
@@ -361,24 +362,25 @@ const messages = {
     edge_preparation_preparing_pending: '本次准备失败，稍后重试',
     edge_preparation_preparing_failed:
       '准备失败（可能是重试次数用尽，也可能是不可重试的错误）',
-    edge_runner_pending_queued: '准备好的输入已提交，Runner 接受了该任务',
-    edge_runner_pending_skipped: '准备失败，因此执行不会发生',
+    edge_execution_pending_queued: '准备好的输入已提交，Runner 接受了该任务',
+    edge_execution_pending_skipped: '准备失败，因此执行不会发生',
     edge_publication_publishing_pending: '某步骤失败但可重试，回到等待后重试',
     edge_publication_publishing_failed: '重试次数用尽，发布最终失败',
     edge_publication_pending_skipped: '执行未成功，没有可发布的内容',
     edge_publication_publishing_skipped:
       '发布过程中发现执行已失败，因此放弃发布',
-    edge_runner_pending_uncertain: '提交没有收到响应，无法确认是否被接受',
-    edge_runner_uncertain_uncertain: '取得恢复认领，开始重放这次未确认的提交',
-    edge_runner_uncertain_queued: '重放的提交被接受，任务进入队列',
-    edge_runner_uncertain_failed: '重放提交得到确定性失败，判定为失败',
-    edge_runner_queued_running: '轮询观察到 Runner 开始执行',
-    edge_runner_running_succeeded: '轮询观察到 Runner 执行成功',
-    edge_runner_queued_succeeded:
+    edge_execution_pending_uncertain: '提交没有收到响应，无法确认是否被接受',
+    edge_execution_uncertain_uncertain:
+      '取得恢复认领，开始重放这次未确认的提交',
+    edge_execution_uncertain_queued: '重放的提交被接受，任务进入队列',
+    edge_execution_uncertain_failed: '重放提交得到确定性失败，判定为失败',
+    edge_execution_queued_running: '轮询观察到 Runner 开始执行',
+    edge_execution_running_succeeded: '轮询观察到 Runner 执行成功',
+    edge_execution_queued_succeeded:
       '首次轮询时 Runner 已完成，未观察到执行中状态',
-    edge_runner_queued_failed:
+    edge_execution_queued_failed:
       '轮询得到确定性失败（报告失败、查不到 run、无结果或响应不合约定）',
-    edge_runner_running_failed:
+    edge_execution_running_failed:
       '轮询得到确定性失败（报告失败、查不到 run、无结果或响应不合约定）',
     edge_publication_pending_publishing: '开始发布结果',
     edge_publication_publishing_publishing:

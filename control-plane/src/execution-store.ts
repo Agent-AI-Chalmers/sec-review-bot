@@ -70,7 +70,7 @@ export class ExecutionStore {
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
-        axis: 'runner',
+        axis: 'execution',
         fromStatus: 'queued',
         toStatus: 'running'
       })
@@ -134,7 +134,7 @@ export class ExecutionStore {
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
-        axis: 'runner',
+        axis: 'execution',
         fromStatus: result.rows[0]?.from_status ?? null,
         toStatus: 'succeeded'
       })
@@ -163,7 +163,7 @@ export class ExecutionStore {
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
-        axis: 'runner',
+        axis: 'execution',
         fromStatus: 'uncertain',
         toStatus: 'uncertain',
         reasonCode: 'SUBMISSION_RECOVERY_CLAIMED'

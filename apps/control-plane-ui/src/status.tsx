@@ -183,10 +183,10 @@ export function preparationStateLabel(
 }
 
 export function axisLabel(
-  axis: 'runner' | 'preparation' | 'publication' | 'notice',
+  axis: 'execution' | 'preparation' | 'publication' | 'notice',
   t: ReturnType<typeof useMessages>
 ): string {
-  if (axis === 'runner') return t('axisRunner')
+  if (axis === 'execution') return t('axisExecution')
   if (axis === 'preparation') return t('axisPreparation')
   if (axis === 'publication') return t('axisPublication')
   return t('axisNotice')

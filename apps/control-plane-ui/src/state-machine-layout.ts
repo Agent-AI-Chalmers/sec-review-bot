@@ -14,7 +14,7 @@ import type { StateAxis } from './state-machines.generated.js'
  * figure leaves it out. This is a presentation choice and lives here rather than in the contract. */
 export const DIAGRAMMED_AXES = [
   'preparation',
-  'runner',
+  'execution',
   'publication'
 ] as const satisfies readonly StateAxis[]
 
@@ -33,7 +33,7 @@ export const STATE_LAYOUT: Partial<
     submitted: { col: 2 },
     failed: { col: 1, row: 1 }
   },
-  runner: {
+  execution: {
     // Main path along row 0; the failure/uncertain/recovery branch on row 1 beneath it.
     pending: { col: 0, row: 0 },
     queued: { col: 1, row: 0 },

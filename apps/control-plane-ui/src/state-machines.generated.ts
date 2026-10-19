@@ -3,7 +3,7 @@
 // this file is its TypeScript view. Regenerate it with
 // `pnpm --dir contracts/control-plane-api/tools run generate`.
 
-export type StateAxis = 'preparation' | 'runner' | 'publication' | 'notice'
+export type StateAxis = 'preparation' | 'execution' | 'publication' | 'notice'
 
 export interface StateTransition {
   from: string
@@ -85,7 +85,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
     ]
   },
   {
-    axis: 'runner',
+    axis: 'execution',
     order: 2,
     title: 'Execution',
     field: 'execution.status',
