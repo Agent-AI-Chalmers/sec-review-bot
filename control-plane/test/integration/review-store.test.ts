@@ -16,6 +16,102 @@ function databaseUrl() {
   return value
 }
 
+test('admission creates exactly one executions row alongside the run trunk', async () => {
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `control-plane-test:${randomUUID()}`
+  })
+  await store.initialize()
+  const pool = new Pool({ connectionString: databaseUrl() })
+  try {
+    const runId = `run-${randomUUID()}`
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: { repo: 'octo/example' }
+    })
+    // The split keeps execution state out of the trunk table, so every run must have exactly
+    // one execution-row or a JOIN read would silently drop it.
+    const executions = await pool.query(
+      'SELECT status, submitted_at, claim_token, claimed_at FROM executions WHERE run_id=$1',
+      [runId]
+    )
+    assert.strictEqual(executions.rowCount, 1)
+    assert.strictEqual(executions.rows[0].status, 'pending')
+    assert.strictEqual(executions.rows[0].submitted_at, null)
+    assert.strictEqual(executions.rows[0].claim_token, null)
+    assert.strictEqual(executions.rows[0].claimed_at, null)
+
+    // Publication input belongs to the publication axis, like the preparation and execution
+    // inputs belong to theirs.
+    const publication = await pool.query(
+      'SELECT input FROM publications WHERE run_id=$1',
+      [runId]
+    )
+    assert.deepStrictEqual(publication.rows[0].input, { repo: 'octo/example' })
+
+    // The trunk keeps only identity and cross-axis fields; execution columns must not be there.
+    const trunk = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='review_runs'`
+    )
+    const trunkColumns = trunk.rows.map(
+      (row: { column_name: string }) => row.column_name
+    )
+    for (const moved of [
+      'runner_status',
+      'runner_input',
+      'runner_failure_code',
+      'artifact_storage',
+      'workflow_result',
+      'recovery_claim_token',
+      'submitted_at',
+      'publish_context'
+    ]) {
+      assert.ok(
+        !trunkColumns.includes(moved),
+        `review_runs must not keep execution column ${moved}`
+      )
+    }
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
+test('a run missing its execution axis is reported, not silently dropped', async () => {
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `control-plane-test:${randomUUID()}`
+  })
+  await store.initialize()
+  const pool = new Pool({ connectionString: databaseUrl() })
+  try {
+    const runId = `run-${randomUUID()}`
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    // Simulate a corrupt/migrated row: delete the execution axis. Reads must surface this as a
+    // dropped row (contract cannot represent it) rather than omit the run with no trace.
+    await pool.query('DELETE FROM executions WHERE run_id=$1', [runId])
+    const page = await store.listRunsPage({ limit: 10 })
+    assert.ok(
+      page.dropped.some((entry) => entry.run_id === runId),
+      'the corrupt run is reported in dropped'
+    )
+    assert.ok(
+      !page.runs.some((run) => run.run_id === runId),
+      'the corrupt run is not returned as a valid record'
+    )
+    assert.strictEqual(await store.getRun(runId), null)
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
 test('Control Plane store initializes its schema and deduplicates ingress', async () => {
   const store = new ReviewRunStore({
     connectionString: databaseUrl(),
@@ -311,7 +407,7 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
 
     const pool = new Pool({ connectionString: databaseUrl() })
     await pool.query(
-      'UPDATE review_runs SET artifact_storage=$2::jsonb WHERE run_id=$1',
+      'UPDATE executions SET artifact_storage=$2::jsonb WHERE run_id=$1',
       [poisonedId, JSON.stringify({ status: 'available' })]
     )
     try {

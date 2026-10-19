@@ -1,5 +1,15 @@
-// Implements Control Plane's durable review, preparation, and publication
-// state machines. Claim tokens here are the sole fencing authority for writes.
+// Implements Control Plane's durable review trunk and its read projection, and orchestrates
+// the cross-axis transitions that must move more than one lifecycle axis in one transaction.
+//
+// Axis ownership:
+// - `execution-store.ts` owns single-axis execution writes (status transitions, observation
+//   heartbeat, artifact/result, submission-recovery claims).
+// - `preparation-store.ts` / `publication-store.ts` own their own axes.
+// - This store owns the run trunk, the full-record projection (`RUN_SELECT`/`rowToRecord`),
+//   and cross-axis transitions (submit -> queued, execution failure -> publication skipped,
+//   recovery -> publication re-pending). A cross-axis transition is owned by the axis that
+//   initiates it; preparations initiating an execution skip is therefore in that store.
+// Claim tokens here are the sole fencing authority for writes.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
@@ -30,6 +40,7 @@ import {
 } from './preparation-store.js'
 import { PublicationStore } from './publication-store.js'
 import { appendEvent, listEvents } from './review-run-events.js'
+import { ExecutionStore } from './execution-store.js'
 
 export type {
   CreateReviewRunArgs,
@@ -63,7 +74,8 @@ interface ReviewRunRow {
   publication_status: PublicationStatus
   created_at: Date | string
   created_at_cursor: string
-  runner_updated_at: Date | string
+  runner_updated_at: Date | string | null
+  execution_missing: boolean
   submitted_at: Date | string | null
   publication_updated_at: Date | string
   published_at: Date | string | null
@@ -86,15 +98,19 @@ const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
 const CLAIM_WAIT_INTERVAL_MS = 250
 
 const RUN_SELECT = `
-  SELECT r.run_id, r.workflow, r.publish_context, r.runner_input, r.runner_status,
-    r.runner_failure_code, r.runner_failure_message, r.artifact_storage, r.workflow_result,
+  SELECT r.run_id, r.workflow, p.input AS publish_context,
     r.ingress_kind, r.ingress_key,
-    r.created_at, r.updated_at AS runner_updated_at, r.submitted_at,
+    r.created_at,
     -- Full-precision (microsecond) UTC timestamp for keyset cursors. node-pg maps
     -- created_at to a millisecond JS Date, so a cursor built from the truncated
     -- value skips every row in the same millisecond; this string keeps the
     -- microseconds for an exact (created_at, run_id) < boundary.
     to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_cursor,
+    e.input AS runner_input, e.status AS runner_status,
+    e.failure_code AS runner_failure_code, e.failure_message AS runner_failure_message,
+    e.artifact_storage, e.workflow_result,
+    e.observed_at AS runner_updated_at, e.submitted_at,
+    (e.run_id IS NULL) AS execution_missing,
     p.status AS publication_status, p.updated_at AS publication_updated_at,
     p.published_at,
     p.failure_code AS publication_failure_code, p.failure_message AS publication_failure_message,
@@ -102,7 +118,11 @@ const RUN_SELECT = `
     pr.updated_at AS preparation_updated_at, pr.failure_code AS preparation_failure_code,
     pr.failure_message AS preparation_failure_message,
     n.status AS preparation_failure_notice_status
-  FROM review_runs r JOIN publications p ON p.run_id = r.run_id
+  FROM review_runs r
+  JOIN publications p ON p.run_id = r.run_id
+  -- LEFT JOIN so a run that somehow lacks its execution row is surfaced (and reported), not
+  -- silently dropped from every read.
+  LEFT JOIN executions e ON e.run_id = r.run_id AND e.connector_id = r.connector_id
   LEFT JOIN preparations pr
     ON pr.run_id = r.run_id AND pr.connector_id = r.connector_id
   LEFT JOIN preparation_failure_notices n
@@ -115,6 +135,11 @@ function iso(value: Date | string): string {
     : new Date(value).toISOString()
 }
 function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
+  if (row.execution_missing) {
+    // A run without its execution row is corrupt, not a valid record. Throwing makes the
+    // projection report it in `dropped` instead of silently omitting or misrepresenting it.
+    throw new Error(`run ${row.run_id} has no executions row`)
+  }
   const publicationFailure = row.publication_status === 'failed'
   return {
     run_id: row.run_id,
@@ -137,7 +162,9 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     publication_status: row.publication_status,
     created_at: iso(row.created_at),
     submitted_at: row.submitted_at === null ? null : iso(row.submitted_at),
-    execution_updated_at: iso(row.runner_updated_at),
+    // `runner_updated_at` is the execution axis' observed_at; the missing-execution guard
+    // above narrows it to a real timestamp.
+    execution_updated_at: iso(row.runner_updated_at as Date | string),
     publication_updated_at: iso(row.publication_updated_at),
     published_at: row.published_at === null ? null : iso(row.published_at),
     // The run-level failure code names whichever axis actually failed: publication, then
@@ -212,6 +239,7 @@ export class ReviewRunStore {
   private readonly claimTimeoutMs: number
   private readonly preparations: PreparationStore
   private readonly publications: PublicationStore
+  private readonly executions: ExecutionStore
   private initialized = false
 
   constructor({
@@ -234,6 +262,11 @@ export class ReviewRunStore {
       this.claimTimeoutMs
     )
     this.publications = new PublicationStore(
+      this.pool,
+      this.connectorId,
+      this.claimTimeoutMs
+    )
+    this.executions = new ExecutionStore(
       this.pool,
       this.connectorId,
       this.claimTimeoutMs
@@ -286,18 +319,24 @@ export class ReviewRunStore {
     const preparationToken = crypto.randomUUID()
     await client.query(
       `INSERT INTO review_runs
-      (run_id,connector_id,workflow,publish_context,runner_input,runner_status,ingress_kind,ingress_key)
-      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,'pending',$6,$7)`,
+      (run_id,connector_id,workflow,ingress_kind,ingress_key)
+      VALUES ($1,$2,$3,$4,$5)`,
       [
         run.run_id,
         this.connectorId,
         run.workflow,
-        JSON.stringify(run.publish_context),
-        run.runner_input === undefined
-          ? null
-          : JSON.stringify(run.runner_input),
         run.ingress_kind ?? null,
         run.ingress_key ?? null
+      ]
+    )
+    await client.query(
+      `INSERT INTO executions
+        (run_id,connector_id,status,input)
+       VALUES ($1,$2,'pending',$3::jsonb)`,
+      [
+        run.run_id,
+        this.connectorId,
+        run.runner_input === undefined ? null : JSON.stringify(run.runner_input)
       ]
     )
     await client.query(
@@ -314,10 +353,10 @@ export class ReviewRunStore {
     )
     await client.query(
       `
-      INSERT INTO publications (run_id,connector_id,status)
-      VALUES ($1,$2,'pending')
+      INSERT INTO publications (run_id,connector_id,input,status)
+      VALUES ($1,$2,$3::jsonb,'pending')
     `,
-      [run.run_id, this.connectorId]
+      [run.run_id, this.connectorId, JSON.stringify(run.publish_context)]
     )
     // Admission is the first transition on both axes: the runner starts `pending` (input not
     // yet submitted) and a preparation row is created already owned by this admission's claim.
@@ -412,16 +451,30 @@ export class ReviewRunStore {
     if (run === null) throw new Error(`Review run does not exist: ${runId}`)
     const result = await this.pool.query(
       `
-      UPDATE review_runs
-      SET publish_context=$3::jsonb, runner_input=$4::jsonb, updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$5
-        AND runner_status='pending' AND EXISTS (
-          SELECT 1 FROM preparations
-          WHERE preparations.run_id=review_runs.run_id
-            AND preparations.connector_id=$5 AND preparations.status='preparing'
-            AND preparations.claim_token=$2
-        )
-        AND workflow=$6
+      WITH updated_publication AS (
+        UPDATE publications
+        SET input=$3::jsonb, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$5
+          AND EXISTS (
+            SELECT 1 FROM review_runs r
+            WHERE r.run_id=publications.run_id AND r.connector_id=$5 AND r.workflow=$6
+          )
+        RETURNING run_id
+      ),
+      updated_execution AS (
+        UPDATE executions
+        SET input=$4::jsonb, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$5
+          AND status='pending' AND EXISTS (
+            SELECT 1 FROM preparations
+            WHERE preparations.run_id=executions.run_id
+              AND preparations.connector_id=$5 AND preparations.status='preparing'
+              AND preparations.claim_token=$2
+          )
+        RETURNING run_id
+      )
+      SELECT run_id FROM updated_execution
+      WHERE EXISTS (SELECT 1 FROM updated_publication)
     `,
       [
         runId,
@@ -482,23 +535,33 @@ export class ReviewRunStore {
       if (run === null) throw new Error(`Review run does not exist: ${runId}`)
       const result = await client.query(
         `
-        UPDATE review_runs
-        SET publish_context=$3::jsonb, runner_status='queued',
-            submitted_at=COALESCE(submitted_at, clock_timestamp()),
-            runner_failure_code=NULL, runner_failure_message=NULL,
-            updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$4
-          AND runner_status='pending' AND EXISTS (
+        UPDATE publications
+        SET input=$2::jsonb, updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$3
+          AND EXISTS (
+            SELECT 1 FROM review_runs r
+            WHERE r.run_id=publications.run_id AND r.connector_id=$3 AND r.workflow=$4
+          )
+      `,
+        [runId, JSON.stringify(context), this.connectorId, run.workflow]
+      )
+      const queued = await client.query(
+        `
+        UPDATE executions
+        SET status='queued', submitted_at=COALESCE(submitted_at, clock_timestamp()),
+            failure_code=NULL, failure_message=NULL,
+            observed_at=clock_timestamp(), updated_at=clock_timestamp()
+        WHERE run_id=$1 AND connector_id=$3
+          AND status='pending' AND EXISTS (
             SELECT 1 FROM preparations
-            WHERE preparations.run_id=review_runs.run_id
-              AND preparations.connector_id=$4 AND preparations.status='preparing'
+            WHERE preparations.run_id=executions.run_id
+              AND preparations.connector_id=$3 AND preparations.status='preparing'
               AND preparations.claim_token=$2
           )
-          AND workflow=$5
       `,
-        [runId, token, JSON.stringify(context), this.connectorId, run.workflow]
+        [runId, token, this.connectorId]
       )
-      if (result.rowCount !== 1)
+      if (result.rowCount !== 1 || queued.rowCount !== 1)
         throw new Error(
           `Review run ${runId} cannot transition from pending to queued.`
         )
@@ -540,7 +603,15 @@ export class ReviewRunStore {
       WHERE r.run_id=$1 AND r.connector_id=$2`,
       [runId, this.connectorId]
     )
-    return result.rows[0] === undefined ? null : rowToRecord(result.rows[0])
+    const row = result.rows[0]
+    if (row === undefined) return null
+    // A row the record contract cannot represent (e.g. a run missing its execution axis) is
+    // treated as absent, matching the list projection that reports it in `dropped`.
+    try {
+      return rowToRecord(row)
+    } catch {
+      return null
+    }
   }
 
   private async listRunRows(
@@ -566,7 +637,7 @@ export class ReviewRunStore {
     if (options.workflow !== undefined)
       clauses.push(`r.workflow=${add(options.workflow)}`)
     if (options.execution_status !== undefined) {
-      clauses.push(`r.runner_status=${add(options.execution_status)}`)
+      clauses.push(`e.status=${add(options.execution_status)}`)
     }
     if (options.publication_status !== undefined) {
       clauses.push(`p.status=${add(options.publication_status)}`)
@@ -653,45 +724,21 @@ export class ReviewRunStore {
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE r.connector_id=$1
+        AND e.status='uncertain'
         AND (
-          -- An uncertain submission is claimable when it has no live claim; the lease is the
-          -- row's updated_at, so a stalled recovery becomes claimable again.
-          (r.runner_status='uncertain' AND (r.recovery_claim_token IS NULL
-            OR r.updated_at <= clock_timestamp()-($2*interval '1 millisecond')))
+          -- An uncertain submission is claimable when it has no live claim; the lease is
+          -- claimed_at, so a stalled recovery becomes claimable again. Observation writes
+          -- observed_at only, so a heartbeat can never extend this lease.
+          e.claim_token IS NULL
+          OR e.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
         )
-      ORDER BY r.updated_at`,
+      ORDER BY e.updated_at`,
       [this.connectorId, this.claimTimeoutMs]
     )
     return projectRunRows(result.rows)
   }
   async claimSubmissionRecovery(runId: string): Promise<string | null> {
-    const token = crypto.randomUUID()
-    return await transaction(this.pool, async (client) => {
-      const result = await client.query<{ recovery_claim_token: string }>(
-        `
-        UPDATE review_runs
-        SET recovery_claim_token=$2, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$3
-          AND runner_status='uncertain'
-          AND (recovery_claim_token IS NULL
-            OR updated_at <= clock_timestamp()-($4*interval '1 millisecond'))
-        RETURNING recovery_claim_token
-      `,
-        [runId, token, this.connectorId, this.claimTimeoutMs]
-      )
-      if (result.rows[0] === undefined) return null
-      // The state stays `uncertain`; taking the claim is not a transition, so record it as a
-      // self-event to keep the operator timeline showing when a replay started.
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'runner',
-        fromStatus: 'uncertain',
-        toStatus: 'uncertain',
-        reasonCode: 'SUBMISSION_RECOVERY_CLAIMED'
-      })
-      return result.rows[0].recovery_claim_token
-    })
+    return await this.executions.claimSubmissionRecovery(runId)
   }
   async completeSubmissionRecovery(
     runId: string,
@@ -700,11 +747,12 @@ export class ReviewRunStore {
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
         `
-        UPDATE review_runs
-        SET runner_status='queued', recovery_claim_token=NULL,
-            runner_failure_code=NULL, runner_failure_message=NULL, updated_at=clock_timestamp()
+        UPDATE executions
+        SET status='queued', claim_token=NULL, claimed_at=NULL,
+            failure_code=NULL, failure_message=NULL,
+            observed_at=clock_timestamp(), updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
-          AND runner_status='uncertain' AND recovery_claim_token=$3
+          AND status='uncertain' AND claim_token=$3
       `,
         [runId, this.connectorId, token]
       )
@@ -736,11 +784,12 @@ export class ReviewRunStore {
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
         `
-        UPDATE review_runs
-        SET runner_status='failed', recovery_claim_token=NULL,
-            runner_failure_code=$4, runner_failure_message=$5, updated_at=clock_timestamp()
+        UPDATE executions
+        SET status='failed', claim_token=NULL, claimed_at=NULL,
+            failure_code=$4, failure_message=$5,
+            observed_at=clock_timestamp(), updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
-          AND runner_status='uncertain' AND recovery_claim_token=$3
+          AND status='uncertain' AND claim_token=$3
       `,
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
@@ -771,109 +820,36 @@ export class ReviewRunStore {
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE r.connector_id=$1
-        AND r.runner_status IN ('queued','running')
-      ORDER BY r.updated_at`,
+        AND e.status IN ('queued','running')
+      ORDER BY e.updated_at`,
       [this.connectorId]
     )
     return projectRunRows(result.rows)
   }
-  /** Record that the Runner was observed just now, without changing state.
-   *
-   * Polling learns a run's state by asking the Runner. When the answer matches the state
-   * already stored, nothing else would write, so the row's mtime would freeze and the console
-   * could not tell a fresh observation from a stale one. Touching `updated_at` on every
-   * successful observation of an active run keeps that signal honest; it is scoped to
-   * queued/running so it can never disturb the `uncertain` recovery lease, which also reads
-   * `updated_at` but only while the run is uncertain. */
+  /** Record that the Runner was observed just now, without changing state. Writes only
+   * `observed_at`, so a heartbeat can never extend the recovery lease. */
   async touchObservation(runId: string): Promise<void> {
-    await this.pool.query(
-      `UPDATE review_runs
-       SET updated_at=clock_timestamp()
-       WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')`,
-      [runId, this.connectorId]
-    )
+    return await this.executions.touchObservation(runId)
   }
   async markRunning(runId: string): Promise<boolean> {
-    return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `
-        UPDATE review_runs
-        SET runner_status='running', updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2 AND runner_status='queued'
-      `,
-        [runId, this.connectorId]
-      )
-      if (result.rowCount !== 1) return false
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'runner',
-        fromStatus: 'queued',
-        toStatus: 'running'
-      })
-      return true
-    })
+    return await this.executions.markRunning(runId)
   }
   async recordArtifactStorage(
     runId: string,
     storage: RunnerArtifactStorage | undefined
   ): Promise<void> {
-    if (storage === undefined) return
-    await this.pool.query(
-      `
-      UPDATE review_runs
-      SET artifact_storage=$3::jsonb, updated_at=clock_timestamp()
-      WHERE run_id=$1 AND connector_id=$2
-    `,
-      [
-        runId,
-        this.connectorId,
-        JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
-      ]
-    )
+    return await this.executions.recordArtifactStorage(runId, storage)
   }
   async recordRunnerSuccess(
     runId: string,
     workflowResult: unknown,
     storage: RunnerArtifactStorage | undefined
   ): Promise<boolean> {
-    return await transaction(this.pool, async (client) => {
-      // RETURNING the previous status through a CTE gives the event a truthful from_status: the
-      // run may have been queued or running, and the log must say which.
-      const result = await client.query<{ from_status: string }>(
-        `
-        WITH previous AS (
-          SELECT run_id, runner_status FROM review_runs
-          WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
-          FOR UPDATE
-        )
-        UPDATE review_runs r
-        SET runner_status='succeeded', workflow_result=$3::jsonb,
-            artifact_storage=$4::jsonb, runner_failure_code=NULL,
-            runner_failure_message=NULL, updated_at=clock_timestamp()
-        FROM previous
-        WHERE r.run_id=previous.run_id
-        RETURNING previous.runner_status AS from_status
-      `,
-        [
-          runId,
-          this.connectorId,
-          JSON.stringify(workflowResult),
-          storage === undefined
-            ? null
-            : JSON.stringify(normalizeArtifactStorage(storage, `run ${runId}`))
-        ]
-      )
-      if (result.rowCount !== 1) return false
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'runner',
-        fromStatus: result.rows[0]?.from_status ?? null,
-        toStatus: 'succeeded'
-      })
-      return true
-    })
+    return await this.executions.recordRunnerSuccess(
+      runId,
+      workflowResult,
+      storage
+    )
   }
   async failRunnerExecution(
     runId: string,
@@ -885,17 +861,17 @@ export class ReviewRunStore {
       const run = await client.query<{ from_status: string }>(
         `
         WITH previous AS (
-          SELECT run_id, runner_status FROM review_runs
-          WHERE run_id=$1 AND connector_id=$2 AND runner_status IN ('queued','running')
+          SELECT run_id, status FROM executions
+          WHERE run_id=$1 AND connector_id=$2 AND status IN ('queued','running')
           FOR UPDATE
         )
-        UPDATE review_runs r
-        SET runner_status='failed', runner_failure_code=$3,
-            runner_failure_message=$4, artifact_storage=$5::jsonb,
-            updated_at=clock_timestamp()
+        UPDATE executions e
+        SET status='failed', failure_code=$3,
+            failure_message=$4, artifact_storage=$5::jsonb,
+            observed_at=clock_timestamp(), updated_at=clock_timestamp()
         FROM previous
-        WHERE r.run_id=previous.run_id
-        RETURNING previous.runner_status AS from_status
+        WHERE e.run_id=previous.run_id
+        RETURNING previous.status AS from_status
       `,
         [
           runId,
@@ -937,13 +913,14 @@ export class ReviewRunStore {
       UPDATE publications p
       SET status='publishing', claim_token=$2, claimed_at=clock_timestamp(),
           failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-      FROM review_runs r
-      WHERE p.run_id=$1 AND p.connector_id=$3 AND r.run_id=p.run_id
+      FROM executions e
+      WHERE p.run_id=$1 AND p.connector_id=$3
+        AND e.run_id=p.run_id AND e.connector_id=p.connector_id
         -- A JSON 'null' result satisfies 'IS NOT NULL' (it is stored as the JSON
         -- value null, not SQL NULL), yet node-pg reads it back as JS null, which
         -- would poison the claim path. Exclude it so a null-result run is never
         -- claimed, instead of blocking every other publication head-of-line.
-        AND r.runner_status='succeeded' AND jsonb_typeof(r.workflow_result) <> 'null'
+        AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
         AND (
           p.status='pending'
           OR (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
@@ -985,12 +962,13 @@ export class ReviewRunStore {
       const candidate = await client.query<{ run_id: string }>(
         `
         SELECT p.run_id
-        FROM publications p JOIN review_runs r ON r.run_id=p.run_id
-        WHERE p.connector_id=$1 AND r.connector_id=$1
+        FROM publications p
+        JOIN executions e ON e.run_id=p.run_id AND e.connector_id=p.connector_id
+        WHERE p.connector_id=$1
           -- Same JSON-null guard as claimPublication: a JSON 'null' result must not
           -- be selected as claimable work, or claimNextPublication would throw and
           -- roll back on the same row every poll.
-          AND r.runner_status='succeeded' AND jsonb_typeof(r.workflow_result) <> 'null'
+          AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
           AND (p.status='pending' OR
             (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
         ORDER BY p.updated_at

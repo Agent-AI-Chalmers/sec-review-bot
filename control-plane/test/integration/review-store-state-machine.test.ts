@@ -287,6 +287,114 @@ test('touchObservation advances the row mtime without changing state', async () 
   }
 })
 
+test('heartbeats do not refresh an expired recovery lease', async () => {
+  // The precise invariant a zero timeout cannot express: with a real timeout, keep heartbeating
+  // past the lease deadline and the claim must STILL be reclaimable. This fails if the lease is
+  // ever computed from observed_at (which the heartbeat moves) instead of claimed_at.
+  const store = await createStore({
+    connectorId: `lease-live:${randomUUID()}`,
+    claimTimeoutMs: 300
+  })
+  try {
+    const runId = `run-lease-live-${randomUUID()}`
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await assert.rejects(
+      submitPreparedRun(
+        store,
+        {
+          runId,
+          preparationToken: admission.preparation_token,
+          publishContext: {},
+          input: {}
+        },
+        async () => {
+          throw new RunnerSubmissionUncertainError('response lost')
+        }
+      ),
+      RunnerSubmissionUncertainError
+    )
+    const first = await store.claimSubmissionRecovery(runId)
+    assert.ok(first)
+
+    // Heartbeat repeatedly past the 300ms lease. If the lease were observed_at-based, these
+    // heartbeats would keep the claim alive and the reclaim below would return null.
+    const deadline = Date.now() + 600
+    while (Date.now() < deadline) {
+      await store.touchObservation(runId)
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+
+    const second = await store.claimSubmissionRecovery(runId)
+    assert.ok(
+      second,
+      'the expired recovery claim is reclaimable despite heartbeats'
+    )
+    assert.notStrictEqual(
+      second,
+      first,
+      'reclaiming issues a new fencing token'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('an observation heartbeat never extends the recovery lease', async () => {
+  // The recovery lease reads claimed_at; the heartbeat writes observed_at only. This test
+  // holds the execution in `uncertain` and shows that one claim, followed by heartbeats, does
+  // not keep the claim alive forever: a zero-timeout store can reclaim it immediately.
+  const sharedConnector = `lease:${randomUUID()}`
+  const runId = `run-lease-${randomUUID()}`
+  const store = await createStore({
+    connectorId: sharedConnector,
+    claimTimeoutMs: 0
+  })
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await assert.rejects(
+      submitPreparedRun(
+        store,
+        {
+          runId,
+          preparationToken: admission.preparation_token,
+          publishContext: {},
+          input: {}
+        },
+        async () => {
+          throw new RunnerSubmissionUncertainError('response lost')
+        }
+      ),
+      RunnerSubmissionUncertainError
+    )
+    assert.strictEqual((await store.getRun(runId))?.runner_status, 'uncertain')
+
+    const first = await store.claimSubmissionRecovery(runId)
+    assert.ok(first)
+    // Heartbeats would, under a shared updated_at lease, refresh the recovery lease. With
+    // observed_at separate they must not; a zero timeout lets us observe that directly.
+    await store.touchObservation(runId)
+    const second = await store.claimSubmissionRecovery(runId)
+    assert.ok(second, 'the expired recovery claim is reclaimable')
+    assert.notStrictEqual(
+      second,
+      first,
+      'reclaiming issues a new fencing token'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
 test('ReviewRunStore returns an expired preparation to pending without failing its run', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-stale-preparation-${randomUUID()}`

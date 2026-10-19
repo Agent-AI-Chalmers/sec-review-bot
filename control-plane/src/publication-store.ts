@@ -44,10 +44,10 @@ export class PublicationStore {
         `UPDATE publications p SET status='publishing', claim_token=$3,
            claimed_at=clock_timestamp(), failure_code=NULL, failure_message=NULL,
            updated_at=clock_timestamp()
-         FROM review_runs r
-         WHERE p.run_id=$1 AND p.connector_id=$2 AND r.run_id=p.run_id
-           AND r.connector_id=$2 AND r.runner_status='succeeded'
-           AND jsonb_typeof(r.workflow_result) <> 'null'
+         FROM executions e
+         WHERE p.run_id=$1 AND p.connector_id=$2
+           AND e.run_id=p.run_id AND e.connector_id=$2 AND e.status='succeeded'
+           AND jsonb_typeof(e.workflow_result) <> 'null'
            AND (p.status='pending' OR (p.status='publishing' AND
              p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond')))
          RETURNING p.run_id`,

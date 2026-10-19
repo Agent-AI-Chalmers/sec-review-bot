@@ -70,11 +70,14 @@ export class PreparationStore {
         attempt_count: number
       }>(
         `SELECT p.run_id,r.workflow,p.input_version,p.input,p.attempt_count
-         FROM preparations p JOIN review_runs r ON r.run_id=p.run_id
+         FROM preparations p
+         JOIN review_runs r ON r.run_id=p.run_id
+         JOIN executions e ON e.run_id=p.run_id
          WHERE p.connector_id=$1 AND p.status='pending'
            AND p.available_at <= clock_timestamp()
            AND p.input_version IS NOT NULL AND p.input IS NOT NULL
-           AND r.runner_status='pending'
+           AND e.status='pending'
+           AND e.connector_id=p.connector_id
          ORDER BY p.updated_at,p.run_id FOR UPDATE OF p SKIP LOCKED LIMIT 1`,
         [this.connectorId]
       )
@@ -228,10 +231,10 @@ export class PreparationStore {
       // Execution never ran, so it is skipped, not failed. The failure reason stays on the
       // preparation row (and is surfaced through the run's preparation summary).
       const failedRuns = await client.query<{ run_id: string }>(
-        `UPDATE review_runs SET runner_status='skipped',
-           runner_failure_code=NULL, runner_failure_message=NULL,
-           updated_at=clock_timestamp()
-         WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND runner_status='pending' RETURNING run_id`,
+        `UPDATE executions SET status='skipped',
+           failure_code=NULL, failure_message=NULL,
+           observed_at=clock_timestamp(), updated_at=clock_timestamp()
+         WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status='pending' RETURNING run_id`,
         [failedRunIds, this.connectorId]
       )
       if (failedRuns.rowCount !== failedRunIds.length)
@@ -317,19 +320,20 @@ export class PreparationStore {
       const submissionUncertain = error.code === 'SUBMISSION_STATE_UNCERTAIN'
       const result = submissionUncertain
         ? await client.query(
-            `UPDATE review_runs SET runner_status='uncertain',
-               runner_failure_code=$4, runner_failure_message=$5, updated_at=clock_timestamp()
-             WHERE run_id=$1 AND connector_id=$2 AND runner_status='pending' AND EXISTS (
-               SELECT 1 FROM preparations WHERE preparations.run_id=review_runs.run_id
+            `UPDATE executions SET status='uncertain',
+               failure_code=$4, failure_message=$5,
+               observed_at=clock_timestamp(), updated_at=clock_timestamp()
+             WHERE run_id=$1 AND connector_id=$2 AND status='pending' AND EXISTS (
+               SELECT 1 FROM preparations WHERE preparations.run_id=executions.run_id
                  AND preparations.connector_id=$2 AND preparations.status='preparing' AND preparations.claim_token=$3)`,
             [runId, this.connectorId, token, error.code, error.message]
           )
         : await client.query(
-            `UPDATE review_runs SET runner_status='skipped',
-               runner_failure_code=NULL, runner_failure_message=NULL,
-               updated_at=clock_timestamp()
-             WHERE run_id=$1 AND connector_id=$2 AND runner_status='pending' AND EXISTS (
-               SELECT 1 FROM preparations WHERE preparations.run_id=review_runs.run_id
+            `UPDATE executions SET status='skipped',
+               failure_code=NULL, failure_message=NULL,
+               observed_at=clock_timestamp(), updated_at=clock_timestamp()
+             WHERE run_id=$1 AND connector_id=$2 AND status='pending' AND EXISTS (
+               SELECT 1 FROM preparations WHERE preparations.run_id=executions.run_id
                  AND preparations.connector_id=$2 AND preparations.status='preparing' AND preparations.claim_token=$3)`,
             [runId, this.connectorId, token]
           )

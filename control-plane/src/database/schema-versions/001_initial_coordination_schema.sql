@@ -1,18 +1,10 @@
--- One row represents the complete Control Plane lifecycle of a review request,
--- from durable admission and input preparation through the terminal Runner result.
+-- The durable review trunk: one row per admitted task, carrying only its identity and the
+-- fields shared across all three lifecycle axes. Execution, preparation, and publication each
+-- keep their own state machine in executions, preparations, and publications.
 CREATE TABLE review_runs (
   run_id text PRIMARY KEY,
   connector_id text NOT NULL,
   workflow text NOT NULL,
-  publish_context jsonb NOT NULL,
-  runner_input jsonb,
-  runner_status text NOT NULL CHECK (runner_status IN ('pending', 'queued', 'running', 'uncertain', 'succeeded', 'skipped', 'failed')),
-  submitted_at timestamptz,
-  runner_failure_code text,
-  runner_failure_message text,
-  artifact_storage jsonb,
-  workflow_result jsonb,
-  recovery_claim_token uuid,
   ingress_kind text,
   ingress_key text,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -21,42 +13,79 @@ CREATE TABLE review_runs (
 );
 
 COMMENT ON TABLE review_runs IS
-  'Durable review identity and Runner-side lifecycle. Publication has a separate state machine in publications.';
+  'Durable review identity: the externally admitted task and the fields that span all three lifecycle axes. Execution, preparation, and publication each keep their own state machine and their own input in executions, preparations, and publications.';
 COMMENT ON COLUMN review_runs.run_id IS
-  'Stable review execution identity assigned before input preparation begins and shared with the Runner.';
+  'Stable review identity assigned at admission, before preparation, execution, or publication begins, and shared with the Runner.';
 COMMENT ON COLUMN review_runs.connector_id IS
   'Coordination namespace that owns the run, such as one configured GitHub App connector.';
 COMMENT ON COLUMN review_runs.workflow IS
   'Workflow contract used to validate, submit, observe, and publish this review.';
-COMMENT ON COLUMN review_runs.publish_context IS
-  'Connector-owned data needed to publish the result, such as repository and pull request identity; it is not sent to the Runner.';
-COMMENT ON COLUMN review_runs.runner_input IS
-  'Prepared Runner request, including artifact references. It is retained so an uncertain submission can be replayed safely.';
-COMMENT ON COLUMN review_runs.runner_status IS
-  'Runner-side lifecycle only: pending until the prepared input is submitted, then Runner execution. uncertain means a submission may have reached the Runner but its result could not be confirmed — it is not a failure; a recovery replays the same run_id under recovery_claim_token to resolve it, then the run becomes queued or failed. skipped means execution never ran because preparation failed. Preparation and publication keep their own state machines.';
-COMMENT ON COLUMN review_runs.runner_failure_code IS
-  'Machine-readable reason for a preparation, submission, polling, or Runner execution failure.';
-COMMENT ON COLUMN review_runs.runner_failure_message IS
-  'Operator-readable detail associated with runner_failure_code.';
-COMMENT ON COLUMN review_runs.artifact_storage IS
-  'Runner-reported terminal diagnostic artifact storage result and immutable object reference when available.';
-COMMENT ON COLUMN review_runs.workflow_result IS
-  'Terminal successful workflow result returned by the Runner and consumed by the connector publisher.';
-COMMENT ON COLUMN review_runs.recovery_claim_token IS
-  'Fencing token held while reconciling a Runner submission whose acceptance was uncertain.';
 COMMENT ON COLUMN review_runs.ingress_kind IS
   'Class of external request that admitted the run, used with ingress_key for replay deduplication.';
 COMMENT ON COLUMN review_runs.ingress_key IS
   'Connector-supplied idempotency key for the external request, scoped by connector_id and ingress_kind.';
 COMMENT ON COLUMN review_runs.created_at IS
   'Time the Control Plane durably admitted the run.';
-COMMENT ON COLUMN review_runs.submitted_at IS
-  'Immutable instant the prepared Runner input was accepted and the run entered queued, i.e. when execution began. NULL until then. Distinct from updated_at, which also moves on input checkpoints and artifact writes and so cannot time a phase.';
 COMMENT ON COLUMN review_runs.updated_at IS
-  'Row mtime: last time this row was touched for any reason, including input checkpoints, artifact writes, and the observation heartbeat that records a successful poll of an active run. It is not a phase start (use submitted_at to time execution) and it does not mean "state last changed" — use review_run_events for transitions.';
+  'Row mtime for the trunk row: last time identity metadata or an ingress checkpoint changed. Lifetime progress and per-axis input live on the axis tables.';
 
-CREATE INDEX review_runs_runner_status_idx
-  ON review_runs (runner_status, updated_at);
+-- Execution is the third lifecycle axis, alongside preparation and publication. It has no
+-- externally claimable owner (Control Plane observes the Runner), so its claim token only
+-- fences replay of an uncertain submission. It deliberately mirrors the axis shape:
+-- run_id + connector_id + status + failure + claim/lease + timestamps.
+CREATE TABLE executions (
+  run_id text PRIMARY KEY REFERENCES review_runs(run_id) ON DELETE CASCADE,
+  connector_id text NOT NULL,
+  status text NOT NULL CHECK (status IN ('pending', 'queued', 'running', 'uncertain', 'succeeded', 'skipped', 'failed')),
+  input jsonb,
+  submitted_at timestamptz,
+  failure_code text,
+  failure_message text,
+  artifact_storage jsonb,
+  workflow_result jsonb,
+  claim_token uuid,
+  claimed_at timestamptz,
+  observed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  CHECK (
+    (claim_token IS NULL AND claimed_at IS NULL)
+    OR (claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+  )
+);
+
+COMMENT ON TABLE executions IS
+  'Run-level state machine for Runner submission and execution. One row per run, created at admission.';
+COMMENT ON COLUMN executions.status IS
+  'Runner-side lifecycle only: pending until the prepared input is submitted, then Runner execution. uncertain means a submission may have reached the Runner but its result could not be confirmed — it is not a failure; a recovery replays the same run_id under claim_token to resolve it, then the run becomes queued or failed. skipped means execution never ran because preparation failed.';
+COMMENT ON COLUMN executions.input IS
+  'Prepared Runner request, including artifact references. Retained so an uncertain submission can be replayed safely.';
+COMMENT ON COLUMN executions.submitted_at IS
+  'Immutable instant the prepared Runner input was accepted and execution began. NULL until then.';
+COMMENT ON COLUMN executions.failure_code IS
+  'Machine-readable reason for a submission, polling, or Runner execution failure; NULL when preparation failed instead (see preparations.failure_code).';
+COMMENT ON COLUMN executions.failure_message IS
+  'Operator-readable detail associated with failure_code.';
+COMMENT ON COLUMN executions.artifact_storage IS
+  'Runner-reported terminal diagnostic artifact storage result and immutable object reference when available.';
+COMMENT ON COLUMN executions.workflow_result IS
+  'Terminal successful workflow result returned by the Runner and consumed by the connector publisher.';
+COMMENT ON COLUMN executions.claim_token IS
+  'Fencing token held while reconciling a Runner submission whose acceptance was uncertain. Not a long-running lease: the replay is short and the Runner owns request idempotency.';
+COMMENT ON COLUMN executions.claimed_at IS
+  'When the current recovery claim was taken; a stale claim is reclaimed after the claim timeout.';
+COMMENT ON COLUMN executions.observed_at IS
+  'Last time polling successfully confirmed the run state. Informational: it never drives claim expiry.';
+COMMENT ON COLUMN executions.created_at IS
+  'Time the execution axis was created with the run at admission.';
+COMMENT ON COLUMN executions.updated_at IS
+  'Time any execution-axis column last changed.';
+
+CREATE INDEX executions_status_idx
+  ON executions (status, updated_at);
+
+CREATE INDEX executions_recovery_idx
+  ON executions (connector_id, status, claimed_at);
 
 -- Preparation is a separately claimable unit of work. Its protocol deliberately
 -- contains no provider-specific columns: connectors own the interpretation of
@@ -135,6 +164,7 @@ CREATE INDEX preparation_failure_notices_claimable_idx
 CREATE TABLE publications (
   run_id text PRIMARY KEY REFERENCES review_runs(run_id) ON DELETE CASCADE,
   connector_id text NOT NULL,
+  input jsonb NOT NULL,
   status text NOT NULL CHECK (status IN ('pending', 'publishing', 'published', 'failed', 'skipped')),
   claim_token uuid,
   claimed_at timestamptz,
@@ -151,6 +181,8 @@ COMMENT ON COLUMN publications.run_id IS
   'Review run whose terminal workflow result is being published.';
 COMMENT ON COLUMN publications.connector_id IS
   'Connector namespace allowed to claim and complete this publication.';
+COMMENT ON COLUMN publications.input IS
+  'Connector-owned publish context, such as repository and pull request identity; it selects the publication target and is never sent to the Runner.';
 COMMENT ON COLUMN publications.status IS
   'Overall delivery state: pending, actively claimed, published, permanently failed, or not applicable.';
 COMMENT ON COLUMN publications.claim_token IS
