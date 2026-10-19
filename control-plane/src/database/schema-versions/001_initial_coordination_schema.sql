@@ -301,7 +301,7 @@ CREATE INDEX publications_status_idx
 -- action prevents a retry from repeating steps that already succeeded.
 CREATE TABLE publication_steps (
   connector_id text NOT NULL,
-  run_id text NOT NULL REFERENCES review_runs(run_id) ON DELETE CASCADE,
+  run_id text NOT NULL,
   step_key text NOT NULL,
   status text NOT NULL CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'terminal_failed')),
   failure_count integer NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
@@ -311,7 +311,12 @@ CREATE TABLE publication_steps (
   failure_message text,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  PRIMARY KEY (connector_id, run_id, step_key)
+  PRIMARY KEY (connector_id, run_id, step_key),
+  -- Steps are read and completed under the connector that owns the run, so a row written under a
+  -- different connector would be invisible to those reads instead of being rejected. Reference
+  -- (run_id, connector_id) together so the trunk decides which connector may own a step.
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
 );
 
 COMMENT ON TABLE publication_steps IS
@@ -346,13 +351,17 @@ COMMENT ON COLUMN publication_steps.updated_at IS
 -- own execution history lives in Temporal and is not duplicated here.
 CREATE TABLE review_run_events (
   event_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  run_id text NOT NULL REFERENCES review_runs(run_id) ON DELETE CASCADE,
+  run_id text NOT NULL,
   connector_id text NOT NULL,
   axis text NOT NULL CHECK (axis IN ('runner', 'preparation', 'publication', 'notice')),
   from_status text,
   to_status text NOT NULL,
   reason_code text,
-  occurred_at timestamptz NOT NULL DEFAULT clock_timestamp()
+  occurred_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  -- Events are read with a connector filter, so a row under the wrong connector would silently
+  -- vanish from the run's history. Tie the append to the trunk's connector so that write fails.
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
 );
 
 COMMENT ON TABLE review_run_events IS

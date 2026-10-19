@@ -69,6 +69,27 @@ test('an axis row cannot be written under a connector the trunk does not own', a
         `${table} must reject a connector its trunk does not own`
       )
     }
+    // The two append/progress tables carry the same connector fence. They are not lifecycle
+    // axes, but both are read with a connector filter (`listPublicationSteps`, `listEvents`), so
+    // a row under the wrong connector would disappear from the run instead of being rejected.
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO publication_steps (connector_id, run_id, step_key, status)
+         VALUES ('intruder', $1, 'step', 'pending')`,
+        [runId]
+      ),
+      /violates foreign key constraint/,
+      'publication_steps must reject a connector its trunk does not own'
+    )
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO review_run_events (run_id, connector_id, axis, to_status)
+         VALUES ($1, 'intruder', 'runner', 'pending')`,
+        [runId]
+      ),
+      /violates foreign key constraint/,
+      'review_run_events must reject a connector its trunk does not own'
+    )
   } finally {
     await pool.end()
     await store.close()
