@@ -7,6 +7,7 @@ import {
   NativeSelect,
   Pagination,
   Paper,
+  Select,
   Stack,
   Table,
   Text,
@@ -19,8 +20,11 @@ import { formatDate, useLanguage, useMessages } from './i18n.js'
 import { CopyAction, RefreshControls, useRefresh } from './App.js'
 import {
   ExecutionStatus,
+  PREPARATION_STATUSES,
+  PreparationStatus,
   PublicationStatus,
   executionStatusLabel,
+  preparationStateLabel,
   runPublicationStatusLabel
 } from './status.js'
 import {
@@ -49,6 +53,13 @@ export function Runs(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
   const [search, setSearch] = useSearchParams()
+  // Mirror the latest params so two filters changed in the same tick compose instead of
+  // overwriting each other. `setSearchParams`'s functional form does not queue across calls
+  // (its `previous` argument is the committed location), and the render closure's `search`
+  // is already stale by the second change, so this ref is the only value that reflects a
+  // change made moments ago.
+  const latestSearch = React.useRef(search)
+  latestSearch.current = search
   // The Control Plane walks pages forward by cursor only, so remember which cursor
   // each page was opened from in order to offer a previous page. Keyed by cursor
   // rather than by position, so the browser back button cannot desynchronise it.
@@ -128,19 +139,29 @@ export function Runs(): React.JSX.Element {
   // to show: nothing will update until it is handled, and the refresh banner cannot say so.
   if (error instanceof ApiError && error.status === 401) throw error
   if (error && data === undefined) throw error
-  const update = (name: string, value: string): void => {
-    const next = new URLSearchParams(search)
-    if (value) next.set(name, value)
-    else next.delete(name)
-    next.delete('cursor')
-    setCursorParents({})
+  // Build the next params from the latest ref, write it through, then advance the ref so a
+  // second change in the same tick starts from the first change's result. Without this, two
+  // filters set together (as a user selecting each in turn can trigger) would leave only the
+  // last one applied.
+  const replaceSearch = (mutate: (next: URLSearchParams) => void): void => {
+    const next = new URLSearchParams(latestSearch.current)
+    mutate(next)
+    latestSearch.current = next
     setSearch(next)
   }
+  const update = (name: string, value: string): void => {
+    setCursorParents({})
+    replaceSearch((next) => {
+      if (value) next.set(name, value)
+      else next.delete(name)
+      next.delete('cursor')
+    })
+  }
   const openCursor = (target: string): void => {
-    const next = new URLSearchParams(search)
-    if (target) next.set('cursor', target)
-    else next.delete('cursor')
-    setSearch(next)
+    replaceSearch((next) => {
+      if (target) next.set('cursor', target)
+      else next.delete('cursor')
+    })
   }
   const openNextPage = (): void => {
     const target = data?.next_cursor
@@ -179,9 +200,15 @@ export function Runs(): React.JSX.Element {
         </Text>
       )}
       <Box className="operations-bar" mb="lg">
-        <Group justify="space-between" align="flex-end" gap="lg">
-          <Group aria-label="Run list controls" align="flex-end">
+        {/*
+          One row: the content filters on the left, the compact refresh cluster fixed to the
+          right. Page size is not here at all — it lives with the pager below the table, the
+          one place where "how many per page" is a meaningful question.
+        */}
+        <div className="operations-row">
+          <Group aria-label="Run list controls" align="flex-end" gap="md">
             <NativeSelect
+              w={150}
               label={t('workflow')}
               value={search.get('workflow') ?? ''}
               onChange={(event) => update('workflow', event.target.value)}
@@ -196,6 +223,22 @@ export function Runs(): React.JSX.Element {
               )}
             </NativeSelect>
             <NativeSelect
+              w={130}
+              label={t('preparation')}
+              value={search.get('preparation_status') ?? ''}
+              onChange={(event) =>
+                update('preparation_status', event.target.value)
+              }
+            >
+              <option value="">{t('all')}</option>
+              {PREPARATION_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {preparationStateLabel(value, t)}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
+              w={120}
               label={t('execution')}
               value={search.get('execution_status') ?? ''}
               onChange={(event) =>
@@ -204,14 +247,7 @@ export function Runs(): React.JSX.Element {
             >
               <option value="">{t('all')}</option>
               {(
-                [
-                  'preparing',
-                  'recovering',
-                  'queued',
-                  'running',
-                  'succeeded',
-                  'failed'
-                ] as const
+                ['pending', 'queued', 'running', 'succeeded', 'failed'] as const
               ).map((value) => (
                 <option key={value} value={value}>
                   {executionStatusLabel(value, t)}
@@ -219,6 +255,7 @@ export function Runs(): React.JSX.Element {
               ))}
             </NativeSelect>
             <NativeSelect
+              w={130}
               label={t('publication')}
               value={search.get('publication_status') ?? ''}
               onChange={(event) =>
@@ -241,6 +278,7 @@ export function Runs(): React.JSX.Element {
               ))}
             </NativeSelect>
             <NativeSelect
+              w={110}
               label={t('timeRange')}
               value={search.get('range') ?? ''}
               onChange={(event) => update('range', event.target.value)}
@@ -250,33 +288,13 @@ export function Runs(): React.JSX.Element {
               <option value="24h">{t('lastDay')}</option>
               <option value="7d">{t('lastWeek')}</option>
             </NativeSelect>
-            <NativeSelect
-              label={t('perPage')}
-              value={String(pageSize)}
-              onChange={(event) =>
-                // Reuse the filter path: changing how much a page holds invalidates
-                // the cursor and the visited-page trail.
-                update(
-                  'limit',
-                  event.target.value === String(DEFAULT_PAGE_SIZE)
-                    ? ''
-                    : event.target.value
-                )
-              }
-            >
-              {pageSizeOptions.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </NativeSelect>
           </Group>
           <RefreshControls
             refresh={refresh}
             refreshing={refreshing}
             lastChecked={lastChecked}
           />
-        </Group>
+        </div>
       </Box>
       {data === undefined ? (
         <p>{t('loadingRuns')}</p>
@@ -297,6 +315,7 @@ export function Runs(): React.JSX.Element {
                 <Table.Tr>
                   <Table.Th>{t('run')}</Table.Th>
                   <Table.Th>{t('workflow')}</Table.Th>
+                  <Table.Th>{t('preparation')}</Table.Th>
                   <Table.Th>{t('execution')}</Table.Th>
                   <Table.Th>{t('publication')}</Table.Th>
                   <Table.Th>{t('lastActivity')}</Table.Th>
@@ -327,6 +346,9 @@ export function Runs(): React.JSX.Element {
                     </Table.Td>
                     <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
                     <Table.Td>
+                      <PreparationStatus preparation={run.preparation} />
+                    </Table.Td>
+                    <Table.Td>
                       <ExecutionStatus status={run.execution_status} />
                     </Table.Td>
                     <Table.Td>
@@ -355,20 +377,56 @@ export function Runs(): React.JSX.Element {
               </Table.Tbody>
             </Table>
           </Paper>
-          {totalPages > 1 && (
-            <Pagination.Root
-              total={totalPages}
-              value={page}
-              onPreviousPage={openPreviousPage}
-              onNextPage={openNextPage}
-              mt="md"
-            >
-              <Group gap="xs" justify="center">
-                <Pagination.Previous aria-label={t('previousPage')} />
-                <Pagination.Next aria-label={t('nextPage')} />
-              </Group>
-            </Pagination.Root>
-          )}
+          {/*
+            One footer row, split across the two edges: the page size on the left as an
+            inline "Rows per page [50]" phrase, the pager on the right. Both are the same
+            height and share a baseline, so "left and right" no longer means a labelled form
+            field on one side and bare buttons on the other. On a single page the pager is
+            absent and the page size simply stays on the left.
+          */}
+          <Group
+            justify="space-between"
+            align="center"
+            mt="md"
+            wrap="wrap"
+            gap="md"
+          >
+            <Group gap={6} align="center" wrap="nowrap">
+              <Text size="sm" c="dimmed">
+                {t('perPage')}
+              </Text>
+              <Select
+                aria-label={t('perPage')}
+                size="xs"
+                w={72}
+                value={String(pageSize)}
+                allowDeselect={false}
+                data={pageSizeOptions.map((size) => String(size))}
+                onChange={(value) => {
+                  // Reuse the filter path: changing how much a page holds invalidates the
+                  // cursor and the visited-page trail.
+                  if (value === null) return
+                  update(
+                    'limit',
+                    value === String(DEFAULT_PAGE_SIZE) ? '' : value
+                  )
+                }}
+              />
+            </Group>
+            {totalPages > 1 && (
+              <Pagination.Root
+                total={totalPages}
+                value={page}
+                onPreviousPage={openPreviousPage}
+                onNextPage={openNextPage}
+              >
+                <Group gap="xs" justify="center">
+                  <Pagination.Previous aria-label={t('previousPage')} />
+                  <Pagination.Next aria-label={t('nextPage')} />
+                </Group>
+              </Pagination.Root>
+            )}
+          </Group>
         </>
       )}
     </Container>

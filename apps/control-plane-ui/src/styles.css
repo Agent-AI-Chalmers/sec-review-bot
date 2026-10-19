@@ -357,8 +357,19 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.refresh-controls .mantine-NativeSelect-root {
-  width: 72px;
+/* One row: content filters on the left, the refresh cluster fixed to the right. The filter
+   group may wrap onto further lines when space is tight; the refresh cluster keeps its shape
+   and stays pinned right, the way a toolbar's time controls do. */
+.operations-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+
+.operations-row .refresh-controls {
+  margin-left: auto;
 }
 
 a {
@@ -502,6 +513,239 @@ a {
   padding-top: 10px;
 }
 
+/* State machines are reference material, collapsed by default like History. */
+.state-machines {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.state-machine-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+  color: var(--mantine-color-dimmed);
+  list-style: none;
+}
+
+.state-machine-summary::-webkit-details-marker {
+  display: none;
+}
+
+.state-machine-summary:hover {
+  color: var(--mantine-color-text);
+}
+
+.state-machine-chevron {
+  transition: transform 120ms ease;
+}
+
+.state-machines[open] .state-machine-chevron {
+  transform: rotate(90deg);
+}
+
+.state-machines-body {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.state-machine-title {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.state-machine-svg {
+  /* Rendered at a fixed pixel size so node widths, labels, and strokes are identical across
+     every axis. A wider axis (execution has more states) stays wider rather than being shrunk
+     to fit, which would otherwise make its text smaller than the other diagrams'. The
+     container scrolls horizontally if an axis does not fit. */
+  display: block;
+  flex: none;
+  color: var(--mantine-color-dimmed);
+  overflow: visible;
+}
+
+.state-machine {
+  overflow-x: auto;
+}
+
+/* Nodes: quiet by default, brand-tinted when current, with a readable label in both themes. */
+.state-machine-node rect {
+  fill: var(--surface-raised);
+  stroke: var(--border);
+  stroke-width: 1;
+  transition: stroke 120ms ease;
+}
+
+.state-machine-node text {
+  fill: var(--mantine-color-text);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.state-machine-node:hover rect {
+  stroke: var(--brand);
+}
+
+.state-machine-node.is-current rect {
+  fill: var(--brand);
+  stroke: var(--brand);
+}
+
+.state-machine-node.is-current text {
+  fill: #fff;
+  font-weight: 600;
+}
+
+.state-machine-node:focus-visible {
+  outline: none;
+}
+
+.state-machine-node:focus-visible rect {
+  stroke: var(--brand);
+  stroke-width: 2;
+}
+
+.state-machine-edge-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  opacity: 0.55;
+}
+
+.state-machine-edge.is-traversed .state-machine-edge-path {
+  stroke: var(--brand);
+  opacity: 1;
+  stroke-width: 1.6;
+}
+
+.state-machine-edge.is-revert .state-machine-edge-path {
+  stroke-dasharray: 4 3;
+}
+
+/* The invisible hover/focus target over an edge: a wide transparent stroke that makes the thin
+   line easy to point at, and a faint ring when focused from the keyboard. */
+.state-machine-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: help;
+  outline: none;
+}
+
+.state-machine-edge-hit:focus-visible {
+  stroke: var(--brand);
+  stroke-opacity: 0.25;
+}
+
+/* The floating transition label shown on edge hover/focus, positioned at the pointer. */
+.state-machine-edge-tip {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  color: var(--mantine-color-text);
+  font-size: var(--mantine-font-size-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 400;
+}
+
+/* Run history is an operator detail, collapsed by default. It sits below the timeline as a
+   quiet disclosure rather than a full table, so the primary run view stays uncluttered. */
+.run-history {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.run-history-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+  color: var(--mantine-color-dimmed);
+  list-style: none;
+}
+
+.run-history-summary::-webkit-details-marker {
+  display: none;
+}
+
+.run-history-summary:hover {
+  color: var(--mantine-color-text);
+}
+
+.run-history-chevron {
+  transition: transform 120ms ease;
+}
+
+.run-history[open] .run-history-chevron {
+  transform: rotate(90deg);
+}
+
+.run-history-count {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--mantine-color-default-hover);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.run-history-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.run-history-item {
+  display: grid;
+  grid-template-columns: 150px 92px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  font-size: var(--mantine-font-size-xs);
+}
+
+.run-history-time {
+  color: var(--mantine-color-dimmed);
+  white-space: nowrap;
+}
+
+.run-history-axis {
+  font-weight: 500;
+}
+
+.run-history-transition,
+.run-history-reason {
+  font-family: var(--mantine-font-family-monospace);
+}
+
+.run-history-reason {
+  color: var(--mantine-color-red-6);
+}
+
 .delivery-main {
   display: flex;
   align-items: center;
@@ -550,22 +794,30 @@ a {
     font-size: 13px;
   }
 
-  .operations-bar > .mantine-Group-root {
+  .operations-row {
     align-items: stretch;
-    flex-direction: column;
   }
 
   .operations-bar [aria-label='Run list controls'] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    width: 100%;
   }
 
-  .operations-bar [aria-label='Run list controls'] > * {
+  .operations-bar [aria-label='Run list controls'] > *,
+  .operations-bar
+    [aria-label='Run list controls']
+    > *
+    .mantine-NativeSelect-root,
+  .operations-per-page,
+  .operations-per-page .mantine-NativeSelect-root {
     min-width: 0;
+    width: 100% !important;
   }
 
-  .refresh-controls {
-    align-items: flex-end;
+  .operations-row .refresh-controls {
+    margin-left: 0;
+    justify-content: flex-start;
   }
 
   .delivery-item {

@@ -38,8 +38,21 @@ function StatusText({
 
 export function executionTone(status: Run['execution_status']): StatusTone {
   if (status === 'running') return 'active'
+  // uncertain means a recovery is resolving a submission whose result is unknown.
+  if (status === 'uncertain') return 'waiting'
   if (status === 'succeeded') return 'complete'
   if (status === 'failed') return 'failed'
+  // skipped means execution never ran (preparation failed); it is neutral, not a failure of
+  // execution itself.
+  if (status === 'skipped') return 'neutral'
+  return 'waiting'
+}
+
+export function preparationTone(preparation: Run['preparation']): StatusTone {
+  if (preparation === null) return 'neutral'
+  if (preparation.status === 'preparing') return 'active'
+  if (preparation.status === 'submitted') return 'complete'
+  if (preparation.status === 'failed') return 'failed'
   return 'waiting'
 }
 
@@ -61,6 +74,20 @@ export function ExecutionStatus({
     <StatusText
       label={executionStatusLabel(status, t)}
       tone={executionTone(status)}
+    />
+  )
+}
+
+export function PreparationStatus({
+  preparation
+}: {
+  preparation: Run['preparation']
+}): React.JSX.Element {
+  const t = useMessages()
+  return (
+    <StatusText
+      label={preparationStatusLabel(preparation, t)}
+      tone={preparationTone(preparation)}
     />
   )
 }
@@ -91,11 +118,11 @@ export function publicationStatusLabel(
   status: PublicationStepStatus,
   t: ReturnType<typeof useMessages>
 ): string {
-  if (status === 'pending') return t('publicationPending')
-  if (status === 'running') return t('publishingStatus')
+  if (status === 'pending') return t('statusPending')
+  if (status === 'running') return t('statusInProgress')
   if (status === 'succeeded') return t('publicationStepSucceeded')
   if (status === 'failed') return t('retryPending')
-  if (status === 'terminal_failed') return t('failedStatus')
+  if (status === 'terminal_failed') return t('statusFailed')
   return status
 }
 
@@ -112,23 +139,73 @@ export function executionStatusLabel(
   status: Run['execution_status'],
   t: ReturnType<typeof useMessages>
 ): string {
-  if (status === 'preparing') return t('statusPreparing')
-  if (status === 'recovering') return t('statusRecovering')
+  if (status === 'pending') return t('statusPending')
   if (status === 'queued') return t('statusQueued')
   if (status === 'running') return t('statusRunning')
   if (status === 'succeeded') return t('statusSucceeded')
+  if (status === 'skipped') return t('statusSkipped')
+  if (status === 'uncertain') return t('statusUncertain')
   return t('statusFailed')
+}
+
+/** The preparation states a run can be in, in the order the contract declares them. The list
+ * filter and its labels are generated from this one array, so a state cannot be addable to
+ * the contract and then silently miss the filter. */
+export const PREPARATION_STATUSES = [
+  'pending',
+  'preparing',
+  'submitted',
+  'failed'
+] as const
+
+export function preparationStateLabel(
+  status: NonNullable<Run['preparation']>['status'],
+  t: ReturnType<typeof useMessages>
+): string {
+  if (status === 'pending') return t('statusPending')
+  if (status === 'preparing') return t('statusPreparing')
+  if (status === 'submitted') return t('statusSubmitted')
+  return t('statusFailed')
+}
+
+export function axisLabel(
+  axis: 'runner' | 'preparation' | 'publication' | 'notice',
+  t: ReturnType<typeof useMessages>
+): string {
+  if (axis === 'runner') return t('axisRunner')
+  if (axis === 'preparation') return t('axisPreparation')
+  if (axis === 'publication') return t('axisPublication')
+  return t('axisNotice')
+}
+
+export function failureNoticeStatusLabel(
+  status: NonNullable<Run['preparation']>['failure_notice_status'],
+  t: ReturnType<typeof useMessages>
+): string {
+  if (status === 'pending') return t('statusPending')
+  if (status === 'delivering') return t('statusDelivering')
+  if (status === 'delivered') return t('statusDelivered')
+  if (status === 'skipped') return t('statusSkipped')
+  return ''
+}
+
+export function preparationStatusLabel(
+  preparation: Run['preparation'],
+  t: ReturnType<typeof useMessages>
+): string {
+  if (preparation === null) return t('preparationNotRecorded')
+  return preparationStateLabel(preparation.status, t)
 }
 
 export function runPublicationStatusLabel(
   status: Run['publication_status'],
   t: ReturnType<typeof useMessages>
 ): string {
-  if (status === 'pending') return t('publicationPending')
-  if (status === 'publishing') return t('publishingStatus')
+  if (status === 'pending') return t('statusPending')
+  if (status === 'publishing') return t('statusPublishing')
   if (status === 'published') return t('statusPublished')
-  if (status === 'failed') return t('failedStatus')
-  return t('publicationSkipped')
+  if (status === 'failed') return t('statusFailed')
+  return t('statusSkipped')
 }
 
 export function artifactStatusLabel(

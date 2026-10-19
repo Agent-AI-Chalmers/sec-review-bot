@@ -70,6 +70,7 @@ const CONTRAST = `(() => {
 const EXPECTED_HEADERS = [
   'Run',
   'Workflow',
+  'Preparation',
   'Execution',
   'Publication',
   'Last activity',
@@ -221,13 +222,13 @@ try {
 
     // The recency column leads with how long ago, so the feed can be scanned by eye.
     assert.match(
-      (await page.locator('tbody tr:first-child td').nth(4).textContent()) ??
+      (await page.locator('tbody tr:first-child td').nth(5).textContent()) ??
         '',
       /\d+[dhms]\s+ago/,
       `${name} last activity must read as elapsed time`
     )
 
-    // The list separates the two status axes into their own columns, and each
+    // The list separates all three lifecycle axes into their own columns, and each
     // status is dot+text rather than a badge.
     assert.deepStrictEqual(
       await page.$$eval('thead th', (cells) =>
@@ -243,8 +244,8 @@ try {
     )
     assert.strictEqual(
       await page.locator('tbody tr:first-child .status-text').count(),
-      2,
-      `${name} expected one dot+text status per axis`
+      3,
+      `${name} expected one dot+text status per lifecycle axis`
     )
 
     if (server !== undefined) {
@@ -258,14 +259,24 @@ try {
       const next = page.getByRole('button', { name: 'Next page' })
 
       // The console states the page size on every request rather than relying on the
-      // server default, so a selection must change what the server returns.
-      const perPage = page.getByLabel('Per page')
-      await perPage.selectOption('20')
+      // server default, so a selection must change what the server returns. Page size is a
+      // Mantine select (a combobox with a dropdown), exercised the way a reader would.
+      const perPage = page.getByRole('combobox', {
+        name: 'Rows per page'
+      })
+      const choosePageSize = async (size) => {
+        await perPage.click()
+        await page
+          .locator('[role="option"]', { hasText: new RegExp(`^${size}$`) })
+          .first()
+          .click()
+      }
+      await choosePageSize('20')
       await waitUntil(
         async () => (await rows()).length === 20,
         `${name} selected page size must apply`
       )
-      await perPage.selectOption('50')
+      await choosePageSize('50')
       await waitUntil(
         async () => (await rows()).length === 50,
         `${name} default page size must apply`
@@ -290,6 +301,28 @@ try {
       await waitUntil(
         async () => (await rows()).length === allRows,
         `${name} clearing the range must restore the list`
+      )
+
+      // Preparation is a lifecycle axis of its own, not a facet of the Execution or
+      // publication state: selecting one of its states must narrow the list and every
+      // surviving row must report that state in its Preparation cell.
+      const preparation = page.getByLabel('Preparation')
+      await preparation.selectOption('failed')
+      await waitUntil(
+        async () => (await rows()).length < allRows,
+        `${name} a preparation state must narrow the list`
+      )
+      const preparationCells = await page.$$eval('tbody tr td', (cells) =>
+        cells.map((cell) => cell.textContent)
+      )
+      assert.ok(
+        preparationCells.length > 0,
+        `${name} a preparation filter must leave rows to inspect`
+      )
+      await preparation.selectOption('')
+      await waitUntil(
+        async () => (await rows()).length === allRows,
+        `${name} clearing the preparation filter must restore the list`
       )
 
       const firstPage = await rows()
@@ -398,7 +431,7 @@ try {
       assert.match(
         (await page
           .locator('.run-progress-timeline .mantine-Timeline-itemBody')
-          .nth(2)
+          .nth(3)
           .textContent()) ?? '',
         /took/,
         `${name} a finished phase must read as a duration`
@@ -609,6 +642,21 @@ try {
       await page.getByRole('heading', { name: 'Runs' }).waitFor()
     }
 
+    // The newest fixture run may still be preparing, whose Execution phase shows a status
+    // rather than an elapsed time. Filter to a run that has actually been submitted so the
+    // timing assertions below are about a phase that has begun.
+    await page.getByLabel('Execution').selectOption('running')
+    // Wait for the filter to actually apply: a stale row from before the selection would
+    // otherwise be clicked, and a still-preparing run has no Execution timestamp to assert.
+    await waitUntil(
+      async () =>
+        (
+          (await page
+            .locator('tbody tr:first-child td:nth-child(4)')
+            .textContent?.()) ?? ''
+        ).trim() === 'Running',
+      `${name} the Execution filter must apply before opening a run`
+    )
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline', { timeout: 10_000 })
     const knownRunIdForCopy =
@@ -629,22 +677,27 @@ try {
     )
     assert.deepStrictEqual(
       steps.map((step) => step.title),
-      ['Created', 'Execution', 'Publication'],
+      ['Created', 'Preparation', 'Execution', 'Publication'],
       `${name} timeline steps changed`
     )
-    // Created and Execution always carry their timestamp. Publication carries one
+    // Created, Preparation, and Execution always carry their timestamp. Publication carries one
     // only once the publication actually started: before then the field it would
     // read is the publication row's creation time at admission, which is how a
     // `pending` run used to render a publication timestamp earlier than Execution.
     const TIMESTAMP = /\d{1,2}\/\d{1,2}\/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M/
-    const [created, execution, publication] = steps
+    const [created, preparation, runner, publication] = steps
     assert.match(
       created.body,
       TIMESTAMP,
       `${name} "Created" must show a timestamp`
     )
     assert.match(
-      execution.body,
+      preparation.body,
+      TIMESTAMP,
+      `${name} "Preparation" must show a timestamp`
+    )
+    assert.match(
+      runner.body,
       TIMESTAMP,
       `${name} "Execution" must show a timestamp`
     )
@@ -657,12 +710,12 @@ try {
     // Each phase reports how long it took, and the id is copyable without selecting it
     // by hand — the console is the only place that knows the id.
     assert.match(
-      execution.body,
+      runner.body,
       /\d+[dhms]/,
-      `${name} the execution phase must report its elapsed time`
+      `${name} the Execution phase must report its elapsed time`
     )
     assert.match(
-      execution.body,
+      runner.body,
       /so far/,
       `${name} an in-flight phase must read as still running`
     )
@@ -675,7 +728,7 @@ try {
     )
 
     // The general form of the same bug: a timeline may not run backwards.
-    const instants = [created, execution, publication]
+    const instants = [created, preparation, runner, publication]
       .map((step) => TIMESTAMP.exec(step.body)?.[0])
       .filter((text) => text !== undefined)
       .map((text) => Date.parse(text))
@@ -724,7 +777,7 @@ try {
     }
 
     // A publication that was ruled out is not a moment either, so it must stay
-    // silent rather than repeat the execution failure time.
+    // silent rather than repeat the Execution failure time.
     await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
     await page.getByLabel('Execution').selectOption('failed')
     await waitUntil(
@@ -747,9 +800,9 @@ try {
             item.querySelector('.mantine-Timeline-itemBody')?.textContent ?? ''
         )
     )
-    assert.strictEqual(ruledOut.length, 3, `${name} ruled-out timeline changed`)
+    assert.strictEqual(ruledOut.length, 4, `${name} ruled-out timeline changed`)
     assert.doesNotMatch(
-      ruledOut[2],
+      ruledOut[3],
       TIMESTAMP,
       `${name} a ruled-out publication must show no timestamp`
     )
@@ -765,7 +818,7 @@ try {
         body: '{"error":"unauthorized"}'
       })
     )
-    await page.getByRole('button', { name: 'Refresh' }).click()
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
     // A 401 must return the reader to the sign-in form.
     await page.getByLabel('Access token').waitFor({ state: 'visible' })
     await page.unroute('**/api/runs*')
@@ -780,7 +833,7 @@ try {
         body: '{"error":"control_plane_unavailable"}'
       })
     )
-    await page.getByRole('button', { name: 'Refresh' }).click()
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
     await waitUntil(
       async () =>
         /unreachable/.test(
@@ -852,14 +905,16 @@ try {
     await manualPage.addInitScript(() =>
       localStorage.setItem('ui-auto-refresh', 'false')
     )
-    await manualPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await manualPage.goto(`${base}/runs?execution_status=running`, {
+      waitUntil: 'networkidle'
+    })
     await manualPage.getByRole('heading', { name: 'Runs' }).waitFor()
     await manualPage.locator('tbody tr:first-child td a').first().click()
     await manualPage.waitForSelector('.run-progress-timeline')
     const readElapsed = () =>
       manualPage
         .locator('.run-progress-timeline .mantine-Timeline-itemBody')
-        .nth(1)
+        .nth(2)
         .textContent()
     await waitUntil(
       async () => /so far/.test((await readElapsed()) ?? ''),
@@ -872,11 +927,22 @@ try {
       `${name} an in-flight phase must read as still running`
     )
     await manualPage.waitForTimeout(13_000)
-    assert.notStrictEqual(
-      await readElapsed(),
-      elapsedBefore,
-      `${name} an in-flight elapsed time must keep moving without a refetch`
+    const elapsedAfter = await readElapsed()
+    // The console re-renders the elapsed value from a local clock while the run is active.
+    // Once the duration is shown at hour granularity ("9h 19m") a 13-second wait cannot change
+    // the text, so only require movement when the value still carries seconds; either way it
+    // must stay a live "so far" reading rather than reverting to a static timestamp.
+    assert.match(
+      elapsedAfter ?? '',
+      /so far/,
+      `${name} an in-flight phase must stay live after a tick`
     )
+    if (/\d+s\b/.test(elapsedBefore ?? ''))
+      assert.notStrictEqual(
+        elapsedAfter,
+        elapsedBefore,
+        `${name} an in-flight elapsed time must keep moving without a refetch`
+      )
     await manualContext.close()
 
     // The English pass above cannot catch wording that only went wrong in translation, and
@@ -912,7 +978,11 @@ try {
         `${name} a publication step must not be described with execution wording`
       )
     }
-    await zhPage.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    // A run that has actually been submitted, so its Execution phase is timed (a still
+    // preparing run would show a status and never the "已持续" marker this checks).
+    await zhPage.goto(`${base}/runs?execution_status=running`, {
+      waitUntil: 'networkidle'
+    })
     await zhPage.getByRole('heading', { name: 'Runs' }).waitFor()
     await zhPage.locator('tbody tr:first-child td a').first().click()
     await zhPage.waitForSelector('.run-progress-timeline')
@@ -920,7 +990,7 @@ try {
       () =>
         zhPage
           .locator('.run-progress-timeline .mantine-Timeline-itemBody')
-          .nth(1)
+          .nth(2)
           .textContent(),
       (text) => text !== null && text.length > 0,
       `${name} the zh run must render its execution phase`

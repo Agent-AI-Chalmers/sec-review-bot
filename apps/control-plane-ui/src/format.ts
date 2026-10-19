@@ -21,7 +21,9 @@ export function safeExternalUrl(value: string | null): string | undefined {
 }
 
 export function isRunTerminal(run: Run): boolean {
-  if (run.execution_status === 'failed') return true
+  // `uncertain` is not terminal: a recovery will resolve it to queued or failed.
+  if (run.execution_status === 'failed' || run.execution_status === 'skipped')
+    return true
   return (
     run.execution_status === 'succeeded' &&
     ['published', 'failed', 'skipped'].includes(run.publication_status)
@@ -74,15 +76,45 @@ export function failureReason(
 
 /** A finished phase reports how long it took; an in-flight one reports how long it has
  * been in that state — a fact about the clock, not about the stored timestamps. */
+/** Elapsed time of a phase measured from its real start.
+ *
+ * `endAt` is the phase's completion time, or null while it is still running. The start is the
+ * phase's own start (execution: the run's submitted_at, not created_at), so a phase that has
+ * not begun is never timed and a running phase counts from when it actually began. */
 export function phaseElapsed(
-  updatedAt: string,
-  createdAt: string,
-  finished: boolean,
+  startAt: string,
+  endAt: string | null,
   t: Translator
 ): string {
-  return finished
-    ? `${t('took')} ${formatDuration(Date.parse(updatedAt) - Date.parse(createdAt), t)}`
-    : `${t('soFar')} ${formatDuration(Date.now() - Date.parse(updatedAt), t)}`
+  return endAt !== null
+    ? `${t('took')} ${formatDuration(Date.parse(endAt) - Date.parse(startAt), t)}`
+    : `${t('soFar')} ${formatDuration(Date.now() - Date.parse(startAt), t)}`
+}
+
+/** How long ago the run's state was last observed, for the states that are learned by polling.
+ *
+ * While a run is `queued` or `running`, the only writer of `execution_updated_at` is the
+ * observation heartbeat, so its age is how long ago we last confirmed the state. Outside those
+ * states nothing is polling, so there is no freshness to report and this returns null. */
+export function observationAgeMs(
+  run: Run,
+  now: number = Date.now()
+): number | null {
+  if (run.execution_status !== 'queued' && run.execution_status !== 'running')
+    return null
+  return Math.max(0, now - Date.parse(run.execution_updated_at))
+}
+
+/** A polled state is stale once we have not confirmed it for a while (the coordinator polls
+ * every few seconds; two minutes without a confirmation means something is wrong). */
+export const STALE_OBSERVATION_MS = 120_000
+
+export function isObservationStale(
+  run: Run,
+  now: number = Date.now()
+): boolean {
+  const age = observationAgeMs(run, now)
+  return age !== null && age > STALE_OBSERVATION_MS
 }
 
 /** Compact elapsed time, e.g. `2m 33s` or `1h 4m`. */

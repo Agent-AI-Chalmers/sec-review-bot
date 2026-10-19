@@ -11,14 +11,38 @@ export interface ArtifactStorage {
   error_code?: string
   message?: string
 }
+export interface RunEvent {
+  event_id: number
+  axis: 'runner' | 'preparation' | 'publication' | 'notice'
+  from_status: string | null
+  to_status: string
+  reason_code: string | null
+  occurred_at: string
+}
+
 export interface Run {
   run_id: string
   workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+  preparation: {
+    status: 'pending' | 'preparing' | 'submitted' | 'failed'
+    attempt_count: number
+    updated_at: string
+    failure_code: string | null
+    failure_notice_status:
+      'pending' | 'delivering' | 'delivered' | 'skipped' | null
+  } | null
   execution_status:
-    'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+    | 'pending'
+    | 'queued'
+    | 'running'
+    | 'uncertain'
+    | 'succeeded'
+    | 'skipped'
+    | 'failed'
   publication_status:
     'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
   created_at: string
+  submitted_at: string | null
   execution_updated_at: string
   publication_updated_at: string
   published_at: string | null

@@ -16,20 +16,33 @@ import {
   IconArrowLeft,
   IconArrowUpRight,
   IconChevronDown,
+  IconChevronRight,
   IconChevronUp,
   IconClock,
   IconDownload
 } from '@tabler/icons-react'
-import { api, ApiError, type ArtifactStorage, type Run } from './api.js'
+import {
+  api,
+  ApiError,
+  type ArtifactStorage,
+  type Run,
+  type RunEvent
+} from './api.js'
+import { RunStateMachines } from './StateMachine.js'
 import { formatDate, useLanguage, useMessages } from './i18n.js'
 import { CopyAction, useRefresh } from './App.js'
 import {
   ExecutionStatus,
+  PreparationStatus,
   PublicationStatus,
+  failureNoticeStatusLabel,
   type PublicationStepStatus,
   artifactStatusColor,
   artifactStatusLabel,
+  axisLabel,
+  executionStatusLabel,
   executionTone,
+  preparationTone,
   publicationStatusColor,
   publicationStatusLabel,
   publicationTone,
@@ -40,9 +53,12 @@ import {
   abbreviateDigest,
   failureReason,
   formatBytes,
+  formatDuration,
   isDownloadableArtifact,
   isRunTerminal,
   phaseElapsed,
+  observationAgeMs,
+  isObservationStale,
   safeExternalUrl,
   workflowLabel
 } from './format.js'
@@ -155,6 +171,7 @@ export function Detail(): React.JSX.Element {
     runId: string
     run: Run
     steps: Step[]
+    events: RunEvent[]
   }>()
   const [failure, setFailure] = React.useState<{
     runId: string
@@ -162,19 +179,22 @@ export function Detail(): React.JSX.Element {
   }>()
   const run = loaded?.runId === runId ? loaded.run : undefined
   const steps = loaded?.runId === runId ? loaded.steps : []
+  const events = loaded?.runId === runId ? loaded.events : []
   const error = failure?.runId === runId ? failure.error : undefined
   const load = React.useCallback(async (): Promise<void> => {
     try {
-      const [runValue, stepValue] = await Promise.all([
+      const [runValue, stepValue, eventValue] = await Promise.all([
         api<{ run: Run }>(`/runs/${encodeURIComponent(runId)}`),
         api<{ publication_steps: Step[] }>(
           `/runs/${encodeURIComponent(runId)}/publication-steps`
-        )
+        ),
+        api<{ events: RunEvent[] }>(`/runs/${encodeURIComponent(runId)}/events`)
       ])
       setLoaded({
         runId,
         run: runValue.run,
-        steps: stepValue.publication_steps
+        steps: stepValue.publication_steps,
+        events: eventValue.events
       })
       setFailure(undefined)
     } catch (value) {
@@ -237,7 +257,7 @@ export function Detail(): React.JSX.Element {
       step.status !== 'succeeded' ||
       safeExternalUrl(step.remote_object_url) !== undefined
   )
-  const publicationIndex = 2 + (run?.artifact_storage === null ? 0 : 1)
+  const publicationIndex = 3
   const timelineActive =
     run?.publication_status === 'pending'
       ? publicationIndex - 1
@@ -285,6 +305,12 @@ export function Detail(): React.JSX.Element {
               <span className="workflow-chip">
                 {workflowLabel(run.workflow, t)}
               </span>
+              <Group gap={6} align="center">
+                <Text c="dimmed" size="xs">
+                  {t('preparation')}
+                </Text>
+                <PreparationStatus preparation={run.preparation} />
+              </Group>
               <Group gap={6} align="center">
                 <Text c="dimmed" size="xs">
                   {t('execution')}
@@ -335,19 +361,63 @@ export function Detail(): React.JSX.Element {
                   </Text>
                 </Timeline.Item>
                 <Timeline.Item
+                  bullet={statusBullet(preparationTone(run.preparation))}
+                  color={statusToneColor(preparationTone(run.preparation))}
+                  title={<Text fw={500}>{t('preparation')}</Text>}
+                >
+                  {run.preparation !== null && (
+                    <Text c="dimmed" size="sm">
+                      {formatDate(run.preparation.updated_at, language)} ·{' '}
+                      {t('preparationAttempts')}:{' '}
+                      {run.preparation.attempt_count}
+                      {run.preparation.failure_notice_status !== null && (
+                        <>
+                          {' · '}
+                          {t('preparationNotice')}:{' '}
+                          {failureNoticeStatusLabel(
+                            run.preparation.failure_notice_status,
+                            t
+                          )}
+                        </>
+                      )}
+                    </Text>
+                  )}
+                </Timeline.Item>
+                <Timeline.Item
                   bullet={statusBullet(executionTone(run.execution_status))}
                   color={statusToneColor(executionTone(run.execution_status))}
                   title={<Text fw={500}>{t('execution')}</Text>}
                 >
-                  <Text c="dimmed" size="sm">
-                    {formatDate(run.execution_updated_at, language)} ·{' '}
-                    {phaseElapsed(
-                      run.execution_updated_at,
-                      run.created_at,
-                      ['succeeded', 'failed'].includes(run.execution_status),
-                      t
-                    )}
-                  </Text>
+                  {run.submitted_at === null ? (
+                    // Execution has not begun: preparation has not handed the input to the
+                    // Runner yet, so there is nothing to time.
+                    <Text c="dimmed" size="sm">
+                      {executionStatusLabel(run.execution_status, t)}
+                    </Text>
+                  ) : (
+                    <Text c="dimmed" size="sm">
+                      {formatDate(run.submitted_at, language)} ·{' '}
+                      {phaseElapsed(
+                        run.submitted_at,
+                        ['succeeded', 'failed'].includes(run.execution_status)
+                          ? run.execution_updated_at
+                          : null,
+                        t
+                      )}
+                    </Text>
+                  )}
+                  {observationAgeMs(run) !== null && (
+                    <Text
+                      c={isObservationStale(run) ? 'yellow' : 'dimmed'}
+                      size="xs"
+                      mt={2}
+                    >
+                      {isObservationStale(run) && '⚠ '}
+                      {t('observedAgo')}:{' '}
+                      {formatDuration(observationAgeMs(run) ?? 0, t)}
+                      {isObservationStale(run) && ` · ${t('observationStale')}`}
+                    </Text>
+                  )}
                   {run.artifact_storage !== null && (
                     <div className="artifact-section">
                       <Artifact
@@ -373,11 +443,12 @@ export function Detail(): React.JSX.Element {
                         )}{' '}
                         ·{' '}
                         {phaseElapsed(
-                          run.published_at ?? run.publication_updated_at,
-                          run.created_at,
-                          ['published', 'failed'].includes(
+                          run.execution_updated_at,
+                          ['published', 'failed', 'skipped'].includes(
                             run.publication_status
-                          ),
+                          )
+                            ? (run.published_at ?? run.publication_updated_at)
+                            : null,
                           t
                         )}
                       </Text>
@@ -453,6 +524,46 @@ export function Detail(): React.JSX.Element {
                   )}
                 </Timeline.Item>
               </Timeline>
+              <RunStateMachines run={run} events={events} />
+              {events.length > 0 && (
+                // A native disclosure keeps this operator detail out of the way until asked
+                // for, collapses without page state, and stays keyboard/screen-reader
+                // accessible. It is a compact list rather than a table: one transition per
+                // line reads better than four columns at this density.
+                <details className="run-history">
+                  <summary className="run-history-summary">
+                    <IconChevronRight
+                      size={14}
+                      className="run-history-chevron"
+                      aria-hidden="true"
+                    />
+                    {t('runHistory')}
+                    <span className="run-history-count">{events.length}</span>
+                  </summary>
+                  <ul className="run-history-list">
+                    {events.map((event) => (
+                      <li key={event.event_id} className="run-history-item">
+                        <span className="run-history-time">
+                          {formatDate(event.occurred_at, language)}
+                        </span>
+                        <span className="run-history-axis">
+                          {axisLabel(event.axis, t)}
+                        </span>
+                        <span className="run-history-transition">
+                          {event.from_status === null ? '—' : event.from_status}
+                          {' → '}
+                          {event.to_status}
+                        </span>
+                        {event.reason_code !== null && (
+                          <span className="run-history-reason">
+                            {event.reason_code}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </Paper>
           </Stack>
         </>

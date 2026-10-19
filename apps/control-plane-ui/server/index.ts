@@ -88,7 +88,7 @@ function forwardedPath(bffUrl: string): string {
 }
 
 const allowed =
-  /^\/api\/runs(?:\?.*)?$|^\/api\/runs\/[^/?]+(?:\/publication-steps)?$/
+  /^\/api\/runs(?:\?.*)?$|^\/api\/runs\/[^/?]+(?:\/(?:publication-steps|events))?$/
 
 function sendJson(
   response: ServerResponse,
