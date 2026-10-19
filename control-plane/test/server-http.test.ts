@@ -354,7 +354,8 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
     assert.strictEqual(response.statusCode, 200)
     assert.strictEqual(response.json(), true)
     assert.deepStrictEqual(completions, [
-      ['3f2504e0-4f89-41d3-9a0c-0305e82c3301', 'notice-claim', false, undefined]
+      // An undelivered notice carries no URL, so the store sees three arguments, not four.
+      ['3f2504e0-4f89-41d3-9a0c-0305e82c3301', 'notice-claim', false]
     ])
   } finally {
     await app.close()

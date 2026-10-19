@@ -108,6 +108,16 @@ export class PublicationStore {
         ]
       )
       if (result.rowCount !== 1) return false
+      // A terminal publication failure ends the run. The requester is told about it here, not
+      // only when an individual step happens to be marked terminal: the coordinator can conclude
+      // the whole publication without going through `failPublicationStep`.
+      if (toStatus === 'failed') {
+        await client.query(
+          `INSERT INTO run_failure_notices (run_id,connector_id,status,failure_stage,failure_code)
+           VALUES ($1,$2,'pending','publication',$3) ON CONFLICT (run_id) DO NOTHING`,
+          [runId, this.connectorId, error.code ?? null]
+        )
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,

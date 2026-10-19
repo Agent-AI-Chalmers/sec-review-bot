@@ -1003,6 +1003,15 @@ export class ReviewRunStore {
         toStatus: 'failed',
         reasonCode: 'PREPARATION_ABANDONED'
       })
+      // A blocked run never queued a notice: its expiry was refused before reaching the code
+      // that does, which is why it needed an operator at all. The decision ends the run, so the
+      // requester has to hear about it; `DO NOTHING` leaves an earlier notice untouched.
+      await client.query(
+        `INSERT INTO run_failure_notices (run_id,connector_id,status,failure_stage,failure_code)
+         VALUES ($1,$2,'pending','preparation','PREPARATION_ABANDONED')
+         ON CONFLICT (run_id) DO NOTHING`,
+        [runId, this.connectorId]
+      )
       // Any publication still waiting is not applicable now that the run will not deliver a
       // result. The helper reports what it actually moved, so the event names the real origin.
       const publicationFrom = await abandonInFlightPublication(
@@ -1094,6 +1103,13 @@ export class ReviewRunStore {
       })
       return true
     })
+  }
+  async releaseSubmissionRecovery(
+    runId: string,
+    token: string
+  ): Promise<boolean> {
+    this.ready()
+    return await this.executions.releaseSubmissionRecovery(runId, token)
   }
   async failSubmissionRecovery(
     runId: string,

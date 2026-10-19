@@ -1574,27 +1574,40 @@ paths:
         required: true
         content:
           application/json:
+            # Two branches rather than a description that promises a rule the schema cannot
+            # express: a delivered notice must carry a URI, an undelivered one must not carry
+            # one at all. Stating it here keeps the contract and the server from disagreeing.
             schema:
-              type: object
-              additionalProperties: false
-              required:
-                - token
-                - delivered
-              properties:
-                token:
-                  type: string
-                  minLength: 1
-                delivered:
-                  type: boolean
-                comment_url:
-                  description: >-
-                    The comment the requester can read. Required when `delivered` is true and
-                    rejected when it is false, so "delivered" cannot claim a destination that
-                    does not exist.
-                  oneOf:
-                    - type: "null"
-                    - type: string
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - token
+                    - delivered
+                    - comment_url
+                  properties:
+                    token:
+                      type: string
+                      minLength: 1
+                    delivered:
+                      type: boolean
+                      enum: [true]
+                    comment_url:
+                      description: The comment the requester can read.
+                      type: string
                       format: uri
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - token
+                    - delivered
+                  properties:
+                    token:
+                      type: string
+                      minLength: 1
+                    delivered:
+                      type: boolean
+                      enum: [false]
       responses:
         "200":
           description: Whether the caller still owned the notice.

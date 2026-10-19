@@ -5,6 +5,7 @@ type SubmissionRecoveryStore = Pick<
   | 'claimSubmissionRecovery'
   | 'completeSubmissionRecovery'
   | 'failSubmissionRecovery'
+  | 'releaseSubmissionRecovery'
 >
 
 type SubmissionError = { code?: string | null; message: string }
@@ -58,12 +59,17 @@ export async function recoverReviewRunSubmission(
       : { status: 'claim_lost' }
   } catch (error) {
     const classified = dependencies.classifyError(error)
+    if (classified.uncertain) {
+      // The replay's outcome is unknown, which is exactly what `uncertain` already means. The
+      // submission may have been accepted, so concluding it would discard a run the Runner is
+      // still working on. Release the claim and leave the state alone.
+      await store.releaseSubmissionRecovery(run.run_id, claimToken)
+      return { status: 'deferred', error }
+    }
     await store.failSubmissionRecovery(run.run_id, claimToken, {
       code: classified.code ?? null,
       message: classified.message
     })
-    return classified.uncertain
-      ? { status: 'deferred', error }
-      : { status: 'failed', error }
+    return { status: 'failed', error }
   }
 }

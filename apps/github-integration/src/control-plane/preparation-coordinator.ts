@@ -215,12 +215,21 @@ async function deliverNextRunFailureNotice({
                 `${notice.failure_stage.toUpperCase()}_FAILED`
             }
           )
-    await store.completeRunFailureNotice(
-      notice.run_id,
-      notice.claim_token,
-      delivered !== null,
-      delivered?.comment_url
-    )
+    // A posted reply names its comment; a failed delivery has none to name.
+    if (delivered === null) {
+      await store.completeRunFailureNotice(
+        notice.run_id,
+        notice.claim_token,
+        false
+      )
+    } else {
+      await store.completeRunFailureNotice(
+        notice.run_id,
+        notice.claim_token,
+        true,
+        delivered.comment_url
+      )
+    }
   } catch (error) {
     // Leave the notice claimed. Its lease makes it eligible for another connector
     // process after a transient GitHub or network failure.

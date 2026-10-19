@@ -103,7 +103,11 @@ const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * BFF never reads or stores it. Keeping it out of the server means a compromised BFF cannot
  * abandon runs, and the Control Plane decides who is allowed to.
  */
-const ADMIN_ABANDON = /^\/api\/admin\/runs\/([^/?]+)\/abandon$/
+// Same shape check as the read allow-list: the id is a UUID or the request is not one this BFF
+// proxies. Sharing `RUN_ID` keeps the two policies from drifting apart.
+const ADMIN_ABANDON = new RegExp(
+  `^/api/admin/runs/(${RUN_ID.source.slice(1, -1)})/abandon$`
+)
 
 function isAllowedReadPath(bffUrl: string): boolean {
   const url = new URL(bffUrl, 'http://control-plane-ui.local')

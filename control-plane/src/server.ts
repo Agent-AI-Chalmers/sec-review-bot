@@ -456,14 +456,17 @@ export async function registerControlPlaneRoutes(
 
     completeRunFailureNotice: async (request) => {
       const { runId } = request.params as PathParams<'completeRunFailureNotice'>
-      const { token, delivered, comment_url } =
-        request.body as RequestBody<'completeRunFailureNotice'>
-      return await store.completeRunFailureNotice(
-        runId,
-        token,
-        delivered,
-        comment_url
-      )
+      const body = request.body as RequestBody<'completeRunFailureNotice'>
+      // The contract's two branches differ by `delivered`, so the URL exists only in the
+      // delivered one. Spreading keeps a single call without losing that distinction.
+      return body.delivered
+        ? await store.completeRunFailureNotice(
+            runId,
+            body.token,
+            true,
+            body.comment_url
+          )
+        : await store.completeRunFailureNotice(runId, body.token, false)
     },
 
     claimNextPublication: async (request) => {

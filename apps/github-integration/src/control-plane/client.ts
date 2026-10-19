@@ -275,13 +275,29 @@ class HttpControlPlaneClient {
   async completeRunFailureNotice(
     runId: string,
     token: string,
+    delivered: true,
+    commentUrl: string
+  ): Promise<boolean>
+  async completeRunFailureNotice(
+    runId: string,
+    token: string,
+    delivered: false
+  ): Promise<boolean>
+  async completeRunFailureNotice(
+    runId: string,
+    token: string,
     delivered: boolean,
     commentUrl?: string
   ): Promise<boolean> {
+    // The contract states the two cases separately: a delivered notice names its comment, an
+    // undelivered one has nowhere to point. The overloads keep that distinction at this seam
+    // instead of letting a missing URL reach the server as a runtime error.
     return await this.request(
       'completeRunFailureNotice',
       { runId },
-      { token, delivered, comment_url: commentUrl ?? null }
+      delivered
+        ? { token, delivered: true, comment_url: commentUrl as string }
+        : { token, delivered: false }
     )
   }
 

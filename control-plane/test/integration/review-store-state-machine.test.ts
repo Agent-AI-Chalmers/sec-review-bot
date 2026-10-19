@@ -1455,6 +1455,107 @@ test('ReviewRunStore records an undeliverable notice as failed, not skipped', as
   }
 })
 
+test('every terminal path that concludes a run queues a failure notice', async () => {
+  // The edges test proves the recorded transitions are declared; it cannot prove a terminal
+  // path also told the requester. This pins the other half: whichever way a run ends, a notice
+  // exists, and it names the axis that failed. Without it, a conclusion path could silently
+  // leave the requester uninformed, which is how the publication coordinator's terminal path
+  // and the unconfirmed-replay path both went unnoticed.
+  const store = await createStore()
+
+  const noticeFor = async (runId: string): Promise<string | null> => {
+    const run = await store.getRun(runId)
+    assert.strictEqual(
+      run?.failure_notice?.status,
+      'pending',
+      `${runId} ended without queueing a notice`
+    )
+    return run?.failure_notice?.failure_stage ?? null
+  }
+
+  try {
+    // preparation failure
+    const preparationRun = `run-${randomUUID()}`
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: preparationRun,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await store.failPreparation(
+      preparationRun,
+      admission.preparation_token,
+      { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
+      { retry: false }
+    )
+    assert.strictEqual(await noticeFor(preparationRun), 'preparation')
+
+    // execution failure
+    const executionRun = await createQueuedRun(store)
+    assert.strictEqual(
+      await store.failRunnerExecution(executionRun, {
+        code: 'RUNNER_EXECUTION_FAILED',
+        message: 'boom'
+      }),
+      true
+    )
+    assert.strictEqual(await noticeFor(executionRun), 'execution')
+
+    // publication failure concluded by the coordinator, not by a terminal step
+    const publicationRun = await createSuccessfulRun(store)
+    const publicationToken = await store.claimPublication(publicationRun)
+    assert.ok(publicationToken)
+    await store.initializePublicationSteps(publicationRun, publicationToken, [
+      'issue:summary-comment'
+    ])
+    assert.strictEqual(
+      await store.failPublication(
+        publicationRun,
+        publicationToken,
+        { code: 'PUBLICATION_STEPS_INCOMPLETE', message: 'steps missing' },
+        { retry: false }
+      ),
+      true
+    )
+    assert.strictEqual(await noticeFor(publicationRun), 'publication')
+
+    // an operator's decision to abandon a blocked run
+    const blockedRun = `run-${randomUUID()}`
+    const blockedAdmission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: blockedRun,
+      publish_context: {}
+    })
+    assert.ok(blockedAdmission.preparation_token)
+    const observer = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      await observer.query(
+        `UPDATE preparations SET attempt_count=8,
+           claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+        [blockedRun]
+      )
+      await observer.query(
+        `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+           finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
+        [blockedRun]
+      )
+    } finally {
+      await observer.end()
+    }
+    const expiry = await store.expireStalePreparations()
+    assert.strictEqual(expiry.blocked.length, 1)
+    assert.strictEqual(
+      (await store.getRun(blockedRun))?.failure_notice,
+      null,
+      'a blocked expiry queues nothing by itself'
+    )
+    await store.abandonBlockedPreparation(blockedRun, 'operator decision')
+    assert.strictEqual(await noticeFor(blockedRun), 'preparation')
+  } finally {
+    await store.close()
+  }
+})
+
 test('ReviewRunStore announces only a publication failure that ends the run', async () => {
   const store = await createStore()
   const runId = await createSuccessfulRun(store)

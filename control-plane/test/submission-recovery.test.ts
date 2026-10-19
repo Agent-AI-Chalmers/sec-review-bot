@@ -53,6 +53,9 @@ function store(
     async completeSubmissionRecovery() {
       return true
     },
+    async releaseSubmissionRecovery() {
+      return true
+    },
     async failSubmissionRecovery() {
       return true
     },
@@ -94,13 +97,20 @@ test('submission recovery replays the persisted input and commits its claim', as
   ])
 })
 
-test('submission recovery persists uncertainty for a later retry', async () => {
-  const failures: unknown[][] = []
+test('submission recovery leaves an uncertain replay claimable', async () => {
+  // An unknown replay outcome is not a failure: the Runner may have accepted the request. The
+  // run has to stay `uncertain` and claimable, so the claim is released rather than concluded.
+  const concluded: unknown[][] = []
+  const released: unknown[][] = []
   const transportError = new Error('response lost')
   const result = await recoverReviewRunSubmission(
     store({
       async failSubmissionRecovery(...args) {
-        failures.push(args)
+        concluded.push(args)
+        return true
+      },
+      async releaseSubmissionRecovery(...args) {
+        released.push(args)
         return true
       }
     }),
@@ -118,13 +128,16 @@ test('submission recovery persists uncertainty for a later retry', async () => {
   )
 
   assert.deepStrictEqual(result, { status: 'deferred', error: transportError })
-  assert.deepStrictEqual(failures, [
-    [
-      'run-1',
-      'claim-1',
-      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' }
-    ]
-  ])
+  assert.deepStrictEqual(
+    released,
+    [['run-1', 'claim-1']],
+    'the claim is released so the run can be replayed again'
+  )
+  assert.deepStrictEqual(
+    concluded,
+    [],
+    'nothing may be concluded while the outcome is unknown'
+  )
 })
 
 test('submission recovery records missing persisted input without calling Runner', async () => {

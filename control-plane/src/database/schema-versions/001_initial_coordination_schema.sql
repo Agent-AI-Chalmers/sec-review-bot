@@ -437,7 +437,7 @@ COMMENT ON COLUMN review_run_events.run_id IS
 COMMENT ON COLUMN review_run_events.connector_id IS
   'Connector namespace that owns the run, kept so reads can be fenced per connector.';
 COMMENT ON COLUMN review_run_events.axis IS
-  'Which coordination state machine the transition belongs to: runner, preparation, publication, or notice.';
+  'Which coordination state machine the transition belongs to: execution, preparation, publication, or notice.';
 COMMENT ON COLUMN review_run_events.from_status IS
   'State before the transition; NULL for the first event on an axis (for example admission).';
 COMMENT ON COLUMN review_run_events.to_status IS

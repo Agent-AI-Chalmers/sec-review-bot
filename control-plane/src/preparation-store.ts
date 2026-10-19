@@ -238,6 +238,14 @@ export class PreparationStore {
         `Failure notice ${runId} cannot be delivered without a comment_url.`
       )
     }
+    if (!delivered && commentUrl !== undefined && commentUrl !== null) {
+      // The other half of the same contract: an undelivered notice has no destination, so a URL
+      // here means the caller believes something was posted. Discarding it silently would hide
+      // that disagreement.
+      throw new Error(
+        `Failure notice ${runId} cannot carry a comment_url when delivery failed.`
+      )
+    }
     return await transaction(this.pool, async (client) => {
       const result = await client.query(
         `UPDATE run_failure_notices SET status=$4, claim_token=NULL,
@@ -249,7 +257,7 @@ export class PreparationStore {
           this.connectorId,
           token,
           delivered ? 'delivered' : 'failed',
-          delivered ? (commentUrl ?? null) : null
+          commentUrl ?? null
         ]
       )
       if (result.rowCount !== 1) return false

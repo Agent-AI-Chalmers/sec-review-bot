@@ -1277,12 +1277,22 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': {
-          token: string
-          delivered: boolean
-          /** @description The comment the requester can read. Required when `delivered` is true and rejected when it is false, so "delivered" cannot claim a destination that does not exist. */
-          comment_url?: null | string
-        }
+        'application/json':
+          | {
+              token: string
+              /** @enum {boolean} */
+              delivered: true
+              /**
+               * Format: uri
+               * @description The comment the requester can read.
+               */
+              comment_url: string
+            }
+          | {
+              token: string
+              /** @enum {boolean} */
+              delivered: false
+            }
       }
     }
     responses: {
