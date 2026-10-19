@@ -39,15 +39,17 @@ If Runner submission may have succeeded but its response was lost, the run enter
 
 ## Persistence model
 
-Execution and publication are separate state machines:
+The run trunk and the three lifecycle axes are separate tables. `review_runs` holds only the admitted identity; each axis keeps its own state and its own input:
 
-| Table                         | Responsibility                                            | Status                                                                        |
-| ----------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `review_runs`                 | Admission, Runner observation, and terminal workflow data | `pending`, `queued`, `running`, `uncertain`, `succeeded`, `skipped`, `failed` |
-| `preparations`                | Claimable input preparation                               | `pending`, `preparing`, `submitted`, `failed`                                 |
-| `preparation_failure_notices` | Connector-owned terminal-failure acknowledgements         | `pending`, `delivering`, `delivered`, `skipped`                               |
-| `publications`                | Whole-publication ownership and outcome                   | `pending`, `publishing`, `published`, `failed`, `skipped`                     |
-| `publication_steps`           | Recoverable individual connector side effects             | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`                |
+| Table                         | Responsibility                                         | Status                                                                        |
+| ----------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `review_runs`                 | Admission identity shared by all axes (no update path) | —                                                                             |
+| `preparations`                | Claimable input preparation                            | `pending`, `preparing`, `submitted`, `failed`                                 |
+| `preparation_failure_notices` | Connector-owned terminal-failure acknowledgements      | `pending`, `delivering`, `delivered`, `skipped`                               |
+| `executions`                  | Runner submission, observation, and terminal result    | `pending`, `queued`, `running`, `uncertain`, `succeeded`, `skipped`, `failed` |
+| `publications`                | Whole-publication ownership and outcome                | `pending`, `publishing`, `published`, `failed`, `skipped`                     |
+| `publication_steps`           | Recoverable individual connector side effects          | `pending`, `running`, `succeeded`, `failed`, `terminal_failed`                |
+| `review_run_events`           | Append-only audit log of transitions on every axis     | —                                                                             |
 
 ```mermaid
 flowchart LR
@@ -58,7 +60,7 @@ flowchart LR
     preparing -->|retry exhausted| prepfailed[failed]
   end
 
-  subgraph runner[review_runs.runner_status / execution_status]
+  subgraph runner[executions.status / execution_status]
     pending -->|input submitted| queued
     pending -->|preparation failed| skipped
     pending -->|submission unconfirmed| uncertain
@@ -73,7 +75,8 @@ flowchart LR
     pubpending[pending] --> publishing --> published
     publishing -->|retryable failure| pubpending
     publishing -->|terminal failure| pubfailed[failed]
-    pubpending -->|execution failed| skipped
+    pubpending -->|execution not publishable| skipped
+    skipped -->|replay accepted| pubpending
   end
 
   subgraph steps[publication_steps.status]

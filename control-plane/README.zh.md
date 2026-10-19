@@ -41,15 +41,17 @@ Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Pla
 
 ## 持久化模型
 
-执行和发布是两个分开的状态机：
+run 主干和三条生命周期轴分别存放在不同的表中。`review_runs` 只保存被接纳的身份；每条轴各自保存自己的状态和输入：
 
-| 表                            | 职责                                  | 状态                                                                          |
-| ----------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
-| `review_runs`                 | 接纳、Runner 观察和终态 workflow 数据 | `pending`、`queued`、`running`、`uncertain`、`succeeded`、`skipped`、`failed` |
-| `preparations`                | 可领取的 input preparation            | `pending`、`preparing`、`submitted`、`failed`                                 |
-| `preparation_failure_notices` | connector 所有的终态失败确认          | `pending`、`delivering`、`delivered`、`skipped`                               |
-| `publications`                | 整体发布的所有权和结果                | `pending`、`publishing`、`published`、`failed`、`skipped`                     |
-| `publication_steps`           | 可恢复的单个 connector 副作用         | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`                |
+| 表                            | 职责                                 | 状态                                                                          |
+| ----------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
+| `review_runs`                 | 所有轴共享的接纳身份（没有更新路径） | —                                                                             |
+| `preparations`                | 可领取的 input preparation           | `pending`、`preparing`、`submitted`、`failed`                                 |
+| `preparation_failure_notices` | connector 所有的终态失败确认         | `pending`、`delivering`、`delivered`、`skipped`                               |
+| `executions`                  | Runner 提交、观察和终态结果          | `pending`、`queued`、`running`、`uncertain`、`succeeded`、`skipped`、`failed` |
+| `publications`                | 整体发布的所有权和结果               | `pending`、`publishing`、`published`、`failed`、`skipped`                     |
+| `publication_steps`           | 可恢复的单个 connector 副作用        | `pending`、`running`、`succeeded`、`failed`、`terminal_failed`                |
+| `review_run_events`           | 每条轴状态转换的只追加审计日志       | —                                                                             |
 
 ```mermaid
 flowchart LR
@@ -60,7 +62,7 @@ flowchart LR
     preparing -->|重试耗尽| prepfailed[failed]
   end
 
-  subgraph runner[review_runs.runner_status / execution_status]
+  subgraph runner[executions.status / execution_status]
     pending -->|提交 input| queued
     pending -->|准备失败| skipped
     pending -->|提交结果未确认| uncertain
@@ -75,7 +77,8 @@ flowchart LR
     pubpending[pending] --> publishing --> published
     publishing -->|可重试失败| pubpending
     publishing -->|终态失败| pubfailed[failed]
-    pubpending -->|执行失败| skipped
+    pubpending -->|执行结果不可发布| skipped
+    skipped -->|重放被接受| pubpending
   end
 
   subgraph steps[publication_steps.status]
