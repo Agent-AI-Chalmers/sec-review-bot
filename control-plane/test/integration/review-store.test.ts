@@ -36,10 +36,18 @@ test('an axis row cannot be written under a connector the trunk does not own', a
     })
     // Delete the axis rows first so the insert below cannot fail on the primary key; the only
     // thing left to reject it is the connector the trunk owns.
-    for (const table of ['executions', 'preparations', 'publications'] as const) {
+    for (const table of [
+      'executions',
+      'preparations',
+      'publications'
+    ] as const) {
       await pool.query(`DELETE FROM ${table} WHERE run_id=$1`, [runId])
     }
-    for (const table of ['executions', 'preparations', 'publications'] as const) {
+    for (const table of [
+      'executions',
+      'preparations',
+      'publications'
+    ] as const) {
       await assert.rejects(
         pool.query(
           `INSERT INTO ${table} (run_id, connector_id, status${
@@ -86,11 +94,10 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
     })
     assert.ok(admission.preparation_token)
     // A terminal preparation failure is what creates the notice row.
-    await store.failPreparation(
-      runId,
-      admission.preparation_token,
-      { code: 'REVIEW_START_FAILED', message: 'boom' }
-    )
+    await store.failPreparation(runId, admission.preparation_token, {
+      code: 'REVIEW_START_FAILED',
+      message: 'boom'
+    })
     // Clear the real notice so the insert below cannot fail on the primary key; the connector is
     // then the only thing left that can reject it.
     await pool.query(
@@ -255,7 +262,10 @@ for (const axis of ['executions', 'preparations'] as const) {
       // The single-run read answers `null`, the same as an unknown id, so it reports the fault
       // through the callback rather than leaving corruption to look like a missing run.
       // An unknown id must NOT report corruption; only a stored row that fails to project does.
-      assert.strictEqual(await store.getRun(`run-unknown-${randomUUID()}`), null)
+      assert.strictEqual(
+        await store.getRun(`run-unknown-${randomUUID()}`),
+        null
+      )
       assert.ok(
         !dropped.some((entry) => entry.run_id.startsWith('run-unknown-')),
         'an unknown run id is not reported as corruption'
@@ -597,6 +607,29 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
     } finally {
       await pool.end()
     }
+  } finally {
+    await store.close()
+  }
+})
+
+test('a submission for an unknown run is a 404, not a server fault', async () => {
+  // `markQueued` used to throw a bare Error when the run was missing, which the HTTP layer
+  // reported as 500 and hid the fact that the caller's run id was wrong. A missing run is the
+  // caller's own input, so it must surface as 404.
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `control-plane-test:${randomUUID()}`
+  })
+  await store.initialize()
+  try {
+    await assert.rejects(
+      store.markQueued(`missing-${randomUUID()}`, randomUUID(), {}),
+      (error: unknown) =>
+        typeof error === 'object' &&
+        error !== null &&
+        'statusCode' in error &&
+        error.statusCode === 404
+    )
   } finally {
     await store.close()
   }

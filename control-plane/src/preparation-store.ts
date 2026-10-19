@@ -73,19 +73,22 @@ export class PreparationStore {
       }>(
         `SELECT p.run_id,r.workflow,p.input_version,p.input,p.attempt_count
          FROM preparations p
-         JOIN review_runs r ON r.run_id=p.run_id
-         JOIN executions e ON e.run_id=p.run_id
+         JOIN review_runs r ON r.run_id=p.run_id AND r.connector_id=p.connector_id
+         JOIN executions e ON e.run_id=p.run_id AND e.connector_id=p.connector_id
          WHERE p.connector_id=$1 AND p.status='pending'
            AND p.available_at <= clock_timestamp()
            AND p.input_version IS NOT NULL AND p.input IS NOT NULL
            AND e.status='pending'
-           AND e.connector_id=p.connector_id
          ORDER BY p.updated_at,p.run_id FOR UPDATE OF p SKIP LOCKED LIMIT 1`,
         [this.connectorId]
       )
       const work = candidate.rows[0]
       if (work === undefined) return null
       const token = crypto.randomUUID()
+      // Claiming a retry starts a new attempt: both failure fields describe the attempt that
+      // just ended, so they go back to NULL. `last_failure_code`/`last_failure_message` are the
+      // durable record of what went wrong and are deliberately left alone, so a lease expiry
+      // on this attempt can still tell the user the real reason.
       const claimed = await client.query(
         `UPDATE preparations SET status='preparing', claim_token=$2, claimed_at=clock_timestamp(),
            attempt_count=attempt_count+1, failure_code=NULL, failure_message=NULL,
@@ -146,11 +149,21 @@ export class PreparationStore {
       const work = candidate.rows[0]
       if (work === undefined) return null
       const token = crypto.randomUUID()
-      const claimedNotice = await client.query(
-        `UPDATE preparation_failure_notices SET status='delivering', claim_token=$2,
-           claimed_at=clock_timestamp(), updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$3`,
-        [work.run_id, token, this.connectorId]
+      // Restate the claimable predicate instead of trusting the SELECT's row lock alone. The
+      // lock makes this safe today, but repeating the condition (and returning the row) keeps
+      // the event's `from_status` pinned to a state this UPDATE actually moved, exactly as
+      // `claimNextPublicationOnce` does. `FOR UPDATE OF n` means the locked row cannot change
+      // under us, so a mismatch is a bug rather than a race.
+      const claimedNotice = await client.query<{
+        status: 'pending' | 'delivering'
+      }>(
+        `UPDATE preparation_failure_notices
+         SET status='delivering', claim_token=$2,
+             claimed_at=clock_timestamp(), updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$3 AND status=$4
+           AND ($4 <> 'delivering' OR claimed_at <= clock_timestamp()-($5*interval '1 millisecond'))
+         RETURNING status`,
+        [work.run_id, token, this.connectorId, work.status, this.claimTimeoutMs]
       )
       if (claimedNotice.rowCount !== 1)
         throw new Error(`Failure notice ${work.run_id} could not be claimed.`)

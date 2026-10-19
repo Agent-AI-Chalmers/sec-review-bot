@@ -687,7 +687,11 @@ x-state-machines:
       - { from: pending, to: preparing, label: claimed}
       - { from: preparing, to: submitted, label: input accepted}
       - { from: preparing, to: pending, label: retry}
-      - { from: preparing, to: failed, reason: PREPARATION_RETRY_EXHAUSTED, label: retry exhausted}
+      # Two write paths reach `failed`: a preparer reporting a terminal error (any
+      # connector-supplied failure code) and the lease expiring on the final allowed attempt.
+      # Only the second one carries a reason code, so the edge is declared without one; a
+      # consumer filtering by reason would otherwise miss every explicit preparation failure.
+      - { from: preparing, to: failed, label: failed}
   runner:
     order: 2
     title: Execution
@@ -737,8 +741,11 @@ x-state-machines:
       - { from: pending, to: uncertain, reason: SUBMISSION_STATE_UNCERTAIN, label: submission unconfirmed }
       - { from: uncertain, to: queued, label: replay accepted}
       - { from: uncertain, to: failed, label: replay rejected }
-      # Observation (a read): the console learns the Runner's progress by polling.
+      # Observation (a read): the console learns the Runner's progress by polling. A short task
+      # can be observed as already finished on the first poll, so `queued` reaches `succeeded`
+      # without ever being seen `running`.
       - { from: queued, to: running, label: runner started }
+      - { from: queued, to: succeeded, label: runner succeeded }
       - { from: running, to: succeeded, label: runner succeeded }
       - { from: queued, to: failed, label: polling concluded failure }
       - { from: running, to: failed, label: polling concluded failure }

@@ -80,8 +80,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       {
         from: 'preparing',
         to: 'failed',
-        reason: 'PREPARATION_RETRY_EXHAUSTED',
-        label: 'retry exhausted'
+        label: 'failed'
       }
     ]
   },
@@ -169,6 +168,11 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         from: 'queued',
         to: 'running',
         label: 'runner started'
+      },
+      {
+        from: 'queued',
+        to: 'succeeded',
+        label: 'runner succeeded'
       },
       {
         from: 'running',

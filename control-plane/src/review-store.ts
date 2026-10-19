@@ -606,7 +606,12 @@ export class ReviewRunStore {
   ): Promise<void> {
     return await transaction(this.pool, async (client) => {
       const run = await this.getWith(client, runId)
-      if (run === null) throw new Error(`Review run does not exist: ${runId}`)
+      if (run === null)
+        // The run id came from the caller, so a missing run is a 4xx, not a server fault.
+        // Without `statusCode` the HTTP layer would report it as 500 and hide the real cause.
+        throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
+          statusCode: 404
+        })
       const result = await client.query(
         `
         UPDATE publications
@@ -809,6 +814,7 @@ export class ReviewRunStore {
    * expired, so a stalled recovery becomes claimable again. The lease is `claimed_at`; the
    * observation heartbeat writes `observed_at` only, so it can never extend this lease. */
   async listSubmissionRecoveries(): Promise<RunRowsProjection> {
+    this.ready()
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE r.connector_id=$1
@@ -927,6 +933,7 @@ export class ReviewRunStore {
   /** Active (queued/running) runs for this connector, as a projection: a row the contract
    * cannot represent is returned in `dropped` instead of aborting the read for every run. */
   async listActiveRuns(): Promise<RunRowsProjection> {
+    this.ready()
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE r.connector_id=$1

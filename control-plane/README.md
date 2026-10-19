@@ -57,7 +57,7 @@ flowchart LR
     prepending[pending] -->|claimed| preparing
     preparing -->|input accepted| submitted
     preparing -->|retry| prepending
-    preparing -->|retry exhausted| prepfailed[failed]
+    preparing -->|failed| prepfailed[failed]
   end
 
   subgraph runner[executions.status / execution.status]
@@ -65,6 +65,7 @@ flowchart LR
     pending -->|preparation failed| skipped
     pending -->|submission unconfirmed| uncertain
     queued --> running --> succeeded
+    queued --> succeeded
     queued --> failed
     running --> failed
     uncertain -->|replay accepted| queued
