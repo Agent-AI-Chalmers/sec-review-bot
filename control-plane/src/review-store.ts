@@ -906,6 +906,11 @@ export class ReviewRunStore {
       return true
     })
   }
+  /** Claim one known run for publication.
+   *
+   * Inlined here rather than forwarded to `PublicationStore`: the claim condition reads the
+   * execution axis (`executions.status='succeeded'` and a non-null workflow_result), so it is
+   * cross-axis orchestration, not a single-axis publication write. */
   async claimPublication(runId: string): Promise<string | null> {
     const token = crypto.randomUUID()
     const result = await this.pool.query<{ claim_token: string }>(
@@ -933,6 +938,9 @@ export class ReviewRunStore {
   }
   /**
    * Claim the next publishable run, optionally holding the request until one appears.
+   *
+   * Like `claimPublication`, this stays here because selecting publishable work joins the
+   * execution axis and the result is a full cross-axis record.
    *
    * The wait lives here because the state it looks for is in this database: a re-check
    * costs one indexed query per tick for the single caller that waits. Waiting on a

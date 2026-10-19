@@ -1,6 +1,12 @@
-// Owns publication lease transitions once a run is known. Run selection and
-// work projection remain with ReviewRunStore because they join review state.
-import crypto from 'node:crypto'
+// Owns the single-axis publication writes: lease renewal, completion, failure, and per-step
+// progress. These only touch `publications` / `publication_steps`, so `ReviewRunStore` forwards
+// to them unchanged.
+//
+// Claiming is deliberately NOT here. Selecting publishable work requires the execution axis
+// (`executions.status='succeeded'` and a non-null workflow_result) and returns a full
+// cross-axis record, so it lives in `ReviewRunStore` as cross-axis orchestration rather than as
+// a single-axis write. Do not reintroduce a publication-only claim here: a version that
+// duplicated the SQL without a caller is what this comment replaces.
 import { Pool, type PoolClient } from 'pg'
 
 import {
@@ -36,34 +42,6 @@ export class PublicationStore {
     private readonly connectorId: string,
     private readonly claimTimeoutMs: number
   ) {}
-
-  async claim(runId: string): Promise<string | null> {
-    const token = crypto.randomUUID()
-    return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `UPDATE publications p SET status='publishing', claim_token=$3,
-           claimed_at=clock_timestamp(), failure_code=NULL, failure_message=NULL,
-           updated_at=clock_timestamp()
-         FROM executions e
-         WHERE p.run_id=$1 AND p.connector_id=$2
-           AND e.run_id=p.run_id AND e.connector_id=$2 AND e.status='succeeded'
-           AND jsonb_typeof(e.workflow_result) <> 'null'
-           AND (p.status='pending' OR (p.status='publishing' AND
-             p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond')))
-         RETURNING p.run_id`,
-        [runId, this.connectorId, token, this.claimTimeoutMs]
-      )
-      if (result.rowCount !== 1) return null
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: 'pending',
-        toStatus: 'publishing'
-      })
-      return token
-    })
-  }
 
   heartbeatIntervalMs(): number {
     return Math.max(100, Math.min(30_000, Math.floor(this.claimTimeoutMs / 3)))
