@@ -842,6 +842,12 @@ export class ReviewRunStore {
     token: string
   ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
+      // An uncertain submission keeps publication pending, so a successful replay moves only the
+      // execution axis and needs no publication change. The EXISTS clause asserts that premise
+      // instead of assuming it: if some other path already concluded the publication (skipped or
+      // failed), queueing the execution would leave a run that is running while its result can no
+      // longer be delivered. Matching nothing returns false, which the caller reports as a lost
+      // claim instead of committing that inconsistent snapshot.
       const result = await client.query(
         `
         UPDATE executions
@@ -851,13 +857,15 @@ export class ReviewRunStore {
             observed_at=clock_timestamp(), updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2
           AND status='uncertain' AND claim_token=$3
+          AND EXISTS (
+            SELECT 1 FROM publications p
+            WHERE p.run_id=executions.run_id AND p.connector_id=executions.connector_id
+              AND p.status='pending'
+          )
       `,
         [runId, this.connectorId, token]
       )
       if (result.rowCount !== 1) return false
-      // Publication stayed `pending` throughout `uncertain` (an accepted submission could still
-      // succeed), so an accepted replay needs no publication change: the run is simply queued
-      // and its eventual result remains publishable.
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,

@@ -2117,3 +2117,52 @@ test('a failed publication reports its own reason, never another axis', async ()
     await second.close()
   }
 })
+
+test('an accepted replay refuses to queue an execution whose publication already ended', async () => {
+  // `completeSubmissionRecovery` moves only the execution axis because an uncertain submission
+  // keeps publication `pending`. That used to be an assumption, not a checked precondition: if a
+  // publication were concluded by any path before the replay resolved, queueing the execution
+  // would produce a run that is running while its result can never be delivered. The write path
+  // now asserts the premise and reports a lost claim instead of committing that snapshot.
+  const store = await createStore()
+  const runId = `run-${randomUUID()}`
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const admitted = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    assert.ok(admitted.preparation_token)
+    await store.failPreparation(
+      runId,
+      admitted.preparation_token,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
+      { retry: false }
+    )
+    // Force the inconsistent state a stable write path cannot reach: publication is concluded
+    // while the execution is still `uncertain`.
+    await pool.query(
+      `UPDATE publications SET status='skipped', finished_at=clock_timestamp()
+       WHERE run_id=$1`,
+      [runId]
+    )
+
+    const token = await store.claimSubmissionRecovery(runId)
+    assert.ok(token)
+    assert.strictEqual(
+      await store.completeSubmissionRecovery(runId, token),
+      false,
+      'an accepted replay must not queue an execution whose publication is gone'
+    )
+    const record = await store.getRun(runId)
+    assert.strictEqual(
+      record?.execution.status,
+      'uncertain',
+      'a refused replay must leave the execution axis untouched'
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
