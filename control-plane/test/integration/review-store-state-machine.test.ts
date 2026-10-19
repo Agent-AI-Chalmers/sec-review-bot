@@ -2166,3 +2166,61 @@ test('an accepted replay refuses to queue an execution whose publication already
     await store.close()
   }
 })
+
+test('markQueued refuses to submit into a publication that already ended', async () => {
+  // `markQueued` is the normal submission entry point, so it must hold the same invariant the
+  // replay path asserts: an execution may only be queued while publication is still `pending`.
+  // It used to check the workflow but not the publication status, so an out-of-band conclusion
+  // (forced repair, or a future write path) let it record `execution=queued` next to a terminal
+  // publication — a run that is running while its result can never be delivered.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    // Positive control: the untouched publication is `pending`, so the submit succeeds.
+    const admitted = `run-${randomUUID()}`
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: admitted,
+      publish_context: {}
+    })
+    assert.ok(admission.preparation_token)
+    await store.markQueued(admitted, admission.preparation_token, {})
+    assert.strictEqual(
+      (await store.getRun(admitted))?.execution.status,
+      'queued'
+    )
+
+    // Negative: once publication is concluded, the same submit must fail and roll back whole.
+    const refused = `run-${randomUUID()}`
+    const refusedAdmission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: refused,
+      publish_context: {}
+    })
+    assert.ok(refusedAdmission.preparation_token)
+    await pool.query(
+      `UPDATE publications SET status='skipped', finished_at=clock_timestamp()
+       WHERE run_id=$1`,
+      [refused]
+    )
+    await assert.rejects(
+      store.markQueued(refused, refusedAdmission.preparation_token, {}),
+      /cannot transition from pending to queued/,
+      'a concluded publication must reject the submission'
+    )
+    const record = await store.getRun(refused)
+    assert.strictEqual(
+      record?.execution.status,
+      'pending',
+      'the refused submission must leave the execution unqueued'
+    )
+    assert.strictEqual(
+      record?.preparation.status,
+      'preparing',
+      'the refused submission must leave the preparation claim intact'
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})

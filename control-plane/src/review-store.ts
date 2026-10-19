@@ -612,11 +612,17 @@ export class ReviewRunStore {
         throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
           statusCode: 404
         })
+      // Submitting the prepared input asserts the same premise a replay does: the publication is
+      // still pending, because the run may now succeed and its result must remain deliverable.
+      // Without the status check this row would accept the new input even after another path had
+      // concluded the publication, and the execution below would then queue a run whose result
+      // can never be published. Matching no row fails the whole transaction.
       const result = await client.query(
         `
         UPDATE publications
         SET input=$2::jsonb, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$3
+          AND status='pending'
           AND EXISTS (
             SELECT 1 FROM review_runs r
             WHERE r.run_id=publications.run_id AND r.connector_id=$3 AND r.workflow=$4
