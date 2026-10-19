@@ -655,3 +655,56 @@ test('a submission for an unknown run is a 404, not a server fault', async () =>
     await store.close()
   }
 })
+
+test('an execution may hold a recovery claim only while uncertain', async () => {
+  // `preparations` ties its claim token to `preparing`; `executions` ties it to `uncertain` the
+  // same way. The claim is what fences a replayed submission, so leaving one on a `queued` or
+  // terminal row would be a stale lease no read path expects. Every write path already clears the
+  // token, so the database enforces the shape rather than trusting each path to remember.
+  const store = new ReviewRunStore({
+    connectionString: databaseUrl(),
+    connectorId: `control-plane-test:${randomUUID()}`
+  })
+  await store.initialize()
+  const pool = new Pool({ connectionString: databaseUrl() })
+  try {
+    const runId = `run-${randomUUID()}`
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    // A token on `pending` is rejected.
+    await assert.rejects(
+      pool.query(
+        `UPDATE executions SET claim_token=$2, claimed_at=clock_timestamp()
+         WHERE run_id=$1`,
+        [runId, randomUUID()]
+      ),
+      /violates check constraint/,
+      'a pending execution must not carry a recovery claim'
+    )
+    // A token on `uncertain` is accepted: that is the state a recovery claims.
+    await pool.query(
+      `UPDATE executions SET status='uncertain' WHERE run_id=$1`,
+      [runId]
+    )
+    await pool.query(
+      `UPDATE executions SET claim_token=$2, claimed_at=clock_timestamp()
+       WHERE run_id=$1`,
+      [runId, randomUUID()]
+    )
+    // Moving out of `uncertain` without clearing the token is rejected.
+    await assert.rejects(
+      pool.query(
+        `UPDATE executions SET status='queued', started_at=clock_timestamp() WHERE run_id=$1`,
+        [runId]
+      ),
+      /violates check constraint/,
+      'leaving uncertain must clear the recovery claim'
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})

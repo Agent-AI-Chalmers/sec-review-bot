@@ -53,9 +53,19 @@ CREATE TABLE executions (
   observed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  -- A recovery claim exists only while the submission result is unknown: `claimSubmissionRecovery`
+  -- takes it on `uncertain`, and every path that leaves `uncertain` clears it. Pinning that to the
+  -- status mirrors `preparations`, which ties its token to `preparing`. The implication is one-way
+  -- on purpose: an `uncertain` row has no claim until a recovery takes one, but no other state may
+  -- hold a token at all. Without this, a `queued` or `succeeded` row could keep a token no read
+  -- path expects, and it would only surface later as a stale recovery lease.
   CHECK (
     (claim_token IS NULL AND claimed_at IS NULL)
-    OR (claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (
+      status = 'uncertain'
+      AND claim_token IS NOT NULL
+      AND claimed_at IS NOT NULL
+    )
   ),
   -- The start/end pair is the phase's own timing, so its presence is pinned to the status
   -- rather than left to each UPDATE. `pending` and `uncertain` have neither: the input has not

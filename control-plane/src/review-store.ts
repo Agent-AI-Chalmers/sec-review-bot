@@ -1014,8 +1014,8 @@ export class ReviewRunStore {
           FOR UPDATE
         )
         UPDATE executions e
-        SET status='failed', failure_code=$3,
-            failure_message=$4, artifact_storage=$5::jsonb,
+        SET status='failed', claim_token=NULL, claimed_at=NULL,
+            failure_code=$3, failure_message=$4, artifact_storage=$5::jsonb,
             finished_at=clock_timestamp(),
             observed_at=clock_timestamp(), updated_at=clock_timestamp()
         FROM previous
