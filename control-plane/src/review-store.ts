@@ -9,6 +9,10 @@
 //   and cross-axis transitions (submit -> queued, execution failure -> publication skipped,
 //   rejected replay -> publication skipped). A cross-axis transition is owned by the axis that
 //   initiates it; preparations initiating an execution skip is therefore in that store.
+// - `publication-abandon.ts` holds the one transition shared by more than one axis: concluding a
+//   publication that can never publish. It is separate because both preparation and execution
+//   trigger it, and single-axis stores must not import each other (this store is what constructs
+//   them). It is still a cross-axis write, kept atomic by taking the caller's transaction.
 //
 // Publication has no reversion into it: an uncertain submission leaves publication `pending`
 // rather than skipping it, so neither an accepted nor a rejected replay has a publication
@@ -43,6 +47,7 @@ import {
   type PreparationWork
 } from './preparation-store.js'
 import { PublicationStore } from './publication-store.js'
+import { abandonInFlightPublication } from './publication-abandon.js'
 import { appendEvent, listEvents } from './review-run-events.js'
 import { ExecutionStore } from './execution-store.js'
 
@@ -165,6 +170,15 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     // which is exactly what the contract says null does *not* mean.
     throw new Error(`run ${row.run_id} has no preparations row`)
   }
+  // The guard above proves the row exists, but TypeScript only knows the summary columns are
+  // nullable because the query LEFT JOINs them. Narrowing with real checks (rather than `as`)
+  // means the type stays honest if a future column is added to the summary without a matching
+  // NOT NULL in the schema.
+  const preparationStatus = row.preparation_status
+  const preparationAttemptCount = row.preparation_attempt_count
+  if (preparationStatus === null || preparationAttemptCount === null) {
+    throw new Error(`run ${row.run_id} has an incomplete preparations row`)
+  }
   const publicationFailure = row.publication_status === 'failed'
   return {
     run_id: row.run_id,
@@ -174,10 +188,8 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     // The guard above proves the row exists; every column is NOT NULL except the failure
     // fields, so the summary is always present.
     preparation: {
-      status: row.preparation_status as NonNullable<
-        ReviewRunRow['preparation_status']
-      >,
-      attempt_count: row.preparation_attempt_count as number,
+      status: preparationStatus,
+      attempt_count: preparationAttemptCount,
       started_at:
         row.preparation_started_at === null
           ? null
@@ -923,26 +935,12 @@ export class ReviewRunStore {
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
       if (result.rowCount !== 1) return false
-      // Converge `publishing` as well as `pending`, for the same reason as
-      // `failRunnerExecution`: a publication left in flight would otherwise never reach a
-      // terminal state once its execution is conclusively failed. Clearing the claim token
-      // fences the old publisher out.
-      const skipped = await client.query<{ from_status: PublicationStatus }>(
-        `
-        WITH previous AS (
-          SELECT run_id, status FROM publications
-          WHERE run_id=$1 AND connector_id=$2 AND status IN ('pending','publishing')
-          FOR UPDATE
-        )
-        UPDATE publications p
-        SET status='skipped', claim_token=NULL, claimed_at=NULL,
-            finished_at=clock_timestamp(),
-            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-        FROM previous
-        WHERE p.run_id=previous.run_id
-        RETURNING previous.status AS from_status
-      `,
-        [runId, this.connectorId]
+      // A rejected replay proves there is nothing to publish: converge a publication that is
+      // still pending or in flight, in this same transaction.
+      const fromStatus = await abandonInFlightPublication(
+        client,
+        this.connectorId,
+        runId
       )
       await appendEvent(client, {
         runId,
@@ -952,13 +950,12 @@ export class ReviewRunStore {
         toStatus: 'failed',
         reasonCode: error.code ?? null
       })
-      const abandoned = skipped.rows[0]
-      if (abandoned !== undefined) {
+      if (fromStatus !== null) {
         await appendEvent(client, {
           runId,
           connectorId: this.connectorId,
           axis: 'publication',
-          fromStatus: abandoned.from_status,
+          fromStatus,
           toStatus: 'skipped',
           // The publication was abandoned because execution was conclusively rejected, not for
           // the rejection's own reason: that code belongs to the runner event above. Keeping it
@@ -1041,31 +1038,12 @@ export class ReviewRunStore {
         ]
       )
       if (run.rowCount !== 1) return false
-      // A terminal Runner failure has no result to publish. Keep the publication
-      // row only as the durable declaration that publication is not applicable.
-      //
-      // `publishing` is converged too, not just `pending`. The normal path cannot reach that
-      // state (publication is only claimed after execution succeeded), but if an execution is
-      // ever concluded failed while a publication is in flight — a replay, a forced repair, a
-      // future write path — leaving it `publishing` would strand the row forever: complete and
-      // fail both require the claim token, and the phase has no writer left. Abandoning the
-      // claim is safe because the claim token fence means the old publisher's writes now fail.
-      const skipped = await client.query<{ from_status: PublicationStatus }>(
-        `
-        WITH previous AS (
-          SELECT run_id, status FROM publications
-          WHERE run_id=$1 AND connector_id=$2 AND status IN ('pending','publishing')
-          FOR UPDATE
-        )
-        UPDATE publications p
-        SET status='skipped', claim_token=NULL, claimed_at=NULL,
-            finished_at=clock_timestamp(),
-            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-        FROM previous
-        WHERE p.run_id=previous.run_id
-        RETURNING previous.status AS from_status
-      `,
-        [runId, this.connectorId]
+      // A terminal Runner failure has no result to publish. Keep the publication row only as the
+      // durable declaration that publication is not applicable, converging an in-flight one too.
+      const fromStatus = await abandonInFlightPublication(
+        client,
+        this.connectorId,
+        runId
       )
       await appendEvent(client, {
         runId,
@@ -1075,15 +1053,14 @@ export class ReviewRunStore {
         toStatus: 'failed',
         reasonCode: error.code ?? null
       })
-      // The publication axis moved too; record it so the audit trail matches the snapshot.
-      // RETURNING keeps the event honest when the publication was already non-pending.
-      const abandoned = skipped.rows[0]
-      if (abandoned !== undefined) {
+      // The publication axis moved too; record it so the audit trail matches the snapshot. The
+      // returned status keeps the event honest when the publication was already concluded.
+      if (fromStatus !== null) {
         await appendEvent(client, {
           runId,
           connectorId: this.connectorId,
           axis: 'publication',
-          fromStatus: abandoned.from_status,
+          fromStatus,
           toStatus: 'skipped',
           reasonCode: 'PUBLICATION_ABANDONED'
         })
