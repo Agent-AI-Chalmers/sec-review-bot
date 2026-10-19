@@ -36,7 +36,10 @@ import {
 import { recoverReviewRunSubmission } from './submission-recovery.js'
 import { submitPreparedRun } from './prepared-submission.js'
 import { observePublicationStep, observeRun } from './observability.js'
-import { DeterministicControlPlaneError } from './errors.js'
+import {
+  DeterministicControlPlaneError,
+  SUBMISSION_STATE_UNCERTAIN
+} from './errors.js'
 import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from './error-codes-generated.js'
 import type { PathParams, RequestBody } from './route-types.js'
 
@@ -739,7 +742,7 @@ export async function startControlPlaneServer(): Promise<{
               uncertain: error instanceof RunnerSubmissionUncertainError,
               code:
                 error instanceof RunnerSubmissionUncertainError
-                  ? 'SUBMISSION_STATE_UNCERTAIN'
+                  ? SUBMISSION_STATE_UNCERTAIN
                   : error instanceof Error &&
                       'code' in error &&
                       typeof error.code === 'string'

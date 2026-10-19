@@ -3,6 +3,7 @@
 import type { ControlPlaneWorkflow } from './contracts.js'
 import type { ReviewRunStore } from './review-store.js'
 import { RunnerSubmissionUncertainError } from './runner-client.js'
+import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 
 type Store = Pick<
   ReviewRunStore,
@@ -66,7 +67,7 @@ export async function submitPreparedRun(
       await store.failPreparation(args.runId, args.preparationToken, {
         code:
           runnerAccepted || error instanceof RunnerSubmissionUncertainError
-            ? 'SUBMISSION_STATE_UNCERTAIN'
+            ? SUBMISSION_STATE_UNCERTAIN
             : error instanceof Error &&
                 'code' in error &&
                 typeof error.code === 'string'

@@ -5,6 +5,7 @@ import type {
   RunnerArtifactStorage
 } from './contracts.js'
 import type { components } from './runner-api-schema.js'
+import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -106,7 +107,7 @@ export function isTerminalRunnerPollingError(error: unknown): boolean {
 }
 
 export class RunnerSubmissionUncertainError extends Error {
-  readonly code = 'SUBMISSION_STATE_UNCERTAIN'
+  readonly code = SUBMISSION_STATE_UNCERTAIN
 
   constructor(message: string, options?: ErrorOptions) {
     super(message, options)

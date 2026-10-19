@@ -14,6 +14,20 @@
  */
 import type { PublicationStepErrorCode } from './error-codes-generated.js'
 
+/**
+ * The failure code that means "the Runner may have accepted this submission, but we could not
+ * confirm it yet".
+ *
+ * It is the one code with a meaning beyond its text: every terminal preparation failure is
+ * reported as execution `skipped` (the Runner was never called), except this one, which becomes
+ * execution `uncertain` and keeps publication `pending` because the run may still succeed. The
+ * code is stamped by the submission paths in this package
+ * (`prepared-submission.ts`, `server.ts`) and read back by `preparation-store.ts`, so it lives
+ * here rather than as a literal in each of them: a changed spelling in one place must not
+ * silently downgrade "may have been accepted" into "never ran".
+ */
+export const SUBMISSION_STATE_UNCERTAIN = 'SUBMISSION_STATE_UNCERTAIN'
+
 export const PUBLICATION_STEP_ERROR_CODES = {
   set_duplicate: 'PUBLICATION_STEP_SET_DUPLICATE',
   set_changed: 'PUBLICATION_STEP_SET_CHANGED',
