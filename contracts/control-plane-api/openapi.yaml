@@ -739,6 +739,9 @@ x-state-machines:
       - { from: pending, to: queued, label: input submitted}
       - { from: pending, to: skipped, label: preparation failed}
       - { from: pending, to: uncertain, reason: SUBMISSION_STATE_UNCERTAIN, label: submission unconfirmed }
+      # Taking the recovery claim is not a state change, but it is audited as a self-event so the
+      # timeline shows when a replay started. The edge is declared because the log writes it.
+      - { from: uncertain, to: uncertain, reason: SUBMISSION_RECOVERY_CLAIMED, label: replay claimed }
       - { from: uncertain, to: queued, label: replay accepted}
       - { from: uncertain, to: failed, label: replay rejected }
       # Observation (a read): the console learns the Runner's progress by polling. A short task
@@ -774,6 +777,9 @@ x-state-machines:
     transitions:
       - { from: pending, to: publishing, label: publishing started }
       - { from: publishing, to: published, label: published }
+      # Re-claiming an expired lease is audited as a self-event; there is no state change, but the
+      # log records that the previous owner's claim lapsed and a new one took over.
+      - { from: publishing, to: publishing, reason: PUBLICATION_LEASE_EXPIRED, label: publishing lease expired }
       - { from: publishing, to: pending, label: retryable failure }
       - { from: publishing, to: failed, label: terminal failure}
       - { from: pending, to: skipped, label: execution not published}

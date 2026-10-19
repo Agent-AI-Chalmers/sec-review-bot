@@ -156,6 +156,12 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       },
       {
         from: 'uncertain',
+        to: 'uncertain',
+        reason: 'SUBMISSION_RECOVERY_CLAIMED',
+        label: 'replay claimed'
+      },
+      {
+        from: 'uncertain',
         to: 'queued',
         label: 'replay accepted'
       },
@@ -235,6 +241,12 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         from: 'publishing',
         to: 'published',
         label: 'published'
+      },
+      {
+        from: 'publishing',
+        to: 'publishing',
+        reason: 'PUBLICATION_LEASE_EXPIRED',
+        label: 'publishing lease expired'
       },
       {
         from: 'publishing',

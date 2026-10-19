@@ -938,7 +938,10 @@ export class ReviewRunStore {
           axis: 'publication',
           fromStatus: abandoned.from_status,
           toStatus: 'skipped',
-          reasonCode: error.code ?? 'PUBLICATION_ABANDONED'
+          // The publication was abandoned because execution was conclusively rejected, not for
+          // the rejection's own reason: that code belongs to the runner event above. Keeping it
+          // constant is what lets the contract declare this edge's reason exactly.
+          reasonCode: 'PUBLICATION_ABANDONED'
         })
       }
       return true
