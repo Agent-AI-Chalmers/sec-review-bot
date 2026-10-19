@@ -6,6 +6,7 @@ import { Pool, type PoolClient } from 'pg'
 import type { ControlPlaneWorkflow as WorkflowName } from './contracts.js'
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 import { appendEvent } from './review-run-events.js'
+import type { PublicationStatus } from './shapes.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -365,14 +366,24 @@ export class PreparationStore {
       // Publication is only "not applicable" once execution is conclusively skipped. An
       // uncertain submission may still be accepted, so its publication stays `pending`: ruling
       // it out early would require a later skipped -> pending reversion just to undo this.
+      // `publishing` is converged as well as `pending`, so a publication that was already in
+      // flight cannot be stranded when its execution is conclusively skipped. Clearing the
+      // claim token fences the old publisher out.
       const skippedPublication = submissionUncertain
         ? undefined
-        : await client.query(
-            `UPDATE publications SET status='skipped', claim_token=NULL,
-               failure_code=NULL, failure_message=NULL,
-               finished_at=clock_timestamp(), updated_at=clock_timestamp()
-             WHERE run_id=$1 AND connector_id=$2 AND status='pending'
-             RETURNING run_id`,
+        : await client.query<{ from_status: PublicationStatus }>(
+            `WITH previous AS (
+               SELECT run_id, status FROM publications
+               WHERE run_id=$1 AND connector_id=$2 AND status IN ('pending','publishing')
+               FOR UPDATE
+             )
+             UPDATE publications p
+             SET status='skipped', claim_token=NULL, claimed_at=NULL,
+                 failure_code=NULL, failure_message=NULL,
+                 finished_at=clock_timestamp(), updated_at=clock_timestamp()
+             FROM previous
+             WHERE p.run_id=previous.run_id
+             RETURNING previous.status AS from_status`,
             [runId, this.connectorId]
           )
       await client.query(
@@ -396,13 +407,15 @@ export class PreparationStore {
         toStatus: submissionUncertain ? 'uncertain' : 'skipped',
         reasonCode: submissionUncertain ? SUBMISSION_STATE_UNCERTAIN : null
       })
-      if (skippedPublication?.rowCount === 1) {
+      const abandonedPublication = skippedPublication?.rows[0]
+      if (abandonedPublication !== undefined) {
         await appendEvent(client, {
           runId,
           connectorId: this.connectorId,
           axis: 'publication',
-          fromStatus: 'pending',
-          toStatus: 'skipped'
+          fromStatus: abandonedPublication.from_status,
+          toStatus: 'skipped',
+          reasonCode: 'PUBLICATION_ABANDONED'
         })
       }
       await appendEvent(client, {

@@ -1856,3 +1856,138 @@ test('a preparation retry does not move the phase start', async () => {
     await store.close()
   }
 })
+
+test('a terminal execution failure converges an in-flight publication', async () => {
+  // Publication is only claimed after execution succeeded, so this combination needs a forced
+  // repair (or a future write path) to occur. If it did, leaving publication `publishing` would
+  // strand the row forever: complete and fail both require the claim token, and the axis has no
+  // writer left. The execution-failure path must converge it to `skipped` and fence the claim.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.notStrictEqual(token, null)
+
+    // Force execution back to a non-terminal-but-failable state, then fail it.
+    const pool = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      await pool.query(
+        `UPDATE executions SET status='running', finished_at=NULL WHERE run_id=$1`,
+        [runId]
+      )
+    } finally {
+      await pool.end()
+    }
+    assert.strictEqual(
+      await store.failRunnerExecution(runId, {
+        code: 'RUNNER_LOST',
+        message: 'expected output'
+      }),
+      true
+    )
+
+    const record = await store.getRun(runId)
+    assert.strictEqual(record?.execution.status, 'failed')
+    assert.strictEqual(
+      record?.publication.status,
+      'skipped',
+      'a publication in flight must not be stranded when execution fails'
+    )
+    assert.strictEqual(record?.publication.finished_at !== null, true)
+
+    const events = await store.listEvents(runId)
+    const abandoned = events.find(
+      (event) =>
+        event.axis === 'publication' &&
+        event.from_status === 'publishing' &&
+        event.to_status === 'skipped'
+    )
+    assert.ok(abandoned, 'the abandonment must be audited')
+    assert.strictEqual(abandoned.reason_code, 'PUBLICATION_ABANDONED')
+  } finally {
+    await store.close()
+  }
+})
+
+test('a rejected submission replay converges an in-flight publication', async () => {
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.notStrictEqual(token, null)
+
+    const pool = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      await pool.query(
+        // `uncertain` has neither bound: the submission may never have been accepted. No claim
+        // is needed either; a missing claim is exactly the recoverable state.
+        `UPDATE executions
+           SET status='uncertain', started_at=NULL, finished_at=NULL,
+               workflow_result=NULL, claim_token=NULL, claimed_at=NULL
+         WHERE run_id=$1`,
+        [runId]
+      )
+    } finally {
+      await pool.end()
+    }
+    const claimToken = await store.claimSubmissionRecovery(runId)
+    assert.notStrictEqual(claimToken, null)
+    assert.strictEqual(
+      await store.failSubmissionRecovery(runId, claimToken as string, {
+        code: 'SUBMISSION_REJECTED',
+        message: 'replay rejected'
+      }),
+      true
+    )
+
+    const record = await store.getRun(runId)
+    assert.strictEqual(record?.execution.status, 'failed')
+    assert.strictEqual(record?.publication.status, 'skipped')
+  } finally {
+    await store.close()
+  }
+})
+
+test('a failed publication reports its own reason, never another axis', async () => {
+  // `publication: failed` is the terminal outcome. Its run-level failure code must come from
+  // the publication row: borrowing an execution or preparation code would name a cause that
+  // did not stop the run, and a publication with no code must read as "no code", not as
+  // somebody else's failure.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.notStrictEqual(token, null)
+    assert.strictEqual(
+      await store.failPublication(
+        runId,
+        token as string,
+        { code: null, message: 'no code' },
+        { retry: false }
+      ),
+      true
+    )
+    const noCode = await store.getRun(runId)
+    assert.strictEqual(noCode?.publication.status, 'failed')
+    assert.strictEqual(noCode?.failure_code, null)
+  } finally {
+    await store.close()
+  }
+
+  const second = await createStore()
+  const secondRunId = await createSuccessfulRun(second)
+  try {
+    const token = await second.claimPublication(secondRunId)
+    assert.notStrictEqual(token, null)
+    await second.failPublication(
+      secondRunId,
+      token as string,
+      { code: 'GITHUB_FORBIDDEN', message: 'forbidden' },
+      { retry: false }
+    )
+    const record = await second.getRun(secondRunId)
+    assert.strictEqual(record?.failure_code, 'GITHUB_FORBIDDEN')
+  } finally {
+    await second.close()
+  }
+})

@@ -217,9 +217,14 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
       updated_at: iso(row.publication_updated_at)
     },
     created_at: iso(row.created_at),
-    // The run-level failure code names whichever axis actually failed: publication, then
-    // execution, then preparation. A skipped execution therefore still reports the
-    // preparation failure that caused it, without pretending execution itself failed.
+    // The run-level failure code names the axis that actually stopped the run, in the order
+    // the phases run:
+    // - a `failed` publication is the terminal failure: report its own code, even when that code
+    //   is null. Falling back to the execution/preparation code here would attribute another
+    //   axis' reason to the publication that genuinely failed.
+    // - otherwise execution is next, then preparation. A skipped execution still reports the
+    //   preparation failure that caused it, and a publication skipped because execution failed
+    //   reports that execution reason, because publication itself never failed.
     failure_code: publicationFailure
       ? row.publication_failure_code
       : (row.runner_failure_code ?? row.preparation_failure_code),
@@ -876,14 +881,24 @@ export class ReviewRunStore {
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
       if (result.rowCount !== 1) return false
-      const skipped = await client.query(
+      // Converge `publishing` as well as `pending`, for the same reason as
+      // `failRunnerExecution`: a publication left in flight would otherwise never reach a
+      // terminal state once its execution is conclusively failed. Clearing the claim token
+      // fences the old publisher out.
+      const skipped = await client.query<{ from_status: PublicationStatus }>(
         `
-        UPDATE publications
-        SET status='skipped', claim_token=NULL,
+        WITH previous AS (
+          SELECT run_id, status FROM publications
+          WHERE run_id=$1 AND connector_id=$2 AND status IN ('pending','publishing')
+          FOR UPDATE
+        )
+        UPDATE publications p
+        SET status='skipped', claim_token=NULL, claimed_at=NULL,
             finished_at=clock_timestamp(),
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2 AND status='pending'
-        RETURNING run_id
+        FROM previous
+        WHERE p.run_id=previous.run_id
+        RETURNING previous.status AS from_status
       `,
         [runId, this.connectorId]
       )
@@ -895,14 +910,15 @@ export class ReviewRunStore {
         toStatus: 'failed',
         reasonCode: error.code ?? null
       })
-      if (skipped.rowCount === 1) {
+      const abandoned = skipped.rows[0]
+      if (abandoned !== undefined) {
         await appendEvent(client, {
           runId,
           connectorId: this.connectorId,
           axis: 'publication',
-          fromStatus: 'pending',
+          fromStatus: abandoned.from_status,
           toStatus: 'skipped',
-          reasonCode: error.code ?? null
+          reasonCode: error.code ?? 'PUBLICATION_ABANDONED'
         })
       }
       return true
@@ -981,14 +997,27 @@ export class ReviewRunStore {
       if (run.rowCount !== 1) return false
       // A terminal Runner failure has no result to publish. Keep the publication
       // row only as the durable declaration that publication is not applicable.
-      const skipped = await client.query(
+      //
+      // `publishing` is converged too, not just `pending`. The normal path cannot reach that
+      // state (publication is only claimed after execution succeeded), but if an execution is
+      // ever concluded failed while a publication is in flight — a replay, a forced repair, a
+      // future write path — leaving it `publishing` would strand the row forever: complete and
+      // fail both require the claim token, and the phase has no writer left. Abandoning the
+      // claim is safe because the claim token fence means the old publisher's writes now fail.
+      const skipped = await client.query<{ from_status: PublicationStatus }>(
         `
-        UPDATE publications
-        SET status='skipped', claim_token=NULL,
+        WITH previous AS (
+          SELECT run_id, status FROM publications
+          WHERE run_id=$1 AND connector_id=$2 AND status IN ('pending','publishing')
+          FOR UPDATE
+        )
+        UPDATE publications p
+        SET status='skipped', claim_token=NULL, claimed_at=NULL,
             finished_at=clock_timestamp(),
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2 AND status='pending'
-        RETURNING run_id
+        FROM previous
+        WHERE p.run_id=previous.run_id
+        RETURNING previous.status AS from_status
       `,
         [runId, this.connectorId]
       )
@@ -1002,13 +1031,15 @@ export class ReviewRunStore {
       })
       // The publication axis moved too; record it so the audit trail matches the snapshot.
       // RETURNING keeps the event honest when the publication was already non-pending.
-      if (skipped.rowCount === 1) {
+      const abandoned = skipped.rows[0]
+      if (abandoned !== undefined) {
         await appendEvent(client, {
           runId,
           connectorId: this.connectorId,
           axis: 'publication',
-          fromStatus: 'pending',
-          toStatus: 'skipped'
+          fromStatus: abandoned.from_status,
+          toStatus: 'skipped',
+          reasonCode: 'PUBLICATION_ABANDONED'
         })
       }
       return true

@@ -78,6 +78,7 @@ flowchart LR
     publishing -->|可重试失败| pubpending
     publishing -->|终态失败| pubfailed[failed]
     pubpending -->|执行结果不可发布| skipped
+    publishing -->|执行失败| skipped
   end
 
   subgraph steps[publication_steps.status]

@@ -76,6 +76,7 @@ flowchart LR
     publishing -->|retryable failure| pubpending
     publishing -->|terminal failure| pubfailed[failed]
     pubpending -->|execution not publishable| skipped
+    publishing -->|execution failed| skipped
   end
 
   subgraph steps[publication_steps.status]

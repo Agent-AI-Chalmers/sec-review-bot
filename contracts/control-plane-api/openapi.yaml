@@ -770,6 +770,11 @@ x-state-machines:
       - { from: publishing, to: pending, label: retryable failure }
       - { from: publishing, to: failed, label: terminal failure}
       - { from: pending, to: skipped, label: execution not published}
+      # A publication can already be in flight when the execution axis is later found
+      # unusable, so the execution-failure paths converge it from `publishing` as well as from
+      # `pending`. Without this edge that row would stay `publishing` with no writer able to
+      # move it.
+      - { from: publishing, to: skipped, reason: PUBLICATION_ABANDONED, label: execution failed}
   # The failure-notice outbox has its own lifecycle, written to the event log on the `notice`
   # axis. It is declared like any other state machine so the contract-consistency test covers its
   # states against `PreparationSummary.failure_notice_status`. Whether the console draws it is a

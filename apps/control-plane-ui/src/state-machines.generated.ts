@@ -246,6 +246,12 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         from: 'pending',
         to: 'skipped',
         label: 'execution not published'
+      },
+      {
+        from: 'publishing',
+        to: 'skipped',
+        reason: 'PUBLICATION_ABANDONED',
+        label: 'execution failed'
       }
     ]
   },
