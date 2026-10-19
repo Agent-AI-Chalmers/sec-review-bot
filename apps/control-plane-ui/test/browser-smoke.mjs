@@ -707,7 +707,10 @@ try {
     // only once the publication actually started: before then the field it would
     // read is the publication row's creation time at admission, which is how a
     // `pending` run used to render a publication timestamp earlier than Execution.
-    const TIMESTAMP = /\d{1,2}\/\d{1,2}\/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M/
+    // 24-hour on purpose: en-US and zh-CN disagreed by default (AM/PM versus 24-hour), so the
+    // same instant read differently depending on the console language. The console now pins
+    // `hour12: false` for both, and this assertion is what keeps that from regressing.
+    const TIMESTAMP = /\d{1,2}\/\d{1,2}\/\d{4}, \d{2}:\d{2}:\d{2}/
     const [created, preparation, runner, publication] = steps
     assert.match(
       created.body,

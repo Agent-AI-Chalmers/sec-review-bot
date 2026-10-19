@@ -26,8 +26,16 @@ export const FONT_STACK =
   '"PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", ' +
   'sans-serif'
 
+// Named Latin monospace faces come before any CJK one. `ui-monospace` alone resolves to whatever
+// the platform considers monospaced, and on a machine without a Latin monospace installed that is
+// a CJK mono face (Noto Sans Mono CJK here). Its Latin glyphs are heavy and tightly spaced, so
+// every run id rendered noticeably worse than the same id in a Latin mono. Listing the Latin faces
+// explicitly keeps ids looking the same everywhere; the CJK faces follow so a label mixing an id
+// with Chinese still finds a monospaced CJK glyph instead of falling back to a proportional one.
 export const MONO_STACK =
-  'ui-monospace, "JetBrains Mono", SFMono-Regular, "SF Mono", Menlo, monospace'
+  '"JetBrains Mono", "SFMono-Regular", "SF Mono", Menlo, Consolas, ' +
+  '"DejaVu Sans Mono", "Noto Sans Mono", "Liberation Mono", ui-monospace, ' +
+  '"Noto Sans Mono CJK SC", monospace'
 
 /** Amber accent, deliberately outside the blue-violet range that AI-generated UIs
  * default to, and far enough in hue from the green/red status colours that the two

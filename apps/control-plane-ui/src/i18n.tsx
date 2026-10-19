@@ -482,8 +482,22 @@ export function useMessages(): (key: Message) => string {
   return (key) => messages[language][key]
 }
 
+/** Render a timestamp for the console.
+ *
+ * `hour12: false` is explicit because the two languages disagree by default: en-US formats with
+ * AM/PM and zh-CN without, so the same instant read differently in each console language. An
+ * operator comparing a Chinese and an English screen (or a log line) must not have to convert
+ * between the two, and 24-hour time is the unambiguous form. The date/time component order still
+ * follows the language, which is a genuine locale difference rather than an inconsistency.
+ */
 export function formatDate(value: string, language: Language): string {
-  // Date formatting follows the selected UI language instead of the browser's
-  // ambient locale, so an English console cannot unexpectedly show Chinese dates.
-  return new Date(value).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
+  return new Date(value).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
 }

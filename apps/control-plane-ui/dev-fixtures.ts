@@ -1151,8 +1151,29 @@ export function devFixtures(): Plugin {
             response.end(JSON.stringify({ error: 'not_blocked' }))
             return
           }
-          abandoned.add(runId)
           const run = runs.find((item) => item.run_id === runId)
+          if (run === undefined) {
+            response.statusCode = 404
+            response.end(JSON.stringify({ error: 'not_found' }))
+            return
+          }
+          // The same transition the Control Plane performs: conclude the axes that were still
+          // open, keep the execution result, and record why. Clearing only the marker would show
+          // the operator a run that looks untouched after an irreversible decision.
+          const now = new Date().toISOString()
+          run.preparation.status = 'failed'
+          run.preparation.failure_code = 'PREPARATION_ABANDONED'
+          run.preparation.failure_notice_status = null
+          run.preparation.finished_at = now
+          run.preparation.expiry_blocked_reason = null
+          if (
+            run.publication.status === 'pending' ||
+            run.publication.status === 'publishing'
+          ) {
+            run.publication.status = 'skipped'
+            run.publication.finished_at = now
+          }
+          abandoned.add(runId)
           response.end(JSON.stringify({ run }))
           return
         }
