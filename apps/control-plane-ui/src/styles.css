@@ -96,6 +96,10 @@
     -apple-system,
     'Segoe UI',
     Roboto,
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Noto Sans CJK SC',
+    'Microsoft YaHei',
     sans-serif
   );
   color-scheme: light;

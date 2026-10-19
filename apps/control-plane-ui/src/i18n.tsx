@@ -2,7 +2,7 @@ import React from 'react'
 
 export type Language = 'en' | 'zh'
 
-const messages = {
+export const messages = {
   en: {
     language: 'Language',
     theme: 'Theme',
@@ -76,9 +76,21 @@ const messages = {
     runProgress: 'Run progress',
     runHistory: 'History',
     runHistoryEmpty: 'No recorded transitions yet',
-    blockedPreparationsTitle: 'Runs needing an operator',
+    cancel: 'Cancel',
+    abandonRun: 'Abandon',
+    abandonTitle: 'Abandon this run',
+    abandonExplainer:
+      'This closes the run instead of trying again. Its recorded result is kept, and it cannot be undone.',
+    abandonReasonLabel: 'Why are you abandoning it?',
+    abandonReasonHint: 'Recorded with the decision so the next person knows.',
+    abandonTokenLabel: 'Admin token',
+    abandonTokenHint: 'Sent with this one request only. Nothing is stored.',
+    abandonConfirm: 'Abandon run',
+    abandonWrongToken: 'That admin token was rejected.',
+    abandonFailed: 'The run could not be abandoned.',
+    blockedPreparationsTitle: 'These runs are stuck',
     blockedPreparationsBody:
-      'Coordination stopped retrying these because their persisted state contradicts the conclusion it could draw. They stay here until someone decides what to do.',
+      'The system cannot finish them on its own, so it has stopped trying. Someone has to look at each one and decide what should happen.',
     axisExecution: 'Execution',
     axisPreparation: 'Preparation',
     axisPublication: 'Publication',
@@ -116,26 +128,26 @@ const messages = {
     state_preparation_failed_label: 'Failed',
     state_preparation_failed_desc:
       'Preparation failed for good (retries used up, or the input could not be built). The Runner never received the task, so execution is skipped.',
-    state_runner_pending_label: 'Pending',
-    state_runner_pending_desc:
+    state_execution_pending_label: 'Pending',
+    state_execution_pending_desc:
       'The run was created and is still being prepared; nothing has been sent to the Runner yet.',
-    state_runner_queued_label: 'Queued',
-    state_runner_queued_desc:
+    state_execution_queued_label: 'Queued',
+    state_execution_queued_desc:
       'The Runner accepted the task and will start it; it has not started executing yet.',
-    state_runner_running_label: 'Running',
-    state_runner_running_desc:
+    state_execution_running_label: 'Running',
+    state_execution_running_desc:
       'Polling observed that the Runner is executing this task. A transient network blip while polling does not change this state: the run keeps the last observed value and is polled again, so this state may be a little out of date.',
-    state_runner_uncertain_label: 'Uncertain',
-    state_runner_uncertain_desc:
+    state_execution_uncertain_label: 'Uncertain',
+    state_execution_uncertain_desc:
       'A submission may have reached the Runner but its result could not be confirmed. A recovery replays the same run_id to find out whether it ran.',
-    state_runner_succeeded_label: 'Succeeded',
-    state_runner_succeeded_desc:
+    state_execution_succeeded_label: 'Succeeded',
+    state_execution_succeeded_desc:
       'The Runner finished successfully; the result can now be published.',
-    state_runner_skipped_label: 'Skipped',
-    state_runner_skipped_desc:
+    state_execution_skipped_label: 'Skipped',
+    state_execution_skipped_desc:
       'Execution never ran because preparation failed. This is not an execution failure; the reason is in the preparation step.',
-    state_runner_failed_label: 'Failed',
-    state_runner_failed_desc:
+    state_execution_failed_label: 'Failed',
+    state_execution_failed_desc:
       'A definite failure, in one of two ways: 1. polling got a conclusive answer that the task cannot succeed — the Runner reported a failure, or the run could not be found, returned no result, or broke the protocol; 2. a retried submission failed conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not a definite failure.',
     state_publication_pending_label: 'Pending',
     state_publication_pending_desc:
@@ -153,7 +165,8 @@ const messages = {
     state_publication_skipped_desc:
       'Nothing was published because execution did not succeed.',
     machine_preparation_title: 'Preparation',
-    machine_runner_title: 'Execution',
+    machine_execution_title: 'Execution',
+    machine_notice_title: 'Failure notice',
     machine_publication_title: 'Publication',
     edge_preparation_pending_preparing:
       'a worker picked up the task and started preparing the input',
@@ -292,9 +305,21 @@ const messages = {
     runProgress: 'Run 进度',
     runHistory: '历史',
     runHistoryEmpty: '暂无记录的变更',
-    blockedPreparationsTitle: '需要人工处理的 run',
+    cancel: '取消',
+    abandonRun: '放弃',
+    abandonTitle: '放弃这个 run',
+    abandonExplainer:
+      '这会结束这个 run，而不是继续重试。已记录的执行结果会保留，操作不可撤销。',
+    abandonReasonLabel: '为什么放弃它？',
+    abandonReasonHint: '会随本次决定一起记录，方便后来的人了解原因。',
+    abandonTokenLabel: 'Admin token',
+    abandonTokenHint: '只随本次请求发送，不会被保存。',
+    abandonConfirm: '放弃',
+    abandonWrongToken: 'Admin token 被拒绝。',
+    abandonFailed: '放弃失败。',
+    blockedPreparationsTitle: '这些 run 卡住了',
     blockedPreparationsBody:
-      '这些 run 的持久化状态与协调能够得出的结论自相矛盾，因此协调已停止重试。在有人决定如何处理之前，它们会一直留在这里。',
+      '系统无法自行处理，已经不再重试。需要有人逐个查看并决定怎么处理。',
     axisExecution: '执行',
     axisPreparation: '准备',
     axisPublication: '发布',
@@ -330,24 +355,24 @@ const messages = {
     state_preparation_failed_label: '失败',
     state_preparation_failed_desc:
       '准备最终失败（重试次数用尽，或无法构造输入）。Runner 从未收到任务，因此执行被跳过。',
-    state_runner_pending_label: '等待中',
-    state_runner_pending_desc: '任务已创建，仍在准备中，尚未发送给 Runner。',
-    state_runner_queued_label: '排队中',
-    state_runner_queued_desc:
+    state_execution_pending_label: '等待中',
+    state_execution_pending_desc: '任务已创建，仍在准备中，尚未发送给 Runner。',
+    state_execution_queued_label: '排队中',
+    state_execution_queued_desc:
       'Runner 已接受这次提交，但轮询还没观察到它开始执行。',
-    state_runner_running_label: '执行中',
-    state_runner_running_desc:
+    state_execution_running_label: '执行中',
+    state_execution_running_desc:
       '轮询观察到 Runner 正在执行该任务。轮询时偶发的网络抖动不会改变这个状态：会保留上次观察到的值并继续轮询，因此这个状态可能略有滞后。',
-    state_runner_uncertain_label: '待确认',
-    state_runner_uncertain_desc:
+    state_execution_uncertain_label: '待确认',
+    state_execution_uncertain_desc:
       '任务已提交，但没有收到响应，因此无法确认 Runner 是否接受。这不是失败；系统会重放这次提交来确认。',
-    state_runner_succeeded_label: '执行成功',
-    state_runner_succeeded_desc: '轮询观察到执行成功，结果可以发布。',
-    state_runner_skipped_label: '已跳过',
-    state_runner_skipped_desc:
+    state_execution_succeeded_label: '执行成功',
+    state_execution_succeeded_desc: '轮询观察到执行成功，结果可以发布。',
+    state_execution_skipped_label: '已跳过',
+    state_execution_skipped_desc:
       '因为准备失败，执行从未运行。这不是执行失败，原因在准备阶段。',
-    state_runner_failed_label: '失败',
-    state_runner_failed_desc:
+    state_execution_failed_label: '失败',
+    state_execution_failed_desc:
       '确定性的失败，分两种情况：1. 轮询得到了“不可能成功”的确定结论：Runner 报告执行失败，或查不到该 run、没有返回结果、响应不符合约定；2. 重放提交得到确定性失败。而网络抖动（超时、5xx、连接中断）不算确定性失败。',
     state_publication_pending_label: '等待中',
     state_publication_pending_desc: '等待执行成功后开始发布。',
@@ -361,7 +386,8 @@ const messages = {
     state_publication_skipped_label: '已跳过',
     state_publication_skipped_desc: '因为执行未成功，没有可发布的内容。',
     machine_preparation_title: '准备',
-    machine_runner_title: '执行',
+    machine_execution_title: '执行',
+    machine_notice_title: '失败通知',
     machine_publication_title: '发布',
     edge_preparation_pending_preparing: '有执行者接手，开始准备输入',
     edge_preparation_preparing_submitted: '输入构造完成，已交给 Runner',

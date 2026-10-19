@@ -97,6 +97,14 @@ const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * with a 400 - but it widens the reachable surface to whatever path a future upstream read
  * endpoint might parse, so the allow-list states the exact shape it means.
  */
+/** `POST /api/admin/runs/<uuid>/abandon`, the only write the console may proxy.
+ *
+ * The admin credential is supplied by the operator for that one request and forwarded as-is; the
+ * BFF never reads or stores it. Keeping it out of the server means a compromised BFF cannot
+ * abandon runs, and the Control Plane decides who is allowed to.
+ */
+const ADMIN_ABANDON = /^\/api\/admin\/runs\/([^/?]+)\/abandon$/
+
 function isAllowedReadPath(bffUrl: string): boolean {
   const url = new URL(bffUrl, 'http://control-plane-ui.local')
   if (url.pathname === '/api/runs') return true
@@ -486,6 +494,64 @@ export function createControlPlaneUiServer({
           clearTimeout(downloadIdleTimeout)
           if (temporaryDirectory !== undefined)
             await rm(temporaryDirectory, { recursive: true, force: true })
+        }
+        return
+      }
+      const abandoned = ADMIN_ABANDON.exec(request.url ?? '')
+      if (request.method === 'POST' && abandoned !== null) {
+        // A session cookie alone must not authorise a cross-site POST: the same check the
+        // sign-out route uses.
+        if (!sameOrigin(request)) {
+          sendJson(response, 403, { error: 'cross_site_request' })
+          return
+        }
+        const adminToken = request.headers['x-control-plane-admin-token']
+        if (typeof adminToken !== 'string' || adminToken.trim() === '') {
+          // 401 rather than 400: the request is well-formed, it just carries no operator
+          // credential. The console turns this into its admin-token prompt.
+          sendJson(response, 401, { error: 'admin_token_required' })
+          return
+        }
+        const chunks: Buffer[] = []
+        let size = 0
+        for await (const chunk of request) {
+          const buffer = Buffer.from(chunk)
+          size += buffer.byteLength
+          if (size > MAX_SESSION_BODY_BYTES) {
+            sendJson(response, 413, { error: 'request_too_large' })
+            return
+          }
+          chunks.push(buffer)
+        }
+        try {
+          const upstream = await fetch(
+            `${controlPlaneUrl}/v1/admin/runs/${encodeURIComponent(
+              decodeURIComponent(abandoned[1] ?? '')
+            )}/abandon`,
+            {
+              method: 'POST',
+              headers: {
+                authorization: `Bearer ${adminToken}`,
+                'content-type': 'application/json'
+              },
+              body: Buffer.concat(chunks),
+              signal: AbortSignal.timeout(CONTROL_PLANE_REQUEST_TIMEOUT_MS)
+            }
+          )
+          response.writeHead(upstream.status, {
+            'content-type':
+              upstream.headers.get('content-type') ?? 'application/json'
+          })
+          response.end(Buffer.from(await upstream.arrayBuffer()))
+        } catch (error) {
+          const timedOut =
+            error instanceof Error &&
+            (error.name === 'AbortError' || error.name === 'TimeoutError')
+          sendJson(response, timedOut ? 504 : 502, {
+            error: timedOut
+              ? 'control_plane_timeout'
+              : 'control_plane_unavailable'
+          })
         }
         return
       }

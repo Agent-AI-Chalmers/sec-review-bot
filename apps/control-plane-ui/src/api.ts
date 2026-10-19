@@ -17,6 +17,32 @@ export type {
   RunEvent
 }
 
+/** Abandon a blocked run at an operator's explicit request.
+ *
+ * The admin token is supplied per call and only travels in this request header: the console keeps
+ * it in component state for the duration of the dialog, and the BFF forwards it without storing
+ * it. Nothing here can act on its own. */
+export async function abandonBlockedRun(
+  runId: string,
+  reason: string,
+  adminToken: string
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/runs/${encodeURIComponent(runId)}/abandon`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-control-plane-admin-token': adminToken
+      },
+      body: JSON.stringify({ reason })
+    }
+  )
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorCode(response))
+  }
+}
+
 /** The runs coordination has stopped retrying. Reading this needs only the read token: knowing
  * a run is stuck is not privileged, only deciding what to do about it is. */
 export async function blockedPreparations(): Promise<

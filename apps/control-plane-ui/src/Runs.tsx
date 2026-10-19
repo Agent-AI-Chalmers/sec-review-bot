@@ -3,8 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import {
   Alert,
   Box,
+  Button,
   Container,
   Group,
+  Modal,
   NativeSelect,
   Pagination,
   Paper,
@@ -12,6 +14,8 @@ import {
   Stack,
   Table,
   Text,
+  Textarea,
+  TextInput,
   Title,
   Tooltip
 } from '@mantine/core'
@@ -19,6 +23,7 @@ import { IconAlertTriangle, IconInbox } from '@tabler/icons-react'
 import {
   api,
   ApiError,
+  abandonBlockedRun,
   blockedPreparations,
   type BlockedPreparationExpiry,
   type Run
@@ -57,6 +62,110 @@ const DEFAULT_PAGE_SIZE = 50
  * run detail and back (see the cursorParents state below). */
 const CURSOR_PARENTS_KEY = 'runs:cursor-parents'
 
+/** The operator decision for one blocked run.
+ *
+ * The admin token is entered here, held only in this component's state, and sent with the single
+ * request. The console backend forwards it and keeps no copy, so closing the dialog (or the tab)
+ * leaves nothing behind that could act later. Asking again for every abandonment is deliberate:
+ * the action concludes a run and cannot be undone.
+ */
+function AbandonDialog({
+  runId,
+  onClose,
+  onDone
+}: {
+  runId: string | null
+  onClose: () => void
+  onDone: () => void | Promise<void>
+}): React.JSX.Element {
+  const t = useMessages()
+  const [reason, setReason] = React.useState('')
+  const [adminToken, setAdminToken] = React.useState('')
+  const [submitting, setSubmitting] = React.useState(false)
+  const [failure, setFailure] = React.useState<string | null>(null)
+
+  // Reset whenever the dialog opens for a different run, so a token typed for one decision is
+  // never silently reused for the next.
+  React.useEffect(() => {
+    if (runId === null) return
+    setReason('')
+    setAdminToken('')
+    setFailure(null)
+    setSubmitting(false)
+  }, [runId])
+
+  const submit = async (): Promise<void> => {
+    if (runId === null) return
+    setSubmitting(true)
+    setFailure(null)
+    try {
+      await abandonBlockedRun(runId, reason.trim(), adminToken.trim())
+      await onDone()
+    } catch (error) {
+      setFailure(
+        error instanceof ApiError && error.status === 401
+          ? t('abandonWrongToken')
+          : t('abandonFailed')
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal
+      opened={runId !== null}
+      onClose={onClose}
+      title={t('abandonTitle')}
+      centered
+    >
+      <Stack gap="sm">
+        <Text size="sm">{t('abandonExplainer')}</Text>
+        <Text size="xs" ff="monospace" c="dimmed">
+          {runId}
+        </Text>
+        <Textarea
+          label={t('abandonReasonLabel')}
+          description={t('abandonReasonHint')}
+          value={reason}
+          onChange={(event) => setReason(event.currentTarget.value)}
+          autosize
+          minRows={2}
+          required
+        />
+        <TextInput
+          label={t('abandonTokenLabel')}
+          description={t('abandonTokenHint')}
+          type="password"
+          value={adminToken}
+          onChange={(event) => setAdminToken(event.currentTarget.value)}
+          required
+        />
+        {failure !== null && (
+          <Text role="alert" c="red" size="sm">
+            {failure}
+          </Text>
+        )}
+        <Group justify="flex-end" gap="xs">
+          <Button variant="default" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button
+            color="red"
+            loading={submitting}
+            disabled={reason.trim() === '' || adminToken.trim() === ''}
+            onClick={() => {
+              void submit()
+            }}
+          >
+            {t('abandonConfirm')}
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
 export function Runs(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
@@ -94,6 +203,8 @@ export function Runs(): React.JSX.Element {
   // pagination, and an operator needs to see them before the list, so they load separately and
   // a failure here never hides the list itself.
   const [blocked, setBlocked] = React.useState<BlockedPreparationExpiry[]>([])
+  // Which run the operator is currently deciding about, if any.
+  const [abandoning, setAbandoning] = React.useState<string | null>(null)
   React.useEffect(() => {
     let cancelled = false
     blockedPreparations()
@@ -234,22 +345,43 @@ export function Runs(): React.JSX.Element {
           <Text size="sm" mb="xs">
             {t('blockedPreparationsBody')}
           </Text>
-          <Stack gap={4}>
+          <Stack gap={6}>
             {blocked.map((block) => (
-              <Text
-                key={block.run_id}
-                size="sm"
-                ff="monospace"
-                component={Link}
-                to={`/runs/${encodeURIComponent(block.run_id)}`}
-                c="orange.9"
-              >
-                {block.run_id}
-              </Text>
+              <Group key={block.run_id} gap="xs">
+                <Text
+                  size="sm"
+                  ff="monospace"
+                  component={Link}
+                  to={`/runs/${encodeURIComponent(block.run_id)}`}
+                  c="orange.9"
+                >
+                  {block.run_id}
+                </Text>
+                <Button
+                  size="compact-xs"
+                  variant="light"
+                  color="orange"
+                  onClick={() => setAbandoning(block.run_id)}
+                >
+                  {t('abandonRun')}
+                </Button>
+              </Group>
             ))}
           </Stack>
         </Alert>
       )}
+      <AbandonDialog
+        runId={abandoning}
+        onClose={() => setAbandoning(null)}
+        onDone={async () => {
+          setAbandoning(null)
+          try {
+            setBlocked(await blockedPreparations())
+          } catch {
+            // Leaving the stale entry visible is better than hiding the queue entirely.
+          }
+        }}
+      />
       {Boolean(error) && (
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}

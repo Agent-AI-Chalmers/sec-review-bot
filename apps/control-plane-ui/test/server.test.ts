@@ -104,6 +104,50 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       headers: { cookie }
     })
     assert.strictEqual(upstreamPath, '/v1/runs/blocked-preparations')
+
+    // The one write the console may proxy. The admin credential is supplied by the operator for
+    // this request and forwarded as-is; the BFF holds no copy of its own.
+    const abandonUrl = `${base}/api/admin/runs/${runUuid}/abandon`
+    // Same origin but no operator credential: the request is well formed, it just cannot act.
+    const noToken = await fetch(abandonUrl, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: '{"reason":"r"}'
+    })
+    assert.strictEqual(noToken.status, 401)
+    const crossSite = await fetch(abandonUrl, {
+      method: 'POST',
+      headers: {
+        cookie,
+        origin: 'https://evil.example',
+        'content-type': 'application/json',
+        'x-control-plane-admin-token': 'admin-value'
+      },
+      body: '{"reason":"r"}'
+    })
+    assert.strictEqual(
+      crossSite.status,
+      403,
+      'a cross-site POST must not carry the session into an abandonment'
+    )
+    authorization = ''
+    const abandon = await fetch(abandonUrl, {
+      method: 'POST',
+      headers: {
+        cookie,
+        origin: base,
+        'content-type': 'application/json',
+        'x-control-plane-admin-token': 'admin-value'
+      },
+      body: '{"reason":"r"}'
+    })
+    assert.strictEqual(abandon.status, 200)
+    assert.strictEqual(upstreamPath, `/v1/admin/runs/${runUuid}/abandon`)
+    assert.strictEqual(
+      authorization,
+      'Bearer admin-value',
+      'the operator credential, not the read token, must authorise the abandonment'
+    )
     const oversizedLogin = await fetch(`${base}/api/session`, {
       method: 'POST',
       body: JSON.stringify({ token: 'x'.repeat(1024 * 1024) })
