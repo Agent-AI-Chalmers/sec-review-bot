@@ -45,7 +45,19 @@ export async function abandonInFlightPublication(
      RETURNING previous.status AS from_status`,
     [runId, connectorId]
   )
-  return result.rows[0]?.from_status ?? null
+  const fromStatus = result.rows[0]?.from_status ?? null
+  // A step left `running` with a claim token whose publication no longer exists would read as
+  // "someone owns this work" forever: `requirePublicationStepClaim` would never be attempted
+  // again, and an operator debugging the row would look for an owner that is gone. The step's
+  // status is kept deliberately - it records how far the step got.
+  if (fromStatus !== null) {
+    await client.query(
+      `UPDATE publication_steps SET claimed_by=NULL, updated_at=clock_timestamp()
+       WHERE run_id=$1 AND connector_id=$2 AND claimed_by IS NOT NULL`,
+      [runId, connectorId]
+    )
+  }
+  return fromStatus
 }
 
 /** The batch form of `abandonInFlightPublication`, for a caller concluding many runs at once.
@@ -82,5 +94,15 @@ export async function abandonInFlightPublications(
      RETURNING p.run_id, previous.status AS from_status`,
     [runIds, connectorId]
   )
-  return new Map(result.rows.map((row) => [row.run_id, row.from_status]))
+  const moved = result.rows.map((row) => [row.run_id, row.from_status] as const)
+  if (moved.length > 0) {
+    // Same reason as the single-run form: drop the step claims of the publications this call
+    // actually converged, and only those.
+    await client.query(
+      `UPDATE publication_steps SET claimed_by=NULL, updated_at=clock_timestamp()
+       WHERE connector_id=$2 AND run_id=ANY($1::text[]) AND claimed_by IS NOT NULL`,
+      [moved.map(([id]) => id), connectorId]
+    )
+  }
+  return new Map(moved)
 }

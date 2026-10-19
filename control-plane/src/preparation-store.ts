@@ -171,19 +171,16 @@ export class PreparationStore {
         failure_code: string | null
         status: 'pending' | 'delivering'
       }>(
-        // The run's input is taken from whichever axis row still holds it. A notice can now be
-        // produced by an execution or publication failure, and those runs may have a preparation
-        // row with no input left, so joining `preparations` alone would silently drop them.
-        `SELECT n.run_id,
-                COALESCE(p.input, e.input, b.input) AS input,
+        // The run's input lives on the preparation row: it is `NOT NULL` there and no path
+        // deletes that row, so an execution- or publication-originated notice still finds it.
+        // Reading it from the other axes was defensive code with nothing to defend against.
+        // The join stays `LEFT` on purpose - a notice whose preparation row is somehow missing
+        // must still be delivered, with an empty input rather than not at all.
+        `SELECT n.run_id,COALESCE(p.input,'{}'::jsonb) AS input,
                 n.failure_stage,n.failure_code,n.status AS status
          FROM run_failure_notices n
          LEFT JOIN preparations p
            ON p.run_id=n.run_id AND p.connector_id=n.connector_id
-         LEFT JOIN executions e
-           ON e.run_id=n.run_id AND e.connector_id=n.connector_id
-         LEFT JOIN publications b
-           ON b.run_id=n.run_id AND b.connector_id=n.connector_id
          WHERE n.connector_id=$1 AND (n.status='pending' OR
            (n.status='delivering' AND n.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
          ORDER BY n.updated_at,n.run_id FOR UPDATE OF n SKIP LOCKED LIMIT 1`,

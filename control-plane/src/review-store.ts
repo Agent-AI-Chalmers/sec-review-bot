@@ -1012,6 +1012,42 @@ export class ReviewRunStore {
          ON CONFLICT (run_id) DO NOTHING`,
         [runId, this.connectorId]
       )
+      // The execution axis must not outlive the run's decision. A blocked run is blocked
+      // precisely because execution already advanced, so it may still be `queued` or `running`
+      // and would otherwise be driven to `succeeded` later with nowhere for that result to go -
+      // an "execution succeeded, publication skipped" pair that reads as a normal outcome while
+      // the notice says the run failed. An execution that already succeeded is left alone: that
+      // is a real result and the evidence behind the blocked decision. One that is still moving
+      // cannot deliver anything now, so it ends here; `skipped` is wrong for it because it did
+      // run.
+      const stoppedExecution = await client.query<{ from_status: string }>(
+        `WITH previous AS (
+           SELECT run_id, status FROM executions
+           WHERE run_id=$1 AND connector_id=$2
+             AND status IN ('queued','running','uncertain')
+           FOR UPDATE
+         )
+         UPDATE executions e
+         SET status='failed', claim_token=NULL, claimed_at=NULL,
+             failure_code='PREPARATION_ABANDONED',
+             failure_message=$3,
+             finished_at=COALESCE(e.finished_at, clock_timestamp()),
+             observed_at=clock_timestamp(), updated_at=clock_timestamp()
+         FROM previous
+         WHERE e.run_id=previous.run_id
+         RETURNING previous.status AS from_status`,
+        [runId, this.connectorId, reason]
+      )
+      if (stoppedExecution.rows[0] !== undefined) {
+        await appendEvent(client, {
+          runId,
+          connectorId: this.connectorId,
+          axis: 'execution',
+          fromStatus: stoppedExecution.rows[0].from_status,
+          toStatus: 'failed',
+          reasonCode: 'PREPARATION_ABANDONED'
+        })
+      }
       // Any publication still waiting is not applicable now that the run will not deliver a
       // result. The helper reports what it actually moved, so the event names the real origin.
       const publicationFrom = await abandonInFlightPublication(

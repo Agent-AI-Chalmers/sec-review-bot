@@ -1551,7 +1551,71 @@ test('every terminal path that concludes a run queues a failure notice', async (
     )
     await store.abandonBlockedPreparation(blockedRun, 'operator decision')
     assert.strictEqual(await noticeFor(blockedRun), 'preparation')
+    // The execution this run had already advanced is concluded with it. Leaving it `running`
+    // let a later observation record `succeeded` with publication `skipped`, an outcome that
+    // looks normal while the notice says the run failed.
+    const concluded = await store.getRun(blockedRun)
+    assert.strictEqual(concluded?.execution.status, 'succeeded')
+    assert.strictEqual(concluded?.publication.status, 'skipped')
   } finally {
+    await store.close()
+  }
+})
+
+test('abandoning a blocked run concludes an execution that is still in flight', async () => {
+  // A blocked run is blocked because execution already advanced, which includes `running`. That
+  // execution cannot deliver anything once the run is abandoned, and leaving it live let a later
+  // observation record `succeeded` beside a `skipped` publication - an outcome that reads as a
+  // normal one while the failure notice says the run ended. It is failed here instead; an
+  // execution that already succeeded is a real result and is left alone.
+  const store = await createStore({ claimTimeoutMs: 1 })
+  const observer = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    for (const status of ['running', 'succeeded'] as const) {
+      const runId = `run-${randomUUID()}`
+      await store.createPreparingReviewRun({
+        workflow: 'issue-review',
+        run_id: runId,
+        publish_context: {}
+      })
+      await observer.query(
+        `UPDATE preparations SET status='preparing', claim_token=$2,
+           claimed_at=clock_timestamp()-interval '1 hour', attempt_count=8,
+           started_at=clock_timestamp(), finished_at=NULL WHERE run_id=$1`,
+        [runId, randomUUID()]
+      )
+      await observer.query(
+        `UPDATE executions SET status=$2, started_at=clock_timestamp(),
+           finished_at=CASE WHEN $2='succeeded' THEN clock_timestamp() END,
+           workflow_result=CASE WHEN $2='succeeded' THEN '{}'::jsonb END
+         WHERE run_id=$1`,
+        [runId, status]
+      )
+      assert.strictEqual(
+        (await store.expireStalePreparations()).blocked.length,
+        1
+      )
+      const abandoned = await store.abandonBlockedPreparation(runId, 'operator')
+      assert.strictEqual(
+        abandoned.execution.status,
+        status === 'running' ? 'failed' : 'succeeded',
+        `an execution that was ${status} is ${
+          status === 'running' ? 'failed' : 'left as the real result'
+        }`
+      )
+      assert.strictEqual(abandoned.publication.status, 'skipped')
+      // Nothing can move it afterwards, whichever way it was concluded.
+      assert.strictEqual(
+        await store.recordRunnerSuccess(
+          runId,
+          { run_id: runId },
+          { status: 'unavailable' }
+        ),
+        false
+      )
+    }
+  } finally {
+    await observer.end()
     await store.close()
   }
 })
