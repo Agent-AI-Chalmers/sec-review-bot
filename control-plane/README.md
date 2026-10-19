@@ -35,6 +35,8 @@ A run begins in `pending` immediately after admission: on the Runner axis its in
 
 Control Plane polls `queued` and `running` runs. A successful Runner result is stored as `succeeded` and becomes eligible for publication. The integration claims that work, performs the GitHub side effects, and records either `published`, a retryable publication failure, or a terminal publication failure.
 
+Re-admitting an already-observed ingress identity is a read-only replay: it returns the existing run and does not claim its preparation. Admission creates that row as `preparing`, which only the original admitter owns, so a process that died mid-preparation is recovered through lease expiry rather than by the replayed request. With the default claim timeout this means a replay can take up to ten minutes to make progress — long enough that a client must not treat "the request returned" as "the work resumed".
+
 If Runner submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. A terminal preparation or Runner failure makes publication `skipped`. A terminal preparation failure also creates connector-owned notice work, so a connector can tell its user even when the preparation owner had already crashed.
 
 ## Persistence model

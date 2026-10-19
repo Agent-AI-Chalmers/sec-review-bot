@@ -37,6 +37,8 @@ Run 在接纳后立即进入 `pending`：在 Runner 轴上表示其 input 尚未
 
 Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Plane 将结果保存为 `succeeded`，使其可以被领取并发布。Integration 领取该工作，执行 GitHub 副作用，再记录 `published`、可重试的 publication 失败或终态 publication 失败。
 
+重复接纳一个已经见过的 ingress 身份是一次只读重放：它返回既有的 run，不会去 claim 它的 preparation。接纳时创建的 preparation 行是 `preparing`，只由最初的接纳方持有，因此在中途崩溃的进程是靠租约过期恢复的，而不是靠重放请求。在默认 claim 超时下，这意味着一次重放最多要等十分钟才能推进——所以客户端不能把"请求返回了"当成"工作已继续"。
+
 如果 Runner submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。Preparation 或 Runner 的终态失败会将 publication 标为 `skipped`。终态 preparation 失败还会创建 connector 所有的 notice work，因此即使原 preparation owner 已崩溃，connector 仍可告知用户。
 
 ## 持久化模型
