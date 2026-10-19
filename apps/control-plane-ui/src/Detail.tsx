@@ -276,26 +276,29 @@ function AbandonDialog({
 function ExplainedCode({
   code,
   className,
-  tone = 'error'
+  tone = 'error',
+  size = 'xs'
 }: {
   code: string
   className?: string
   /** `error` for a failure code, `neutral` for a state marker that is not itself a failure. */
   tone?: 'error' | 'neutral'
+  size?: 'xs' | 'sm'
 }): React.JSX.Element {
   const t = useMessages()
   const { explanation } = failureCodeLabel(code, t)
+  // Inline on purpose: as a block, a wrapping parent stretches this element to the row height
+  // and the code no longer shares a baseline with the label beside it.
   const label = (
-    <span className={className}>
-      <Text
-        component="span"
-        c={tone === 'error' ? 'red' : 'dimmed'}
-        size="xs"
-        ff="monospace"
-      >
-        {code}
-      </Text>
-    </span>
+    <Text
+      component="span"
+      className={className}
+      c={tone === 'error' ? 'red' : 'dimmed'}
+      size={size}
+      ff="monospace"
+    >
+      {code}
+    </Text>
   )
   if (explanation === null) return label
   return (
@@ -484,11 +487,14 @@ export function Detail(): React.JSX.Element {
                 <PublicationStatus status={run.publication.status} />
               </Group>
               {run.failure_code && (
-                <Group gap={6} wrap="wrap">
+                // `baseline` rather than the default: the label and the code are different
+                // typefaces at the same size, so centring them leaves the two baselines a
+                // fraction apart and the pair reads as misaligned.
+                <Group gap={6} wrap="wrap" align="baseline">
                   <Text c="dimmed" size="xs">
                     {t('failureCode')}:
                   </Text>
-                  <ExplainedCode code={run.failure_code} />
+                  <ExplainedCode code={run.failure_code} size="xs" />
                 </Group>
               )}
             </Group>
