@@ -208,4 +208,4 @@ Comments, PRs, or pushes created by the bot itself may trigger webhooks again an
 
 Manual comment command parsing also ignores Markdown blockquote lines, so quoting an older bot command in a reply does not retrigger that command. A new command must appear outside the quoted text.
 
-Publishing has one related guard: when the current App bot authored the PR, the App publishes a normal review comment instead of creating `APPROVE` or `REQUEST_CHANGES` reviewer state for itself. If GitHub still rejects an approval as an own-PR review, the publisher falls back to a normal review comment.
+Publishing has one related guard: when the current App bot authored the PR, the App publishes a normal review comment instead of creating `APPROVE` or `REQUEST_CHANGES` reviewer state for itself. This check is the same shared attribution function the loop guard uses, so an unknown App login fails the publication closed instead of guessing; if GitHub still rejects an approval as an own-PR review, the publisher falls back to a normal review comment.

@@ -1,9 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+// These tests exercise the publication side effects, not attribution: the app must be able to
+// recognize its own bot so the shared check can answer. The one test that needs missing metadata
+// (`an unattributable PR author is never approved`) clears it itself.
+
 import { handlePullRequestReviewRun } from '../../../src/reviews/pull-requests/publish.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+
+// Publish paths now share the fail-closed attribution check, so the app must know its own bot
+// login or publishing a PR review refuses to run. The suite's default metadata is the app the
+// fixtures pretend to be; the one test about missing metadata clears it explicitly.
+setGitHubAppMetadata({ slug: 'web-sec-bot' })
 
 const stepStore = {
   initializePublicationSteps: async () => {},
@@ -360,7 +369,9 @@ test('pull request publish comments instead of approving a PR authored by the ap
       installation_octokit_for_repo: async () => octokit
     })
   } finally {
-    setGitHubAppMetadata()
+    // Restore the suite-wide metadata, not an empty state: every later test publishes through
+    // the fail-closed attribution check.
+    setGitHubAppMetadata({ slug: 'web-sec-bot' })
   }
 
   assert.deepStrictEqual(
@@ -626,4 +637,69 @@ test('pull request publish does not create a fallback review after an uncertain 
   )
 
   assert.strictEqual(createCalls, 1)
+})
+
+test('an unattributable PR author is never approved', async () => {
+  // Without the app's own login, "is this our PR?" cannot be answered. Approving then would be
+  // a side effect driven by a guess, and the app would approve its own PR, so the shared
+  // attribution check fails closed. This test pins the fail-closed behaviour of the publication
+  // path, which used to have its own copy of the check that silently answered "not ours".
+  setGitHubAppMetadata()
+  const pullReviews: unknown[] = []
+  const octokit = {
+    rest: {
+      pulls: {
+        listReviews: async () => ({ data: [] }),
+        createReview: async (args: unknown) => {
+          pullReviews.push(args)
+          return {
+            data: {
+              id: 4,
+              html_url: 'https://example.test/review/4',
+              state: 'COMMENTED'
+            }
+          }
+        }
+      }
+    }
+  }
+
+  try {
+    await assert.rejects(
+      handlePullRequestReviewRun({
+        run: {
+          run_id: 'run-1',
+          publish_context: {
+            pr: pullRequestContext({ pr_author: 'web-sec-bot[bot]' }),
+            files: [],
+            event_type: 'manual_review'
+          }
+        },
+        result: {
+          contract_version: CONTRACT_VERSION,
+          review_record: review_record({
+            analysis: {
+              verdict: 'no-actionable-finding',
+              overview: 'No actionable security issue remains in this PR.',
+              narratives: []
+            }
+          })
+        },
+        store: stepStore as never,
+        claim_token: 'test-claim',
+        assert_publication_claim: async () => {},
+        installation_octokit_for_repo: async () => octokit
+      }),
+      /metadata is not loaded/
+    )
+  } finally {
+    // Restore the suite-wide metadata so later tests are not left in the fail-closed state.
+    setGitHubAppMetadata({ slug: 'web-sec-bot' })
+  }
+
+  assert.deepStrictEqual(
+    pullReviews.map((item) => (item as { event: string }).event),
+    [],
+    'no review may be created while attribution is unknown'
+  )
 })

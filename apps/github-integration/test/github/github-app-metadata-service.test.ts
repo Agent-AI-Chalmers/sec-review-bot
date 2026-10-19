@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   currentAppBotLogin,
+  isCurrentAppBotLogin,
   normalizeLogin,
   setGitHubAppMetadata,
   wasAuthoredByCurrentAppBot
@@ -50,6 +51,34 @@ test('wasAuthoredByCurrentAppBot recognizes only this app bot', () => {
     false
   )
   assert.strictEqual(wasAuthoredByCurrentAppBot(null), false)
+})
+
+test('isCurrentAppBotLogin compares only a stored login, and says so', () => {
+  // A persisted PR author keeps a login but no user `type`. This narrower check exists so a
+  // caller does not fabricate `type: 'Bot'` and silently make half of the full guard true.
+  assert.strictEqual(isCurrentAppBotLogin('Sec-Review-Bot[bot]'), true)
+  assert.strictEqual(isCurrentAppBotLogin('other-bot[bot]'), false)
+  assert.strictEqual(isCurrentAppBotLogin('alice'), false)
+  assert.strictEqual(isCurrentAppBotLogin(null), false)
+  // It fails closed exactly like the full check: no metadata means no safe answer.
+  setGitHubAppMetadata({})
+  assert.throws(
+    () => isCurrentAppBotLogin('sec-review-bot[bot]'),
+    /metadata is not loaded/
+  )
+})
+
+test('wasAuthoredByCurrentAppBot still rejects a human account with a bot login', () => {
+  // The full check keeps both halves: the login must match AND the entity must be a Bot. This
+  // is why callers without a `type` use the narrower function instead of passing a fake one.
+  assert.strictEqual(
+    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' }),
+    false
+  )
+  assert.strictEqual(
+    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'Bot' }),
+    true
+  )
 })
 
 test('wasAuthoredByCurrentAppBot refuses to attribute when metadata is unloaded', () => {

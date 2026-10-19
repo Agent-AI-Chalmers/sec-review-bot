@@ -209,4 +209,4 @@ Bot 自己创建的 comment、PR 或 push 可能会再次触发 webhook，形成
 
 手动 comment 命令解析也会忽略 Markdown blockquote 行，所以在回复里引用旧 bot 命令不会再次触发；新的命令必须写在引用文本之外。
 
-发布阶段也有一个相关边界：如果 PR 作者是当前 App bot，App 会发布普通 review comment，而不是给自己的 PR 创建 `APPROVE` 或 `REQUEST_CHANGES` reviewer state。如果 GitHub 仍然以 own-PR review 拒绝 approval，publisher 会降级为普通 review comment。
+发布阶段也有一个相关边界：如果 PR 作者是当前 App bot，App 会发布普通 review comment，而不是给自己的 PR 创建 `APPROVE` 或 `REQUEST_CHANGES` reviewer state。该判断复用与自循环守卫相同的归属函数，因此 App 自身 login 未知时发布会 fail closed，而不是猜测。如果 GitHub 仍然以 own-PR review 拒绝 approval，publisher 会降级为普通 review comment。

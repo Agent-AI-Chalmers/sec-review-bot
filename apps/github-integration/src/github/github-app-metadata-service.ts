@@ -64,12 +64,30 @@ export function currentAppBotLogin(): string | null {
   return normalizeLogin(github_app_metadata.bot_login)
 }
 
+/** The expected app bot login, or a deterministic error when it is unknown.
+ *
+ * Attribution decides whether an existing marker comment/review is reused, so getting it wrong
+ * is a duplicated side effect. Without a known login there is no safe expectation: returning
+ * `false` would silently rewrite every prior publication. Callers run after startup loads
+ * `/app`, so unset metadata is a programming/startup fault — and the error is deterministic, not
+ * transient, so a publisher cannot turn it into an endless retry loop. */
+function requireAppBotLogin(): string {
+  const expectedLogin = currentAppBotLogin()
+  if (expectedLogin === null) {
+    throw new DeterministicRunnerPublishError(
+      'GitHub App metadata is not loaded; cannot attribute a bot-authored object.',
+      RUNNER_PUBLISH_ERROR_CODES.app_metadata_unavailable
+    )
+  }
+  return expectedLogin
+}
+
 /** Whether a GitHub user object was authored by this app's bot.
  *
- * This decides whether an existing marker comment/review is reused, so getting it wrong is a
- * duplicated side effect. When the app metadata is unavailable this throws rather than
- * returning false: an empty expectation would silently rewrite every prior publication.
- * Callers run after startup loads `/app`, so unset metadata is a programming/startup fault. */
+ * This is the full check: the object must be a Bot entity *and* carry this app's login. Use it
+ * for anything shaped like a GitHub user, because a human account can reuse a bot-looking login
+ * string. For a stored login that is already known to name a bot identity, use
+ * `isCurrentAppBotLogin` instead of fabricating a `type`. */
 export function wasAuthoredByCurrentAppBot(
   user:
     | {
@@ -79,16 +97,19 @@ export function wasAuthoredByCurrentAppBot(
     | null
     | undefined
 ): boolean {
-  const expectedLogin = currentAppBotLogin()
-  if (expectedLogin === null) {
-    // Deterministic, not transient: re-claiming the same publication would hit the same
-    // unanswered question. Without a code the publisher would classify this as an unknown
-    // fault and retry forever, so name it and let it fail once with a diagnosable reason.
-    throw new DeterministicRunnerPublishError(
-      'GitHub App metadata is not loaded; cannot attribute a bot-authored object.',
-      RUNNER_PUBLISH_ERROR_CODES.app_metadata_unavailable
-    )
-  }
+  const expectedLogin = requireAppBotLogin()
   const login = normalizeLogin(user?.login)
   return user?.type === 'Bot' && login !== null && login === expectedLogin
+}
+
+/** Whether a stored login names this app's bot, without a user `type` to check.
+ *
+ * Some persisted records keep only a login (for example a pull request author) and the caller
+ * has already decided the entity is a bot. This function does not skip the type check as a
+ * convenience: it is a narrower contract that says exactly that, so a reader is never led to
+ * believe the full `type === 'Bot'` guard ran. */
+export function isCurrentAppBotLogin(login: unknown): boolean {
+  const expectedLogin = requireAppBotLogin()
+  const candidate = normalizeLogin(login)
+  return candidate !== null && candidate === expectedLogin
 }

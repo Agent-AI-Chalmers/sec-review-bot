@@ -22,10 +22,7 @@ import {
 import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorWithResponse, asErrorMessage } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import {
-  currentAppBotLogin,
-  normalizeLogin
-} from '../../github/github-app-metadata-service.js'
+import { isCurrentAppBotLogin } from '../../github/github-app-metadata-service.js'
 import { assertWorkflowResult } from '../../runner/contract-schema.js'
 import type { ControlPlaneClient } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
@@ -152,22 +149,19 @@ function pullRequestReviewRunMarker(run_id: string): string {
   return `<!-- sec-review-bot:pull-request-review-run:${run_id} -->`
 }
 
-function isAuthoredByCurrentAppBot(pr: PersistedPullRequest): boolean {
-  const author_login = normalizeLogin(pr.pr_author)
-  const appBotLogin = currentAppBotLogin()
-  return (
-    author_login !== null &&
-    appBotLogin !== null &&
-    author_login === appBotLogin
-  )
-}
-
 function reviewEventForRecord(
   review_record: ReviewRecord,
   pr: PersistedPullRequest
 ): PullRequestReviewEvent {
   // The app should leave evidence on its own PRs, not create reviewer state for itself.
-  if (isAuthoredByCurrentAppBot(pr)) {
+  //
+  // A stored PR context keeps the author as a login only, with no user `type`, so this uses the
+  // shared login comparison rather than the full user check: passing a fabricated
+  // `type: 'Bot'` to `wasAuthoredByCurrentAppBot` would make half of that guard unconditionally
+  // true and read as if the bot-entity check had run. `isCurrentAppBotLogin` also fails closed
+  // (throws) when the app's own login is unknown, which a local copy did not: that copy
+  // answered `false` and would have approved the app's own PRs.
+  if (isCurrentAppBotLogin(pr.pr_author)) {
     return 'COMMENT'
   }
 
