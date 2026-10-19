@@ -3,12 +3,30 @@
 // could not tell `available` (which requires `artifact`) apart from the other statuses.
 import type {
   ArtifactStorage,
+  BlockedPreparationExpiry,
   PublicationStep,
   Run,
   RunEvent
 } from './control-plane-api-types.js'
 
-export type { ArtifactStorage, PublicationStep, Run, RunEvent }
+export type {
+  ArtifactStorage,
+  BlockedPreparationExpiry,
+  PublicationStep,
+  Run,
+  RunEvent
+}
+
+/** The runs coordination has stopped retrying. Reading this needs only the read token: knowing
+ * a run is stuck is not privileged, only deciding what to do about it is. */
+export async function blockedPreparations(): Promise<
+  BlockedPreparationExpiry[]
+> {
+  const body = await api<{ blocks: BlockedPreparationExpiry[] }>(
+    '/runs/blocked-preparations'
+  )
+  return body.blocks
+}
 
 export class ApiError extends Error {
   constructor(

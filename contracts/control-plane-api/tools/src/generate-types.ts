@@ -353,7 +353,8 @@ const UI_SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
   ['ArtifactStorage', 'ArtifactStorage'],
   ['Run', 'ObservedRun'],
   ['RunEvent', 'ReviewRunEvent'],
-  ['PublicationStep', 'ObservedPublicationStep']
+  ['PublicationStep', 'ObservedPublicationStep'],
+  ['BlockedPreparationExpiry', 'BlockedPreparationExpiry']
 ]
 
 /** The committed content of `apps/control-plane-ui/src/control-plane-api-types.ts`. */

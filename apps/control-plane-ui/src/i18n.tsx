@@ -76,6 +76,9 @@ const messages = {
     runProgress: 'Run progress',
     runHistory: 'History',
     runHistoryEmpty: 'No recorded transitions yet',
+    blockedPreparationsTitle: 'Runs needing an operator',
+    blockedPreparationsBody:
+      'Coordination stopped retrying these because their persisted state contradicts the conclusion it could draw. They stay here until someone decides what to do.',
     axisExecution: 'Execution',
     axisPreparation: 'Preparation',
     axisPublication: 'Publication',
@@ -289,6 +292,9 @@ const messages = {
     runProgress: 'Run 进度',
     runHistory: '历史',
     runHistoryEmpty: '暂无记录的变更',
+    blockedPreparationsTitle: '需要人工处理的 run',
+    blockedPreparationsBody:
+      '这些 run 的持久化状态与协调能够得出的结论自相矛盾，因此协调已停止重试。在有人决定如何处理之前，它们会一直留在这里。',
     axisExecution: '执行',
     axisPreparation: '准备',
     axisPublication: '发布',

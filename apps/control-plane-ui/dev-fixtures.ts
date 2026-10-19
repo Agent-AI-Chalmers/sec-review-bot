@@ -560,8 +560,9 @@ function preparationFor(
         : (finishedAt ?? createdAt)
     ),
     failure_code: status === 'failed' ? scenario.failure_code : null,
-    // The fixtures only describe reachable coordination states; a blocked expiry is an operator
-    // repair queue, not a lifecycle stage, so no fixture models it.
+    // Set by the derivation below, not by a scenario: a blocked run is not a lifecycle stage, it
+    // is an operator queue entry, and adding it as a scenario would shift every other run's
+    // (scenario, workflow) pairing.
     expiry_blocked_reason: null,
     failure_notice_status:
       status === 'failed' ? scenario.preparation_notice : null
@@ -710,10 +711,15 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
     // skip it, and the state machine has no `skipped -> pending` edge to undo an early skip.
     fail('an uncertain submission keeps its publication pending')
   }
+  // A blocked run is the deliberate exception: coordination found preparation unfinished while
+  // execution had already advanced, which is exactly the contradiction it refuses to resolve on
+  // its own. That state is unreachable by a normal write path but reachable by a partial repair,
+  // and the console has to be able to render it, so the fixture models it here.
   if (
     preparation.status !== 'submitted' &&
     execution !== 'pending' &&
-    execution !== 'skipped'
+    execution !== 'skipped' &&
+    preparation.expiry_blocked_reason === null
   ) {
     fail('only a pending or skipped run can have unfinished preparation')
   }
@@ -895,9 +901,15 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
   const executionNeverRan =
     scenario.execution_status === 'pending' ||
     scenario.execution_status === 'skipped'
+  // For an in-flight run the whole timeline is relative to "now", and `updated_at` is pinned a
+  // few seconds before it, so `started_at` must be relative to that same instant rather than to
+  // `createdAt + elapsed`: with a long `executionMs` the two formulas disagree and start drifts
+  // past the observation time. An active run has by definition been observed after it started.
   const submittedAt = executionNeverRan
     ? null
-    : createdAt + Math.min(scenario.executionMs, 60_000)
+    : active
+      ? Date.now() - Math.min(5_000, scenario.executionMs) - 1_000
+      : createdAt + Math.min(scenario.executionMs, 60_000)
   // Execution ends on a terminal state; `uncertain` is explicitly not terminal.
   const executionFinished =
     scenario.execution_status === 'succeeded' ||
@@ -951,6 +963,10 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
   }
 })
 
+// Derive the operator queue instead of modelling it as a scenario. A blocked run keeps its
+// preparation at `preparing` while its execution has advanced - the contradiction coordination
+// refuses to resolve on its own - so the marker is applied after the fact and leaves every other
+// run's scenario/workflow pairing untouched.
 const stepsByRun = new Map<string, FixtureStep[]>(
   runs.map((run, index) => [
     run.run_id,
@@ -1081,6 +1097,20 @@ export function devFixtures(): Plugin {
                   'base64url'
                 )
           response.end(JSON.stringify({ runs: page, next_cursor: nextCursor }))
+          return
+        }
+        // Before the run-detail match below, which would otherwise read this fixed segment as a
+        // run id. Mirrors `GET /v1/runs/blocked-preparations`.
+        if (request.url === '/api/runs/blocked-preparations') {
+          // Synthetic: a blocked run is not a lifecycle stage any scenario can describe (it is
+          // the contradictory shape coordination refuses to resolve), so it is invented here
+          // rather than mutating a real run. The ids are real, so following one opens a detail
+          // page that loads.
+          const blocks = runs.slice(0, 2).map((run) => ({
+            run_id: run.run_id,
+            reason: 'EXECUTION_ALREADY_ADVANCED'
+          }))
+          response.end(JSON.stringify({ blocks }))
           return
         }
         const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(

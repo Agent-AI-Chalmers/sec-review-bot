@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
+  Alert,
   Box,
   Container,
   Group,
@@ -14,8 +15,14 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconInbox } from '@tabler/icons-react'
-import { api, ApiError, type Run } from './api.js'
+import { IconAlertTriangle, IconInbox } from '@tabler/icons-react'
+import {
+  api,
+  ApiError,
+  blockedPreparations,
+  type BlockedPreparationExpiry,
+  type Run
+} from './api.js'
 import { formatDate, useLanguage, useMessages } from './i18n.js'
 import { CopyAction, RefreshControls, useRefresh } from './App.js'
 import {
@@ -83,6 +90,23 @@ export function Runs(): React.JSX.Element {
     next_cursor: string | null
   }>()
   const [error, setError] = React.useState<unknown>()
+  // Runs coordination has stopped retrying. They are not part of the run list's normal
+  // pagination, and an operator needs to see them before the list, so they load separately and
+  // a failure here never hides the list itself.
+  const [blocked, setBlocked] = React.useState<BlockedPreparationExpiry[]>([])
+  React.useEffect(() => {
+    let cancelled = false
+    blockedPreparations()
+      .then((blocks) => {
+        if (!cancelled) setBlocked(blocks)
+      })
+      .catch(() => {
+        // The queue is an operator aid, not a precondition for reading runs; leave it empty.
+      })
+    return (): void => {
+      cancelled = true
+    }
+  }, [])
   React.useEffect(() => {
     window.sessionStorage.setItem(
       CURSOR_PARENTS_KEY,
@@ -194,6 +218,38 @@ export function Runs(): React.JSX.Element {
       <Title order={1} mb="lg">
         {t('runs')}
       </Title>
+      {blocked.length > 0 && (
+        <Alert
+          color="orange"
+          variant="light"
+          mb="md"
+          title={t('blockedPreparationsTitle')}
+          icon={<IconAlertTriangle size={18} />}
+          data-testid="blocked-preparations"
+          // A standing queue, not a transient fault: `role="alert"` belongs to the refresh
+          // error below, and Mantine's Alert would otherwise claim that role and be the first
+          // thing an alert-based assertion sees.
+          role="status"
+        >
+          <Text size="sm" mb="xs">
+            {t('blockedPreparationsBody')}
+          </Text>
+          <Stack gap={4}>
+            {blocked.map((block) => (
+              <Text
+                key={block.run_id}
+                size="sm"
+                ff="monospace"
+                component={Link}
+                to={`/runs/${encodeURIComponent(block.run_id)}`}
+                c="orange.9"
+              >
+                {block.run_id}
+              </Text>
+            ))}
+          </Stack>
+        </Alert>
+      )}
       {Boolean(error) && (
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}

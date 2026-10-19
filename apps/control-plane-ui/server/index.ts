@@ -100,6 +100,9 @@ const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 function isAllowedReadPath(bffUrl: string): boolean {
   const url = new URL(bffUrl, 'http://control-plane-ui.local')
   if (url.pathname === '/api/runs') return true
+  // A fixed sub-resource of the run collection, not a run id: it lists the runs coordination
+  // has stopped retrying, so the console can show the operator queue without any write access.
+  if (url.pathname === '/api/runs/blocked-preparations') return true
   const segments = url.pathname.split('/')
   // ['', 'api', 'runs', '<runId>', ...optional suffix]
   if (segments.length < 4 || segments[1] !== 'api' || segments[2] !== 'runs')

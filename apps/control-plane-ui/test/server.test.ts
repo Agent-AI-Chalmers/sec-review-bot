@@ -98,6 +98,12 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       '',
       'a rejected path must never reach the upstream Control Plane'
     )
+    // The blocked-preparation queue is a fixed sub-resource of the run collection, not a run id,
+    // so it must pass the allow-list before the UUID check rejects it.
+    await fetch(`${base}/api/runs/blocked-preparations`, {
+      headers: { cookie }
+    })
+    assert.strictEqual(upstreamPath, '/v1/runs/blocked-preparations')
     const oversizedLogin = await fetch(`${base}/api/session`, {
       method: 'POST',
       body: JSON.stringify({ token: 'x'.repeat(1024 * 1024) })

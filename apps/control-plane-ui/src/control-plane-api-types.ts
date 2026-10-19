@@ -330,3 +330,5 @@ export type ArtifactStorage = components['schemas']['ArtifactStorage']
 export type Run = components['schemas']['ObservedRun']
 export type RunEvent = components['schemas']['ReviewRunEvent']
 export type PublicationStep = components['schemas']['ObservedPublicationStep']
+export type BlockedPreparationExpiry =
+  components['schemas']['BlockedPreparationExpiry']
