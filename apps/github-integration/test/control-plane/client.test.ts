@@ -13,9 +13,11 @@ const preparingRun: ReviewRunRecord = {
   run_id: 'run-1',
   workflow: 'repository-review',
   publish_context: {},
-  runner_status: 'preparing',
+  preparation: null,
+  runner_status: 'pending',
   publication_status: 'pending',
   created_at: '2026-10-07T00:00:00.000Z',
+  submitted_at: null,
   execution_updated_at: '2026-10-07T00:00:00.000Z',
   publication_updated_at: '2026-10-07T00:00:00.000Z',
   published_at: null,
@@ -97,7 +99,7 @@ test('repository preparation can replace the admitted empty publish context', as
     preparation_input_version: 'v1',
     preparation_input: { kind: 'test' }
   })
-  assert.strictEqual(admission.record.runner_status, 'preparing')
+  assert.strictEqual(admission.record.runner_status, 'pending')
 
   await controlPlaneClient.submitPreparedRun(
     'run-1',

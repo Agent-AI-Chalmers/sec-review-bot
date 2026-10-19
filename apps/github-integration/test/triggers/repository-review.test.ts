@@ -198,7 +198,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
         admitReviewRun: (run) => {
           saved_runs.push(withoutPreparationInput(run))
           return {
-            record: { ...run, run_id: 'run-1', runner_status: 'preparing' },
+            record: { ...run, run_id: 'run-1', runner_status: 'pending' },
             created: true,
             preparation_token: 'claim'
           } as never
@@ -336,12 +336,12 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', withoutPreparationInput(run)])
+            transitions.push(['pending', withoutPreparationInput(run)])
             return {
               record: {
                 ...run,
                 run_id: 'run-invalid-window',
-                runner_status: 'preparing'
+                runner_status: 'pending'
               },
               created: true,
               preparation_token: 'claim'
@@ -433,12 +433,12 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', withoutPreparationInput(run)])
+            transitions.push(['pending', withoutPreparationInput(run)])
             return {
               record: {
                 ...run,
                 run_id: 'run-repo-failed',
-                runner_status: 'preparing'
+                runner_status: 'pending'
               },
               created: true,
               preparation_token: 'claim'
@@ -456,7 +456,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
 
   assert.deepStrictEqual(transitions, [
     [
-      'preparing',
+      'pending',
       {
         workflow: 'repository-review',
         publish_context: {},
@@ -534,7 +534,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
               record: {
                 ...run,
                 run_id: 'run-repo-uncertain',
-                runner_status: 'preparing'
+                runner_status: 'pending'
               },
               created: true,
               preparation_token: 'claim'

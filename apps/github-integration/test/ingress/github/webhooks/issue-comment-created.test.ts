@@ -303,7 +303,7 @@ test('issue-comment-created delegates PR context loading until after command adm
         assert.ok(resolve_pr)
         on_admitted?.({
           run_id: 'run-pr-context',
-          status: 'preparing',
+          status: 'pending',
           replayed: false
         })
         await assert.rejects(resolve_pr(), /GitHub PR lookup failed/)

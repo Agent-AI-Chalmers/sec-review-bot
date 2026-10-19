@@ -114,7 +114,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
       store: {
         ...preparationClaim,
         admitReviewRun: (run) => {
-          transitions.push(['preparing', withoutPreparationInput(run)])
+          transitions.push(['pending', withoutPreparationInput(run)])
           return {
             record: { ...run, run_id: 'run-issue-1' },
             created: true,
@@ -132,7 +132,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
   assert.strictEqual(submitted.run_id, 'run-issue-1')
   assert.deepStrictEqual(transitions, [
     [
-      'preparing',
+      'pending',
       {
         workflow: 'issue-review',
         publish_context: {},
@@ -197,7 +197,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
       store: {
         ...preparationClaim,
         admitReviewRun: (run) => {
-          transitions.push(['preparing', withoutPreparationInput(run)])
+          transitions.push(['pending', withoutPreparationInput(run)])
           return {
             record: { ...run, run_id: 'run-pr-1' },
             created: true,
@@ -215,7 +215,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
   assert.strictEqual(submitted.run_id, 'run-pr-1')
   assert.deepStrictEqual(transitions, [
     [
-      'preparing',
+      'pending',
       {
         workflow: 'pull-request-review',
         publish_context: {},
@@ -262,7 +262,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', withoutPreparationInput(run)])
+            transitions.push(['pending', withoutPreparationInput(run)])
             return {
               record: { ...run, run_id: 'run-pr-failed' },
               created: true,
@@ -281,7 +281,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
 
   assert.deepStrictEqual(transitions, [
     [
-      'preparing',
+      'pending',
       {
         workflow: 'pull-request-review',
         publish_context: {},
@@ -333,7 +333,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               record: {
                 ...run,
                 run_id: 'run-uncertain',
-                runner_status: 'preparing'
+                runner_status: 'pending'
               },
               created: true,
               preparation_token: 'claim'
@@ -387,7 +387,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
               record: {
                 ...run,
                 run_id: 'run-pr-uncertain',
-                runner_status: 'preparing'
+                runner_status: 'pending'
               },
               created: true,
               preparation_token: 'claim'
@@ -436,12 +436,12 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', 'run-context-failure'])
+            transitions.push(['pending', 'run-context-failure'])
             return {
               record: {
                 ...run,
                 run_id: 'run-context-failure',
-                runner_status: 'preparing'
+                runner_status: 'pending'
               },
               created: true,
               preparation_token: 'claim'
@@ -458,7 +458,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
   )
 
   assert.deepStrictEqual(transitions, [
-    ['preparing', 'run-context-failure'],
+    ['pending', 'run-context-failure'],
     ['context'],
     [
       'failed',

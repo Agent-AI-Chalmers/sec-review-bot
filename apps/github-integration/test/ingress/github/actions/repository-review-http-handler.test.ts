@@ -134,7 +134,7 @@ test('repository dispatch returns preparing as soon as durable admission complet
     dispatchReview: async ({ on_admitted: onAdmitted }) => {
       onAdmitted?.({
         run_id: 'run-immediate',
-        status: 'preparing',
+        status: 'pending',
         replayed: false
       })
       await new Promise<void>((resolve) => {
@@ -148,7 +148,7 @@ test('repository dispatch returns preparing as soon as durable admission complet
   assert.deepStrictEqual(JSON.parse(response.body ?? '{}'), {
     ok: true,
     accepted: true,
-    status: 'preparing',
+    status: 'pending',
     replayed: false,
     run_id: 'run-immediate',
     repo_full_name: 'octo/example',
