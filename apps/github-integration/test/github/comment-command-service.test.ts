@@ -151,3 +151,32 @@ test('extractCommentCommand parses a command after quoted text', () => {
     }
   )
 })
+
+test('extractCommentCommand accepts the bot login and bare slug, not invented variants', () => {
+  // GitHub assigns exactly `<slug>[bot]` as the bot login. The bare slug is also real because
+  // users type the app name. A guessed `-bot` spelling is neither: accepting it would let a
+  // different account (`@sec-review-bot-bot`, `@sec-review-bot-bot[bot]`) trigger a review as if
+  // it were this app.
+  assert.deepStrictEqual(extractCommentCommand('@sec-review-bot[bot] review'), {
+    command: 'review',
+    mention: 'sec-review-bot[bot]',
+    test_changes: 'allow',
+    open_pr: false
+  })
+  assert.deepStrictEqual(extractCommentCommand('@sec-review-bot review'), {
+    command: 'review',
+    mention: 'sec-review-bot',
+    test_changes: 'allow',
+    open_pr: false
+  })
+  assert.strictEqual(
+    extractCommentCommand('@sec-review-bot-bot review'),
+    null,
+    'an invented -bot spelling must not be treated as this app'
+  )
+  assert.strictEqual(
+    extractCommentCommand('@sec-review-bot-bot[bot] review'),
+    null,
+    'an invented -bot[bot] spelling must not be treated as this app'
+  )
+})

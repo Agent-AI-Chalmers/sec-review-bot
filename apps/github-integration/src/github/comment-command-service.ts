@@ -1,27 +1,28 @@
 import type { TestChangesPolicy } from '../runner/input.js'
-import { getGitHubAppMetadata } from './github-app-metadata-service.js'
+import {
+  currentAppBotLogin,
+  getGitHubAppMetadata
+} from './github-app-metadata-service.js'
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** The forms a user may type to address this app in a command comment.
+ *
+ * Two spellings are real: the bare slug (`@my-app`) and the bot login GitHub actually assigns
+ * (`@my-app[bot]`). We deliberately do not guess variants such as `my-app-bot`: an invented
+ * spelling either matches nothing (the reader's command is silently ignored) or, worse, matches
+ * a different account whose name happens to end in `-bot`. `currentAppBotLogin` is the shared
+ * source for the bot login so this cannot drift from the attribution checks. */
 function buildMentionCandidates(): string[] {
   const metadata = getGitHubAppMetadata()
   const slug =
     typeof metadata.slug === 'string' && metadata.slug.trim() !== ''
       ? metadata.slug.trim().toLowerCase()
       : null
-  const bot_login =
-    typeof metadata.bot_login === 'string' && metadata.bot_login.trim() !== ''
-      ? metadata.bot_login.trim().toLowerCase()
-      : null
-
-  return [
-    slug,
-    bot_login,
-    slug ? `${slug}-bot` : null,
-    slug ? `${slug}-bot[bot]` : null
-  ].filter((item): item is string => Boolean(item))
+  const bot_login = currentAppBotLogin()
+  return [slug, bot_login].filter((item): item is string => Boolean(item))
 }
 
 function stripMarkdownQuotedLines(body: string): string {
