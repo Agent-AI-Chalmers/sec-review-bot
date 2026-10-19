@@ -1,3 +1,6 @@
+import { DeterministicRunnerPublishError } from '../runner/publish-error.js'
+import { RUNNER_PUBLISH_ERROR_CODES } from '../runner/publish-error-code.js'
+
 interface GitHubAppMetadata {
   id: number | null
   slug: string | null
@@ -78,8 +81,12 @@ export function wasAuthoredByCurrentAppBot(
 ): boolean {
   const expectedLogin = currentAppBotLogin()
   if (expectedLogin === null) {
-    throw new Error(
-      'GitHub App metadata is not loaded; cannot attribute a bot-authored object.'
+    // Deterministic, not transient: re-claiming the same publication would hit the same
+    // unanswered question. Without a code the publisher would classify this as an unknown
+    // fault and retry forever, so name it and let it fail once with a diagnosable reason.
+    throw new DeterministicRunnerPublishError(
+      'GitHub App metadata is not loaded; cannot attribute a bot-authored object.',
+      RUNNER_PUBLISH_ERROR_CODES.app_metadata_unavailable
     )
   }
   const login = normalizeLogin(user?.login)

@@ -18,7 +18,11 @@ export const RUNNER_PUBLISH_ERROR_CODES = {
   // A step that is already 'succeeded' (or otherwise not claimable and not
   // retry-exhausted) cannot be repaired by re-claiming, so it is terminal.
   publication_step_not_claimable: 'PUBLICATION_STEP_NOT_CLAIMABLE',
-  runner_publish_non_retryable: 'RUNNER_PUBLISH_NON_RETRYABLE'
+  runner_publish_non_retryable: 'RUNNER_PUBLISH_NON_RETRYABLE',
+  // The app could not attribute a bot-authored object because its own login is unknown.
+  // Re-claiming the same publication re-enters the same condition, so retrying only loops; a
+  // restart with complete `/app` metadata is what repairs it.
+  app_metadata_unavailable: 'APP_METADATA_UNAVAILABLE'
 } as const
 
 export type RunnerPublishErrorCode =

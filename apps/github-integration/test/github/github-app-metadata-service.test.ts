@@ -8,6 +8,7 @@ import {
   wasAuthoredByCurrentAppBot
 } from '../../src/github/github-app-metadata-service.js'
 import { isSelfOriginatedWebhookEvent } from '../../src/github/webhook-origin-guard.js'
+import { classifyPublicationFailure } from '../../src/control-plane/publication-failure.js'
 
 test.beforeEach(() => {
   setGitHubAppMetadata({ slug: 'sec-review-bot' })
@@ -62,6 +63,30 @@ test('wasAuthoredByCurrentAppBot refuses to attribute when metadata is unloaded'
         type: 'Bot'
       }),
     /metadata is not loaded/
+  )
+})
+
+test('unattributable metadata is a deterministic publish failure, not a retryable one', () => {
+  // The publisher classifies a fault without a response status as "unknown, retry". An
+  // unattributable object can never be answered by re-claiming the same publication, so without
+  // a deterministic code this turned a configuration mistake into an endless retry loop.
+  setGitHubAppMetadata({})
+  let thrown: unknown
+  try {
+    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'Bot' })
+  } catch (error) {
+    thrown = error
+  }
+  assert.ok(thrown instanceof Error, 'unattributable metadata must throw')
+  assert.deepStrictEqual(
+    (({ retry, code, reason }) => ({ retry, code, reason }))(
+      classifyPublicationFailure(thrown)
+    ),
+    {
+      retry: false,
+      code: 'APP_METADATA_UNAVAILABLE',
+      reason: 'deterministic-publish-result'
+    }
   )
 })
 
