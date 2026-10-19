@@ -8,8 +8,8 @@ import type { GitHubAppOctokit } from '../../github/octokit.js'
 import type { ReviewRecord } from '../review-record.js'
 import type { FileChange, FileMode } from '../file-change.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
-import { asErrorWithResponse } from '../../utils/error-utils.js'
 import { resolveTrustedDefaultBranch } from '../../github/default-branch-service.js'
+import { isBranchAlreadyExists } from '../shared/branch-already-exists.js'
 import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 
 interface IssueContext {
@@ -260,18 +260,11 @@ export async function createDraftPullRequestFromIssueReviewRecord({
       sha: newCommitResponse.data.sha
     })
   } catch (error) {
-    const errorInfo = asErrorWithResponse(error)
-    if (errorInfo.status !== 422) {
-      throw error
-    }
-    const message = String(
-      errorInfo.response?.data?.message ?? errorInfo.message
-    ).toLowerCase()
-    if (!message.includes('already exists')) {
-      throw error
-    }
     // The existing run-specific branch is a recovery checkpoint only when it
     // still represents this run's validated result. Do not overwrite it.
+    if (!isBranchAlreadyExists(error)) {
+      throw error
+    }
     await assert_publication_claim()
     const existingRef = await octokit.rest.git.getRef({
       owner,

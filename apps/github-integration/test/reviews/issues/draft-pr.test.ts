@@ -228,8 +228,11 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
 })
 
 test('issue draft PR retry reuses a branch left by a partial prior attempt without overwriting it', async () => {
-  const createRefError = Object.assign(new Error('Reference already exists'), {
-    status: 422
+  // The real 422 from `git.createRef` carries its reason in the response payload; the top-level
+  // message is not a GitHub statement and must not be what the recovery check reads.
+  const createRefError = Object.assign(new Error('Request failed'), {
+    status: 422,
+    response: { status: 422, data: { message: 'Reference already exists' } }
   })
   const octokit = createOctokitMock({ createRefError })
   const review_record = reviewRecordWithMitigation({
@@ -264,8 +267,11 @@ test('issue draft PR retry reuses a branch left by a partial prior attempt witho
 })
 
 test('issue draft PR does not create a PR from an existing branch with a different tree', async () => {
-  const createRefError = Object.assign(new Error('Reference already exists'), {
-    status: 422
+  // The real 422 from `git.createRef` carries its reason in the response payload; the top-level
+  // message is not a GitHub statement and must not be what the recovery check reads.
+  const createRefError = Object.assign(new Error('Request failed'), {
+    status: 422,
+    response: { status: 422, data: { message: 'Reference already exists' } }
   })
   const octokit = createOctokitMock({ createRefError })
   const originalGetCommit = octokit.rest.git.getCommit

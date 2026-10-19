@@ -5,7 +5,7 @@ import type { FileChange, FileMode, TextEncoding } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import type { RepositoryCaseResult, RepositoryDelivery } from './result.js'
-import { asErrorWithResponse } from '../../utils/error-utils.js'
+import { isBranchAlreadyExists } from '../shared/branch-already-exists.js'
 import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 
 interface RepositoryContext {
@@ -254,18 +254,9 @@ export async function createRepositoryDeliveryDraftPr({
       sha: newCommitResponse.data.sha
     })
   } catch (error) {
-    const errorInfo = asErrorWithResponse(error)
-    if (errorInfo.status !== 422) {
-      throw error
-    }
-
-    // createRef returns 422 both for "reference already exists" and for an
-    // invalid ref name. An existing run-specific branch is a recovery
-    // checkpoint only when it still has this run's validated contents.
-    const message = String(
-      errorInfo.response?.data?.message ?? ''
-    ).toLowerCase()
-    if (!message.includes('already exists')) {
+    // An existing run-specific branch is a recovery checkpoint only when it
+    // still has this run's validated contents.
+    if (!isBranchAlreadyExists(error)) {
       throw error
     }
 
