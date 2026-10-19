@@ -22,7 +22,10 @@ import {
 import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorWithResponse, asErrorMessage } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { getGitHubAppMetadata } from '../../github/github-app-metadata-service.js'
+import {
+  currentAppBotLogin,
+  normalizeLogin
+} from '../../github/github-app-metadata-service.js'
 import { assertWorkflowResult } from '../../runner/contract-schema.js'
 import type { ControlPlaneClient } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
@@ -149,15 +152,9 @@ function pullRequestReviewRunMarker(run_id: string): string {
   return `<!-- sec-review-bot:pull-request-review-run:${run_id} -->`
 }
 
-function normalizeLogin(login: unknown): string | null {
-  return typeof login === 'string' && login.trim() !== ''
-    ? login.trim().toLowerCase()
-    : null
-}
-
 function isAuthoredByCurrentAppBot(pr: PersistedPullRequest): boolean {
   const author_login = normalizeLogin(pr.pr_author)
-  const appBotLogin = normalizeLogin(getGitHubAppMetadata().bot_login)
+  const appBotLogin = currentAppBotLogin()
   return (
     author_login !== null &&
     appBotLogin !== null &&

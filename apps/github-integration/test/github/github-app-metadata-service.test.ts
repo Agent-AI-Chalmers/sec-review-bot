@@ -1,0 +1,88 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import {
+  currentAppBotLogin,
+  normalizeLogin,
+  setGitHubAppMetadata,
+  wasAuthoredByCurrentAppBot
+} from '../../src/github/github-app-metadata-service.js'
+import { isSelfOriginatedWebhookEvent } from '../../src/github/webhook-origin-guard.js'
+
+test.beforeEach(() => {
+  setGitHubAppMetadata({ slug: 'sec-review-bot' })
+})
+
+test('normalizeLogin lowercases and trims, and rejects non-strings', () => {
+  assert.strictEqual(
+    normalizeLogin('  Sec-Review-Bot[bot] '),
+    'sec-review-bot[bot]'
+  )
+  assert.strictEqual(normalizeLogin(''), null)
+  assert.strictEqual(normalizeLogin('   '), null)
+  assert.strictEqual(normalizeLogin(undefined), null)
+  assert.strictEqual(normalizeLogin(42), null)
+})
+
+test('currentAppBotLogin derives the bot login from the app slug', () => {
+  assert.strictEqual(currentAppBotLogin(), 'sec-review-bot[bot]')
+  setGitHubAppMetadata({})
+  assert.strictEqual(currentAppBotLogin(), null)
+})
+
+test('wasAuthoredByCurrentAppBot recognizes only this app bot', () => {
+  assert.strictEqual(
+    wasAuthoredByCurrentAppBot({
+      login: 'Sec-Review-Bot[bot]',
+      type: 'Bot'
+    }),
+    true
+  )
+  // A different bot is not us, even with a similar login.
+  assert.strictEqual(
+    wasAuthoredByCurrentAppBot({ login: 'other-bot[bot]', type: 'Bot' }),
+    false
+  )
+  // A human account with the same login string is not a bot.
+  assert.strictEqual(
+    wasAuthoredByCurrentAppBot({ login: 'sec-review-bot[bot]', type: 'User' }),
+    false
+  )
+  assert.strictEqual(wasAuthoredByCurrentAppBot(null), false)
+})
+
+test('wasAuthoredByCurrentAppBot refuses to attribute when metadata is unloaded', () => {
+  // With no app metadata there is no safe expectation: returning false would let a marker
+  // be re-published, so the helper must surface the startup fault instead.
+  setGitHubAppMetadata({})
+  assert.throws(
+    () =>
+      wasAuthoredByCurrentAppBot({
+        login: 'sec-review-bot[bot]',
+        type: 'Bot'
+      }),
+    /metadata is not loaded/
+  )
+})
+
+test('isSelfOriginatedWebhookEvent ignores this app bot and other bots when attributing', () => {
+  const event = (login: string, type: string) => ({
+    sender: { login, type }
+  })
+  assert.strictEqual(
+    isSelfOriginatedWebhookEvent(event('sec-review-bot[bot]', 'Bot')),
+    true,
+    'our own bot event must be skipped to avoid a publish/trigger loop'
+  )
+  assert.strictEqual(
+    isSelfOriginatedWebhookEvent(event('human', 'User')),
+    false,
+    'a human event is external'
+  )
+  // An unattributable bot is treated as self-originated (fail closed) rather than processed.
+  setGitHubAppMetadata({})
+  assert.strictEqual(
+    isSelfOriginatedWebhookEvent(event('sec-review-bot[bot]', 'Bot')),
+    true
+  )
+})
