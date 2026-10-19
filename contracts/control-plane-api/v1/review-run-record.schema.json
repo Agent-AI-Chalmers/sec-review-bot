@@ -47,6 +47,7 @@
         "finished_at",
         "updated_at",
         "failure_code",
+        "expiry_blocked_reason",
         "failure_notice_status"
       ],
       "properties": {
@@ -63,6 +64,13 @@
         "attempt_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "expiry_blocked_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Non-null when coordination stopped retrying this run: an expired preparation lease could not be concluded because the execution axis had already moved past `pending`, so writing the \"execution never ran\" conclusion would overwrite a real Runner result. The run is left untouched and reported here instead of being retried every pass. Clearing it requires an operator decision; nothing clears it automatically, because deciding that the contradiction is resolved needs judgement no rule can supply. The only value today is `EXECUTION_ALREADY_ADVANCED`."
         },
         "started_at": {
           "type": [

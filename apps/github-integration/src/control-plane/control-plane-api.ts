@@ -395,6 +395,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/runs/blocked-preparations': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description List the runs whose expired preparation could not be concluded because the run's persisted state contradicts the conclusion. Coordination stops retrying these, so this is the queue of runs that need an operator decision. Reading it needs only the read token: knowing that a run is stuck is not a privileged act, and the console should be able to show it without holding operator credentials. */
+    get: operations['listBlockedPreparationExpiries']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/admin/runs/{runId}/abandon': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description An operator decision, not a repair: conclude a blocked run's open axes so it stops holding unwinnable work. Execution is left untouched (a recorded result and its `workflow_result` stay), nothing is deleted, and the run keeps its ingress identity so a replay still resolves to it. Only a run listed by `listBlockedPreparationExpiries` is eligible; that restriction is what keeps this from becoming a general state-jumping endpoint, so a leaked admin token can at most abandon runs the system already proved it cannot finish. Requires the admin token; the route does not exist when none is configured. */
+    post: operations['abandonBlockedPreparation']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/config/preparation-heartbeat-interval': {
     parameters: {
       query?: never
@@ -621,6 +655,11 @@ export interface components {
       /** Format: date-time */
       occurred_at: string
     }
+    BlockedPreparationExpiry: {
+      run_id: string
+      /** @enum {string} */
+      reason: 'EXECUTION_ALREADY_ADVANCED'
+    }
     /** @description Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — the Control Plane drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary. */
     PreparationSummary: {
       /**
@@ -629,6 +668,8 @@ export interface components {
        */
       status: 'pending' | 'preparing' | 'submitted' | 'failed'
       attempt_count: number
+      /** @description Non-null when coordination stopped retrying this run: an expired preparation lease could not be concluded because the execution axis had already moved past `pending`, so writing the "execution never ran" conclusion would overwrite a real Runner result. The run is left untouched and reported here instead of being retried every pass. Clearing it requires an operator decision; nothing clears it automatically, because deciding that the contradiction is resolved needs judgement no rule can supply. The only value today is `EXECUTION_ALREADY_ADVANCED`. */
+      expiry_blocked_reason: string | null
       /**
        * Format: date-time
        * @description Immutable instant the preparation phase began (a preparer first claimed the work); null while it is still pending. A retry that returns the row to pending and claims it again does not move it, so it is a safe start bound for the phase.
@@ -692,6 +733,15 @@ export interface components {
     }
     /** @description The referenced run was not found. */
     RunNotFound: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description The run is not in a state this operation may act on, such as abandoning a run that is not blocked. */
+    Conflict: {
       headers: {
         [name: string]: unknown
       }
@@ -1553,6 +1603,66 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
+  listBlockedPreparationExpiries: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Blocked runs, oldest block first. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            blocks: components['schemas']['BlockedPreparationExpiry'][]
+          }
+        }
+      }
+      401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
+    }
+  }
+  abandonBlockedPreparation: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          /** @description Why this run is being abandoned; recorded on every event it writes. */
+          reason: string
+        }
+      }
+    }
+    responses: {
+      /** @description The run after its open axes were concluded. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReviewRunRecord']
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
+      409: components['responses']['Conflict']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
   getPreparationHeartbeatInterval: {
     parameters: {
       query?: never
@@ -1669,6 +1779,14 @@ export const operationRoutes = {
   listInternalPublicationSteps: {
     path: '/v1/internal/runs/{runId}/publication/steps',
     method: 'get'
+  },
+  listBlockedPreparationExpiries: {
+    path: '/v1/runs/blocked-preparations',
+    method: 'get'
+  },
+  abandonBlockedPreparation: {
+    path: '/v1/admin/runs/{runId}/abandon',
+    method: 'post'
   },
   getPreparationHeartbeatInterval: {
     path: '/v1/config/preparation-heartbeat-interval',

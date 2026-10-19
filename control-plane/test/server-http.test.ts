@@ -23,7 +23,7 @@ const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } =
 const SERVICE_TOKEN = 'service-token'
 const READ_TOKEN = 'read-token'
 
-async function buildApp(store: Record<string, unknown>) {
+async function buildApp(store: Record<string, unknown>, adminToken?: string) {
   // Same options as the real server, so validation behaviour (notably additionalProperties)
   // is exercised as deployed rather than with Fastify's defaults.
   const app = Fastify(CONTROL_PLANE_FASTIFY_OPTIONS)
@@ -32,7 +32,8 @@ async function buildApp(store: Record<string, unknown>) {
   await registerControlPlaneRoutes(app, {
     store: store as never,
     serviceToken: SERVICE_TOKEN,
-    readToken: READ_TOKEN
+    readToken: READ_TOKEN,
+    ...(adminToken === undefined ? {} : { adminToken })
   })
   await app.ready()
   return app
@@ -646,6 +647,149 @@ test('a request body over the size limit is a 413 with the declared envelope', a
     assert.deepStrictEqual(response.json(), {
       error: 'Request body is too large.'
     })
+  } finally {
+    await app.close()
+  }
+})
+
+test('the admin surface is absent unless an admin token is configured', async () => {
+  // An unconfigured deployment must not advertise an operator surface. Answering 401 would say
+  // "this route exists, you just lack the credential", which is exactly the information a
+  // deployment that deliberately has no admin route should not leak. The check runs before
+  // routing, because fastify-openapi-glue rewrites any security-handler failure into its own
+  // 401 regardless of the status the handler chose.
+  const runId = '0123abcd-4567-89ef-0123-456789abcdef'
+  const path = `/v1/admin/runs/${runId}/abandon`
+  const body = { reason: 'operator says stop' }
+
+  const unconfigured = await buildApp({ connectorId: 'github-app:test' })
+  try {
+    for (const headers of [
+      {},
+      { authorization: `Bearer ${SERVICE_TOKEN}` },
+      { authorization: 'Bearer any-other-value' }
+    ]) {
+      const response = await unconfigured.inject({
+        method: 'POST',
+        url: path,
+        headers: { ...headers, 'content-type': 'application/json' },
+        payload: body
+      })
+      assert.strictEqual(
+        response.statusCode,
+        404,
+        `an unconfigured admin surface must not exist (tried ${JSON.stringify(headers)})`
+      )
+      assert.deepStrictEqual(response.json(), { error: 'not_found' })
+    }
+  } finally {
+    await unconfigured.close()
+  }
+
+  // Configured: the credential must be the admin token. In particular the service token, which
+  // a component holds, must not reach an operator decision.
+  const adminToken = 'admin-token'
+  const store = {
+    connectorId: 'github-app:test',
+    abandonBlockedPreparation: async () => ({
+      run_id: runId,
+      workflow: 'issue-review',
+      preparation: {
+        status: 'failed',
+        attempt_count: 1,
+        expiry_blocked_reason: null,
+        started_at: null,
+        finished_at: null,
+        updated_at: '2026-01-01T00:00:00.000Z',
+        failure_code: 'PREPARATION_ABANDONED',
+        failure_notice_status: null
+      },
+      execution: {
+        status: 'succeeded',
+        started_at: null,
+        finished_at: null,
+        updated_at: '2026-01-01T00:00:00.000Z'
+      },
+      publication: {
+        status: 'skipped',
+        started_at: null,
+        finished_at: null,
+        updated_at: '2026-01-01T00:00:00.000Z'
+      },
+      publish_context: {},
+      created_at: '2026-01-01T00:00:00.000Z',
+      failure_code: null,
+      failure_message: null,
+      artifact_storage: null
+    })
+  }
+  const configured = await buildApp(store, adminToken)
+  try {
+    const anonymous = await configured.inject({
+      method: 'POST',
+      url: path,
+      headers: { 'content-type': 'application/json' },
+      payload: body
+    })
+    assert.strictEqual(anonymous.statusCode, 401)
+    const viaService = await configured.inject({
+      method: 'POST',
+      url: path,
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: body
+    })
+    assert.strictEqual(
+      viaService.statusCode,
+      401,
+      'the service token must not reach an operator decision'
+    )
+    const accepted = await configured.inject({
+      method: 'POST',
+      url: path,
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json'
+      },
+      payload: body
+    })
+    assert.strictEqual(accepted.statusCode, 200)
+    assert.strictEqual(
+      (accepted.json() as { preparation: { status: string } }).preparation
+        .status,
+      'failed'
+    )
+  } finally {
+    await configured.close()
+  }
+})
+
+test('the blocked preparation queue is readable with the read token', async () => {
+  // Knowing a run is stuck is not privileged: the console must be able to surface the queue
+  // without holding an operator credential. Only acting on it is admin-gated.
+  const app = await buildApp({
+    connectorId: 'github-app:test',
+    listBlockedPreparationExpiries: async () => [
+      { run_id: 'run-1', reason: 'EXECUTION_ALREADY_ADVANCED' }
+    ]
+  })
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/runs/blocked-preparations',
+      headers: { authorization: `Bearer ${READ_TOKEN}` }
+    })
+    assert.strictEqual(response.statusCode, 200)
+    assert.deepStrictEqual(response.json(), {
+      blocks: [{ run_id: 'run-1', reason: 'EXECUTION_ALREADY_ADVANCED' }]
+    })
+    const anonymous = await app.inject({
+      method: 'GET',
+      url: '/v1/runs/blocked-preparations'
+    })
+    assert.strictEqual(anonymous.statusCode, 401)
   } finally {
     await app.close()
   }

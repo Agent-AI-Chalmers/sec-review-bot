@@ -268,6 +268,9 @@ interface ControlPlaneRouteDeps {
   store: ReviewRunStore
   serviceToken: string
   readToken: string
+  /** Optional operator credential. When absent the whole `/v1/admin` surface answers 404, so an
+   * unconfigured deployment exposes no admin route at all rather than an unauthenticated one. */
+  adminToken?: string
 }
 
 /** Locate the OpenAPI contract relative to this module, not the process CWD.
@@ -319,7 +322,7 @@ export async function registerControlPlaneRoutes(
   app: FastifyInstance,
   deps: ControlPlaneRouteDeps
 ): Promise<void> {
-  const { store, serviceToken, readToken } = deps
+  const { store, serviceToken, readToken, adminToken } = deps
 
   // Errors propagate to the Fastify error handler, which maps a DeterministicControlPlaneError
   // to 409 + code and keeps every other fault a message-free 500; handlers stay domain-only.
@@ -547,6 +550,18 @@ export async function registerControlPlaneRoutes(
       return reply.send(await store.listPublicationSteps(run.run_id))
     },
 
+    listBlockedPreparationExpiries: async () => ({
+      blocks: await store.listBlockedPreparationExpiries()
+    }),
+
+    abandonBlockedPreparation: async (request) => {
+      const { runId } =
+        request.params as PathParams<'abandonBlockedPreparation'>
+      const { reason } =
+        request.body as RequestBody<'abandonBlockedPreparation'>
+      return await store.abandonBlockedPreparation(runId, reason)
+    },
+
     getPreparationHeartbeatInterval: async () =>
       store.preparationHeartbeatIntervalMs(),
 
@@ -673,6 +688,16 @@ export async function registerControlPlaneRoutes(
   // Runs before the route's own schema (Fastify order: preValidation, then validation), and the
   // hook is inherited by the child scope fastify-openapi-glue registers its routes in. Registered
   // here, on this HTTP surface, so it applies to (and only to) the contract's routes.
+  // An unconfigured deployment must not expose an admin surface, not even as a 401. The security
+  // handler alone cannot express that: fastify-openapi-glue wraps any failure there into its own
+  // 401 `SecurityError`, so answering 404 from the handler still advertises the route. This hook
+  // runs before routing settles on the glue's handler, so the path simply does not exist.
+  app.addHook('onRequest', async (request, reply) => {
+    if (adminToken === undefined && request.url.startsWith('/v1/admin')) {
+      return reply.code(404).send({ error: 'not_found' })
+    }
+  })
+
   app.addHook('preValidation', async (request) => {
     coerceQueryStrings(request)
   })
@@ -721,6 +746,17 @@ export async function registerControlPlaneRoutes(
         if (!bearerTokenMatches(request.headers.authorization, readToken)) {
           throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
         }
+      },
+      adminToken: async (request: FastifyRequest) => {
+        // With no configured token the routes must not exist: answering 401 would advertise an
+        // operator surface this deployment deliberately does not have. A missing credential is
+        // still unauthorized, so a configured deployment does not leak by status code either.
+        if (adminToken === undefined) {
+          throw Object.assign(new Error('not found'), { statusCode: 404 })
+        }
+        if (!bearerTokenMatches(request.headers.authorization, adminToken)) {
+          throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
+        }
       }
     }
   })
@@ -731,6 +767,9 @@ export async function startControlPlaneServer(): Promise<{
 }> {
   const token = requiredEnv('CONTROL_PLANE_SERVICE_TOKEN')
   const readToken = requiredEnv('CONTROL_PLANE_READ_TOKEN')
+  // Optional by design: a deployment that does not want an operator surface simply leaves it
+  // unset, and `/v1/admin/*` then answers 404 instead of existing behind a token nobody rotates.
+  const adminToken = process.env.CONTROL_PLANE_ADMIN_TOKEN?.trim() || undefined
   const connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
   const store = new ReviewRunStore({
     connectionString: requiredEnv('DATABASE_URL'),
@@ -820,7 +859,8 @@ export async function startControlPlaneServer(): Promise<{
   await registerControlPlaneRoutes(app, {
     store,
     serviceToken: token,
-    readToken
+    readToken,
+    ...(adminToken === undefined ? {} : { adminToken })
   })
 
   const port = Number.parseInt(process.env.CONTROL_PLANE_PORT || '8090', 10)

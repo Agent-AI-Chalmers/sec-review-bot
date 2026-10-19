@@ -198,6 +198,11 @@ export interface components {
       /** Format: date-time */
       occurred_at: string
     }
+    BlockedPreparationExpiry: {
+      run_id: string
+      /** @enum {string} */
+      reason: 'EXECUTION_ALREADY_ADVANCED'
+    }
     /** @description Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — the Control Plane drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary. */
     PreparationSummary: {
       /**
@@ -206,6 +211,8 @@ export interface components {
        */
       status: 'pending' | 'preparing' | 'submitted' | 'failed'
       attempt_count: number
+      /** @description Non-null when coordination stopped retrying this run: an expired preparation lease could not be concluded because the execution axis had already moved past `pending`, so writing the "execution never ran" conclusion would overwrite a real Runner result. The run is left untouched and reported here instead of being retried every pass. Clearing it requires an operator decision; nothing clears it automatically, because deciding that the contradiction is resolved needs judgement no rule can supply. The only value today is `EXECUTION_ALREADY_ADVANCED`. */
+      expiry_blocked_reason: string | null
       /**
        * Format: date-time
        * @description Immutable instant the preparation phase began (a preparer first claimed the work); null while it is still pending. A retry that returns the row to pending and claims it again does not move it, so it is a safe start bound for the phase.
@@ -269,6 +276,15 @@ export interface components {
     }
     /** @description The referenced run was not found. */
     RunNotFound: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description The run is not in a state this operation may act on, such as abandoning a run that is not blocked. */
+    Conflict: {
       headers: {
         [name: string]: unknown
       }

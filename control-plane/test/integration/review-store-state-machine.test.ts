@@ -2628,3 +2628,116 @@ test('a blocked expiry does not stop the rest of the coordination pass', async (
     await store.close()
   }
 })
+
+test('abandoning a blocked run concludes its open axes and keeps the execution evidence', async () => {
+  // The operator path for a blocked run. It is an abandonment, not a repair: the open axes are
+  // concluded so the run stops holding work nobody can conclude, while the execution axis keeps
+  // the result the Runner actually produced. Nothing is deleted, and the ingress identity stays,
+  // so a replay of the same webhook resolves to this run instead of starting a second one.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  const runId = `run-blocked-${randomUUID()}`
+  const ingress = {
+    kind: 'github_webhook' as const,
+    key: `delivery-${randomUUID()}`
+  }
+  try {
+    await store.admitReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {},
+      ingress_kind: ingress.kind,
+      ingress_key: ingress.key
+    })
+    await pool.query(
+      `UPDATE preparations SET attempt_count=8,
+         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [runId]
+    )
+    await pool.query(
+      `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+         finished_at=clock_timestamp(), workflow_result='{"keep":true}'::jsonb
+       WHERE run_id=$1`,
+      [runId]
+    )
+    await pool.query(
+      `UPDATE publications SET status='publishing', claim_token=$2,
+         claimed_at=clock_timestamp(), started_at=clock_timestamp() WHERE run_id=$1`,
+      [runId, randomUUID()]
+    )
+    const expiry = await store.expireStalePreparations()
+    assert.deepStrictEqual(expiry.blocked, [
+      { run_id: runId, reason: 'EXECUTION_ALREADY_ADVANCED' }
+    ])
+    assert.deepStrictEqual(await store.listBlockedPreparationExpiries(), [
+      { run_id: runId, reason: 'EXECUTION_ALREADY_ADVANCED' }
+    ])
+
+    // A blank reason is refused: an abandonment must always say why it happened.
+    await assert.rejects(
+      store.abandonBlockedPreparation(runId, '   '),
+      /reason is required/
+    )
+    // A run that is not blocked cannot be abandoned through this path, which is what keeps it
+    // from becoming a general state-jumping endpoint.
+    await assert.rejects(
+      store.abandonBlockedPreparation(`run-${randomUUID()}`, 'not blocked'),
+      /is not a blocked preparation/
+    )
+
+    const abandoned = await store.abandonBlockedPreparation(
+      runId,
+      'execution result will not be delivered'
+    )
+    assert.strictEqual(abandoned.preparation.status, 'failed')
+    assert.strictEqual(
+      abandoned.preparation.failure_code,
+      'PREPARATION_ABANDONED'
+    )
+    assert.strictEqual(abandoned.publication.status, 'skipped')
+    // The execution result is evidence, not an error to clear.
+    assert.strictEqual(abandoned.execution.status, 'succeeded')
+
+    const stored = await pool.query<{ workflow_result: unknown }>(
+      'SELECT workflow_result FROM executions WHERE run_id=$1',
+      [runId]
+    )
+    assert.deepStrictEqual(stored.rows[0]?.workflow_result, { keep: true })
+
+    // The block marker is gone, so coordination no longer skips the run, and the abandonment is
+    // on the record with its reason.
+    assert.deepStrictEqual(await store.listBlockedPreparationExpiries(), [])
+    const events = await store.listEvents(runId)
+    assert.ok(
+      events.some(
+        (event) =>
+          event.axis === 'preparation' &&
+          event.to_status === 'failed' &&
+          event.reason_code === 'PREPARATION_ABANDONED'
+      )
+    )
+    assert.ok(
+      events.some(
+        (event) =>
+          event.axis === 'publication' &&
+          event.from_status === 'publishing' &&
+          event.to_status === 'skipped'
+      )
+    )
+
+    // Nothing was deleted: the same ingress identity still resolves to this run.
+    const replay = await store.admitReviewRun({
+      workflow: 'issue-review',
+      run_id: `run-${randomUUID()}`,
+      publish_context: {},
+      ingress_kind: ingress.kind,
+      ingress_key: ingress.key
+    })
+    assert.strictEqual(replay.created, false)
+    assert.strictEqual(replay.record.run_id, runId)
+    assert.strictEqual(replay.record.preparation.status, 'failed')
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})

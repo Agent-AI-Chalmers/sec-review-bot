@@ -14,6 +14,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
       finished_at: '2026-01-01T00:00:30.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
+      expiry_blocked_reason: null,
       failure_notice_status: null
     },
     execution: {
@@ -45,6 +46,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
       finished_at: '2026-01-01T00:00:30.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
+      expiry_blocked_reason: null,
       failure_notice_status: null
     },
     execution: {

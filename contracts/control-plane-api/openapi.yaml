@@ -18,6 +18,14 @@ components:
       type: http
       scheme: bearer
       description: Redacted read access (console).
+    adminToken:
+      type: http
+      scheme: bearer
+      description: >-
+        Operator access to `/v1/admin/*`. Held by a person or an incident script, never by a
+        service component: the operations these routes expose are human decisions, not
+        coordination steps. The token is optional; when it is not configured the whole
+        `/v1/admin` surface is absent rather than merely unauthorized.
   responses:
     InvalidRequest:
       description: >-
@@ -35,6 +43,14 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     RunNotFound:
       description: The referenced run was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: >-
+        The run is not in a state this operation may act on, such as abandoning a run that is
+        not blocked.
       content:
         application/json:
           schema:
@@ -545,6 +561,20 @@ components:
         occurred_at:
           type: string
           format: date-time
+    BlockedPreparationExpiry:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - reason
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        reason:
+          type: string
+          enum:
+            - EXECUTION_ALREADY_ADVANCED
     PreparationSummary:
       type: object
       description: >-
@@ -563,6 +593,7 @@ components:
         - finished_at
         - updated_at
         - failure_code
+        - expiry_blocked_reason
         - failure_notice_status
       properties:
         status:
@@ -579,6 +610,18 @@ components:
         attempt_count:
           type: integer
           minimum: 0
+        expiry_blocked_reason:
+          type:
+            - string
+            - "null"
+          description: >-
+            Non-null when coordination stopped retrying this run: an expired preparation lease
+            could not be concluded because the execution axis had already moved past `pending`,
+            so writing the "execution never ran" conclusion would overwrite a real Runner
+            result. The run is left untouched and reported here instead of being retried every
+            pass. Clearing it requires an operator decision; nothing clears it automatically,
+            because deciding that the contradiction is resolved needs judgement no rule can
+            supply. The only value today is `EXECUTION_ALREADY_ADVANCED`.
         started_at:
           type:
             - string
@@ -1966,6 +2009,91 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/blocked-preparations:
+    get:
+      operationId: listBlockedPreparationExpiries
+      description: >-
+        List the runs whose expired preparation could not be concluded because the run's
+        persisted state contradicts the conclusion. Coordination stops retrying these, so this is
+        the queue of runs that need an operator decision. Reading it needs only the read token:
+        knowing that a run is stuck is not a privileged act, and the console should be able to
+        show it without holding operator credentials.
+      security:
+        - readToken: []
+      responses:
+        "200":
+          description: Blocked runs, oldest block first.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - blocks
+                properties:
+                  blocks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlockedPreparationExpiry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/admin/runs/{runId}/abandon:
+    post:
+      operationId: abandonBlockedPreparation
+      description: >-
+        An operator decision, not a repair: conclude a blocked run's open axes so it stops
+        holding unwinnable work. Execution is left untouched (a recorded result and its
+        `workflow_result` stay), nothing is deleted, and the run keeps its ingress identity so a
+        replay still resolves to it. Only a run listed by `listBlockedPreparationExpiries` is
+        eligible; that restriction is what keeps this from becoming a general state-jumping
+        endpoint, so a leaked admin token can at most abandon runs the system already proved it
+        cannot finish. Requires the admin token; the route does not exist when none is
+        configured.
+      security:
+        - adminToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Control Plane assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 1
+                  description: Why this run is being abandoned; recorded on every event it writes.
+      responses:
+        "200":
+          description: The run after its open axes were concluded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "500":
           $ref: "#/components/responses/InternalError"
   /v1/config/preparation-heartbeat-interval:

@@ -35,6 +35,7 @@ interface FixtureRun {
     finished_at: string | null
     updated_at: string
     failure_code: string | null
+    expiry_blocked_reason: string | null
     failure_notice_status: NoticeStage | null
   }
   execution: {
@@ -559,6 +560,9 @@ function preparationFor(
         : (finishedAt ?? createdAt)
     ),
     failure_code: status === 'failed' ? scenario.failure_code : null,
+    // The fixtures only describe reachable coordination states; a blocked expiry is an operator
+    // repair queue, not a lifecycle stage, so no fixture models it.
+    expiry_blocked_reason: null,
     failure_notice_status:
       status === 'failed' ? scenario.preparation_notice : null
   }

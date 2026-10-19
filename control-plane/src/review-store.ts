@@ -43,6 +43,7 @@ import {
 } from './shapes.js'
 import {
   PreparationStore,
+  type PreparationExpiryBlocked,
   type PreparationExpiryResult,
   type PreparationFailureNoticeWork,
   type PreparationWork
@@ -105,6 +106,7 @@ interface ReviewRunRow {
   preparation_finished_at: Date | string | null
   preparation_failure_code: string | null
   preparation_failure_message: string | null
+  preparation_expiry_blocked_reason: string | null
   preparation_failure_notice_status:
     'pending' | 'delivering' | 'delivered' | 'skipped' | null
 }
@@ -145,6 +147,7 @@ const RUN_SELECT = `
     pr.updated_at AS preparation_updated_at,
     pr.failure_code AS preparation_failure_code,
     pr.failure_message AS preparation_failure_message,
+    pr.expiry_blocked_reason AS preparation_expiry_blocked_reason,
     n.status AS preparation_failure_notice_status
   FROM review_runs r
   JOIN publications p ON p.run_id = r.run_id AND p.connector_id = r.connector_id
@@ -203,6 +206,10 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
           : iso(row.preparation_finished_at),
       updated_at: iso(row.preparation_updated_at),
       failure_code: row.preparation_failure_code,
+      // Non-null means coordination stopped retrying this run: the persisted story contradicts
+      // an expiry conclusion, so it needs an operator decision. Exposed here so the condition is
+      // visible on the read surface instead of only in a log line.
+      expiry_blocked_reason: row.preparation_expiry_blocked_reason,
       failure_notice_status: row.preparation_failure_notice_status
     },
     // Each axis reports the same three instants under the same names: when it started, when it
@@ -849,6 +856,111 @@ export class ReviewRunStore {
   async expireStalePreparations(): Promise<PreparationExpiryResult> {
     this.ready()
     return await this.preparations.expireStale()
+  }
+  /** List the runs coordination has stopped retrying, because their persisted story
+   * contradicts an expiry conclusion. These are the rows an operator has to decide about; the
+   * read exists so that decision can start from the API instead of from a log search. */
+  async listBlockedPreparationExpiries(): Promise<PreparationExpiryBlocked[]> {
+    this.ready()
+    const result = await this.pool.query<{
+      run_id: string
+      reason: PreparationExpiryBlocked['reason']
+    }>(
+      `SELECT run_id, expiry_blocked_reason AS reason FROM preparations
+       WHERE connector_id=$1 AND expiry_blocked_reason IS NOT NULL
+       ORDER BY expiry_blocked_at, run_id`,
+      [this.connectorId]
+    )
+    return result.rows
+  }
+
+  /** Abandon a blocked run at an operator's explicit request.
+   *
+   * This is not a repair and does not try to make the run publishable: it concludes the axes
+   * that are still open, so the run stops holding work no coordinator can conclude. The
+   * execution axis is deliberately left exactly as it is - a `succeeded` result and its
+   * `workflow_result` stay on the row - because abandoning says "this result will not be
+   * delivered", not "this result never happened". Nothing is deleted: the run, its events, and
+   * its ingress identity all remain, so a replay of the same webhook still resolves to this run
+   * instead of starting a new one.
+   *
+   * Only a blocked preparation is eligible. That restriction is what keeps this from becoming a
+   * general state-jumping endpoint: it can only finish a transition coordination already proved
+   * impossible.
+   *
+   * `reason` is required and recorded on every event, so an abandonment always names why. */
+  async abandonBlockedPreparation(
+    runId: string,
+    reason: string
+  ): Promise<ReviewRunRecord> {
+    this.ready()
+    if (reason.trim() === '')
+      throw Object.assign(new Error('An abandonment reason is required.'), {
+        statusCode: 400
+      })
+    return await transaction(this.pool, async (client) => {
+      // Claim the decision: only one caller may abandon a given blocked row, and the block
+      // marker doubles as the "still needs a decision" flag.
+      const blocked = await client.query<{ attempt_count: number }>(
+        `SELECT attempt_count FROM preparations
+         WHERE run_id=$1 AND connector_id=$2
+           AND expiry_blocked_reason IS NOT NULL
+         FOR UPDATE`,
+        [runId, this.connectorId]
+      )
+      if (blocked.rowCount !== 1)
+        throw Object.assign(
+          new Error(`Review run ${runId} is not a blocked preparation.`),
+          { statusCode: 409 }
+        )
+
+      const failed = await client.query(
+        `UPDATE preparations
+         SET status='failed', claim_token=NULL, claimed_at=NULL,
+             failure_code='PREPARATION_ABANDONED',
+             failure_message=$3,
+             last_failure_code='PREPARATION_ABANDONED',
+             last_failure_message=$3,
+             finished_at=clock_timestamp(),
+             expiry_blocked_reason=NULL, expiry_blocked_at=NULL,
+             updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$2 AND status='preparing'`,
+        [runId, this.connectorId, reason]
+      )
+      if (failed.rowCount !== 1)
+        throw new Error(
+          `Preparation ${runId} changed while being abandoned; nothing was written.`
+        )
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'preparation',
+        fromStatus: 'preparing',
+        toStatus: 'failed',
+        reasonCode: 'PREPARATION_ABANDONED'
+      })
+      // Any publication still waiting is not applicable now that the run will not deliver a
+      // result. The helper reports what it actually moved, so the event names the real origin.
+      const publicationFrom = await abandonInFlightPublication(
+        client,
+        this.connectorId,
+        runId
+      )
+      if (publicationFrom !== null) {
+        await appendEvent(client, {
+          runId,
+          connectorId: this.connectorId,
+          axis: 'publication',
+          fromStatus: publicationFrom,
+          toStatus: 'skipped',
+          reasonCode: 'PUBLICATION_ABANDONED'
+        })
+      }
+      const record = await this.getWith(client, runId)
+      if (record === null)
+        throw new Error(`Review run ${runId} disappeared during abandonment.`)
+      return record
+    })
   }
   /** Recoverable runs, as a projection rather than a bare array: a row the contract cannot
    * represent is returned in `dropped` instead of aborting the read.
