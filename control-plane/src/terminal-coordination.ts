@@ -72,7 +72,8 @@ export async function observeRunnerRun(
   }
   if (status.status === 'running') {
     // `markRunning` only writes on the queued -> running transition; when the run is already
-    // running we still record that it was observed just now.
+    // running, retry the heartbeat so `execution_updated_at` keeps advancing. If the store has
+    // already seen a different state, the UPDATE matches nothing and the run stays as observed.
     if (!(await store.markRunning(run.run_id))) {
       await store.touchObservation(run.run_id)
       return 'active'
@@ -87,6 +88,8 @@ export async function observeRunnerRun(
     return 'active'
   }
   if (status.status !== 'succeeded' && status.status !== 'failed') {
+    // The Runner still reports an unfinished task. Refresh the observation heartbeat only for
+    // the states it applies to; `touchObservation` is a no-op for pending/uncertain.
     await store.touchObservation(run.run_id)
     return 'active'
   }

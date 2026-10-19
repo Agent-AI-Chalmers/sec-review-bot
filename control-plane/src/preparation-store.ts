@@ -347,12 +347,18 @@ export class PreparationStore {
          WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
-      await client.query(
-        `UPDATE publications SET status='skipped', claim_token=NULL, failure_code=NULL,
-           failure_message=NULL, updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='pending'`,
-        [runId, this.connectorId]
-      )
+      // Publication is only "not applicable" once execution is conclusively skipped. An
+      // uncertain submission may still be accepted, so its publication stays `pending`: ruling
+      // it out early would require a later skipped -> pending reversion just to undo this.
+      const skippedPublication = submissionUncertain
+        ? undefined
+        : await client.query(
+            `UPDATE publications SET status='skipped', claim_token=NULL,
+               failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+             WHERE run_id=$1 AND connector_id=$2 AND status='pending'
+             RETURNING run_id`,
+            [runId, this.connectorId]
+          )
       await client.query(
         `INSERT INTO preparation_failure_notices (run_id,connector_id,status)
          VALUES ($1,$2,'pending') ON CONFLICT (run_id) DO NOTHING`,
@@ -374,13 +380,15 @@ export class PreparationStore {
         toStatus: submissionUncertain ? 'uncertain' : 'skipped',
         reasonCode: submissionUncertain ? 'SUBMISSION_STATE_UNCERTAIN' : null
       })
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: 'pending',
-        toStatus: 'skipped'
-      })
+      if (skippedPublication?.rowCount === 1) {
+        await appendEvent(client, {
+          runId,
+          connectorId: this.connectorId,
+          axis: 'publication',
+          fromStatus: 'pending',
+          toStatus: 'skipped'
+        })
+      }
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,

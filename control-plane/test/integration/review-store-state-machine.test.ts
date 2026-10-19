@@ -1509,3 +1509,97 @@ test('the write path refuses an artifact storage value the contract forbids', as
     await store.close()
   }
 })
+
+test('every publication transition writes exactly one audit event', async () => {
+  // The audit log is the operator's timeline of a run. A publication state change that is
+  // not logged makes the History view claim the publication never started (or never got
+  // skipped), so each write path below must leave one matching publication event.
+  const store = await createStore()
+  const publicationEvents = async (runId: string) =>
+    (await store.listEvents(runId))
+      .filter((event) => event.axis === 'publication')
+      .map((event) => `${event.from_status}->${event.to_status}`)
+  try {
+    // Terminal execution failure skips publication.
+    const failedRun = await createQueuedRun(store)
+    assert.strictEqual(
+      await store.failRunnerExecution(failedRun, {
+        code: 'RUNNER_EXECUTION_FAILED',
+        message: 'boom'
+      }),
+      true
+    )
+    assert.deepStrictEqual(await publicationEvents(failedRun), [
+      'null->pending',
+      'pending->skipped'
+    ])
+
+    // Claiming publishable work starts publishing.
+    const claimedRun = await createSuccessfulRun(store)
+    assert.ok(await store.claimPublication(claimedRun))
+    assert.deepStrictEqual(await publicationEvents(claimedRun), [
+      'null->pending',
+      'pending->publishing'
+    ])
+
+    // An uncertain submission may still be accepted, so publication must NOT be ruled out yet:
+    // it stays `pending` until execution is conclusively skipped or failed.
+    const recoveredRun = `run-${randomUUID()}`
+    const admitted = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: recoveredRun,
+      publish_context: {}
+    })
+    assert.ok(admitted.preparation_token)
+    await store.failPreparation(
+      recoveredRun,
+      admitted.preparation_token,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
+      { retry: false }
+    )
+    assert.strictEqual(
+      (await store.getRun(recoveredRun))?.publication_status,
+      'pending',
+      'an uncertain submission must not skip publication'
+    )
+    const recoveryToken = await store.claimSubmissionRecovery(recoveredRun)
+    assert.ok(recoveryToken)
+    assert.strictEqual(
+      await store.completeSubmissionRecovery(recoveredRun, recoveryToken),
+      true
+    )
+    assert.deepStrictEqual(await publicationEvents(recoveredRun), [
+      'null->pending'
+    ])
+
+    // Only a rejected replay proves there is nothing to publish.
+    const rejectedRun = `run-${randomUUID()}`
+    const rejectedAdmission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: rejectedRun,
+      publish_context: {}
+    })
+    assert.ok(rejectedAdmission.preparation_token)
+    await store.failPreparation(
+      rejectedRun,
+      rejectedAdmission.preparation_token,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
+      { retry: false }
+    )
+    const rejectedToken = await store.claimSubmissionRecovery(rejectedRun)
+    assert.ok(rejectedToken)
+    assert.strictEqual(
+      await store.failSubmissionRecovery(rejectedRun, rejectedToken, {
+        code: 'SUBMISSION_FAILED',
+        message: 'no'
+      }),
+      true
+    )
+    assert.deepStrictEqual(await publicationEvents(rejectedRun), [
+      'null->pending',
+      'pending->skipped'
+    ])
+  } finally {
+    await store.close()
+  }
+})

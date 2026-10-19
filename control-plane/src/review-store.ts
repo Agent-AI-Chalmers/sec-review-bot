@@ -757,15 +757,9 @@ export class ReviewRunStore {
         [runId, this.connectorId, token]
       )
       if (result.rowCount !== 1) return false
-      await client.query(
-        `
-        UPDATE publications
-        SET status='pending', claim_token=NULL, failure_code=NULL,
-            failure_message=NULL, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2 AND status='skipped'
-      `,
-        [runId, this.connectorId]
-      )
+      // Publication stayed `pending` throughout `uncertain` (an accepted submission could still
+      // succeed), so an accepted replay needs no publication change: the run is simply queued
+      // and its eventual result remains publishable.
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -794,12 +788,13 @@ export class ReviewRunStore {
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
       if (result.rowCount !== 1) return false
-      await client.query(
+      const skipped = await client.query(
         `
         UPDATE publications
         SET status='skipped', claim_token=NULL,
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND status='pending'
+        RETURNING run_id
       `,
         [runId, this.connectorId]
       )
@@ -811,6 +806,16 @@ export class ReviewRunStore {
         toStatus: 'failed',
         reasonCode: error.code ?? null
       })
+      if (skipped.rowCount === 1) {
+        await appendEvent(client, {
+          runId,
+          connectorId: this.connectorId,
+          axis: 'publication',
+          fromStatus: 'pending',
+          toStatus: 'skipped',
+          reasonCode: error.code ?? null
+        })
+      }
       return true
     })
   }
@@ -886,12 +891,13 @@ export class ReviewRunStore {
       if (run.rowCount !== 1) return false
       // A terminal Runner failure has no result to publish. Keep the publication
       // row only as the durable declaration that publication is not applicable.
-      await client.query(
+      const skipped = await client.query(
         `
         UPDATE publications
         SET status='skipped', claim_token=NULL,
             failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
         WHERE run_id=$1 AND connector_id=$2 AND status='pending'
+        RETURNING run_id
       `,
         [runId, this.connectorId]
       )
@@ -903,6 +909,17 @@ export class ReviewRunStore {
         toStatus: 'failed',
         reasonCode: error.code ?? null
       })
+      // The publication axis moved too; record it so the audit trail matches the snapshot.
+      // RETURNING keeps the event honest when the publication was already non-pending.
+      if (skipped.rowCount === 1) {
+        await appendEvent(client, {
+          runId,
+          connectorId: this.connectorId,
+          axis: 'publication',
+          fromStatus: 'pending',
+          toStatus: 'skipped'
+        })
+      }
       return true
     })
   }
@@ -913,28 +930,54 @@ export class ReviewRunStore {
    * cross-axis orchestration, not a single-axis publication write. */
   async claimPublication(runId: string): Promise<string | null> {
     const token = crypto.randomUUID()
-    const result = await this.pool.query<{ claim_token: string }>(
-      `
-      UPDATE publications p
-      SET status='publishing', claim_token=$2, claimed_at=clock_timestamp(),
-          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-      FROM executions e
-      WHERE p.run_id=$1 AND p.connector_id=$3
-        AND e.run_id=p.run_id AND e.connector_id=p.connector_id
-        -- A JSON 'null' result satisfies 'IS NOT NULL' (it is stored as the JSON
-        -- value null, not SQL NULL), yet node-pg reads it back as JS null, which
-        -- would poison the claim path. Exclude it so a null-result run is never
-        -- claimed, instead of blocking every other publication head-of-line.
-        AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
-        AND (
-          p.status='pending'
-          OR (p.status='publishing' AND p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
+    return await transaction(this.pool, async (client) => {
+      // Capture the pre-update state so the audit event names where the claim came from:
+      // a fresh `pending` claim versus reclaiming an expired `publishing` lease.
+      const result = await client.query<{
+        claim_token: string
+        from_status: PublicationStatus
+      }>(
+        `
+        WITH previous AS (
+          SELECT run_id, status FROM publications
+          WHERE run_id=$1 AND connector_id=$3
+          FOR UPDATE
         )
-      RETURNING p.claim_token
-    `,
-      [runId, token, this.connectorId, this.claimTimeoutMs]
-    )
-    return result.rows[0]?.claim_token ?? null
+        UPDATE publications p
+        SET status='publishing', claim_token=$2, claimed_at=clock_timestamp(),
+            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+        FROM previous, executions e
+        WHERE p.run_id=previous.run_id AND previous.run_id=$1 AND p.connector_id=$3
+          AND e.run_id=p.run_id AND e.connector_id=p.connector_id
+          -- A JSON 'null' result satisfies 'IS NOT NULL' (it is stored as the JSON
+          -- value null, not SQL NULL), yet node-pg reads it back as JS null, which
+          -- would poison the claim path. Exclude it so a null-result run is never
+          -- claimed, instead of blocking every other publication head-of-line.
+          AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
+          AND (
+            previous.status='pending'
+            OR (previous.status='publishing'
+              AND p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
+          )
+        RETURNING p.claim_token, previous.status AS from_status
+      `,
+        [runId, token, this.connectorId, this.claimTimeoutMs]
+      )
+      const claimed = result.rows[0]
+      if (claimed === undefined) return null
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'publication',
+        fromStatus: claimed.from_status,
+        toStatus: 'publishing',
+        reasonCode:
+          claimed.from_status === 'publishing'
+            ? 'PUBLICATION_LEASE_EXPIRED'
+            : null
+      })
+      return claimed.claim_token
+    })
   }
   /**
    * Claim the next publishable run, optionally holding the request until one appears.
@@ -967,9 +1010,12 @@ export class ReviewRunStore {
 
   private async claimNextPublicationOnce(): Promise<PublicationWork | null> {
     return await transaction(this.pool, async (client) => {
-      const candidate = await client.query<{ run_id: string }>(
+      const candidate = await client.query<{
+        run_id: string
+        status: PublicationStatus
+      }>(
         `
-        SELECT p.run_id
+        SELECT p.run_id, p.status
         FROM publications p
         JOIN executions e ON e.run_id=p.run_id AND e.connector_id=p.connector_id
         WHERE p.connector_id=$1
@@ -985,8 +1031,9 @@ export class ReviewRunStore {
       `,
         [this.connectorId, this.claimTimeoutMs]
       )
-      const runId = candidate.rows[0]?.run_id
-      if (runId === undefined) return null
+      const candidateRow = candidate.rows[0]
+      if (candidateRow === undefined) return null
+      const runId = candidateRow.run_id
       const token = crypto.randomUUID()
       await client.query(
         `
@@ -997,6 +1044,17 @@ export class ReviewRunStore {
       `,
         [runId, this.connectorId, token]
       )
+      await appendEvent(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'publication',
+        fromStatus: candidateRow.status,
+        toStatus: 'publishing',
+        reasonCode:
+          candidateRow.status === 'publishing'
+            ? 'PUBLICATION_LEASE_EXPIRED'
+            : null
+      })
       const result = await client.query<ReviewRunRow>(
         `${RUN_SELECT}
         WHERE r.run_id=$1 AND r.connector_id=$2`,
