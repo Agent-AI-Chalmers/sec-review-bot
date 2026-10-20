@@ -491,16 +491,27 @@ function requireComparableRefs(
  * therefore drops files the patch still contains, which is the window divergence this module
  * exists to prevent.
  */
-const GIT_STATUS_NAMES: Record<string, string> = {
+/** The scan scope's change vocabulary, as the contract schema defines it. */
+export type ChangedFileStatus =
+  'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
+
+/**
+ * Project git's diff letters onto the contract's status vocabulary.
+ *
+ * Git and the compare API are upstream representations; neither is the domain value. Only letters
+ * that map to a contract status are listed: `U` (unmerged) and `B` (broken) describe workspace
+ * states with no scan-scope meaning, so an unlisted letter is rejected rather than guessed at.
+ *
+ * `D` becomes `deleted`, not the compare API's `removed`, because `deleted` is the value the rest
+ * of this repository uses -- discovery skips exactly that status.
+ */
+const GIT_STATUS_NAMES: Record<string, ChangedFileStatus> = {
   A: 'added',
   C: 'copied',
-  D: 'removed',
+  D: 'deleted',
   M: 'modified',
   R: 'renamed',
-  T: 'changed',
-  U: 'unmerged',
-  X: 'unknown',
-  B: 'broken'
+  T: 'type_changed'
 }
 
 /**
@@ -512,13 +523,13 @@ const GIT_STATUS_NAMES: Record<string, string> = {
  */
 function parseNameStatusZ(output: string): {
   path: string
-  status: string
+  status: ChangedFileStatus
   previous_path: string | null
 }[] {
   const fields = output.split('\0')
   const entries: {
     path: string
-    status: string
+    status: ChangedFileStatus
     previous_path: string | null
   }[] = []
   let index = 0
@@ -527,7 +538,12 @@ function parseNameStatusZ(output: string): {
     if (raw_status === '') break
     index += 1
     const code = raw_status.charAt(0)
-    const status = GIT_STATUS_NAMES[code] ?? 'unknown'
+    const status = GIT_STATUS_NAMES[code]
+    if (status === undefined) {
+      throw new Error(
+        `workspace diff reported git status '${code}', which has no scan-scope meaning`
+      )
+    }
     if (code === 'R' || code === 'C') {
       const previous_path = fields[index] ?? ''
       const path = fields[index + 1] ?? ''
@@ -608,7 +624,13 @@ export async function exportWorkspaceChangedFiles({
   base_sha: string
   head_sha: string
 }): Promise<
-  { path: string; status: string; additions: number; deletions: number }[]
+  {
+    path: string
+    status: ChangedFileStatus
+    previous_path: string | null
+    additions: number
+    deletions: number
+  }[]
 > {
   requireComparableRefs(base_sha, head_sha, 'exportWorkspaceChangedFiles')
   const range = `${base_sha.trim()}...${head_sha.trim()}`
@@ -626,8 +648,38 @@ export async function exportWorkspaceChangedFiles({
   return parseNameStatusZ(name_status).map((entry) => ({
     path: entry.path,
     status: entry.status,
+    previous_path: entry.previous_path,
     ...(counts.get(entry.path) ?? { additions: 0, deletions: 0 })
   }))
+}
+
+/**
+ * List the commits in `base..head`, oldest first.
+ *
+ * The compare API paginates its `commits` array: without `per_page` it returns 250 per page, and
+ * reading further pages is a loop this caller does not want. The workspace already holds the
+ * history, so `git rev-list` answers the same question in one call with no page size and no cap.
+ * This is also what the local materializer does, so both producers name the window's commits the
+ * same way.
+ */
+export async function exportWorkspaceCommits({
+  workspace_path,
+  base_sha,
+  head_sha
+}: {
+  workspace_path: string
+  base_sha: string
+  head_sha: string
+}): Promise<string[]> {
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceCommits')
+  // Two dots, not three: the window is the commits reachable from head and not from base, which
+  // is the same set the diff renders, expressed in commit terms.
+  const output = await runGitCommandCapture(
+    workspace_path,
+    ['rev-list', '--reverse', `${base_sha.trim()}..${head_sha.trim()}`],
+    { config: WORKSPACE_GIT_CONFIG }
+  )
+  return output.split('\n').filter((sha) => sha !== '')
 }
 
 /**
@@ -650,18 +702,21 @@ export async function exportWorkspaceWindow({
   patch: string
   files: {
     filename: string
-    status: string
+    status: ChangedFileStatus
+    previous_path: string | null
     additions: number
     deletions: number
     patch: string | null
   }[]
+  commit_shas: string[]
 }> {
   requireComparableRefs(base_sha, head_sha, 'exportWorkspaceWindow')
   const range = `${base_sha.trim()}...${head_sha.trim()}`
 
-  const [entries, patch] = await Promise.all([
+  const [entries, patch, commit_shas] = await Promise.all([
     exportWorkspaceChangedFiles({ workspace_path, base_sha, head_sha }),
-    exportWorkspaceDiff({ workspace_path, base_sha, head_sha })
+    exportWorkspaceDiff({ workspace_path, base_sha, head_sha }),
+    exportWorkspaceCommits({ workspace_path, base_sha, head_sha })
   ])
   const ordered_paths = await runGitCommandCapture(
     workspace_path,
@@ -689,11 +744,13 @@ export async function exportWorkspaceWindow({
 
   return {
     patch,
+    commit_shas,
     files: entries.map((entry) => {
       const file_patch = patch_by_path.get(entry.path)
       return {
         filename: entry.path,
         status: entry.status,
+        previous_path: entry.previous_path,
         additions: entry.additions,
         deletions: entry.deletions,
         // A binary file's hunk is the "Binary files ... differ" placeholder, which carries no

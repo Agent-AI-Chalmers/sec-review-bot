@@ -42,7 +42,6 @@ Compared with full scan, incremental scan adds these artifacts:
 - `incremental-window/incremental.patch`: unified diff for `base_sha..head_sha`
 - `incremental-window/changed-files.json`: structured changed-file list, including status, rename, size, and similar metadata
 - `history/scan-window.json`: incremental window metadata, including base/head, trigger source, and time
-- `history/commits.json`: commit summaries for `base_sha..head_sha`
 
 Minimum `changed-files.json` shape:
 
@@ -60,22 +59,7 @@ Minimum `changed-files.json` shape:
 }
 ```
 
-Minimum `history/commits.json` shape:
-
-```json
-{
-  "base_sha": "abc123",
-  "head_sha": "def456",
-  "commits": [
-    {
-      "sha": "111aaa",
-      "title": "fix(auth): tighten JWT audience check",
-      "author": "alice",
-      "committed_at": "2026-04-19T08:01:02Z"
-    }
-  ]
-}
-```
+The commit identities for the window travel in `scan_target.commit_shas`, as they do for pull request runs. Commit messages and authorship are not materialized: the patch already shows what changed, and a message is author-supplied text that adds nothing a security review can act on.
 
 ### Role of `history` as Auxiliary Evidence
 

@@ -21,7 +21,7 @@ def _run_git(repo_path: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def test_build_changed_files_normalizes_copied_status_to_modified() -> None:
+def test_build_changed_files_reports_copied_with_its_source() -> None:
     with patch(
         "sec_review_agents.cli.local_materialization.repository.subprocess.run",
         return_value=subprocess.CompletedProcess(
@@ -34,10 +34,12 @@ def test_build_changed_files_normalizes_copied_status_to_modified() -> None:
 
         entries = _build_changed_files(Path("/repo"), "base", "head")
 
+    # `copied` is part of the contract's change vocabulary, so it keeps its own name instead of
+    # collapsing into `modified`, and the source path travels with it.
     assert entries == [
         {
             "path": "new.py",
-            "status": "modified",
+            "status": "copied",
             "previous_path": "old.py",
         }
     ]

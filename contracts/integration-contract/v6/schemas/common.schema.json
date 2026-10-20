@@ -423,7 +423,7 @@
                 "$ref": "#/$defs/nonBlankString"
               },
               "status": {
-                "$ref": "#/$defs/nonBlankString"
+                "$ref": "#/$defs/changedFileStatus"
               },
               "previous_path": {
                 "type": [
@@ -431,7 +431,50 @@
                   "null"
                 ]
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "renamed",
+                        "copied"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "previous_path": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "not": {
+                        "enum": [
+                          "renamed",
+                          "copied"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "previous_path": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
           }
         }
       }
@@ -541,6 +584,18 @@
       "maxLength": 65536,
       "pattern": ".*\\S.*",
       "$comment": "Inline setup declaration text (`.sec-review/setup.yml`). Non-blank and bounded: the text travels inside the workflow input, so an unbounded file would grow the submission without limit. The real cap is 64 KiB of UTF-8 bytes, enforced by both producers before parse and by the runner's parser; this `maxLength` counts characters, so it can only admit a few extra multi-byte characters as a backstop -- the byte cap still rejects them loudly (before submission in the integration, at parse in the runner)."
+    },
+    "changedFileStatus": {
+      "type": "string",
+      "enum": [
+        "added",
+        "modified",
+        "deleted",
+        "renamed",
+        "copied",
+        "type_changed"
+      ],
+      "$comment": "The scan scope's change vocabulary, independent of how a producer learns it. Git reports D/R/C/T and the compare API reports 'removed'; producers project those into these values."
     }
   }
 }

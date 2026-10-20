@@ -44,7 +44,6 @@
 - `incremental-window/incremental.patch`：`base_sha..head_sha` 的统一 diff
 - `incremental-window/changed-files.json`：结构化变更文件列表（状态、重命名、大小等）
 - `history/scan-window.json`：增量窗口元信息（base/head、触发来源、时间）
-- `history/commits.json`：`base_sha..head_sha` 区间内 commit 摘要
 
 `changed-files.json` 最小结构：
 
@@ -62,22 +61,7 @@
 }
 ```
 
-`history/commits.json` 最小结构：
-
-```json
-{
-  "base_sha": "abc123",
-  "head_sha": "def456",
-  "commits": [
-    {
-      "sha": "111aaa",
-      "title": "fix(auth): tighten JWT audience check",
-      "author": "alice",
-      "committed_at": "2026-04-19T08:01:02Z"
-    }
-  ]
-}
-```
+窗口内的 commit 标识随 `scan_target.commit_shas` 传递，与 pull request run 一致。commit message 与作者信息不再物化：patch 已经说明了改了什么，而 message 属于作者提供的文本，不提供安全审查可以据以判断的信息。
 
 ### `history` 的定位（辅助证据层）
 

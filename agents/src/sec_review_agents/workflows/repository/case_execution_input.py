@@ -82,7 +82,6 @@ def build_review_input(*, case: Mapping[str, Any], scan_mode: str) -> str:
                 "- Changed files: `/incremental-window/changed-files.json`",
                 "- Incremental patch: `/incremental-window/incremental.patch`",
                 "- Scan window: `/history/scan-window.json`",
-                "- Commits: `/history/commits.json`",
             ]
         )
     return "\n".join(sections).strip()

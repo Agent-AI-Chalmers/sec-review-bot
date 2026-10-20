@@ -264,3 +264,95 @@ def test_contracts_root_env_var_that_lacks_schemas_fails_loudly(
     monkeypatch.setenv("SEC_REVIEW_CONTRACTS_ROOT", str(tmp_path))
     with pytest.raises(RuntimeError, match="SEC_REVIEW_CONTRACTS_ROOT"):
         contract_schema._schema_root()
+
+
+# The fixture and the schema it validates against are separate names; resolve the schema from the
+# manifest instead of restating it here.
+_REPOSITORY_INCREMENTAL_SCHEMA = fixture_schemas()[
+    "repository-review-input-incremental.json"
+]
+
+
+def _repository_input_with_changed_files(
+    changed_files: list[dict[str, object]],
+) -> dict[str, object]:
+    fixture = deepcopy(contract_fixture("repository-review-input-incremental.json"))
+    scan_scope = fixture["scan_scope"]
+    assert isinstance(scan_scope, dict)
+    scan_scope["incremental_changed_files"] = changed_files
+    return fixture
+
+
+@pytest.mark.parametrize(
+    "status",
+    ["added", "modified", "deleted", "renamed", "copied", "type_changed"],
+)
+def test_v6_incremental_changed_file_accepts_every_contract_status(
+    status: str,
+) -> None:
+    """The scan scope's status is a closed vocabulary, and every value in it must validate.
+
+    A producer that gains a status the schema has not accepted would otherwise be silently
+    downgraded, which is how `removed` reached discovery while it was waiting for `deleted`.
+    """
+    previous_path = "old.py" if status in {"renamed", "copied"} else None
+    fixture = _repository_input_with_changed_files(
+        [{"path": "new.py", "status": status, "previous_path": previous_path}]
+    )
+
+    errors = list(
+        contract_validator(_REPOSITORY_INCREMENTAL_SCHEMA).iter_errors(fixture)
+    )
+
+    assert errors == [], format_schema_errors(errors)
+
+
+@pytest.mark.parametrize("status", ["removed", "Renamed", "unknown", ""])
+def test_v6_incremental_changed_file_rejects_status_outside_the_contract(
+    status: str,
+) -> None:
+    """Upstream vocabulary must not travel as-is.
+
+    `removed` is the GitHub compare API's word for a deletion; carrying it into the scan scope
+    made discovery scan a file that no longer exists.
+    """
+    fixture = _repository_input_with_changed_files(
+        [{"path": "new.py", "status": status, "previous_path": None}]
+    )
+
+    errors = list(
+        contract_validator(_REPOSITORY_INCREMENTAL_SCHEMA).iter_errors(fixture)
+    )
+
+    assert errors, f"status {status!r} was accepted"
+
+
+@pytest.mark.parametrize("status", ["renamed", "copied"])
+def test_v6_incremental_changed_file_requires_previous_path_for_a_move(
+    status: str,
+) -> None:
+    fixture = _repository_input_with_changed_files(
+        [{"path": "new.py", "status": status, "previous_path": None}]
+    )
+
+    errors = list(
+        contract_validator(_REPOSITORY_INCREMENTAL_SCHEMA).iter_errors(fixture)
+    )
+
+    assert errors, f"status {status!r} was accepted without a previous path"
+
+
+@pytest.mark.parametrize("status", ["added", "modified", "deleted", "type_changed"])
+def test_v6_incremental_changed_file_rejects_previous_path_without_a_move(
+    status: str,
+) -> None:
+    """Only a move has a source path; on any other status it would be a meaningless field."""
+    fixture = _repository_input_with_changed_files(
+        [{"path": "new.py", "status": status, "previous_path": "old.py"}]
+    )
+
+    errors = list(
+        contract_validator(_REPOSITORY_INCREMENTAL_SCHEMA).iter_errors(fixture)
+    )
+
+    assert errors, f"status {status!r} was accepted with a previous path"

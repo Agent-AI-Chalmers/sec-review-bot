@@ -27,7 +27,8 @@ export interface RepositoryScanScope {
   paths_ignore: string[]
   incremental_changed_files: {
     path: string
-    status: string
+    status:
+      'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
     previous_path: string | null
   }[]
 }

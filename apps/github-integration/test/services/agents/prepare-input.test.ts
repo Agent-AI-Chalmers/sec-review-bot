@@ -191,13 +191,17 @@ function repositoryOctokit(refs: {
     if (pathname.includes('/compare/')) {
       return githubJson({
         status: 'ahead',
+        // Deliberately not the workspace's change set. The incremental window's patch and file
+        // list are exported from the workspace repository, because the compare response caps its
+        // file list (300) and its diff media type (~3 MB, truncated mid-file). If either artifact
+        // were taken from this response, the assertions below would see `from-api.ts`.
         files: [
           {
-            filename: 'src/app.ts',
+            filename: 'from-api.ts',
             status: 'modified',
-            additions: 1,
-            deletions: 1,
-            changes: 2
+            additions: 99,
+            deletions: 99,
+            changes: 198
           }
         ],
         commits: [
@@ -610,9 +614,55 @@ test(
       })
       assert.strictEqual(incremental.input.scan_target.scan_mode, 'incremental')
       assert.strictEqual(incremental.input.scan_target.base_sha, refs.base_sha)
-      assert.strictEqual(
-        incremental.input.scan_scope.incremental_changed_files[0]?.path,
-        'src/app.ts'
+      const changed_paths =
+        incremental.input.scan_scope.incremental_changed_files.map(
+          (file) => file.path
+        )
+      assert.ok(
+        changed_paths.includes('src/app.ts'),
+        `the workspace change is missing from the scan scope: ${changed_paths.join(', ')}`
+      )
+      assert.ok(
+        !changed_paths.includes('from-api.ts'),
+        'the scan scope was read from the compare response instead of the workspace'
+      )
+      const incremental_patch = await fs.readFile(
+        path.join(
+          incremental.input_bundle_root,
+          'incremental-window',
+          'incremental.patch'
+        ),
+        'utf8'
+      )
+      assert.match(incremental_patch, /src\/app\.ts/)
+      assert.doesNotMatch(incremental_patch, /from-api\.ts/)
+
+      // The bundle is what the agent reads, so the file has to be there. The manifest and the
+      // prompts both name this path; asserting only that they mention it let the file itself
+      // stop being written.
+      const incremental_changed_files = JSON.parse(
+        await fs.readFile(
+          path.join(
+            incremental.input_bundle_root,
+            'incremental-window',
+            'changed-files.json'
+          ),
+          'utf8'
+        )
+      ) as {
+        base_sha: string
+        head_sha: string
+        files: { path: string; status: string; previous_path: string | null }[]
+      }
+      assert.strictEqual(incremental_changed_files.base_sha, refs.base_sha)
+      assert.strictEqual(incremental_changed_files.head_sha, refs.head_sha)
+      assert.deepStrictEqual(
+        incremental_changed_files.files.map((file) => [
+          file.path,
+          file.status,
+          file.previous_path
+        ]),
+        [['src/app.ts', 'modified', null]]
       )
       const incrementalManifest = JSON.parse(
         await fs.readFile(
@@ -621,6 +671,23 @@ test(
         )
       ) as Record<string, unknown>
       assert.strictEqual('incremental_window' in incrementalManifest, true)
+
+      // One writer produces the window record for both modes, so a field cannot exist in one
+      // and be missing from the other.
+      const scan_window = JSON.parse(
+        await fs.readFile(
+          path.join(
+            incremental.input_bundle_root,
+            'history',
+            'scan-window.json'
+          ),
+          'utf8'
+        )
+      ) as Record<string, unknown>
+      assert.strictEqual(scan_window['scan_mode'], 'incremental')
+      assert.strictEqual(scan_window['base_sha'], refs.base_sha)
+      assert.strictEqual(scan_window['head_sha'], refs.head_sha)
+      assert.strictEqual(typeof scan_window['changed_file_count'], 'number')
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer

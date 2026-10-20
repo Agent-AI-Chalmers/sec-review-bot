@@ -28,8 +28,6 @@ import {
   readSetupDeclaration
 } from '../shared/input-bundle.js'
 
-const MAX_INCREMENTAL_FILES = 5000
-
 interface RepositoryContext {
   owner_login: string
   repo_name: string
@@ -176,19 +174,30 @@ export async function prepareRepositoryReviewInput({
     if (!windowValid) {
       throw new Error('incremental scan window is invalid.')
     }
+  }
 
+  const historyRefs =
+    resolvedScanMode === 'incremental' &&
+    typeof resolvedBaseSha === 'string' &&
+    resolvedBaseSha.trim() !== ''
+      ? [resolvedBaseSha, resolvedHeadSha]
+      : [resolvedHeadSha]
+  await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
+
+  if (
+    resolvedScanMode === 'incremental' &&
+    typeof resolvedBaseSha === 'string' &&
+    resolvedBaseSha.trim() !== ''
+  ) {
     let incrementalResult: {
       changed_files: ChangedFileRecord[]
       commit_shas: string[]
     }
     try {
       incrementalResult = await materializeIncrementalArtifacts({
-        octokit,
-        repo,
+        workspace_path,
         incremental_window_path,
         history_path,
-        run_id,
-        event_type,
         base_sha: resolvedBaseSha,
         head_sha: resolvedHeadSha
       })
@@ -201,20 +210,7 @@ export async function prepareRepositoryReviewInput({
 
     changedFilesForScanScope = incrementalResult.changed_files
     commitShasForScanTarget = incrementalResult.commit_shas
-    if (incrementalResult.changed_files.length > MAX_INCREMENTAL_FILES) {
-      throw new Error(
-        `incremental diff too large: changed files ${incrementalResult.changed_files.length} exceeds limit ${MAX_INCREMENTAL_FILES}.`
-      )
-    }
   }
-
-  const historyRefs =
-    resolvedScanMode === 'incremental' &&
-    typeof resolvedBaseSha === 'string' &&
-    resolvedBaseSha.trim() !== ''
-      ? [resolvedBaseSha, resolvedHeadSha]
-      : [resolvedHeadSha]
-  await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
   // Trusted default branch (not the user-selectable target_branch): its head SHA
   // was resolved once upstream; read the setup declaration from it through the
   // Contents API, whose auth rides on `octokit`.
@@ -230,16 +226,19 @@ export async function prepareRepositoryReviewInput({
     include_incremental_window: resolvedScanMode === 'incremental'
   })
 
-  if (resolvedScanMode === 'full') {
-    await writeJsonArtifact(path.join(history_path, 'scan-window.json'), {
-      run_id,
-      event_type: event_type,
-      scan_mode: 'full',
-      base_sha: resolvedBaseSha,
-      head_sha: resolvedHeadSha,
-      generated_at: new Date().toISOString()
-    })
-  }
+  // One writer for the run's window. The incremental scan contributes the only field a full scan
+  // cannot report: how many files the window touched.
+  await writeJsonArtifact(path.join(history_path, 'scan-window.json'), {
+    run_id,
+    event_type,
+    scan_mode: resolvedScanMode,
+    base_sha: resolvedBaseSha,
+    head_sha: resolvedHeadSha,
+    ...(changedFilesForScanScope === null
+      ? {}
+      : { changed_file_count: changedFilesForScanScope.length }),
+    generated_at: new Date().toISOString()
+  })
 
   const input_bundle = await archiveInputBundle({
     input_bundle_root,
