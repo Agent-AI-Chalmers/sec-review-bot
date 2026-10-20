@@ -379,12 +379,10 @@ async function deliverNextRunFailureNotice({
               run_id: notice.run_id,
               input,
               failure_stage: notice.failure_stage,
-              // A notice always names the stage; only the reason can be missing. The fallback
-              // keeps the reply readable without inventing a preparation failure for a run that
-              // actually failed later.
-              failure_code:
-                notice.failure_code ??
-                `${notice.failure_stage.toUpperCase()}_FAILED`
+              // A notice always names the stage; the reason may be absent. Passing null keeps the
+              // reply honest: synthesising `${stage}_FAILED` would print a code that is not in the
+              // coordination vocabulary and that the console cannot explain.
+              failure_code: notice.failure_code
             }
           )
     // A posted reply names its comment; a failed delivery has none to name.

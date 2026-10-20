@@ -18,12 +18,14 @@ function stubOctokit(
   report: {
     created: Array<{ owner: string; repo: string }>
     commented: number[]
+    /** The body of each comment the reply path posted, so its wording can be asserted. */
+    bodies?: string[]
     installed?: string[]
   },
   options: { repoLookupFailsWith?: number } = {}
 ): Octokit {
   const installed = new Set(report.installed ?? [])
-  const { octokit } = fakeGitHub(({ method, url }) => {
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
     const parsed = new URL(url)
     const pathname = parsed.pathname
     const repoMatch = /^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(pathname)
@@ -50,6 +52,8 @@ function stubOctokit(
     if (tail.endsWith('/comments') && method === 'GET') return githubJson([])
     if (tail.endsWith('/comments') && method === 'POST') {
       report.commented.push(Number(tail.split('/').at(-2)))
+      const posted = body as { body?: unknown } | undefined
+      if (typeof posted?.body === 'string') report.bodies?.push(posted.body)
       return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
     return githubJson({})
@@ -211,4 +215,53 @@ test('a transient repository lookup fault stays retryable', async () => {
     /Server Error/
   )
   assert.deepStrictEqual(report.created, [])
+})
+
+test('a notice without a failure code says so instead of inventing one', async () => {
+  // The contract allows `failure_code: null`. Substituting `${stage}_FAILED` printed a code that
+  // exists neither in the coordination vocabulary nor in the console's explanations, so a reader
+  // saw a plausible-looking reason that was never recorded anywhere.
+  const report = {
+    created: [] as Array<{ owner: string; repo: string }>,
+    commented: [] as number[],
+    bodies: [] as string[],
+    installed: ['octo/example']
+  }
+  await sendRunFailureReply(stubOctokit(report), {
+    run_id: 'run-no-code',
+    input: {
+      kind: 'github_repository_review',
+      verified_repository: 'octo/example'
+    },
+    failure_stage: 'execution',
+    failure_code: null
+  })
+
+  assert.strictEqual(report.bodies.length, 1)
+  const body = report.bodies[0]!
+  assert.doesNotMatch(body, /[A-Z_]+_FAILED/, 'no synthesized code may appear')
+  assert.doesNotMatch(body, /Reason:/, 'there is no reason to state')
+  assert.match(body, /no failure code/i)
+  assert.match(body, /run-no-code/, 'the run is still identified')
+})
+
+test('a notice with a failure code still states it', async () => {
+  const report = {
+    created: [] as Array<{ owner: string; repo: string }>,
+    commented: [] as number[],
+    bodies: [] as string[],
+    installed: ['octo/example']
+  }
+  await sendRunFailureReply(stubOctokit(report), {
+    run_id: 'run-with-code',
+    input: {
+      kind: 'github_repository_review',
+      verified_repository: 'octo/example'
+    },
+    failure_stage: 'execution',
+    failure_code: 'RUNNER_RESULT_MISSING'
+  })
+
+  assert.strictEqual(report.bodies.length, 1)
+  assert.match(report.bodies[0]!, /Reason: `RUNNER_RESULT_MISSING`\./)
 })

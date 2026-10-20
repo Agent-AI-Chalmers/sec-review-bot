@@ -149,7 +149,10 @@ export async function sendRunFailureReply(
     run_id: string
     input: Record<string, unknown>
     failure_stage: RunFailureStage
-    failure_code: string
+    /** The reason the Control Plane recorded, or null when it recorded none. A missing reason is
+     * stated as such: the notice must not invent a code that neither the contract nor the
+     * console knows, because the reader would take it as a unit of the coordination vocabulary. */
+    failure_code: string | null
   }
 ): Promise<RunFailureReplyResult | null> {
   // Resolve where the outcome belongs. A conversation (issue/PR) is named directly by persisted
@@ -183,10 +186,14 @@ export async function sendRunFailureReply(
   // The marker keeps the comment idempotent per run. It names the run only, not the stage: a run
   // that fails once should not collect one comment per axis that happened to observe it.
   const marker = `<!-- sec-review-failed:${args.run_id} -->`
+  const reason =
+    args.failure_code === null
+      ? 'The Control Plane recorded no failure code.'
+      : `Reason: \`${args.failure_code}\`.`
   const posted = await createIssueCommentUnlessMarkerExists(octokit, {
     ...target,
     marker,
-    body: `${marker}\n\n${STAGE_SENTENCE[args.failure_stage]} Reference: \`${args.run_id}\`. Reason: \`${args.failure_code}\`.`,
+    body: `${marker}\n\n${STAGE_SENTENCE[args.failure_stage]} Reference: \`${args.run_id}\`. ${reason}`,
     assert_publication_claim: async () => undefined
   })
   return { comment_url: posted.html_url }
