@@ -12,6 +12,7 @@ import { parse } from 'yaml'
 
 import { staleGeneratedArtifacts } from '../src/check-generated-artifacts.js'
 import { generatedArtifacts as schemas } from '../src/generate-schemas.js'
+import { generatedArtifacts as stateMachines } from '../src/generate-state-machines.js'
 import { generatedArtifacts as types } from '../src/generate-types.js'
 import { REPO_ROOT } from '../src/repo-root.js'
 
@@ -29,7 +30,10 @@ interface Manifest {
 
 const ACTUAL_OUTPUTS: Record<string, string[]> = {
   types: types().map((a) => path.relative(REPO_ROOT, a.output)),
-  schemas: schemas().map((a) => path.relative(REPO_ROOT, a.output))
+  schemas: schemas().map((a) => path.relative(REPO_ROOT, a.output)),
+  'state-machines': stateMachines().map((a) =>
+    path.relative(REPO_ROOT, a.output)
+  )
 }
 
 test('every committed artifact matches a fresh render', async () => {
