@@ -476,9 +476,11 @@ export function Detail(): React.JSX.Element {
   // is written on the first claim and `publication.finished_at` when it reaches a terminal
   // state. A run that is still `pending`, or whose publication was ruled out as `skipped`,
   // never started, so it has no such moment to present.
-  const publicationStarted =
-    run !== undefined &&
-    ['publishing', 'published', 'failed'].includes(run.publication.status)
+  //
+  // This asks the timestamp rather than the status on purpose: a status list has to be
+  // updated whenever the contract gains a state, and a forgotten entry would silently hide a
+  // real publication. `started_at` is exactly the fact being reported.
+  const publishedStart = run?.publication.started_at ?? null
   return (
     <Container size="lg" py="xl">
       <Button
@@ -715,26 +717,21 @@ export function Detail(): React.JSX.Element {
                   title={<Text fw={500}>{t('publication')}</Text>}
                 >
                   <div className="publication-summary">
-                    {publicationStarted && (
+                    {publishedStart !== null && (
                       <Text c="dimmed" size="sm">
                         {/* The publication phase starts when the work is first claimed, not
                             when execution ended: the gap between the two is the coordinator's
-                            polling wait and is not publishing time. `publicationStarted` above
-                            already guarantees a start and, for a terminal status, an end. */}
+                            polling wait and is not publishing time. The guard above proves the
+                            start exists, and `finished_at` is present exactly for terminal
+                            states, so neither is papered over with a fallback. */}
                         {formatDate(
-                          run.publication.finished_at ??
-                            run.publication.started_at ??
-                            run.created_at,
+                          run.publication.finished_at ?? publishedStart,
                           language
                         )}{' '}
                         ·{' '}
                         {phaseElapsed(
-                          run.publication.started_at ?? run.created_at,
-                          ['published', 'failed', 'skipped'].includes(
-                            run.publication.status
-                          )
-                            ? run.publication.finished_at
-                            : null,
+                          publishedStart,
+                          run.publication.finished_at,
                           t
                         )}
                       </Text>
