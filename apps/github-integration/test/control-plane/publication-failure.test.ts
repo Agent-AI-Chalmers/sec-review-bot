@@ -22,17 +22,17 @@ test('a publication step that exhausted its retry budget fails rather than retri
   })
 })
 
-test('the same exhaustion code carried by a transport fault stays retryable', () => {
-  // Control Plane reports the code on a refusal, but the publish paths rethrow whatever the claim
-  // call threw, and a request that never reached it (a client timeout, a connection reset) or
-  // that a proxy answered (502/503) carries the same code without Control Plane having decided
-  // anything. A timeout is raised with the code but no HTTP status, so that is the shape worth
-  // pinning: treating it as a verdict ends a publication whose steps were never refused.
-  const timeout = Object.assign(
-    new Error('Control Plane requirePublicationStepClaim request timed out.'),
-    { code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted }
-  )
-  assert.deepStrictEqual(classifyPublicationFailure(timeout), {
+test('the same exhaustion code carried by a proxy answer stays retryable', () => {
+  // The publish paths rethrow whatever the claim call threw. A proxy or load balancer answering
+  // 502/503 in front of Control Plane can relay the same code without Control Plane having
+  // decided anything about the step, so treating a 5xx as a verdict would end a publication whose
+  // steps were never refused. (A client-side timeout does not carry this code at all: the client
+  // raises `CONTROL_PLANE_REQUEST_TIMEOUT` for those, which is already retryable.)
+  const relayed = Object.assign(new Error('Bad Gateway'), {
+    code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+    status: 503
+  })
+  assert.deepStrictEqual(classifyPublicationFailure(relayed), {
     retry: true,
     code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
     reason: 'publication-step-retry-exhausted'

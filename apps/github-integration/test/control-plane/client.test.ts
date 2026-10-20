@@ -8,6 +8,7 @@ import {
   type ReviewRunRecord
 } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import { asErrorWithResponse, errorCode } from '../../src/utils/error-utils.js'
 
 const preparingRun: ReviewRunRecord = {
   run_id: 'run-1',
@@ -298,5 +299,47 @@ test('void operations accept the empty 200 body the real server sends', async (t
       message: 'x'
     }),
     undefined
+  )
+})
+
+test('a Control Plane refusal carries the HTTP status that tells it apart from a fault', async (t) => {
+  // Classification downstream separates two errors carrying the same `code`: Control Plane
+  // refusing the claim (409 — a verdict, terminal) from the same code on a request that never got
+  // an answer (no status — retryable). Only the status tells them apart, so the client must report
+  // the status it received. Without it every refusal looks like a transport fault and the
+  // publication re-claims the same spent step on every poll, forever.
+  const previousUrl = process.env.CONTROL_PLANE_SERVICE_URL
+  const previousToken = process.env.CONTROL_PLANE_SERVICE_TOKEN
+  process.env.CONTROL_PLANE_SERVICE_URL = 'http://control-plane.test'
+  process.env.CONTROL_PLANE_SERVICE_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousUrl === undefined) delete process.env.CONTROL_PLANE_SERVICE_URL
+    else process.env.CONTROL_PLANE_SERVICE_URL = previousUrl
+    if (previousToken === undefined)
+      delete process.env.CONTROL_PLANE_SERVICE_TOKEN
+    else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
+  })
+
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json(
+      {
+        error: 'Publication step has no attempts left; reconcile first.',
+        code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+      },
+      { status: 409 }
+    )
+  )
+
+  const error = await controlPlaneClient
+    .requirePublicationStepClaim('run-1', 'claim-1', 'issue:draft-pr')
+    .then(
+      () => assert.fail('the refusal must be raised'),
+      (raised: unknown) => raised
+    )
+  assert.strictEqual(errorCode(error), 'PUBLICATION_STEP_RETRY_EXHAUSTED')
+  assert.strictEqual(
+    asErrorWithResponse(error).status,
+    409,
+    'the client reports the status Control Plane answered with'
   )
 })

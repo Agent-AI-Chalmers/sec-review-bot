@@ -45,27 +45,20 @@ function publicationStepCodesFromContract(): string[] {
     .sort()
 }
 
-/** Control Plane's own terminal publication-step codes: every `PUBLICATION_STEP_*` code except
- * the exhaustion signal, which is also what a request that never reached the service carries.
- * See the retry assertions below for why that one cannot be classified from the code alone. */
-const DETERMINISTIC_CODES = (codes: string[]): string[] =>
-  codes.filter(
-    (code) =>
-      code !== RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
-  )
-
-test('every Control Plane publication-step code is known and classified', () => {
+test('every Control Plane publication-step code is known and terminal when refused', () => {
   const codes = publicationStepCodesFromContract()
   assert.ok(codes.length > 0, 'expected publication-step codes')
 
   const known = new Set<string>(Object.values(RUNNER_PUBLISH_ERROR_CODES))
-  for (const code of DETERMINISTIC_CODES(codes)) {
+  for (const code of codes) {
     assert.ok(
       known.has(code),
       `${code} is missing from RUNNER_PUBLISH_ERROR_CODES`
     )
-    // These are refusals: a stored run re-enters the same condition on every claim, so a
-    // missing classification here would resolve to `retry: true` and loop forever.
+    // Control Plane answers every one of these with a 409 (server.ts maps
+    // `DeterministicControlPlaneError` to 409), and a stored run re-enters the same condition on
+    // every claim. A missing classification would resolve to `retry: true` and loop forever, so
+    // this asserts the exact shape the client produces for that refusal.
     assert.strictEqual(
       classifyPublicationFailure({ code, status: 409 }).retry,
       false,
@@ -73,24 +66,17 @@ test('every Control Plane publication-step code is known and classified', () => 
     )
   }
 
-  // The exhaustion signal is terminal only when Control Plane answered it. The same code reaches
-  // this package from a claim call that timed out, and from one a proxy answered with a 5xx; a
-  // publication whose steps were never refused must not be ended by that.
-  const exhausted = RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
-  assert.ok(codes.includes(exhausted))
+  // The exhaustion signal is the one code whose meaning depends on who answered: a proxy in front
+  // of Control Plane can relay it without Control Plane having decided anything, and a publication
+  // whose steps were never refused must not be ended by that. The step-set codes above are
+  // deliberately status-blind instead — retrying a changed step set re-derives the same set
+  // forever — so this exception is about exhaustion alone, not a general rule for the enum.
   assert.strictEqual(
-    classifyPublicationFailure({ code: exhausted, status: 409 }).retry,
-    false,
-    'a refusal with no attempts left is terminal'
-  )
-  assert.strictEqual(
-    classifyPublicationFailure({ code: exhausted }).retry,
+    classifyPublicationFailure({
+      code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+      status: 503
+    }).retry,
     true,
-    'the same code from a request that never got an answer must stay retryable'
-  )
-  assert.strictEqual(
-    classifyPublicationFailure({ code: exhausted, status: 503 }).retry,
-    true,
-    'a proxy answer says nothing about the step budget'
+    'an exhaustion signal relayed by a proxy says nothing about the step budget'
   )
 })

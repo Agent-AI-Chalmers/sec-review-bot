@@ -151,11 +151,14 @@ class HttpControlPlaneClient {
         const parsed = (await response
           .json()
           .catch(() => ({}))) as HttpErrorBody
+        // The status is part of the answer, not decoration: a refusal (4xx) is a verdict that
+        // classification must tell apart from the same `code` carried by a request that never
+        // got an answer. Dropping it here made every refusal look like a transport fault.
         throw Object.assign(
           new Error(
             parsed.error ?? `Control Plane returned HTTP ${response.status}.`
           ),
-          { code: parsed.code ?? null }
+          { code: parsed.code ?? null, status: response.status }
         )
       }
       // A success body may legitimately be empty: three operations (`failPreparation`,
