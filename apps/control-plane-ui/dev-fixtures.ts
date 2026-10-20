@@ -1409,7 +1409,6 @@ if (publicationParkedIndex >= 0) {
   )
 }
 
-
 for (const run of runs) validateRun(run, stepsByRun.get(run.run_id) ?? [])
 if (new Set(runs.map((run) => run.run_id)).size !== runs.length) {
   throw new Error('dev fixtures must not reuse a run id.')
@@ -1453,11 +1452,9 @@ export function devFixtures(): Plugin {
       // set that produced them. Deriving from state is what lets all three axes appear in the
       // queue: a run parked on execution or publication is as invisible to an operator as one
       // parked on preparation if the list is built from a preparation-only source.
-      const parkedAxis = (run: FixtureRun):
-        | 'preparation'
-        | 'execution'
-        | 'publication'
-        | null =>
+      const parkedAxis = (
+        run: FixtureRun
+      ): 'preparation' | 'execution' | 'publication' | null =>
         run.preparation.status === 'disconnected'
           ? 'preparation'
           : run.execution.status === 'disconnected'
