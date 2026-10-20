@@ -48,12 +48,8 @@ export interface components {
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
-      /**
-       * @description Whether the requester has been told this run failed, or null when no notice exists.
-       *     It sits on the run rather than on an axis because any axis can end a run, and the
-       *     delivery status is a property of the run's whole outcome.
-       */
-      failure_notice: null | components['schemas']['RunFailureNoticeSummary']
+      /** @description User-visible notices caused by this run's coordination events, in creation order. */
+      notices: components['schemas']['RunNoticeSummary'][]
     }
     ReviewRunAdmission: {
       record: components['schemas']['ReviewRunRecord']
@@ -71,34 +67,30 @@ export interface components {
       claim_token: string
       attempt_count: number
     }
-    /**
-     * @description One pending notice that a run failed, claimed by the component that can tell the
-     *     requester. Any lifecycle axis can produce one; `failure_stage` says which, so the
-     *     delivery side can word the reply accurately instead of always reporting that the
-     *     review never started.
-     */
-    RunFailureNoticeWork: {
+    /** @description One pending user-visible notice, claimed by the component that can deliver it. */
+    RunNoticeWork: {
+      notice_id: string
       run_id: string
       input: {
         [key: string]: unknown
       }
-      /**
-       * @description The axis whose failure ended the run. `preparation` means nothing ran and the
-       *     review never started; `execution` means the Runner ran but did not finish;
-       *     `publication` means the work completed but its result could not be delivered.
-       * @enum {string}
-       */
-      failure_stage: 'preparation' | 'execution' | 'publication'
-      failure_code: string | null
+      /** @enum {string} */
+      kind: 'failure' | 'attention'
+      /** @enum {string} */
+      axis: 'preparation' | 'execution' | 'publication'
+      reason_code: string | null
       claim_token: string
     }
-    /** @description Delivery state of the one acknowledgement a failed run produces. */
-    RunFailureNoticeSummary: {
+    /** @description Delivery state of one user-visible coordination notice. */
+    RunNoticeSummary: {
+      notice_id: string
+      /** @enum {string} */
+      kind: 'failure' | 'attention'
+      /** @enum {string} */
+      axis: 'preparation' | 'execution' | 'publication'
       /** @enum {string} */
       status: 'pending' | 'delivering' | 'delivered' | 'failed'
-      /** @enum {string} */
-      failure_stage: 'preparation' | 'execution' | 'publication'
-      failure_code: string | null
+      reason_code: string | null
       /** @description Where the requester can read the outcome. Always an absolute URI when present, and null only when no message reached them. */
       comment_url: null | string
     }
@@ -129,7 +121,14 @@ export interface components {
     PublicationStepRecord: {
       step_key: string
       /** @enum {string} */
-      status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+      status:
+        | 'pending'
+        | 'running'
+        | 'uncertain'
+        | 'disconnected'
+        | 'succeeded'
+        | 'failed'
+        | 'terminal_failed'
       /** @description How many times this step has been claimed and started. More than one means an earlier owner began the side effect, so a reclaiming publisher must reconcile against the remote object (`remote_object_id`/`remote_object_url`) instead of assuming nothing happened. */
       attempt_count: number
       /**
@@ -137,7 +136,6 @@ export interface components {
        * @description When the latest claim of this step started; null until the step is claimed once. Together with `attempt_count` it distinguishes a step that never started from one whose publisher died mid-effect.
        */
       last_attempt_at: string | null
-      failure_count: number
       remote_object_id: string | null
       /** Format: uri */
       remote_object_url: string | null
@@ -147,8 +145,16 @@ export interface components {
     ObservedPublicationStep: {
       step_key: string
       /** @enum {string} */
-      status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-      failure_count: number
+      status:
+        | 'pending'
+        | 'running'
+        | 'uncertain'
+        | 'disconnected'
+        | 'succeeded'
+        | 'failed'
+        | 'terminal_failed'
+      /** @description How many attempts this step has started against its budget. A count above one on a successful step means the side effect was reached after a retry or a recovery, not on the first try. */
+      attempt_count: number
       /** Format: uri */
       remote_object_url: string | null
       failure_code: string | null
@@ -165,15 +171,12 @@ export interface components {
       created_at: string
       failure_code: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
-      /**
-       * @description Whether the requester has been told this run failed, or null when no notice exists.
-       *     It sits on the run rather than on an axis because any axis can end a run.
-       */
-      failure_notice: null | components['schemas']['RunFailureNoticeSummary']
+      /** @description User-visible notices caused by this run's coordination events, in creation order. */
+      notices: components['schemas']['RunNoticeSummary'][]
     }
     ExecutionSummary: {
       /**
-       * @description The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it to resolve the run to `queued` or `failed`, so it is not a failure.
+       * @description The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it under the same identity. `disconnected` means automatic recovery stopped after its finite budget without a conclusive answer, so it is not a failure.
        * @enum {string}
        */
       status:
@@ -181,6 +184,7 @@ export interface components {
         | 'queued'
         | 'running'
         | 'uncertain'
+        | 'disconnected'
         | 'succeeded'
         | 'skipped'
         | 'failed'
@@ -191,7 +195,7 @@ export interface components {
       started_at: string | null
       /**
        * Format: date-time
-       * @description Immutable instant the execution axis reached a terminal state (`succeeded`, `failed`, or `skipped`); null while it is pending, queued, running, or uncertain. Together with `started_at` it times the phase (only when `started_at` is non-null, since `skipped` has an end without a start).
+       * @description Immutable instant the execution axis reached a terminal state (`succeeded`, `failed`, or `skipped`); null while it is pending, queued, running, uncertain, or disconnected. Together with `started_at` it times the phase (only when `started_at` is non-null, since `skipped` has an end without a start).
        */
       finished_at: string | null
       /**
@@ -202,7 +206,14 @@ export interface components {
     }
     PublicationSummary: {
       /** @enum {string} */
-      status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      status:
+        | 'pending'
+        | 'publishing'
+        | 'uncertain'
+        | 'disconnected'
+        | 'published'
+        | 'failed'
+        | 'skipped'
       /**
        * Format: date-time
        * @description Immutable instant the publication phase began (the work was first claimed); null while it is pending, and null for `skipped`, which is concluded without ever having started. A retryable failure that returns the row to pending and claims it again does not move it.
@@ -223,7 +234,7 @@ export interface components {
       /** @description Monotonic identifier; also the tie-breaker within one occurred_at. */
       event_id: number
       /** @enum {string} */
-      axis: 'execution' | 'preparation' | 'publication' | 'notice'
+      axis: 'execution' | 'preparation' | 'publication'
       /** @description State before the transition; null for the first event on an axis. */
       from_status: string | null
       to_status: string
@@ -232,10 +243,19 @@ export interface components {
       /** Format: date-time */
       occurred_at: string
     }
-    BlockedPreparationExpiry: {
+    /** @description One run the system stopped working on by itself, and the axis it is parked on. A queue that listed only preparation left an operator unable to find a run whose execution or publication stalled. */
+    ParkedRun: {
       run_id: string
       /** @enum {string} */
-      reason: 'EXECUTION_ALREADY_ADVANCED'
+      axis: 'preparation' | 'execution' | 'publication'
+      /**
+       * @description Why automation stopped. A publication parks when a step's reconciliation budget is spent; the steps themselves record which one and what its last failure was.
+       * @enum {string}
+       */
+      reason:
+        | 'EXECUTION_ALREADY_ADVANCED'
+        | 'SUBMISSION_RECOVERY_EXHAUSTED'
+        | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
     }
     /** @description Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — the Control Plane drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary. */
     PreparationSummary: {
@@ -243,10 +263,16 @@ export interface components {
        * @description Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own "in progress" state and is unrelated to the Runner, which is only submitted to once preparation reaches `submitted`.
        * @enum {string}
        */
-      status: 'pending' | 'preparing' | 'submitted' | 'failed'
+      status:
+        | 'pending'
+        | 'preparing'
+        | 'uncertain'
+        | 'disconnected'
+        | 'submitted'
+        | 'failed'
       attempt_count: number
-      /** @description Non-null when coordination stopped retrying this run: an expired preparation lease could not be concluded because the execution axis had already moved past `pending`, so writing the "execution never ran" conclusion would overwrite a real Runner result. The run is left untouched and reported here instead of being retried every pass. Clearing it requires an operator decision; nothing clears it automatically, because deciding that the contradiction is resolved needs judgement no rule can supply. The only value today is `EXECUTION_ALREADY_ADVANCED`. */
-      expiry_blocked_reason: string | null
+      /** @description Non-null only while `status` is `disconnected`: the reason the run's own records do not admit the transition an expired lease would make, so automatic work cannot conclude it. It names that conflict and nothing else - what an operator may do about it is the `disconnected` state's business, not this field's. The value today is `EXECUTION_ALREADY_ADVANCED`. */
+      disconnect_reason: string | null
       /**
        * Format: date-time
        * @description Immutable instant the preparation phase began (a preparer first claimed the work); null while it is still pending. A retry that returns the row to pending and claims it again does not move it, so it is a safe start bound for the phase.
@@ -361,5 +387,4 @@ export type ArtifactStorage = components['schemas']['ArtifactStorage']
 export type Run = components['schemas']['ObservedRun']
 export type RunEvent = components['schemas']['ReviewRunEvent']
 export type PublicationStep = components['schemas']['ObservedPublicationStep']
-export type BlockedPreparationExpiry =
-  components['schemas']['BlockedPreparationExpiry']
+export type ParkedRun = components['schemas']['ParkedRun']

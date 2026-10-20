@@ -66,7 +66,6 @@ function buildHarness() {
           status: 'pending',
           attempt_count: 0,
           last_attempt_at: null,
-          failure_count: 0,
           remote_object_id: null,
           remote_object_url: null,
           failure_code: null,
@@ -76,6 +75,7 @@ function buildHarness() {
     listPublicationSteps: async () => Array.from(steps.values()),
     requirePublicationStepClaim: async () => {},
     completePublicationStep: async () => true,
+    settleExhaustedPublicationStep: async () => true,
     failPublicationStep: async () => true
   } satisfies PublicationStepStore
 

@@ -10,7 +10,7 @@ import {
 export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
 export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
 export type PublicationWork = components['schemas']['PublicationWork']
-export type RunFailureNoticeWork = components['schemas']['RunFailureNoticeWork']
+export type RunNoticeWork = components['schemas']['RunNoticeWork']
 export type PublicationStepRecord =
   components['schemas']['PublicationStepRecord']
 
@@ -268,23 +268,23 @@ class HttpControlPlaneClient {
     )
   }
 
-  async claimNextRunFailureNotice(): Promise<RunFailureNoticeWork | null> {
-    return await this.request('claimNextRunFailureNotice', {}, undefined)
+  async claimNextRunNotice(): Promise<RunNoticeWork | null> {
+    return await this.request('claimNextRunNotice', {}, undefined)
   }
 
-  async completeRunFailureNotice(
-    runId: string,
+  async completeRunNotice(
+    noticeId: string,
     token: string,
     delivered: true,
     commentUrl: string
   ): Promise<boolean>
-  async completeRunFailureNotice(
-    runId: string,
+  async completeRunNotice(
+    noticeId: string,
     token: string,
     delivered: false
   ): Promise<boolean>
-  async completeRunFailureNotice(
-    runId: string,
+  async completeRunNotice(
+    noticeId: string,
     token: string,
     delivered: boolean,
     commentUrl?: string
@@ -293,8 +293,8 @@ class HttpControlPlaneClient {
     // undelivered one has nowhere to point. The overloads keep that distinction at this seam
     // instead of letting a missing URL reach the server as a runtime error.
     return await this.request(
-      'completeRunFailureNotice',
-      { runId },
+      'completeRunNotice',
+      { noticeId },
       delivered
         ? { token, delivered: true, comment_url: commentUrl as string }
         : { token, delivered: false }
@@ -414,6 +414,41 @@ class HttpControlPlaneClient {
     )
   }
 
+  /** Conclude a step that ran out of attempts, from what the caller found remotely.
+   *
+   * Passing `found: true` is how a reconciliation that discovers the side effect already
+   * happened turns an exhausted step into `succeeded`; `found: false` is the only way a step
+   * becomes `terminal_failed`, and it is a claim that the remote system was checked. */
+  async settleExhaustedPublicationStep(
+    runId: string,
+    token: string,
+    stepKey: string,
+    found: {
+      remote?: { id?: string | number | null; url?: string | null }
+    } | null
+  ): Promise<boolean> {
+    const remote = found?.remote
+    return await this.request(
+      'settleExhaustedPublicationStep',
+      { runId, stepKey },
+      {
+        token,
+        found: found !== null,
+        ...(remote === undefined
+          ? {}
+          : {
+              remote_object: {
+                id:
+                  remote.id === null || remote.id === undefined
+                    ? null
+                    : String(remote.id),
+                url: remote.url ?? null
+              }
+            })
+      }
+    )
+  }
+
   async failPublicationStep(
     runId: string,
     token: string,
@@ -489,8 +524,8 @@ export type ControlPlaneClient = Pick<
   | 'renewPreparationClaim'
   | 'claimNextPreparation'
   | 'checkpointPreparationInput'
-  | 'claimNextRunFailureNotice'
-  | 'completeRunFailureNotice'
+  | 'claimNextRunNotice'
+  | 'completeRunNotice'
   | 'preparationHeartbeatIntervalMs'
   | 'renewPublicationClaim'
   | 'publicationHeartbeatIntervalMs'
@@ -499,6 +534,7 @@ export type ControlPlaneClient = Pick<
   | 'listPublicationSteps'
   | 'requirePublicationStepClaim'
   | 'completePublicationStep'
+  | 'settleExhaustedPublicationStep'
   | 'failPublicationStep'
   | 'completePublication'
   | 'failPublication'
@@ -520,6 +556,7 @@ export type PublicationStepStore = Pick<
   | 'listPublicationSteps'
   | 'requirePublicationStepClaim'
   | 'completePublicationStep'
+  | 'settleExhaustedPublicationStep'
   | 'failPublicationStep'
 >
 
@@ -532,8 +569,8 @@ export type PublicationStepStore = Pick<
 export type PreparationCoordinatorStore = Pick<
   ControlPlaneClient,
   | 'claimNextPreparation'
-  | 'claimNextRunFailureNotice'
-  | 'completeRunFailureNotice'
+  | 'claimNextRunNotice'
+  | 'completeRunNotice'
   | 'failPreparation'
   | 'admitReviewRun'
   | 'submitPreparedRun'
@@ -569,6 +606,7 @@ export type PublicationCoordinatorStore = Pick<
   | 'listPublicationSteps'
   | 'requirePublicationStepClaim'
   | 'completePublicationStep'
+  | 'settleExhaustedPublicationStep'
   | 'failPublicationStep'
 >
 

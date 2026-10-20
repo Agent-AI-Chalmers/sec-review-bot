@@ -321,16 +321,15 @@ test('the completion route keeps the comment_url its branch requires', async () 
   // because they never go through schema validation.
   const completed: unknown[][] = []
   const app = await buildApp({
-    completeRunFailureNotice: async (...args: unknown[]) => {
+    completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
     }
   })
-  const runId = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
   try {
     const delivered = await app.inject({
       method: 'POST',
-      url: `/v1/runs/${runId}/failure-notice/complete`,
+      url: `/v1/run-notices/notice-http-1/complete`,
       headers: {
         authorization: `Bearer ${SERVICE_TOKEN}`,
         'content-type': 'application/json'
@@ -344,7 +343,7 @@ test('the completion route keeps the comment_url its branch requires', async () 
     assert.strictEqual(delivered.statusCode, 200)
     assert.deepStrictEqual(completed, [
       [
-        runId,
+        'notice-http-1',
         'notice-claim',
         true,
         'https://github.com/o/r/issues/1#issuecomment-9'
@@ -354,7 +353,7 @@ test('the completion route keeps the comment_url its branch requires', async () 
     // The other branch must reject a URL rather than silently dropping it.
     const notDelivered = await app.inject({
       method: 'POST',
-      url: `/v1/runs/${runId}/failure-notice/complete`,
+      url: `/v1/run-notices/notice-http-1/complete`,
       headers: {
         authorization: `Bearer ${SERVICE_TOKEN}`,
         'content-type': 'application/json'
@@ -399,7 +398,7 @@ test('an operation with no response body sends an empty 200, not a null body', a
 test('a failure notice completion forwards an intentional skip through the HTTP route', async () => {
   const completions: unknown[][] = []
   const app = await buildApp({
-    completeRunFailureNotice: async (...args: unknown[]) => {
+    completeRunNotice: async (...args: unknown[]) => {
       completions.push(args)
       return true
     }
@@ -407,7 +406,7 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
   try {
     const response = await app.inject({
       method: 'POST',
-      url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/failure-notice/complete',
+      url: '/v1/run-notices/notice-http-2/complete',
       headers: {
         authorization: `Bearer ${SERVICE_TOKEN}`,
         'content-type': 'application/json'
@@ -418,7 +417,7 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
     assert.strictEqual(response.json(), true)
     assert.deepStrictEqual(completions, [
       // An undelivered notice carries no URL, so the store sees three arguments, not four.
-      ['3f2504e0-4f89-41d3-9a0c-0305e82c3301', 'notice-claim', false]
+      ['notice-http-2', 'notice-claim', false]
     ])
   } finally {
     await app.close()
@@ -753,39 +752,44 @@ test('the admin surface is absent unless an admin token is configured', async ()
   // Configured: the credential must be the admin token. In particular the service token, which
   // a component holds, must not reach an operator decision.
   const adminToken = 'admin-token'
+  // One record shaped as each decision returns it: abandoning concludes preparation as
+  // `failed`, resuming hands it back as `uncertain`.
+  const adminRecord = (preparationStatus: 'failed' | 'uncertain') => ({
+    run_id: runId,
+    workflow: 'issue-review',
+    preparation: {
+      status: preparationStatus,
+      attempt_count: 1,
+      disconnect_reason: null,
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+      failure_code:
+        preparationStatus === 'failed' ? 'EXECUTION_ALREADY_ADVANCED' : null
+    },
+    execution: {
+      status: 'succeeded',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publication: {
+      status: 'skipped',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publish_context: {},
+    created_at: '2026-01-01T00:00:00.000Z',
+    failure_code: null,
+    failure_message: null,
+    artifact_storage: null,
+    notices: []
+  })
   const store = {
     connectorId: 'github-app:test',
-    abandonBlockedPreparation: async () => ({
-      run_id: runId,
-      workflow: 'issue-review',
-      preparation: {
-        status: 'failed',
-        attempt_count: 1,
-        expiry_blocked_reason: null,
-        started_at: null,
-        finished_at: null,
-        updated_at: '2026-01-01T00:00:00.000Z',
-        failure_code: 'PREPARATION_ABANDONED'
-      },
-      execution: {
-        status: 'succeeded',
-        started_at: null,
-        finished_at: null,
-        updated_at: '2026-01-01T00:00:00.000Z'
-      },
-      publication: {
-        status: 'skipped',
-        started_at: null,
-        finished_at: null,
-        updated_at: '2026-01-01T00:00:00.000Z'
-      },
-      publish_context: {},
-      created_at: '2026-01-01T00:00:00.000Z',
-      failure_code: null,
-      failure_message: null,
-      artifact_storage: null,
-      failure_notice: null
-    })
+    abandonBlockedPreparation: async () => adminRecord('failed'),
+    resumeDisconnectedRun: async () => adminRecord('uncertain')
   }
   const configured = await buildApp(store, adminToken)
   try {
@@ -825,8 +829,56 @@ test('the admin surface is absent unless an admin token is configured', async ()
         .status,
       'failed'
     )
+
+    // Resuming is an operator decision too, and it goes through the same credential gate. It
+    // posts no body, so the route must not require one.
+    const resumePath = `/v1/admin/runs/${runId}/resume`
+    const anonymousResume = await configured.inject({
+      method: 'POST',
+      url: resumePath
+    })
+    assert.strictEqual(anonymousResume.statusCode, 401)
+    const viaServiceResume = await configured.inject({
+      method: 'POST',
+      url: resumePath,
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
+    })
+    assert.strictEqual(viaServiceResume.statusCode, 401)
+    const resumed = await configured.inject({
+      method: 'POST',
+      url: resumePath,
+      headers: { authorization: `Bearer ${adminToken}` }
+    })
+    assert.strictEqual(resumed.statusCode, 200)
   } finally {
     await configured.close()
+  }
+})
+
+test('the resume route answers 409 for a run that is not disconnected', async () => {
+  // The store decides eligibility; this pins that a refusal surfaces as the contract's 409
+  // rather than an opaque fault, so the console can explain what happened.
+  const app = await buildApp(
+    {
+      connectorId: 'github-app:test',
+      resumeDisconnectedRun: async () => {
+        throw Object.assign(
+          new Error('Review run x has no disconnected axis to resume.'),
+          { statusCode: 409 }
+        )
+      }
+    },
+    'admin-token'
+  )
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/runs/0123abcd-4567-89ef-0123-456789abcdef/resume',
+      headers: { authorization: 'Bearer admin-token' }
+    })
+    assert.strictEqual(response.statusCode, 409)
+  } finally {
+    await app.close()
   }
 })
 
@@ -835,23 +887,33 @@ test('the blocked preparation queue is readable with the read token', async () =
   // without holding an operator credential. Only acting on it is admin-gated.
   const app = await buildApp({
     connectorId: 'github-app:test',
-    listBlockedPreparationExpiries: async () => [
-      { run_id: 'run-1', reason: 'EXECUTION_ALREADY_ADVANCED' }
+    listParkedRuns: async () => [
+      {
+        run_id: 'run-1',
+        axis: 'preparation',
+        reason: 'EXECUTION_ALREADY_ADVANCED'
+      }
     ]
   })
   try {
     const response = await app.inject({
       method: 'GET',
-      url: '/v1/runs/blocked-preparations',
+      url: '/v1/runs/parked',
       headers: { authorization: `Bearer ${READ_TOKEN}` }
     })
     assert.strictEqual(response.statusCode, 200)
     assert.deepStrictEqual(response.json(), {
-      blocks: [{ run_id: 'run-1', reason: 'EXECUTION_ALREADY_ADVANCED' }]
+      blocks: [
+        {
+          run_id: 'run-1',
+          axis: 'preparation',
+          reason: 'EXECUTION_ALREADY_ADVANCED'
+        }
+      ]
     })
     const anonymous = await app.inject({
       method: 'GET',
-      url: '/v1/runs/blocked-preparations'
+      url: '/v1/runs/parked'
     })
     assert.strictEqual(anonymous.statusCode, 401)
   } finally {

@@ -9,8 +9,7 @@ import type { PoolClient } from 'pg'
 
 import type { ReviewRunEvent } from './shapes.js'
 
-export type CoordinationAxis =
-  'execution' | 'preparation' | 'publication' | 'notice'
+export type CoordinationAxis = 'execution' | 'preparation' | 'publication'
 
 export interface AppendEventArgs {
   runId: string
@@ -41,11 +40,12 @@ function iso(value: Date | string): string {
 export async function appendEvent(
   client: PoolClient,
   args: AppendEventArgs
-): Promise<void> {
-  await client.query(
+): Promise<string> {
+  const result = await client.query<{ event_id: string }>(
     `INSERT INTO review_run_events
        (run_id, connector_id, axis, from_status, to_status, reason_code)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING event_id`,
     [
       args.runId,
       args.connectorId,
@@ -55,6 +55,10 @@ export async function appendEvent(
       args.reasonCode ?? null
     ]
   )
+  const event = result.rows[0]
+  if (event === undefined)
+    throw new Error('Appending a coordination event returned no id.')
+  return event.event_id
 }
 
 /** The observed, ordered event list for one run. Rows are returned oldest first, with

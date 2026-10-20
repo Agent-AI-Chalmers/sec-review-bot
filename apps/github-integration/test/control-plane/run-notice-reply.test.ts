@@ -2,13 +2,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { sendRunFailureReply } from '../../src/control-plane/run-failure-reply.js'
+import { sendRunNoticeReply } from '../../src/control-plane/run-notice-reply.js'
 import { repositoryFullName } from '../../src/github/repository-service.js'
 import type { Octokit } from 'octokit'
 import { fakeGitHub, githubJson } from '../github-client.js'
 
 /**
- * A real client whose transport serves the endpoints `sendRunFailureReply` uses, recording what it
+ * A real client whose transport serves the endpoints `sendRunNoticeReply` uses, recording what it
  * was asked to create.
  *
  * `installed` is the set of repositories GitHub answers for; anything else is a 404, which is how
@@ -83,11 +83,13 @@ test('a repository failure target must be exactly owner/repo', async () => {
         repo.includes('/') ? repo : `x/${repo}`
       )
     }
-    const result = await sendRunFailureReply(stubOctokit(report), {
+    const result = await sendRunNoticeReply(stubOctokit(report), {
       run_id: 'run-repository',
+      notice_id: 'notice-test',
       input: { kind: 'github_repository_review', verified_repository },
-      failure_stage: 'preparation',
-      failure_code: 'PREPARATION_RETRY_EXHAUSTED'
+      axis: 'preparation',
+      reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+      kind: 'failure'
     })
     assert.strictEqual(
       result,
@@ -110,14 +112,16 @@ test('a repository failure target tolerates surrounding whitespace', async () =>
     commented: [] as number[],
     installed: ['octo/example']
   }
-  const result = await sendRunFailureReply(stubOctokit(report), {
+  const result = await sendRunNoticeReply(stubOctokit(report), {
     run_id: 'run-repository',
+    notice_id: 'notice-test',
     input: {
       kind: 'github_repository_review',
       verified_repository: '  octo/example  '
     },
-    failure_stage: 'preparation',
-    failure_code: 'PREPARATION_RETRY_EXHAUSTED'
+    axis: 'preparation',
+    reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+    kind: 'failure'
   })
   assert.deepStrictEqual(report.created, [{ owner: 'octo', repo: 'example' }])
   assert.deepStrictEqual(report.commented, [9])
@@ -144,11 +148,13 @@ test('the reply target and the installation lookup agree on what names a reposit
       commented: [] as number[],
       installed: ['octo/example']
     }
-    const result = await sendRunFailureReply(stubOctokit(report), {
+    const result = await sendRunNoticeReply(stubOctokit(report), {
       run_id: 'run-agreement',
+      notice_id: 'notice-test',
       input: { kind: 'github_repository_review', verified_repository },
-      failure_stage: 'preparation',
-      failure_code: 'PREPARATION_RETRY_EXHAUSTED'
+      axis: 'preparation',
+      reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+      kind: 'failure'
     })
     const namesARepository = repositoryFullName(verified_repository) !== null
     assert.strictEqual(
@@ -180,11 +186,13 @@ test('a target repository outside the installation is refused before any write',
       installed: ['octo/example']
     }
     await assert.rejects(
-      sendRunFailureReply(stubOctokit(report), {
+      sendRunNoticeReply(stubOctokit(report), {
         run_id: 'run-foreign',
+        notice_id: 'notice-foreign',
         input,
-        failure_stage: 'preparation',
-        failure_code: 'PREPARATION_RETRY_EXHAUSTED'
+        axis: 'preparation',
+        reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+        kind: 'failure'
       }),
       /not installed on this app/,
       `${JSON.stringify(input)} must be refused`
@@ -203,14 +211,16 @@ test('a transient repository lookup fault stays retryable', async () => {
     installed: ['octo/example']
   }
   await assert.rejects(
-    sendRunFailureReply(stubOctokit(report, { repoLookupFailsWith: 502 }), {
+    sendRunNoticeReply(stubOctokit(report, { repoLookupFailsWith: 502 }), {
       run_id: 'run-transient',
+      notice_id: 'notice-test',
       input: {
         kind: 'github_repository_review',
         verified_repository: 'octo/example'
       },
-      failure_stage: 'preparation',
-      failure_code: 'PREPARATION_RETRY_EXHAUSTED'
+      axis: 'preparation',
+      reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+      kind: 'failure'
     }),
     /Server Error/
   )
@@ -218,7 +228,7 @@ test('a transient repository lookup fault stays retryable', async () => {
 })
 
 test('a notice without a failure code says so instead of inventing one', async () => {
-  // The contract allows `failure_code: null`. Substituting `${stage}_FAILED` printed a code that
+  // The contract allows `reason_code: null`. Substituting `${stage}_FAILED` printed a code that
   // exists neither in the coordination vocabulary nor in the console's explanations, so a reader
   // saw a plausible-looking reason that was never recorded anywhere.
   const report = {
@@ -227,14 +237,16 @@ test('a notice without a failure code says so instead of inventing one', async (
     bodies: [] as string[],
     installed: ['octo/example']
   }
-  await sendRunFailureReply(stubOctokit(report), {
+  await sendRunNoticeReply(stubOctokit(report), {
     run_id: 'run-no-code',
+    notice_id: 'notice-test',
     input: {
       kind: 'github_repository_review',
       verified_repository: 'octo/example'
     },
-    failure_stage: 'execution',
-    failure_code: null
+    axis: 'execution',
+    reason_code: null,
+    kind: 'failure'
   })
 
   assert.strictEqual(report.bodies.length, 1)
@@ -252,14 +264,16 @@ test('a notice with a failure code still states it', async () => {
     bodies: [] as string[],
     installed: ['octo/example']
   }
-  await sendRunFailureReply(stubOctokit(report), {
+  await sendRunNoticeReply(stubOctokit(report), {
     run_id: 'run-with-code',
+    notice_id: 'notice-test',
     input: {
       kind: 'github_repository_review',
       verified_repository: 'octo/example'
     },
-    failure_stage: 'execution',
-    failure_code: 'RUNNER_RESULT_MISSING'
+    axis: 'execution',
+    reason_code: 'RUNNER_RESULT_MISSING',
+    kind: 'failure'
   })
 
   assert.strictEqual(report.bodies.length, 1)

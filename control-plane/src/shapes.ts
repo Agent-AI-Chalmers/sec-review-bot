@@ -21,7 +21,7 @@ import type {
 export type ReviewRunEvent = components['schemas']['ReviewRunEvent']
 
 /** A queued failure acknowledgement, as the connector receives it. */
-export type RunFailureNoticeWork = components['schemas']['RunFailureNoticeWork']
+export type RunNoticeWork = components['schemas']['RunNoticeWork']
 
 export type {
   ObservedRun,
@@ -44,7 +44,13 @@ export type RunnerStatus =
   | 'skipped'
   | 'failed'
 export type PublicationStatus =
-  'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+  | 'pending'
+  | 'publishing'
+  | 'uncertain'
+  | 'disconnected'
+  | 'published'
+  | 'failed'
+  | 'skipped'
 /** The redacted preparation summary's state, as both the contract and the run record use it. */
 export type PreparationStatus = NonNullable<
   ReviewRunRecord['preparation']
@@ -54,13 +60,14 @@ export type JsonObject = Record<string, unknown>
 /** The durable record's artifact storage, narrowed from the runner's loose type. */
 export type ArtifactStorage = ReviewRunRecord['artifact_storage']
 
-/** The observed step summary is the step record minus the reconciliation id and the
- * publisher's attempt bookkeeping. Those describe how Control Plane retried the step, which the
- * console does not show; keeping them here would widen the redacted surface by accident whenever
- * the durable record gains a diagnostic column. */
+/** The observed step summary is the step record minus the reconciliation id and the timing of
+ * the latest attempt. `attempt_count` is deliberately kept: it is the step's budget, so a
+ * reader of the summary can tell a step that is on its last try from one that has not started.
+ * The reconciliation id stays internal because it names the remote object, which the summary
+ * reaches through `remote_object_url` instead. */
 export type PublicationStepSummary = Omit<
   PublicationStepRecord,
-  'remote_object_id' | 'attempt_count' | 'last_attempt_at'
+  'remote_object_id' | 'last_attempt_at'
 >
 
 /** The arguments the store accepts for a new run. */

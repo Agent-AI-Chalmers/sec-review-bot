@@ -3,7 +3,7 @@
 // this file is its TypeScript view. Regenerate it with
 // `pnpm --dir contracts/control-plane-api/tools run generate`.
 
-export type StateAxis = 'preparation' | 'execution' | 'publication' | 'notice'
+export type StateAxis = 'preparation' | 'execution' | 'publication'
 
 export interface StateTransition {
   from: string
@@ -39,7 +39,14 @@ export const STATE_MACHINES: readonly StateMachine[] = [
     field: 'preparation.status',
     initial: 'pending',
     terminal: ['submitted', 'failed'],
-    states: ['pending', 'preparing', 'submitted', 'failed'],
+    states: [
+      'pending',
+      'preparing',
+      'uncertain',
+      'disconnected',
+      'submitted',
+      'failed'
+    ],
     details: {
       pending: {
         label: 'Pending',
@@ -49,6 +56,16 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         label: 'Preparing',
         description:
           'A coordinator currently owns the claim and is building the Runner input.'
+      },
+      uncertain: {
+        label: 'Uncertain',
+        description:
+          'The claim lapsed before the preparer reported, so it is unknown whether the prepared input reached Control Plane. This is not a failure: a claim may rebuild the input and resubmit it under the same identity, which is idempotent.'
+      },
+      disconnected: {
+        label: 'Disconnected',
+        description:
+          "Automatic work stopped without a conclusion, because the run's persisted state no longer admits the only transition expiry could make. Nothing retries this row on its own; an operator resumes it into `uncertain` or abandons it."
       },
       submitted: {
         label: 'Submitted',
@@ -79,6 +96,46 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       },
       {
         from: 'preparing',
+        to: 'uncertain',
+        label: 'claim lapsed'
+      },
+      {
+        from: 'uncertain',
+        to: 'preparing',
+        label: 'reclaim to confirm'
+      },
+      {
+        from: 'preparing',
+        to: 'disconnected',
+        reason: 'EXECUTION_ALREADY_ADVANCED',
+        label: 'cannot be concluded automatically'
+      },
+      {
+        from: 'disconnected',
+        to: 'uncertain',
+        reason: 'PREPARATION_RESUMED_BY_OPERATOR',
+        label: 'resumed by an operator'
+      },
+      {
+        from: 'disconnected',
+        to: 'failed',
+        reason: 'PREPARATION_GIVEN_UP_BY_OPERATOR',
+        label: 'given up by an operator'
+      },
+      {
+        from: 'disconnected',
+        to: 'failed',
+        reason: 'EXECUTION_ALREADY_ADVANCED',
+        label: 'abandoned by an operator'
+      },
+      {
+        from: 'disconnected',
+        to: 'failed',
+        reason: 'PREPARATION_ABANDONED',
+        label: 'abandoned by an operator'
+      },
+      {
+        from: 'preparing',
         to: 'failed',
         label: 'failed'
       }
@@ -98,6 +155,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       'succeeded',
       'skipped',
       'uncertain',
+      'disconnected',
       'failed'
     ],
     details: {
@@ -129,7 +187,12 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       uncertain: {
         label: 'Unconfirmed',
         description:
-          'The task was submitted, but no response arrived, so it is unknown whether the Runner accepted it. This is not a failure: the submission is replayed under the same run_id, and the run becomes queued if accepted or failed if it keeps failing.'
+          'The task was submitted, but no response arrived, so it is unknown whether the Runner accepted it. This is not a failure: the submission is replayed under the same run_id.'
+      },
+      disconnected: {
+        label: 'Disconnected',
+        description:
+          'Automatic recovery used its budget without a conclusive Runner answer. The run is visible for operator action and is not reported as failed.'
       },
       failed: {
         label: 'Failed',
@@ -171,6 +234,24 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         label: 'replay rejected'
       },
       {
+        from: 'uncertain',
+        to: 'disconnected',
+        reason: 'SUBMISSION_RECOVERY_EXHAUSTED',
+        label: 'recovery disconnected'
+      },
+      {
+        from: 'disconnected',
+        to: 'uncertain',
+        reason: 'SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR',
+        label: 'resumed by an operator'
+      },
+      {
+        from: 'disconnected',
+        to: 'failed',
+        reason: 'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR',
+        label: 'given up by an operator'
+      },
+      {
         from: 'queued',
         to: 'running',
         label: 'runner started'
@@ -204,7 +285,15 @@ export const STATE_MACHINES: readonly StateMachine[] = [
     field: 'publication.status',
     initial: 'pending',
     terminal: ['published', 'failed', 'skipped'],
-    states: ['pending', 'publishing', 'published', 'failed', 'skipped'],
+    states: [
+      'pending',
+      'publishing',
+      'uncertain',
+      'disconnected',
+      'published',
+      'failed',
+      'skipped'
+    ],
     details: {
       pending: {
         label: 'Pending',
@@ -215,6 +304,16 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         label: 'Publishing',
         description:
           'A coordinator owns the publication claim and is performing the side effects.'
+      },
+      uncertain: {
+        label: 'Uncertain',
+        description:
+          'A step may have completed its side effect remotely and is being reconciled. The axis reflects its strongest step; this is not a failure, and other steps keep publishing.'
+      },
+      disconnected: {
+        label: 'Disconnected',
+        description:
+          'Automatic reconciliation of a step stopped without an answer, so an operator has to establish what is on the remote system. The axis reflects its strongest step.'
       },
       published: {
         label: 'Published',
@@ -236,6 +335,33 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         from: 'pending',
         to: 'publishing',
         label: 'publishing started'
+      },
+      {
+        from: 'publishing',
+        to: 'uncertain',
+        label: 'a step may have taken effect'
+      },
+      {
+        from: 'uncertain',
+        to: 'publishing',
+        label: 'step settled'
+      },
+      {
+        from: 'uncertain',
+        to: 'disconnected',
+        label: 'reconciliation could not conclude'
+      },
+      {
+        from: 'disconnected',
+        to: 'uncertain',
+        reason: 'PUBLICATION_RESUMED_BY_OPERATOR',
+        label: 'resumed by an operator'
+      },
+      {
+        from: 'disconnected',
+        to: 'failed',
+        reason: 'PUBLICATION_ABANDONED_BY_OPERATOR',
+        label: 'given up by an operator'
       },
       {
         from: 'publishing',
@@ -268,58 +394,6 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         to: 'skipped',
         reason: 'PUBLICATION_ABANDONED',
         label: 'execution failed'
-      }
-    ]
-  },
-  {
-    axis: 'notice',
-    order: 4,
-    title: 'Failure notice',
-    field: 'failure_notice.status',
-    initial: 'pending',
-    terminal: ['delivered', 'failed'],
-    states: ['pending', 'delivering', 'delivered', 'failed'],
-    details: {
-      pending: {
-        label: 'Pending',
-        description:
-          'A run ended on some axis and the requester still has to be told.'
-      },
-      delivering: {
-        label: 'Delivering',
-        description: 'The failure notice is being delivered to the requester.'
-      },
-      delivered: {
-        label: 'Delivered',
-        description: 'The requester was told the run failed.'
-      },
-      failed: {
-        label: 'Delivery failed',
-        description:
-          'Delivery was attempted and did not succeed, most often because the provider could not be reached. The notice is retained as the record that the requester was never told.'
-      }
-    },
-    transitions: [
-      {
-        from: 'pending',
-        to: 'delivering',
-        label: 'notice claimed'
-      },
-      {
-        from: 'delivering',
-        to: 'delivering',
-        reason: 'NOTICE_LEASE_EXPIRED',
-        label: 'delivery lease expired'
-      },
-      {
-        from: 'delivering',
-        to: 'delivered',
-        label: 'notice delivered'
-      },
-      {
-        from: 'delivering',
-        to: 'failed',
-        label: 'delivery failed'
       }
     ]
   }

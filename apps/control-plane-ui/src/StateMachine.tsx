@@ -13,7 +13,8 @@ import {
 import {
   DIAGRAMMED_AXES,
   STATE_LAYOUT,
-  revertSide
+  revertSide,
+  selfLoopSide
 } from './state-machine-layout.js'
 
 /** The current state of one axis, read from the run. */
@@ -391,13 +392,17 @@ export function StateMachineDiagram({
             .join(' ')
 
           // A self-loop needs its own arc: the two-node geometries put both ends at the same
-          // point and collapse into a line on the node's own edge. It faces into empty space: a
-          // branch node on the last row loops downward, anything with a row below loops upward so
-          // the arc cannot cross that row's nodes or their edges.
+          // point and collapse into a line on the node's own edge. Layout can override the
+          // otherwise geometric choice for an edge whose semantic grouping reads better on one
+          // side of its node.
           const { d } = selfLoop
             ? selfLoopGeometry(
                 from,
-                (rows.get(edge.from) ?? 0) === maxRows - 1 ? 'below' : 'above'
+                selfLoopSide(
+                  machine.axis,
+                  edge.from,
+                  (rows.get(edge.from) ?? 0) === maxRows - 1 ? 'below' : 'above'
+                )
               )
             : revert
               ? revertGeometry(

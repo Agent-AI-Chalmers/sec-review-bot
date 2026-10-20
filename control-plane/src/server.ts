@@ -33,7 +33,10 @@ import {
   type RunnerRunStatus,
   type RunnerRunStatusBatch
 } from './runner-client.js'
-import { recoverReviewRunSubmission } from './submission-recovery.js'
+import {
+  concludeExhaustedSubmissionRecovery,
+  recoverReviewRunSubmission
+} from './submission-recovery.js'
 import { submitPreparedRun } from './prepared-submission.js'
 import { observePublicationStep, observeRun } from './observability.js'
 import {
@@ -237,7 +240,7 @@ function logDroppedRunRow(
  * store marks it durably and stops retrying it, and this line is what tells an operator which run
  * to repair. It is deliberately one event per blocked run with a stable `reason` code, so it can
  * be alarmed on without scraping English out of an error string. */
-function logBlockedPreparationExpiry(
+function logParkedRun(
   connectorId: string,
   blocked: { run_id: string; reason: string }
 ): void {
@@ -439,8 +442,7 @@ export async function registerControlPlaneRoutes(
       await store.checkpointPreparationInput(runId, token, input)
     },
 
-    claimNextRunFailureNotice: async () =>
-      await store.claimNextRunFailureNotice(),
+    claimNextRunNotice: async () => await store.claimNextRunNotice(),
 
     failPreparation: async (request) => {
       const { runId } = request.params as PathParams<'failPreparation'>
@@ -454,19 +456,19 @@ export async function registerControlPlaneRoutes(
       })
     },
 
-    completeRunFailureNotice: async (request) => {
-      const { runId } = request.params as PathParams<'completeRunFailureNotice'>
-      const body = request.body as RequestBody<'completeRunFailureNotice'>
+    completeRunNotice: async (request) => {
+      const { noticeId } = request.params as PathParams<'completeRunNotice'>
+      const body = request.body as RequestBody<'completeRunNotice'>
       // The contract's two branches differ by `delivered`, so the URL exists only in the
       // delivered one. Spreading keeps a single call without losing that distinction.
       return body.delivered
-        ? await store.completeRunFailureNotice(
-            runId,
+        ? await store.completeRunNotice(
+            noticeId,
             body.token,
             true,
             body.comment_url
           )
-        : await store.completeRunFailureNotice(runId, body.token, false)
+        : await store.completeRunNotice(noticeId, body.token, false)
     },
 
     claimNextPublication: async (request) => {
@@ -508,6 +510,19 @@ export async function registerControlPlaneRoutes(
         token,
         stepKey,
         remote_object ?? {}
+      )
+    },
+
+    settleExhaustedPublicationStep: async (request) => {
+      const { runId, stepKey } =
+        request.params as PathParams<'settleExhaustedPublicationStep'>
+      const { token, found, remote_object } =
+        request.body as RequestBody<'settleExhaustedPublicationStep'>
+      return await store.settleExhaustedPublicationStep(
+        runId,
+        token,
+        stepKey,
+        found ? { found: true, remote: remote_object ?? {} } : { found: false }
       )
     },
 
@@ -553,8 +568,8 @@ export async function registerControlPlaneRoutes(
       return reply.send(await store.listPublicationSteps(run.run_id))
     },
 
-    listBlockedPreparationExpiries: async () => ({
-      blocks: await store.listBlockedPreparationExpiries()
+    listParkedRuns: async () => ({
+      blocks: await store.listParkedRuns()
     }),
 
     abandonBlockedPreparation: async (request) => {
@@ -563,6 +578,17 @@ export async function registerControlPlaneRoutes(
       const { reason } =
         request.body as RequestBody<'abandonBlockedPreparation'>
       return await store.abandonBlockedPreparation(runId, reason)
+    },
+
+    giveUpDisconnectedRun: async (request) => {
+      const { runId } = request.params as PathParams<'giveUpDisconnectedRun'>
+      const { reason } = request.body as RequestBody<'giveUpDisconnectedRun'>
+      return await store.giveUpDisconnectedRun(runId, reason)
+    },
+
+    resumeDisconnectedRun: async (request) => {
+      const { runId } = request.params as PathParams<'resumeDisconnectedRun'>
+      return await store.resumeDisconnectedRun(runId)
     },
 
     getPreparationHeartbeatInterval: async () =>
@@ -800,6 +826,20 @@ export async function startControlPlaneServer(): Promise<{
             run_id: run.run_id,
             workflow: run.workflow
           })
+          // Enforce the replay budget before replaying. Exhaustion stops automatic recovery, but
+          // does not prove the Runner rejected an earlier request, so it becomes disconnected.
+          const exhausted = await concludeExhaustedSubmissionRecovery(
+            store,
+            run
+          )
+          if (exhausted !== null) {
+            logEvent('runner_submission_recovery_disconnected', {
+              connector_id: store.connectorId,
+              run_id: run.run_id,
+              workflow: run.workflow
+            })
+            return
+          }
           await recoverReviewRunSubmission(store, run, {
             submit: submitRunnerRun,
             classifyError: (error) => ({
@@ -833,7 +873,7 @@ export async function startControlPlaneServer(): Promise<{
         // The store already stopped retrying this run, so the pass keeps coordinating the
         // others; this line is the operator's cue to repair the contradiction by hand.
         onBlockedPreparationExpiry: (blocked) => {
-          logBlockedPreparationExpiry(store.connectorId, blocked)
+          logParkedRun(store.connectorId, blocked)
         },
         observeActiveRun: async (run, statuses) => {
           await observeRunnerRun(

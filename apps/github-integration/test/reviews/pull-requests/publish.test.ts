@@ -29,7 +29,6 @@ const stepStore = {
       status: 'pending' as const,
       attempt_count: 0,
       last_attempt_at: null,
-      failure_count: 0,
       remote_object_id: null,
       remote_object_url: null,
       failure_code: null,
@@ -38,6 +37,7 @@ const stepStore = {
   ],
   requirePublicationStepClaim: async () => {},
   completePublicationStep: async () => true,
+  settleExhaustedPublicationStep: async () => true,
   failPublicationStep: async () => true
 } satisfies PublicationStepStore
 
@@ -690,5 +690,85 @@ test('an unattributable PR author is never approved', async () => {
     pullReviews.map((item) => (item as { event: string }).event),
     [],
     'no review may be created while attribution is unknown'
+  )
+})
+
+test('an exhausted PR review step is concluded from the review already on the pull request', async () => {
+  // The failure this prevents: the review was submitted and either its response was lost or its
+  // publisher died. The step then runs out of attempts; concluding it as a failure would report
+  // a review that is on GitHub as missing. The run marker identifies it.
+  const settles: Array<{ stepKey: string; found: unknown }> = []
+  const store = {
+    initializePublicationSteps: async () => {},
+    listPublicationSteps: async () => [],
+    requirePublicationStepClaim: async () => {
+      throw Object.assign(new Error('no attempts left'), {
+        code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+      })
+    },
+    completePublicationStep: async () => true,
+    settleExhaustedPublicationStep: async (
+      _runId: string,
+      _token: string,
+      stepKey: string,
+      found: unknown
+    ) => {
+      settles.push({ stepKey, found })
+      return true
+    },
+    failPublicationStep: async () => true
+  } satisfies PublicationStepStore
+
+  const pullReviews: unknown[] = []
+  const { octokit } = fakeGitHub(({ method, url }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/reviews') && method === 'GET') {
+      return githubJson([
+        {
+          id: 31,
+          html_url: 'https://example.test/review/31',
+          state: 'COMMENTED',
+          body: '<!-- sec-review-bot:pull-request-review-run:run-1 -->\n\nReviewed.',
+          user: { login: 'web-sec-bot[bot]', type: 'Bot' }
+        }
+      ])
+    }
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      pullReviews.push({ body: 'unexpected' })
+      return githubJson({ id: 2, html_url: 'https://example.test/review/2' })
+    }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
+
+  await handlePullRequestReviewRun({
+    run: {
+      run_id: 'run-1',
+      publish_context: {
+        pr: pullRequestContext(),
+        files: [],
+        event_type: 'manual_review'
+      }
+    },
+    result: {
+      contract_version: CONTRACT_VERSION,
+      review_record: review_record()
+    },
+    store,
+    claim_token: 'test-claim',
+    assert_publication_claim: async () => {},
+    installation_octokit_for_repo: async () => octokit
+  })
+
+  assert.deepStrictEqual(settles, [
+    {
+      stepKey: 'pull-request:review',
+      found: { remote: { id: 31, url: 'https://example.test/review/31' } }
+    }
+  ])
+  assert.deepStrictEqual(
+    pullReviews,
+    [],
+    'a settled step must never submit another review'
   )
 })

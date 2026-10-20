@@ -14,7 +14,7 @@ const run: ReviewRunRecord = {
     finished_at: '2026-01-01T00:00:02.000Z',
     updated_at: '2026-01-01T00:00:03.000Z',
     failure_code: null,
-    expiry_blocked_reason: null
+    disconnect_reason: null
   },
   execution: {
     status: 'queued',
@@ -32,7 +32,7 @@ const run: ReviewRunRecord = {
   failure_code: null,
   failure_message: null,
   artifact_storage: null,
-  failure_notice: null
+  notices: []
 }
 function store(events: unknown[][]): Parameters<typeof observeRunnerRun>[0] {
   return {
@@ -85,7 +85,7 @@ test('successful Runner result is durably recorded for later publication', async
         status: 'succeeded',
         result: { answer: 42 },
         artifact_storage: artifact,
-        failure_notice: null
+        notices: []
       }),
       () => false
     ),
@@ -150,7 +150,7 @@ test('Runner failure records its artifact atomically with the terminal failure',
         workflow: 'issue-review',
         status: 'failed',
         artifact_storage: artifact,
-        failure_notice: null,
+        notices: [],
         error: { code: 'RUNNER_FAILED', message: 'failed' }
       }),
       () => false

@@ -14,10 +14,7 @@ test('fan-out reads refuse to run before initialize()', async () => {
   await assert.rejects(() => store.listActiveRuns(), /initialize/)
   // Added later than the two above; every read that reaches the pool belongs to this guard, not
   // only the fan-out ones that originally motivated it.
-  await assert.rejects(
-    () => store.listBlockedPreparationExpiries(),
-    /initialize/
-  )
+  await assert.rejects(() => store.listParkedRuns(), /initialize/)
   await assert.rejects(() => store.listEvents('run-1'), /initialize/)
   await assert.rejects(() => store.runExists('run-1'), /initialize/)
 })

@@ -82,8 +82,8 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       '/api/runs/%2e%2e/publication-steps',
       '/api/runs/0123abcd-4567-89ef-0123-456789abcdef/unknown-suffix',
       // Traversal hidden in the id segment: rejected before normalisation can reshape the path.
-      '/api/runs/0123abcd-4567-89ef-0123-456789abcdef/../..%2Fblocked-preparations',
-      '/api/runs/..%2F..%2Fblocked-preparations',
+      '/api/runs/0123abcd-4567-89ef-0123-456789abcdef/../..%2Fparked',
+      '/api/runs/..%2F..%2Fparked',
       // A valid id with an encoded separator glued to it is not a sub-resource.
       '/api/runs/0123abcd-4567-89ef-0123-456789abcdef%2Fevents'
     ]) {
@@ -100,10 +100,10 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     )
     // The blocked-preparation queue is a fixed sub-resource of the run collection, not a run id,
     // so it must pass the allow-list before the UUID check rejects it.
-    await fetch(`${base}/api/runs/blocked-preparations`, {
+    await fetch(`${base}/api/runs/parked`, {
       headers: { cookie }
     })
-    assert.strictEqual(upstreamPath, '/v1/runs/blocked-preparations')
+    assert.strictEqual(upstreamPath, '/v1/runs/parked')
 
     // The one write the console may proxy. The admin credential is supplied by the operator for
     // this request and forwarded as-is; the BFF holds no copy of its own.

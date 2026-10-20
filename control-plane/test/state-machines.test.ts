@@ -29,9 +29,7 @@ function enumFor(spec: Spec, field: string): string[] {
   // are not inlined here; resolve the ref to the component it names.
   if (field.includes('.')) {
     const [axis, key = ''] = field.split('.')
-    // The member may be declared directly as a `$ref`, or (for an optional object such as the
-    // failure notice) as a `oneOf` that admits null alongside the ref. Resolve either form to the
-    // component it names, so the machine is still checked against the real enum.
+    // The member is a `$ref` to its summary schema; resolve it before reading the enum.
     const node = props[axis as string] as
       { $ref?: string; oneOf?: Array<{ $ref?: string }> } | undefined
     const target = (
@@ -47,7 +45,7 @@ function enumFor(spec: Spec, field: string): string[] {
 
 function asEnum(value: unknown, field: string): string[] {
   if (!Array.isArray(value)) throw new Error(`${field} has no enum`)
-  // `preparation.status`/notice enums are plain arrays; the nullable ones include a null.
+  // Nullable enums include null; state machines only describe named string states.
   return value.filter((item): item is string => typeof item === 'string')
 }
 

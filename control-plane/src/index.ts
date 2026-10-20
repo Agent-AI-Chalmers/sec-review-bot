@@ -18,14 +18,17 @@ export {
   type PublicationStepRecord,
   type PublicationWork,
   type PreparationWork,
-  type RunFailureNoticeWork,
+  type RunNoticeWork,
   type PublishContext,
   type ReviewRunAdmission,
   type ReviewRunRecord,
   type RunRowsProjection
 } from './review-store.js'
 export {
+  concludeExhaustedSubmissionRecovery,
   recoverReviewRunSubmission,
+  MAX_SUBMISSION_RECOVERY_ATTEMPTS,
+  SUBMISSION_RECOVERY_EXHAUSTED,
   type SubmissionRecoveryDependencies,
   type SubmissionRecoveryResult
 } from './submission-recovery.js'

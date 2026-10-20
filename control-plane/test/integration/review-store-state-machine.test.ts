@@ -6,7 +6,9 @@ import test from 'node:test'
 import { Pool } from 'pg'
 
 import {
+  concludeExhaustedSubmissionRecovery,
   coordinateReviewRunsOnce,
+  MAX_SUBMISSION_RECOVERY_ATTEMPTS,
   recoverReviewRunSubmission,
   ReviewRunStore,
   submitPreparedRun,
@@ -420,9 +422,9 @@ test('a failure notice reports the reason captured when it was created', async (
       code: 'REVIEW_START_FAILED',
       message: 'preparation could not start'
     })
-    const notice = await store.claimNextRunFailureNotice()
+    const notice = await store.claimNextRunNotice()
     assert.ok(notice)
-    assert.strictEqual(notice.failure_code, 'REVIEW_START_FAILED')
+    assert.strictEqual(notice.reason_code, 'REVIEW_START_FAILED')
 
     // Rewriting the preparation row must not change what the notice reports.
     const pool = new Pool({ connectionString: requireTestDatabase() })
@@ -446,17 +448,17 @@ test('a failure notice reports the reason captured when it was created', async (
     const pool2 = new Pool({ connectionString: requireTestDatabase() })
     try {
       await pool2.query(
-        `UPDATE run_failure_notices
+        `UPDATE run_notices
            SET status='pending', claim_token=NULL, claimed_at=NULL WHERE run_id=$1`,
         [runId]
       )
     } finally {
       await pool2.end()
     }
-    const reclaimed = await store.claimNextRunFailureNotice()
+    const reclaimed = await store.claimNextRunNotice()
     assert.ok(reclaimed)
     assert.strictEqual(
-      reclaimed.failure_code,
+      reclaimed.reason_code,
       'REVIEW_START_FAILED',
       "the notice carries its own reason, not the preparation row's current value"
     )
@@ -465,7 +467,7 @@ test('a failure notice reports the reason captured when it was created', async (
   }
 })
 
-test('ReviewRunStore returns an expired preparation to pending without failing its run', async () => {
+test('ReviewRunStore turns an expired preparation uncertain without failing its run', async () => {
   const store = await createStore({ claimTimeoutMs: 0 })
   const runId = `run-stale-preparation-${randomUUID()}`
   try {
@@ -479,9 +481,11 @@ test('ReviewRunStore returns an expired preparation to pending without failing i
     const run = await store.getRun(runId)
     assert.strictEqual(run?.execution.status, 'pending')
     assert.strictEqual(run?.failure_code, null)
-    assert.strictEqual(run?.preparation?.status, 'pending')
+    // The lease lapsed, so nobody knows how far the preparer got: that is uncertainty, not a
+    // return to "never started".
+    assert.strictEqual(run?.preparation?.status, 'uncertain')
     assert.strictEqual(run?.preparation?.attempt_count, 1)
-    assert.strictEqual(run?.failure_notice, null)
+    assert.deepStrictEqual(run?.notices, [])
     assert.strictEqual(await store.claimPublication(runId), null)
     assert.strictEqual((await store.expireStalePreparations()).concluded, 0)
   } finally {
@@ -513,33 +517,33 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
         status: run?.preparation?.status,
         attempt_count: run?.preparation?.attempt_count,
         failure_code: run?.preparation?.failure_code,
-        notice_status: run?.failure_notice?.status,
-        notice_stage: run?.failure_notice?.failure_stage
+        notice_status: run?.notices?.[0]?.status,
+        notice_axis: run?.notices?.[0]?.axis
       },
       {
         status: 'failed',
         attempt_count: 8,
         failure_code: 'PREPARATION_RETRY_EXHAUSTED',
         notice_status: 'pending',
-        notice_stage: 'preparation'
+        notice_axis: 'preparation'
       }
     )
     assert.strictEqual(await store.claimNextPreparation(), null)
     assert.strictEqual(await store.claimPublication(runId), null)
-    const notice = await store.claimNextRunFailureNotice()
+    const notice = await store.claimNextRunNotice()
     assert.ok(notice)
     assert.strictEqual(notice.run_id, runId)
     assert.deepStrictEqual(notice.input, {})
-    assert.strictEqual(notice.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
+    assert.strictEqual(notice.reason_code, 'PREPARATION_RETRY_EXHAUSTED')
     assert.strictEqual(
-      (await store.getRun(runId))?.failure_notice?.status,
+      (await store.getRun(runId))?.notices?.[0]?.status,
       'delivering'
     )
     assert.strictEqual(
       // A stale claim is rejected, not thrown at: the delivery is well-formed, it simply no
       // longer owns the notice.
-      await store.completeRunFailureNotice(
-        runId,
+      await store.completeRunNotice(
+        notice.notice_id,
         randomUUID(),
         true,
         'https://github.com/example/example/issues/1#issuecomment-1'
@@ -547,8 +551,8 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
       false
     )
     assert.strictEqual(
-      await store.completeRunFailureNotice(
-        runId,
+      await store.completeRunNotice(
+        notice.notice_id,
         notice.claim_token,
         true,
         'https://github.com/example/example/issues/1#issuecomment-1'
@@ -556,59 +560,10 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
       true
     )
     assert.strictEqual(
-      (await store.getRun(runId))?.failure_notice?.status,
+      (await store.getRun(runId))?.notices?.[0]?.status,
       'delivered'
     )
-    assert.strictEqual(await store.claimNextRunFailureNotice(), null)
-  } finally {
-    await observer.end()
-    await store.close()
-  }
-})
-
-test('re-claiming an expired notice records delivering -> delivering, not pending -> delivering', async () => {
-  const connector = `notice-lease:${randomUUID()}`
-  const store = await createStore({ connectorId: connector, claimTimeoutMs: 0 })
-  const observer = new Pool({ connectionString: requireTestDatabase() })
-  const runId = `run-notice-lease-${randomUUID()}`
-  try {
-    await store.createPreparingReviewRun({
-      workflow: 'issue-review',
-      run_id: runId,
-      publish_context: {}
-    })
-    // Produce a terminal preparation failure so a notice exists.
-    await observer.query(
-      `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour',
-         attempt_count=8 WHERE run_id=$1`,
-      [runId]
-    )
-    await store.expireStalePreparations()
-
-    const first = await store.claimNextRunFailureNotice()
-    assert.ok(first)
-    // Expire its lease, then claim again: the notice was already `delivering`.
-    await observer.query(
-      `UPDATE run_failure_notices SET claimed_at=clock_timestamp()-interval '1 hour'
-       WHERE run_id=$1`,
-      [runId]
-    )
-    const second = await store.claimNextRunFailureNotice()
-    assert.ok(second)
-
-    const noticeEvents = (await store.listEvents(runId)).filter(
-      (event) => event.axis === 'notice'
-    )
-    assert.deepStrictEqual(
-      noticeEvents.map((event) => [event.from_status, event.to_status]),
-      [
-        [null, 'pending'],
-        ['pending', 'delivering'],
-        ['delivering', 'delivering']
-      ],
-      'the re-claim comes from delivering, and is marked as a lease expiry'
-    )
-    assert.strictEqual(noticeEvents[2]?.reason_code, 'NOTICE_LEASE_EXPIRED')
+    assert.strictEqual(await store.claimNextRunNotice(), null)
   } finally {
     await observer.end()
     await store.close()
@@ -642,8 +597,8 @@ test('concurrent failure notice consumers cannot own the same outbox work', asyn
     assert.strictEqual((await producer.expireStalePreparations()).concluded, 1)
 
     const claims = await Promise.all([
-      first.claimNextRunFailureNotice(),
-      second.claimNextRunFailureNotice()
+      first.claimNextRunNotice(),
+      second.claimNextRunNotice()
     ])
     assert.strictEqual(claims.filter((claim) => claim !== null).length, 1)
   } finally {
@@ -1188,7 +1143,7 @@ test('ReviewRunStore does not publish while a required step is incomplete', asyn
       'issue:summary-comment'
     ])
     const [step] = await store.listPublicationSteps(runId)
-    assert.strictEqual(step?.failure_count, 0)
+    assert.strictEqual(step?.attempt_count, 0)
     assert.strictEqual(await store.completePublication(runId, token), false)
     assert.strictEqual(
       (await store.getRun(runId))?.publication.status,
@@ -1238,6 +1193,180 @@ test('ReviewRunStore spends retry budget only for the current publication owner'
     )
     assert.deepStrictEqual((await store.listActiveRuns()).runs, [])
   } finally {
+    await store.close()
+  }
+})
+
+test('the publication axis records an event only when its derived status actually changes', async () => {
+  // The axis status is derived from its steps. That derivation decides two things at once: the
+  // value written, and whether the write is a transition worth auditing. When those were two
+  // copies of the same expression, editing one could make the row move without an event (a
+  // silent timeline gap) or emit an event for a state no write produced. This pins the pair the
+  // derivation must keep equal: a settlement that leaves the axis where it was writes nothing,
+  // and one that moves it writes exactly one event naming the status the row now holds.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await store.initializePublicationSteps(runId, token, [
+      'issue:summary-comment',
+      'issue:draft-pr'
+    ])
+    await store.requirePublicationStepClaim(
+      runId,
+      token,
+      'issue:summary-comment'
+    )
+
+    const publicationEvents = async () =>
+      (await store.listEvents(runId)).filter(
+        (event) => event.axis === 'publication'
+      )
+
+    // A retryable failure leaves the axis publishing: the step is still claimable, so the axis
+    // has nothing new to report and must not write an event.
+    const beforeRetry = (await publicationEvents()).length
+    await store.failPublicationStep(
+      runId,
+      token,
+      'issue:summary-comment',
+      { message: 'retryable' },
+      { retry: true }
+    )
+    assert.strictEqual(
+      (await publicationEvents()).length,
+      beforeRetry,
+      'an unchanged derived status must not be audited as a transition'
+    )
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.status,
+      'publishing'
+    )
+
+    // A terminal step failure fails the axis. Its event must name the state the row actually
+    // left, which is the derived status, not a hardcoded guess. The step write is fenced on the
+    // owner's claim, so the retried step is claimed again first, exactly as the publish path
+    // does between attempts.
+    await store.requirePublicationStepClaim(
+      runId,
+      token,
+      'issue:summary-comment'
+    )
+    await store.failPublicationStep(
+      runId,
+      token,
+      'issue:summary-comment',
+      { code: 'GITHUB_REJECTED', message: 'rejected' },
+      { retry: false }
+    )
+    const last = (await publicationEvents()).at(-1)
+    assert.strictEqual(last?.to_status, 'failed')
+    assert.strictEqual(
+      last?.from_status,
+      (await store.getRun(runId))?.publication.status === 'failed'
+        ? 'publishing'
+        : last?.from_status
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('a publication left uncertain by a dead publisher is reclaimed once its lease expires', async () => {
+  // The axis reads `uncertain` while its owner reconciles a step. Before this, no claim
+  // predicate accepted that row: `publishing` with an expired lease was reclaimable, `uncertain`
+  // was not, so a run whose reconciling publisher died was unreachable for automated work and
+  // only an operator resume could move it. A live lease must still be respected, which is why
+  // the same claim-timeout fence applies to both states.
+  // Two stores share one connector id because publication claims are scoped by connector, not
+  // by process: the reclaim has to come from outside the owning store, or the test would only
+  // prove that a store can reclaim its own row.
+  const ownerConnector = `publication-reclaim:${randomUUID()}`
+  const store = await createStore({ connectorId: ownerConnector })
+  const runId = await createSuccessfulRun(store)
+  const sibling = await createStore({ connectorId: ownerConnector })
+  try {
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await store.initializePublicationSteps(runId, token, [
+      'issue:summary-comment'
+    ])
+    // Drive the step to `uncertain` the way the publish path does: report an unanswered attempt,
+    // then ask for the next one, until the step has no attempt left. That final refused request
+    // is what parks the step.
+    let stepParked = false
+    for (let attempt = 0; attempt < 10 && !stepParked; attempt += 1) {
+      // Only a claimable step is claimed again: once it is `uncertain` the claim is refused with
+      // `not_claimable` (its outcome is being established, not retried), which is not the
+      // exhaustion the loop is looking for.
+      const status = (await store.listPublicationSteps(runId))[0]?.status
+      if (status === 'pending' || status === 'failed') {
+        await store.requirePublicationStepClaim(
+          runId,
+          token,
+          'issue:summary-comment'
+        )
+      }
+      await store.failPublicationStep(
+        runId,
+        token,
+        'issue:summary-comment',
+        { message: 'response lost' },
+        { retry: true }
+      )
+      stepParked = await store
+        .requirePublicationStepClaim(runId, token, 'issue:summary-comment')
+        .then(
+          () => false,
+          () => true
+        )
+    }
+    assert.ok(stepParked, 'the step must run out of attempts')
+    assert.strictEqual(
+      (await store.listPublicationSteps(runId))[0]?.status,
+      'uncertain'
+    )
+    // The axis reports its strongest step, and the owner is alive, so it is `uncertain` too.
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.status,
+      'uncertain'
+    )
+
+    // A live lease is not stolen, by either claim path.
+    assert.strictEqual(await sibling.claimPublication(runId), null)
+    assert.strictEqual(await sibling.claimNextPublication(0), null)
+
+    // The owner died. Its lease is moved past the default claim timeout (ten minutes), so the
+    // only thing that can admit the reclaim is the fence being expired.
+    const clock = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      await clock.query(
+        `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 hour'
+         WHERE run_id=$1`,
+        [runId]
+      )
+      const expired = await clock.query<{ expired: boolean }>(
+        `SELECT claimed_at <= clock_timestamp()-($2*interval '1 millisecond') AS expired
+         FROM publications WHERE run_id=$1`,
+        [runId, 10 * 60 * 1000]
+      )
+      assert.strictEqual(expired.rows[0]?.expired, true)
+    } finally {
+      await clock.end()
+    }
+
+    const reclaimed = await sibling.claimPublication(runId)
+    assert.ok(reclaimed, 'an expired uncertain lease must be reclaimable')
+    assert.notStrictEqual(reclaimed, token)
+    const event = (await store.listEvents(runId))
+      .filter((item) => item.axis === 'publication')
+      .at(-1)
+    assert.strictEqual(event?.from_status, 'uncertain')
+    assert.strictEqual(event?.to_status, 'publishing')
+    assert.strictEqual(event?.reason_code, 'PUBLICATION_LEASE_EXPIRED')
+  } finally {
+    await sibling.close()
     await store.close()
   }
 })
@@ -1309,7 +1438,7 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
         true
       )
       assert.strictEqual(
-        (await store.listPublicationSteps(runId))[0]?.failure_count,
+        (await store.listPublicationSteps(runId))[0]?.attempt_count,
         attempt + 1
       )
       assert.strictEqual(
@@ -1336,9 +1465,90 @@ test('ReviewRunStore reports an exhausted publication step as deterministic', as
         'code' in error &&
         error.code === 'PUBLICATION_STEP_RETRY_EXHAUSTED'
     )
+    // Exhaustion alone does NOT conclude the step. The last attempt may have taken effect
+    // remotely before its response was lost, and Control Plane cannot see GitHub, so the step is
+    // left for the connector to reconcile.
+    const [exhaustedStep] = await store.listPublicationSteps(runId)
+    assert.strictEqual(exhaustedStep?.status, 'uncertain')
+    assert.strictEqual(exhaustedStep?.attempt_count, 3)
+
+    // A reconciliation that confirms nothing was published is what makes it terminal.
+    assert.strictEqual(
+      await store.settleExhaustedPublicationStep(
+        runId,
+        finalToken,
+        'issue:summary-comment',
+        { found: false }
+      ),
+      true
+    )
     const [step] = await store.listPublicationSteps(runId)
     assert.strictEqual(step?.status, 'terminal_failed')
-    assert.strictEqual(step?.failure_count, 3)
+    assert.strictEqual(step?.attempt_count, 3)
+  } finally {
+    await store.close()
+  }
+})
+
+test('a reconciliation that finds the side effect completes an exhausted step', async () => {
+  // The failure this prevents: a publisher posted the comment and died before recording it. The
+  // step spends its budget, and reporting it as failed would tell the requester nothing was
+  // published while the comment is on GitHub. Finding it turns the step into a success instead.
+  const store = await createStore()
+  const runId = await createSuccessfulRun(store)
+  try {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const token = await store.claimPublication(runId)
+      assert.ok(token)
+      if (attempt === 0)
+        await store.initializePublicationSteps(runId, token, [
+          'issue:summary-comment'
+        ])
+      await store.requirePublicationStepClaim(
+        runId,
+        token,
+        'issue:summary-comment'
+      )
+      await store.failPublicationStep(runId, token, 'issue:summary-comment', {
+        message: 'response lost after posting'
+      })
+      await store.failPublication(
+        runId,
+        token,
+        { message: 'response lost after posting' },
+        { retry: true }
+      )
+    }
+
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await assert.rejects(
+      store.requirePublicationStepClaim(runId, token, 'issue:summary-comment')
+    )
+    assert.strictEqual(
+      await store.settleExhaustedPublicationStep(
+        runId,
+        token,
+        'issue:summary-comment',
+        {
+          found: true,
+          remote: {
+            id: '4242',
+            url: 'https://github.com/octo/example/issues/1#c'
+          }
+        }
+      ),
+      true
+    )
+    const [step] = await store.listPublicationSteps(runId)
+    assert.strictEqual(step?.status, 'succeeded')
+    assert.strictEqual(step?.remote_object_id, '4242')
+    // The publication can now finish: the run is not failed for work that was done.
+    assert.strictEqual(await store.completePublication(runId, token), true)
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.status,
+      'published'
+    )
   } finally {
     await store.close()
   }
@@ -1363,14 +1573,14 @@ test('ReviewRunStore records Runner execution failure without publication failur
     // An execution failure ends the run, so the requester has to be told. The notice names the
     // axis that failed, because the reply says the review started but could not finish rather
     // than claiming it never started.
-    const notice = await store.claimNextRunFailureNotice()
+    const notice = await store.claimNextRunNotice()
     assert.notStrictEqual(notice, null)
     assert.strictEqual(notice?.run_id, runId)
-    assert.strictEqual(notice?.failure_stage, 'execution')
-    assert.strictEqual(notice?.failure_code, 'RUNNER_EXECUTION_FAILED')
+    assert.strictEqual(notice?.axis, 'execution')
+    assert.strictEqual(notice?.reason_code, 'RUNNER_EXECUTION_FAILED')
     assert.strictEqual(
-      await store.completeRunFailureNotice(
-        runId,
+      await store.completeRunNotice(
+        notice?.notice_id ?? '',
         notice?.claim_token ?? '',
         true,
         'https://github.com/example/example/issues/1#issuecomment-1'
@@ -1395,19 +1605,19 @@ test('ReviewRunStore stores the comment a delivered notice points at', async () 
       }),
       true
     )
-    const notice = await store.claimNextRunFailureNotice()
+    const notice = await store.claimNextRunNotice()
     assert.ok(notice)
 
     // A delivery has to name where the requester can read it. Storing `delivered` with no URL
     // would claim someone was told while giving no way to check.
     await assert.rejects(
-      store.completeRunFailureNotice(runId, notice.claim_token, true),
+      store.completeRunNotice(notice.notice_id, notice.claim_token, true),
       /cannot be delivered without a comment_url/
     )
 
     assert.strictEqual(
-      await store.completeRunFailureNotice(
-        runId,
+      await store.completeRunNotice(
+        notice.notice_id,
         notice.claim_token,
         true,
         commentUrl
@@ -1415,7 +1625,7 @@ test('ReviewRunStore stores the comment a delivered notice points at', async () 
       true
     )
     assert.strictEqual(
-      (await store.getRun(runId))?.failure_notice?.comment_url,
+      (await store.getRun(runId))?.notices?.[0]?.comment_url,
       commentUrl
     )
   } finally {
@@ -1434,22 +1644,26 @@ test('ReviewRunStore records an undeliverable notice as failed, not skipped', as
       }),
       true
     )
-    const notice = await store.claimNextRunFailureNotice()
+    const notice = await store.claimNextRunNotice()
     assert.ok(notice)
     // The connector could not reach the provider. That is a failed delivery, not a decision to
     // skip one, and the two must not share a state: an operator reading `skipped` would think
     // nothing was attempted.
     assert.strictEqual(
-      await store.completeRunFailureNotice(runId, notice.claim_token, false),
+      await store.completeRunNotice(
+        notice.notice_id,
+        notice.claim_token,
+        false
+      ),
       true
     )
     assert.strictEqual(
-      (await store.getRun(runId))?.failure_notice?.status,
+      (await store.getRun(runId))?.notices?.[0]?.status,
       'failed'
     )
     // The notice stays terminal: nothing retries it, by design. Reaching the provider is an
     // operator problem, not one this loop can solve by trying again.
-    assert.strictEqual(await store.claimNextRunFailureNotice(), null)
+    assert.strictEqual(await store.claimNextRunNotice(), null)
   } finally {
     await store.close()
   }
@@ -1466,11 +1680,11 @@ test('every terminal path that concludes a run queues a failure notice', async (
   const noticeFor = async (runId: string): Promise<string | null> => {
     const run = await store.getRun(runId)
     assert.strictEqual(
-      run?.failure_notice?.status,
+      run?.notices?.[0]?.status,
       'pending',
       `${runId} ended without queueing a notice`
     )
-    return run?.failure_notice?.failure_stage ?? null
+    return run?.notices?.[0]?.axis ?? null
   }
 
   try {
@@ -1544,10 +1758,13 @@ test('every terminal path that concludes a run queues a failure notice', async (
     }
     const expiry = await store.expireStalePreparations()
     assert.strictEqual(expiry.blocked.length, 1)
-    assert.strictEqual(
-      (await store.getRun(blockedRun))?.failure_notice,
-      null,
-      'a blocked expiry queues nothing by itself'
+    // Disconnecting is a conclusion about automation, not about the run: it asks a person to
+    // look, so it queues an attention notice rather than reporting a failure.
+    const disconnectedNotice = (await store.getRun(blockedRun))?.notices
+    assert.deepStrictEqual(
+      disconnectedNotice?.map((notice) => [notice.kind, notice.axis]),
+      [['attention', 'preparation']],
+      'disconnecting queues an attention notice, never a failure report'
     )
     await store.abandonBlockedPreparation(blockedRun, 'operator decision')
     assert.strictEqual(await noticeFor(blockedRun), 'preparation')
@@ -1656,7 +1873,7 @@ test('ReviewRunStore announces only a publication failure that ends the run', as
       true
     )
     assert.strictEqual(
-      await store.claimNextRunFailureNotice(),
+      await store.claimNextRunNotice(),
       null,
       'a retryable step failure must not produce a notice'
     )
@@ -1679,10 +1896,10 @@ test('ReviewRunStore announces only a publication failure that ends the run', as
       ),
       true
     )
-    const notice = await store.claimNextRunFailureNotice()
+    const notice = await store.claimNextRunNotice()
     assert.strictEqual(notice?.run_id, runId)
-    assert.strictEqual(notice?.failure_stage, 'publication')
-    assert.strictEqual(notice?.failure_code, 'GITHUB_VALIDATION_REJECTED')
+    assert.strictEqual(notice?.axis, 'publication')
+    assert.strictEqual(notice?.reason_code, 'GITHUB_VALIDATION_REJECTED')
   } finally {
     await store.close()
   }
@@ -2325,9 +2542,9 @@ test('an exhausted preparation keeps the last real failure reason instead of the
       'pending->skipped'
     ])
 
-    const notice = await store.claimNextRunFailureNotice()
+    const notice = await store.claimNextRunNotice()
     assert.ok(notice)
-    assert.strictEqual(notice.failure_code, 'GITHUB_RATE_LIMITED')
+    assert.strictEqual(notice.reason_code, 'GITHUB_RATE_LIMITED')
   } finally {
     await pool.end()
     await store.close()
@@ -2354,9 +2571,9 @@ test('a preparation failure with no recorded reason still reports the exhaustion
     )
     await store.expireStalePreparations()
 
-    const notice = await store.claimNextRunFailureNotice()
+    const notice = await store.claimNextRunNotice()
     assert.ok(notice)
-    assert.strictEqual(notice.failure_code, 'PREPARATION_RETRY_EXHAUSTED')
+    assert.strictEqual(notice.reason_code, 'PREPARATION_RETRY_EXHAUSTED')
   } finally {
     await pool.end()
     await store.close()
@@ -2892,9 +3109,14 @@ test('an unreconcilable expiry blocks one run instead of aborting the pass forev
     assert.strictEqual(healthy?.execution.status, 'skipped')
     assert.strictEqual(healthy?.publication.status, 'skipped')
 
-    // The corrupt run's story is left exactly as it was, contradiction intact and repairable.
+    // The corrupt run becomes `disconnected` and nothing else about it is rewritten: the
+    // contradiction stays visible, and the state itself is what tells an operator to look.
     const corrupt = await store.getRun(corruptRunId)
-    assert.strictEqual(corrupt?.preparation?.status, 'preparing')
+    assert.strictEqual(corrupt?.preparation?.status, 'disconnected')
+    assert.strictEqual(
+      corrupt?.preparation?.disconnect_reason,
+      'EXECUTION_ALREADY_ADVANCED'
+    )
     assert.strictEqual(corrupt?.execution.status, 'succeeded')
     assert.strictEqual(corrupt?.publication.status, 'publishing')
 
@@ -2905,17 +3127,16 @@ test('an unreconcilable expiry blocks one run instead of aborting the pass forev
     assert.deepStrictEqual(second.blocked, [])
 
     const marker = await pool.query<{
-      expiry_blocked_reason: string | null
-      expiry_blocked_at: Date | null
-    }>(
-      `SELECT expiry_blocked_reason, expiry_blocked_at FROM preparations WHERE run_id=$1`,
-      [corruptRunId]
-    )
+      status: string
+      disconnect_reason: string | null
+    }>(`SELECT status, disconnect_reason FROM preparations WHERE run_id=$1`, [
+      corruptRunId
+    ])
+    assert.strictEqual(marker.rows[0]?.status, 'disconnected')
     assert.strictEqual(
-      marker.rows[0]?.expiry_blocked_reason,
+      marker.rows[0]?.disconnect_reason,
       'EXECUTION_ALREADY_ADVANCED'
     )
-    assert.notStrictEqual(marker.rows[0]?.expiry_blocked_at, null)
   } finally {
     await pool.end()
     await store.close()
@@ -2992,8 +3213,8 @@ test('a blocked expiry does not stop the rest of the coordination pass', async (
   }
 })
 
-test('abandoning a blocked run concludes its open axes and keeps the execution evidence', async () => {
-  // The operator path for a blocked run. It is an abandonment, not a repair: the open axes are
+test('abandoning a disconnected run concludes its open axes and keeps the execution evidence', async () => {
+  // The operator path for a disconnected run. It is an abandonment, not a repair: the open axes are
   // concluded so the run stops holding work nobody can conclude, while the execution axis keeps
   // the result the Runner actually produced. Nothing is deleted, and the ingress identity stays,
   // so a replay of the same webhook resolves to this run instead of starting a second one.
@@ -3032,8 +3253,12 @@ test('abandoning a blocked run concludes its open axes and keeps the execution e
     assert.deepStrictEqual(expiry.blocked, [
       { run_id: runId, reason: 'EXECUTION_ALREADY_ADVANCED' }
     ])
-    assert.deepStrictEqual(await store.listBlockedPreparationExpiries(), [
-      { run_id: runId, reason: 'EXECUTION_ALREADY_ADVANCED' }
+    assert.deepStrictEqual(await store.listParkedRuns(), [
+      {
+        run_id: runId,
+        axis: 'preparation',
+        reason: 'EXECUTION_ALREADY_ADVANCED'
+      }
     ])
 
     // A blank reason is refused: an abandonment must always say why it happened.
@@ -3045,7 +3270,7 @@ test('abandoning a blocked run concludes its open axes and keeps the execution e
     // from becoming a general state-jumping endpoint.
     await assert.rejects(
       store.abandonBlockedPreparation(`run-${randomUUID()}`, 'not blocked'),
-      /is not a blocked preparation/
+      /is not a disconnected preparation/
     )
 
     const abandoned = await store.abandonBlockedPreparation(
@@ -3053,9 +3278,12 @@ test('abandoning a blocked run concludes its open axes and keeps the execution e
       'execution result will not be delivered'
     )
     assert.strictEqual(abandoned.preparation.status, 'failed')
+    // The abandonment records the reason the row was parked under, which is the reason the
+    // contract declares for `disconnected -> failed` on this axis. Inventing a second code here
+    // would put a reason in the audit log that no declared edge names.
     assert.strictEqual(
       abandoned.preparation.failure_code,
-      'PREPARATION_ABANDONED'
+      'EXECUTION_ALREADY_ADVANCED'
     )
     assert.strictEqual(abandoned.publication.status, 'skipped')
     // The execution result is evidence, not an error to clear.
@@ -3069,21 +3297,22 @@ test('abandoning a blocked run concludes its open axes and keeps the execution e
 
     // The block marker is gone, so coordination no longer skips the run, and the abandonment is
     // on the record with its reason.
-    assert.deepStrictEqual(await store.listBlockedPreparationExpiries(), [])
+    assert.deepStrictEqual(await store.listParkedRuns(), [])
     const events = await store.listEvents(runId)
     assert.ok(
       events.some(
         (event) =>
           event.axis === 'preparation' &&
           event.to_status === 'failed' &&
-          event.reason_code === 'PREPARATION_ABANDONED'
+          event.reason_code === 'EXECUTION_ALREADY_ADVANCED'
       )
     )
     assert.ok(
       events.some(
         (event) =>
           event.axis === 'publication' &&
-          event.from_status === 'publishing' &&
+          (event.from_status === 'publishing' ||
+            event.from_status === 'pending') &&
           event.to_status === 'skipped'
       )
     )
@@ -3105,11 +3334,11 @@ test('abandoning a blocked run concludes its open axes and keeps the execution e
   }
 })
 
-test('an abandon of a self-contradictory block answers 409, not an opaque server fault', async () => {
-  // A block marker on a preparation that is no longer `preparing` is self-contradictory stored
-  // data, not a lost race: the marker row is locked before it is updated, so nothing else can
-  // change it in between. The operator asked about a run in a state this operation may not act
-  // on, which is a client-visible conflict rather than the opaque 500 a bare Error becomes.
+test('resuming a disconnected run grants a fresh attempt budget, not just a fresh status', async () => {
+  // The regression this prevents: disconnection is reached exactly when the attempt budget is
+  // spent, so a resumed row that kept its count would be concluded as `failed` by the very next
+  // expired lease, and the operator's decision would never get a single attempt. Resuming must
+  // therefore move the row to `uncertain` AND zero `attempt_count`.
   const store = await createStore()
   const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
@@ -3119,11 +3348,475 @@ test('an abandon of a self-contradictory block answers 409, not an opaque server
       run_id: runId,
       publish_context: {}
     })
+    // Arrange the contradictory state disconnection exists for: an expired `preparing` lease
+    // whose execution has already left `pending`, with the budget fully spent.
+    await pool.query(
+      `UPDATE preparations SET attempt_count=8,
+         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [runId]
+    )
+    await pool.query(
+      `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+         finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
+      [runId]
+    )
+    assert.strictEqual(
+      (await store.expireStalePreparations()).blocked.length,
+      1
+    )
+
+    // A run that never disconnected is refused the same way abandonment refuses one.
+    await assert.rejects(
+      store.resumeDisconnectedPreparation(`run-${randomUUID()}`),
+      (error: unknown) => {
+        assert.strictEqual((error as { statusCode?: number }).statusCode, 409)
+        return true
+      }
+    )
+
+    const resumed = await store.resumeDisconnectedPreparation(runId)
+    assert.strictEqual(resumed.preparation.status, 'uncertain')
+    assert.strictEqual(resumed.preparation.disconnect_reason, null)
+    assert.strictEqual(
+      resumed.preparation.attempt_count,
+      0,
+      'a resumed row must get a budget it can actually act on'
+    )
+    // The run left the operator queue, and the decision is on the record.
+    assert.deepStrictEqual(await store.listParkedRuns(), [])
+    const events = await store.listEvents(runId)
+    assert.ok(
+      events.some(
+        (event) =>
+          event.axis === 'preparation' &&
+          event.from_status === 'disconnected' &&
+          event.to_status === 'uncertain' &&
+          event.reason_code === 'PREPARATION_RESUMED_BY_OPERATOR'
+      )
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
+test('a disconnected execution has no automatic way out, so an operator resumes it', async () => {
+  // Regression: once execution disconnects, `claimSubmissionRecovery` no longer matches it (it
+  // only takes `uncertain`) and no automatic selector picks a `disconnected` execution, so
+  // without an operator resume the run would be stuck forever with no owner and no writer. The
+  // resume must also reset the replay budget, or the next coordination pass would disconnect it
+  // again before a single replay happened.
+  const store = await createStore()
+  try {
+    const runId = `run-${randomUUID()}`
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await store.failPreparation(runId, admission.preparation_token as string, {
+      code: 'SUBMISSION_STATE_UNCERTAIN',
+      message: 'unknown'
+    })
+    assert.strictEqual(
+      (await store.getRun(runId))?.execution.status,
+      'uncertain'
+    )
+
+    // A budget that has not been spent leaves the run to normal replay; only a spent budget
+    // disconnects it.
+    assert.strictEqual(
+      await store.disconnectExhaustedSubmissionRecovery(runId, 8),
+      null,
+      'a run that has not spent its budget is not disconnected'
+    )
+    assert.notStrictEqual(
+      await store.disconnectExhaustedSubmissionRecovery(runId, 0),
+      null,
+      'a spent budget disconnects the run'
+    )
+    assert.strictEqual(
+      (await store.getRun(runId))?.execution.status,
+      'disconnected'
+    )
+    assert.strictEqual(
+      await store.claimSubmissionRecovery(runId),
+      null,
+      'a disconnected execution is not claimable by automatic recovery'
+    )
+
+    const resumed = await store.resumeDisconnectedRun(runId)
+    assert.strictEqual(resumed.execution.status, 'uncertain')
+    assert.strictEqual(
+      await store.submissionRecoveryAttemptCount(runId),
+      0,
+      'resuming grants a replay budget the run can act on'
+    )
+    assert.notStrictEqual(
+      await store.claimSubmissionRecovery(runId),
+      null,
+      'the resumed run is claimable again'
+    )
+    const events = await store.listEvents(runId)
+    assert.ok(
+      events.some(
+        (event) =>
+          event.axis === 'execution' &&
+          event.from_status === 'disconnected' &&
+          event.to_status === 'uncertain' &&
+          event.reason_code === 'SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR'
+      )
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('giving up on a disconnected execution stops waiting without claiming it never ran', async () => {
+  // The decision this covers is "we will not wait for this outcome", not "the task never ran".
+  // The Runner may have accepted and be executing the task right now, so the failure code has to
+  // name the decision, and publication must be skipped for "no result to deliver" rather than
+  // for "nothing was produced".
+  const store = await createStore()
+  try {
+    const runId = `run-${randomUUID()}`
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await store.failPreparation(runId, admission.preparation_token as string, {
+      code: 'SUBMISSION_STATE_UNCERTAIN',
+      message: 'unknown'
+    })
+    assert.notStrictEqual(
+      await store.disconnectExhaustedSubmissionRecovery(runId, 0),
+      null
+    )
+
+    await assert.rejects(
+      store.giveUpDisconnectedRun(runId, '   '),
+      (error: unknown) => {
+        assert.strictEqual((error as { statusCode?: number }).statusCode, 400)
+        return true
+      }
+    )
+
+    const givenUp = await store.giveUpDisconnectedRun(runId, 'operator stopped')
+    assert.strictEqual(givenUp.execution.status, 'failed')
+    assert.strictEqual(
+      givenUp.failure_code,
+      'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR',
+      'the code names the decision, not an unproven "never ran"'
+    )
+    assert.strictEqual(givenUp.publication.status, 'skipped')
+    // A failure notice is queued so the requester learns the outcome was abandoned, and it is a
+    // failure (not an attention notice): the run is over.
+    assert.ok(
+      givenUp.notices.some(
+        (notice) => notice.axis === 'execution' && notice.kind === 'failure'
+      )
+    )
+    // The decision is final: neither resuming nor giving up again applies.
+    await assert.rejects(
+      store.resumeDisconnectedRun(runId),
+      (error: unknown) => {
+        assert.strictEqual((error as { statusCode?: number }).statusCode, 409)
+        return true
+      }
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('giving up on a disconnected publication fails rather than skipping', async () => {
+  // A step in this state may already have taken effect on GitHub, so the axis must not report
+  // "skipped" — that reads as "nothing was published". It fails, which says publishing stopped
+  // while what is actually on the remote system remains unknown, and the step keeps its own
+  // status as the record of that.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.claimPublication(runId)
+    await store.initializePublicationSteps(runId, token as string, [
+      'issue:summary-comment'
+    ])
+    await store.requirePublicationStepClaim(
+      runId,
+      token as string,
+      'issue:summary-comment'
+    )
+    const claim = async (): Promise<void> => {
+      await store
+        .requirePublicationStepClaim(
+          runId,
+          token as string,
+          'issue:summary-comment'
+        )
+        .catch(() => undefined)
+    }
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await store.failPublicationStep(
+        runId,
+        token as string,
+        'issue:summary-comment',
+        { code: 'GITHUB_TIMEOUT', message: 'no answer' },
+        { retry: true }
+      )
+      const status = (
+        (await store.listPublicationSteps(runId))[0] as { status: string }
+      ).status
+      if (status === 'disconnected') break
+      await claim()
+    }
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.status,
+      'disconnected'
+    )
+
+    const givenUp = await store.giveUpDisconnectedRun(runId, 'operator stopped')
+    assert.strictEqual(givenUp.publication.status, 'failed')
+    assert.strictEqual(
+      givenUp.failure_code,
+      'PUBLICATION_ABANDONED_BY_OPERATOR'
+    )
+    // The step is untouched: it is the record of which side effect could not be confirmed.
+    assert.strictEqual(
+      ((await store.listPublicationSteps(runId))[0] as { status: string })
+        .status,
+      'disconnected'
+    )
+    await pool.end()
+  } finally {
+    await store.close()
+  }
+})
+
+test('a disconnected publication is parked until an operator resumes it', async () => {
+  // A step parked after its reconciliation budget ran out excludes the whole publication from
+  // every automatic claim, which is what keeps a side effect with an unknown remote outcome from
+  // being repeated. It also means nothing can ever retry the run, so the operator resume has to
+  // re-claim the publication — and re-claiming the parked step must then be refused instead of
+  // running the side effect again.
+  const store = await createStore()
+  // A second connection reads the claim the store wrote. The record model deliberately never
+  // carries credentials, so the fixture reads the column the way the publisher holding the
+  // lease would.
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.claimPublication(runId)
+    assert.notStrictEqual(token, null)
+    await store.initializePublicationSteps(runId, token as string, [
+      'issue:summary-comment'
+    ])
+    await store.requirePublicationStepClaim(
+      runId,
+      token as string,
+      'issue:summary-comment'
+    )
+    // The shape disconnection exists for: the step may have taken effect remotely and nobody can
+    // establish whether it did. Attempts and reconciliations keep failing until the store moves
+    // the step to `uncertain`; every further reconciliation fails here (the remote check throws).
+    const stepStatus = async (): Promise<string> =>
+      ((await store.listPublicationSteps(runId))[0] as { status: string })
+        .status
+    // Whether a claim succeeds or reports the budget spent is the budget's decision, not the
+    // test's: both mean the reconciliation budget below is what matters.
+    const claim = async (): Promise<void> => {
+      await store
+        .requirePublicationStepClaim(
+          runId,
+          token as string,
+          'issue:summary-comment'
+        )
+        .catch(() => undefined)
+    }
+    const reconcile = async (): Promise<void> => {
+      await store.failPublicationStep(
+        runId,
+        token as string,
+        'issue:summary-comment',
+        { code: 'GITHUB_TIMEOUT', message: 'provider did not answer' },
+        { retry: true }
+      )
+    }
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await reconcile()
+      await claim()
+    }
+    // Reconciliation after reconciliation never reaches an answer, until the budget parks it.
+    for (
+      let attempt = 0;
+      attempt < 10 && (await stepStatus()) !== 'disconnected';
+      attempt += 1
+    ) {
+      await reconcile()
+    }
+    const parkedStep = (await store.listPublicationSteps(runId))[0] as {
+      status: string
+    }
+    assert.strictEqual(parkedStep.status, 'disconnected')
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.status,
+      'disconnected',
+      'the axis reports the step uncertainty so the run surfaces for an operator'
+    )
+    // Automation must not pick it up: no selector claims a run whose step is parked, and the
+    // internal single-run claim refuses it too. Without a way out, the run would be stuck with
+    // no owner and no writer - which is exactly why the operator resume exists.
+    assert.strictEqual(await store.claimPublication(runId), null)
+
+    // The operator resume grants a fresh *reconciliation* budget: the parked step returns to
+    // `uncertain` so the connector can look at the remote system once more. It does not grant a
+    // new attempt - re-running a side effect whose outcome nobody established is exactly what
+    // disconnection exists to prevent - so the attempt count stays spent.
+    // `recovery_attempt_count` is internal (the summary deliberately does not publish it), so the
+    // budget is read from the row that actually holds it.
+    const readStep = async (): Promise<{
+      status: string
+      attempt_count: number
+      recovery_attempt_count: number
+    }> =>
+      (
+        await pool.query<{
+          status: string
+          attempt_count: number
+          recovery_attempt_count: number
+        }>(
+          `SELECT status,attempt_count,recovery_attempt_count FROM publication_steps
+           WHERE run_id=$1`,
+          [runId]
+        )
+      ).rows[0] as {
+        status: string
+        attempt_count: number
+        recovery_attempt_count: number
+      }
+    const steppedBefore = await readStep()
+    const resumed = await store.resumeDisconnectedRun(runId)
+    assert.strictEqual(
+      resumed.publication.status,
+      'uncertain',
+      'the axis reports what the revived step is, so the run stays visible to reconciliation'
+    )
+    const revived = await readStep()
+    assert.strictEqual(revived.status, 'uncertain')
+    assert.strictEqual(
+      revived.recovery_attempt_count,
+      0,
+      'the operator decision refreshes the reconciliation budget'
+    )
+    assert.strictEqual(
+      revived.attempt_count,
+      steppedBefore.attempt_count,
+      'it refreshes no attempt budget: the side effect may not be repeated'
+    )
+
+    // A resumed run is claimable again, and re-claiming its step is still refused because the
+    // attempt budget is spent. That refusal is what makes the connector reconcile instead of
+    // re-running the write, and it must not be a dead end: `retry_exhausted` is what tells it to
+    // look, so the step is reconcilable rather than reported as unsettled.
+    const resumedToken = (
+      await pool.query<{ claim_token: string }>(
+        `SELECT claim_token FROM publications WHERE run_id=$1`,
+        [runId]
+      )
+    ).rows[0]?.claim_token
+    assert.ok(resumedToken)
+    await assert.rejects(
+      store.requirePublicationStepClaim(
+        runId,
+        resumedToken,
+        'issue:summary-comment'
+      ),
+      (error: unknown) => {
+        assert.strictEqual(
+          (error as { code?: string }).code,
+          'PUBLICATION_STEP_RETRY_EXHAUSTED',
+          'the resumed step is offered for reconciliation, not reported as unsettled'
+        )
+        return true
+      }
+    )
+
+    // The resume is on the record.
+    const events = await store.listEvents(runId)
+    assert.ok(
+      events.some(
+        (event) =>
+          event.axis === 'publication' &&
+          event.to_status === 'uncertain' &&
+          event.reason_code === 'PUBLICATION_RESUMED_BY_OPERATOR'
+      )
+    )
+
+    // The connector looks and finds nothing: only that answer may end the step. Once it does,
+    // the published run fails terminally instead of looping.
+    assert.strictEqual(
+      await store.settleExhaustedPublicationStep(
+        runId,
+        resumedToken,
+        'issue:summary-comment',
+        { found: false }
+      ),
+      true
+    )
+    await assert.rejects(
+      (async () => {
+        try {
+          await store.requirePublicationStepClaim(
+            runId,
+            resumedToken,
+            'issue:summary-comment'
+          )
+        } catch (error) {
+          // Mirrors the publication coordinator: classify, then commit the terminal failure.
+          await store.failPublication(
+            runId,
+            resumedToken,
+            {
+              code: (error as { code?: string }).code ?? null,
+              message: 'step could not be reconciled'
+            },
+            { retry: false }
+          )
+          throw error
+        }
+      })()
+    )
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.status,
+      'failed',
+      'settling an unsettled step fails the run instead of looping'
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
+test('abandoning a run that is no longer disconnected answers 409, not an opaque fault', async () => {
+  // The endpoint only ever concludes a run that is still waiting on an operator. When the row
+  // has moved on, the request names a run in a state this operation may not act on: that is a
+  // client-visible conflict rather than the opaque 500 a bare Error becomes.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = `run-${randomUUID()}`
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    // The row is concluded elsewhere while the operator is looking at it. The endpoint must then
+    // answer 409 rather than act on a run that is no longer disconnected.
     await pool.query(
       `UPDATE preparations SET status='failed', claim_token=NULL, claimed_at=NULL,
          started_at=clock_timestamp(), finished_at=clock_timestamp(),
-         expiry_blocked_reason='EXECUTION_ALREADY_ADVANCED',
-         expiry_blocked_at=clock_timestamp()
+         disconnect_reason=NULL
        WHERE run_id=$1`,
       [runId]
     )
@@ -3140,12 +3833,12 @@ test('an abandon of a self-contradictory block answers 409, not an opaque server
     )
     // Nothing was written on the refused path.
     const stored = await pool.query<{ status: string; reason: string | null }>(
-      'SELECT status, expiry_blocked_reason AS reason FROM preparations WHERE run_id=$1',
+      'SELECT status, disconnect_reason AS reason FROM preparations WHERE run_id=$1',
       [runId]
     )
     assert.deepStrictEqual(stored.rows[0], {
       status: 'failed',
-      reason: 'EXECUTION_ALREADY_ADVANCED'
+      reason: null
     })
   } finally {
     await pool.end()
@@ -3283,8 +3976,8 @@ test('a step claim is refused once another path has concluded the publication', 
 test('a step failure records its code and message on the right fields', async () => {
   // `failPublicationStep` binds five positional values, two of them connector-supplied strings
   // (`error.code` and `error.message`). A reordering that swapped those two would still pass a
-  // test that only counts `failure_count`, so this pins the actual fields rather than the write
-  // happening at all.
+  // test that only checked the step left `running`, so this pins the actual fields rather than
+  // the write happening at all.
   const store = await createStore()
   try {
     const runId = await createSuccessfulRun(store)
@@ -3308,13 +4001,13 @@ test('a step failure records its code and message on the right fields', async ()
         status: step?.status,
         code: step?.failure_code,
         message: step?.failure_message,
-        failure_count: step?.failure_count
+        attempt_count: step?.attempt_count
       },
       {
         status: 'failed',
         code: 'SOME_CODE',
         message: 'some message',
-        failure_count: 1
+        attempt_count: 1
       },
       'the code and message must land in their own columns, not each other'
     )
@@ -3351,6 +4044,273 @@ test('an owner cannot claim a publication step it already holds', async () => {
       1,
       'the refused claim must not touch the attempt count'
     )
+  } finally {
+    await store.close()
+  }
+})
+
+test('an uncertain submission queues no notice until the run is conclusively failed', async () => {
+  // Entering `uncertain` means the outcome is unknown, so a notice there would tell the requester
+  // "this never started" while a replay may still be accepted and the review may complete and
+  // publish normally. A posted comment cannot be taken back, so the notice waits for the
+  // transition that actually concludes the run.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = `run-uncertain-notice-${randomUUID()}`
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await store.savePreparedSubmission(
+      runId,
+      admission.preparation_token as string,
+      {},
+      { contract_version: 'v6' }
+    )
+    await store.failPreparation(
+      runId,
+      admission.preparation_token as string,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' },
+      { retry: false }
+    )
+
+    const uncertain = await store.getRun(runId)
+    assert.strictEqual(uncertain?.execution.status, 'uncertain')
+    assert.deepStrictEqual(
+      uncertain?.notices,
+      [],
+      'an unknown outcome must not be announced as a failure'
+    )
+    assert.strictEqual(
+      await store.claimNextRunNotice(),
+      null,
+      'nothing may be deliverable while the run can still succeed'
+    )
+
+    // The replay is accepted: the run proceeds normally and was never announced as failed.
+    const recoveryToken = await store.claimSubmissionRecovery(runId)
+    assert.ok(recoveryToken)
+    assert.strictEqual(
+      await store.completeSubmissionRecovery(runId, recoveryToken),
+      true
+    )
+    const recovered = await store.getRun(runId)
+    assert.strictEqual(recovered?.execution.status, 'queued')
+    assert.deepStrictEqual(
+      recovered?.notices,
+      [],
+      'a recovered run must not carry a failure notice'
+    )
+    assert.strictEqual(await store.claimNextRunNotice(), null)
+  } finally {
+    await store.close()
+  }
+})
+
+test('a rejected replay announces the failure that actually happened', async () => {
+  // The notice belongs to the path that concludes the run, not to the one that merely loses track
+  // of it. This is the write that makes the eventual comment describe a real failure.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = `run-rejected-replay-notice-${randomUUID()}`
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await store.savePreparedSubmission(
+      runId,
+      admission.preparation_token as string,
+      {},
+      { contract_version: 'v6' }
+    )
+    await store.failPreparation(
+      runId,
+      admission.preparation_token as string,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' },
+      { retry: false }
+    )
+    const recoveryToken = await store.claimSubmissionRecovery(runId)
+    assert.ok(recoveryToken)
+    assert.strictEqual(
+      await store.failSubmissionRecovery(runId, recoveryToken, {
+        code: 'RUNNER_REJECTED',
+        message: 'the Runner refused the replayed submission'
+      }),
+      true
+    )
+
+    const run = await store.getRun(runId)
+    assert.strictEqual(run?.execution.status, 'failed')
+    assert.strictEqual(run?.publication.status, 'skipped')
+    assert.deepStrictEqual(run?.notices, [
+      {
+        notice_id: run?.notices[0]?.notice_id,
+        kind: 'failure',
+        axis: 'execution',
+        status: 'pending',
+        reason_code: 'RUNNER_REJECTED',
+        comment_url: null
+      }
+    ])
+  } finally {
+    await store.close()
+  }
+})
+
+test('an uncertain submission that never resolves is concluded once its budget is spent', async () => {
+  // Without a budget this run would stay `uncertain` forever, and (now that entering that state
+  // queues no notice) would never be reported at all. Spending the budget concludes it as a real
+  // failure, which is what makes the notice truthful.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = `run-recovery-exhausted-${randomUUID()}`
+  try {
+    const admission = await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await store.savePreparedSubmission(
+      runId,
+      admission.preparation_token as string,
+      {},
+      { contract_version: 'v6' }
+    )
+    await store.failPreparation(
+      runId,
+      admission.preparation_token as string,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' },
+      { retry: false }
+    )
+
+    const recovering = await store.getRun(runId)
+    assert.ok(recovering)
+    assert.strictEqual(
+      await concludeExhaustedSubmissionRecovery(store, recovering),
+      null,
+      'an unspent budget must leave the run to the normal replay path'
+    )
+
+    // Every replay keeps ending with an unknown outcome.
+    for (
+      let attempt = 0;
+      attempt < MAX_SUBMISSION_RECOVERY_ATTEMPTS;
+      attempt += 1
+    ) {
+      const claimed = await store.claimSubmissionRecovery(runId)
+      assert.ok(claimed, `replay ${attempt + 1} should be claimable`)
+      assert.strictEqual(
+        await store.recordUnknownRecoveryOutcome(runId, claimed),
+        true
+      )
+    }
+    assert.strictEqual(
+      await store.submissionRecoveryAttemptCount(runId),
+      MAX_SUBMISSION_RECOVERY_ATTEMPTS
+    )
+    assert.deepStrictEqual(
+      (await store.getRun(runId))?.notices,
+      [],
+      'replaying an unknown outcome is not yet a conclusion'
+    )
+
+    const exhaustedRun = await store.getRun(runId)
+    assert.ok(exhaustedRun)
+    assert.deepStrictEqual(
+      await concludeExhaustedSubmissionRecovery(store, exhaustedRun),
+      { status: 'disconnected' }
+    )
+    const run = await store.getRun(runId)
+    assert.strictEqual(run?.execution.status, 'disconnected')
+    assert.strictEqual(run?.failure_code, 'SUBMISSION_STATE_UNCERTAIN')
+    assert.strictEqual(run?.publication.status, 'pending')
+    assert.deepStrictEqual(run?.notices, [
+      {
+        notice_id: run?.notices[0]?.notice_id,
+        kind: 'attention',
+        axis: 'execution',
+        status: 'pending',
+        reason_code: 'SUBMISSION_RECOVERY_EXHAUSTED',
+        comment_url: null
+      }
+    ])
+    // The budget is spent, so a later pass does not replay this run again.
+    assert.strictEqual(await store.claimSubmissionRecovery(runId), null)
+  } finally {
+    await store.close()
+  }
+})
+
+test('a step whose owners kept dying exhausts the budget and is concluded', async () => {
+  // The budget is spent by attempts, not by recorded failures. A publisher that dies mid-effect
+  // never calls `failPublicationStep`, so a failure-only budget would let this step be taken over
+  // forever: every new owner would start another attempt, die, and leave the run `publishing`
+  // with nobody to finish it. Counting the attempt makes the crash loop end the same way a
+  // failure loop does, and the takeover that finds no budget left is what concludes the step.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  const runId = await createSuccessfulRun(store)
+  try {
+    const first = await store.claimPublication(runId)
+    assert.ok(first)
+    await store.initializePublicationSteps(runId, first, ['s'])
+    await store.requirePublicationStepClaim(runId, first, 's')
+
+    // Attempts 2 and 3 are taken over by new owners that also die without reporting.
+    for (let attempt = 2; attempt <= 3; attempt += 1) {
+      const takeover = await store.claimPublication(runId)
+      assert.ok(
+        takeover,
+        `attempt ${attempt} should claim a new publication owner`
+      )
+      await store.requirePublicationStepClaim(runId, takeover, 's')
+      assert.strictEqual(
+        (await store.listPublicationSteps(runId))[0]?.attempt_count,
+        attempt
+      )
+    }
+    assert.strictEqual(
+      (await store.listPublicationSteps(runId))[0]?.status,
+      'running',
+      'no failure was ever recorded, yet the budget is spent'
+    )
+
+    const last = await store.claimPublication(runId)
+    assert.ok(last)
+    await assert.rejects(
+      store.requirePublicationStepClaim(runId, last, 's'),
+      (error: unknown) =>
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+    )
+    // Now `uncertain`, not concluded: every one of those owners may have finished the side
+    // effect before dying, so the step must be reconciled rather than declared failed.
+    const [exhausted] = await store.listPublicationSteps(runId)
+    assert.strictEqual(exhausted?.status, 'uncertain')
+    assert.strictEqual(exhausted?.attempt_count, 3)
+
+    // Only a reconciliation that confirms absence concludes it, and it releases the claim: a
+    // concluded row that still names an owner would read as work someone is holding.
+    assert.strictEqual(
+      await store.settleExhaustedPublicationStep(runId, last, 's', {
+        found: false
+      }),
+      true
+    )
+    const [step] = await store.listPublicationSteps(runId)
+    assert.strictEqual(step?.status, 'terminal_failed')
+    assert.strictEqual(step?.attempt_count, 3)
+    const observer = new Pool({ connectionString: requireTestDatabase() })
+    try {
+      const owner = await observer.query<{ claimed_by: string | null }>(
+        `SELECT claimed_by FROM publication_steps WHERE run_id=$1`,
+        [runId]
+      )
+      assert.strictEqual(owner.rows[0]?.claimed_by, null)
+    } finally {
+      await observer.end()
+    }
   } finally {
     await store.close()
   }

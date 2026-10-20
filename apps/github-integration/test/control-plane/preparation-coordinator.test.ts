@@ -53,8 +53,9 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   })
   const completed: unknown[] = []
   const store = {
-    claimNextRunFailureNotice: async () => ({
+    claimNextRunNotice: async () => ({
       run_id: 'run-pr-reference',
+      notice_id: 'notice-test',
       input: {
         kind: 'github_pull_request_review',
         pr_reference: {
@@ -63,11 +64,12 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
           pr_number: 7
         }
       },
-      failure_stage: 'preparation' as const,
-      failure_code: 'PREPARATION_RETRY_EXHAUSTED',
+      axis: 'preparation' as const,
+      reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+      kind: 'failure' as const,
       claim_token: 'notice-token'
     }),
-    completeRunFailureNotice: async (...args: unknown[]) => {
+    completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
     },
@@ -96,7 +98,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   assert.match(posted.body, /run-pr-reference/)
   assert.deepStrictEqual(completed, [
     // The comment that was posted, so the console can link the requester to it.
-    ['run-pr-reference', 'notice-token', true, 'https://example.test/comment/9']
+    ['notice-test', 'notice-token', true, 'https://example.test/comment/9']
   ])
 })
 
@@ -107,17 +109,19 @@ test('preparation-first scheduling falls back to a terminal notice when no prepa
       calls.push('preparation')
       return null
     },
-    claimNextRunFailureNotice: async () => {
+    claimNextRunNotice: async () => {
       calls.push('notice')
       return {
         run_id: 'run-without-reply-target',
+        notice_id: 'notice-test',
         input: {},
-        failure_stage: 'preparation' as const,
-        failure_code: 'PREPARATION_RETRY_EXHAUSTED',
+        axis: 'preparation' as const,
+        reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+        kind: 'failure' as const,
         claim_token: 'notice-claim'
       }
     },
-    completeRunFailureNotice: async () => {
+    completeRunNotice: async () => {
       calls.push('complete-notice')
       return true
     },
@@ -164,18 +168,20 @@ test('a repository scan failure reports into the repository summary issue', asyn
   })
   const completed: unknown[] = []
   const store = {
-    claimNextRunFailureNotice: async () => ({
+    claimNextRunNotice: async () => ({
       run_id: 'run-repository',
+      notice_id: 'notice-test',
       input: {
         kind: 'github_repository_review',
         payload: { repo_full_name: 'octo/example' },
         verified_repository: 'octo/example'
       },
-      failure_stage: 'preparation' as const,
-      failure_code: 'PREPARATION_RETRY_EXHAUSTED',
+      axis: 'preparation' as const,
+      reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+      kind: 'failure' as const,
       claim_token: 'notice-token'
     }),
-    completeRunFailureNotice: async (...args: unknown[]) => {
+    completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
     },
@@ -200,7 +206,7 @@ test('a repository scan failure reports into the repository summary issue', asyn
   assert.match(body.body, /run-repository/)
   assert.match(body.body, /PREPARATION_RETRY_EXHAUSTED/)
   assert.deepStrictEqual(completed, [
-    ['run-repository', 'notice-token', true, 'https://example.test/comment/5']
+    ['notice-test', 'notice-token', true, 'https://example.test/comment/5']
   ])
 })
 
@@ -212,17 +218,19 @@ test('an unrecoverable notice concludes instead of being retried forever', async
   // so the record reflects what happened.
   const completed: unknown[] = []
   const store = {
-    claimNextRunFailureNotice: async () => ({
+    claimNextRunNotice: async () => ({
       run_id: 'run-unreachable-repository',
+      notice_id: 'notice-test',
       input: {
         kind: 'github_repository_review',
         verified_repository: 'octo/example'
       },
-      failure_stage: 'preparation' as const,
-      failure_code: 'PREPARATION_RETRY_EXHAUSTED',
+      axis: 'preparation' as const,
+      reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+      kind: 'failure' as const,
       claim_token: 'notice-token'
     }),
-    completeRunFailureNotice: async (...args: unknown[]) => {
+    completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
     },
@@ -242,9 +250,63 @@ test('an unrecoverable notice concludes instead of being retried forever', async
     completed,
     [
       // No comment URL: nothing was posted, and the notice says so instead of staying open.
-      ['run-unreachable-repository', 'notice-token', false]
+      ['notice-test', 'notice-token', false]
     ],
     'an unrecoverable notice is concluded, not left claimable'
+  )
+})
+
+test('a process without the GitHub installation concludes the notice, which the single-role assumption forbids', async () => {
+  // The notice claim is per connector, not per capability: every process running this coordinator
+  // shares one outbox, and the oldest pending notice is what any of them takes next. That is only
+  // safe because the deployment runs one coordinator role per connector, each holding the App
+  // credentials a reply needs.
+  //
+  // This test pins the consequence of breaking that assumption, so the cost of a future
+  // publisher-only deployment is visible instead of discovered in production: a process that
+  // cannot reach the installation takes the notice, fails deterministically, and the outbox
+  // records "the requester was not told" even though another process could have told them. No
+  // claim-side gate exists to prevent it; if such a deployment ever exists, the claim needs a
+  // role or capability rather than a second queue.
+  const completed: unknown[] = []
+  let claimed = 0
+  const store = {
+    claimNextRunNotice: async () => {
+      claimed += 1
+      return {
+        run_id: 'run-wrong-role',
+        notice_id: 'notice-test',
+        input: {
+          kind: 'github_repository_review',
+          verified_repository: 'octo/example'
+        },
+        axis: 'preparation' as const,
+        reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+        kind: 'failure' as const,
+        claim_token: 'notice-token'
+      }
+    },
+    completeRunNotice: async (...args: unknown[]) => {
+      completed.push(args)
+      return true
+    },
+    claimNextPreparation: async () =>
+      assert.fail('the notice was already handled this pass'),
+    failPreparation: async () =>
+      assert.fail('the notice path must not fail preparation'),
+    ...unreachedPreparationMembers()
+  }
+  // No installation is visible to this process: the App answers 404 for the scanned repository.
+  const { app } = fakeApp({
+    respond: () => githubJson({ message: 'Not Found' }, 404)
+  })
+
+  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
+  assert.strictEqual(claimed, 1, 'the claim is per connector, so this process takes it')
+  assert.deepStrictEqual(
+    completed,
+    [['notice-test', 'notice-token', false]],
+    'the notice is concluded as undelivered, not left for a process that could deliver it'
   )
 })
 
@@ -254,17 +316,19 @@ test('a transient notice failure stays claimable for another attempt', async () 
   // outcome the requester still has no way to read.
   const completed: unknown[] = []
   const store = {
-    claimNextRunFailureNotice: async () => ({
+    claimNextRunNotice: async () => ({
       run_id: 'run-transient',
+      notice_id: 'notice-test',
       input: {
         kind: 'github_repository_review',
         verified_repository: 'octo/example'
       },
-      failure_stage: 'preparation' as const,
-      failure_code: 'PREPARATION_RETRY_EXHAUSTED',
+      axis: 'preparation' as const,
+      reason_code: 'PREPARATION_RETRY_EXHAUSTED',
+      kind: 'failure' as const,
       claim_token: 'notice-token'
     }),
-    completeRunFailureNotice: async (...args: unknown[]) => {
+    completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
     },
@@ -290,7 +354,7 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
   // The issue record is replayed from storage, so it is untyped JSON. A missing field must fail as
   // invalid preparation input rather than produce a context whose fields are `undefined`.
   const store = {
-    claimNextRunFailureNotice: async () => null,
+    claimNextRunNotice: async () => null,
     claimNextPreparation: async () => ({
       run_id: 'run-malformed-issue',
       workflow: 'issue-review' as const,
@@ -316,7 +380,7 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
   const failures: Array<{ message: string }> = []
   const failing = {
     ...store,
-    completeRunFailureNotice: async () => true,
+    completeRunNotice: async () => true,
     failPreparation: async (
       _runId: string,
       _token: string,
@@ -339,7 +403,7 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
 
 test('a recovered preparation with a malformed trusted default branch is rejected', async () => {
   const store = {
-    claimNextRunFailureNotice: async () => null,
+    claimNextRunNotice: async () => null,
     claimNextPreparation: async () => ({
       run_id: 'run-malformed-branch',
       workflow: 'issue-review' as const,
@@ -380,7 +444,7 @@ test('a recovered preparation with a malformed trusted default branch is rejecte
   const failures: Array<{ message: string }> = []
   const failing = {
     ...store,
-    completeRunFailureNotice: async () => true,
+    completeRunNotice: async () => true,
     failPreparation: async (
       _runId: string,
       _token: string,
@@ -437,7 +501,7 @@ test('a recovered issue that omits sender_login or issue_author is rejected', as
     delete partialIssue[missing]
     const failures: Array<{ message: string }> = []
     const store = {
-      claimNextRunFailureNotice: async () => null,
+      claimNextRunNotice: async () => null,
       claimNextPreparation: async () => ({
         run_id: `run-missing-${missing}`,
         workflow: 'issue-review' as const,
@@ -454,7 +518,7 @@ test('a recovered issue that omits sender_login or issue_author is rejected', as
           open_pr: null
         }
       }),
-      completeRunFailureNotice: async () => true,
+      completeRunNotice: async () => true,
       failPreparation: async (
         _runId: string,
         _token: string,
@@ -487,7 +551,7 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
   for (const bad of [null, 123, {}]) {
     const failures: Array<{ message: string }> = []
     const store = {
-      claimNextRunFailureNotice: async () => null,
+      claimNextRunNotice: async () => null,
       claimNextPreparation: async () => ({
         run_id: 'run-bad-author',
         workflow: 'issue-review' as const,
@@ -521,7 +585,7 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
           open_pr: null
         }
       }),
-      completeRunFailureNotice: async () => true,
+      completeRunNotice: async () => true,
       failPreparation: async (
         _runId: string,
         _token: string,

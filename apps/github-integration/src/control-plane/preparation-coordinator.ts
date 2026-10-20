@@ -23,7 +23,7 @@ import {
   classifyPreparationFailure,
   InvalidPreparationInputError
 } from './preparation-failure.js'
-import { sendRunFailureReply } from './run-failure-reply.js'
+import { sendRunNoticeReply } from './run-notice-reply.js'
 import { installationOctokitForRepo } from '../github/installation-client.js'
 
 interface PreparationCoordinator {
@@ -355,14 +355,27 @@ function noticeRepository(input: Record<string, unknown>): string | null {
   return repositoryFullName(input.verified_repository)
 }
 
-async function deliverNextRunFailureNotice({
+/** Deliver the oldest queued notice for this connector.
+ *
+ * A connector is assumed to run one coordinator role, which is why the claim is not filtered by
+ * capability: `claimNextRunNotice` takes the oldest pending notice for the connector, and every
+ * process in that role holds the GitHub App credentials a reply needs. A process that legitimately
+ * does not - a publisher-only deployment under the same connector - would claim a notice it cannot
+ * post and could conclude it as undelivered. Should such a deployment exist, the claim needs a
+ * role or capability field rather than a second queue: one outbox per connector is what makes
+ * "the requester was told" a single fact.
+ *
+ * That assumption is deliberately recorded rather than enforced, because enforcing it here would
+ * mean encoding deployment shape into the coordination protocol.
+ */
+async function deliverNextRunNotice({
   app,
   store
 }: {
   app: App
   store: PreparationCoordinatorStore
 }): Promise<boolean> {
-  const notice = await store.claimNextRunFailureNotice()
+  const notice = await store.claimNextRunNotice()
   if (notice === null) return false
   try {
     const input = requireRecord(notice.input, 'object')
@@ -373,28 +386,23 @@ async function deliverNextRunFailureNotice({
     const delivered =
       repo === null
         ? null
-        : await sendRunFailureReply(
+        : await sendRunNoticeReply(
             await installationOctokitForRepo(app, repo),
             {
               run_id: notice.run_id,
+              notice_id: notice.notice_id,
               input,
-              failure_stage: notice.failure_stage,
-              // A notice always names the stage; the reason may be absent. Passing null keeps the
-              // reply honest: synthesising `${stage}_FAILED` would print a code that is not in the
-              // coordination vocabulary and that the console cannot explain.
-              failure_code: notice.failure_code
+              axis: notice.axis,
+              kind: notice.kind,
+              reason_code: notice.reason_code
             }
           )
     // A posted reply names its comment; a failed delivery has none to name.
     if (delivered === null) {
-      await store.completeRunFailureNotice(
-        notice.run_id,
-        notice.claim_token,
-        false
-      )
+      await store.completeRunNotice(notice.notice_id, notice.claim_token, false)
     } else {
-      await store.completeRunFailureNotice(
-        notice.run_id,
+      await store.completeRunNotice(
+        notice.notice_id,
         notice.claim_token,
         true,
         delivered.comment_url
@@ -408,11 +416,7 @@ async function deliverNextRunFailureNotice({
     // otherwise be re-claimed every lease period forever, so it is concluded as an undelivered
     // notice instead. The distinction is what `classifyPreparationFailure` already encodes.
     if (!classifyPreparationFailure(error, 1).retry) {
-      await store.completeRunFailureNotice(
-        notice.run_id,
-        notice.claim_token,
-        false
-      )
+      await store.completeRunNotice(notice.notice_id, notice.claim_token, false)
     }
     logError('review_preparation_terminal_reply_failed', {
       error,
@@ -431,10 +435,7 @@ export async function prepareReviewRunsOnce({
   store?: PreparationCoordinatorStore
   preferFailureNotice?: boolean
 }): Promise<boolean> {
-  if (
-    preferFailureNotice &&
-    (await deliverNextRunFailureNotice({ app, store }))
-  )
+  if (preferFailureNotice && (await deliverNextRunNotice({ app, store })))
     return true
   const work = await store.claimNextPreparation()
   if (work !== null) {
@@ -478,7 +479,7 @@ export async function prepareReviewRunsOnce({
   // so this fallback never becomes a hot retry loop.
   return preferFailureNotice
     ? false
-    : await deliverNextRunFailureNotice({ app, store })
+    : await deliverNextRunNotice({ app, store })
 }
 
 export function startPreparationCoordinator({

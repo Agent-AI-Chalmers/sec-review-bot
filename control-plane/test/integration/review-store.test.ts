@@ -121,11 +121,11 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
     })
     // Clear the real notice so the insert below cannot fail on the primary key; the connector is
     // then the only thing left that can reject it.
-    await pool.query('DELETE FROM run_failure_notices WHERE run_id=$1', [runId])
+    await pool.query('DELETE FROM run_notices WHERE run_id=$1', [runId])
     await assert.rejects(
       pool.query(
-        `INSERT INTO run_failure_notices (run_id, connector_id, status, failure_stage)
-         VALUES ($1, 'intruder', 'pending', 'preparation')`,
+        `INSERT INTO run_notices (run_id, connector_id, status, kind, axis)
+         VALUES ($1, 'intruder', 'pending', 'failure', 'preparation')`,
         [runId]
       ),
       /violates foreign key constraint/,
@@ -136,16 +136,16 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
     // connector is simply not found and the notice reads as absent — a notice that
     // exists, is never delivered, and leaves nothing visible to explain why. Asserting the
     // symptom, not just the rejection, is what makes the constraint's purpose checkable.
-    await pool.query('DELETE FROM run_failure_notices WHERE run_id=$1', [runId])
+    await pool.query('DELETE FROM run_notices WHERE run_id=$1', [runId])
     await pool
       .query(
-        `INSERT INTO run_failure_notices (run_id, connector_id, status, failure_stage)
-         VALUES ($1, 'intruder', 'pending', 'preparation')`,
+        `INSERT INTO run_notices (run_id, connector_id, status, kind, axis)
+         VALUES ($1, 'intruder', 'pending', 'failure', 'preparation')`,
         [runId]
       )
       .catch(() => undefined)
     const stored = await pool.query(
-      'SELECT connector_id FROM run_failure_notices WHERE run_id=$1',
+      'SELECT connector_id FROM run_notices WHERE run_id=$1',
       [runId]
     )
     assert.strictEqual(
@@ -153,9 +153,9 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
       0,
       'the wrong-connector notice was never stored'
     )
-    assert.strictEqual(
-      (await store.getRun(runId))?.failure_notice,
-      null,
+    assert.deepStrictEqual(
+      (await store.getRun(runId))?.notices,
+      [],
       'and so the run reports no notice rather than a phantom one'
     )
   } finally {

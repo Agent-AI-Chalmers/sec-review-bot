@@ -44,9 +44,9 @@ export function classifyPublicationFailure(
       reason: 'deterministic-publish-result'
     }
   }
-  // A publication step that exhausted its retry budget is terminal. Retrying the
-  // whole publication re-claims the same terminal_failed step and fails the same
-  // way, so it must fail rather than loop.
+  // An exhausted step that reached this classification was reconciled first: the publish paths
+  // only propagate the exhaustion error after looking for the remote effect and finding none.
+  // Re-claiming would be refused again (no attempt is left), so it must fail rather than loop.
   if (
     errorCode(error) ===
     RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted

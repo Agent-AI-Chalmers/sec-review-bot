@@ -19,7 +19,7 @@ const SPEC_PATH = path.resolve(
   'openapi.yaml'
 )
 
-export type StateAxis = 'preparation' | 'execution' | 'publication' | 'notice'
+export type StateAxis = 'preparation' | 'execution' | 'publication'
 
 export interface StateTransition {
   from: string
@@ -56,12 +56,7 @@ export interface StateMachine {
   transitions: StateTransition[]
 }
 
-const AXES: readonly StateAxis[] = [
-  'preparation',
-  'execution',
-  'publication',
-  'notice'
-]
+const AXES: readonly StateAxis[] = ['preparation', 'execution', 'publication']
 
 /** Read and validate the `x-state-machines` block. Validation here is deliberately strict:
  * a generator that silently accepts a malformed machine would produce a diagram that no
@@ -141,9 +136,7 @@ export function readStateMachines(): StateMachine[] {
     }
   })
   // The lifecycle order is declared in the contract (`order`), not implied by YAML key order,
-  // so the diagram reads preparation -> execution -> publication. The `notice` axis is not a
-  // run lifecycle axis and is deliberately absent from this diagram (the console shows the
-  // failure-notice stage as a line on a failed preparation instead).
+  // so the diagram reads preparation -> execution -> publication.
   return machines.sort((left, right) => left.order - right.order)
 }
 

@@ -97,16 +97,16 @@ const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * with a 400 - but it widens the reachable surface to whatever path a future upstream read
  * endpoint might parse, so the allow-list states the exact shape it means.
  */
-/** `POST /api/admin/runs/<uuid>/abandon`, the only write the console may proxy.
+/** The operator writes the console may proxy: `/api/admin/runs/<uuid>/<action>`.
  *
  * The admin credential is supplied by the operator for that one request and forwarded as-is; the
  * BFF never reads or stores it. Keeping it out of the server means a compromised BFF cannot
- * abandon runs, and the Control Plane decides who is allowed to.
+ * abandon or resume runs, and the Control Plane decides who is allowed to.
  */
 // Same shape check as the read allow-list: the id is a UUID or the request is not one this BFF
 // proxies. Sharing `RUN_ID` keeps the two policies from drifting apart.
-const ADMIN_ABANDON = new RegExp(
-  `^/api/admin/runs/(${RUN_ID.source.slice(1, -1)})/abandon$`
+const ADMIN_DECISION = new RegExp(
+  `^/api/admin/runs/(${RUN_ID.source.slice(1, -1)})/(abandon|resume|give-up)$`
 )
 
 function isAllowedReadPath(bffUrl: string): boolean {
@@ -114,7 +114,7 @@ function isAllowedReadPath(bffUrl: string): boolean {
   if (url.pathname === '/api/runs') return true
   // A fixed sub-resource of the run collection, not a run id: it lists the runs coordination
   // has stopped retrying, so the console can show the operator queue without any write access.
-  if (url.pathname === '/api/runs/blocked-preparations') return true
+  if (url.pathname === '/api/runs/parked') return true
   const segments = url.pathname.split('/')
   // ['', 'api', 'runs', '<runId>', ...optional suffix]
   if (segments.length < 4 || segments[1] !== 'api' || segments[2] !== 'runs')
@@ -513,8 +513,8 @@ export function createControlPlaneUiServer({
         }
         return
       }
-      const abandoned = ADMIN_ABANDON.exec(request.url ?? '')
-      if (request.method === 'POST' && abandoned !== null) {
+      const decision = ADMIN_DECISION.exec(request.url ?? '')
+      if (request.method === 'POST' && decision !== null) {
         // A session cookie alone must not authorise a cross-site POST: the same check the
         // sign-out route uses.
         if (!sameOrigin(request)) {
@@ -540,10 +540,18 @@ export function createControlPlaneUiServer({
           chunks.push(buffer)
         }
         try {
+          // The action is taken from the matched route, never from the raw URL, so the
+          // upstream path can only be one of the two decisions this BFF states it proxies.
+          const action =
+            decision[2] === 'resume'
+              ? 'resume'
+              : decision[2] === 'give-up'
+                ? 'give-up'
+                : 'abandon'
           const upstream = await fetch(
             `${controlPlaneUrl}/v1/admin/runs/${encodeURIComponent(
-              decodeURIComponent(abandoned[1] ?? '')
-            )}/abandon`,
+              decodeURIComponent(decision[1] ?? '')
+            )}/${action}`,
             {
               method: 'POST',
               headers: {

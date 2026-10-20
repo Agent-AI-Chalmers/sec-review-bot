@@ -100,7 +100,7 @@ async function createIssueComment(
   return response.data
 }
 
-async function findIssueCommentByMarker(
+export async function findIssueCommentByMarker(
   octokit: Octokit,
   {
     owner_login,
@@ -226,7 +226,7 @@ async function createPullRequestReview(
   return response.data
 }
 
-async function findPullRequestReviewByMarker(
+export async function findPullRequestReviewByMarker(
   octokit: Octokit,
   {
     owner_login,

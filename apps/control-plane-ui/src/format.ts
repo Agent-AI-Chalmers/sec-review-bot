@@ -20,6 +20,30 @@ export function safeExternalUrl(value: string | null): string | undefined {
   }
 }
 
+/** Whether this parked run can be handed back to automatic recovery.
+ *
+ * Mirrors the server's rule rather than approximating it. Two things must hold, and the second
+ * is the one that is easy to miss: a resumable axis alone is not enough, because axes can be
+ * parked *together*. A run whose preparation and execution both disconnected would otherwise
+ * look resumable through its execution while the preparation axis makes the resume a no-op.
+ *
+ * - No second parked axis may be in the way. Preparation parks only by contradicting execution,
+ *   so a run with a disconnected preparation can never resume its execution or publication.
+ * - The axis asked about must itself be resumable: an execution replays its persisted input, a
+ *   publication re-claims without repeating side effects, and a preparation is taken only while
+ *   execution is still pending - the claim path will not accept it otherwise, so resuming would
+ *   leave the row stalled and invisible, which is worse than the parked state it replaced.
+ *
+ * Offering a button the server answers with 409 teaches an operator that the decision existed. */
+export function canResumeRun(run: Run): boolean {
+  if (run.preparation.status === 'disconnected') {
+    return run.execution.status === 'pending'
+  }
+  if (run.execution.status === 'disconnected') return true
+  if (run.publication.status === 'disconnected') return true
+  return false
+}
+
 export function isRunTerminal(run: Run): boolean {
   // `uncertain` is not terminal: a recovery will resolve it to queued or failed.
   if (run.execution.status === 'failed' || run.execution.status === 'skipped')
@@ -79,6 +103,11 @@ export const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
   PREPARATION_ABANDONED: 'failureCodePreparationAbandoned',
   EXECUTION_ALREADY_ADVANCED: 'failureCodeExecutionAlreadyAdvanced',
   SUBMISSION_STATE_UNCERTAIN: 'failureCodeSubmissionUncertain',
+  SUBMISSION_RECOVERY_EXHAUSTED: 'failureCodeSubmissionRecoveryExhausted',
+  SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR:
+    'failureCodeSubmissionRecoveryAbandoned',
+  PREPARATION_GIVEN_UP_BY_OPERATOR: 'failureCodePreparationGivenUp',
+  PUBLICATION_ABANDONED_BY_OPERATOR: 'failureCodePublicationGivenUp',
   RUNNER_EXECUTION_FAILED: 'failureCodeRunnerExecutionFailed',
   RUNNER_RESULT_MISSING: 'failureCodeRunnerResultMissing',
   PUBLICATION_ABANDONED: 'failureCodePublicationAbandoned',

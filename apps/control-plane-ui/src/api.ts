@@ -3,19 +3,13 @@
 // could not tell `available` (which requires `artifact`) apart from the other statuses.
 import type {
   ArtifactStorage,
-  BlockedPreparationExpiry,
+  ParkedRun,
   PublicationStep,
   Run,
   RunEvent
 } from './control-plane-api-types.js'
 
-export type {
-  ArtifactStorage,
-  BlockedPreparationExpiry,
-  PublicationStep,
-  Run,
-  RunEvent
-}
+export type { ArtifactStorage, ParkedRun, PublicationStep, Run, RunEvent }
 
 /** Abandon a blocked run at an operator's explicit request.
  *
@@ -43,14 +37,58 @@ export async function abandonBlockedRun(
   }
 }
 
+/** Hand a disconnected run back to automatic recovery at an operator's explicit request.
+ *
+ * The credential handling is identical to `abandonBlockedRun`: the admin token travels with this
+ * one request and is never stored. The two decisions are deliberately separate calls — resuming
+ * asks the system to try again, abandoning ends the run — so the console cannot send one while
+ * meaning the other. */
+export async function resumeDisconnectedRun(
+  runId: string,
+  adminToken: string
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/runs/${encodeURIComponent(runId)}/resume`,
+    {
+      method: 'POST',
+      headers: { 'x-control-plane-admin-token': adminToken }
+    }
+  )
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorCode(response))
+  }
+}
+
+/** Stop waiting for a disconnected run at an operator's explicit request.
+ *
+ * The third operator decision, and the one that does not claim anything was resolved: a
+ * disconnected execution may still be running, and a disconnected publication may already have
+ * delivered part of its result. It records that the outcome will not be waited for. */
+export async function giveUpDisconnectedRun(
+  runId: string,
+  reason: string,
+  adminToken: string
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/runs/${encodeURIComponent(runId)}/give-up`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-control-plane-admin-token': adminToken
+      },
+      body: JSON.stringify({ reason })
+    }
+  )
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorCode(response))
+  }
+}
+
 /** The runs coordination has stopped retrying. Reading this needs only the read token: knowing
  * a run is stuck is not privileged, only deciding what to do about it is. */
-export async function blockedPreparations(): Promise<
-  BlockedPreparationExpiry[]
-> {
-  const body = await api<{ blocks: BlockedPreparationExpiry[] }>(
-    '/runs/blocked-preparations'
-  )
+export async function parkedRuns(): Promise<ParkedRun[]> {
+  const body = await api<{ blocks: ParkedRun[] }>('/runs/parked')
   return body.blocks
 }
 

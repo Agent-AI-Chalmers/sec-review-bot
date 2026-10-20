@@ -91,10 +91,12 @@ test('a comment_url must be an absolute URI, not just any string', () => {
   const base = fixture('observed-run.json') as Record<string, unknown>
   const withUrl = (url: unknown): unknown => ({
     ...base,
-    failure_notice: {
-      ...(base.failure_notice as Record<string, unknown>),
-      comment_url: url
-    }
+    notices: [
+      {
+        ...(base.notices as Array<Record<string, unknown>>)[0]!,
+        comment_url: url
+      }
+    ]
   })
   assert.strictEqual(
     validate('observed-run.schema.json', withUrl('https://example.test/c/1')),
@@ -170,7 +172,7 @@ function recordWith(
       finished_at: '2026-01-01T00:00:30.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
-      expiry_blocked_reason: null
+      disconnect_reason: null
     },
     // The fixtures describe states the store can actually produce. `succeeded` means the
     // execution ran and ended, and `published` means the publication started and ended; a
@@ -192,7 +194,7 @@ function recordWith(
     failure_code: null,
     failure_message: null,
     artifact_storage: artifactStorage,
-    failure_notice: null,
+    notices: [],
     runner_input: { must: 'not leak' },
     publish_context: { repository: 'octo/example' }
   } as ReviewRunRecord
@@ -214,7 +216,7 @@ test('the redacted read never carries a field the observed schema does not decla
       'created_at',
       'execution',
       'failure_code',
-      'failure_notice',
+      'notices',
       'preparation',
       'publication',
       'run_id',
@@ -241,7 +243,7 @@ test('the redacted read never carries a field the observed schema does not decla
     Object.keys(preparation).sort(),
     [
       'attempt_count',
-      'expiry_blocked_reason',
+      'disconnect_reason',
       'failure_code',
       'finished_at',
       'started_at',

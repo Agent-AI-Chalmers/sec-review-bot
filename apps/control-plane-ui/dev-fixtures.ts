@@ -8,18 +8,37 @@ type Workflow = 'issue-review' | 'pull-request-review' | 'repository-review'
 type ExecutionStatus =
   | 'pending'
   | 'uncertain'
+  | 'disconnected'
   | 'queued'
   | 'running'
   | 'succeeded'
   | 'skipped'
   | 'failed'
 type PublicationStatus =
-  'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
-type PreparationStatus = 'pending' | 'preparing' | 'submitted' | 'failed'
+  | 'pending'
+  | 'publishing'
+  | 'uncertain'
+  | 'disconnected'
+  | 'published'
+  | 'failed'
+  | 'skipped'
+type PreparationStatus =
+  | 'pending'
+  | 'preparing'
+  | 'uncertain'
+  | 'disconnected'
+  | 'submitted'
+  | 'failed'
 type NoticeStage = 'pending' | 'delivering' | 'delivered' | 'failed'
 type ArtifactStatus = 'available' | 'unavailable' | 'failed'
 type StepStatus =
-  'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+  | 'pending'
+  | 'running'
+  | 'uncertain'
+  | 'disconnected'
+  | 'succeeded'
+  | 'failed'
+  | 'terminal_failed'
 
 // The contract's own artifact union, not a look-alike: `available` is the only status that may
 // carry `artifact`, and the fixtures must satisfy the same shape the console renders.
@@ -35,15 +54,9 @@ interface FixtureRun {
     finished_at: string | null
     updated_at: string
     failure_code: string | null
-    expiry_blocked_reason: string | null
+    disconnect_reason: string | null
   }
-  /** Null until a terminal failure queues a connector acknowledgement. */
-  failure_notice: {
-    status: NoticeStage
-    failure_stage: 'preparation' | 'execution' | 'publication'
-    failure_code: string | null
-    comment_url: string | null
-  } | null
+  notices: Run['notices']
   execution: {
     status: ExecutionStatus
     started_at: string | null
@@ -82,7 +95,7 @@ void _runMatchesFixture
 interface FixtureStep {
   step_key: string
   status: StepStatus
-  failure_count: number
+  attempt_count: number
   remote_object_url: string | null
   failure_code: string | null
   failure_message: string | null
@@ -105,13 +118,21 @@ interface Scenario {
   publicationMs?: number
   /** Where the run's preparation stopped. Like the two status axes above, this is the one
    * free choice the scenario makes about preparation; its attempt count, failure code, and
-   * timestamps are derived, the way each publication step's `failure_count` and remote
+   * timestamps are derived, the way each publication step's `attempt_count` and remote
    * object are. */
   preparation_status: PreparationStatus
   /** The failure-notice stage the run is in, or null when its preparation did not fail.
    * This mirrors `step`: a free choice that only has meaning in one preparation state
    * (`failed`), exactly as `step` only has meaning once a publication has started. */
   preparation_notice: NoticeStage | null
+  /** The attention-notice stage after exhausted submission recovery. It only applies to a
+   * disconnected execution: the external task outcome is unknown, but telling the requester
+   * that automation stopped still has its own delivery lifecycle. */
+  execution_attention_notice?: NoticeStage
+  /** The attention-notice stage after reconciliation of a publication step stopped. It only
+   * applies to a disconnected publication, for the same reason as the execution one: the run
+   * is not a failure, but someone has to be told automation stopped. */
+  publication_attention_notice?: NoticeStage
   /** Status of the run's single publication step, or null when none exists. */
   step: StepStatus | null
 }
@@ -275,6 +296,53 @@ const SCENARIOS: readonly Scenario[] = [
     preparation_status: 'submitted',
     preparation_notice: null
   },
+  {
+    // Recovery exhausted its replay budget without learning whether the Runner accepted this
+    // submission. The execution has not started from Control Plane's point of view, publication
+    // remains pending, and the queued attention notice is deliberately not a failure report.
+    execution_status: 'disconnected',
+    publication_status: 'pending',
+    failure_code: 'SUBMISSION_STATE_UNCERTAIN',
+    artifact: null,
+    executionMs: 221_000,
+    step: null,
+    preparation_status: 'submitted',
+    preparation_notice: null,
+    execution_attention_notice: 'pending'
+  },
+  {
+    execution_status: 'disconnected',
+    publication_status: 'pending',
+    failure_code: 'SUBMISSION_STATE_UNCERTAIN',
+    artifact: null,
+    executionMs: 221_000,
+    step: null,
+    preparation_status: 'submitted',
+    preparation_notice: null,
+    execution_attention_notice: 'delivering'
+  },
+  {
+    execution_status: 'disconnected',
+    publication_status: 'pending',
+    failure_code: 'SUBMISSION_STATE_UNCERTAIN',
+    artifact: null,
+    executionMs: 221_000,
+    step: null,
+    preparation_status: 'submitted',
+    preparation_notice: null,
+    execution_attention_notice: 'delivered'
+  },
+  {
+    execution_status: 'disconnected',
+    publication_status: 'pending',
+    failure_code: 'SUBMISSION_STATE_UNCERTAIN',
+    artifact: null,
+    executionMs: 221_000,
+    step: null,
+    preparation_status: 'submitted',
+    preparation_notice: null,
+    execution_attention_notice: 'failed'
+  },
   // A run whose preparation exhausted its retries fails before execution, so the publication
   // is skipped. The failure-notice outbox is what the connector eventually delivers to the
   // user, and it walks pending -> delivering -> delivered (or `failed` when delivery could not
@@ -346,6 +414,64 @@ const SCENARIOS: readonly Scenario[] = [
     step: null,
     preparation_status: 'submitted',
     preparation_notice: null
+  },
+  {
+    // A completed run whose delivery had to be reconciled: the result is published, but only
+    // after a retry. The table described each outcome once, which left the operator queue with a
+    // single published shape; a second one keeps two parked runs from looking identical.
+    execution_status: 'succeeded',
+    publication_status: 'published',
+    failure_code: null,
+    artifact: 'available',
+    executionMs: 247_000,
+    publicationMs: 612_000,
+    step: 'succeeded',
+    preparation_status: 'submitted',
+    preparation_notice: null
+  },
+  // The states below are reachable but were not represented, which taught the console a
+  // narrower lifecycle than the Control Plane produces: an operator could never see what a
+  // parked publication looks like, or what a preparation does while it is being re-established.
+  {
+    // A preparation whose claim lapsed: nobody knows whether the prepared input reached the
+    // Control Plane, so the next claim has to re-establish that before rebuilding. Not a
+    // failure, so the run stays pending on both later axes.
+    execution_status: 'pending',
+    publication_status: 'pending',
+    failure_code: null,
+    artifact: null,
+    executionMs: 95_000,
+    step: null,
+    preparation_status: 'uncertain',
+    preparation_notice: null
+  },
+  {
+    // A publication step may have taken effect remotely and is being reconciled. The axis
+    // reports that so an operator can find the run, while the rest of the publication is
+    // unaffected; this is not a failure.
+    execution_status: 'succeeded',
+    publication_status: 'uncertain',
+    failure_code: null,
+    artifact: 'available',
+    executionMs: 158_000,
+    publicationMs: 402_000,
+    step: 'uncertain',
+    preparation_status: 'submitted',
+    preparation_notice: null
+  },
+  {
+    // Reconciliation of that step stopped without an answer: the run is parked for an operator,
+    // and the queued notice is an attention notice rather than a failure report.
+    execution_status: 'succeeded',
+    publication_status: 'disconnected',
+    failure_code: null,
+    artifact: 'available',
+    executionMs: 158_000,
+    publicationMs: 402_000,
+    step: 'disconnected',
+    preparation_status: 'submitted',
+    preparation_notice: null,
+    publication_attention_notice: 'pending'
   }
 ]
 
@@ -414,15 +540,15 @@ function artifactFor(
  */
 function eventsFor(run: FixtureRun): Array<{
   event_id: number
-  axis: 'execution' | 'preparation' | 'publication' | 'notice'
+  axis: 'execution' | 'preparation' | 'publication'
   from_status: string | null
   to_status: string
-  reason_code: string | null
+  failure_code: string | null
   occurred_at: string
 }> {
   let eventId = 0
   const push = (
-    axis: 'execution' | 'preparation' | 'publication' | 'notice',
+    axis: 'execution' | 'preparation' | 'publication',
     from: string | null,
     to: string,
     at: string,
@@ -432,7 +558,7 @@ function eventsFor(run: FixtureRun): Array<{
     axis,
     from_status: from,
     to_status: to,
-    reason_code: reason,
+    failure_code: reason,
     occurred_at: at
   })
   const events = [
@@ -455,7 +581,10 @@ function eventsFor(run: FixtureRun): Array<{
       )
     )
   }
-  if (run.execution.status === 'uncertain') {
+  if (
+    run.execution.status === 'uncertain' ||
+    run.execution.status === 'disconnected'
+  ) {
     // An unresolved submission never reached `queued`: Control Plane moves `pending` straight to
     // `uncertain` when the Runner call's acceptance could not be confirmed. The recovery then
     // resolves it to `queued` or `failed`, which is why this originates at `pending`.
@@ -468,6 +597,17 @@ function eventsFor(run: FixtureRun): Array<{
         'SUBMISSION_STATE_UNCERTAIN'
       )
     )
+    if (run.execution.status === 'disconnected') {
+      events.push(
+        push(
+          'execution',
+          'uncertain',
+          'disconnected',
+          run.execution.updated_at,
+          'SUBMISSION_RECOVERY_EXHAUSTED'
+        )
+      )
+    }
   } else if (run.execution.started_at !== null) {
     events.push(
       push('execution', 'pending', 'queued', run.execution.started_at)
@@ -489,21 +629,6 @@ function eventsFor(run: FixtureRun): Array<{
     events.push(
       push('execution', 'pending', 'skipped', run.execution.updated_at)
     )
-  }
-  if (run.failure_notice != null) {
-    // The outbox has its own lifecycle, and the history must show the same edges the store
-    // writes: a notice is claimed (`pending -> delivering`) before it is delivered or fails.
-    // Emitting only `null -> pending -> <final>` would hide the claim and teach the diagram an
-    // edge that does not exist.
-    const noticeAt = run.preparation.finished_at ?? run.created_at
-    const stage = run.failure_notice.status
-    events.push(push('notice', null, 'pending', noticeAt))
-    if (stage !== 'pending') {
-      events.push(push('notice', 'pending', 'delivering', noticeAt))
-      if (stage !== 'delivering') {
-        events.push(push('notice', 'delivering', stage, noticeAt))
-      }
-    }
   }
   if (['publishing', 'published', 'failed'].includes(run.publication.status)) {
     events.push(
@@ -536,7 +661,7 @@ function eventsFor(run: FixtureRun): Array<{
 /**
  * A scenario names only where preparation stopped; how many times it tried and which
  * failure it recorded follow from that state, the way each publication step's
- * `failure_count` follows from whether that step failed. `failed` necessarily means the
+ * `attempt_count` follows from whether that step ran. `failed` necessarily means the
  * retry budget was exhausted, so it is derived with more than one attempt rather than the
  * one attempt a still-live preparation has.
  */
@@ -565,10 +690,9 @@ function preparationFor(
         : (finishedAt ?? createdAt)
     ),
     failure_code: status === 'failed' ? scenario.failure_code : null,
-    // Set by the derivation below, not by a scenario: a blocked run is not a lifecycle stage, it
-    // is an operator queue entry, and adding it as a scenario would shift every other run's
-    // (scenario, workflow) pairing.
-    expiry_blocked_reason: null
+    // Set by the derivation below, not by a scenario: a disconnected run is a state no scenario
+    // describes, and adding it as one would shift every other run's (scenario, workflow) pairing.
+    disconnect_reason: null
   }
 }
 
@@ -596,7 +720,9 @@ function stepsFor(
     return {
       step_key,
       status,
-      failure_count: failed ? 1 : 0,
+      // An attempt is spent by starting one, not by failing: `succeeded` and `failed` steps have
+      // run once, and a step that exhausted its budget ran as many times as the budget allows.
+      attempt_count: status === 'pending' ? 0 : failed ? 3 : 1,
       remote_object_url:
         status === 'succeeded' ? remoteUrlFor(step_key, index) : null,
       failure_code: failed ? scenario.failure_code : null,
@@ -623,9 +749,15 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   const execution = run.execution.status
   const preparation = run.preparation
   const publication = run.publication.status
-  const startedPublication = ['publishing', 'published', 'failed'].includes(
-    publication
-  )
+  // `uncertain` and `disconnected` are mid-phase states, so a publication that reports one has
+  // necessarily started: the axis reflects a step that may already have taken effect remotely.
+  const startedPublication = [
+    'publishing',
+    'uncertain',
+    'disconnected',
+    'published',
+    'failed'
+  ].includes(publication)
 
   // Each axis records a start and an end, and the fixture must respect the same rules the store
   // enforces: a start exists once the phase has begun, an end exists once it is terminal, and
@@ -708,11 +840,14 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   if (execution === 'skipped' && preparation.status !== 'failed') {
     fail('execution is skipped only when preparation failed before it ran')
   }
-  if (execution === 'uncertain' && publication !== 'pending') {
+  if (
+    (execution === 'uncertain' || execution === 'disconnected') &&
+    publication !== 'pending'
+  ) {
     // An unconfirmed submission may still be accepted, so it is not yet a conclusion that
     // nothing is publishable. Publication must stay `pending`; only a conclusive failure may
     // skip it, and the state machine has no `skipped -> pending` edge to undo an early skip.
-    fail('an uncertain submission keeps its publication pending')
+    fail('an unconfirmed submission keeps its publication pending')
   }
   // A blocked run is the deliberate exception: coordination found preparation unfinished while
   // execution had already advanced, which is exactly the contradiction it refuses to resolve on
@@ -722,7 +857,7 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
     preparation.status !== 'submitted' &&
     execution !== 'pending' &&
     execution !== 'skipped' &&
-    preparation.expiry_blocked_reason === null
+    preparation.disconnect_reason === null
   ) {
     fail('only a pending or skipped run can have unfinished preparation')
   }
@@ -741,26 +876,59 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
       : execution === 'failed'
         ? 'execution'
         : null
-  if (failedAxis !== null && run.failure_notice === null) {
+  if (failedAxis !== null && run.notices.length === 0) {
     fail(
       'a run that failed on an axis names the stage its failure notice reached'
     )
   }
-  if (failedAxis === null && run.failure_notice !== null) {
-    fail('only a run that failed on some axis has a failure notice')
+  // A parked run is not a failed run, but the requester is still told that automation stopped,
+  // so an attention notice exists for exactly those two parked states and nothing else.
+  if (
+    failedAxis === null &&
+    execution !== 'disconnected' &&
+    publication !== 'disconnected' &&
+    run.notices.length > 0
+  ) {
+    fail('only a failed or disconnected run has a notice')
   }
   if (
-    run.failure_notice !== null &&
+    run.notices.length > 0 &&
     failedAxis !== null &&
-    run.failure_notice.failure_stage !== failedAxis
+    run.notices[0]?.axis !== failedAxis
   ) {
     fail('a failure notice names the axis that actually failed')
   }
+  if (execution === 'disconnected') {
+    const notice = run.notices[0]
+    if (
+      run.notices.length !== 1 ||
+      notice?.kind !== 'attention' ||
+      notice.axis !== 'execution' ||
+      notice.reason_code !== 'SUBMISSION_RECOVERY_EXHAUSTED'
+    ) {
+      fail('a disconnected execution queues one execution attention notice')
+    }
+  }
+  if (publication === 'disconnected') {
+    const notice = run.notices[0]
+    if (
+      run.notices.length !== 1 ||
+      notice?.kind !== 'attention' ||
+      notice.axis !== 'publication'
+    ) {
+      fail('a disconnected publication queues one publication attention notice')
+    }
+  }
   if (
     preparation.status === 'submitted' &&
-    !['uncertain', 'queued', 'running', 'succeeded', 'failed'].includes(
-      execution
-    )
+    ![
+      'uncertain',
+      'disconnected',
+      'queued',
+      'running',
+      'succeeded',
+      'failed'
+    ].includes(execution)
   ) {
     fail(
       'a submitted preparation means the run has moved on to the Runner lifecycle'
@@ -782,21 +950,25 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   if (
     run.failure_code !== null &&
     !failedOnAnAxis &&
-    execution !== 'uncertain' // an unresolved submission keeps its code
+    execution !== 'uncertain' &&
+    execution !== 'disconnected' // an unconfirmed submission keeps its code
   ) {
     fail(
-      'only a terminal failure or an uncertain submission carries a failure code'
+      'only a terminal failure or unconfirmed submission carries a failure code'
     )
   }
   if (run.created_at > run.execution.updated_at) {
     fail('execution.updated_at must not precede created_at')
   }
   if (
-    (execution === 'pending' || execution === 'skipped') !==
+    (execution === 'pending' ||
+      execution === 'uncertain' ||
+      execution === 'disconnected' ||
+      execution === 'skipped') !==
     (run.execution.started_at === null)
   ) {
     fail(
-      'a pending or skipped execution has no execution.started_at, and every other state has one'
+      'an unaccepted, pending, or skipped execution has no execution.started_at, and every other state has one'
     )
   }
   if (
@@ -900,35 +1072,82 @@ function noticeCommentUrl(status: NoticeStage): string | null {
   return 'https://github.com/example/example/issues/1#issuecomment-1'
 }
 
-/** The acknowledgement a terminal failure queues, for whichever axis failed.
+/** The notice a terminal failure or disconnected recovery queues.
  *
  * Publication failures are excluded deliberately: a run whose result could not be delivered is
  * still `failed` on that axis, but the fixture's scenario table does not distinguish "the step
  * failed" from "the run is over", and guessing would put a notice on runs the real store would
  * leave alone.
  */
-function failureNoticeFor(
+function noticesFor(
   scenario: Scenario,
   preparation: { status: PreparationStatus; failure_code: string | null },
-  execution: ExecutionStatus
-): FixtureRun['failure_notice'] {
+  execution: ExecutionStatus,
+  publication: PublicationStatus
+): FixtureRun['notices'] {
   if (preparation.status === 'failed' && scenario.preparation_notice !== null) {
-    return {
-      status: scenario.preparation_notice,
-      failure_stage: 'preparation',
-      failure_code: preparation.failure_code,
-      comment_url: noticeCommentUrl(scenario.preparation_notice)
-    }
+    return [
+      {
+        notice_id: `fixture-${scenario.failure_code ?? 'none'}-preparation`,
+        kind: 'failure',
+        status: scenario.preparation_notice,
+        axis: 'preparation',
+        reason_code: preparation.failure_code,
+        comment_url: noticeCommentUrl(scenario.preparation_notice)
+      }
+    ]
   }
   if (execution === 'failed') {
-    return {
-      status: 'pending',
-      failure_stage: 'execution',
-      failure_code: scenario.failure_code,
-      comment_url: null
-    }
+    return [
+      {
+        notice_id: `fixture-${scenario.failure_code ?? 'none'}-execution`,
+        kind: 'failure',
+        status: 'pending',
+        axis: 'execution',
+        reason_code: scenario.failure_code,
+        comment_url: null
+      }
+    ]
   }
-  return null
+  if (execution === 'disconnected') {
+    const status = scenario.execution_attention_notice
+    if (status === undefined) {
+      throw new Error(
+        'a disconnected fixture must name its attention notice stage'
+      )
+    }
+    return [
+      {
+        notice_id: `fixture-${scenario.failure_code ?? 'none'}-execution-attention`,
+        kind: 'attention',
+        status,
+        axis: 'execution',
+        reason_code: 'SUBMISSION_RECOVERY_EXHAUSTED',
+        comment_url: noticeCommentUrl(status)
+      }
+    ]
+  }
+  if (publication === 'disconnected') {
+    const status = scenario.publication_attention_notice
+    if (status === undefined) {
+      throw new Error(
+        'a disconnected publication must name its attention notice stage'
+      )
+    }
+    // Same reasoning as the execution one: the run is parked, not failed, and the notice
+    // reports that automation stopped — so it is an attention notice, not a failure report.
+    return [
+      {
+        notice_id: `fixture-${scenario.failure_code ?? 'none'}-publication-attention`,
+        kind: 'attention',
+        status,
+        axis: 'publication',
+        reason_code: 'PUBLICATION_RECONCILIATION_EXHAUSTED',
+        comment_url: noticeCommentUrl(status)
+      }
+    ]
+  }
+  return []
 }
 
 const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
@@ -949,25 +1168,37 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
   const createdAt = active
     ? Date.now() - (index % 5) * 60_000 - scenario.executionMs
     : BASE_TIME - index * RUN_SPACING_MS
-  const executionUpdatedAt = createdAt + scenario.executionMs
+  // `executionMs` is the execution phase's own duration, which is what the console shows. The
+  // phase cannot start before preparation ends, so the axis ends at preparation's end plus this
+  // duration. Previously the end was `createdAt + executionMs` while the start was capped at 60s,
+  // so every run displayed `executionMs - 60s` of execution - a 247s scenario read as 187s.
+  const executionStartedAt = createdAt + Math.min(scenario.executionMs, 60_000)
+  const executionUpdatedAt = executionStartedAt + scenario.executionMs
   const publicationUpdatedAt =
     scenario.publicationMs === undefined
       ? createdAt
       : createdAt + scenario.publicationMs
-  // A run is only submitted to the Runner once preparation completes; `pending` is exactly
-  // the state before that, so its `execution.started_at` stays null and the UI must not time it.
+  // `pending` has not been submitted. `uncertain` and `disconnected` have a submission whose
+  // acceptance is unknown, so none of them has an execution start time to measure.
   const executionNeverRan =
     scenario.execution_status === 'pending' ||
+    scenario.execution_status === 'uncertain' ||
+    scenario.execution_status === 'disconnected' ||
     scenario.execution_status === 'skipped'
   // For an in-flight run the whole timeline is relative to "now", and `updated_at` is pinned a
   // few seconds before it, so `started_at` must be relative to that same instant rather than to
   // `createdAt + elapsed`: with a long `executionMs` the two formulas disagree and start drifts
   // past the observation time. An active run has by definition been observed after it started.
+  // Execution starts right after preparation finishes, and ends `executionMs` later. Capping the
+  // start instead (as this used to) made every run report `executionMs - 60s` of execution time:
+  // a 247s scenario displayed as 187s, so the duration on screen was not the duration the
+  // scenario described. Preparation's own end keeps its cap, because it only has to be shorter
+  // than the phase after it, not equal to it.
   const submittedAt = executionNeverRan
     ? null
     : active
       ? Date.now() - Math.min(5_000, scenario.executionMs) - 1_000
-      : createdAt + Math.min(scenario.executionMs, 60_000)
+      : executionStartedAt
   // Execution ends on a terminal state; `uncertain` is explicitly not terminal.
   const executionFinished =
     scenario.execution_status === 'succeeded' ||
@@ -979,8 +1210,12 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
     scenario.publication_status === 'published' ||
     scenario.publication_status === 'failed' ||
     scenario.publication_status === 'skipped'
+  // Uncertain and disconnected are mid-phase: the publication has been claimed and at least
+  // one step has run, so the phase has a start.
   const publicationStarted =
     scenario.publication_status === 'publishing' ||
+    scenario.publication_status === 'uncertain' ||
+    scenario.publication_status === 'disconnected' ||
     scenario.publication_status === 'published' ||
     scenario.publication_status === 'failed'
   // The publication cannot start before execution ended. Halfway between those two instants
@@ -1026,7 +1261,12 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
     // Any axis that ends a run queues a notice, so the fixture derives one from whichever axis
     // actually failed. Modelling only the preparation case taught the console a narrower world
     // than the Control Plane produces.
-    failure_notice: failureNoticeFor(scenario, preparation, execution)
+    notices: noticesFor(
+      scenario,
+      preparation,
+      execution,
+      scenario.publication_status
+    )
   }
 })
 
@@ -1036,35 +1276,139 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
 // below are put into that contradictory state - preparation still `preparing`, execution advanced,
 // publication still waiting - rather than just being labelled with the code. A marker on a run
 // whose axes are consistent would teach the console a state the Control Plane cannot produce.
-const BLOCKED_RUN_COUNT = 2
-for (const run of runs.slice(0, BLOCKED_RUN_COUNT)) {
-  const startedAt = run.execution.updated_at
-  run.preparation.status = 'preparing'
-  // A run in this state has necessarily been claimed at least once, so the phase has a start.
-  if (run.preparation.started_at === null)
-    run.preparation.started_at = run.created_at
-  run.preparation.finished_at = null
-  run.preparation.failure_code = null
-  run.failure_notice = null
-  run.preparation.expiry_blocked_reason = 'EXECUTION_ALREADY_ADVANCED'
-  // Execution reached a terminal result, which is what makes the expiry conclusion impossible.
-  run.execution.status = 'succeeded'
-  run.execution.started_at = startedAt
-  run.execution.finished_at = startedAt
-  // Publication never started, because execution success is what would have started it.
-  run.publication.status = 'pending'
-  run.publication.started_at = null
-  run.publication.finished_at = null
-  // A run-level failure code would contradict a succeeded execution.
-  run.failure_code = null
-}
-
+// The two runs standing in for the queue are chosen by scenario, not by position: the shape this
+// mutation needs is "execution really finished", so it borrows the first scenarios that already
+// describe a completed execution (with its own duration and artifact) rather than inheriting
+// whatever happens to sit at the front of the table. Taking `slice(0, 2)` used to land on
+// `execution: pending` rows, and forcing them to `succeeded` produced a zero-second execution
+// with no artifact - a run that reported success it could not have had.
+// The mutation needs a run that both ran to completion AND published its result, because that is
+// the shape it is meant to show: an unpublishable preparation that stopped nothing. A `pending`
+// or `publishing` publication would reintroduce exactly the false impression this fixture exists
+// to correct - that the result is waiting for the operator.
+// Steps are built before the parked-run mutations below, because parking a publication means
+// parking one of its steps: the axis is derived from its strongest step, so the steps have to
+// exist before the axis can be described.
 const stepsByRun = new Map<string, FixtureStep[]>(
   runs.map((run, index) => [
     run.run_id,
     stepsFor(SCENARIOS[index % SCENARIOS.length]!, run.workflow, index)
   ])
 )
+
+const BLOCKED_SCENARIO_INDEXES = SCENARIOS.map((scenario, index) =>
+  scenario.execution_status === 'succeeded' &&
+  scenario.publication_status === 'published'
+    ? index
+    : -1
+)
+  .filter((index) => index >= 0)
+  .slice(0, 2)
+const BLOCKED_RUN_COUNT = 2
+const blockedIndexes = new Set<number>()
+// Every run parked on any axis, including the execution and publication cases below.
+const parkedIndexes = new Set<number>()
+for (let position = 0; position < BLOCKED_RUN_COUNT; position += 1) {
+  const scenarioIndex = BLOCKED_SCENARIO_INDEXES[position]
+  if (scenarioIndex === undefined) break
+  const index = runs.findIndex(
+    (_, runIndex) => runIndex % SCENARIOS.length === scenarioIndex
+  )
+  if (index < 0) break
+  const run = runs[index]!
+  blockedIndexes.add(index)
+  run.preparation.status = 'disconnected'
+  // A run in this state has necessarily been claimed at least once, so the phase has a start.
+  if (run.preparation.started_at === null)
+    run.preparation.started_at = run.created_at
+  run.preparation.finished_at = null
+  run.preparation.failure_code = null
+  run.notices = []
+  run.preparation.disconnect_reason = 'EXECUTION_ALREADY_ADVANCED'
+  // Execution keeps the start, end, and artifact its scenario already gave it: it really did
+  // run to completion, and pretending otherwise would show success with no evidence. The
+  // publication is left as the scenario wrote it - completed - because that is the point of
+  // this run: publishing does not wait on preparation. Rewinding it to `pending` would imply
+  // the result is waiting for the operator's decision, which it never is.
+  // A run-level failure code would contradict a succeeded execution.
+  run.failure_code = null
+  parkedIndexes.add(index)
+}
+
+// The other two axes park too, and an operator has to be able to find them. They are built from
+// runs that finished their earlier phases, because that is what the real paths require: an
+// execution only disconnects after a submission went unconfirmed, and a publication only parks
+// after its side effects started.
+const executionParkedIndex = runs.findIndex(
+  (run, index) =>
+    !parkedIndexes.has(index) &&
+    // Preparation must have completed normally: a run whose preparation is also disconnected
+    // cannot resume execution, so building the sample from it would leave the fixtures with no
+    // resumable run at all and the console's Resume action unreachable locally.
+    run.preparation.status === 'submitted' &&
+    run.execution.status === 'succeeded'
+)
+if (executionParkedIndex >= 0) {
+  const run = runs[executionParkedIndex]!
+  parkedIndexes.add(executionParkedIndex)
+  // Execution is the parked axis; preparation completed normally, so the run got this far.
+  run.execution.status = 'disconnected'
+  run.execution.started_at = null
+  run.execution.finished_at = null
+  run.publication.status = 'pending'
+  run.publication.started_at = null
+  run.publication.finished_at = null
+  // A disconnected execution has no result yet, so there is no diagnostic artifact to report.
+  run.artifact_storage = null
+  run.failure_code = null
+  run.notices = noticesFor(
+    {
+      ...SCENARIOS[executionParkedIndex % SCENARIOS.length]!,
+      execution_status: 'disconnected',
+      execution_attention_notice: 'pending'
+    },
+    run.preparation,
+    'disconnected',
+    'pending'
+  )
+}
+
+const publicationParkedIndex = runs.findIndex(
+  (run, index) =>
+    !parkedIndexes.has(index) && run.publication.status === 'published'
+)
+if (publicationParkedIndex >= 0) {
+  const run = runs[publicationParkedIndex]!
+  parkedIndexes.add(publicationParkedIndex)
+  // The axis follows its strongest step, so a disconnected axis without a disconnected step
+  // describes a state the store cannot produce: every step succeeded, so nothing is unsettled
+  // and the publication would simply be published. The parked step is the one that ran out of
+  // reconciliation attempts; the rest keep the result they already delivered.
+  const parkedSteps = stepsByRun.get(run.run_id) ?? []
+  const lastStep = parkedSteps[parkedSteps.length - 1]
+  if (lastStep !== undefined) {
+    lastStep.status = 'disconnected'
+    lastStep.attempt_count = 3
+    lastStep.remote_object_url = null
+    lastStep.failure_code = 'GITHUB_TIMEOUT'
+    lastStep.failure_message =
+      'Reconciliation could not establish whether this step took effect.'
+  }
+  run.publication.status = 'disconnected'
+  run.publication.finished_at = null
+  run.failure_code = null
+  run.notices = noticesFor(
+    {
+      ...SCENARIOS[publicationParkedIndex % SCENARIOS.length]!,
+      publication_status: 'disconnected',
+      publication_attention_notice: 'pending'
+    },
+    run.preparation,
+    run.execution.status,
+    'disconnected'
+  )
+}
+
 
 for (const run of runs) validateRun(run, stepsByRun.get(run.run_id) ?? [])
 if (new Set(runs.map((run) => run.run_id)).size !== runs.length) {
@@ -1100,10 +1444,59 @@ export function devFixtures(): Plugin {
       // what makes the abandon button actually work locally: the queue shrinks and the detail
       // page stops offering the decision, instead of the button being permanently inert.
       const abandoned = new Set<string>()
-      // The two runs standing in for the operator queue. Fixed rather than derived, because a
-      // blocked run's shape cannot be produced by any scenario.
+      // Runs the operator handed back to automatic recovery. The resume button has to do
+      // something locally too, or the console teaches a decision that visibly fails: the real
+      // endpoint moves the row to `uncertain` with a fresh budget, so the detail page must stop
+      // reporting `disconnected` and the run must leave the operator queue.
+      const resumed = new Set<string>()
+      // The runs the mutation above parked, read from their own axes rather than from the index
+      // set that produced them. Deriving from state is what lets all three axes appear in the
+      // queue: a run parked on execution or publication is as invisible to an operator as one
+      // parked on preparation if the list is built from a preparation-only source.
+      const parkedAxis = (run: FixtureRun):
+        | 'preparation'
+        | 'execution'
+        | 'publication'
+        | null =>
+        run.preparation.status === 'disconnected'
+          ? 'preparation'
+          : run.execution.status === 'disconnected'
+            ? 'execution'
+            : run.publication.status === 'disconnected'
+              ? 'publication'
+              : null
+      const blockedRuns = (): Array<{
+        run_id: string
+        axis: 'preparation' | 'execution' | 'publication'
+        reason:
+          | 'EXECUTION_ALREADY_ADVANCED'
+          | 'SUBMISSION_RECOVERY_EXHAUSTED'
+          | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
+      }> =>
+        runs.flatMap((run, index) => {
+          // Only the runs this fixture deliberately parked are queued. A run whose state
+          // merely happens to be `disconnected` (the lifecycle scenarios, repeated across the
+          // page) is not an operator backlog: listing all of them turned four sample states into
+          // thirteen queue entries. The parked ones are what an operator is actually shown.
+          if (!parkedIndexes.has(index)) return []
+          const axis = parkedAxis(run)
+          if (axis === null) return []
+          if (abandoned.has(run.run_id) || resumed.has(run.run_id)) return []
+          return [
+            {
+              run_id: run.run_id,
+              axis,
+              reason:
+                axis === 'preparation'
+                  ? ('EXECUTION_ALREADY_ADVANCED' as const)
+                  : axis === 'execution'
+                    ? ('SUBMISSION_RECOVERY_EXHAUSTED' as const)
+                    : ('PUBLICATION_RECONCILIATION_EXHAUSTED' as const)
+            }
+          ]
+        })
       const blockedRunIds = (): string[] =>
-        runs.slice(0, 2).map((run) => run.run_id)
+        blockedRuns().map((block) => block.run_id)
       server.middlewares.use((request, response, next) => {
         if (!request.url?.startsWith('/api/')) return next()
         response.setHeader('content-type', 'application/json')
@@ -1200,10 +1593,49 @@ export function devFixtures(): Plugin {
           return
         }
         // Before the run-detail match below, which would otherwise read this fixed segment as a
-        // run id. Mirrors `GET /v1/runs/blocked-preparations`.
+        // run id. Mirrors `GET /v1/runs/parked`.
         const abandonMatch = /^\/api\/admin\/runs\/([^/?]+)\/abandon$/.exec(
           request.url
         )
+        // Mirrors `POST /v1/admin/runs/{runId}/resume`: the same eligibility (a run in the
+        // queue), the same credential, and the same transition to `uncertain`.
+        const resumeMatch = /^\/api\/admin\/runs\/([^/?]+)\/resume$/.exec(
+          request.url
+        )
+        if (request.method === 'POST' && resumeMatch !== null) {
+          if (request.headers['x-control-plane-admin-token'] === undefined) {
+            response.statusCode = 401
+            response.end(JSON.stringify({ error: 'admin_token_required' }))
+            return
+          }
+          const runId = decodeURIComponent(resumeMatch[1] ?? '')
+          if (
+            !blockedRunIds().includes(runId) ||
+            abandoned.has(runId) ||
+            resumed.has(runId)
+          ) {
+            response.statusCode = 409
+            response.end(JSON.stringify({ error: 'not_disconnected' }))
+            return
+          }
+          const run = runs.find((item) => item.run_id === runId)
+          if (run === undefined) {
+            response.statusCode = 404
+            response.end(JSON.stringify({ error: 'not_found' }))
+            return
+          }
+          // The same transition Control Plane performs: preparation returns to `uncertain`
+          // with a fresh attempt budget, and the reason that parked it is cleared. The axes are
+          // left as they are, because resuming asserts nothing about them.
+          run.preparation.status = 'uncertain'
+          run.preparation.disconnect_reason = null
+          run.preparation.attempt_count = 0
+          run.preparation.failure_code = null
+          run.preparation.updated_at = new Date().toISOString()
+          resumed.add(runId)
+          response.end(JSON.stringify({ run }))
+          return
+        }
         if (request.method === 'POST' && abandonMatch !== null) {
           // Mirrors the real endpoint's contract closely enough for local use: an operator token
           // is required, the run must be in the queue, and success removes it from the queue.
@@ -1230,14 +1662,19 @@ export function devFixtures(): Plugin {
           const now = new Date().toISOString()
           run.preparation.status = 'failed'
           run.preparation.failure_code = 'PREPARATION_ABANDONED'
-          run.failure_notice = {
-            status: 'pending',
-            failure_stage: 'preparation',
-            failure_code: 'PREPARATION_ABANDONED',
-            comment_url: null
-          }
+          run.notices = [
+            {
+              notice_id: `fixture-${run.run_id}-abandoned`,
+              kind: 'failure',
+              status: 'pending',
+              axis: 'preparation',
+              reason_code: 'PREPARATION_ABANDONED',
+              comment_url: null
+            }
+          ]
           run.preparation.finished_at = now
-          run.preparation.expiry_blocked_reason = null
+          run.preparation.status = 'failed'
+          run.preparation.disconnect_reason = null
           if (
             run.publication.status === 'pending' ||
             run.publication.status === 'publishing'
@@ -1249,18 +1686,12 @@ export function devFixtures(): Plugin {
           response.end(JSON.stringify({ run }))
           return
         }
-        if (request.url === '/api/runs/blocked-preparations') {
+        if (request.url === '/api/runs/parked') {
           // Synthetic: a blocked run is not a lifecycle stage any scenario can describe (it is
           // the contradictory shape coordination refuses to resolve), so it is invented here
           // rather than mutating a real run. The ids are real, so following one opens a detail
           // page that loads.
-          const blocks = blockedRunIds()
-            .filter((runId) => !abandoned.has(runId))
-            .map((runId) => ({
-              run_id: runId,
-              reason: 'EXECUTION_ALREADY_ADVANCED'
-            }))
-          response.end(JSON.stringify({ blocks }))
+          response.end(JSON.stringify({ blocks: blockedRuns() }))
           return
         }
         const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(
@@ -1295,23 +1726,10 @@ export function devFixtures(): Plugin {
           const runId = decodeURIComponent(runMatch[1] ?? '')
           const run = runs.find((item) => item.run_id === runId)
           if (run) {
-            response.end(
-              JSON.stringify({
-                run: {
-                  ...run,
-                  preparation: {
-                    ...run.preparation,
-                    // The queue is synthetic, so the detail read has to agree with it: a run
-                    // still in the queue reports the marker, an abandoned one does not.
-                    expiry_blocked_reason:
-                      blockedRunIds().includes(run.run_id) &&
-                      !abandoned.has(run.run_id)
-                        ? 'EXECUTION_ALREADY_ADVANCED'
-                        : null
-                  }
-                }
-              })
-            )
+            // The run already carries its real axes. Forcing preparation to `disconnected` here
+            // (as this used to) mislabelled every parked run as preparation-parked, including
+            // the ones parked on execution or publication, and made their resume ineligible.
+            response.end(JSON.stringify({ run }))
             return
           }
         }

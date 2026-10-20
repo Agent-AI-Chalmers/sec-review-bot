@@ -14,7 +14,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
       finished_at: '2026-01-01T00:00:30.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
-      expiry_blocked_reason: null
+      disconnect_reason: null
     },
     execution: {
       status: 'succeeded',
@@ -32,7 +32,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
     failure_code: null,
     failure_message: 'request failed for https://secret@example.test/private',
     artifact_storage: null,
-    failure_notice: null,
+    notices: [],
     runner_input: { secret: 'must-not-leak' },
     publish_context: { repository: 'octo/example' }
   })
@@ -46,7 +46,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
       finished_at: '2026-01-01T00:00:30.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
-      expiry_blocked_reason: null
+      disconnect_reason: null
     },
     execution: {
       status: 'succeeded',
@@ -63,7 +63,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
     created_at: '2026-01-01T00:00:00.000Z',
     failure_code: null,
     artifact_storage: null,
-    failure_notice: null
+    notices: []
   })
 })
 
@@ -73,7 +73,6 @@ test('publication step observation exposes operator outcomes without reconciliat
     status: 'failed',
     attempt_count: 3,
     last_attempt_at: '2026-01-01T00:00:05.000Z',
-    failure_count: 2,
     remote_object_id: '142',
     remote_object_url: 'https://github.com/octo/example/pull/142',
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
@@ -82,7 +81,7 @@ test('publication step observation exposes operator outcomes without reconciliat
   assert.deepStrictEqual(observed, {
     step_key: 'issue:draft-pr',
     status: 'failed',
-    failure_count: 2,
+    attempt_count: 3,
     remote_object_url: 'https://github.com/octo/example/pull/142',
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
     failure_message: 'GitHub temporarily limited publication.'

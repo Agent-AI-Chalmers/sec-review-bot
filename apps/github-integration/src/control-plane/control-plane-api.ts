@@ -191,7 +191,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/v1/run-failure-notices/claims/next': {
+  '/v1/run-notices/claims/next': {
     parameters: {
       query?: never
       header?: never
@@ -200,15 +200,15 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** @description Claim one connector-owned terminal preparation-failure notice. Returns null when no undelivered notice is available; an expired notice claim is eligible again. */
-    post: operations['claimNextRunFailureNotice']
+    /** @description Claim one connector-owned user-visible notice. Returns null when no undelivered notice is available; an expired notice claim is eligible again. */
+    post: operations['claimNextRunNotice']
     delete?: never
     options?: never
     head?: never
     patch?: never
     trace?: never
   }
-  '/v1/runs/{runId}/failure-notice/complete': {
+  '/v1/run-notices/{noticeId}/complete': {
     parameters: {
       query?: never
       header?: never
@@ -217,8 +217,8 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** @description Complete a failure notice the caller still owns. `delivered` is true only when the requester can actually read the outcome; `comment_url` is the comment that carries it and is required in that case, so a delivered notice always points at something. Both a delivery that failed and a run with no user-visible target record `delivered: false`. */
-    post: operations['completeRunFailureNotice']
+    /** @description Complete a notice the caller still owns. `delivered` is true only when the requester can actually read the outcome; `comment_url` is the comment that carries it and is required in that case, so a delivered notice always points at something. A delivery that failed records `delivered: false`. A notice has no user-visible target when the connector cannot resolve one (its input names neither a conversation nor a repository), which the caller reports the same way, because a notice nobody can read is not delivered. */
+    post: operations['completeRunNotice']
     delete?: never
     options?: never
     head?: never
@@ -310,6 +310,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/runs/{runId}/publication/steps/{stepKey}/settle-exhausted': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Conclude a publication step that has no attempts left, from what the connector found on the remote system. Exhaustion alone never concludes a step: an attempt that started may have taken effect remotely before its owner died or its response was lost, and Control Plane cannot see that system. The connector therefore reports either the effect it found (the step becomes succeeded, using the same remote reference a live completion would have written) or that it looked and found nothing (only then does the step become terminal_failed). The caller must still own the publication claim. */
+    post: operations['settleExhaustedPublicationStep']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/runs/{runId}/publication/steps/{stepKey}/fail': {
     parameters: {
       query?: never
@@ -395,15 +412,15 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/v1/runs/blocked-preparations': {
+  '/v1/runs/parked': {
     parameters: {
       query?: never
       header?: never
       path?: never
       cookie?: never
     }
-    /** @description List the runs whose expired preparation could not be concluded because the run's persisted state contradicts the conclusion. Coordination stops retrying these, so this is the queue of runs that need an operator decision. Reading it needs only the read token: knowing that a run is stuck is not a privileged act, and the console should be able to show it without holding operator credentials. */
-    get: operations['listBlockedPreparationExpiries']
+    /** @description List the runs whose automatic work stopped without a conclusion, on any axis. Coordination stops retrying these, so this is the queue of runs that need an operator decision, and `axis` says which part of the run stopped. Reading it needs only the read token: knowing that a run is stuck is not a privileged act, and the console should be able to show it without holding operator credentials. */
+    get: operations['listParkedRuns']
     put?: never
     post?: never
     delete?: never
@@ -421,8 +438,42 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** @description An operator decision, not a repair: conclude a blocked run's open axes so it stops holding unwinnable work. Execution is left untouched (a recorded result and its `workflow_result` stay), nothing is deleted, and the run keeps its ingress identity so a replay still resolves to it. Only a run listed by `listBlockedPreparationExpiries` is eligible; that restriction is what keeps this from becoming a general state-jumping endpoint, so a leaked admin token can at most abandon runs the system already proved it cannot finish. Requires the admin token; the route does not exist when none is configured. */
+    /** @description An operator decision, not a repair: conclude a blocked run's open axes so it stops holding unwinnable work. Execution is left untouched (a recorded result and its `workflow_result` stay), nothing is deleted, and the run keeps its ingress identity so a replay still resolves to it. Only a run listed by `listParkedRuns` is eligible; that restriction is what keeps this from becoming a general state-jumping endpoint, so a leaked admin token can at most abandon runs the system already proved it cannot finish. Requires the admin token; the route does not exist when none is configured. */
     post: operations['abandonBlockedPreparation']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/admin/runs/{runId}/give-up': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description An operator decision that stops waiting for a disconnected run instead of resuming it. It never claims that nothing happened: a disconnected execution may already have been accepted by the Runner, and a disconnected publication may already have delivered some of its steps. The decision is therefore recorded as "this outcome will not be waited for": the disconnected axis ends as failed with a reason naming the operator, and whatever the run would still have produced is not published. A disconnected preparation concludes as a failure, an execution in flight is stopped, and a publication is skipped. Only a run with a disconnected axis is eligible, and a reason is required so the decision is never anonymous. Requires the admin token; the route does not exist when none is configured. */
+    post: operations['giveUpDisconnectedRun']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/admin/runs/{runId}/resume': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description An operator decision that hands a disconnected run back to automatic recovery. Exactly one axis can be `disconnected` at a time, and this resumes whichever it is. A disconnected preparation returns to `uncertain` and its attempt budget is reset, because such a row has always spent that budget and would otherwise be concluded as failed by the next command without ever being attempted again. A disconnected execution returns to `uncertain` with its replay budget reset, for the same reason: the replays stopped precisely because that budget was spent. A disconnected publication is re-claimed and published again; its steps are not reset, so a step whose reconciliation already ran out fails as unsettled rather than running its side effect a fourth time. Nothing is repaired and no outcome is asserted either way. Only a run with a disconnected axis is eligible, so a leaked admin token can at most restart work the system already stopped by itself. Requires the admin token; the route does not exist when none is configured. */
+    post: operations['resumeDisconnectedRun']
     delete?: never
     options?: never
     head?: never
@@ -505,12 +556,8 @@ export interface components {
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
-      /**
-       * @description Whether the requester has been told this run failed, or null when no notice exists.
-       *     It sits on the run rather than on an axis because any axis can end a run, and the
-       *     delivery status is a property of the run's whole outcome.
-       */
-      failure_notice: null | components['schemas']['RunFailureNoticeSummary']
+      /** @description User-visible notices caused by this run's coordination events, in creation order. */
+      notices: components['schemas']['RunNoticeSummary'][]
     }
     ReviewRunAdmission: {
       record: components['schemas']['ReviewRunRecord']
@@ -528,34 +575,30 @@ export interface components {
       claim_token: string
       attempt_count: number
     }
-    /**
-     * @description One pending notice that a run failed, claimed by the component that can tell the
-     *     requester. Any lifecycle axis can produce one; `failure_stage` says which, so the
-     *     delivery side can word the reply accurately instead of always reporting that the
-     *     review never started.
-     */
-    RunFailureNoticeWork: {
+    /** @description One pending user-visible notice, claimed by the component that can deliver it. */
+    RunNoticeWork: {
+      notice_id: string
       run_id: string
       input: {
         [key: string]: unknown
       }
-      /**
-       * @description The axis whose failure ended the run. `preparation` means nothing ran and the
-       *     review never started; `execution` means the Runner ran but did not finish;
-       *     `publication` means the work completed but its result could not be delivered.
-       * @enum {string}
-       */
-      failure_stage: 'preparation' | 'execution' | 'publication'
-      failure_code: string | null
+      /** @enum {string} */
+      kind: 'failure' | 'attention'
+      /** @enum {string} */
+      axis: 'preparation' | 'execution' | 'publication'
+      reason_code: string | null
       claim_token: string
     }
-    /** @description Delivery state of the one acknowledgement a failed run produces. */
-    RunFailureNoticeSummary: {
+    /** @description Delivery state of one user-visible coordination notice. */
+    RunNoticeSummary: {
+      notice_id: string
+      /** @enum {string} */
+      kind: 'failure' | 'attention'
+      /** @enum {string} */
+      axis: 'preparation' | 'execution' | 'publication'
       /** @enum {string} */
       status: 'pending' | 'delivering' | 'delivered' | 'failed'
-      /** @enum {string} */
-      failure_stage: 'preparation' | 'execution' | 'publication'
-      failure_code: string | null
+      reason_code: string | null
       /** @description Where the requester can read the outcome. Always an absolute URI when present, and null only when no message reached them. */
       comment_url: null | string
     }
@@ -586,7 +629,14 @@ export interface components {
     PublicationStepRecord: {
       step_key: string
       /** @enum {string} */
-      status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+      status:
+        | 'pending'
+        | 'running'
+        | 'uncertain'
+        | 'disconnected'
+        | 'succeeded'
+        | 'failed'
+        | 'terminal_failed'
       /** @description How many times this step has been claimed and started. More than one means an earlier owner began the side effect, so a reclaiming publisher must reconcile against the remote object (`remote_object_id`/`remote_object_url`) instead of assuming nothing happened. */
       attempt_count: number
       /**
@@ -594,7 +644,6 @@ export interface components {
        * @description When the latest claim of this step started; null until the step is claimed once. Together with `attempt_count` it distinguishes a step that never started from one whose publisher died mid-effect.
        */
       last_attempt_at: string | null
-      failure_count: number
       remote_object_id: string | null
       /** Format: uri */
       remote_object_url: string | null
@@ -604,8 +653,16 @@ export interface components {
     ObservedPublicationStep: {
       step_key: string
       /** @enum {string} */
-      status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-      failure_count: number
+      status:
+        | 'pending'
+        | 'running'
+        | 'uncertain'
+        | 'disconnected'
+        | 'succeeded'
+        | 'failed'
+        | 'terminal_failed'
+      /** @description How many attempts this step has started against its budget. A count above one on a successful step means the side effect was reached after a retry or a recovery, not on the first try. */
+      attempt_count: number
       /** Format: uri */
       remote_object_url: string | null
       failure_code: string | null
@@ -622,15 +679,12 @@ export interface components {
       created_at: string
       failure_code: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
-      /**
-       * @description Whether the requester has been told this run failed, or null when no notice exists.
-       *     It sits on the run rather than on an axis because any axis can end a run.
-       */
-      failure_notice: null | components['schemas']['RunFailureNoticeSummary']
+      /** @description User-visible notices caused by this run's coordination events, in creation order. */
+      notices: components['schemas']['RunNoticeSummary'][]
     }
     ExecutionSummary: {
       /**
-       * @description The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it to resolve the run to `queued` or `failed`, so it is not a failure.
+       * @description The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it under the same identity. `disconnected` means automatic recovery stopped after its finite budget without a conclusive answer, so it is not a failure.
        * @enum {string}
        */
       status:
@@ -638,6 +692,7 @@ export interface components {
         | 'queued'
         | 'running'
         | 'uncertain'
+        | 'disconnected'
         | 'succeeded'
         | 'skipped'
         | 'failed'
@@ -648,7 +703,7 @@ export interface components {
       started_at: string | null
       /**
        * Format: date-time
-       * @description Immutable instant the execution axis reached a terminal state (`succeeded`, `failed`, or `skipped`); null while it is pending, queued, running, or uncertain. Together with `started_at` it times the phase (only when `started_at` is non-null, since `skipped` has an end without a start).
+       * @description Immutable instant the execution axis reached a terminal state (`succeeded`, `failed`, or `skipped`); null while it is pending, queued, running, uncertain, or disconnected. Together with `started_at` it times the phase (only when `started_at` is non-null, since `skipped` has an end without a start).
        */
       finished_at: string | null
       /**
@@ -659,7 +714,14 @@ export interface components {
     }
     PublicationSummary: {
       /** @enum {string} */
-      status: 'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      status:
+        | 'pending'
+        | 'publishing'
+        | 'uncertain'
+        | 'disconnected'
+        | 'published'
+        | 'failed'
+        | 'skipped'
       /**
        * Format: date-time
        * @description Immutable instant the publication phase began (the work was first claimed); null while it is pending, and null for `skipped`, which is concluded without ever having started. A retryable failure that returns the row to pending and claims it again does not move it.
@@ -680,7 +742,7 @@ export interface components {
       /** @description Monotonic identifier; also the tie-breaker within one occurred_at. */
       event_id: number
       /** @enum {string} */
-      axis: 'execution' | 'preparation' | 'publication' | 'notice'
+      axis: 'execution' | 'preparation' | 'publication'
       /** @description State before the transition; null for the first event on an axis. */
       from_status: string | null
       to_status: string
@@ -689,10 +751,19 @@ export interface components {
       /** Format: date-time */
       occurred_at: string
     }
-    BlockedPreparationExpiry: {
+    /** @description One run the system stopped working on by itself, and the axis it is parked on. A queue that listed only preparation left an operator unable to find a run whose execution or publication stalled. */
+    ParkedRun: {
       run_id: string
       /** @enum {string} */
-      reason: 'EXECUTION_ALREADY_ADVANCED'
+      axis: 'preparation' | 'execution' | 'publication'
+      /**
+       * @description Why automation stopped. A publication parks when a step's reconciliation budget is spent; the steps themselves record which one and what its last failure was.
+       * @enum {string}
+       */
+      reason:
+        | 'EXECUTION_ALREADY_ADVANCED'
+        | 'SUBMISSION_RECOVERY_EXHAUSTED'
+        | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
     }
     /** @description Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — the Control Plane drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary. */
     PreparationSummary: {
@@ -700,10 +771,16 @@ export interface components {
        * @description Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own "in progress" state and is unrelated to the Runner, which is only submitted to once preparation reaches `submitted`.
        * @enum {string}
        */
-      status: 'pending' | 'preparing' | 'submitted' | 'failed'
+      status:
+        | 'pending'
+        | 'preparing'
+        | 'uncertain'
+        | 'disconnected'
+        | 'submitted'
+        | 'failed'
       attempt_count: number
-      /** @description Non-null when coordination stopped retrying this run: an expired preparation lease could not be concluded because the execution axis had already moved past `pending`, so writing the "execution never ran" conclusion would overwrite a real Runner result. The run is left untouched and reported here instead of being retried every pass. Clearing it requires an operator decision; nothing clears it automatically, because deciding that the contradiction is resolved needs judgement no rule can supply. The only value today is `EXECUTION_ALREADY_ADVANCED`. */
-      expiry_blocked_reason: string | null
+      /** @description Non-null only while `status` is `disconnected`: the reason the run's own records do not admit the transition an expired lease would make, so automatic work cannot conclude it. It names that conflict and nothing else - what an operator may do about it is the `disconnected` state's business, not this field's. The value today is `EXECUTION_ALREADY_ADVANCED`. */
+      disconnect_reason: string | null
       /**
        * Format: date-time
        * @description Immutable instant the preparation phase began (a preparer first claimed the work); null while it is still pending. A retry that returns the row to pending and claims it again does not move it, so it is a safe start bound for the phase.
@@ -1242,7 +1319,7 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
-  claimNextRunFailureNotice: {
+  claimNextRunNotice: {
     parameters: {
       query?: never
       header?: never
@@ -1251,27 +1328,26 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description The claimed failure notice, or null when none is available. */
+      /** @description The claimed notice, or null when none is available. */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/json':
-            components['schemas']['RunFailureNoticeWork'] | null
+          'application/json': components['schemas']['RunNoticeWork'] | null
         }
       }
       401: components['responses']['Unauthorized']
       500: components['responses']['InternalError']
     }
   }
-  completeRunFailureNotice: {
+  completeRunNotice: {
     parameters: {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission (a UUID). */
-        runId: string
+        /** @description The claimed notice identifier. */
+        noticeId: string
       }
       cookie?: never
     }
@@ -1481,6 +1557,48 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
+  settleExhaustedPublicationStep: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+        /** @description The publication step key, as supplied at initializePublicationSteps. */
+        stepKey: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          token: string
+          /** @description Whether the connector found the side effect already present on the remote system. `false` means the connector looked and confirmed it is absent. */
+          found: boolean
+          /** @description The remote object the connector matched when `found` is true; ignored otherwise. */
+          remote_object?: {
+            id?: string | null
+            url?: string | null
+          }
+        }
+      }
+    }
+    responses: {
+      /** @description Whether this call concluded the step. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': boolean
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
   failPublicationStep: {
     parameters: {
       query?: never
@@ -1646,7 +1764,7 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
-  listBlockedPreparationExpiries: {
+  listParkedRuns: {
     parameters: {
       query?: never
       header?: never
@@ -1655,14 +1773,14 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description Blocked runs, oldest block first. */
+      /** @description Parked runs, oldest first. */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
           'application/json': {
-            blocks: components['schemas']['BlockedPreparationExpiry'][]
+            blocks: components['schemas']['ParkedRun'][]
           }
         }
       }
@@ -1703,6 +1821,69 @@ export interface operations {
       404: components['responses']['RunNotFound']
       409: components['responses']['Conflict']
       413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
+  giveUpDisconnectedRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          /** @description Why this outcome is being given up on; recorded on every event it writes. */
+          reason: string
+        }
+      }
+    }
+    responses: {
+      /** @description The run after the decision concluded its disconnected axis. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReviewRunRecord']
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
+      409: components['responses']['Conflict']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
+  resumeDisconnectedRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The run after its disconnected axis was handed back to automatic recovery. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReviewRunRecord']
+        }
+      }
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
+      409: components['responses']['Conflict']
       500: components['responses']['InternalError']
     }
   }
@@ -1781,12 +1962,9 @@ export const operationRoutes = {
     path: '/v1/runs/{runId}/preparation/failure',
     method: 'post'
   },
-  claimNextRunFailureNotice: {
-    path: '/v1/run-failure-notices/claims/next',
-    method: 'post'
-  },
-  completeRunFailureNotice: {
-    path: '/v1/runs/{runId}/failure-notice/complete',
+  claimNextRunNotice: { path: '/v1/run-notices/claims/next', method: 'post' },
+  completeRunNotice: {
+    path: '/v1/run-notices/{noticeId}/complete',
     method: 'post'
   },
   claimNextPublication: { path: '/v1/publication/claims/next', method: 'post' },
@@ -1806,6 +1984,10 @@ export const operationRoutes = {
     path: '/v1/runs/{runId}/publication/steps/{stepKey}/complete',
     method: 'post'
   },
+  settleExhaustedPublicationStep: {
+    path: '/v1/runs/{runId}/publication/steps/{stepKey}/settle-exhausted',
+    method: 'post'
+  },
   failPublicationStep: {
     path: '/v1/runs/{runId}/publication/steps/{stepKey}/fail',
     method: 'post'
@@ -1823,12 +2005,17 @@ export const operationRoutes = {
     path: '/v1/internal/runs/{runId}/publication/steps',
     method: 'get'
   },
-  listBlockedPreparationExpiries: {
-    path: '/v1/runs/blocked-preparations',
-    method: 'get'
-  },
+  listParkedRuns: { path: '/v1/runs/parked', method: 'get' },
   abandonBlockedPreparation: {
     path: '/v1/admin/runs/{runId}/abandon',
+    method: 'post'
+  },
+  giveUpDisconnectedRun: {
+    path: '/v1/admin/runs/{runId}/give-up',
+    method: 'post'
+  },
+  resumeDisconnectedRun: {
+    path: '/v1/admin/runs/{runId}/resume',
     method: 'post'
   },
   getPreparationHeartbeatInterval: {

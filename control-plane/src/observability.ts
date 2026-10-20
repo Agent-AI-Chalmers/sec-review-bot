@@ -20,7 +20,7 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
     artifact_storage: run.artifact_storage,
     // Whether the requester has been told is an operator concern, not connector-owned state, so
     // it survives redaction. It reports the axis and reason, never the delivery internals.
-    failure_notice: run.failure_notice
+    notices: run.notices
   }
 }
 
@@ -30,7 +30,7 @@ export function observePublicationStep(
   return {
     step_key: step.step_key,
     status: step.status,
-    failure_count: step.failure_count,
+    attempt_count: step.attempt_count,
     remote_object_url: step.remote_object_url,
     failure_code: step.failure_code,
     failure_message: step.failure_message

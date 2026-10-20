@@ -31,6 +31,8 @@ import {
   abandonBlockedRun,
   api,
   ApiError,
+  giveUpDisconnectedRun,
+  resumeDisconnectedRun,
   type ArtifactStorage,
   type Run,
   type RunEvent
@@ -62,6 +64,7 @@ import {
   failureReason,
   formatBytes,
   formatDuration,
+  canResumeRun,
   isDownloadableArtifact,
   isRunTerminal,
   phaseElapsed,
@@ -176,11 +179,15 @@ function Artifact({
  */
 function AbandonDialog({
   runId,
+  keepsResult,
   opened,
   onClose,
   onDone
 }: {
   runId: string
+  /** Whether the run has a result at all. A run whose execution never produced one has nothing
+   * to keep, so promising it would be kept would describe something that does not exist. */
+  keepsResult: boolean
   opened: boolean
   onClose: () => void
   onDone: () => void | Promise<void>
@@ -217,7 +224,10 @@ function AbandonDialog({
   return (
     <Modal opened={opened} onClose={onClose} title={t('abandonTitle')} centered>
       <Stack gap="sm">
-        <Text size="sm">{t('abandonExplainer')}</Text>
+        <Text size="sm">
+          {t('abandonExplainer')}
+          {keepsResult && ` ${t('abandonExplainerKeepsResult')}`}
+        </Text>
         <Text size="xs" ff="monospace" c="dimmed">
           {runId}
         </Text>
@@ -263,27 +273,215 @@ function AbandonDialog({
   )
 }
 
-/** How the requester was told the run failed, shown inside the phase that failed.
+/** Stop waiting for an outcome that cannot be established.
  *
- * The notice belongs to the phase, not to the run's footer: "the user was told" is part of what
- * happened in preparation, execution, or publication, and a separate line at the bottom detached
- * it from the evidence above it. A delivery that could not be completed is reported here too,
- * because its absence is the operator's problem to notice.
+ * Distinct from `AbandonDialog`, which resolves a *contradiction*. This one accepts that the
+ * outcome is unknowable — the Runner may have accepted the task, a publication step may already
+ * have taken effect — and records only that the run will not wait for it any longer. A reason is
+ * required because the decision is irreversible and says nothing about what actually happened.
  */
-function FailureNoticeLine({
+function GiveUpDialog({
+  runId,
+  opened,
+  onClose,
+  onDone
+}: {
+  runId: string
+  opened: boolean
+  onClose: () => void
+  onDone: () => void | Promise<void>
+}): React.JSX.Element {
+  const t = useMessages()
+  const [reason, setReason] = React.useState('')
+  const [adminToken, setAdminToken] = React.useState('')
+  const [submitting, setSubmitting] = React.useState(false)
+  const [failure, setFailure] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (!opened) return
+    setReason('')
+    setAdminToken('')
+    setFailure(null)
+    setSubmitting(false)
+  }, [opened, runId])
+
+  const submit = async (): Promise<void> => {
+    setSubmitting(true)
+    setFailure(null)
+    try {
+      await giveUpDisconnectedRun(runId, reason.trim(), adminToken.trim())
+      await onDone()
+    } catch (error) {
+      setFailure(t(abandonFailureMessageKey(error)))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal opened={opened} onClose={onClose} title={t('giveUpTitle')} centered>
+      <Stack gap="sm">
+        <Text size="sm">{t('giveUpExplainer')}</Text>
+        <Text size="xs" ff="monospace" c="dimmed">
+          {runId}
+        </Text>
+        <Textarea
+          label={t('abandonReasonLabel')}
+          description={t('abandonReasonHint')}
+          value={reason}
+          onChange={(event) => setReason(event.currentTarget.value)}
+          autosize
+          minRows={2}
+          required
+        />
+        <TextInput
+          label={t('abandonTokenLabel')}
+          description={t('abandonTokenHint')}
+          type="password"
+          value={adminToken}
+          onChange={(event) => setAdminToken(event.currentTarget.value)}
+          required
+        />
+        {failure !== null && (
+          <Text role="alert" c="red" size="sm">
+            {failure}
+          </Text>
+        )}
+        <Group justify="flex-end" gap="xs">
+          <Button variant="default" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button
+            color="orange"
+            loading={submitting}
+            disabled={reason.trim() === '' || adminToken.trim() === ''}
+            onClick={() => {
+              void submit()
+            }}
+            data-testid="give-up-confirm"
+          >
+            {t('giveUpConfirm')}
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
+/** The other operator decision for a blocked run: try again.
+ *
+ * Resuming is a request, not a repair: Control Plane puts the row back in `uncertain` with a
+ * fresh attempt budget so automatic recovery can establish what the previous owner left behind.
+ * It is offered next to abandonment because those are the only two decisions such a run is
+ * waiting for. No reason is asked for: nothing is concluded, and the credential handling is the
+ * same one-request rule as abandonment.
+ */
+function ResumeDialog({
+  runId,
+  opened,
+  onClose,
+  onDone
+}: {
+  runId: string
+  opened: boolean
+  onClose: () => void
+  onDone: () => void | Promise<void>
+}): React.JSX.Element {
+  const t = useMessages()
+  const [adminToken, setAdminToken] = React.useState('')
+  const [submitting, setSubmitting] = React.useState(false)
+  const [failure, setFailure] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (!opened) return
+    setAdminToken('')
+    setFailure(null)
+    setSubmitting(false)
+  }, [opened, runId])
+
+  const submit = async (): Promise<void> => {
+    setSubmitting(true)
+    setFailure(null)
+    try {
+      await resumeDisconnectedRun(runId, adminToken.trim())
+      await onDone()
+    } catch (error) {
+      setFailure(t(abandonFailureMessageKey(error)))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal opened={opened} onClose={onClose} title={t('resumeTitle')} centered>
+      <Stack gap="sm">
+        <Text size="sm">{t('resumeExplainer')}</Text>
+        <Text size="xs" ff="monospace" c="dimmed">
+          {runId}
+        </Text>
+        <TextInput
+          label={t('abandonTokenLabel')}
+          description={t('abandonTokenHint')}
+          type="password"
+          value={adminToken}
+          onChange={(event) => setAdminToken(event.currentTarget.value)}
+          required
+        />
+        {failure !== null && (
+          <Text role="alert" c="red" size="sm">
+            {failure}
+          </Text>
+        )}
+        <Group justify="flex-end" gap="xs">
+          <Button variant="default" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button
+            loading={submitting}
+            disabled={adminToken.trim() === ''}
+            onClick={() => {
+              void submit()
+            }}
+            data-testid="resume-run-confirm"
+          >
+            {t('resumeConfirm')}
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
+/** What the requester was told about this phase, shown inside that phase.
+ *
+ * Notices are of two kinds: a `failure` (the run really ended) and an `attention` (automation
+ * stopped without a conclusion, so someone has to look). Only a failure may be worded as one;
+ * an attention notice says the outcome is unconfirmed. The line belongs to the phase, not to the
+ * run's footer: "the user was told" is part of what happened in preparation, execution, or
+ * publication, and a separate line at the bottom detached it from the evidence above it. A
+ * delivery that could not be completed is reported here too, because its absence is the
+ * operator's problem to notice.
+ */
+function NoticeLine({
   notice
 }: {
-  notice: NonNullable<Run['failure_notice']>
+  notice: Run['notices'][number]
 }): React.JSX.Element {
   const t = useMessages()
   // Phrased as "who knows", not as "a notice was delivered/failed": "Failure notice: delivery
   // failed" says the same thing twice and still leaves the reader asking whether anyone was told.
   const label =
-    notice.status === 'delivered'
-      ? t('failureNoticeDelivered')
-      : notice.status === 'failed'
-        ? t('failureNoticeNotDelivered')
-        : t('failureNoticeDelivering')
+    notice.kind === 'attention'
+      ? notice.status === 'delivered'
+        ? t('attentionNoticeDelivered')
+        : notice.status === 'failed'
+          ? t('attentionNoticeNotDelivered')
+          : t('attentionNoticeDelivering')
+      : notice.status === 'delivered'
+        ? t('failureNoticeDelivered')
+        : notice.status === 'failed'
+          ? t('failureNoticeNotDelivered')
+          : t('failureNoticeDelivering')
   // Only a delivered notice has a comment to open; a failed or in-flight one has nothing to
   // link to, which is exactly when the reader needs to know the requester was never told.
   const href = notice.comment_url ?? undefined
@@ -304,7 +502,9 @@ function FailureNoticeLine({
           size="xs"
           data-testid="failure-notice-link"
         >
-          {t('viewFailureNotice')}
+          {notice.kind === 'attention'
+            ? t('viewAttentionNotice')
+            : t('viewFailureNotice')}
         </Anchor>
       )}
     </Text>
@@ -384,10 +584,36 @@ export function Detail(): React.JSX.Element {
     error: unknown
   }>()
   const [abandoning, setAbandoning] = React.useState(false)
+  const [resuming, setResuming] = React.useState(false)
+  const [givingUp, setGivingUp] = React.useState(false)
   const run = loaded?.runId === runId ? loaded.run : undefined
   const steps = loaded?.runId === runId ? loaded.steps : []
   const events = loaded?.runId === runId ? loaded.events : []
   const error = failure?.runId === runId ? failure.error : undefined
+  // What the reason code means, looked up once. The banner names the conflict only through this
+  // sentence, so an unrecognised code renders plainly instead of guessing at a cause.
+  const disconnectExplanation = run?.preparation.disconnect_reason
+    ? failureCodeLabel(run.preparation.disconnect_reason, t).explanation
+    : null
+  // Abandoning stops an execution that is still moving, and leaves a finished one alone. Saying
+  // so unconditionally would describe a stop that cannot happen - a run whose task already
+  // completed has nothing left to stop.
+  const executionStillMovable =
+    run !== undefined &&
+    ['queued', 'running', 'uncertain'].includes(run.execution.status)
+  // Which axis parked this run, so the banner's wording follows one value instead of a chain of
+  // ternaries that silently falls back to the preparation case for anything new. Preparation wins
+  // when present because it always explains the others: it parks only by contradicting execution.
+  const parkedAxis: 'preparation' | 'execution' | 'publication' | null =
+    run === undefined
+      ? null
+      : run.preparation.status === 'disconnected'
+        ? 'preparation'
+        : run.execution.status === 'disconnected'
+          ? 'execution'
+          : run.publication.status === 'disconnected'
+            ? 'publication'
+            : null
   const load = React.useCallback(async (): Promise<void> => {
     try {
       const [runValue, stepValue, eventValue] = await Promise.all([
@@ -554,6 +780,10 @@ export function Detail(): React.JSX.Element {
             )}
             <AbandonDialog
               runId={run.run_id}
+              keepsResult={
+                run.execution.status === 'succeeded' ||
+                run.execution.status === 'failed'
+              }
               opened={abandoning}
               onClose={() => setAbandoning(false)}
               onDone={async () => {
@@ -561,7 +791,29 @@ export function Detail(): React.JSX.Element {
                 await load()
               }}
             />
-            {run.preparation.expiry_blocked_reason !== null && (
+            <ResumeDialog
+              runId={run.run_id}
+              opened={resuming}
+              onClose={() => setResuming(false)}
+              onDone={async () => {
+                setResuming(false)
+                await load()
+              }}
+            />
+            <GiveUpDialog
+              runId={run.run_id}
+              opened={givingUp}
+              onClose={() => setGivingUp(false)}
+              onDone={async () => {
+                setGivingUp(false)
+                await load()
+              }}
+            />
+            {/* Every axis that can park must reach this banner, or a parked run shows no
+                decision at all - the queue names it and the detail page offers nothing. */}
+            {(run.preparation.status === 'disconnected' ||
+              run.execution.status === 'disconnected' ||
+              run.publication.status === 'disconnected') && (
               <Alert
                 // A run the system refused to conclude. `Alert` rather than `Paper`: this is a
                 // call to act, and it must not look like another content card on the page.
@@ -570,7 +822,13 @@ export function Detail(): React.JSX.Element {
                 radius="sm"
                 p="lg"
                 icon={<IconAlertTriangle size={22} />}
-                title={t('blockedRunTitle')}
+                title={t(
+                  parkedAxis === 'preparation'
+                    ? 'blockedRunTitle'
+                    : parkedAxis === 'execution'
+                      ? 'disconnectedExecutionTitle'
+                      : 'disconnectedPublicationTitle'
+                )}
                 className="blocked-run"
                 data-testid="blocked-run"
               >
@@ -584,24 +842,120 @@ export function Detail(): React.JSX.Element {
                     gap="lg"
                     wrap="nowrap"
                   >
-                    <Text size="sm" className="blocked-run-body">
-                      {t('blockedRunBody')}
-                    </Text>
-                    <Button
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      onClick={() => setAbandoning(true)}
-                      data-testid="abandon-run"
+                    {/* The two parked states have different causes and different
+                        consequences, so the explanation follows the axis that stopped rather
+                        than describing the preparation contradiction in both cases. */}
+                    <Stack gap={4}>
+                      <Text size="sm" className="blocked-run-body">
+                        {t(
+                          parkedAxis === 'preparation'
+                            ? 'blockedRunBody'
+                            : parkedAxis === 'execution'
+                              ? 'disconnectedExecutionBody'
+                              : 'disconnectedPublicationBody'
+                        )}
+                      </Text>
+                      {/* What each decision actually does, stated before it is taken rather
+                          than discovered afterwards. The two buttons look alike, and only the
+                          consequence tells them apart. A resume is only described when the
+                          server would accept it: an unusable decision is not offered, and its
+                          description is not shown either. */}
+                      {canResumeRun(run) && (
+                        <Text size="xs" c="dimmed">
+                          {t(
+                            parkedAxis === 'preparation'
+                              ? 'blockedOutcomeResume'
+                              : parkedAxis === 'execution'
+                                ? 'disconnectedExecutionOutcomeResume'
+                                : 'disconnectedPublicationOutcomeResume'
+                          )}
+                        </Text>
+                      )}
+                      {!canResumeRun(run) && (
+                        <Text size="xs" c="dimmed">
+                          {t('blockedNoResumeReason')}
+                        </Text>
+                      )}
+                      <Text size="xs" c="dimmed">
+                        {t(
+                          parkedAxis === 'preparation'
+                            ? 'blockedOutcomeAbandon'
+                            : parkedAxis === 'execution'
+                              ? 'disconnectedExecutionOutcomeGiveUp'
+                              : 'disconnectedPublicationOutcomeGiveUp'
+                        )}
+                        {/* Only when there is something to stop. */}
+                        {parkedAxis === 'preparation' &&
+                          executionStillMovable &&
+                          ` ${t('blockedOutcomeAbandonStopsExecution')}`}
+                      </Text>
+                    </Stack>
+                    {/* Resuming is offered first: it keeps the run alive, while the other
+                        decision stops waiting for it. The labels differ by axis because the
+                        decisions do: a contradicted run is abandoned, while an unknowable
+                        outcome is given up on, which claims nothing about what happened.
+                        The group is non-shrinking as a unit, so no button collapses when the
+                        explanation fills the row. */}
+                    <Group
+                      gap="xs"
+                      wrap="nowrap"
                       className="blocked-run-action"
                     >
-                      {t('abandonRun')}
-                    </Button>
+                      {canResumeRun(run) && (
+                        <Button
+                          variant="default"
+                          size="xs"
+                          onClick={() => setResuming(true)}
+                          data-testid="resume-run"
+                        >
+                          {t('resumeRun')}
+                        </Button>
+                      )}
+                      {/* Two different decisions reach the same server operation, and the
+                          label follows the axis: a contradicted run is abandoned, while an
+                          unknowable outcome is given up on. */}
+                      {run.preparation.status === 'disconnected' ? (
+                        <Button
+                          color="orange"
+                          variant="filled"
+                          size="xs"
+                          onClick={() => setAbandoning(true)}
+                          data-testid="abandon-run"
+                          className="blocked-run-action"
+                        >
+                          {t('abandonRun')}
+                        </Button>
+                      ) : (
+                        <Button
+                          color="orange"
+                          variant="filled"
+                          size="xs"
+                          onClick={() => setGivingUp(true)}
+                          data-testid="give-up-run"
+                          className="blocked-run-action"
+                        >
+                          {t('giveUpRun')}
+                        </Button>
+                      )}
+                    </Group>
                   </Group>
-                  <ExplainedCode
-                    code={run.preparation.expiry_blocked_reason}
-                    tone="neutral"
-                  />
+                  {/* The banner states only that the run stopped and why a decision is needed;
+                      this is where the specific conflict is named. It is shown, not hidden
+                      behind a tooltip: the banner points the reader here, and a tooltip would
+                      make that pointer lead nowhere unless guessed at. A code the console does
+                      not know still renders as the bare code. */}
+                  {run.preparation.disconnect_reason !== null && (
+                    <Stack gap={2}>
+                      <Text size="xs" ff="monospace" c="dimmed">
+                        {run.preparation.disconnect_reason}
+                      </Text>
+                      {disconnectExplanation !== null && (
+                        <Text size="xs" c="dimmed">
+                          {disconnectExplanation}
+                        </Text>
+                      )}
+                    </Stack>
+                  )}
                 </Stack>
               </Alert>
             )}
@@ -649,9 +1003,11 @@ export function Detail(): React.JSX.Element {
                     {' · '}
                     {t('preparationAttempts')}: {run.preparation.attempt_count}
                   </Text>
-                  {run.failure_notice?.failure_stage === 'preparation' && (
-                    <FailureNoticeLine notice={run.failure_notice} />
-                  )}
+                  {run.notices
+                    .filter((notice) => notice.axis === 'preparation')
+                    .map((notice) => (
+                      <NoticeLine key={notice.notice_id} notice={notice} />
+                    ))}
                 </Timeline.Item>
                 <Timeline.Item
                   bullet={statusBullet(executionTone(run.execution.status))}
@@ -694,9 +1050,11 @@ export function Detail(): React.JSX.Element {
                       {isObservationStale(run) && ` · ${t('observationStale')}`}
                     </Text>
                   )}
-                  {run.failure_notice?.failure_stage === 'execution' && (
-                    <FailureNoticeLine notice={run.failure_notice} />
-                  )}
+                  {run.notices
+                    .filter((notice) => notice.axis === 'execution')
+                    .map((notice) => (
+                      <NoticeLine key={notice.notice_id} notice={notice} />
+                    ))}
                   {run.artifact_storage !== null && (
                     <div className="artifact-section">
                       <Artifact
@@ -802,9 +1160,11 @@ export function Detail(): React.JSX.Element {
                       })}
                     </div>
                   )}
-                  {run.failure_notice?.failure_stage === 'publication' && (
-                    <FailureNoticeLine notice={run.failure_notice} />
-                  )}
+                  {run.notices
+                    .filter((notice) => notice.axis === 'publication')
+                    .map((notice) => (
+                      <NoticeLine key={notice.notice_id} notice={notice} />
+                    ))}
                 </Timeline.Item>
               </Timeline>
               <RunStateMachines run={run} events={events} />

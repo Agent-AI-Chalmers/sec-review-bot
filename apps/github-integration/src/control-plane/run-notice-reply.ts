@@ -1,6 +1,6 @@
 // Sends the connector-facing acknowledgement that a run failed. Any axis can produce this: the
 // review may never have started, may have started and not finished, or may have finished with a
-// result that could not be delivered. The wording follows `failure_stage` so the reply says how
+// result that could not be delivered. The wording follows `axis` so the reply says how
 // far the run actually got instead of always claiming it never started.
 import { createIssueCommentUnlessMarkerExists } from '../github/comment-service.js'
 import type { Octokit } from 'octokit'
@@ -106,10 +106,10 @@ async function assertRepositoryIsInstalled(
   }
 }
 
-export type RunFailureStage = 'preparation' | 'execution' | 'publication'
+export type RunNoticeAxis = 'preparation' | 'execution' | 'publication'
 
 /** How far the run got, in words the requester can act on. */
-const STAGE_SENTENCE: Record<RunFailureStage, string> = {
+const STAGE_SENTENCE: Record<RunNoticeAxis, string> = {
   preparation: 'Security review could not be started after automatic retries.',
   execution: 'Security review started but could not be completed.',
   publication:
@@ -123,7 +123,7 @@ const STAGE_SENTENCE: Record<RunFailureStage, string> = {
  * here because a failure notice has no publication claim to assert - creating this issue is
  * reporting, not publishing a scan result.
  *
- * This performs a public write (it may create the issue), so `sendRunFailureReply` verifies the
+ * This performs a public write (it may create the issue), so `sendRunNoticeReply` verifies the
  * repository against the installation before calling it. */
 async function ensureRepositorySummaryIssue(
   octokit: Octokit,
@@ -138,23 +138,25 @@ async function ensureRepositorySummaryIssue(
   return await ensureSummaryIssueNumber(octokit, repo, async () => undefined)
 }
 
-export interface RunFailureReplyResult {
+export interface RunNoticeReplyResult {
   /** The comment that was posted (or already existed) on the requester's issue or pull request. */
   comment_url: string
 }
 
-export async function sendRunFailureReply(
+export async function sendRunNoticeReply(
   octokit: Octokit,
   args: {
     run_id: string
+    notice_id: string
     input: Record<string, unknown>
-    failure_stage: RunFailureStage
+    axis: RunNoticeAxis
     /** The reason the Control Plane recorded, or null when it recorded none. A missing reason is
      * stated as such: the notice must not invent a code that neither the contract nor the
      * console knows, because the reader would take it as a unit of the coordination vocabulary. */
-    failure_code: string | null
+    reason_code: string | null
+    kind: 'failure' | 'attention'
   }
-): Promise<RunFailureReplyResult | null> {
+): Promise<RunNoticeReplyResult | null> {
   // Resolve where the outcome belongs. A conversation (issue/PR) is named directly by persisted
   // input; a repository scan has no conversation, so it reports to that repository's summary
   // issue, which may not exist yet.
@@ -183,17 +185,18 @@ export async function sendRunFailureReply(
     }
   }
 
-  // The marker keeps the comment idempotent per run. It names the run only, not the stage: a run
-  // that fails once should not collect one comment per axis that happened to observe it.
-  const marker = `<!-- sec-review-failed:${args.run_id} -->`
+  // A source event produces one notice and one comment. The notice id is intentionally in the
+  // marker: a later disconnected transition for the same run is a new fact, not a duplicate.
+  const attention = args.kind === 'attention'
+  const marker = `<!-- sec-review-notice:${args.notice_id} -->`
   const reason =
-    args.failure_code === null
+    args.reason_code === null
       ? 'The Control Plane recorded no failure code.'
-      : `Reason: \`${args.failure_code}\`.`
+      : `Reason: \`${args.reason_code}\`.`
   const posted = await createIssueCommentUnlessMarkerExists(octokit, {
     ...target,
     marker,
-    body: `${marker}\n\n${STAGE_SENTENCE[args.failure_stage]} Reference: \`${args.run_id}\`. ${reason}`,
+    body: `${marker}\n\n${attention ? 'The review outcome could not be confirmed. Automatic recovery has stopped and this requires operator follow-up; this is not a failure report.' : STAGE_SENTENCE[args.axis]} Reference: \`${args.run_id}\`. ${reason}`,
     assert_publication_claim: async () => undefined
   })
   return { comment_url: posted.html_url }

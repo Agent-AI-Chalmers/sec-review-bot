@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  concludeExhaustedSubmissionRecovery,
+  MAX_SUBMISSION_RECOVERY_ATTEMPTS,
   recoverReviewRunSubmission,
   type ReviewRunRecord
 } from '../src/index.js'
@@ -20,7 +22,7 @@ function run(
       finished_at: '2026-01-01T00:00:02.000Z',
       updated_at: '2026-01-01T00:00:03.000Z',
       failure_code: null,
-      expiry_blocked_reason: null
+      disconnect_reason: null
     },
     ...(input === null ? {} : { runner_input: input }),
     execution: {
@@ -39,7 +41,7 @@ function run(
     failure_code: null,
     failure_message: null,
     artifact_storage: null,
-    failure_notice: null
+    notices: []
   }
 }
 
@@ -54,6 +56,15 @@ function store(
       return true
     },
     async failSubmissionRecovery() {
+      return true
+    },
+    async submissionRecoveryAttemptCount() {
+      return 0
+    },
+    async disconnectExhaustedSubmissionRecovery() {
+      return null
+    },
+    async recordUnknownRecoveryOutcome() {
       return true
     },
     ...overrides
@@ -100,11 +111,16 @@ test('submission recovery leaves an uncertain replay untouched', async () => {
   // in place too - the run becomes claimable again when its lease expires, which is the pace it
   // had before this path existed. Clearing it would replay a failing submission every tick.
   const concluded: unknown[][] = []
+  const counted: string[] = []
   const transportError = new Error('response lost')
   const result = await recoverReviewRunSubmission(
     store({
       async failSubmissionRecovery(...args) {
         concluded.push(args)
+        return true
+      },
+      async recordUnknownRecoveryOutcome(_runId, token) {
+        counted.push(token)
         return true
       }
     }),
@@ -122,6 +138,9 @@ test('submission recovery leaves an uncertain replay untouched', async () => {
   )
 
   assert.deepStrictEqual(result, { status: 'deferred', error: transportError })
+  // The attempt is counted even though nothing is concluded: the budget is what eventually lets
+  // an otherwise endless uncertainty end, so it has to advance on every unknown outcome.
+  assert.deepStrictEqual(counted, ['claim-1'])
   assert.deepStrictEqual(
     concluded,
     [],
@@ -153,4 +172,65 @@ test('submission recovery records missing persisted input without calling Runner
   assert.strictEqual(result.status, 'input_missing')
   assert.strictEqual(submitted, false)
   assert.strictEqual(failure?.code, 'SUBMISSION_RECOVERY_INPUT_MISSING')
+})
+
+test('an uncertain submission disconnects once its replay budget is spent', async () => {
+  // A submission whose replays never resolve would otherwise stay `uncertain` forever: no axis
+  // must stop automation, but it is not evidence that the Runner rejected the submission.
+  const result = await concludeExhaustedSubmissionRecovery(
+    store({
+      async submissionRecoveryAttemptCount() {
+        return MAX_SUBMISSION_RECOVERY_ATTEMPTS
+      },
+      async disconnectExhaustedSubmissionRecovery(_runId, maxAttempts) {
+        assert.strictEqual(maxAttempts, MAX_SUBMISSION_RECOVERY_ATTEMPTS)
+        return 'disconnect-claim'
+      }
+    }),
+    run()
+  )
+
+  assert.deepStrictEqual(result, { status: 'disconnected' })
+})
+
+test('a replay budget that is not spent yet leaves the run to the normal replay path', async () => {
+  let taken = false
+  const result = await concludeExhaustedSubmissionRecovery(
+    store({
+      async submissionRecoveryAttemptCount() {
+        return MAX_SUBMISSION_RECOVERY_ATTEMPTS - 1
+      },
+      async disconnectExhaustedSubmissionRecovery() {
+        taken = true
+        return 'exhausted-claim'
+      }
+    }),
+    run()
+  )
+
+  assert.strictEqual(result, null)
+  assert.strictEqual(
+    taken,
+    false,
+    'an unfinished budget must not conclude the run'
+  )
+})
+
+test('losing the race to another owner reports nothing', async () => {
+  // Two processes can both see a spent budget. `disconnectExhaustedSubmissionRecovery` is gated on the
+  // claim, so only one wins; the loser must stay silent rather than report a conclusion it did
+  // not make.
+  const result = await concludeExhaustedSubmissionRecovery(
+    store({
+      async submissionRecoveryAttemptCount() {
+        return MAX_SUBMISSION_RECOVERY_ATTEMPTS
+      },
+      async disconnectExhaustedSubmissionRecovery() {
+        return null
+      }
+    }),
+    run()
+  )
+
+  assert.strictEqual(result, null)
 })

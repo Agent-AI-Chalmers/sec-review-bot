@@ -68,22 +68,28 @@ function declaredEdges(axis: StateAxis): Set<string> {
 
 /** Claim from the notice queue until the given run's notice is in hand.
  *
- * `claimNextRunFailureNotice` is a queue, not a lookup: other runs' notices queued earlier would
+ * `claimNextRunNotice` is a queue, not a lookup: other runs' notices queued earlier would
  * otherwise be claimed here and left dangling, which is exactly how an earlier version of this
  * driver failed to exercise `delivering -> failed` while appearing to.
  */
 async function claimNoticeFor(
   store: ReviewRunStore,
   runId: string
-): Promise<{ claim_token: string }> {
-  const deferred: Array<{ run_id: string; claim_token: string }> = []
+): Promise<{ notice_id: string; claim_token: string }> {
+  const deferred: Array<{
+    notice_id: string
+    run_id: string
+    claim_token: string
+  }> = []
   const deadline = Date.now() + 5_000
   try {
     while (Date.now() < deadline) {
-      const notice = await store.claimNextRunFailureNotice()
+      const notice = await store.claimNextRunNotice()
       if (notice === null) break
-      if (notice.run_id === runId) return { claim_token: notice.claim_token }
+      if (notice.run_id === runId)
+        return { notice_id: notice.notice_id, claim_token: notice.claim_token }
       deferred.push({
+        notice_id: notice.notice_id,
         run_id: notice.run_id,
         claim_token: notice.claim_token
       })
@@ -95,11 +101,7 @@ async function claimNoticeFor(
     // than delivered: no reply was attempted for them, so claiming one was delivered would be a
     // lie that the URL check now rejects.
     for (const other of deferred) {
-      await store.completeRunFailureNotice(
-        other.run_id,
-        other.claim_token,
-        false
-      )
+      await store.completeRunNotice(other.notice_id, other.claim_token, false)
     }
   }
 }
@@ -174,10 +176,10 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
-    const preparedNotice = await store.claimNextRunFailureNotice()
+    const preparedNotice = await store.claimNextRunNotice()
     assert.notStrictEqual(preparedNotice, null)
-    await store.completeRunFailureNotice(
-      failedPreparation.runId,
+    await store.completeRunNotice(
+      preparedNotice?.notice_id ?? '',
       preparedNotice?.claim_token ?? '',
       true,
       'https://github.com/example/example/issues/1#issuecomment-1'
@@ -192,9 +194,9 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
-    assert.notStrictEqual(await store.claimNextRunFailureNotice(), null)
+    assert.notStrictEqual(await store.claimNextRunNotice(), null)
     await new Promise((resolve) => setTimeout(resolve, 20))
-    assert.notStrictEqual(await store.claimNextRunFailureNotice(), null)
+    assert.notStrictEqual(await store.claimNextRunNotice(), null)
 
     // notice: delivering -> failed when the provider cannot be reached.
     const undeliverable = await newPreparingRun()
@@ -205,21 +207,35 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
     const undeliverableNotice = await claimNoticeFor(store, undeliverable.runId)
-    await store.completeRunFailureNotice(
-      undeliverable.runId,
+    await store.completeRunNotice(
+      undeliverableNotice.notice_id,
       undeliverableNotice.claim_token,
       false
     )
 
-    // preparation: preparing -> pending when a lease expires without exhausting retries, then
-    // pending -> preparing when the next preparer claims it. Both halves matter: the second is
-    // the only path that returns a run to active preparation after a failure.
+    // preparation: preparing -> pending on a retryable failure, then pending -> preparing when
+    // the next preparer claims it. Both halves matter: the second is the only path that returns
+    // a run to active preparation without leaving the phase.
+    const retryable = await newPreparingRun()
+    await store.failPreparation(
+      retryable.runId,
+      retryable.token,
+      { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'retrying' },
+      { retry: true }
+    )
+    const reclaimed = await store.claimNextPreparation()
+    assert.notStrictEqual(reclaimed, null)
+
+    // preparation: preparing -> uncertain when the lease lapses without exhausting retries, and
+    // uncertain -> preparing when a preparer picks it up again. The origin state is Control
+    // Plane's own bookkeeping: it names the audit event below, and is not published to the
+    // connector.
     await newPreparingRun()
     await new Promise((resolve) => setTimeout(resolve, 20))
     const expiry = await store.expireStalePreparations()
     assert.ok(expiry.concluded >= 1)
-    const reclaimed = await store.claimNextPreparation()
-    assert.notStrictEqual(reclaimed, null)
+    const fromUncertain = await store.claimNextPreparation()
+    assert.notStrictEqual(fromUncertain, null)
 
     // execution: pending -> uncertain on an unconfirmed submission, then the recovery claim
     // records uncertain -> uncertain before resolving it.
@@ -240,6 +256,47 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         recovery as string
       ),
       true
+    )
+
+    // execution: uncertain -> disconnected when automatic recovery reaches its budget. This is
+    // deliberately not a failure: a prior idempotent submission may still exist at the Runner.
+    const uncertainDisconnects = await newPreparingRun()
+    await store.failPreparation(
+      uncertainDisconnects.runId,
+      uncertainDisconnects.token,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
+      { retry: false }
+    )
+    assert.notStrictEqual(
+      await store.disconnectExhaustedSubmissionRecovery(
+        uncertainDisconnects.runId,
+        0
+      ),
+      null
+    )
+    // execution: disconnected -> uncertain when an operator hands it back. Without this the run
+    // would stay parked forever: automatic recovery only claims `uncertain`.
+    await store.resumeDisconnectedExecution(uncertainDisconnects.runId)
+
+    // execution: disconnected -> failed when an operator stops waiting. This does not claim the
+    // task never ran - the Runner may still have it - only that the outcome will not be awaited.
+    const giveUpExecution = await newPreparingRun()
+    await store.failPreparation(
+      giveUpExecution.runId,
+      giveUpExecution.token,
+      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
+      { retry: false }
+    )
+    assert.notStrictEqual(
+      await store.disconnectExhaustedSubmissionRecovery(
+        giveUpExecution.runId,
+        0
+      ),
+      null
+    )
+    await store.giveUpDisconnectedRun(
+      giveUpExecution.runId,
+      'operator stopped waiting'
     )
 
     // execution: uncertain -> failed when the replay concludes the submission was not accepted.
@@ -330,6 +387,117 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
 
+    // publication: publishing -> uncertain when a step runs out of attempts, because the last
+    // attempt may have taken effect remotely and only a reconciliation can say. The axis follows
+    // its step, which is what puts the run in the operator's view without freezing the rest.
+    const publishUncertain = await newPublishingRun()
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await store.requirePublicationStepClaim(
+        publishUncertain.runId,
+        publishUncertain.token,
+        'issue:summary-comment'
+      )
+      await store.failPublicationStep(
+        publishUncertain.runId,
+        publishUncertain.token,
+        'issue:summary-comment',
+        { message: 'response lost' },
+        { retry: true }
+      )
+    }
+    await assert.rejects(
+      store.requirePublicationStepClaim(
+        publishUncertain.runId,
+        publishUncertain.token,
+        'issue:summary-comment'
+      )
+    )
+
+    // publication: publishing -> disconnected when a reconciliation itself runs out of budget
+    // without an answer. The step is what becomes disconnected; the axis follows it.
+    const publishDisconnected = await newPublishingRun()
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await store.requirePublicationStepClaim(
+        publishDisconnected.runId,
+        publishDisconnected.token,
+        'issue:summary-comment'
+      )
+      await store.failPublicationStep(
+        publishDisconnected.runId,
+        publishDisconnected.token,
+        'issue:summary-comment',
+        { message: 'response lost' },
+        { retry: true }
+      )
+    }
+    await assert.rejects(
+      store.requirePublicationStepClaim(
+        publishDisconnected.runId,
+        publishDisconnected.token,
+        'issue:summary-comment'
+      )
+    )
+    // The step is now `uncertain`, waiting on a reconciliation. Three reconciliation rounds that
+    // cannot reach the remote system spend its own budget, after which it stops answering for
+    // itself and asks a person to look.
+    assert.strictEqual(
+      (await store.getRun(publishDisconnected.runId))?.publication.status,
+      'uncertain',
+      'an exhausted step makes the axis uncertain before its reconciliation runs'
+    )
+    for (let round = 0; round < 3; round += 1) {
+      await store.failPublicationStep(
+        publishDisconnected.runId,
+        publishDisconnected.token,
+        'issue:summary-comment',
+        { code: 'RECONCILIATION_UNREACHABLE', message: 'could not look' },
+        { retry: true }
+      )
+    }
+    assert.strictEqual(
+      (await store.getRun(publishDisconnected.runId))?.publication.status,
+      'disconnected',
+      'the axis has to follow its step into disconnected'
+    )
+
+    // publication: uncertain -> publishing when the reconciliation settles the step. The axis
+    // returns to publishing because the publisher still owns the claim and continues with the
+    // remaining steps. A separate run drives it: the one above already went on to `disconnected`,
+    // and this edge is about a single step that resolves.
+    const publishSettled = await newPublishingRun()
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await store.requirePublicationStepClaim(
+        publishSettled.runId,
+        publishSettled.token,
+        'issue:summary-comment'
+      )
+      await store.failPublicationStep(
+        publishSettled.runId,
+        publishSettled.token,
+        'issue:summary-comment',
+        { message: 'response lost' },
+        { retry: true }
+      )
+    }
+    await assert.rejects(
+      store.requirePublicationStepClaim(
+        publishSettled.runId,
+        publishSettled.token,
+        'issue:summary-comment'
+      )
+    )
+    await store.settleExhaustedPublicationStep(
+      publishSettled.runId,
+      publishSettled.token,
+      'issue:summary-comment',
+      { found: true, remote: { id: '9', url: 'https://example.test/c/9' } }
+    )
+    assert.strictEqual(
+      (await store.getRun(publishSettled.runId))?.publication.status,
+      'publishing',
+      'a settled step hands the axis back to its publisher'
+    )
+
     // publication: publishing -> pending on a retryable failure.
     const publishRetried = await newPublishingRun()
     await store.failPublication(
@@ -376,6 +544,164 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       (await store.expireStalePreparations()).blocked.length,
       1
     )
+
+    // preparation: disconnected -> uncertain when an operator hands the row back to automatic
+    // recovery. A second run is arranged for it so the abandonment below still starts from a
+    // disconnected row and keeps producing disconnected -> failed.
+    const resumed = await newPreparingRun()
+    await pool.query(
+      `UPDATE preparations SET attempt_count=8,
+         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [resumed.runId]
+    )
+    await pool.query(
+      `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+         finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
+      [resumed.runId]
+    )
+    assert.strictEqual(
+      (await store.expireStalePreparations()).blocked.length,
+      1
+    )
+    await store.resumeDisconnectedPreparation(resumed.runId)
+
+    // preparation: disconnected -> failed when an operator gives up on it, which is the plain
+    // case (an expired lease that ran out its budget) rather than a contradicted run.
+    const givenUpPreparation = await newPreparingRun()
+    await pool.query(
+      `UPDATE preparations SET attempt_count=8,
+         claimed_at=clock_timestamp()-interval '1 hour' WHERE run_id=$1`,
+      [givenUpPreparation.runId]
+    )
+    // Execution stays `pending`: a preparation only expires (and so can only disconnect) while
+    // its execution has not advanced. The expiry itself is not what this records - the operator's
+    // decision on the resulting row is - so the row is put in that state directly.
+    await pool.query(
+      `UPDATE preparations SET status='disconnected',
+         disconnect_reason='EXECUTION_ALREADY_ADVANCED', claim_token=NULL, claimed_at=NULL,
+         started_at=COALESCE(started_at, clock_timestamp()),
+         finished_at=NULL WHERE run_id=$1`,
+      [givenUpPreparation.runId]
+    )
+    await store.giveUpDisconnectedRun(
+      givenUpPreparation.runId,
+      'operator stopped waiting'
+    )
+
+    // publication: disconnected -> failed when an operator stops publishing. The step may
+    // already have taken effect remotely, so the axis fails instead of being skipped.
+    const givenUpPublication = await newPreparingRun()
+    await pool.query(
+      `UPDATE preparations SET status='submitted', claim_token=NULL, claimed_at=NULL,
+         finished_at=clock_timestamp() WHERE run_id=$1`,
+      [givenUpPublication.runId]
+    )
+    await pool.query(
+      `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+         finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
+      [givenUpPublication.runId]
+    )
+    const publicationToken = await store.claimPublication(
+      givenUpPublication.runId
+    )
+    await store.initializePublicationSteps(
+      givenUpPublication.runId,
+      publicationToken as string,
+      ['issue:summary-comment']
+    )
+    await store.requirePublicationStepClaim(
+      givenUpPublication.runId,
+      publicationToken as string,
+      'issue:summary-comment'
+    )
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await store.failPublicationStep(
+        givenUpPublication.runId,
+        publicationToken as string,
+        'issue:summary-comment',
+        { code: 'GITHUB_TIMEOUT', message: 'no answer' },
+        { retry: true }
+      )
+      const status = (
+        (await store.listPublicationSteps(givenUpPublication.runId))[0] as {
+          status: string
+        }
+      ).status
+      if (status === 'disconnected') break
+      await store
+        .requirePublicationStepClaim(
+          givenUpPublication.runId,
+          publicationToken as string,
+          'issue:summary-comment'
+        )
+        .catch(() => undefined)
+    }
+    await store.giveUpDisconnectedRun(
+      givenUpPublication.runId,
+      'operator stopped publishing'
+    )
+
+    // publication: disconnected -> uncertain when an operator hands a parked publication back.
+    // The steps return to `uncertain` with a fresh reconciliation budget, so the axis follows
+    // them; the attempt budget stays spent, which is what keeps the side effect from running
+    // again.
+    const resumedPublication = await newPreparingRun()
+    await pool.query(
+      `UPDATE preparations SET status='submitted', claim_token=NULL, claimed_at=NULL,
+         finished_at=clock_timestamp() WHERE run_id=$1`,
+      [resumedPublication.runId]
+    )
+    await pool.query(
+      `UPDATE executions SET status='succeeded', started_at=clock_timestamp(),
+         finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
+      [resumedPublication.runId]
+    )
+    const parkedToken = await store.claimPublication(resumedPublication.runId)
+    await store.initializePublicationSteps(
+      resumedPublication.runId,
+      parkedToken as string,
+      ['issue:summary-comment']
+    )
+    // `initializePublicationSteps` claims the first attempt, so each round reports an unanswered
+    // call and then claims the next attempt. The step becomes `uncertain` once its attempts are
+    // spent, and a later reconciliation failure is what parks it.
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await store.failPublicationStep(
+        resumedPublication.runId,
+        parkedToken as string,
+        'issue:summary-comment',
+        { code: 'GITHUB_TIMEOUT', message: 'no answer' },
+        { retry: true }
+      )
+      if (
+        (await store.getRun(resumedPublication.runId))?.publication.status ===
+        'disconnected'
+      )
+        break
+      await store
+        .requirePublicationStepClaim(
+          resumedPublication.runId,
+          parkedToken as string,
+          'issue:summary-comment'
+        )
+        .catch(() => undefined)
+    }
+    assert.strictEqual(
+      (await store.getRun(resumedPublication.runId))?.publication.status,
+      'disconnected',
+      'the resume below has to start from a parked publication'
+    )
+    await store.resumeDisconnectedRun(resumedPublication.runId)
+    assert.strictEqual(
+      (await store.getRun(resumedPublication.runId))?.publication.status,
+      'uncertain'
+    )
+    assert.strictEqual(
+      (await store.getRun(blocked.runId))?.preparation?.status,
+      'disconnected',
+      'the abandonment below has to start from a disconnected row'
+    )
+
     await store.abandonBlockedPreparation(blocked.runId, 'operator decision')
 
     const recorded: RecordedEdge[] = []
@@ -431,16 +757,21 @@ test('every declared edge is reachable by a write path', async () => {
   }
 })
 
-/** The fixed reason a declared edge promises, keyed by `axis from->to`, or null when the edge
- * deliberately accepts any reason (a connector-supplied error code). */
-function declaredReasons(): Map<string, string | null> {
-  const reasons = new Map<string, string | null>()
+/** The reasons each declared edge promises, keyed by `axis from->to`.
+ *
+ * One pair of states can be written by more than one decision: a disconnected preparation is
+ * abandoned when it contradicts execution, and given up on when an operator simply stops
+ * waiting. Both are `disconnected -> failed`, and both carry a reason naming which decision
+ * happened, so the contract declares them as separate edges and this collects the whole set.
+ * A `null` entry means the edge deliberately accepts any reason (a connector-supplied code). */
+function declaredReasons(): Map<string, Array<string | null>> {
+  const reasons = new Map<string, Array<string | null>>()
   for (const machine of STATE_MACHINES) {
     for (const edge of machine.transitions) {
-      reasons.set(
-        `${machine.axis} ${edge.from}->${edge.to}`,
-        edge.reason ?? null
-      )
+      const key = `${machine.axis} ${edge.from}->${edge.to}`
+      const existing = reasons.get(key) ?? []
+      existing.push(edge.reason ?? null)
+      reasons.set(key, existing)
     }
   }
   return reasons
@@ -455,13 +786,13 @@ test('a reason the audit log writes is the reason the contract declares', async 
   const declared = declaredReasons()
   for (const { axis, edge, reason } of recorded) {
     const key = `${axis} ${edge}`
-    assert.ok(declared.has(key), `${key} is not declared`)
     const expected = declared.get(key)
-    if (expected === null || expected === undefined) continue
-    assert.strictEqual(
-      reason,
-      expected,
-      `${key} was recorded with ${String(reason)} but the contract declares ${expected}`
+    assert.ok(expected !== undefined, `${key} is not declared`)
+    // An edge that accepts any reason makes the whole pair open.
+    if (expected.some((value) => value === null)) continue
+    assert.ok(
+      expected.includes(reason),
+      `${key} was recorded with ${String(reason)} but the contract declares ${expected.join(' or ')}`
     )
   }
 })

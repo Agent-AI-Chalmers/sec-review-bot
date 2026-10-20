@@ -10,7 +10,13 @@ import { type ArtifactStorage, type Run } from './api.js'
 import { useMessages } from './i18n.js'
 
 export type PublicationStepStatus =
-  'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
+  | 'pending'
+  | 'running'
+  | 'uncertain'
+  | 'disconnected'
+  | 'succeeded'
+  | 'failed'
+  | 'terminal_failed'
 
 type StatusTone = 'waiting' | 'active' | 'complete' | 'failed' | 'neutral'
 
@@ -40,6 +46,7 @@ export function executionTone(status: Run['execution']['status']): StatusTone {
   if (status === 'running') return 'active'
   // uncertain means a recovery is resolving a submission whose result is unknown.
   if (status === 'uncertain') return 'waiting'
+  if (status === 'disconnected') return 'neutral'
   if (status === 'succeeded') return 'complete'
   if (status === 'failed') return 'failed'
   // skipped means execution never ran (preparation failed); it is neutral, not a failure of
@@ -50,6 +57,10 @@ export function executionTone(status: Run['execution']['status']): StatusTone {
 
 export function preparationTone(preparation: Run['preparation']): StatusTone {
   if (preparation.status === 'preparing') return 'active'
+  // The outcome is not known yet, but automation is still working on it.
+  if (preparation.status === 'uncertain') return 'waiting'
+  // Nothing will happen until a person acts, so it must not look busy or finished.
+  if (preparation.status === 'disconnected') return 'neutral'
   if (preparation.status === 'submitted') return 'complete'
   if (preparation.status === 'failed') return 'failed'
   return 'waiting'
@@ -59,6 +70,8 @@ export function publicationTone(
   status: Run['publication']['status']
 ): StatusTone {
   if (status === 'publishing') return 'active'
+  if (status === 'uncertain') return 'waiting'
+  if (status === 'disconnected') return 'neutral'
   if (status === 'published') return 'complete'
   if (status === 'failed') return 'failed'
   if (status === 'pending') return 'waiting'
@@ -122,6 +135,8 @@ export function publicationStatusLabel(
   if (status === 'pending') return t('statusPending')
   if (status === 'running') return t('statusInProgress')
   if (status === 'succeeded') return t('publicationStepSucceeded')
+  if (status === 'uncertain') return t('statusUncertain')
+  if (status === 'disconnected') return t('statusDisconnected')
   if (status === 'failed') return t('retryPending')
   if (status === 'terminal_failed') return t('statusFailed')
   return status
@@ -130,6 +145,8 @@ export function publicationStatusLabel(
 export function publicationStatusColor(status: PublicationStepStatus): string {
   if (status === 'terminal_failed') return 'red'
   if (status === 'failed') return 'yellow'
+  if (status === 'uncertain') return 'yellow'
+  if (status === 'disconnected') return 'gray'
   if (status === 'running') return 'blue'
   if (status === 'pending') return 'gray'
   if (status === 'succeeded') return 'green'
@@ -146,6 +163,7 @@ export function executionStatusLabel(
   if (status === 'succeeded') return t('statusSucceeded')
   if (status === 'skipped') return t('statusSkipped')
   if (status === 'uncertain') return t('statusUncertain')
+  if (status === 'disconnected') return t('statusDisconnected')
   return t('statusFailed')
 }
 
@@ -167,6 +185,7 @@ export const EXECUTION_STATUSES = [
   'queued',
   'running',
   'uncertain',
+  'disconnected',
   'succeeded',
   'skipped',
   'failed'
@@ -178,20 +197,21 @@ export function preparationStateLabel(
 ): string {
   if (status === 'pending') return t('statusPending')
   if (status === 'preparing') return t('statusPreparing')
+  if (status === 'uncertain') return t('statusUncertain')
+  if (status === 'disconnected') return t('statusDisconnected')
   if (status === 'submitted') return t('statusSubmitted')
   return t('statusFailed')
 }
 
 /** Human label for a coordination axis.
  *
- * An unrecognised axis renders as its raw value rather than as some other axis' label. The
- * previous fallback returned "Failure notice" for anything it did not match, so an axis the
- * console did not know about - including a stored event written before the axis was renamed -
- * was silently presented as a notice. Showing the value makes the mismatch visible instead of
- * inventing a plausible-looking history.
+ * An unrecognised axis renders as its raw value rather than as some other axis' label, so a
+ * mismatch is visible instead of being presented as a plausible-looking history.
  */
+export type CoordinationAxis = 'execution' | 'preparation' | 'publication'
+
 export function axisLabel(
-  axis: 'execution' | 'preparation' | 'publication' | 'notice',
+  axis: CoordinationAxis,
   t: ReturnType<typeof useMessages>
 ): string {
   switch (axis) {
@@ -201,8 +221,6 @@ export function axisLabel(
       return t('axisPreparation')
     case 'publication':
       return t('axisPublication')
-    case 'notice':
-      return t('axisNotice')
     default:
       return String(axis)
   }
@@ -212,6 +230,7 @@ export function preparationStatusLabel(
   preparation: Run['preparation'],
   t: ReturnType<typeof useMessages>
 ): string {
+  // `disconnected` is a state of its own now, so the stalled case needs no derived wording here.
   return preparationStateLabel(preparation.status, t)
 }
 
@@ -221,6 +240,11 @@ export function runPublicationStatusLabel(
 ): string {
   if (status === 'pending') return t('statusPending')
   if (status === 'publishing') return t('statusPublishing')
+  // Mid-phase states: the publication started and is waiting on a step's outcome. Falling
+  // through to "Skipped" (as the catch-all below used to) said nothing was published, which is
+  // the opposite of what these states mean and contradicted the succeeded steps on the page.
+  if (status === 'uncertain') return t('statusUncertain')
+  if (status === 'disconnected') return t('statusDisconnected')
   if (status === 'published') return t('statusPublished')
   if (status === 'failed') return t('statusFailed')
   return t('statusSkipped')

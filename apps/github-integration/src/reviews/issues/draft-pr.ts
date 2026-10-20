@@ -19,7 +19,7 @@ interface IssueContext {
   repo_name: string
 }
 
-function buildDraftBranchName(
+export function buildDraftBranchName(
   issue: IssueContext,
   run_id: string | undefined
 ): string {

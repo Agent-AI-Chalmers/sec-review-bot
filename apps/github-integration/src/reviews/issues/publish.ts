@@ -2,10 +2,16 @@ import {
   CONTRACT_VERSION,
   type ContractVersion
 } from '../../runner/contract-version.js'
-import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
+import {
+  createIssueCommentUnlessMarkerExists,
+  findIssueCommentByMarker
+} from '../../github/comment-service.js'
 import type { PersistedIssue } from '../../control-plane/publish-context.js'
 import type { Octokit } from 'octokit'
-import { createDraftPullRequestFromIssueReviewRecord } from './draft-pr.js'
+import {
+  buildDraftBranchName,
+  createDraftPullRequestFromIssueReviewRecord
+} from './draft-pr.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
 import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 import { parseIssueReviewPublishContext } from '../../control-plane/publish-context.js'
@@ -15,6 +21,11 @@ import {
 } from './renderer.js'
 import { logInfo } from '../../utils/logger.js'
 import { asErrorMessage } from '../../utils/error-utils.js'
+import {
+  findOpenPullRequestByHeadBranch,
+  isPublicationStepExhausted,
+  settleExhaustedStep
+} from '../shared/settle-exhausted-step.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { assertWorkflowResult } from '../../runner/contract-schema.js'
 import type { PublicationStepStore } from '../../control-plane/client.js'
@@ -138,6 +149,8 @@ async function publishIssueReviewResult({
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {
   let draftPullRequest: IssueDraftPullRequest | null = null
+  // Set when reconciliation concluded this step from the remote system instead of creating it.
+  let stepSettledExternally = false
   const github = octokit
 
   const review_record = workflow_result.review_record
@@ -190,50 +203,97 @@ async function publishIssueReviewResult({
           previous_attempts: step.attempt_count
         })
       }
-      await store.requirePublicationStepClaim(
-        run_id,
-        claim_token,
-        'issue:draft-pr'
-      )
       try {
-        // A lease is permission to start a side effect, not merely permission
-        // to record it afterward. If ownership cannot be proved, fail closed.
-        await assert_publication_claim()
-        draftPullRequest = (await createDraftPullRequestFromIssueReviewRecord({
-          octokit: github,
-          issue,
+        await store.requirePublicationStepClaim(
           run_id,
-          workspace_ref,
-          review_record,
-          assert_publication_claim
-        })) as IssueDraftPullRequest | null
-        const remote =
-          draftPullRequest === null
-            ? {}
-            : { id: draftPullRequest.number, url: draftPullRequest.html_url }
-        if (
-          !(await store.completePublicationStep(
+          claim_token,
+          'issue:draft-pr'
+        )
+      } catch (error) {
+        // No attempts left. The publisher that started this step may already have created the
+        // draft PR; concluding it as failed without looking would report an existing PR as
+        // missing. The head branch is run-specific, so an open PR from it is this step's effect.
+        if (!isPublicationStepExhausted(error)) throw error
+        const branch = buildDraftBranchName(issue, run_id)
+        const settled = await settleExhaustedStep({
+          store,
+          runId: run_id,
+          token: claim_token,
+          stepKey: 'issue:draft-pr',
+          find: async () => {
+            const existing = await findOpenPullRequestByHeadBranch(github, {
+              owner_login: issue.owner_login,
+              repo_name: issue.repo_name,
+              branch_name: branch
+            })
+            return existing === null
+              ? null
+              : { id: existing.number, url: existing.html_url }
+          }
+        })
+        // Only a recorded success lets this caller continue. A confirmed absence is already a
+        // conclusion on the step, and a refusal means another owner owns it; neither leaves
+        // anything for this caller to do but report the exhaustion it was given.
+        if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
+          throw error
+        stepSettledExternally = true
+        draftPullRequest = {
+          number: Number(settled.remote.id),
+          html_url: settled.remote.url ?? ''
+        } as IssueDraftPullRequest
+        logInfo('draft_pr_creation_reconciled', {
+          event_type,
+          issue: issue.issue_number,
+          repo: issue.repo_full_name,
+          draft_pr_number: draftPullRequest.number
+        })
+      }
+      // The step is already settled when the reconciliation above found what a previous owner
+      // created: it must not create anything again. `draftPullRequest` alone cannot say this,
+      // because `null` is also the legitimate outcome of a creation that needed no PR.
+      if (!stepSettledExternally) {
+        try {
+          // A lease is permission to start a side effect, not merely permission
+          // to record it afterward. If ownership cannot be proved, fail closed.
+          await assert_publication_claim()
+          draftPullRequest = (await createDraftPullRequestFromIssueReviewRecord(
+            {
+              octokit: github,
+              issue,
+              run_id,
+              workspace_ref,
+              review_record,
+              assert_publication_claim
+            }
+          )) as IssueDraftPullRequest | null
+          const remote =
+            draftPullRequest === null
+              ? {}
+              : { id: draftPullRequest.number, url: draftPullRequest.html_url }
+          if (
+            !(await store.completePublicationStep(
+              run_id,
+              claim_token,
+              'issue:draft-pr',
+              remote
+            ))
+          )
+            throw new PublicationClaimLostError(run_id)
+        } catch (error) {
+          if (isPublicationClaimLostError(error)) throw error
+          const failure = classifyPublicationFailure(error)
+          await store.failPublicationStep(
             run_id,
             claim_token,
             'issue:draft-pr',
-            remote
-          ))
-        )
-          throw new PublicationClaimLostError(run_id)
-      } catch (error) {
-        if (isPublicationClaimLostError(error)) throw error
-        const failure = classifyPublicationFailure(error)
-        await store.failPublicationStep(
-          run_id,
-          claim_token,
-          'issue:draft-pr',
-          {
-            code: failure.code,
-            message: asErrorMessage(error)
-          },
-          { retry: failure.retry }
-        )
-        throw error
+            {
+              code: failure.code,
+              message: asErrorMessage(error)
+            },
+            { retry: failure.retry }
+          )
+          throw error
+        }
       }
     }
     if (draftPullRequest) {
@@ -267,11 +327,36 @@ async function publishIssueReviewResult({
     (item) => item.step_key === 'issue:summary-comment'
   )
   if (commentStep?.status === 'succeeded') return
-  await store.requirePublicationStepClaim(
-    run_id,
-    claim_token,
-    'issue:summary-comment'
-  )
+  try {
+    await store.requirePublicationStepClaim(
+      run_id,
+      claim_token,
+      'issue:summary-comment'
+    )
+  } catch (error) {
+    // Exhaustion is not a verdict: the last attempt may have posted the comment and lost its
+    // response. Look for this run's marker before letting the step be a failure.
+    if (!isPublicationStepExhausted(error)) throw error
+    const settled = await settleExhaustedStep({
+      store,
+      runId: run_id,
+      token: claim_token,
+      stepKey: 'issue:summary-comment',
+      find: async () =>
+        await findIssueCommentByMarker(github, {
+          owner_login: issue.owner_login,
+          repo_name: issue.repo_name,
+          issue_number: issue.issue_number,
+          marker
+        }).then((found) =>
+          found === null ? null : { id: found.id, url: found.html_url }
+        )
+    })
+    // The comment already existed: nothing left to publish for this step.
+    // The step is already recorded as succeeded, so there is nothing left to publish for it.
+    if (settled.outcome === 'recorded' && settled.step === 'succeeded') return
+    throw error
+  }
   let comment: IssueReviewComment
   try {
     await assert_publication_claim()

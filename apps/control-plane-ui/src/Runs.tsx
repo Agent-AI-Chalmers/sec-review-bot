@@ -16,13 +16,7 @@ import {
   Tooltip
 } from '@mantine/core'
 import { IconAlertTriangle, IconInbox } from '@tabler/icons-react'
-import {
-  api,
-  ApiError,
-  blockedPreparations,
-  type BlockedPreparationExpiry,
-  type Run
-} from './api.js'
+import { api, ApiError, parkedRuns, type ParkedRun, type Run } from './api.js'
 import { formatDate, useLanguage, useMessages } from './i18n.js'
 import { CopyAction, RefreshControls, useRefresh } from './App.js'
 import {
@@ -31,6 +25,7 @@ import {
   PREPARATION_STATUSES,
   PreparationStatus,
   PublicationStatus,
+  axisLabel,
   executionStatusLabel,
   preparationStateLabel,
   runPublicationStatusLabel
@@ -93,10 +88,10 @@ export function Runs(): React.JSX.Element {
   // Runs coordination has stopped retrying. They are not part of the run list's normal
   // pagination, and an operator needs to see them before the list, so they load separately and
   // a failure here never hides the list itself.
-  const [blocked, setBlocked] = React.useState<BlockedPreparationExpiry[]>([])
+  const [blocked, setBlocked] = React.useState<ParkedRun[]>([])
   React.useEffect(() => {
     let cancelled = false
-    blockedPreparations()
+    parkedRuns()
       .then((blocks) => {
         if (!cancelled) setBlocked(blocks)
       })
@@ -223,28 +218,35 @@ export function Runs(): React.JSX.Element {
           color="orange"
           variant="light"
           mb="md"
-          title={t('blockedPreparationsTitle')}
+          title={t('parkedRunsTitle')}
           icon={<IconAlertTriangle size={18} />}
-          data-testid="blocked-preparations"
+          data-testid="parked-runs"
           // A standing queue, not a transient fault: `role="alert"` belongs to the refresh
           // error below, and Mantine's Alert would otherwise claim that role and be the first
           // thing an alert-based assertion sees.
           role="status"
         >
           <Text size="sm" mb="xs">
-            {t('blockedPreparationsBody')}
+            {t('parkedRunsBody')}
           </Text>
           <Stack gap={4}>
             {blocked.map((block) => (
               <Text
                 key={block.run_id}
                 size="sm"
-                ff="monospace"
                 component={Link}
                 to={`/runs/${encodeURIComponent(block.run_id)}`}
                 c="orange.9"
               >
-                {block.run_id}
+                {/* The axis is shown because the decision differs by axis, and the run id alone
+                    leaves the operator guessing which one stopped. */}
+                <Text span size="xs" c="dimmed">
+                  {axisLabel(block.axis, t)}
+                  {' · '}
+                </Text>
+                <Text span ff="monospace" size="sm">
+                  {block.run_id}
+                </Text>
               </Text>
             ))}
           </Stack>

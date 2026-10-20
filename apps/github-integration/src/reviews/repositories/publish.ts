@@ -1,4 +1,7 @@
-import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
+import {
+  createIssueCommentUnlessMarkerExists,
+  findIssueCommentByMarker
+} from '../../github/comment-service.js'
 import { findRepositorySecuritySummaryIssue } from '../../github/repository-service.js'
 import type { Octokit } from 'octokit'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
@@ -10,7 +13,10 @@ import {
 } from '../../control-plane/publication-claim.js'
 import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 import { parseRepositoryReviewPublishContext } from '../../control-plane/publish-context.js'
-import { createRepositoryDeliveryDraftPr } from './delivery-draft-pr.js'
+import {
+  buildRepositoryDeliveryBranchName,
+  createRepositoryDeliveryDraftPr
+} from './delivery-draft-pr.js'
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
 import {
   buildRepositorySummaryWorkflowView,
@@ -20,6 +26,11 @@ import {
 } from './renderer.js'
 import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorMessage } from '../../utils/error-utils.js'
+import {
+  findOpenPullRequestByHeadBranch,
+  isPublicationStepExhausted,
+  settleExhaustedStep
+} from '../shared/settle-exhausted-step.js'
 import {
   parseRepositoryWorkflowResult,
   type RepositoryCaseResult,
@@ -201,44 +212,31 @@ export async function publishDeliveryDraftPrs({
       // A deterministic rejection is already final for this delivery. Later
       // publication retries still need to reach the summary and other deliveries.
       if (persisted?.status === 'terminal_failed') continue
-      let draftPullRequest: DraftPullRequestSummary
-      if (
+      const draftPullRequest: DraftPullRequestSummary =
         persisted?.status === 'succeeded' &&
         persisted.remote_object_id &&
         persisted.remote_object_url
-      ) {
-        draftPullRequest = {
-          title: String(buildDeliveryDraftPrTitle(delivery)),
-          html_url: persisted.remote_object_url,
-          number: Number(persisted.remote_object_id),
-          reused: true
-        }
-      } else {
-        await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
-        await assert_publication_claim()
-        draftPullRequest = (await create_delivery_draft_pr({
-          octokit,
-          repo,
-          run_id,
-          input: {
-            workspace_ref: resolvedWorkspaceRef,
-            ...(scan_target?.target_branch
-              ? { scan_target: { target_branch: scan_target.target_branch } }
-              : {})
-          },
-          delivery,
-          case_results,
-          assert_publication_claim
-        })) as DraftPullRequestSummary
-        if (
-          !(await store.completePublicationStep(run_id, claim_token, stepKey, {
-            id: draftPullRequest.number,
-            url: draftPullRequest.html_url
-          }))
-        ) {
-          throw new PublicationClaimLostError(run_id)
-        }
-      }
+          ? {
+              title: String(buildDeliveryDraftPrTitle(delivery)),
+              html_url: persisted.remote_object_url,
+              number: Number(persisted.remote_object_id),
+              reused: true
+            }
+          : await publishOrReconcileDeliveryDraftPr({
+              octokit,
+              store,
+              create_delivery_draft_pr,
+              run_id,
+              claim_token,
+              stepKey,
+              repo,
+              delivery,
+              case_results,
+              resolvedWorkspaceRef,
+              scan_target,
+              event_type,
+              assert_publication_claim
+            })
       published_delivery_entries.push({
         delivery_id: String(delivery.delivery_id ?? ''),
         case_count: deliveryCvss.case_count,
@@ -318,6 +316,187 @@ export async function ensureSummaryIssueNumber(
   return created.data.number
 }
 
+/** Claim the summary issue step, or conclude it from the issue a previous owner already created.
+ *
+ * The summary issue is identified by its fixed title, so an existing one answers whether this
+ * step's side effect happened — including when the publisher that created it died before
+ * recording it, or when no attempt is left to record it. */
+async function claimOrReconcileSummaryIssue({
+  octokit,
+  store,
+  run_id,
+  claim_token,
+  repo,
+  event_type,
+  assert_publication_claim
+}: {
+  octokit: Octokit
+  store: PublicationStepStore
+  run_id: string
+  claim_token: string
+  repo: RepositoryContext
+  event_type: string
+  assert_publication_claim: () => Promise<void>
+}): Promise<number> {
+  const stepKey = 'repository:summary-issue'
+  try {
+    await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
+  } catch (error) {
+    if (!isPublicationStepExhausted(error)) throw error
+    const settled = await settleExhaustedStep({
+      store,
+      runId: run_id,
+      token: claim_token,
+      stepKey,
+      find: async () => {
+        const existing = await findRepositorySecuritySummaryIssue(octokit, {
+          owner_login: repo.owner_login,
+          repo_name: repo.repo_name,
+          title: REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE
+        })
+        return existing === null ? null : { id: existing.number }
+      }
+    })
+    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
+      throw error
+    const issueNumber = Number(settled.remote.id)
+    logInfo('repository_summary_issue_reconciled', {
+      event_type,
+      repo: repo.repo_full_name,
+      issue_number: issueNumber
+    })
+    return issueNumber
+  }
+
+  try {
+    await assert_publication_claim()
+    const summaryIssueNumber = await ensureSummaryIssueNumber(
+      octokit,
+      repo,
+      assert_publication_claim
+    )
+    if (
+      !(await store.completePublicationStep(run_id, claim_token, stepKey, {
+        id: summaryIssueNumber
+      }))
+    )
+      throw new PublicationClaimLostError(run_id)
+    return summaryIssueNumber
+  } catch (error) {
+    if (isPublicationClaimLostError(error)) throw error
+    const failure = classifyPublicationFailure(error)
+    await store.failPublicationStep(
+      run_id,
+      claim_token,
+      stepKey,
+      {
+        code: failure.code,
+        message: asErrorMessage(error)
+      },
+      { retry: failure.retry }
+    )
+    throw error
+  }
+}
+
+/** Create a delivery's draft PR, or conclude the step from one a previous owner already opened.
+ *
+ * A delivery step that runs out of attempts may still have its draft PR on GitHub: the publisher
+ * that opened it can die before recording it. The head branch embeds the run and delivery ids, so
+ * an open PR from it is unambiguously this step's side effect. Reconciliation only reports what
+ * it found; the step is concluded through `settleExhaustedPublicationStep`, which is also what
+ * makes a confirmed absence a terminal failure. */
+async function publishOrReconcileDeliveryDraftPr({
+  octokit,
+  store,
+  create_delivery_draft_pr,
+  run_id,
+  claim_token,
+  stepKey,
+  repo,
+  delivery,
+  case_results,
+  resolvedWorkspaceRef,
+  scan_target,
+  event_type,
+  assert_publication_claim
+}: {
+  octokit: Octokit
+  store: PublicationStepStore
+  create_delivery_draft_pr: typeof createRepositoryDeliveryDraftPr
+  run_id: string
+  claim_token: string
+  stepKey: string
+  repo: RepositoryContext
+  delivery: RepositoryDelivery
+  case_results: RepositoryCaseResult[]
+  resolvedWorkspaceRef: string
+  scan_target: { target_branch?: string } | undefined
+  event_type: string
+  assert_publication_claim: () => Promise<void>
+}): Promise<DraftPullRequestSummary> {
+  try {
+    await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
+  } catch (error) {
+    if (!isPublicationStepExhausted(error)) throw error
+    const settled = await settleExhaustedStep({
+      store,
+      runId: run_id,
+      token: claim_token,
+      stepKey,
+      find: async () => {
+        const existing = await findOpenPullRequestByHeadBranch(octokit, {
+          owner_login: repo.owner_login,
+          repo_name: repo.repo_name,
+          branch_name: buildRepositoryDeliveryBranchName(run_id, delivery)
+        })
+        return existing === null
+          ? null
+          : { id: existing.number, url: existing.html_url }
+      }
+    })
+    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
+      throw error
+    logInfo('delivery_draft_pr_reconciled', {
+      delivery_id: delivery.delivery_id,
+      draft_pr_number: Number(settled.remote.id),
+      event_type,
+      repo: repo.repo_full_name
+    })
+    return {
+      title: String(buildDeliveryDraftPrTitle(delivery)),
+      html_url: settled.remote.url ?? '',
+      number: Number(settled.remote.id),
+      reused: true
+    }
+  }
+
+  await assert_publication_claim()
+  const draftPullRequest = (await create_delivery_draft_pr({
+    octokit,
+    repo,
+    run_id,
+    input: {
+      workspace_ref: resolvedWorkspaceRef,
+      ...(scan_target?.target_branch
+        ? { scan_target: { target_branch: scan_target.target_branch } }
+        : {})
+    },
+    delivery,
+    case_results,
+    assert_publication_claim
+  })) as DraftPullRequestSummary
+  if (
+    !(await store.completePublicationStep(run_id, claim_token, stepKey, {
+      id: draftPullRequest.number,
+      url: draftPullRequest.html_url
+    }))
+  ) {
+    throw new PublicationClaimLostError(run_id)
+  }
+  return draftPullRequest
+}
+
 async function publishRepositoryReviewResult({
   octokit,
   repo,
@@ -368,52 +547,19 @@ async function publishRepositoryReviewResult({
   const summaryIssueStep = steps.find(
     (step) => step.step_key === 'repository:summary-issue'
   )
-  let summaryIssueNumber: number
-  if (
+  const summaryIssueNumber =
     summaryIssueStep?.status === 'succeeded' &&
     summaryIssueStep.remote_object_id
-  ) {
-    summaryIssueNumber = Number(summaryIssueStep.remote_object_id)
-  } else {
-    await store.requirePublicationStepClaim(
-      run_id,
-      claim_token,
-      'repository:summary-issue'
-    )
-    try {
-      await assert_publication_claim()
-      summaryIssueNumber = await ensureSummaryIssueNumber(
-        github,
-        repo,
-        assert_publication_claim
-      )
-      if (
-        !(await store.completePublicationStep(
+      ? Number(summaryIssueStep.remote_object_id)
+      : await claimOrReconcileSummaryIssue({
+          octokit: github,
+          store,
           run_id,
           claim_token,
-          'repository:summary-issue',
-          {
-            id: summaryIssueNumber
-          }
-        ))
-      )
-        throw new PublicationClaimLostError(run_id)
-    } catch (error) {
-      if (isPublicationClaimLostError(error)) throw error
-      const failure = classifyPublicationFailure(error)
-      await store.failPublicationStep(
-        run_id,
-        claim_token,
-        'repository:summary-issue',
-        {
-          code: failure.code,
-          message: asErrorMessage(error)
-        },
-        { retry: failure.retry }
-      )
-      throw error
-    }
-  }
+          repo,
+          event_type,
+          assert_publication_claim
+        })
   const marker = repositorySummaryRunMarker(run_id)
   const commentBody = [
     marker,
@@ -431,11 +577,36 @@ async function publishRepositoryReviewResult({
     (step) => step.step_key === 'repository:summary-comment'
   )
   if (summaryCommentStep?.status === 'succeeded') return
-  await store.requirePublicationStepClaim(
-    run_id,
-    claim_token,
-    'repository:summary-comment'
-  )
+  try {
+    await store.requirePublicationStepClaim(
+      run_id,
+      claim_token,
+      'repository:summary-comment'
+    )
+  } catch (error) {
+    // No attempts left. The summary comment may already be posted under this run's marker, in
+    // which case the step is done and reporting a failure would contradict what is on GitHub.
+    if (!isPublicationStepExhausted(error)) throw error
+    const settled = await settleExhaustedStep({
+      store,
+      runId: run_id,
+      token: claim_token,
+      stepKey: 'repository:summary-comment',
+      find: async () => {
+        const existing = await findIssueCommentByMarker(github, {
+          owner_login: repo.owner_login,
+          repo_name: repo.repo_name,
+          issue_number: summaryIssueNumber,
+          marker
+        })
+        return existing === null
+          ? null
+          : { id: existing.id, url: existing.html_url }
+      }
+    })
+    if (settled.outcome === 'recorded' && settled.step === 'succeeded') return
+    throw error
+  }
   let comment
   try {
     await assert_publication_claim()

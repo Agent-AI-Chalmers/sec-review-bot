@@ -8,7 +8,7 @@
     "finished_at": "2026-10-10T05:00:30.000Z",
     "updated_at": "2026-10-10T05:00:30.000Z",
     "failure_code": "PREPARATION_RETRY_EXHAUSTED",
-    "expiry_blocked_reason": null
+    "disconnect_reason": null
   },
   "execution": {
     "status": "succeeded",
@@ -34,10 +34,14 @@
     }
   },
   "failure_code": "PREPARATION_RETRY_EXHAUSTED",
-  "failure_notice": {
-    "status": "delivered",
-    "failure_stage": "preparation",
-    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
-    "comment_url": "not a url"
-  }
+  "notices": [
+    {
+      "notice_id": "notice-fixture",
+      "kind": "failure",
+      "status": "delivered",
+      "axis": "preparation",
+      "reason_code": "PREPARATION_RETRY_EXHAUSTED",
+      "comment_url": "not a url"
+    }
+  ]
 }

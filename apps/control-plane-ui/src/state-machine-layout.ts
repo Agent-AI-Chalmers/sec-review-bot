@@ -9,9 +9,7 @@
 // side branches on the row below).
 import type { StateAxis } from './state-machines.generated.js'
 
-/** Which axes the console draws, in lifecycle order. The failure-notice outbox (`notice`) is a
- * real state machine and is declared in the contract, but it is not a run lifecycle axis, so the
- * figure leaves it out. This is a presentation choice and lives here rather than in the contract. */
+/** Which lifecycle axes the console draws, in lifecycle order. */
 export const DIAGRAMMED_AXES = [
   'preparation',
   'execution',
@@ -41,7 +39,8 @@ export const STATE_LAYOUT: Partial<
     succeeded: { col: 3, row: 0 },
     skipped: { col: 0, row: 1 },
     uncertain: { col: 1, row: 1 },
-    failed: { col: 2, row: 1 }
+    disconnected: { col: 2, row: 1 },
+    failed: { col: 2, row: 2 }
   },
   publication: {
     pending: { col: 0 },
@@ -58,10 +57,25 @@ export const REVERT_SIDE: Record<string, 'above' | 'below'> = {
   'publication:publishing->pending': 'above'
 }
 
+/** Which side a self-transition loops on, keyed `axis:state`. Default is chosen from the grid. */
+export const SELF_LOOP_SIDE: Record<string, 'above' | 'below'> = {
+  // Replays keep the submission unconfirmed. The lower arc reads as a retry contained within
+  // that branch, and stays clear of the normal pending -> queued path above it.
+  'execution:uncertain': 'below'
+}
+
 export function revertSide(
   axis: StateAxis,
   from: string,
   to: string
 ): 'above' | 'below' {
   return REVERT_SIDE[`${axis}:${from}->${to}`] ?? 'below'
+}
+
+export function selfLoopSide(
+  axis: StateAxis,
+  state: string,
+  defaultSide: 'above' | 'below'
+): 'above' | 'below' {
+  return SELF_LOOP_SIDE[`${axis}:${state}`] ?? defaultSide
 }

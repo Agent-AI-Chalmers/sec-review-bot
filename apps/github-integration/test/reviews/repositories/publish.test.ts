@@ -37,7 +37,6 @@ function step(
     status: 'pending',
     attempt_count: 1,
     last_attempt_at: '2026-01-01T00:00:00.000Z',
-    failure_count: 0,
     remote_object_id: null,
     remote_object_url: null,
     failure_code: null,
@@ -54,8 +53,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
       remote_object_url: 'https://example.test/pull/11'
     }),
     step('repository:delivery:delivery-b', {
-      status: 'failed',
-      failure_count: 1
+      status: 'failed'
     })
   ]
   const claimed: string[] = []
@@ -78,6 +76,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
       completed.push(stepKey)
       return true
     },
+    settleExhaustedPublicationStep: async () => true,
     failPublicationStep: async () => true
   } satisfies PublicationStepStore
 
@@ -127,6 +126,7 @@ test('repository delivery continues after a deterministic failure', async () => 
     listPublicationSteps: async () => steps,
     requirePublicationStepClaim: async () => {},
     completePublicationStep: async () => true,
+    settleExhaustedPublicationStep: async () => true,
     failPublicationStep: async (
       _runId: string,
       _token: string,
@@ -191,7 +191,6 @@ test('repository delivery recovery skips terminal failures and reaches later wor
   const steps = [
     step('repository:delivery:delivery-a', {
       status: 'terminal_failed',
-      failure_count: 1,
       failure_code: 'GITHUB_VALIDATION_REJECTED'
     }),
     step('repository:delivery:delivery-b')
@@ -208,6 +207,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
       claimed.push(stepKey)
     },
     completePublicationStep: async () => true,
+    settleExhaustedPublicationStep: async () => true,
     failPublicationStep: async () => true
   } satisfies PublicationStepStore
 
@@ -283,4 +283,74 @@ test('summary issue lookup reuses an issue when the create response is lost', as
   await assert.rejects(ensure(), /response lost/)
   assert.strictEqual(await ensure(), 17)
   assert.strictEqual(createAttempts, 1)
+})
+
+test('an exhausted delivery step is concluded from the draft PR a previous owner opened', async () => {
+  // The failure this prevents: a publisher opened the delivery's draft PR and died before
+  // recording it. The step then runs out of attempts, and concluding it as a failure would
+  // report a PR that is on GitHub as missing. The head branch embeds the run and delivery ids,
+  // so an open PR from it is this step's side effect.
+  const steps = [step('repository:delivery:delivery-a')]
+  const settles: Array<{ stepKey: string; found: unknown }> = []
+  const store = {
+    initializePublicationSteps: async () => {},
+    listPublicationSteps: async () => steps,
+    requirePublicationStepClaim: async () => {
+      throw Object.assign(new Error('no attempts left'), {
+        code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+      })
+    },
+    completePublicationStep: async () => true,
+    settleExhaustedPublicationStep: async (
+      _runId: string,
+      _token: string,
+      stepKey: string,
+      found: unknown
+    ) => {
+      settles.push({ stepKey, found })
+      return true
+    },
+    failPublicationStep: async () => true
+  } satisfies PublicationStepStore
+
+  const { octokit } = fakeGitHub(({ method, url }) => {
+    if (new URL(url).pathname.endsWith('/pulls') && method === 'GET') {
+      return githubJson([
+        { number: 77, html_url: 'https://example.test/pull/77' }
+      ])
+    }
+    return githubJson({})
+  })
+
+  const published = await publishDeliveryDraftPrs({
+    octokit,
+    repo: {
+      owner_login: 'octo',
+      repo_name: 'example',
+      repo_full_name: 'octo/example',
+      default_branch: 'main'
+    },
+    run_id: 'run-1',
+    workspace_ref: 'main',
+    deliveries: [delivery('delivery-a')],
+    case_results: [],
+    event_type: 'manual',
+    store,
+    claim_token: 'claim-1',
+    assert_publication_claim: async () => {},
+    create_delivery_draft_pr: async () => {
+      throw new Error('a settled step must not create another pull request')
+    }
+  })
+
+  assert.deepStrictEqual(settles, [
+    {
+      stepKey: 'repository:delivery:delivery-a',
+      found: { remote: { id: 77, url: 'https://example.test/pull/77' } }
+    }
+  ])
+  assert.deepStrictEqual(
+    published.map((item) => item.html_url),
+    ['https://example.test/pull/77']
+  )
 })
