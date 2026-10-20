@@ -2,6 +2,8 @@
 
 语言：[English](TRUSTED_SETUP.md) | 中文
 
+本文是 [TRUSTED_SETUP.md](TRUSTED_SETUP.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 仓库可以在**默认分支**上声明如何准备它被审查时所用的环境。本页记录这个功能**为什么**是现在这个样子：它要解决什么问题、由此引出什么信任问题、信任模型推出哪些约束，以及哪些选择与信任无关。
 
 声明的格式是一份独立契约：[contracts/setup-declaration](../../contracts/setup-declaration/README.zh.md)。
