@@ -400,19 +400,13 @@ export class PublicationStore {
       }
       // The stored set is the run's step set: it was fixed by the claim that created it, and every
       // later pass over this run - a takeover after an expired lease, an operator resume - is a
-      // repeat of the same publication, not a fresh one. Such a pass must re-derive keys that are
-      // all already stored; it may not add a step (nothing recorded that side effect, and the run
-      // would publish something no earlier attempt accounted for) and it does not have to repeat
-      // one it no longer derives (dropping it would lose a step the run already owns).
-      //
-      // Refusing a re-derivation outright is worse than either: `set_changed` is terminal, so a
-      // run would be failed by its own retry and could then be neither resumed nor given up. Only
-      // a key this run never stored is a real conflict.
-      const persisted = new Set(existing.rows.map((row) => row.step_key))
-      const added = uniqueKeys.filter((key) => !persisted.has(key))
-      if (added.length > 0) {
+      // repeat of the same publication, not a fresh one. It must derive the same set: adding a
+      // step would publish an unrecorded side effect, while omitting one would leave stored work
+      // that this publisher never attempts and can never complete.
+      const persisted = existing.rows.map((row) => row.step_key).sort()
+      if (JSON.stringify(persisted) !== JSON.stringify(uniqueKeys)) {
         throw new DeterministicControlPlaneError(
-          `Publication step set changed for run ${runId}: ${added.join(', ')} was not part of the publication.`,
+          `Publication step set changed for run ${runId}.`,
           PUBLICATION_STEP_ERROR_CODES.set_changed
         )
       }

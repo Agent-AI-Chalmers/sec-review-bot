@@ -4026,7 +4026,7 @@ test('a disconnected publication is parked until an operator resumes it', async 
   }
 })
 
-test('a takeover re-derives the step set its predecessor stored instead of failing as changed', async () => {
+test('a takeover must re-derive the exact step set its predecessor stored', async () => {
   // The publish paths recompute their step keys on every attempt and pass them to
   // initializePublicationSteps, which rejects any set that differs from the stored one with a
   // *terminal* code. A run whose publisher died while its steps were uncertain is taken over and
@@ -4059,20 +4059,19 @@ test('a takeover re-derives the step set its predecessor stored instead of faili
       'issue:summary-comment'
     ])
 
-    // And when its derivation no longer names a step the run already stored, the stored steps
-    // stay the run's steps. The set was fixed at the first claim; a later attempt cannot shrink
-    // it, or the step it drops would be lost while the run reports publishing something it no
-    // longer tracks. Rejecting the takeover instead would be worse: it is a terminal verdict
-    // reached by the run's own retry.
-    await store.initializePublicationSteps(runId, takeover as string, [
-      'issue:summary-comment'
-    ])
-    assert.deepStrictEqual(
-      (await store.listPublicationSteps(runId))
-        .map((step) => (step as { step_key: string }).step_key)
-        .sort(),
-      ['issue:draft-pr', 'issue:summary-comment'],
-      'the takeover keeps every step the run stored'
+    // Omitting an existing step is a contract change, not compatibility. Accepting it would leave
+    // stored work that this publisher never attempts and make completion impossible.
+    await assert.rejects(
+      store.initializePublicationSteps(runId, takeover as string, [
+        'issue:summary-comment'
+      ]),
+      (error: unknown) => {
+        assert.strictEqual(
+          (error as { code?: string }).code,
+          'PUBLICATION_STEP_SET_CHANGED'
+        )
+        return true
+      }
     )
   } finally {
     await pool.end()
