@@ -357,3 +357,49 @@ def test_v6_incremental_changed_file_rejects_previous_path_without_a_move(
     )
 
     assert errors, f"status {status!r} was accepted with a previous path"
+
+
+def test_v6_scan_scope_bounds_the_inlined_changed_file_list() -> None:
+    """The scan scope is inlined into the workflow input, so it needs a size boundary.
+
+    Without one, a wide window produces an arbitrarily large input that fails during transport
+    or persistence instead of during preparation.
+    """
+    limit = 5000
+    fixture = _repository_input_with_changed_files(
+        [
+            {"path": f"src/file{i}.py", "status": "modified", "previous_path": None}
+            for i in range(limit)
+        ]
+    )
+    errors = list(
+        contract_validator(_REPOSITORY_INCREMENTAL_SCHEMA).iter_errors(fixture)
+    )
+    assert errors == [], format_schema_errors(errors)
+
+    fixture["scan_scope"]["incremental_changed_files"] = [
+        {"path": f"src/file{i}.py", "status": "modified", "previous_path": None}
+        for i in range(limit + 1)
+    ]
+    errors = list(
+        contract_validator(_REPOSITORY_INCREMENTAL_SCHEMA).iter_errors(fixture)
+    )
+    assert errors, "a changed-file list past the limit was accepted"
+
+
+def test_setup_declaration_limit_matches_the_schema() -> None:
+    """The runner's byte limit has to be the schema's `maxLength`.
+
+    The declaration travels inline in the workflow input, so the schema carries the bound and
+    the runner enforces it before building the input. Two numbers that drift apart would let the
+    runner accept text the contract rejects, which surfaces as a validation failure far from the
+    cause.
+    """
+    from sec_review_agents.entrypoints.setup_declaration import (
+        MAX_SETUP_DECLARATION_BYTES,
+    )
+    from tests.contract_fixtures import contract_schema as read_schema
+
+    common = read_schema("common.schema.json")
+    setup_text = common["$defs"]["setupDeclarationText"]
+    assert setup_text["maxLength"] == MAX_SETUP_DECLARATION_BYTES

@@ -390,7 +390,9 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/nonBlankString"
-          }
+          },
+          "maxItems": 20000,
+          "$comment": "Bounded because the list is inlined into the workflow input; see scanScope.incremental_changed_files."
         }
       }
     },
@@ -475,7 +477,9 @@
                 }
               }
             ]
-          }
+          },
+          "maxItems": 5000,
+          "$comment": "Bounded because every entry is inlined into the workflow input: the whole list crosses Temporal and is persisted, so an unbounded list fails late in transport instead of here."
         }
       }
     },
@@ -596,6 +600,11 @@
         "type_changed"
       ],
       "$comment": "The scan scope's change vocabulary, independent of how a producer learns it. Git reports D/R/C/T and the compare API reports 'removed'; producers project those into these values."
+    },
+    "workflowInputBytes": {
+      "type": "integer",
+      "const": 1500000,
+      "$comment": "Hard ceiling on the UTF-8 size of a serialized workflow input, including the pull request, issue and repository shapes. Prose constraints like maxItems bound the number of entries but not their size: a path may be long, so 5000 entries can still serialize to tens of megabytes. The producer measures the finished input against this value, because the input travels through Temporal and is persisted, and both fail far from the cause when the payload is too large. 1500000 leaves headroom under Temporal's 2 MiB blob limit for the envelope."
     }
   }
 }

@@ -10,10 +10,12 @@ import {
 import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { Octokit } from 'octokit'
 import type {
+  InputBundleArtifactRef,
   PullRequestReviewInput,
   PullRequestReviewSubject
 } from '../../runner/input.js'
 import type { TestChangesPolicy } from '../../runner/input.js'
+import { MAX_PR_COMMIT_SHAS } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import {
   exportWorkspaceWindow,
@@ -21,7 +23,7 @@ import {
 } from '../../artifacts/git-workspace.js'
 import type { ReviewWindow } from './review-window.js'
 import {
-  archiveInputBundle,
+  archiveInputBundleAndPublish,
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
@@ -336,6 +338,15 @@ export async function preparePullRequestReviewInput({
     octokit,
     pr
   })
+  // Every SHA is inlined into the workflow input, and the commit list is paginated, so nothing
+  // else bounds it. Refuse here, with a message that names the limit, instead of failing later
+  // in transport. The value matches `maxItems` on `pr.commit_shas` in the v6 schema.
+  if (commit_shas.length > MAX_PR_COMMIT_SHAS) {
+    throw new Error(
+      `pull request has too many commits: ${commit_shas.length} exceeds the limit of ` +
+        `${MAX_PR_COMMIT_SHAS}`
+    )
+  }
 
   await materializeWorkspaceHistory({
     octokit,
@@ -377,21 +388,26 @@ export async function preparePullRequestReviewInput({
     history_path
   })
   const pullRequestMetadata = historyArtifacts.pr_metadata
-  const input_bundle = await archiveInputBundle({
+  // The bundle is published only after the input that references it fits, so a failure here
+  // cannot leave an unreferenced immutable bundle behind.
+  const { input } = await archiveInputBundleAndPublish<PullRequestReviewInput>({
     input_bundle_root,
     include_incremental_window: true,
-    run_id
+    run_id,
+    workflow: 'pull request review',
+    build_input: (
+      reference: InputBundleArtifactRef
+    ): PullRequestReviewInput => ({
+      contract_version: CONTRACT_VERSION,
+      review_intent: {
+        objective: 'audit',
+        ...(test_changes ? { test_changes } : {})
+      },
+      pr: pullRequestMetadata,
+      input_bundle: reference,
+      ...(setup_declaration ? { setup_declaration } : {})
+    })
   })
-  const input: PullRequestReviewInput = {
-    contract_version: CONTRACT_VERSION,
-    review_intent: {
-      objective: 'audit',
-      ...(test_changes ? { test_changes } : {})
-    },
-    pr: pullRequestMetadata,
-    input_bundle,
-    ...(setup_declaration ? { setup_declaration } : {})
-  }
 
   const input_path = path.join(
     input_bundle_root,

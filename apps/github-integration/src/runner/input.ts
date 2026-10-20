@@ -15,6 +15,15 @@ import type {
 // transport field here: a hand-maintained copy is how the producer and the schemas drifted apart
 // before the projection existed.
 
+// The limits are values, not types: a producer needs the bound before it builds the input.
+export {
+  MAX_PR_COMMIT_SHAS,
+  MAX_SETUP_DECLARATION_TEXT,
+  MAX_WORKFLOW_INPUT_BYTES,
+  MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES,
+  MAX_SCAN_TARGET_COMMIT_SHAS
+} from './integration-contract-types-generated.js'
+
 export type {
   InputBundleArtifactRef,
   IssueReviewInput,

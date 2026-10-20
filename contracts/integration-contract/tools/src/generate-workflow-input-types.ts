@@ -294,6 +294,93 @@ function renderCommonTypes(common: JsonSchema): string {
     .join('\n\n')
 }
 
+/**
+ * Collect every `maxItems` the schemas declare, as named limits.
+ *
+ * A producer that inlines a list into the workflow input needs the bound before the input is
+ * built, so it can fail with a message that names the limit. Restating the number in TypeScript
+ * would make the schema stop being the only place the boundary is defined.
+ */
+function renderLimits(): string {
+  const limits: string[] = []
+  const seen = new Set<string>()
+  const visit = (node: unknown, path: string[]): void => {
+    if (Array.isArray(node)) {
+      node.forEach((item) => visit(item, path))
+      return
+    }
+    if (typeof node !== 'object' || node === null) return
+    const record = node as Record<string, unknown>
+    for (const [key, value] of Object.entries(record)) {
+      const next = [...path, key]
+      if (LIMIT_KEYS.has(key) && typeof value === 'number') {
+        const name = limitName(path)
+        if (name !== null && !seen.has(name)) {
+          seen.add(name)
+          limits.push(`export const ${name} = ${value}`)
+        }
+        continue
+      }
+      // A `$defs` entry whose body is a single `const` states a limit directly, for bounds that
+      // no JSON Schema keyword can express (a serialized byte size, for instance).
+      if (
+        key === 'const' &&
+        typeof value === 'number' &&
+        path.length === 2 &&
+        path[0] === '$defs'
+      ) {
+        const name = limitName([path[1] as string])
+        if (name !== null && !seen.has(name)) {
+          seen.add(name)
+          limits.push(`export const ${name} = ${value}`)
+        }
+        continue
+      }
+      visit(value, next)
+    }
+  }
+  visit(readSchema(COMMON_SCHEMA), [])
+  for (const { schema } of WORKFLOW_INPUTS) {
+    visit(readSchema(schema), [])
+  }
+  return limits.join('\n')
+}
+
+/**
+ * Name a limit after the fields it applies to.
+ *
+ * `["properties", "pr", "properties", "commit_shas", "maxItems"]` becomes
+ * `MAX_PR_COMMIT_SHAS`. Structural keys (`properties`, `$defs`, `allOf`, `then`) and the
+ * `maxItems` keyword itself carry no meaning for a caller, so they are dropped. An `allOf`
+ * branch states a constraint for one mode rather than a bound a producer can check up front, so
+ * those are skipped.
+ */
+// The schema keywords whose numeric value a producer needs before it builds the input.
+const LIMIT_KEYS = new Set(['maxItems', 'maxLength'])
+
+const STRUCTURAL_KEYS = new Set([
+  'properties',
+  'items',
+  'maxItems',
+  'maxLength',
+  '$defs',
+  'allOf',
+  'anyOf',
+  'oneOf',
+  'if',
+  'then',
+  'else'
+])
+
+function limitName(path: string[]): string | null {
+  if (path.some((part) => part === 'allOf' || part === 'if' || part === 'then')) {
+    return null
+  }
+  const parts = path.filter((part) => !STRUCTURAL_KEYS.has(part))
+  if (parts.length === 0) return null
+  return `MAX_${parts.join('_').replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase()}`
+}
+
 function renderFile(): string {
   const common = readSchema(COMMON_SCHEMA)
   const inputs = WORKFLOW_INPUTS.map(({ schema, interface: name }) =>
@@ -304,6 +391,8 @@ function renderFile(): string {
     '// Regenerate with `pnpm --dir contracts/integration-contract/tools run generate`.',
     '',
     renderCommonTypes(common),
+    '',
+    renderLimits(),
     '',
     inputs.join('\n\n'),
     ''

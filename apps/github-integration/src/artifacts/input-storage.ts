@@ -64,6 +64,22 @@ async function existingObjectMatches(
   }
 }
 
+/**
+ * The reference a local bundle will have once published.
+ *
+ * The bucket and key are known before the upload, so a caller can build and size the workflow
+ * input against the URI that will actually be submitted, and refuse an oversized input before
+ * anything is written to object storage.
+ */
+export function publishedInputBundleReference(
+  reference: InputBundleArtifactRef,
+  runId: string
+): InputBundleArtifactRef {
+  if (artifact_store === 'file') return reference
+  const key = inputObjectKey(runId)
+  return { ...reference, uri: `s3://${artifact_s3_bucket}/${key}` }
+}
+
 export async function publishInputBundle(
   reference: InputBundleArtifactRef,
   runId: string
@@ -88,7 +104,7 @@ export async function publishInputBundle(
     reference
   )
   if (existing === true) {
-    return { ...reference, uri: `s3://${artifact_s3_bucket}/${key}` }
+    return publishedInputBundleReference(reference, runId)
   }
   if (existing === false) {
     throw new Error(

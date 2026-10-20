@@ -1,6 +1,7 @@
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 import type { Node, YAMLMap } from 'yaml'
 
+import { MAX_SETUP_DECLARATION_TEXT } from '../runner/input.js'
 import { isRecord } from '../utils/error-utils.js'
 
 /**
@@ -25,10 +26,10 @@ import { isRecord } from '../utils/error-utils.js'
  * absent declaration.
  */
 
-// Upper bound on the declaration text. It travels inline in the workflow input,
-// so an unbounded default-branch file would grow every submission; the runner's
-// parser and the contract schema carry the same limit.
-export const MAX_SETUP_DECLARATION_BYTES = 65536
+// Upper bound on the declaration text. It travels inline in the workflow input, so an unbounded
+// default-branch file would grow every submission. The bound is the contract schema's
+// `maxLength`; this name is the projection of it into TypeScript.
+export const MAX_SETUP_DECLARATION_BYTES: number = MAX_SETUP_DECLARATION_TEXT
 
 const ALLOWED_STEP_KEYS = new Set([
   'run',

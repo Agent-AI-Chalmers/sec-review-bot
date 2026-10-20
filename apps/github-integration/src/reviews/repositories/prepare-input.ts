@@ -9,8 +9,13 @@ import {
 import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { Octokit } from 'octokit'
 import type {
+  InputBundleArtifactRef,
   TestChangesPolicy,
   RepositoryReviewInput
+} from '../../runner/input.js'
+import {
+  MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES,
+  MAX_SCAN_TARGET_COMMIT_SHAS
 } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
@@ -20,7 +25,7 @@ import {
   type ChangedFileRecord
 } from './incremental-artifacts.js'
 import {
-  archiveInputBundle,
+  archiveInputBundleAndPublish,
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
@@ -208,6 +213,26 @@ export async function prepareRepositoryReviewInput({
       )
     }
 
+    // Refuse an oversized window here rather than at transport. Every entry below is inlined
+    // into the workflow input, so an unbounded list would cross Temporal and be persisted, and
+    // the failure would surface as an infrastructure error far from its cause. The limits match
+    // `maxItems` in the v6 schemas, which is where the boundary is defined.
+    if (
+      incrementalResult.changed_files.length >
+      MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES
+    ) {
+      throw new Error(
+        `incremental window is too large: ${incrementalResult.changed_files.length} changed ` +
+          `files exceeds the limit of ${MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES}`
+      )
+    }
+    if (incrementalResult.commit_shas.length > MAX_SCAN_TARGET_COMMIT_SHAS) {
+      throw new Error(
+        `incremental window is too large: ${incrementalResult.commit_shas.length} commits ` +
+          `exceeds the limit of ${MAX_SCAN_TARGET_COMMIT_SHAS}`
+      )
+    }
+
     changedFilesForScanScope = incrementalResult.changed_files
     commitShasForScanTarget = incrementalResult.commit_shas
   }
@@ -240,39 +265,44 @@ export async function prepareRepositoryReviewInput({
     generated_at: new Date().toISOString()
   })
 
-  const input_bundle = await archiveInputBundle({
+  // The bundle is published only after the input that references it fits, so a failure here
+  // cannot leave an unreferenced immutable bundle behind.
+  const { input } = await archiveInputBundleAndPublish<RepositoryReviewInput>({
     input_bundle_root,
     include_incremental_window: resolvedScanMode === 'incremental',
-    run_id
+    run_id,
+    workflow: 'repository review',
+    build_input: (
+      reference: InputBundleArtifactRef
+    ): RepositoryReviewInput => ({
+      contract_version: CONTRACT_VERSION,
+      input_bundle: reference,
+      review_intent: {
+        objective: 'audit',
+        ...(test_changes ? { test_changes } : {})
+      },
+      scan_target: {
+        target_branch: targetBranchForResolution,
+        default_branch: trusted_default_branch.default_branch,
+        event_type,
+        scan_mode: resolvedScanMode,
+        base_sha: resolvedBaseSha,
+        head_sha: resolvedHeadSha,
+        commit_shas: commitShasForScanTarget
+      },
+      scan_scope: {
+        paths_ignore: Array.isArray(paths_ignore) ? paths_ignore : [],
+        incremental_changed_files: Array.isArray(changedFilesForScanScope)
+          ? changedFilesForScanScope.map((item) => ({
+              path: item.path,
+              status: item.status,
+              previous_path: item.previous_path
+            }))
+          : []
+      },
+      ...(setup_declaration ? { setup_declaration } : {})
+    })
   })
-  const input: RepositoryReviewInput = {
-    contract_version: CONTRACT_VERSION,
-    input_bundle,
-    review_intent: {
-      objective: 'audit',
-      ...(test_changes ? { test_changes } : {})
-    },
-    scan_target: {
-      target_branch: targetBranchForResolution,
-      default_branch: trusted_default_branch.default_branch,
-      event_type,
-      scan_mode: resolvedScanMode,
-      base_sha: resolvedBaseSha,
-      head_sha: resolvedHeadSha,
-      commit_shas: commitShasForScanTarget
-    },
-    scan_scope: {
-      paths_ignore: Array.isArray(paths_ignore) ? paths_ignore : [],
-      incremental_changed_files: Array.isArray(changedFilesForScanScope)
-        ? changedFilesForScanScope.map((item) => ({
-            path: item.path,
-            status: item.status,
-            previous_path: item.previous_path
-          }))
-        : []
-    },
-    ...(setup_declaration ? { setup_declaration } : {})
-  }
 
   const input_path = path.join(
     input_bundle_root,
