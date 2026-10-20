@@ -852,6 +852,10 @@ export class ReviewRunStore {
       clauses.push(`r.created_at>=${add(options.from)}`)
     if (options.to !== undefined)
       clauses.push(`r.created_at<${add(options.to)}`)
+    // The keyset predicate and the ORDER BY below MUST stay the same ordering: the cursor names
+    // the last row of the previous page under that ordering, so comparing against a different
+    // one would silently re-read or skip rows. `run_id` is the tie-breaker because `created_at`
+    // alone is not unique, and it is compared with the same direction as the sort.
     if (options.cursor !== undefined) {
       const [createdAt, runId] = Buffer.from(options.cursor, 'base64url')
         .toString('utf8')
@@ -861,6 +865,10 @@ export class ReviewRunStore {
         `(r.created_at, r.run_id)<(${add(createdAt)}, ${add(runId)})`
       )
     }
+    // Ordering lives here, not in `RUN_SELECT`: a projection constant cannot promise a result
+    // order, and `listRunsPage` builds its cursor from the last row of THIS result. Every join
+    // above is on a primary key (`run_id`), so a run contributes exactly one row and a filter
+    // cannot reorder or duplicate the boundary.
     const result = await this.pool.query<ReviewRunRow>(
       `${RUN_SELECT}
       WHERE ${clauses.join(' AND ')} ORDER BY r.created_at DESC, r.run_id DESC LIMIT ${add(limit)}`,

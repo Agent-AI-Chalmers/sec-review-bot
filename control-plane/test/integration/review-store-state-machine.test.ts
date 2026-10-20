@@ -3076,6 +3076,176 @@ test('abandoning a blocked run concludes its open axes and keeps the execution e
   }
 })
 
+test('an execution failure and an in-flight step commit converge on one outcome', async () => {
+  // A publisher can be committing a step while coordination concludes the run's execution.
+  // Either order is legitimate: the step may finish first and then be abandoned with the
+  // publication, or the failure may converge the publication first and refuse the commit. What
+  // must never happen is a step recorded `succeeded` on a publication that was already
+  // concluded, or a publication left `publishing` with nobody able to finish it.
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    for (const executorFirst of [true, false]) {
+      const store = await createStore()
+      const runId = await createQueuedRun(store)
+      try {
+        // Model a publisher that started before the outcome was rewritten: `claimPublication`
+        // requires a successful execution, so the in-flight row is created directly.
+        const token = randomUUID()
+        await pool.query(
+          `INSERT INTO publication_steps (connector_id,run_id,step_key,status,claimed_by)
+           VALUES ($1,$2,'step','running',$3)`,
+          [store.connectorId, runId, token]
+        )
+        await pool.query(
+          `UPDATE publications SET status='publishing', claim_token=$2,
+             claimed_at=clock_timestamp(), started_at=clock_timestamp()
+           WHERE run_id=$1`,
+          [runId, token]
+        )
+
+        const complete = async (): Promise<boolean> =>
+          await store.completePublicationStep(runId, token, 'step', {
+            url: 'https://example.test/comment'
+          })
+        const failExecution = async (): Promise<boolean> =>
+          await store.failRunnerExecution(runId, {
+            code: 'RUNNER_EXECUTION_FAILED',
+            message: 'the runner concluded the task failed'
+          })
+
+        if (executorFirst) {
+          await failExecution()
+          assert.strictEqual(
+            await complete(),
+            false,
+            'a step commit after the publication was abandoned is refused'
+          )
+        } else {
+          assert.strictEqual(await complete(), true)
+          await failExecution()
+        }
+
+        const stored = await store.getRun(runId)
+        assert.strictEqual(
+          stored?.execution.status,
+          'failed',
+          'the execution conclusion is the run outcome in both orders'
+        )
+        assert.strictEqual(
+          stored?.publication.status,
+          'skipped',
+          'a publication whose execution failed is never left publishing'
+        )
+        const steps = await store.listPublicationSteps(runId)
+        assert.strictEqual(
+          steps[0]?.status,
+          executorFirst ? 'running' : 'succeeded',
+          'the step records whether its side effect had already been committed'
+        )
+        // Whatever the order produced, a further commit can no longer attach to the run.
+        assert.strictEqual(
+          await complete(),
+          false,
+          'a step commit after the run concluded is refused, not recorded'
+        )
+      } finally {
+        await store.close()
+      }
+    }
+  } finally {
+    await pool.end()
+  }
+})
+
+test('a step claim is refused once another path has concluded the publication', async () => {
+  // `claimPublicationStep` used to be a single UPDATE whose WHERE read `publications`, which
+  // takes a snapshot: a concurrent path that moved the publication to `skipped` could commit in
+  // between, and the step would still be claimed `running` on a concluded publication. The
+  // claim now locks the publication row first, so it either observes the conclusion or the
+  // conclusion waits for it - never a `running` step left behind.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  const blocker = await pool.connect()
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await store.initializePublicationSteps(runId, token, ['s'])
+
+    // A separate transaction concludes the publication without committing yet. The claim must
+    // wait for it rather than read the pre-conclusion snapshot.
+    await blocker.query('BEGIN')
+    await blocker.query(
+      `UPDATE publications SET status='skipped', claim_token=NULL, claimed_at=NULL,
+         finished_at=clock_timestamp()
+       WHERE run_id=$1 AND connector_id=$2`,
+      [runId, store.connectorId]
+    )
+    const claim = store.requirePublicationStepClaim(runId, token, 's')
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await blocker.query('COMMIT')
+
+    await assert.rejects(
+      claim,
+      /not claimable/,
+      'a claim against a publication concluded by another path is refused'
+    )
+    const steps = await store.listPublicationSteps(runId)
+    assert.strictEqual(
+      steps[0]?.status,
+      'pending',
+      'the refused claim must not leave a running step behind'
+    )
+  } finally {
+    blocker.release()
+    await pool.end()
+    await store.close()
+  }
+})
+
+test('a step failure records its code and message on the right fields', async () => {
+  // `failPublicationStep` binds five positional values, two of them connector-supplied strings
+  // (`error.code` and `error.message`). A reordering that swapped those two would still pass a
+  // test that only counts `failure_count`, so this pins the actual fields rather than the write
+  // happening at all.
+  const store = await createStore()
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.claimPublication(runId)
+    assert.ok(token)
+    await store.initializePublicationSteps(runId, token, ['s'])
+    await store.requirePublicationStepClaim(runId, token, 's')
+    assert.strictEqual(
+      await store.failPublicationStep(
+        runId,
+        token,
+        's',
+        { code: 'SOME_CODE', message: 'some message' },
+        { retry: true }
+      ),
+      true
+    )
+    const [step] = await store.listPublicationSteps(runId)
+    assert.deepStrictEqual(
+      {
+        status: step?.status,
+        code: step?.failure_code,
+        message: step?.failure_message,
+        failure_count: step?.failure_count
+      },
+      {
+        status: 'failed',
+        code: 'SOME_CODE',
+        message: 'some message',
+        failure_count: 1
+      },
+      'the code and message must land in their own columns, not each other'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
 test('an owner cannot claim a publication step it already holds', async () => {
   // A step left `running` may belong to a publisher that died mid-effect, so a *different*
   // publication token must be able to take it over. The same token must not: it would start a

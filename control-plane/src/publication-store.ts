@@ -16,6 +16,44 @@ import {
 import type { PublicationStepRecord } from './shapes.js'
 import { appendEvent } from './review-run-events.js'
 
+/**
+ * Why every `publication_steps` write takes the publication row lock FIRST.
+ *
+ * PostgreSQL keeps the legacy "one statement validates its own precondition" habit dangerous
+ * here. A statement like
+ *
+ *     UPDATE publication_steps s SET ... FROM publications p
+ *     WHERE p.run_id = s.run_id AND p.status = 'publishing' AND p.claim_token = $token
+ *
+ * looks like it checks the publication before writing the step, but `publications` is only a
+ * snapshot read: no row lock is taken on it (an `EXPLAIN`/`pg_locks` inspection shows just an
+ * ACCESS SHARE relation lock and no tuple lock on `publications`). So a concurrent transaction
+ * that converges the publication to `skipped` — an execution failure, a rejected submission
+ * replay, or an operator abandon — can commit between this statement's snapshot and its write,
+ * and the step is still recorded on a publication that no longer publishes anything.
+ *
+ * The result of that race is a permanent orphan: `publications.status='skipped'` next to a
+ * `publication_steps` row that is `running` (or `succeeded`) with a claim token whose owner is
+ * gone. Nothing sweeps such rows, because every repair path starts from a publication that is
+ * still `publishing`, so the contradiction stays visible to operators and misleads them into
+ * looking for a publisher that does not exist. It also invalidates the reasoning the claim path
+ * depends on (`attempt_count > 1` means "a previous owner may have already run this side
+ * effect"), because the step is neither really running nor definitely abandoned.
+ *
+ * The fix is to lock the publication row and re-read it inside the same transaction
+ * (`SELECT ... FOR UPDATE`) before touching the step. That serialises the two writers: either
+ * the step write commits first, or it observes the conclusion and refuses. The shared
+ * `lockPublicationOwnership` helper does this so the three write paths cannot drift apart: a
+ * step write that skipped the lock would look correct on its own while disagreeing with the
+ * other two.
+ *
+ * Note on discovery: this is not reproducible by adding concurrency pressure. Interleavings are
+ * only observable when one writer's UPDATE is deliberately left uncommitted while the other
+ * proceeds, so a stress test tends to report "no deadlock, no errors" and prove nothing. The
+ * failure is a lost update, not a lock wait: the two writers never block each other today, they
+ * merely disagree. Verify a change here by forcing the interleaving (hold the publication
+ * UPDATE open in a second session and assert the step write waits), not by raising the load.
+ */
 const MAX_PUBLICATION_STEP_FAILURES = 3
 
 async function transaction<T>(
@@ -184,7 +222,16 @@ export class PublicationStore {
     })
   }
   async listPublicationSteps(runId: string): Promise<PublicationStepRecord[]> {
-    const result = await this.pool.query<
+    return await this.listPublicationStepsWith(this.pool, runId)
+  }
+
+  /** The same read on a caller-provided client, so a locked publication can be inspected and
+   * classified inside the transaction that holds the lock. */
+  private async listPublicationStepsWith(
+    client: Pick<PoolClient, 'query'>,
+    runId: string
+  ): Promise<PublicationStepRecord[]> {
+    const result = await client.query<
       Omit<PublicationStepRecord, 'last_attempt_at'> & {
         last_attempt_at: Date | string | null
       }
@@ -210,6 +257,25 @@ export class PublicationStore {
             : row.last_attempt_at
     }))
   }
+  /** Lock the publication that owns this claim token, or answer false.
+   *
+   * Callers must hold the returned lock before writing `publication_steps`; see the module-level
+   * note on why a single `UPDATE ... FROM publications` is not sufficient. Kept in one place so
+   * the claim, complete, and fail paths cannot diverge in the order they take these locks. */
+  private async lockPublicationOwnership(
+    client: PoolClient,
+    runId: string,
+    token: string
+  ): Promise<boolean> {
+    const owner = await client.query(
+      `SELECT 1 FROM publications
+       WHERE run_id=$1 AND connector_id=$2
+         AND status='publishing' AND claim_token=$3
+       FOR UPDATE`,
+      [runId, this.connectorId, token]
+    )
+    return owner.rowCount === 1
+  }
   private async claimPublicationStep(
     runId: string,
     token: string,
@@ -221,28 +287,30 @@ export class PublicationStore {
     // caller can see `attempt_count > 1` and reconcile against the remote object before issuing
     // another call. Assuming a reclaim means "nothing happened yet" is what would duplicate a
     // comment or a pull request.
-    const result = await this.pool.query(
-      `
-      UPDATE publication_steps s
-      SET status='running', claimed_by=$4, attempt_count=s.attempt_count+1,
-          last_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
-      FROM publications p
-      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
-        AND (
-          s.status='pending'
-          -- A step left running belongs to an owner that may have died mid-effect. Only a
-          -- different token may take it over: the same owner claiming its own running step
-          -- would start a second attempt for one side effect, which is precisely what the
-          -- attempt count is supposed to make visible rather than corrupt.
-          OR (s.status='running' AND s.claimed_by IS DISTINCT FROM $4::uuid)
-          OR (s.status='failed' AND s.failure_count<$5)
-        )
-        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-        AND p.status='publishing' AND p.claim_token=$4
-    `,
-      [runId, this.connectorId, stepKey, token, MAX_PUBLICATION_STEP_FAILURES]
-    )
-    return result.rowCount === 1
+    return await transaction(this.pool, async (client) => {
+      // Lock first; see the module note on why the step UPDATE alone is not a precondition check.
+      if (!(await this.lockPublicationOwnership(client, runId, token)))
+        return false
+      const result = await client.query(
+        `
+        UPDATE publication_steps s
+        SET status='running', claimed_by=$3, attempt_count=s.attempt_count+1,
+            last_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
+        WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$4
+          AND (
+            s.status='pending'
+            -- A step left running belongs to an owner that may have died mid-effect. Only a
+            -- different token may take it over: the same owner claiming its own running step
+            -- would start a second attempt for one side effect, which is precisely what the
+            -- attempt count is supposed to make visible rather than corrupt.
+            OR (s.status='running' AND s.claimed_by IS DISTINCT FROM $3::uuid)
+            OR (s.status='failed' AND s.failure_count<$5)
+          )
+      `,
+        [runId, this.connectorId, token, stepKey, MAX_PUBLICATION_STEP_FAILURES]
+      )
+      return result.rowCount === 1
+    })
   }
   async requirePublicationStepClaim(
     runId: string,
@@ -251,23 +319,26 @@ export class PublicationStore {
   ): Promise<void> {
     if (await this.claimPublicationStep(runId, token, stepKey)) return
 
-    // Retry exhaustion is a persisted step outcome, not merely an exception
-    // observed by one publisher. The current publication owner records it once.
-    await this.pool.query(
-      `
-      UPDATE publication_steps s
-      SET status='terminal_failed', updated_at=clock_timestamp()
-      FROM publications p
-      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3
-        AND s.status='failed' AND s.failure_count>=$5
-        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-        AND p.status='publishing' AND p.claim_token=$4
-    `,
-      [runId, this.connectorId, stepKey, token, MAX_PUBLICATION_STEP_FAILURES]
-    )
-    const step = (await this.listPublicationSteps(runId)).find(
-      (item) => item.step_key === stepKey
-    )
+    // Retry exhaustion is a persisted step outcome, not merely an exception observed by one
+    // publisher. The current publication owner records it once, under the same publication lock
+    // the write paths use, so the classification below cannot read a state a concurrent
+    // conclusion of the run just superseded.
+    const { step } = await transaction(this.pool, async (client) => {
+      const owned = await this.lockPublicationOwnership(client, runId, token)
+      if (owned) {
+        await client.query(
+          `
+          UPDATE publication_steps
+          SET status='terminal_failed', updated_at=clock_timestamp()
+          WHERE run_id=$1 AND connector_id=$2 AND step_key=$3
+            AND status='failed' AND failure_count>=$4
+        `,
+          [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_FAILURES]
+        )
+      }
+      const steps = await this.listPublicationStepsWith(client, runId)
+      return { step: steps.find((item) => item.step_key === stepKey) }
+    })
     if (step?.status === 'terminal_failed') {
       throw new DeterministicControlPlaneError(
         `Publication step exhausted its retry budget: ${stepKey}`,
@@ -285,29 +356,30 @@ export class PublicationStore {
     stepKey: string,
     remote: { id?: string | null; url?: string | null } = {}
   ): Promise<boolean> {
-    // A publication token fences every step commit, not only the final run
-    // state. This prevents a timed-out worker from recording stale remote data.
-    const result = await this.pool.query(
-      `
-      UPDATE publication_steps s
-      SET status='succeeded', claimed_by=NULL,
-          remote_object_id=$5, remote_object_url=$6,
-          failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-      FROM publications p
-      WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
-        AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-        AND p.status='publishing' AND p.claim_token=$4
-    `,
-      [
-        runId,
-        this.connectorId,
-        stepKey,
-        token,
-        remote.id ?? null,
-        remote.url ?? null
-      ]
-    )
-    return result.rowCount === 1
+    // A publication token fences every step commit, not only the final run state, so a timed-out
+    // worker cannot record stale remote data.
+    return await transaction(this.pool, async (client) => {
+      // Lock first; see the module note on why the step UPDATE alone is not a precondition check.
+      if (!(await this.lockPublicationOwnership(client, runId, token)))
+        return false
+      const result = await client.query(
+        `
+        UPDATE publication_steps s
+        SET status='succeeded', claimed_by=NULL,
+            remote_object_id=$4, remote_object_url=$5,
+            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
+        WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
+      `,
+        [
+          runId,
+          this.connectorId,
+          stepKey,
+          remote.id ?? null,
+          remote.url ?? null
+        ]
+      )
+      return result.rowCount === 1
+    })
   }
   async failPublicationStep(
     runId: string,
@@ -318,24 +390,27 @@ export class PublicationStore {
   ): Promise<boolean> {
     const terminal = options.retry === false
     return await transaction(this.pool, async (client) => {
+      // Lock first; see the module note on why the step UPDATE alone is not a precondition check.
+      if (!(await this.lockPublicationOwnership(client, runId, token)))
+        return false
+      // Placeholders are ordered by type, not by the call's argument list: $1/$2 are the
+      // identity, $3/$4 the connector-supplied strings, $5 the status, $6 the step. Swapping
+      // $3 and $4 would silently store the message as the code (both are text), which no
+      // status-only assertion would catch.
       const result = await client.query(
         `
         UPDATE publication_steps s
-        SET status=$7, claimed_by=NULL, failure_count=s.failure_count+1,
-            failure_code=$5, failure_message=$6, updated_at=clock_timestamp()
-        FROM publications p
-        WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$3 AND s.status='running'
-          AND p.run_id=s.run_id AND p.connector_id=s.connector_id
-          AND p.status='publishing' AND p.claim_token=$4
+        SET status=$5, claimed_by=NULL, failure_count=s.failure_count+1,
+            failure_code=$3, failure_message=$4, updated_at=clock_timestamp()
+        WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$6 AND s.status='running'
       `,
         [
           runId,
           this.connectorId,
-          stepKey,
-          token,
           error.code ?? null,
           error.message,
-          terminal ? 'terminal_failed' : 'failed'
+          terminal ? 'terminal_failed' : 'failed',
+          stepKey
         ]
       )
       if (result.rowCount !== 1) return false
