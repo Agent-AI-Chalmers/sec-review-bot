@@ -8,6 +8,7 @@ import { promisify } from 'node:util'
 
 import {
   configuredGitTimeoutMs,
+  exportWorkspaceWindow,
   createWorkspaceSnapshotTar,
   exportWorkspaceDiff,
   materializeWorkspaceWithCommitHistory,
@@ -591,6 +592,64 @@ test('exportWorkspaceDiff excludes changes that only landed on the base branch',
     })
     assert.match(diff, /\+pr-only line/)
     assert.doesNotMatch(diff, /base-branch-only line/)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('exportWorkspaceWindow keeps patches for paths git would quote', async () => {
+  // Git's human-readable output quotes and octal-escapes paths containing a tab, quote,
+  // newline, or non-ASCII byte. Parsing that form would leave the path as a quoted literal,
+  // so it would never match the diff section and the patch would be dropped without a word --
+  // exactly the failure this export exists to prevent. Reading paths with `-z` avoids the
+  // quoting entirely.
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'git-workspace-quoted-paths-')
+  )
+  try {
+    const source = path.join(root, 'source')
+    const workspace = path.join(root, 'workspace')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    await fs.writeFile(path.join(source, 'plain.txt'), 'base\n', 'utf8')
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'before'])
+    const base_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    const awkward = ['file\tname.txt', 'quote"name.txt', '中文名.txt']
+    for (const name of awkward) {
+      await fs.writeFile(path.join(source, name), 'content\n', 'utf8')
+    }
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'after'])
+    const head_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await materializeWorkspaceWithCommitHistory({
+      workspace_path: workspace,
+      git_remote_url: source,
+      refs: [base_sha, head_sha]
+    })
+
+    const exported = await exportWorkspaceWindow({
+      workspace_path: workspace,
+      base_sha,
+      head_sha
+    })
+
+    assert.deepStrictEqual(
+      exported.files.map((file) => file.filename).sort(),
+      [...awkward].sort()
+    )
+    for (const file of exported.files) {
+      assert.ok(
+        file.patch !== null,
+        `${file.filename} lost its patch; git quoted the path`
+      )
+      assert.match(file.patch, /\+content/)
+      assert.match(file.patch, /^diff --git /)
+    }
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

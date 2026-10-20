@@ -491,34 +491,6 @@ function requireComparableRefs(
  * therefore drops files the patch still contains, which is the window divergence this module
  * exists to prevent.
  */
-export async function exportWorkspaceChangedFiles({
-  workspace_path,
-  base_sha,
-  head_sha
-}: {
-  workspace_path: string
-  base_sha: string
-  head_sha: string
-}): Promise<
-  { path: string; status: string; additions: number; deletions: number }[]
-> {
-  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceChangedFiles')
-  const range = `${base_sha.trim()}...${head_sha.trim()}`
-
-  const name_status = await runGitCommandCapture(
-    workspace_path,
-    [...WORKSPACE_DIFF_ARGS, '--name-status', range],
-    { config: WORKSPACE_GIT_CONFIG }
-  )
-  const numstat = await runGitCommandCapture(
-    workspace_path,
-    [...WORKSPACE_DIFF_ARGS, '--numstat', range],
-    { config: WORKSPACE_GIT_CONFIG }
-  )
-
-  return parseChangedFiles(name_status, numstat)
-}
-
 const GIT_STATUS_NAMES: Record<string, string> = {
   A: 'added',
   C: 'copied',
@@ -532,63 +504,118 @@ const GIT_STATUS_NAMES: Record<string, string> = {
 }
 
 /**
- * Combine `--name-status` and `--numstat` into one entry per file.
+ * Read `--name-status -z` output: `<STATUS>\0<path>\0`, with an extra path for a rename or copy.
  *
- * `--numstat` reports binary files as `-`, which is not a line count; those become 0 so the list
- * stays numeric and the patch still carries the authoritative placeholder.
+ * `-z` writes paths as raw bytes with no quoting or escaping. The human-readable form quotes any
+ * path containing a tab, quote, or newline and octal-escapes non-ASCII bytes, which makes the
+ * path unusable as a key unless this module re-implements git's quoting rules.
  */
-function parseChangedFiles(
-  name_status: string,
-  numstat: string
-): { path: string; status: string; additions: number; deletions: number }[] {
-  const counts = new Map<string, { additions: number; deletions: number }>()
-  for (const line of numstat.split('\n')) {
-    if (line === '') continue
-    const fields = line.split('\t')
-    const added = fields[0]
-    const removed = fields[1]
-    const path = fields.at(-1)
-    if (added === undefined || removed === undefined || path === undefined) {
-      continue
-    }
-    counts.set(path, {
-      additions: added === '-' ? 0 : Number.parseInt(added, 10) || 0,
-      deletions: removed === '-' ? 0 : Number.parseInt(removed, 10) || 0
-    })
-  }
-
-  const files: {
+function parseNameStatusZ(output: string): {
+  path: string
+  status: string
+  previous_path: string | null
+}[] {
+  const fields = output.split('\0')
+  const entries: {
     path: string
     status: string
-    additions: number
-    deletions: number
+    previous_path: string | null
   }[] = []
-  for (const line of name_status.split('\n')) {
-    if (line === '') continue
-    const fields = line.split('\t')
-    const code = fields[0]?.charAt(0) ?? ''
-    const path = fields.at(-1)
-    if (code === '' || path === undefined) continue
-    const counts_for_path = counts.get(path) ?? { additions: 0, deletions: 0 }
-    files.push({
-      path,
-      status: GIT_STATUS_NAMES[code] ?? 'unknown',
-      additions: counts_for_path.additions,
-      deletions: counts_for_path.deletions
-    })
+  let index = 0
+  while (index + 1 < fields.length) {
+    const raw_status = fields[index] ?? ''
+    if (raw_status === '') break
+    index += 1
+    const code = raw_status.charAt(0)
+    const status = GIT_STATUS_NAMES[code] ?? 'unknown'
+    if (code === 'R' || code === 'C') {
+      const previous_path = fields[index] ?? ''
+      const path = fields[index + 1] ?? ''
+      index += 2
+      if (path !== '') entries.push({ path, status, previous_path })
+      continue
+    }
+    const path = fields[index] ?? ''
+    index += 1
+    if (path !== '') entries.push({ path, status, previous_path: null })
   }
-  return files
+  return entries
 }
 
 /**
- * Export one entry per changed file, carrying that file's diff hunks.
+ * Read `--numstat -z` output: `<added>\t<deleted>\t\0<path>\0`, with an extra path for a rename.
  *
- * The suggestion anchoring needs a per-file slice of the diff to map a mitigation hunk onto
- * PR-visible lines. That slice is cut out of the workspace diff the run already exported, rather
- * than by running `git diff -- <path>` per file: a 340-file pull request would otherwise start
- * 340 concurrent processes, each allowed a 128 MiB buffer, and the endpoint's 3000-file ceiling
- * would make that worse. Slicing also keeps this set derived from the same text as the patch, so
- * the two cannot disagree about what changed.
+ * A binary file reports `-` for both counts, which is not a line count; those become 0 so the
+ * list stays numeric while the patch keeps the authoritative placeholder.
+ */
+function parseNumstatZ(
+  output: string
+): Map<string, { additions: number; deletions: number }> {
+  const counts = new Map<string, { additions: number; deletions: number }>()
+  const fields = output.split('\0')
+  let index = 0
+  while (index < fields.length) {
+    const header = fields[index] ?? ''
+    if (header === '') break
+    index += 1
+    const [added, removed] = header.split('\t')
+    const is_rename =
+      (added ?? '').includes('') === false && header.split('\t').length === 3
+    const path = fields[index] ?? ''
+    const counts_for_file = {
+      additions: added === '-' ? 0 : Number.parseInt(added ?? '', 10) || 0,
+      deletions: removed === '-' ? 0 : Number.parseInt(removed ?? '', 10) || 0
+    }
+    if (is_rename) {
+      const renamed_to = fields[index + 1] ?? ''
+      index += 2
+      counts.set(renamed_to, counts_for_file)
+      continue
+    }
+    index += 1
+    counts.set(path, counts_for_file)
+  }
+  return counts
+}
+
+export async function exportWorkspaceChangedFiles({
+  workspace_path,
+  base_sha,
+  head_sha
+}: {
+  workspace_path: string
+  base_sha: string
+  head_sha: string
+}): Promise<
+  { path: string; status: string; additions: number; deletions: number }[]
+> {
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceChangedFiles')
+  const range = `${base_sha.trim()}...${head_sha.trim()}`
+  const name_status = await runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, '--name-status', '-z', range],
+    { config: WORKSPACE_GIT_CONFIG }
+  )
+  const numstat = await runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, '--numstat', '-z', range],
+    { config: WORKSPACE_GIT_CONFIG }
+  )
+  const counts = parseNumstatZ(numstat)
+  return parseNameStatusZ(name_status).map((entry) => ({
+    path: entry.path,
+    status: entry.status,
+    ...(counts.get(entry.path) ?? { additions: 0, deletions: 0 })
+  }))
+}
+
+/**
+ * Every artifact a run needs from one workspace comparison.
+ *
+ * The patch, the file list, and the per-file slices must describe the same change set, and
+ * computing them together makes that structural rather than a convention. The work is a fixed
+ * number of git invocations regardless of file count, which matters because a pull request can
+ * carry thousands of files.
  */
 export async function exportWorkspaceWindow({
   workspace_path,
@@ -609,82 +636,77 @@ export async function exportWorkspaceWindow({
   }[]
 }> {
   requireComparableRefs(base_sha, head_sha, 'exportWorkspaceWindow')
-  const entries = await exportWorkspaceChangedFiles({
-    workspace_path,
-    base_sha,
-    head_sha
-  })
-  const diff = await exportWorkspaceDiff({
-    workspace_path,
-    base_sha,
-    head_sha
-  })
-  const sections = splitDiffByFile(diff)
+  const range = `${base_sha.trim()}...${head_sha.trim()}`
 
-  const files = entries.map((entry) => {
-    const patch = sections.get(entry.path)
-    return {
-      filename: entry.path,
-      status: entry.status,
-      additions: entry.additions,
-      deletions: entry.deletions,
-      // A binary file's hunk is the "Binary files ... differ" placeholder, which carries no
-      // anchorable lines; report it as absent rather than as a patch that cannot be mapped.
-      patch:
-        patch === undefined || patch.includes('Binary files') ? null : patch
-    }
+  const [entries, patch] = await Promise.all([
+    exportWorkspaceChangedFiles({ workspace_path, base_sha, head_sha }),
+    exportWorkspaceDiff({ workspace_path, base_sha, head_sha })
+  ])
+  const ordered_paths = await runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, '--name-only', '-z', range],
+    { config: WORKSPACE_GIT_CONFIG }
+  ).then((output) => output.split('\0').filter((path) => path !== ''))
+
+  // The diff's sections appear in the same order as `--name-only -z`, so the paths pair with the
+  // sections positionally. Reading the paths from git in raw form avoids parsing the human
+  // `diff --git` header, which quotes any path containing a tab, quote, or non-ASCII byte.
+  const sections = splitDiffIntoSections(patch)
+  if (sections.length !== ordered_paths.length) {
+    // Pairing is positional, so a mismatch means the assumption no longer holds and every patch
+    // would be dropped silently -- the failure this whole export exists to prevent. Fail loudly
+    // instead of returning a suggestion set that cannot anchor anything.
+    throw new Error(
+      `workspace diff sections (${sections.length}) do not match changed files (${ordered_paths.length})`
+    )
+  }
+  const patch_by_path = new Map<string, string>()
+  ordered_paths.forEach((file_path, index) => {
+    const section = sections[index]
+    if (section !== undefined) patch_by_path.set(file_path, section)
   })
 
-  return { patch: diff, files }
+  return {
+    patch,
+    files: entries.map((entry) => {
+      const file_patch = patch_by_path.get(entry.path)
+      return {
+        filename: entry.path,
+        status: entry.status,
+        additions: entry.additions,
+        deletions: entry.deletions,
+        // A binary file's hunk is the "Binary files ... differ" placeholder, which carries no
+        // anchorable lines; report it as absent rather than as a patch that cannot be mapped.
+        patch:
+          file_patch === undefined || file_patch.includes('Binary files')
+            ? null
+            : file_patch
+      }
+    })
+  }
 }
 
 /**
- * Split a unified diff into one entry per file, keyed by the file's new-side path.
+ * Split a unified diff at each `diff --git` line, keeping the line with its section.
  *
- * `diff --git a/<old> b/<new>` starts each section. The new path is the last token, and for a
- * rename it is the destination, which is the path the diff and the file list use. A path
- * containing spaces is quoted by git, so the header is not simply split on spaces.
+ * A diff with no changes is the empty string, which must produce no sections: `''.split('\n')`
+ * yields one empty line, and counting that as a section would report a change where there is
+ * none.
  */
-function splitDiffByFile(diff: string): Map<string, string> {
-  const sections = new Map<string, string>()
-  let current_path: string | null = null
-  let current_lines: string[] = []
-
-  const flush = (): void => {
-    if (current_path !== null) {
-      sections.set(current_path, current_lines.join('\n'))
-    }
-  }
-
+function splitDiffIntoSections(diff: string): string[] {
+  if (diff === '') return []
+  const sections: string[] = []
+  let current: string[] = []
   for (const line of diff.split('\n')) {
     if (line.startsWith('diff --git ')) {
-      flush()
-      current_lines = [line]
-      const target = line.slice('diff --git '.length)
-      // `a/... b/...` -- the destination is the second half, after the " b/" marker.
-      const marker = target.lastIndexOf(' b/')
-      current_path =
-        marker === -1 ? null : unquoteGitPath(target.slice(marker + 3))
+      if (current.length > 0) sections.push(current.join('\n'))
+      current = [line]
       continue
     }
-    current_lines.push(line)
+    current.push(line)
   }
-  flush()
+  if (current.length > 0) sections.push(current.join('\n'))
   return sections
-}
-
-/** Undo git's C-style quoting for paths that contain spaces, quotes, or control characters. */
-function unquoteGitPath(value: string): string {
-  if (!value.startsWith('"') || !value.endsWith('"')) return value
-  const body = value.slice(1, -1)
-  const escapes: Record<string, string> = {
-    n: '\n',
-    t: '\t',
-    r: '\r',
-    '"': '"',
-    '\\': '\\'
-  }
-  return body.replace(/\\(.)/g, (_match, char: string) => escapes[char] ?? char)
 }
 
 export async function exportWorkspaceDiff({
