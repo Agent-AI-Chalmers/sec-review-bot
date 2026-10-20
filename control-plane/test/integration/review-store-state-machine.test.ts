@@ -3076,6 +3076,54 @@ test('abandoning a blocked run concludes its open axes and keeps the execution e
   }
 })
 
+test('an abandon of a self-contradictory block answers 409, not an opaque server fault', async () => {
+  // A block marker on a preparation that is no longer `preparing` is self-contradictory stored
+  // data, not a lost race: the marker row is locked before it is updated, so nothing else can
+  // change it in between. The operator asked about a run in a state this operation may not act
+  // on, which is a client-visible conflict rather than the opaque 500 a bare Error becomes.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = `run-${randomUUID()}`
+    await store.createPreparingReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {}
+    })
+    await pool.query(
+      `UPDATE preparations SET status='failed', claim_token=NULL, claimed_at=NULL,
+         started_at=clock_timestamp(), finished_at=clock_timestamp(),
+         expiry_blocked_reason='EXECUTION_ALREADY_ADVANCED',
+         expiry_blocked_at=clock_timestamp()
+       WHERE run_id=$1`,
+      [runId]
+    )
+    await assert.rejects(
+      store.abandonBlockedPreparation(runId, 'operator decision'),
+      (error: unknown) => {
+        assert.strictEqual(
+          (error as { statusCode?: number }).statusCode,
+          409,
+          'a contradiction the endpoint cannot act on is a client-visible conflict'
+        )
+        return true
+      }
+    )
+    // Nothing was written on the refused path.
+    const stored = await pool.query<{ status: string; reason: string | null }>(
+      'SELECT status, expiry_blocked_reason AS reason FROM preparations WHERE run_id=$1',
+      [runId]
+    )
+    assert.deepStrictEqual(stored.rows[0], {
+      status: 'failed',
+      reason: 'EXECUTION_ALREADY_ADVANCED'
+    })
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
 test('an execution failure and an in-flight step commit converge on one outcome', async () => {
   // A publisher can be committing a step while coordination concludes the run's execution.
   // Either order is legitimate: the step may finish first and then be abandoned with the

@@ -1000,8 +1000,16 @@ export class ReviewRunStore {
         [runId, this.connectorId, reason]
       )
       if (failed.rowCount !== 1)
-        throw new Error(
-          `Preparation ${runId} changed while being abandoned; nothing was written.`
+        // The row was selected `FOR UPDATE` above, so nothing else can change it while this
+        // transaction runs: reaching here means the stored row disagrees with itself (a block
+        // marker on a preparation that is no longer `preparing`), never lost a race. That is a
+        // caller-visible fact about the run rather than a server fault, so it answers 409 like
+        // every other "this run is not in a state this operation may act on".
+        throw Object.assign(
+          new Error(
+            `Preparation ${runId} is marked blocked but is no longer preparing; nothing was written.`
+          ),
+          { statusCode: 409 }
         )
       await appendEvent(client, {
         runId,
