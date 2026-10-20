@@ -326,10 +326,13 @@ test('a reconciliation that loses the step ends the publication instead of holdi
         })
       ),
     // The publish path reaches the claim first; refusing it with the exhaustion code is what
-    // enters reconciliation, and the reconciliation then loses the settlement.
+    // enters reconciliation, and the reconciliation then loses the settlement. Control Plane
+    // answers a refusal with a 409, which is what tells this code apart from the same code on a
+    // request that never reached it.
     requirePublicationStepClaim: async () => {
       throw Object.assign(new Error('no attempts left'), {
-        code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+        code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+        status: 409
       })
     },
     completePublicationStep: async () => true,
