@@ -45,15 +45,15 @@ Control Plane 轮询 `queued` 和 `running` run。Runner 成功后，Control Pla
 
 run 主干和三条生命周期轴分别存放在不同的表中。`review_runs` 只保存被接纳的身份；每条轴各自保存自己的状态和输入：
 
-| 表                  | 职责                                   | 状态                                                                                          |
-| ------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `review_runs`       | 所有轴共享的接纳身份（没有更新路径）   | —                                                                                             |
-| `preparations`      | 可领取的 input preparation             | `pending`、`preparing`、`uncertain`、`disconnected`、`submitted`、`failed`                    |
-| `run_notices`       | connector 所有的用户可见失败与待确认通知 | `pending`、`delivering`、`delivered`、`failed`                                              |
-| `executions`        | Runner 提交、观察和终态结果            | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
-| `publications`      | 整体发布的所有权和结果                 | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
-| `publication_steps` | 可恢复的单个 connector 副作用          | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
-| `review_run_events` | 每条轴状态转换的只追加审计日志         | —                                                                                             |
+| 表                  | 职责                                     | 状态                                                                                          |
+| ------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `review_runs`       | 所有轴共享的接纳身份（没有更新路径）     | —                                                                                             |
+| `preparations`      | 可领取的 input preparation               | `pending`、`preparing`、`uncertain`、`disconnected`、`submitted`、`failed`                    |
+| `run_notices`       | connector 所有的用户可见失败与待确认通知 | `pending`、`delivering`、`delivered`、`failed`                                                |
+| `executions`        | Runner 提交、观察和终态结果              | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
+| `publications`      | 整体发布的所有权和结果                   | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
+| `publication_steps` | 可恢复的单个 connector 副作用            | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
+| `review_run_events` | 每条轴状态转换的只追加审计日志           | —                                                                                             |
 
 ```mermaid
 flowchart LR
