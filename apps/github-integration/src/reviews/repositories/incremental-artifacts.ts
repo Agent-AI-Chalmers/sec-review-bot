@@ -1,7 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 
 export interface RepositoryContext {
   owner_login: string
@@ -40,7 +40,7 @@ export async function materializeIncrementalArtifacts({
   base_sha,
   head_sha
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   repo: RepositoryContext
   incremental_window_path: string
   history_path: string
@@ -177,7 +177,7 @@ export async function isAncestorCommit({
   base_sha,
   head_sha
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   repo: RepositoryContext
   base_sha: string
   head_sha: string

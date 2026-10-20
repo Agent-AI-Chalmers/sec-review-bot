@@ -1,4 +1,4 @@
-import type { GitHubAppOctokit } from './octokit.js'
+import type { Octokit } from 'octokit'
 
 export type RepositoryPermission =
   'none' | 'read' | 'triage' | 'write' | 'maintain' | 'admin' | 'unknown'
@@ -48,7 +48,7 @@ export async function authorizeManualCommentCommand({
   repo_name,
   sender_login
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   owner_login: string
   repo_name: string
   sender_login: string | undefined

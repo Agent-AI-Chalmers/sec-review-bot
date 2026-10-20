@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { handlePullRequestReadyForReviewWithDeps } from '../../../../src/ingress/github/webhooks/pull-request-ready-for-review.js'
+import { unusedGitHub } from '../../../github-client.js'
 
 function createPayload({ fromFork = false } = {}) {
   return {
@@ -65,7 +66,7 @@ test('skips fork PRs on ready_for_review; approval is an explicit comment comman
   await handlePullRequestReadyForReviewWithDeps(
     {
       id: 'delivery-fork-ready',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createPayload({ fromFork: true })
     },
     {
@@ -93,7 +94,11 @@ test('does not start a review when automatic mode is disabled', async () => {
   let reviewStarted = false
 
   await handlePullRequestReadyForReviewWithDeps(
-    { id: 'delivery-manual', octokit: {}, payload: createPayload() },
+    {
+      id: 'delivery-manual',
+      octokit: unusedGitHub().octokit,
+      payload: createPayload()
+    },
     {
       fetchTrustedRepositoryTriggerConfigFn: async () => automaticResolution(),
       isAutomaticTriggerModeEnabledFn: () => false,

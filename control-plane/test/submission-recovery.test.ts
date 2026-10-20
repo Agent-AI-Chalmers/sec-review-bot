@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  concludeExhaustedSubmissionRecovery,
+  MAX_SUBMISSION_RECOVERY_ATTEMPTS,
   recoverReviewRunSubmission,
   type ReviewRunRecord
 } from '../src/index.js'
@@ -13,16 +15,33 @@ function run(
     run_id: 'run-1',
     workflow: 'issue-review',
     publish_context: {},
+    preparation: {
+      status: 'submitted',
+      attempt_count: 1,
+      started_at: '2026-01-01T00:00:01.000Z',
+      finished_at: '2026-01-01T00:00:02.000Z',
+      updated_at: '2026-01-01T00:00:03.000Z',
+      failure_code: null,
+      disconnect_reason: null
+    },
     ...(input === null ? {} : { runner_input: input }),
-    runner_status: 'recovering',
-    publication_status: 'pending',
+    execution: {
+      status: 'uncertain',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publication: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
     created_at: '2026-01-01T00:00:00.000Z',
-    execution_updated_at: '2026-01-01T00:00:00.000Z',
-    publication_updated_at: '2026-01-01T00:00:00.000Z',
-    published_at: null,
     failure_code: null,
     failure_message: null,
-    artifact_storage: null
+    artifact_storage: null,
+    notices: []
   }
 }
 
@@ -37,6 +56,15 @@ function store(
       return true
     },
     async failSubmissionRecovery() {
+      return true
+    },
+    async submissionRecoveryAttemptCount() {
+      return 0
+    },
+    async disconnectExhaustedSubmissionRecovery() {
+      return false
+    },
+    async recordUnknownRecoveryOutcome() {
       return true
     },
     ...overrides
@@ -77,13 +105,22 @@ test('submission recovery replays the persisted input and commits its claim', as
   ])
 })
 
-test('submission recovery persists uncertainty for a later retry', async () => {
-  const failures: unknown[][] = []
+test('submission recovery leaves an uncertain replay untouched', async () => {
+  // An unknown replay outcome is not a failure: the Runner may have accepted the request, so
+  // nothing may be concluded and the state must stay `uncertain`. The claim is deliberately left
+  // in place too - the run becomes claimable again when its lease expires, which is the pace it
+  // had before this path existed. Clearing it would replay a failing submission every tick.
+  const concluded: unknown[][] = []
+  const counted: string[] = []
   const transportError = new Error('response lost')
   const result = await recoverReviewRunSubmission(
     store({
       async failSubmissionRecovery(...args) {
-        failures.push(args)
+        concluded.push(args)
+        return true
+      },
+      async recordUnknownRecoveryOutcome(_runId, token) {
+        counted.push(token)
         return true
       }
     }),
@@ -101,13 +138,14 @@ test('submission recovery persists uncertainty for a later retry', async () => {
   )
 
   assert.deepStrictEqual(result, { status: 'deferred', error: transportError })
-  assert.deepStrictEqual(failures, [
-    [
-      'run-1',
-      'claim-1',
-      { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'response lost' }
-    ]
-  ])
+  // The attempt is counted even though nothing is concluded: the budget is what eventually lets
+  // an otherwise endless uncertainty end, so it has to advance on every unknown outcome.
+  assert.deepStrictEqual(counted, ['claim-1'])
+  assert.deepStrictEqual(
+    concluded,
+    [],
+    'nothing may be concluded while the outcome is unknown'
+  )
 })
 
 test('submission recovery records missing persisted input without calling Runner', async () => {
@@ -134,4 +172,65 @@ test('submission recovery records missing persisted input without calling Runner
   assert.strictEqual(result.status, 'input_missing')
   assert.strictEqual(submitted, false)
   assert.strictEqual(failure?.code, 'SUBMISSION_RECOVERY_INPUT_MISSING')
+})
+
+test('an uncertain submission disconnects once its replay budget is spent', async () => {
+  // A submission whose replays never resolve would otherwise stay `uncertain` forever: no axis
+  // must stop automation, but it is not evidence that the Runner rejected the submission.
+  const result = await concludeExhaustedSubmissionRecovery(
+    store({
+      async submissionRecoveryAttemptCount() {
+        return MAX_SUBMISSION_RECOVERY_ATTEMPTS
+      },
+      async disconnectExhaustedSubmissionRecovery(_runId, maxAttempts) {
+        assert.strictEqual(maxAttempts, MAX_SUBMISSION_RECOVERY_ATTEMPTS)
+        return true
+      }
+    }),
+    run()
+  )
+
+  assert.deepStrictEqual(result, { status: 'disconnected' })
+})
+
+test('a replay budget that is not spent yet leaves the run to the normal replay path', async () => {
+  let taken = false
+  const result = await concludeExhaustedSubmissionRecovery(
+    store({
+      async submissionRecoveryAttemptCount() {
+        return MAX_SUBMISSION_RECOVERY_ATTEMPTS - 1
+      },
+      async disconnectExhaustedSubmissionRecovery() {
+        taken = true
+        return true
+      }
+    }),
+    run()
+  )
+
+  assert.strictEqual(result, null)
+  assert.strictEqual(
+    taken,
+    false,
+    'an unfinished budget must not conclude the run'
+  )
+})
+
+test('losing the race to another owner reports nothing', async () => {
+  // Two processes can both see a spent budget. `disconnectExhaustedSubmissionRecovery` is gated on the
+  // claim, so only one wins; the loser must stay silent rather than report a conclusion it did
+  // not make.
+  const result = await concludeExhaustedSubmissionRecovery(
+    store({
+      async submissionRecoveryAttemptCount() {
+        return MAX_SUBMISSION_RECOVERY_ATTEMPTS
+      },
+      async disconnectExhaustedSubmissionRecovery() {
+        return false
+      }
+    }),
+    run()
+  )
+
+  assert.strictEqual(result, null)
 })

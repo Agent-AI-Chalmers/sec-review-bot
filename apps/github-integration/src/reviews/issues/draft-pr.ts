@@ -4,12 +4,13 @@ import {
   hasReviewRecordPatchReadyForPromotion,
   normalizePromotionFilePath
 } from './renderer.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { ReviewRecord } from '../review-record.js'
 import type { FileChange, FileMode } from '../file-change.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
-import { asErrorWithResponse } from '../../utils/error-utils.js'
 import { resolveTrustedDefaultBranch } from '../../github/default-branch-service.js'
+import { isBranchAlreadyExists } from '../shared/branch-already-exists.js'
+import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 
 interface IssueContext {
   issue_number: number
@@ -18,16 +19,19 @@ interface IssueContext {
   repo_name: string
 }
 
-function buildDraftBranchName(
+export function buildDraftBranchName(
   issue: IssueContext,
   run_id: string | undefined
 ): string {
-  // Control Plane assigns a UUID run id, so the last 8 characters are stable, unique enough
-  // for a branch segment, and already hyphen-free at that offset.
-  const shortRunId = String(run_id ?? 'manual').slice(-8)
-  return sanitizeBranchSegment(
-    `sec-review-bot/issue-${issue.issue_number}-${shortRunId}`
-  )
+  // The whole run id, not a slice of it. The branch is the publication's idempotency key: an
+  // existing branch is verified against this run's tree and reused, so a name two runs share
+  // makes one run adopt the other's branch - or, when the trees differ, conclude that its own
+  // validated result "does not match" and fail. The last 8 hex characters of a UUID collide
+  // after about 65k runs, which is reachable in a busy deployment; the full id cannot.
+  // A UUID is already git-ref-safe, but it still goes through the shared sanitizer so every
+  // branch segment this package builds obeys the same ref rules.
+  const runSegment = sanitizeBranchSegment(String(run_id ?? 'manual'))
+  return `sec-review-bot/issue-${issue.issue_number}-${runSegment}`
 }
 
 function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
@@ -99,7 +103,7 @@ function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
 }
 
 async function buildTreeElementsFromFileChanges(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   file_changes: FileChange[],
   issue: IssueContext,
   assertPublicationClaim: () => Promise<void>
@@ -155,7 +159,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
   review_record,
   assert_publication_claim
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   issue: IssueContext
   run_id: string
   workspace_ref: string
@@ -259,19 +263,31 @@ export async function createDraftPullRequestFromIssueReviewRecord({
       sha: newCommitResponse.data.sha
     })
   } catch (error) {
-    if (asErrorWithResponse(error).status !== 422) {
+    // The existing run-specific branch is a recovery checkpoint only when it
+    // still represents this run's validated result. Do not overwrite it.
+    if (!isBranchAlreadyExists(error)) {
       throw error
     }
-    // A previous attempt may have created the run-specific branch but failed
-    // before opening the PR. Reuse that branch as the retry checkpoint.
     await assert_publication_claim()
-    await octokit.rest.git.updateRef({
+    const existingRef = await octokit.rest.git.getRef({
       owner,
       repo,
-      ref: `heads/${branch_name}`,
-      sha: newCommitResponse.data.sha,
-      force: true
+      ref: `heads/${branch_name}`
     })
+    const existingCommit = await octokit.rest.git.getCommit({
+      owner,
+      repo,
+      commit_sha: existingRef.data.object.sha
+    })
+    if (
+      existingCommit.data.tree.sha !== treeResponse.data.sha ||
+      existingCommit.data.parents?.length !== 1 ||
+      existingCommit.data.parents[0]?.sha !== head_sha
+    ) {
+      throw new DeterministicRunnerPublishError(
+        `Existing draft PR branch does not match the validated result for run ${run_id}.`
+      )
+    }
   }
 
   await assert_publication_claim()

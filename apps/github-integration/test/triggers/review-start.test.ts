@@ -5,11 +5,65 @@ import test from 'node:test'
 
 import { startIssueReviewCommand } from '../../src/triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-review.js'
+import type { SubmittedPullRequestReviewRun } from '../../src/reviews/pull-requests/submit.js'
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
+import type {
+  IssueReviewInput,
+  PullRequestReviewInput
+} from '../../src/runner/input.js'
+import type {
+  ReviewRunAdmission,
+  ReviewRunRecord
+} from '../../src/control-plane/client.js'
+import { unusedGitHub } from '../github-client.js'
+
+/** An admitted run record as the Control Plane returns it, with the axis shapes spelled once.
+ *
+ * The tests below stub `admitReviewRun`, and each stub used to write out the whole record shape
+ * and then cast it with `as never`. That cast switched off every check on the shape, so a field
+ * added to the contract (or moved between axes) left these stubs compiling while returning
+ * something the real service never would. Building the record here keeps one definition and
+ * lets the `ReviewRunRecord` type police it.
+ */
+function admittedRecord(
+  overrides: Partial<ReviewRunRecord> & { run_id: string }
+): ReviewRunRecord {
+  return {
+    workflow: 'issue-review',
+    publish_context: {},
+    preparation: {
+      status: 'submitted',
+      attempt_count: 1,
+      started_at: '2026-01-01T00:00:01.000Z',
+      finished_at: '2026-01-01T00:00:02.000Z',
+      updated_at: '2026-01-01T00:00:03.000Z',
+      failure_code: null,
+      disconnect_reason: null
+    },
+    execution: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publication: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    created_at: '2026-01-01T00:00:00.000Z',
+    failure_code: null,
+    failure_message: null,
+    artifact_storage: null,
+    notices: [],
+    ...overrides
+  }
+}
 
 const TRUSTED_DEFAULT_BRANCH = {
   default_branch: 'main',
@@ -75,12 +129,47 @@ function pullRequestContext(): PullRequestContext {
   }
 }
 
+/** A complete `IssueReviewInput`, the second argument of `on_prepared`.
+ *
+ * `satisfies` keeps this honest: the trigger reads the field set, so an incomplete stub would
+ * silently hand it `undefined` where the real submission always supplies a value.
+ */
+function issueReviewInput(): IssueReviewInput & Record<string, unknown> {
+  return {
+    contract_version: CONTRACT_VERSION,
+    input_bundle: {
+      uri: 's3://bucket/input.tar.zst',
+      digest: `sha256:${'a'.repeat(64)}`,
+      media_type: 'application/tar+zstd',
+      size_bytes: 1
+    },
+    review_intent: { objective: 'audit' },
+    issue: {}
+  } satisfies IssueReviewInput
+}
+
+/** A complete `PullRequestReviewInput`, the second argument of `on_prepared` for PR runs. */
+function pullRequestReviewInput(): PullRequestReviewInput &
+  Record<string, unknown> {
+  return {
+    contract_version: CONTRACT_VERSION,
+    input_bundle: {
+      uri: 's3://bucket/input.tar.zst',
+      digest: `sha256:${'a'.repeat(64)}`,
+      media_type: 'application/tar+zstd',
+      size_bytes: 1
+    },
+    review_intent: { objective: 'audit' },
+    pr: {}
+  } satisfies PullRequestReviewInput
+}
+
 test('startIssueReviewCommand starts and persists a queued issue review run', async () => {
   const issue = issueContext()
   const transitions: unknown[] = []
 
   const submitted = await startIssueReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     issue,
     event_type: 'opened',
@@ -106,20 +195,18 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           event_type: 'opened' as const,
           open_pr: false
         }
-        await on_prepared?.(prepared, {
-          contract_version: CONTRACT_VERSION
-        } as never)
+        await on_prepared?.(prepared, issueReviewInput())
         return prepared
       },
       store: {
         ...preparationClaim,
         admitReviewRun: (run) => {
-          transitions.push(['preparing', withoutPreparationInput(run)])
+          transitions.push(['pending', withoutPreparationInput(run)])
           return {
-            record: { ...run, run_id: 'run-issue-1' },
+            record: admittedRecord({ ...run, run_id: 'run-issue-1' }),
             created: true,
             preparation_token: 'claim'
-          } as never
+          }
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
@@ -132,7 +219,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
   assert.strictEqual(submitted.run_id, 'run-issue-1')
   assert.deepStrictEqual(transitions, [
     [
-      'preparing',
+      'pending',
       {
         workflow: 'issue-review',
         publish_context: {},
@@ -165,7 +252,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
   const transitions: unknown[] = []
 
   const submitted = await startPullRequestReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     pr,
     event_type: 'manual_review',
@@ -189,20 +276,18 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
           workflow: 'pull-request-review',
           event_type: 'manual_review' as const
         }
-        await on_prepared?.(prepared, {
-          contract_version: CONTRACT_VERSION
-        } as never)
+        await on_prepared?.(prepared, pullRequestReviewInput())
         return prepared
       },
       store: {
         ...preparationClaim,
         admitReviewRun: (run) => {
-          transitions.push(['preparing', withoutPreparationInput(run)])
+          transitions.push(['pending', withoutPreparationInput(run)])
           return {
-            record: { ...run, run_id: 'run-pr-1' },
+            record: admittedRecord({ ...run, run_id: 'run-pr-1' }),
             created: true,
             preparation_token: 'claim'
-          } as never
+          }
         },
         submitPreparedRun: (run_id, _token, publish_context) =>
           transitions.push(['queued', run_id, publish_context]),
@@ -215,7 +300,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
   assert.strictEqual(submitted.run_id, 'run-pr-1')
   assert.deepStrictEqual(transitions, [
     [
-      'preparing',
+      'pending',
       {
         workflow: 'pull-request-review',
         publish_context: {},
@@ -249,7 +334,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
 
   await assert.rejects(
     startPullRequestReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
@@ -262,12 +347,12 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', withoutPreparationInput(run)])
+            transitions.push(['pending', withoutPreparationInput(run)])
             return {
-              record: { ...run, run_id: 'run-pr-failed' },
+              record: admittedRecord({ ...run, run_id: 'run-pr-failed' }),
               created: true,
               preparation_token: 'claim'
-            } as never
+            }
           },
           submitPreparedRun: () =>
             assert.fail('failed review must not be queued'),
@@ -281,7 +366,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
 
   assert.deepStrictEqual(transitions, [
     [
-      'preparing',
+      'pending',
       {
         workflow: 'pull-request-review',
         publish_context: {},
@@ -306,7 +391,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
 
   await assert.rejects(
     startIssueReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       issue: issueContext(),
       event_type: 'opened',
@@ -322,7 +407,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               event_type: 'opened',
               open_pr: false
             },
-            { contract_version: CONTRACT_VERSION } as never
+            issueReviewInput()
           )
           throw error
         },
@@ -330,14 +415,10 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: {
-                ...run,
-                run_id: 'run-uncertain',
-                runner_status: 'preparing'
-              },
+              record: admittedRecord({ ...run, run_id: 'run-uncertain' }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) =>
@@ -361,7 +442,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
 
   await assert.rejects(
     startPullRequestReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
@@ -376,7 +457,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
               workflow: 'pull-request-review',
               event_type: 'opened'
             },
-            { contract_version: CONTRACT_VERSION } as never
+            pullRequestReviewInput()
           )
           throw error
         },
@@ -384,14 +465,10 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: {
-                ...run,
-                run_id: 'run-pr-uncertain',
-                runner_status: 'preparing'
-              },
+              record: admittedRecord({ ...run, run_id: 'run-pr-uncertain' }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) =>
@@ -411,7 +488,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
 
   await assert.rejects(
     startPullRequestReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',
       delivery_id: 'delivery-context-failure',
@@ -436,16 +513,12 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
         store: {
           ...preparationClaim,
           admitReviewRun: (run) => {
-            transitions.push(['preparing', 'run-context-failure'])
+            transitions.push(['pending', 'run-context-failure'])
             return {
-              record: {
-                ...run,
-                run_id: 'run-context-failure',
-                runner_status: 'preparing'
-              },
+              record: admittedRecord({ ...run, run_id: 'run-context-failure' }),
               created: true,
               preparation_token: 'claim'
-            } as never
+            } satisfies ReviewRunAdmission
           },
           submitPreparedRun: () =>
             assert.fail('failed context lookup must not queue'),
@@ -458,7 +531,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
   )
 
   assert.deepStrictEqual(transitions, [
-    ['preparing', 'run-context-failure'],
+    ['pending', 'run-context-failure'],
     ['context'],
     [
       'failed',
@@ -472,7 +545,7 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
   const pr = pullRequestContext()
   const checkpoints: unknown[][] = []
   await startPullRequestReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     event_type: 'manual_review',
     delivery_id: 'delivery-checkpoint',
@@ -492,16 +565,22 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
       start_review: async ({ pr: preparedPr }) => {
         assert.strictEqual(preparedPr, pr)
         assert.strictEqual(checkpoints.length, 1)
-        return { run_id: 'run-checkpoint' } as never
+        return {
+          pr: preparedPr,
+          run_id: 'run-checkpoint',
+          files: [],
+          workflow: 'pull-request-review',
+          event_type: 'manual_review'
+        } satisfies SubmittedPullRequestReviewRun
       },
       store: {
         ...preparationClaim,
         admitReviewRun: (run) =>
           ({
-            record: { ...run, run_id: 'run-checkpoint' },
+            record: admittedRecord({ ...run, run_id: 'run-checkpoint' }),
             created: true,
             preparation_token: 'claim'
-          }) as never,
+          }) satisfies ReviewRunAdmission,
         checkpointPreparationInput: async (...args) => {
           checkpoints.push(args)
         },
@@ -534,7 +613,7 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
 test('startPullRequestReviewCommand reuses a webhook delivery without starting another review', async () => {
   let starts = 0
   const submitted = await startPullRequestReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     pr: pullRequestContext(),
     event_type: 'opened',
@@ -549,7 +628,15 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
         admitReviewRun: () => ({
           created: false,
           preparation_token: null,
-          record: { run_id: 'run-original', runner_status: 'queued' } as never
+          record: admittedRecord({
+            run_id: 'run-original',
+            execution: {
+              status: 'queued',
+              started_at: null,
+              finished_at: null,
+              updated_at: '2026-01-01T00:00:00.000Z'
+            }
+          })
         }),
         submitPreparedRun: () =>
           assert.fail('replayed delivery must not queue again'),
@@ -566,7 +653,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
 test('startIssueReviewCommand reuses a webhook delivery without starting another review', async () => {
   let starts = 0
   const submitted = await startIssueReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     issue: issueContext(),
     event_type: 'opened',
@@ -581,7 +668,15 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
         admitReviewRun: () => ({
           created: false,
           preparation_token: null,
-          record: { run_id: 'run-original', runner_status: 'queued' } as never
+          record: admittedRecord({
+            run_id: 'run-original',
+            execution: {
+              status: 'queued',
+              started_at: null,
+              finished_at: null,
+              updated_at: '2026-01-01T00:00:00.000Z'
+            }
+          })
         }),
         submitPreparedRun: () =>
           assert.fail('replayed delivery must not queue again'),
@@ -600,7 +695,7 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
 
   await assert.rejects(
     startPullRequestReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
@@ -618,10 +713,13 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, run_id: 'run-pr-setup-invalid' },
+              record: admittedRecord({
+                ...run,
+                run_id: 'run-pr-setup-invalid'
+              }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: () =>
             assert.fail('invalid setup must not be queued'),
           failPreparation: (run_id, _token, error) =>
@@ -649,7 +747,7 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
 
   await assert.rejects(
     startIssueReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       issue: issueContext(),
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',
@@ -667,10 +765,13 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: { ...run, run_id: 'run-issue-setup-invalid' },
+              record: admittedRecord({
+                ...run,
+                run_id: 'run-issue-setup-invalid'
+              }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: () =>
             assert.fail('invalid setup must not be queued'),
           failPreparation: (run_id, _token, error) =>

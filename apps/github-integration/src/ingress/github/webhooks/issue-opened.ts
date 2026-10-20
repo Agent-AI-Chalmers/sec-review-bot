@@ -10,7 +10,7 @@ import {
   isAutomaticTriggerModeEnabled,
   isRepositoryTriggerConfigError
 } from '../../../github/repo-config-service.js'
-import type { GitHubAppOctokit } from '../../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { TrustedDefaultBranch } from '../../../github/default-branch-service.js'
 import {
   isSelfOriginatedWebhookEvent,
@@ -29,7 +29,7 @@ type IssueOpenedWebhookEvent = Pick<
   EmitterWebhookEvent<'issues.opened'>,
   'id' | 'payload'
 > & {
-  octokit: unknown
+  octokit: Octokit
 }
 
 interface HandlerDeps extends TriggerConfigHandlerDeps {
@@ -89,13 +89,10 @@ export async function handleIssueOpenedWithDeps(
   try {
     // Resolve the trusted default branch via API, once for this run, and read
     // config from it (A1: do not trust the payload's repository.default_branch).
-    const resolved = await fetchTrustedRepositoryTriggerConfigFn(
-      octokit as GitHubAppOctokit,
-      {
-        owner_login: issue.owner_login,
-        repo_name: issue.repo_name
-      }
-    )
+    const resolved = await fetchTrustedRepositoryTriggerConfigFn(octokit, {
+      owner_login: issue.owner_login,
+      repo_name: issue.repo_name
+    })
     triggerConfig = resolved.config
     trusted_default_branch = {
       default_branch: resolved.default_branch,

@@ -6,10 +6,9 @@ import {
   Button,
   Container,
   Group,
-  NativeSelect,
+  Menu,
   Paper,
   PasswordInput,
-  Stack,
   Switch,
   Text,
   TextInput,
@@ -19,6 +18,7 @@ import {
 import {
   IconArrowRight,
   IconCheck,
+  IconChevronDown,
   IconCopy,
   IconRefresh
 } from '@tabler/icons-react'
@@ -129,46 +129,71 @@ export function RefreshControls({
   const { autoRefresh, refreshInterval, setAutoRefresh, setRefreshInterval } =
     usePreferences()
   const t = useMessages()
+  const intervalLabel = (ms: number): string =>
+    ms >= 60_000 ? `${ms / 60_000}m` : `${ms / 1000}s`
+  const lastCheckedText = `${t('lastChecked')}: ${
+    lastChecked
+      ? formatDate(lastChecked.toISOString(), language)
+      : t('neverChecked')
+  }`
   return (
-    <Stack gap={4} align="flex-end" className="refresh-controls">
-      <Text c="dimmed" size="xs" ta="right">
-        {t('lastChecked')}:{' '}
-        {lastChecked
-          ? formatDate(lastChecked.toISOString(), language)
-          : t('neverChecked')}
-      </Text>
-      <Group gap="sm" wrap="nowrap">
-        <Switch
-          label={t('autoRefresh')}
-          checked={autoRefresh && autoRefreshEnabled}
-          disabled={!autoRefreshEnabled}
-          onChange={(event) => setAutoRefresh(event.currentTarget.checked)}
-        />
-        <NativeSelect
-          aria-label={t('refreshInterval')}
-          value={String(refreshInterval)}
-          disabled={!autoRefresh || !autoRefreshEnabled}
-          onChange={(event) =>
-            setRefreshInterval(
-              Number(event.currentTarget.value) as 5000 | 15000 | 30000 | 60000
-            )
-          }
-        >
-          <option value="5000">5s</option>
-          <option value="15000">15s</option>
-          <option value="30000">30s</option>
-          <option value="60000">1m</option>
-        </NativeSelect>
-        <Button
-          variant="default"
-          leftSection={<IconRefresh size={16} />}
-          loading={refreshing}
-          onClick={refresh}
-        >
-          {t('refresh')}
-        </Button>
-      </Group>
-    </Stack>
+    // One compact cluster: a manual refresh (its tooltip carries the last-checked time), an
+    // auto-refresh switch, and the interval tucked into a menu on the refresh button rather
+    // than sitting beside it as a second control. The interval is a detail most readers
+    // never change, so it should not take a permanent slot in a crowded toolbar.
+    <Group gap="sm" wrap="nowrap" className="refresh-controls">
+      <Switch
+        label={t('autoRefresh')}
+        checked={autoRefresh && autoRefreshEnabled}
+        disabled={!autoRefreshEnabled}
+        onChange={(event) => setAutoRefresh(event.currentTarget.checked)}
+      />
+      <Tooltip label={lastCheckedText} withArrow>
+        <Button.Group>
+          <Button
+            variant="default"
+            leftSection={<IconRefresh size={16} />}
+            loading={refreshing}
+            onClick={refresh}
+          >
+            {t('refresh')}
+          </Button>
+          <Menu withinPortal position="bottom-end" withArrow>
+            <Menu.Target>
+              <Button
+                variant="default"
+                aria-label={t('refreshInterval')}
+                px={6}
+              >
+                <Group gap={2} wrap="nowrap">
+                  <Text size="xs" c="dimmed">
+                    {intervalLabel(refreshInterval)}
+                  </Text>
+                  <IconChevronDown size={14} />
+                </Group>
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>
+                {t('refreshInterval')}
+                {!autoRefresh && ` · ${t('autoRefresh')} off`}
+              </Menu.Label>
+              {([5000, 15000, 30000, 60000] as const).map((ms) => (
+                <Menu.Item
+                  key={ms}
+                  rightSection={
+                    refreshInterval === ms ? <IconCheck size={14} /> : null
+                  }
+                  onClick={() => setRefreshInterval(ms)}
+                >
+                  {intervalLabel(ms)}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+        </Button.Group>
+      </Tooltip>
+    </Group>
   )
 }
 

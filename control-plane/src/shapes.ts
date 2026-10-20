@@ -7,6 +7,7 @@
 // not part of that contract: the small vocabulary unions, the store's create args, and the
 // runner-artifact narrowing helper.
 import type { RunnerArtifactStorage } from './contracts.js'
+import type { components } from './contract-types-generated.js'
 import type {
   ObservedRun,
   ObservedStep,
@@ -15,6 +16,12 @@ import type {
   ReviewRunAdmission,
   ReviewRunRecord
 } from './contract-types-generated.js'
+
+/** One coordination state transition, as the read endpoint reports it. */
+export type ReviewRunEvent = components['schemas']['ReviewRunEvent']
+
+/** A queued failure acknowledgement, as the connector receives it. */
+export type RunNoticeWork = components['schemas']['RunNoticeWork']
 
 export type {
   ObservedRun,
@@ -29,18 +36,38 @@ export type WorkflowName =
   'issue-review' | 'pull-request-review' | 'repository-review'
 export type IngressKind = 'github_webhook' | 'github_actions_dispatch'
 export type RunnerStatus =
-  'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
+  | 'pending'
+  | 'queued'
+  | 'running'
+  | 'uncertain'
+  | 'succeeded'
+  | 'skipped'
+  | 'failed'
 export type PublicationStatus =
-  'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+  | 'pending'
+  | 'publishing'
+  | 'uncertain'
+  | 'disconnected'
+  | 'published'
+  | 'failed'
+  | 'skipped'
+/** The redacted preparation summary's state, as both the contract and the run record use it. */
+export type PreparationStatus = NonNullable<
+  ReviewRunRecord['preparation']
+>['status']
 export type JsonObject = Record<string, unknown>
 
 /** The durable record's artifact storage, narrowed from the runner's loose type. */
 export type ArtifactStorage = ReviewRunRecord['artifact_storage']
 
-/** The observed step summary is the step record minus the reconciliation id. */
+/** The observed step summary is the step record minus the reconciliation id and the timing of
+ * the latest attempt. `attempt_count` is deliberately kept: it is the step's budget, so a
+ * reader of the summary can tell a step that is on its last try from one that has not started.
+ * The reconciliation id stays internal because it names the remote object, which the summary
+ * reaches through `remote_object_url` instead. */
 export type PublicationStepSummary = Omit<
   PublicationStepRecord,
-  'remote_object_id'
+  'remote_object_id' | 'last_attempt_at'
 >
 
 /** The arguments the store accepts for a new run. */

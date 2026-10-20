@@ -8,19 +8,36 @@ import {
   type RunRowsProjection
 } from '../src/index.js'
 
-const run = {
+const run: ReviewRunRecord = {
   run_id: 'run-1',
-  workflow: 'issue-review' as const,
+  workflow: 'issue-review',
   publish_context: {},
-  runner_status: 'queued' as const,
-  publication_status: 'pending' as const,
+  preparation: {
+    status: 'submitted',
+    attempt_count: 1,
+    started_at: '2026-01-01T00:00:01.000Z',
+    finished_at: '2026-01-01T00:00:02.000Z',
+    updated_at: '2026-01-01T00:00:03.000Z',
+    failure_code: null,
+    disconnect_reason: null
+  },
+  execution: {
+    status: 'queued',
+    started_at: null,
+    finished_at: null,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  },
+  publication: {
+    status: 'pending',
+    started_at: null,
+    finished_at: null,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  },
   created_at: '2026-01-01T00:00:00.000Z',
-  execution_updated_at: '2026-01-01T00:00:00.000Z',
-  publication_updated_at: '2026-01-01T00:00:00.000Z',
-  published_at: null,
   failure_code: null,
   failure_message: null,
-  artifact_storage: null
+  artifact_storage: null,
+  notices: []
 }
 
 /** A pass result with nothing dropped, for the common stub case. */
@@ -33,7 +50,7 @@ test('coordination expires preparations before recovery and active observation',
   const store = {
     async expireStalePreparations() {
       events.push('expire')
-      return 0
+      return { concluded: 0, blocked: [] }
     },
     async listSubmissionRecoveries() {
       return projected([{ ...run, run_id: 'recover-1' }])
@@ -56,6 +73,9 @@ test('coordination expires preparations before recovery and active observation',
     },
     onDroppedRunRow() {
       throw new Error('this pass drops no rows')
+    },
+    onBlockedPreparationExpiry() {
+      throw new Error('this pass blocks no expiries')
     }
   })
 
@@ -73,7 +93,7 @@ test('one pass reads every active run status in a single request', async () => {
   // ask once, whatever the number of runs.
   const store = {
     async expireStalePreparations() {
-      return 0
+      return { concluded: 0, blocked: [] }
     },
     async listSubmissionRecoveries() {
       return projected([])
@@ -100,6 +120,9 @@ test('one pass reads every active run status in a single request', async () => {
     },
     onDroppedRunRow() {
       throw new Error('this pass drops no rows')
+    },
+    onBlockedPreparationExpiry() {
+      throw new Error('this pass blocks no expiries')
     }
   })
 
@@ -111,7 +134,7 @@ test('a pass with no active runs asks the Runner nothing', async () => {
   const reads: number[] = []
   const store = {
     async expireStalePreparations() {
-      return 0
+      return { concluded: 0, blocked: [] }
     },
     async listSubmissionRecoveries() {
       return projected([])
@@ -134,6 +157,9 @@ test('a pass with no active runs asks the Runner nothing', async () => {
     },
     onDroppedRunRow() {
       throw new Error('this pass drops no rows')
+    },
+    onBlockedPreparationExpiry() {
+      throw new Error('this pass blocks no expiries')
     }
   })
 
@@ -146,7 +172,7 @@ test('a single row the contract cannot represent degrades that run, not the pass
   // healthy runs on both sides of it are still observed.
   const store = {
     async expireStalePreparations() {
-      return 0
+      return { concluded: 0, blocked: [] }
     },
     async listSubmissionRecoveries() {
       return {
@@ -176,6 +202,9 @@ test('a single row the contract cannot represent degrades that run, not the pass
     },
     async observeActiveRun(entry) {
       observed.push(entry.run_id)
+    },
+    onBlockedPreparationExpiry() {
+      throw new Error('this pass blocks no expiries')
     },
     onDroppedRunRow({ run_id, error }) {
       reported.push({

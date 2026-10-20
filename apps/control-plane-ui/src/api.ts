@@ -1,30 +1,97 @@
-export interface ArtifactStorage {
-  status: 'available' | 'unavailable' | 'failed'
-  artifact?: {
-    kind: 'diagnostic_bundle'
-    /** Where the Runner stored the bundle. The contract requires it. */
-    uri: string
-    media_type: string
-    digest: string
-    size_bytes: number
+// The response shapes come from the generated contract projection rather than hand-written
+// interfaces: `ArtifactStorage` is a discriminated union in the contract, and a flattened copy
+// could not tell `available` (which requires `artifact`) apart from the other statuses.
+import type {
+  ArtifactStorage,
+  ParkedRun,
+  PublicationStep,
+  Run,
+  RunEvent
+} from './control-plane-api-types.js'
+
+export type { ArtifactStorage, ParkedRun, PublicationStep, Run, RunEvent }
+
+/** Abandon a blocked run at an operator's explicit request.
+ *
+ * The admin token is supplied per call and only travels in this request header: the console keeps
+ * it in component state for the duration of the dialog, and the BFF forwards it without storing
+ * it. Nothing here can act on its own. */
+export async function abandonBlockedRun(
+  runId: string,
+  reason: string,
+  adminToken: string
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/runs/${encodeURIComponent(runId)}/abandon`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-control-plane-admin-token': adminToken
+      },
+      body: JSON.stringify({ reason })
+    }
+  )
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorCode(response))
   }
-  error_code?: string
-  message?: string
 }
-export interface Run {
-  run_id: string
-  workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
-  execution_status:
-    'preparing' | 'recovering' | 'queued' | 'running' | 'succeeded' | 'failed'
-  publication_status:
-    'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
-  created_at: string
-  execution_updated_at: string
-  publication_updated_at: string
-  published_at: string | null
-  failure_code: string | null
-  artifact_storage: ArtifactStorage | null
+
+/** Hand a disconnected run back to automatic recovery at an operator's explicit request.
+ *
+ * The credential handling is identical to `abandonBlockedRun`: the admin token travels with this
+ * one request and is never stored. The two decisions are deliberately separate calls — resuming
+ * asks the system to try again, abandoning ends the run — so the console cannot send one while
+ * meaning the other. */
+export async function resumeDisconnectedRun(
+  runId: string,
+  adminToken: string
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/runs/${encodeURIComponent(runId)}/resume`,
+    {
+      method: 'POST',
+      headers: { 'x-control-plane-admin-token': adminToken }
+    }
+  )
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorCode(response))
+  }
 }
+
+/** Stop waiting for a disconnected run at an operator's explicit request.
+ *
+ * The third operator decision, and the one that does not claim anything was resolved: a
+ * disconnected execution may still be running, and a disconnected publication may already have
+ * delivered part of its result. It records that the outcome will not be waited for. */
+export async function giveUpDisconnectedRun(
+  runId: string,
+  reason: string,
+  adminToken: string
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/runs/${encodeURIComponent(runId)}/give-up`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-control-plane-admin-token': adminToken
+      },
+      body: JSON.stringify({ reason })
+    }
+  )
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorCode(response))
+  }
+}
+
+/** The runs coordination has stopped retrying. Reading this needs only the read token: knowing
+ * a run is stuck is not privileged, only deciding what to do about it is. */
+export async function parkedRuns(): Promise<ParkedRun[]> {
+  const body = await api<{ blocks: ParkedRun[] }>('/runs/parked')
+  return body.blocks
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,

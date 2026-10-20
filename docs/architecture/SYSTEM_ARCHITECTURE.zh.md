@@ -14,7 +14,7 @@ flowchart TD
   storage[(对象存储\ninput bundle + 终态 artifact)]
   runner[agents/\nRunner 与 workflow 执行]
   ui[apps/control-plane-ui\n运维界面]
-  state[(PostgreSQL\nrun + publication 状态)]
+  state[(PostgreSQL\n准备 / 执行 / 发布状态)]
 
   github -->|1. webhook 或 Actions 请求| app
   app -->|2. 提交已校验请求| cp

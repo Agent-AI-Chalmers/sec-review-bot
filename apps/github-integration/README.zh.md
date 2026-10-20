@@ -155,6 +155,8 @@ sec_review_bot:
 
 这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review`。
 
+本 app 只回应自己名字的两种拼写：裸 slug，以及 GitHub 分配的 bot login `@<app-slug>[bot]`。它刻意不去猜测 `@<app-slug>-bot` 这类近似写法，因为那样的名字可能属于另一个账号。其他写法都视为普通对话，不做处理。
+
 issue 与 PR conversation comment 共用同一套命令语法；下面的参数在两种场景下解析方式一致，对当前目标没有意义的参数会被忽略（每个参数下已注明）：
 
 ```text
@@ -192,6 +194,8 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 
 `schedule` 触发默认按 incremental scan 处理，并由 App 侧根据 cron 推导扫描窗口；手动 incremental 必须显式提供 `base_sha`。
 
+仓库级运行没有可供回复的对话线程，因此它的结果和失败都落在该仓库长期存在的 summary issue（`[sec-review-bot] Repository Security Review Summary`）上。成功扫描会在此追加结果评论；任一阶段失败的运行会追加一条注明失败阶段与原因的评论。若某仓库从未成功完成过扫描，首次失败会创建该 issue，使一直失败的扫描仍然可见，而不是静默消失。
+
 补充说明：
 
 - 手动命令接受普通 issue comment 和 pull request 页面 Conversation 标签下的 comment。
@@ -205,8 +209,8 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 
 ## Bot 自身事件与发布边界
 
-Bot 自己创建的 comment、PR 或 push 可能会再次触发 webhook，形成自循环。系统在 webhook 入口检查 sender 是否为 Bot，命中后直接跳过，只跳过本 App 自己发出的回流事件。
+Bot 自己创建的 comment、PR 或 push 可能会再次触发 webhook，形成自循环。系统在 webhook 入口检查 sender 是否为 Bot，命中后直接跳过，只跳过本 App 自己发出的回流事件。当 App 自身的 login 未知时，该守卫会跳过所有 Bot 事件（无法区分自己与别人）；服务在该状态下拒绝启动，因此这只会影响绕过启动流程的调用方。
 
 手动 comment 命令解析也会忽略 Markdown blockquote 行，所以在回复里引用旧 bot 命令不会再次触发；新的命令必须写在引用文本之外。
 
-发布阶段也有一个相关边界：如果 PR 作者是当前 App bot，App 会发布普通 review comment，而不是给自己的 PR 创建 `APPROVE` 或 `REQUEST_CHANGES` reviewer state。如果 GitHub 仍然以 own-PR review 拒绝 approval，publisher 会降级为普通 review comment。
+发布阶段也有一个相关边界：如果 PR 作者是当前 App bot，App 会发布普通 review comment，而不是给自己的 PR 创建 `APPROVE` 或 `REQUEST_CHANGES` reviewer state。该判断复用与自循环守卫相同的归属函数，因此 App 自身 login 未知时发布会 fail closed，而不是猜测。如果 GitHub 仍然以 own-PR review 拒绝 approval，publisher 会降级为普通 review comment。

@@ -7,7 +7,7 @@
 // Every check compares key sets rather than values, and the direction matters:
 //
 // - TypeScript widens JSON strings to `string`, so assigning a fixture to `Run` would
-//   reject a perfectly correct example that carries `"execution_status": "succeeded"`
+//   reject a perfectly correct example that carries `"status": "succeeded"`
 //   instead of the narrower union.
 // - An optional field appears in the schema's properties but not in every example, so
 //   equality is the wrong relation between an example and the schema. Each check below
@@ -42,12 +42,19 @@ export type RunModelsTheExample = Expect<SameKeys<Run, typeof fixture>>
 
 /**
  * The artifact is required to be complete, so this pairing is the strict one: the console's
- * artifact type and the example's artifact must name the same fields. This is the check
- * that caught `uri` missing from the console's type while the contract required it.
+ * artifact type and the example's artifact must name the same fields. This is the check that
+ * caught `uri` missing from the console's type while the contract required it.
+ *
+ * `ArtifactStorage` is now the contract's discriminated union, so `artifact` is reached through
+ * its `available` arm - the only one the contract lets carry the reference.
  */
+type AvailableArtifactStorage = Extract<
+  NonNullable<ArtifactStorage>,
+  { status: 'available' }
+>
 export type ArtifactKeysMatchTheContract = Expect<
   SameKeys<
     NonNullable<(typeof fixture)['artifact_storage']>['artifact'],
-    NonNullable<ArtifactStorage['artifact']>
+    AvailableArtifactStorage['artifact']
   >
 >

@@ -154,6 +154,8 @@ A repository can also declare how to prepare a dependency-complete environment f
 
 `<app-slug>` is not a literal placeholder; it is the actual slug registered for the GitHub App. If the app slug is `web-sec-bot`, the real comment is `@web-sec-bot review`.
 
+The app answers two spellings of its own name: the bare slug and the bot login GitHub assigns, `@<app-slug>[bot]`. It deliberately does not guess near-misses such as `@<app-slug>-bot`, because another account could be named that. Anything else is ordinary conversation and is ignored.
+
 Issue and PR conversation comments share one command grammar. The flags below are parsed the same way in both places; a flag that has no meaning for a target is ignored (noted per flag):
 
 ```text
@@ -191,6 +193,8 @@ Manual `workflow_dispatch` supports:
 
 `schedule` triggers default to incremental scan, and the App derives the scan window from the cron schedule. Manual incremental scans must explicitly provide `base_sha`.
 
+A repository-level run has no conversation to reply in, so both its results and its failures land in the repository's long-lived summary issue (`[sec-review-bot] Repository Security Review Summary`). A successful scan appends a result comment there; a run that fails at any stage appends a failure comment naming the stage and reason. The first failure in a repository that has never completed a scan creates that issue, so a scan that never works is still visible instead of failing silently.
+
 Additional notes:
 
 - Manual commands are accepted from normal issue comments and comments on the Pull Request page's Conversation tab.
@@ -204,8 +208,8 @@ Additional notes:
 
 ## Bot-Originated Events And Publishing
 
-Comments, PRs, or pushes created by the bot itself may trigger webhooks again and create a loop. The webhook entrypoint checks whether the sender is the bot and skips matching events. Only events produced by this App itself are skipped.
+Comments, PRs, or pushes created by the bot itself may trigger webhooks again and create a loop. The webhook entrypoint checks whether the sender is the bot and skips matching events. Only events produced by this App itself are skipped. If the App's own login is unknown the guard skips every bot event, because it cannot tell its own from another's; the service refuses to start in that state, so this only affects callers that bypass startup.
 
 Manual comment command parsing also ignores Markdown blockquote lines, so quoting an older bot command in a reply does not retrigger that command. A new command must appear outside the quoted text.
 
-Publishing has one related guard: when the current App bot authored the PR, the App publishes a normal review comment instead of creating `APPROVE` or `REQUEST_CHANGES` reviewer state for itself. If GitHub still rejects an approval as an own-PR review, the publisher falls back to a normal review comment.
+Publishing has one related guard: when the current App bot authored the PR, the App publishes a normal review comment instead of creating `APPROVE` or `REQUEST_CHANGES` reviewer state for itself. This check is the same shared attribution function the loop guard uses, so an unknown App login fails the publication closed instead of guessing; if GitHub still rejects an approval as an own-PR review, the publisher falls back to a normal review comment.

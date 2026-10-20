@@ -2,7 +2,6 @@ import { clearInterval } from 'node:timers'
 import type { App } from 'octokit'
 
 import { startReviewRunCoordinatorLoop } from '../control-plane/coordinator.js'
-import { splitRepoFullName } from '../github/repository-service.js'
 import { handleIssueReviewRun } from '../reviews/issues/publish.js'
 import { handlePullRequestReviewRun } from '../reviews/pull-requests/publish.js'
 import { handleRepositoryReviewRun } from '../reviews/repositories/publish.js'
@@ -15,16 +14,18 @@ import {
 } from './publication-claim.js'
 import {
   controlPlaneClient,
-  type ControlPlaneClient,
+  type PublicationCoordinatorStore,
+  type PublicationHeartbeatStore,
   type PublicationWork
 } from './client.js'
+import { installationOctokitForRepo } from '../github/installation-client.js'
 
 export interface PublicationCoordinator {
   stop: () => Promise<void>
 }
 interface Options {
   app: App
-  store?: ControlPlaneClient
+  store?: PublicationCoordinatorStore
   intervalMs?: number
 }
 
@@ -36,21 +37,9 @@ function pollIntervalMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 15_000
 }
 
-async function installationOctokitForRepo(
-  app: App,
-  repoFullName: string
-): Promise<unknown> {
-  const { owner_login, repo_name } = splitRepoFullName(repoFullName)
-  const installation = await app.octokit.rest.apps.getRepoInstallation({
-    owner: owner_login,
-    repo: repo_name
-  })
-  return await app.getInstallationOctokit(installation.data.id)
-}
-
 async function publishWork(
   app: App,
-  store: ControlPlaneClient,
+  store: PublicationCoordinatorStore,
   work: PublicationWork,
   assertOwned: () => Promise<void>
 ): Promise<void> {
@@ -70,7 +59,7 @@ async function publishWork(
 }
 
 export async function withPublicationHeartbeat(
-  store: ControlPlaneClient,
+  store: PublicationHeartbeatStore,
   work: PublicationWork,
   operation: (assertOwned: () => Promise<void>) => Promise<void>
 ): Promise<boolean> {
@@ -134,7 +123,7 @@ export async function publishReviewRunsOnce({
   store = controlPlaneClient
 }: {
   app: App
-  store?: ControlPlaneClient
+  store?: PublicationCoordinatorStore
 }): Promise<void> {
   // Hold the claim briefly rather than returning immediately: a run that becomes
   // publishable mid-interval is picked up as soon as it does, and the poll timer above

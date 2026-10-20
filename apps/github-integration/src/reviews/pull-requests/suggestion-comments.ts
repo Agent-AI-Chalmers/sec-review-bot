@@ -4,6 +4,7 @@ import {
   type ReviewCommentSide
 } from '../../github/comment-service.js'
 import type { PersistedPullRequest } from '../../control-plane/publish-context.js'
+import type { Octokit } from 'octokit'
 
 interface SuggestionCandidate {
   path: string
@@ -23,7 +24,7 @@ interface PublishSuggestionReviewArgs {
 }
 
 export async function publishPullRequestSuggestionReview(
-  octokit: Parameters<typeof createPullRequestReviewUnlessMarkerExists>[0],
+  octokit: Octokit,
   {
     pr,
     review_body,

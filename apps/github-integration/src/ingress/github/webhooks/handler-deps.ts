@@ -4,6 +4,7 @@ import type {
   isAutomaticTriggerModeEnabled,
   isRepositoryTriggerConfigError
 } from '../../../github/repo-config-service.js'
+import type { Octokit } from 'octokit'
 
 /**
  * Shared request shape for webhook handlers. Handlers that expose a testable
@@ -12,7 +13,7 @@ import type {
  */
 export interface WebhookHandlerArgs {
   id: string
-  octokit: unknown
+  octokit: Octokit
   payload: unknown
 }
 

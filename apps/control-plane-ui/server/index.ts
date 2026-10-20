@@ -87,8 +87,62 @@ function forwardedPath(bffUrl: string): string {
   return `${url.pathname.slice('/api'.length)}${query === '' ? '' : `?${query}`}`
 }
 
-const allowed =
-  /^\/api\/runs(?:\?.*)?$|^\/api\/runs\/[^/?]+(?:\/publication-steps)?$/
+/** The UUID a Control Plane run id is (see the contract's `runId` path parameter). */
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/** Whether this BFF path is one of the reads the console may proxy upstream.
+ *
+ * The run-id segment is matched against the contract's UUID shape after percent-decoding, not
+ * with a catch-all. A catch-all would still be safe today - Control Plane rejects a malformed id
+ * with a 400 - but it widens the reachable surface to whatever path a future upstream read
+ * endpoint might parse, so the allow-list states the exact shape it means.
+ */
+/** The operator writes the console may proxy: `/api/admin/runs/<uuid>/<action>`.
+ *
+ * The admin credential is supplied by the operator for that one request and forwarded as-is; the
+ * BFF never reads or stores it. Keeping it out of the server means a compromised BFF cannot
+ * abandon or resume runs, and the Control Plane decides who is allowed to.
+ */
+// Same shape check as the read allow-list: the id is a UUID or the request is not one this BFF
+// proxies. Sharing `RUN_ID` keeps the two policies from drifting apart.
+const ADMIN_DECISION = new RegExp(
+  `^/api/admin/runs/(${RUN_ID.source.slice(1, -1)})/(abandon|resume|give-up)$`
+)
+
+function isAllowedReadPath(bffUrl: string): boolean {
+  const url = new URL(bffUrl, 'http://control-plane-ui.local')
+  if (url.pathname === '/api/runs') return true
+  // A fixed sub-resource of the run collection, not a run id: it lists the runs coordination
+  // has stopped retrying, so the console can show the operator queue without any write access.
+  if (url.pathname === '/api/runs/parked') return true
+  const segments = url.pathname.split('/')
+  // ['', 'api', 'runs', '<runId>', ...optional suffix]
+  if (segments.length < 4 || segments[1] !== 'api' || segments[2] !== 'runs')
+    return false
+  let runId: string
+  try {
+    runId = decodeURIComponent(segments[3] ?? '')
+  } catch {
+    // A malformed escape (`%zz`) is not a path this BFF proxies.
+    return false
+  }
+  if (!RUN_ID.test(runId)) return false
+  if (segments.length === 4) return true
+  if (segments.length !== 5) return false
+  return segments[4] === 'publication-steps' || segments[4] === 'events'
+}
+
+/**
+ * The `content-type` served for a proxied Control Plane response.
+ *
+ * Every proxied route (the reads and the admin write) returns JSON, so the BFF answers with a
+ * fixed JSON media type instead of echoing the upstream `content-type`. The upstream value is
+ * only attacker-influenced if Control Plane is compromised, but copying it verbatim would serve
+ * whatever that response claimed (for example `text/html`) from the console's own origin, where
+ * a browser could run it as script. A constant cannot be mismatched with the body either: the
+ * bytes are forwarded unchanged and the contract says they are JSON.
+ */
+const PROXIED_CONTENT_TYPE = 'application/json; charset=utf-8'
 
 function sendJson(
   response: ServerResponse,
@@ -459,7 +513,72 @@ export function createControlPlaneUiServer({
         }
         return
       }
-      if (request.method !== 'GET' || !allowed.test(request.url)) {
+      const decision = ADMIN_DECISION.exec(request.url ?? '')
+      if (request.method === 'POST' && decision !== null) {
+        // A session cookie alone must not authorise a cross-site POST: the same check the
+        // sign-out route uses.
+        if (!sameOrigin(request)) {
+          sendJson(response, 403, { error: 'cross_site_request' })
+          return
+        }
+        const adminToken = request.headers['x-control-plane-admin-token']
+        if (typeof adminToken !== 'string' || adminToken.trim() === '') {
+          // 401 rather than 400: the request is well-formed, it just carries no operator
+          // credential. The console turns this into its admin-token prompt.
+          sendJson(response, 401, { error: 'admin_token_required' })
+          return
+        }
+        const chunks: Buffer[] = []
+        let size = 0
+        for await (const chunk of request) {
+          const buffer = Buffer.from(chunk)
+          size += buffer.byteLength
+          if (size > MAX_SESSION_BODY_BYTES) {
+            sendJson(response, 413, { error: 'request_too_large' })
+            return
+          }
+          chunks.push(buffer)
+        }
+        try {
+          // The action is taken from the matched route, never from the raw URL, so the
+          // upstream path can only be one of the two decisions this BFF states it proxies.
+          const action =
+            decision[2] === 'resume'
+              ? 'resume'
+              : decision[2] === 'give-up'
+                ? 'give-up'
+                : 'abandon'
+          const upstream = await fetch(
+            `${controlPlaneUrl}/v1/admin/runs/${encodeURIComponent(
+              decodeURIComponent(decision[1] ?? '')
+            )}/${action}`,
+            {
+              method: 'POST',
+              headers: {
+                authorization: `Bearer ${adminToken}`,
+                'content-type': 'application/json'
+              },
+              body: Buffer.concat(chunks),
+              signal: AbortSignal.timeout(CONTROL_PLANE_REQUEST_TIMEOUT_MS)
+            }
+          )
+          response.writeHead(upstream.status, {
+            'content-type': PROXIED_CONTENT_TYPE
+          })
+          response.end(Buffer.from(await upstream.arrayBuffer()))
+        } catch (error) {
+          const timedOut =
+            error instanceof Error &&
+            (error.name === 'AbortError' || error.name === 'TimeoutError')
+          sendJson(response, timedOut ? 504 : 502, {
+            error: timedOut
+              ? 'control_plane_timeout'
+              : 'control_plane_unavailable'
+          })
+        }
+        return
+      }
+      if (request.method !== 'GET' || !isAllowedReadPath(request.url ?? '')) {
         response.writeHead(404)
         response.end()
         return
@@ -478,8 +597,7 @@ export function createControlPlaneUiServer({
           }
         )
         response.writeHead(upstream.status, {
-          'content-type':
-            upstream.headers.get('content-type') ?? 'application/json'
+          'content-type': PROXIED_CONTENT_TYPE
         })
         response.end(Buffer.from(await upstream.arrayBuffer()))
       } catch (error) {

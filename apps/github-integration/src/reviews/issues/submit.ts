@@ -1,13 +1,13 @@
 import type { IssueContext } from '../../github/issue-service.js'
 import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import { prepareIssueReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
 import type { IssueReviewInput, TestChangesPolicy } from '../../runner/input.js'
 
 interface RunIssueReviewArgs {
   run_id: string
-  octokit: unknown
+  octokit: Octokit
   issue: IssueContext
   trusted_default_branch: TrustedDefaultBranch
   event_type?: 'opened' | 'manual_review' | null
@@ -84,7 +84,7 @@ async function materializeIssueReviewInput(
 
   const prepared = await prepare_input({
     run_id,
-    octokit: octokit as GitHubAppOctokit,
+    octokit,
     issue,
     trusted_default_branch,
     review_objective: resolvedReviewObjective,

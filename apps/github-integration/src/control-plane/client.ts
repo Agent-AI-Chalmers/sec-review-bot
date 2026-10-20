@@ -10,8 +10,7 @@ import {
 export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
 export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
 export type PublicationWork = components['schemas']['PublicationWork']
-export type PreparationFailureNoticeWork =
-  components['schemas']['PreparationFailureNoticeWork']
+export type RunNoticeWork = components['schemas']['RunNoticeWork']
 export type PublicationStepRecord =
   components['schemas']['PublicationStepRecord']
 
@@ -152,11 +151,14 @@ class HttpControlPlaneClient {
         const parsed = (await response
           .json()
           .catch(() => ({}))) as HttpErrorBody
+        // The status is part of the answer, not decoration: a refusal (4xx) is a verdict that
+        // classification must tell apart from the same `code` carried by a request that never
+        // got an answer. Dropping it here made every refusal look like a transport fault.
         throw Object.assign(
           new Error(
             parsed.error ?? `Control Plane returned HTTP ${response.status}.`
           ),
-          { code: parsed.code ?? null }
+          { code: parsed.code ?? null, status: response.status }
         )
       }
       // A success body may legitimately be empty: three operations (`failPreparation`,
@@ -269,23 +271,36 @@ class HttpControlPlaneClient {
     )
   }
 
-  async claimNextPreparationFailureNotice(): Promise<PreparationFailureNoticeWork | null> {
-    return await this.request(
-      'claimNextPreparationFailureNotice',
-      {},
-      undefined
-    )
+  async claimNextRunNotice(): Promise<RunNoticeWork | null> {
+    return await this.request('claimNextRunNotice', {}, undefined)
   }
 
-  async completePreparationFailureNotice(
-    runId: string,
+  async completeRunNotice(
+    noticeId: string,
     token: string,
-    delivered: boolean
+    delivered: true,
+    commentUrl: string
+  ): Promise<boolean>
+  async completeRunNotice(
+    noticeId: string,
+    token: string,
+    delivered: false
+  ): Promise<boolean>
+  async completeRunNotice(
+    noticeId: string,
+    token: string,
+    delivered: boolean,
+    commentUrl?: string
   ): Promise<boolean> {
+    // The contract states the two cases separately: a delivered notice names its comment, an
+    // undelivered one has nowhere to point. The overloads keep that distinction at this seam
+    // instead of letting a missing URL reach the server as a runtime error.
     return await this.request(
-      'completePreparationFailureNotice',
-      { runId },
-      { token, delivered }
+      'completeRunNotice',
+      { noticeId },
+      delivered
+        ? { token, delivered: true, comment_url: commentUrl as string }
+        : { token, delivered: false }
     )
   }
 
@@ -402,6 +417,41 @@ class HttpControlPlaneClient {
     )
   }
 
+  /** Conclude a step that ran out of attempts, from what the caller found remotely.
+   *
+   * Passing `found: true` is how a reconciliation that discovers the side effect already
+   * happened turns an exhausted step into `succeeded`; `found: false` is the only way a step
+   * becomes `terminal_failed`, and it is a claim that the remote system was checked. */
+  async settleExhaustedPublicationStep(
+    runId: string,
+    token: string,
+    stepKey: string,
+    found: {
+      remote?: { id?: string | number | null; url?: string | null }
+    } | null
+  ): Promise<boolean> {
+    const remote = found?.remote
+    return await this.request(
+      'settleExhaustedPublicationStep',
+      { runId, stepKey },
+      {
+        token,
+        found: found !== null,
+        ...(remote === undefined
+          ? {}
+          : {
+              remote_object: {
+                id:
+                  remote.id === null || remote.id === undefined
+                    ? null
+                    : String(remote.id),
+                url: remote.url ?? null
+              }
+            })
+      }
+    )
+  }
+
   async failPublicationStep(
     runId: string,
     token: string,
@@ -477,8 +527,8 @@ export type ControlPlaneClient = Pick<
   | 'renewPreparationClaim'
   | 'claimNextPreparation'
   | 'checkpointPreparationInput'
-  | 'claimNextPreparationFailureNotice'
-  | 'completePreparationFailureNotice'
+  | 'claimNextRunNotice'
+  | 'completeRunNotice'
   | 'preparationHeartbeatIntervalMs'
   | 'renewPublicationClaim'
   | 'publicationHeartbeatIntervalMs'
@@ -487,10 +537,80 @@ export type ControlPlaneClient = Pick<
   | 'listPublicationSteps'
   | 'requirePublicationStepClaim'
   | 'completePublicationStep'
+  | 'settleExhaustedPublicationStep'
   | 'failPublicationStep'
   | 'completePublication'
   | 'failPublication'
   | 'failPreparation'
+>
+
+/** The publication-step slice of the client.
+ *
+ * A publisher drives the step protocol and nothing else: it never admits runs, claims
+ * preparation, or reads a run back. Naming the slice here means a caller (and a test double)
+ * only has to provide what the protocol actually uses, and a misspelled or missing member is a
+ * compile error rather than a runtime "not a function".
+ *
+ * `Pick` over the concrete client keeps each member's exact signature - including return types -
+ * so this cannot drift from the real implementation. */
+export type PublicationStepStore = Pick<
+  ControlPlaneClient,
+  | 'initializePublicationSteps'
+  | 'listPublicationSteps'
+  | 'requirePublicationStepClaim'
+  | 'completePublicationStep'
+  | 'settleExhaustedPublicationStep'
+  | 'failPublicationStep'
+>
+
+/** The preparation-coordinator slice.
+ *
+ * It claims preparation work and settles failure notices, and it also hands the same store to the
+ * trigger commands it runs, so the slice includes what those commands need (`admitReviewRun`,
+ * `submitPreparedRun`, the preparation lease, and the optional input checkpoint). Naming the union
+ * here keeps the coordinator from requiring the whole 22-method client just to call four of them. */
+export type PreparationCoordinatorStore = Pick<
+  ControlPlaneClient,
+  | 'claimNextPreparation'
+  | 'claimNextRunNotice'
+  | 'completeRunNotice'
+  | 'failPreparation'
+  | 'admitReviewRun'
+  | 'submitPreparedRun'
+  | 'renewPreparationClaim'
+  | 'preparationHeartbeatIntervalMs'
+> & {
+  checkpointPreparationInput?: ControlPlaneClient['checkpointPreparationInput']
+}
+
+/** The heartbeat slice: what a lease keeper needs, and nothing else.
+ *
+ * `withPublicationHeartbeat` only renews a claim and asks how often to; it never publishes. Naming
+ * this slice lets that helper stay usable (and testable) without a store that can do everything. */
+export type PublicationHeartbeatStore = Pick<
+  ControlPlaneClient,
+  'renewPublicationClaim' | 'publicationHeartbeatIntervalMs'
+>
+
+/** The publication-coordinator slice.
+ *
+ * It claims publishable work, keeps the lease and concludes it - and hands the same store to the
+ * publisher, which drives the step protocol. The slice therefore includes `PublicationStepStore`,
+ * so one type covers the coordinator's own calls and the protocol it delegates to. */
+export type PublicationCoordinatorStore = Pick<
+  ControlPlaneClient,
+  | 'connectorId'
+  | 'claimNextPublication'
+  | 'renewPublicationClaim'
+  | 'publicationHeartbeatIntervalMs'
+  | 'completePublication'
+  | 'failPublication'
+  | 'initializePublicationSteps'
+  | 'listPublicationSteps'
+  | 'requirePublicationStepClaim'
+  | 'completePublicationStep'
+  | 'settleExhaustedPublicationStep'
+  | 'failPublicationStep'
 >
 
 export const controlPlaneClient: ControlPlaneClient =

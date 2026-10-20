@@ -1,5 +1,5 @@
 import { parse as parseYaml } from 'yaml'
-import type { GitHubAppOctokit } from './octokit.js'
+import type { Octokit } from 'octokit'
 import { asErrorWithResponse, isRecord } from '../utils/error-utils.js'
 import { resolveTrustedDefaultBranch } from './default-branch-service.js'
 
@@ -221,7 +221,7 @@ interface FetchRepositoryTriggerConfigArgs {
 }
 
 async function readRepositoryTriggerConfig(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   {
     owner_login,
     repo_name,
@@ -272,7 +272,7 @@ async function readRepositoryTriggerConfig(
 }
 
 export async function fetchRepositoryTriggerConfig(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   { owner_login, repo_name, ref }: FetchRepositoryTriggerConfigArgs
 ): Promise<RepositoryTriggerConfig> {
   const configRef = ref ?? null
@@ -313,7 +313,7 @@ export interface TrustedTriggerConfigResolution {
  * `target_branch` / `head_ref`.
  */
 export async function fetchTrustedRepositoryTriggerConfig(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   { owner_login, repo_name }: { owner_login: string; repo_name: string }
 ): Promise<TrustedTriggerConfigResolution> {
   const { default_branch, head_sha } = await resolveTrustedDefaultBranch(

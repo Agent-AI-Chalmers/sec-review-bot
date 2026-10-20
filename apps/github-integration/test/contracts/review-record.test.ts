@@ -252,6 +252,8 @@ test('parseReviewRecord rejects removed public status fields', () => {
 
 test('parseReviewRecord rejects numeric changed_files instead of coercing them', () => {
   const record = validReviewRecord()
+  // Deliberately violate the type: the point of the test is that the runtime validator, not the
+  // compiler, rejects a wrong element type arriving from persisted or external data.
   record.mitigation.changed_files = [123] as unknown as string[]
 
   assert.throws(

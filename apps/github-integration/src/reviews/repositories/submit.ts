@@ -1,7 +1,7 @@
 import { splitRepoFullName } from '../../github/repository-service.js'
 import { prepareRepositoryReviewInput } from './prepare-input.js'
 import { fetchTrustedRepositoryTriggerConfig } from '../../github/repo-config-service.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import { logInfo } from '../../utils/logger.js'
 import type {
   TestChangesPolicy,
@@ -18,7 +18,7 @@ export interface RepositoryContext {
 
 interface RunRepositoryReviewArgs {
   run_id: string
-  octokit: unknown
+  octokit: Octokit
   repo_full_name: string
   target_branch?: string | null
   scan_mode: 'full' | 'incremental'
@@ -77,7 +77,7 @@ async function materializeRepositoryReviewInput({
   })
 
   const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
-  const github = octokit as GitHubAppOctokit
+  const github = octokit
   // Read trigger config from the API-resolved default branch, not the
   // user-selectable target_branch.
   const trusted = await fetchTrustedRepositoryTriggerConfig(github, {

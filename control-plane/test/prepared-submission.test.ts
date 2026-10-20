@@ -8,15 +8,32 @@ const run: ReviewRunRecord = {
   run_id: 'run-1',
   workflow: 'issue-review',
   publish_context: {},
-  runner_status: 'preparing',
-  publication_status: 'pending',
+  preparation: {
+    status: 'submitted',
+    attempt_count: 1,
+    started_at: '2026-01-01T00:00:01.000Z',
+    finished_at: '2026-01-01T00:00:02.000Z',
+    updated_at: '2026-01-01T00:00:03.000Z',
+    failure_code: null,
+    disconnect_reason: null
+  },
+  execution: {
+    status: 'pending',
+    started_at: null,
+    finished_at: null,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  },
+  publication: {
+    status: 'pending',
+    started_at: null,
+    finished_at: null,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  },
   created_at: '2026-01-01T00:00:00.000Z',
-  execution_updated_at: '2026-01-01T00:00:00.000Z',
-  publication_updated_at: '2026-01-01T00:00:00.000Z',
-  published_at: null,
   failure_code: null,
   failure_message: null,
-  artifact_storage: null
+  artifact_storage: null,
+  notices: []
 }
 
 test('prepared submission persists input before crossing the Runner boundary', async () => {

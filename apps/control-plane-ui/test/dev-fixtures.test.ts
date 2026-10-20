@@ -125,3 +125,76 @@ test('dev fixtures leave non-API requests to the next middleware', async () => {
     await fixture.close()
   }
 })
+
+test('dev fixtures page the run list in the order their cursor describes', async () => {
+  // The run list is built in scenario order, and an active run's timestamp is anchored near
+  // now rather than at its newest historical slot, so array order is not creation order. The
+  // fixture has to sort by the same `(created_at, run_id)` key its cursor compares against,
+  // or `created_at < cursor.createdAt` matches every row and page two repeats page one - the
+  // paging affordance then silently disappears wherever the fixture is the only server.
+  const fixture = await startFixtureServer()
+  try {
+    const first = await (
+      await fetch(`${fixture.base}/api/runs?limit=50`)
+    ).json()
+    const stamps = first.runs.map(
+      (run: { created_at: string }) => run.created_at
+    )
+    assert.deepStrictEqual(
+      stamps,
+      [...stamps].sort().reverse(),
+      'the list is newest-first, which is what the cursor walks'
+    )
+    assert.ok(
+      first.next_cursor,
+      'sixty-two fixtures must not fit one page of fifty'
+    )
+
+    const second = await (
+      await fetch(
+        `${fixture.base}/api/runs?limit=50&cursor=${first.next_cursor}`
+      )
+    ).json()
+    const firstIds = new Set(
+      first.runs.map((run: { run_id: string }) => run.run_id)
+    )
+    assert.ok(second.runs.length > 0, 'the cursor must return a second page')
+    for (const run of second.runs as { run_id: string }[]) {
+      assert.ok(
+        !firstIds.has(run.run_id),
+        `${run.run_id} appears on both pages`
+      )
+    }
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('the unfiltered list does not lead with a row that satisfies a filter lookup', async () => {
+  // The browser smoke test opens "the first row" after selecting a filter, and waits for that
+  // row to look filtered. When the newest run already looks like the filter's result before
+  // the filtered response arrives, the wait passes against the stale list and the test opens
+  // a run the filter excluded - which is how a run with no publication start reached an
+  // assertion about a published phase.
+  //
+  // The smoke test now checks two columns instead of one, but the fixtures must not depend on
+  // that: the newest run stays outside the (workflow, publication) combination the smoke test
+  // filters for, so a one-column wait cannot pass early again.
+  const fixture = await startFixtureServer()
+  try {
+    const unfiltered = await (
+      await fetch(`${fixture.base}/api/runs?limit=1`)
+    ).json()
+    const newest = unfiltered.runs[0]
+    assert.ok(newest, 'the fixtures must serve at least one run')
+    assert.ok(
+      !(
+        newest.workflow === 'repository-review' &&
+        newest.publication.status === 'published'
+      ),
+      'the newest run must not already look like the published repository filter'
+    )
+  } finally {
+    await fixture.close()
+  }
+})

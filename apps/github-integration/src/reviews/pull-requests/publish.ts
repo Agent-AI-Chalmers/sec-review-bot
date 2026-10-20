@@ -4,9 +4,10 @@ import {
 } from '../../runner/contract-version.js'
 import {
   createPullRequestReviewUnlessMarkerExists,
+  findPullRequestReviewByMarker,
   type PullRequestReviewEvent
 } from '../../github/comment-service.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
 import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 import {
@@ -21,10 +22,14 @@ import {
 } from './suggestion-service.js'
 import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorWithResponse, asErrorMessage } from '../../utils/error-utils.js'
+import {
+  isPublicationStepExhausted,
+  settleExhaustedStep
+} from '../shared/settle-exhausted-step.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { getGitHubAppMetadata } from '../../github/github-app-metadata-service.js'
+import { isCurrentAppBotLogin } from '../../github/github-app-metadata-service.js'
 import { assertWorkflowResult } from '../../runner/contract-schema.js'
-import type { ControlPlaneClient } from '../../control-plane/client.js'
+import type { PublicationStepStore } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
   isPublicationClaimLostError,
@@ -68,7 +73,7 @@ export interface PullRequestReviewWorkflowResult {
   [key: string]: unknown
 }
 
-type InstallationOctokitForRepo = (repo_full_name: string) => Promise<unknown>
+type InstallationOctokitForRepo = (repo_full_name: string) => Promise<Octokit>
 type CompletedRunnerRun = {
   run_id: string
   publish_context: Record<string, unknown>
@@ -108,7 +113,7 @@ export async function handlePullRequestReviewRun({
 }: {
   run: CompletedRunnerRun
   result: unknown
-  store: ControlPlaneClient
+  store: PublicationStepStore
   claim_token: string
   assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo
@@ -149,28 +154,19 @@ function pullRequestReviewRunMarker(run_id: string): string {
   return `<!-- sec-review-bot:pull-request-review-run:${run_id} -->`
 }
 
-function normalizeLogin(login: unknown): string | null {
-  return typeof login === 'string' && login.trim() !== ''
-    ? login.trim().toLowerCase()
-    : null
-}
-
-function isAuthoredByCurrentAppBot(pr: PersistedPullRequest): boolean {
-  const author_login = normalizeLogin(pr.pr_author)
-  const appBotLogin = normalizeLogin(getGitHubAppMetadata().bot_login)
-  return (
-    author_login !== null &&
-    appBotLogin !== null &&
-    author_login === appBotLogin
-  )
-}
-
 function reviewEventForRecord(
   review_record: ReviewRecord,
   pr: PersistedPullRequest
 ): PullRequestReviewEvent {
   // The app should leave evidence on its own PRs, not create reviewer state for itself.
-  if (isAuthoredByCurrentAppBot(pr)) {
+  //
+  // A stored PR context keeps the author as a login only, with no user `type`, so this uses the
+  // shared login comparison rather than the full user check: passing a fabricated
+  // `type: 'Bot'` to `wasAuthoredByCurrentAppBot` would make half of that guard unconditionally
+  // true and read as if the bot-entity check had run. `isCurrentAppBotLogin` also fails closed
+  // (throws) when the app's own login is unknown, which a local copy did not: that copy
+  // answered `false` and would have approved the app's own PRs.
+  if (isCurrentAppBotLogin(pr.pr_author)) {
     return 'COMMENT'
   }
 
@@ -245,13 +241,13 @@ async function publishPullRequestReviewResult({
   claim_token,
   assert_publication_claim
 }: {
-  octokit: unknown
+  octokit: Octokit
   pr: PersistedPullRequest
   files: PersistedPullRequestFile[]
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   workflow_result: PullRequestReviewWorkflowResult
   run_id: string
-  store: ControlPlaneClient
+  store: PublicationStepStore
   claim_token: string
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {
@@ -259,7 +255,35 @@ async function publishPullRequestReviewResult({
   await store.initializePublicationSteps(run_id, claim_token, [stepKey])
   const persisted = (await store.listPublicationSteps(run_id))[0]
   if (persisted?.status === 'succeeded') return
-  await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
+  try {
+    await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
+  } catch (error) {
+    // No attempts left is not a verdict: the review may already be on the pull request. The
+    // attempt that posted it can lose its response, and the publisher that started it may have
+    // died before recording it. Look for this run's marker before the step becomes a failure.
+    if (!isPublicationStepExhausted(error)) throw error
+    const marker = pullRequestReviewRunMarker(run_id)
+    const settled = await settleExhaustedStep({
+      store,
+      runId: run_id,
+      token: claim_token,
+      stepKey,
+      find: async () => {
+        const existing = await findPullRequestReviewByMarker(octokit, {
+          owner_login: pr.owner_login,
+          repo_name: pr.repo_name,
+          pr_number: pr.pr_number,
+          marker
+        })
+        return existing === null
+          ? null
+          : { id: existing.id, url: existing.html_url }
+      }
+    })
+    // The review was already submitted: nothing left to publish for this step.
+    if (settled.outcome === 'recorded' && settled.step === 'succeeded') return
+    throw error
+  }
   try {
     // Never begin a GitHub mutation on the strength of an expired heartbeat.
     await assert_publication_claim()
@@ -307,7 +331,7 @@ async function publishPullRequestReviewSideEffect({
   run_id,
   assert_publication_claim
 }: {
-  octokit: unknown
+  octokit: Octokit
   pr: PersistedPullRequest
   files: PersistedPullRequestFile[]
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
@@ -407,7 +431,7 @@ async function publishPullRequestReviewSideEffect({
   })
 
   const reviewComment = await createPullRequestReviewUnlessMarkerExists(
-    octokit as GitHubAppOctokit,
+    octokit,
     {
       owner_login: pr.owner_login,
       repo_name: pr.repo_name,

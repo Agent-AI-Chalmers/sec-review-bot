@@ -8,6 +8,8 @@ import type { PullRequestContext } from '../../../../src/github/pull-request-ser
 import type { SubmittedIssueReviewRun } from '../../../../src/reviews/issues/submit.js'
 import type { SubmittedPullRequestReviewRun } from '../../../../src/reviews/pull-requests/submit.js'
 import { handleIssueCommentCreatedWithDeps } from '../../../../src/ingress/github/webhooks/issue-comment-created.js'
+import { createLogThrottle } from '../../../../src/utils/log-throttle.js'
+import { unusedGitHub } from '../../../github-client.js'
 
 setGitHubAppMetadata({
   id: 1,
@@ -131,7 +133,7 @@ test('issue-comment-created skips manual command when commenter lacks write perm
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload()
     },
     {
@@ -169,7 +171,7 @@ test('issue-comment-created starts an audited issue manual review for write comm
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review'
       })
@@ -212,7 +214,7 @@ test('issue-comment-created forwards the open-pr opt-in for issue reviews', asyn
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-draft-pr',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review --open-pr'
       })
@@ -241,7 +243,7 @@ test('issue-comment-created starts pull request manual review for write commente
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review',
         is_pull_request: true
@@ -281,7 +283,7 @@ test('issue-comment-created delegates PR context loading until after command adm
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-pr-context',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review',
         is_pull_request: true
@@ -303,7 +305,7 @@ test('issue-comment-created delegates PR context loading until after command adm
         assert.ok(resolve_pr)
         on_admitted?.({
           run_id: 'run-pr-context',
-          status: 'preparing',
+          status: 'pending',
           replayed: false
         })
         await assert.rejects(resolve_pr(), /GitHub PR lookup failed/)
@@ -314,4 +316,56 @@ test('issue-comment-created delegates PR context loading until after command adm
 
   assert.strictEqual(commandStarted, true)
   assert.strictEqual(contextLoaded, true)
+})
+
+test('an unrecognized mention logs at most once per repository per window', async () => {
+  // The diagnostic is text anyone can type, so it must not be an unbounded log stream. The
+  // handler consults the throttle before logging; here the throttle is driven directly so the
+  // assertion does not depend on wall-clock time or on other tests' traffic.
+  const logged: Array<Record<string, unknown>> = []
+  const originalWrite = process.stdout.write.bind(process.stdout)
+  process.stdout.write = ((chunk: unknown) => {
+    const text = String(chunk)
+    if (text.includes('comment_mention_not_recognized')) {
+      logged.push({ line: text })
+    }
+    return true
+  }) as typeof process.stdout.write
+
+  // The real throttle, with a frozen clock so "same window" is deterministic and independent of
+  // other tests that may already have logged for these repositories.
+  const throttle = createLogThrottle({
+    minIntervalMs: 5 * 60_000,
+    maxKeys: 200,
+    now: () => 0
+  })
+  try {
+    const payload = createIssueCommentPayload({
+      body: 'hey @someone-else please'
+    })
+    for (const repository of ['octo/one', 'octo/two']) {
+      // Each repository is a distinct throttle key: the first sighting logs, the second does not.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await handleIssueCommentCreatedWithDeps(
+          {
+            id: `delivery-${repository}-${attempt}`,
+            octokit: unusedGitHub().octokit,
+            payload: {
+              ...payload,
+              repository: { ...payload.repository, full_name: repository }
+            }
+          },
+          { unmatchedMentionThrottleFn: throttle }
+        )
+      }
+    }
+  } finally {
+    process.stdout.write = originalWrite
+  }
+
+  assert.strictEqual(
+    logged.length,
+    2,
+    'one diagnostic line per repository, not one per comment'
+  )
 })

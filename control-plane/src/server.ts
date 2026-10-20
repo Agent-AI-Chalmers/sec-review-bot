@@ -13,7 +13,11 @@ import Fastify, {
 
 import { contractDigest } from './contract-digest.js'
 import { ReviewRunStore } from './review-store.js'
-import type { PublicationStatus, RunnerStatus } from './review-store.js'
+import type {
+  PreparationStatus,
+  PublicationStatus,
+  RunnerStatus
+} from './review-store.js'
 import { type ControlPlaneWorkflow } from './contracts.js'
 import {
   coordinateReviewRunsOnce,
@@ -29,10 +33,16 @@ import {
   type RunnerRunStatus,
   type RunnerRunStatusBatch
 } from './runner-client.js'
-import { recoverReviewRunSubmission } from './submission-recovery.js'
+import {
+  concludeExhaustedSubmissionRecovery,
+  recoverReviewRunSubmission
+} from './submission-recovery.js'
 import { submitPreparedRun } from './prepared-submission.js'
 import { observePublicationStep, observeRun } from './observability.js'
-import { DeterministicControlPlaneError } from './errors.js'
+import {
+  DeterministicControlPlaneError,
+  SUBMISSION_STATE_UNCERTAIN
+} from './errors.js'
 import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from './error-codes-generated.js'
 import type { PathParams, RequestBody } from './route-types.js'
 
@@ -186,6 +196,9 @@ function parseListQuery(url: URL): ListQueryOptions {
   const publicationStatus = url.searchParams.get('publication_status')
   if (publicationStatus !== null)
     options.publication_status = publicationStatus as PublicationStatus
+  const preparationStatus = url.searchParams.get('preparation_status')
+  if (preparationStatus !== null)
+    options.preparation_status = preparationStatus as PreparationStatus
   const workflow = url.searchParams.get('workflow')
   if (workflow !== null) options.workflow = workflow as ControlPlaneWorkflow
   for (const name of ['from', 'to'] as const) {
@@ -221,6 +234,23 @@ function logDroppedRunRow(
   })
 }
 
+/** Report a run whose expired preparation could not be concluded.
+ *
+ * This is the escape hatch that keeps such a run from becoming a silent, permanent stall: the
+ * store marks it durably and stops retrying it, and this line is what tells an operator which run
+ * to repair. It is deliberately one event per blocked run with a stable `reason` code, so it can
+ * be alarmed on without scraping English out of an error string. */
+function logParkedRun(
+  connectorId: string,
+  blocked: { run_id: string; reason: string }
+): void {
+  logEvent('control_plane_preparation_expiry_blocked', {
+    connector_id: connectorId,
+    run_id: blocked.run_id,
+    reason: blocked.reason
+  })
+}
+
 /** Compare a bearer credential in constant time.
  *
  * The equality check runs for every request, so `!==` would let an attacker recover a token
@@ -241,6 +271,9 @@ interface ControlPlaneRouteDeps {
   store: ReviewRunStore
   serviceToken: string
   readToken: string
+  /** Optional operator credential. When absent the whole `/v1/admin` surface answers 404, so an
+   * unconfigured deployment exposes no admin route at all rather than an unauthenticated one. */
+  adminToken?: string
 }
 
 /** Locate the OpenAPI contract relative to this module, not the process CWD.
@@ -292,7 +325,7 @@ export async function registerControlPlaneRoutes(
   app: FastifyInstance,
   deps: ControlPlaneRouteDeps
 ): Promise<void> {
-  const { store, serviceToken, readToken } = deps
+  const { store, serviceToken, readToken, adminToken } = deps
 
   // Errors propagate to the Fastify error handler, which maps a DeterministicControlPlaneError
   // to 409 + code and keeps every other fault a message-free 500; handlers stay domain-only.
@@ -352,6 +385,14 @@ export async function registerControlPlaneRoutes(
       }
     },
 
+    listRunEvents: async (request, reply) => {
+      const { runId } = request.params as PathParams<'listRunEvents'>
+      // Only the trunk has to exist: the events are trunk-owned, so a readable history must not
+      // be hidden behind the record projection that reports an axis-row fault as "not found".
+      if (!(await store.runExists(runId)))
+        return reply.code(404).send({ error: 'run_not_found' })
+      return { run_id: runId, events: await store.listEvents(runId) }
+    },
     admitRun: async (request) => {
       const body = request.body as RequestBody<'admitRun'>
       if (
@@ -401,8 +442,7 @@ export async function registerControlPlaneRoutes(
       await store.checkpointPreparationInput(runId, token, input)
     },
 
-    claimNextPreparationFailureNotice: async () =>
-      await store.claimNextPreparationFailureNotice(),
+    claimNextRunNotice: async () => await store.claimNextRunNotice(),
 
     failPreparation: async (request) => {
       const { runId } = request.params as PathParams<'failPreparation'>
@@ -416,16 +456,19 @@ export async function registerControlPlaneRoutes(
       })
     },
 
-    completePreparationFailureNotice: async (request) => {
-      const { runId } =
-        request.params as PathParams<'completePreparationFailureNotice'>
-      const { token, delivered } =
-        request.body as RequestBody<'completePreparationFailureNotice'>
-      return await store.completePreparationFailureNotice(
-        runId,
-        token,
-        delivered
-      )
+    completeRunNotice: async (request) => {
+      const { noticeId } = request.params as PathParams<'completeRunNotice'>
+      const body = request.body as RequestBody<'completeRunNotice'>
+      // The contract's two branches differ by `delivered`, so the URL exists only in the
+      // delivered one. Spreading keeps a single call without losing that distinction.
+      return body.delivered
+        ? await store.completeRunNotice(
+            noticeId,
+            body.token,
+            true,
+            body.comment_url
+          )
+        : await store.completeRunNotice(noticeId, body.token, false)
     },
 
     claimNextPublication: async (request) => {
@@ -470,6 +513,19 @@ export async function registerControlPlaneRoutes(
       )
     },
 
+    settleExhaustedPublicationStep: async (request) => {
+      const { runId, stepKey } =
+        request.params as PathParams<'settleExhaustedPublicationStep'>
+      const { token, found, remote_object } =
+        request.body as RequestBody<'settleExhaustedPublicationStep'>
+      return await store.settleExhaustedPublicationStep(
+        runId,
+        token,
+        stepKey,
+        found ? { found: true, remote: remote_object ?? {} } : { found: false }
+      )
+    },
+
     failPublicationStep: async (request) => {
       const { runId, stepKey } =
         request.params as PathParams<'failPublicationStep'>
@@ -510,6 +566,29 @@ export async function registerControlPlaneRoutes(
       const run = await store.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
       return reply.send(await store.listPublicationSteps(run.run_id))
+    },
+
+    listParkedRuns: async () => ({
+      blocks: await store.listParkedRuns()
+    }),
+
+    abandonBlockedPreparation: async (request) => {
+      const { runId } =
+        request.params as PathParams<'abandonBlockedPreparation'>
+      const { reason } =
+        request.body as RequestBody<'abandonBlockedPreparation'>
+      return await store.abandonBlockedPreparation(runId, reason)
+    },
+
+    giveUpDisconnectedRun: async (request) => {
+      const { runId } = request.params as PathParams<'giveUpDisconnectedRun'>
+      const { reason } = request.body as RequestBody<'giveUpDisconnectedRun'>
+      return await store.giveUpDisconnectedRun(runId, reason)
+    },
+
+    resumeDisconnectedRun: async (request) => {
+      const { runId } = request.params as PathParams<'resumeDisconnectedRun'>
+      return await store.resumeDisconnectedRun(runId)
     },
 
     getPreparationHeartbeatInterval: async () =>
@@ -638,6 +717,16 @@ export async function registerControlPlaneRoutes(
   // Runs before the route's own schema (Fastify order: preValidation, then validation), and the
   // hook is inherited by the child scope fastify-openapi-glue registers its routes in. Registered
   // here, on this HTTP surface, so it applies to (and only to) the contract's routes.
+  // An unconfigured deployment must not expose an admin surface, not even as a 401. The security
+  // handler alone cannot express that: fastify-openapi-glue wraps any failure there into its own
+  // 401 `SecurityError`, so answering 404 from the handler still advertises the route. This hook
+  // runs before routing settles on the glue's handler, so the path simply does not exist.
+  app.addHook('onRequest', async (request, reply) => {
+    if (adminToken === undefined && request.url.startsWith('/v1/admin')) {
+      return reply.code(404).send({ error: 'not_found' })
+    }
+  })
+
   app.addHook('preValidation', async (request) => {
     coerceQueryStrings(request)
   })
@@ -686,6 +775,17 @@ export async function registerControlPlaneRoutes(
         if (!bearerTokenMatches(request.headers.authorization, readToken)) {
           throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
         }
+      },
+      adminToken: async (request: FastifyRequest) => {
+        // With no configured token the routes must not exist: answering 401 would advertise an
+        // operator surface this deployment deliberately does not have. A missing credential is
+        // still unauthorized, so a configured deployment does not leak by status code either.
+        if (adminToken === undefined) {
+          throw Object.assign(new Error('not found'), { statusCode: 404 })
+        }
+        if (!bearerTokenMatches(request.headers.authorization, adminToken)) {
+          throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
+        }
       }
     }
   })
@@ -696,9 +796,16 @@ export async function startControlPlaneServer(): Promise<{
 }> {
   const token = requiredEnv('CONTROL_PLANE_SERVICE_TOKEN')
   const readToken = requiredEnv('CONTROL_PLANE_READ_TOKEN')
+  // Optional by design: a deployment that does not want an operator surface simply leaves it
+  // unset, and `/v1/admin/*` then answers 404 instead of existing behind a token nobody rotates.
+  const adminToken = process.env.CONTROL_PLANE_ADMIN_TOKEN?.trim() || undefined
+  const connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
   const store = new ReviewRunStore({
     connectionString: requiredEnv('DATABASE_URL'),
-    connectorId: process.env.CONNECTOR_ID?.trim() || 'github-app:default'
+    connectorId,
+    // The single-run read turns an unrepresentable row into `null` (the same answer as an
+    // unknown id), so report it here; otherwise corruption would only ever surface as a 404.
+    onDroppedRunRow: (dropped) => logDroppedRunRow(connectorId, dropped)
   })
   await store.initialize()
   const configuredIntervalMs = Number.parseInt(
@@ -719,13 +826,27 @@ export async function startControlPlaneServer(): Promise<{
             run_id: run.run_id,
             workflow: run.workflow
           })
+          // Enforce the replay budget before replaying. Exhaustion stops automatic recovery, but
+          // does not prove the Runner rejected an earlier request, so it becomes disconnected.
+          const exhausted = await concludeExhaustedSubmissionRecovery(
+            store,
+            run
+          )
+          if (exhausted !== null) {
+            logEvent('runner_submission_recovery_disconnected', {
+              connector_id: store.connectorId,
+              run_id: run.run_id,
+              workflow: run.workflow
+            })
+            return
+          }
           await recoverReviewRunSubmission(store, run, {
             submit: submitRunnerRun,
             classifyError: (error) => ({
               uncertain: error instanceof RunnerSubmissionUncertainError,
               code:
                 error instanceof RunnerSubmissionUncertainError
-                  ? 'SUBMISSION_STATE_UNCERTAIN'
+                  ? SUBMISSION_STATE_UNCERTAIN
                   : error instanceof Error &&
                       'code' in error &&
                       typeof error.code === 'string'
@@ -748,6 +869,11 @@ export async function startControlPlaneServer(): Promise<{
         // read-side failure used to lack.
         onDroppedRunRow: (dropped) => {
           logDroppedRunRow(store.connectorId, dropped)
+        },
+        // The store already stopped retrying this run, so the pass keeps coordinating the
+        // others; this line is the operator's cue to repair the contradiction by hand.
+        onBlockedPreparationExpiry: (blocked) => {
+          logParkedRun(store.connectorId, blocked)
         },
         observeActiveRun: async (run, statuses) => {
           await observeRunnerRun(
@@ -776,7 +902,8 @@ export async function startControlPlaneServer(): Promise<{
   await registerControlPlaneRoutes(app, {
     store,
     serviceToken: token,
-    readToken
+    readToken,
+    ...(adminToken === undefined ? {} : { adminToken })
   })
 
   const port = Number.parseInt(process.env.CONTROL_PLANE_PORT || '8090', 10)

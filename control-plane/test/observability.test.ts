@@ -7,29 +7,63 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
   const observed = observeRun({
     run_id: 'run-1',
     workflow: 'issue-review',
-    runner_status: 'succeeded',
-    publication_status: 'pending',
+    preparation: {
+      status: 'submitted',
+      attempt_count: 1,
+      started_at: '2026-01-01T00:00:10.000Z',
+      finished_at: '2026-01-01T00:00:30.000Z',
+      updated_at: '2026-01-01T00:00:03.000Z',
+      failure_code: null,
+      disconnect_reason: null
+    },
+    execution: {
+      status: 'succeeded',
+      started_at: '2026-01-01T00:00:01.000Z',
+      finished_at: '2026-01-01T00:01:00.000Z',
+      updated_at: '2026-01-01T00:01:00.000Z'
+    },
+    publication: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
     created_at: '2026-01-01T00:00:00.000Z',
-    execution_updated_at: '2026-01-01T00:01:00.000Z',
-    publication_updated_at: '2026-01-01T00:01:00.000Z',
-    published_at: null,
     failure_code: null,
     failure_message: 'request failed for https://secret@example.test/private',
     artifact_storage: null,
+    notices: [],
     runner_input: { secret: 'must-not-leak' },
     publish_context: { repository: 'octo/example' }
   })
   assert.deepStrictEqual(observed, {
     run_id: 'run-1',
     workflow: 'issue-review',
-    execution_status: 'succeeded',
-    publication_status: 'pending',
+    preparation: {
+      status: 'submitted',
+      attempt_count: 1,
+      started_at: '2026-01-01T00:00:10.000Z',
+      finished_at: '2026-01-01T00:00:30.000Z',
+      updated_at: '2026-01-01T00:00:03.000Z',
+      failure_code: null,
+      disconnect_reason: null
+    },
+    execution: {
+      status: 'succeeded',
+      started_at: '2026-01-01T00:00:01.000Z',
+      finished_at: '2026-01-01T00:01:00.000Z',
+      updated_at: '2026-01-01T00:01:00.000Z'
+    },
+    publication: {
+      status: 'pending',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
     created_at: '2026-01-01T00:00:00.000Z',
-    execution_updated_at: '2026-01-01T00:01:00.000Z',
-    publication_updated_at: '2026-01-01T00:01:00.000Z',
-    published_at: null,
     failure_code: null,
-    artifact_storage: null
+    artifact_storage: null,
+    notices: []
   })
 })
 
@@ -37,7 +71,8 @@ test('publication step observation exposes operator outcomes without reconciliat
   const observed = observePublicationStep({
     step_key: 'issue:draft-pr',
     status: 'failed',
-    failure_count: 2,
+    attempt_count: 3,
+    last_attempt_at: '2026-01-01T00:00:05.000Z',
     remote_object_id: '142',
     remote_object_url: 'https://github.com/octo/example/pull/142',
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
@@ -46,7 +81,7 @@ test('publication step observation exposes operator outcomes without reconciliat
   assert.deepStrictEqual(observed, {
     step_key: 'issue:draft-pr',
     status: 'failed',
-    failure_count: 2,
+    attempt_count: 3,
     remote_object_url: 'https://github.com/octo/example/pull/142',
     failure_code: 'GITHUB_SECONDARY_RATE_LIMIT',
     failure_message: 'GitHub temporarily limited publication.'

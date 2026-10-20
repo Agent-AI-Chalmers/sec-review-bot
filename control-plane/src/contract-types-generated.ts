@@ -36,31 +36,19 @@ export interface components {
       runner_input?: {
         [key: string]: unknown
       }
+      preparation: components['schemas']['PreparationSummary']
       /** @enum {string} */
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
-      /** @enum {string} */
-      runner_status:
-        | 'preparing'
-        | 'recovering'
-        | 'queued'
-        | 'running'
-        | 'succeeded'
-        | 'failed'
-      /** @enum {string} */
-      publication_status:
-        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      execution: components['schemas']['ExecutionSummary']
+      publication: components['schemas']['PublicationSummary']
       /** Format: date-time */
       created_at: string
-      /** Format: date-time */
-      execution_updated_at: string
-      /** Format: date-time */
-      publication_updated_at: string
-      /** Format: date-time */
-      published_at: string | null
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
+      /** @description User-visible notices caused by this run's coordination events, in creation order. */
+      notices: components['schemas']['RunNoticeSummary'][]
     }
     ReviewRunAdmission: {
       record: components['schemas']['ReviewRunRecord']
@@ -78,13 +66,32 @@ export interface components {
       claim_token: string
       attempt_count: number
     }
-    PreparationFailureNoticeWork: {
+    /** @description One pending user-visible notice, claimed by the component that can deliver it. */
+    RunNoticeWork: {
+      notice_id: string
       run_id: string
       input: {
         [key: string]: unknown
       }
-      failure_code: string | null
+      /** @enum {string} */
+      kind: 'failure' | 'attention'
+      /** @enum {string} */
+      axis: 'preparation' | 'execution' | 'publication'
+      reason_code: string | null
       claim_token: string
+    }
+    /** @description Delivery state of one user-visible coordination notice. */
+    RunNoticeSummary: {
+      notice_id: string
+      /** @enum {string} */
+      kind: 'failure' | 'attention'
+      /** @enum {string} */
+      axis: 'preparation' | 'execution' | 'publication'
+      /** @enum {string} */
+      status: 'pending' | 'delivering' | 'delivered' | 'failed'
+      reason_code: string | null
+      /** @description Where the requester can read the outcome. Always an absolute URI when present, and null only when no message reached them. */
+      comment_url: null | string
     }
     PublicationWork: {
       run_id: string
@@ -96,28 +103,14 @@ export interface components {
       runner_input?: {
         [key: string]: unknown
       }
+      preparation: components['schemas']['PreparationSummary']
       /** @enum {string} */
       ingress_kind?: 'github_webhook' | 'github_actions_dispatch'
       ingress_key?: string
-      /** @enum {string} */
-      runner_status:
-        | 'preparing'
-        | 'recovering'
-        | 'queued'
-        | 'running'
-        | 'succeeded'
-        | 'failed'
-      /** @enum {string} */
-      publication_status:
-        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      execution: components['schemas']['ExecutionSummary']
+      publication: components['schemas']['PublicationSummary']
       /** Format: date-time */
       created_at: string
-      /** Format: date-time */
-      execution_updated_at: string
-      /** Format: date-time */
-      publication_updated_at: string
-      /** Format: date-time */
-      published_at: string | null
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
@@ -127,8 +120,21 @@ export interface components {
     PublicationStepRecord: {
       step_key: string
       /** @enum {string} */
-      status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-      failure_count: number
+      status:
+        | 'pending'
+        | 'running'
+        | 'uncertain'
+        | 'disconnected'
+        | 'succeeded'
+        | 'failed'
+        | 'terminal_failed'
+      /** @description How many times this step has been claimed and started. More than one means an earlier owner began the side effect, so a reclaiming publisher must reconcile against the remote object (`remote_object_id`/`remote_object_url`) instead of assuming nothing happened. */
+      attempt_count: number
+      /**
+       * Format: date-time
+       * @description When the latest claim of this step started; null until the step is claimed once. Together with `attempt_count` it distinguishes a step that never started from one whose publisher died mid-effect.
+       */
+      last_attempt_at: string | null
       remote_object_id: string | null
       /** Format: uri */
       remote_object_url: string | null
@@ -138,8 +144,16 @@ export interface components {
     ObservedPublicationStep: {
       step_key: string
       /** @enum {string} */
-      status: 'pending' | 'running' | 'succeeded' | 'failed' | 'terminal_failed'
-      failure_count: number
+      status:
+        | 'pending'
+        | 'running'
+        | 'uncertain'
+        | 'disconnected'
+        | 'succeeded'
+        | 'failed'
+        | 'terminal_failed'
+      /** @description How many attempts this step has started against its budget. A count above one on a successful step means the side effect was reached after a retry or a recovery, not on the first try. */
+      attempt_count: number
       /** Format: uri */
       remote_object_url: string | null
       failure_code: string | null
@@ -149,27 +163,131 @@ export interface components {
       run_id: string
       /** @enum {string} */
       workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
-      /** @enum {string} */
-      execution_status:
-        | 'preparing'
-        | 'recovering'
-        | 'queued'
-        | 'running'
-        | 'succeeded'
-        | 'failed'
-      /** @enum {string} */
-      publication_status:
-        'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      preparation: components['schemas']['PreparationSummary']
+      execution: components['schemas']['ExecutionSummary']
+      publication: components['schemas']['PublicationSummary']
       /** Format: date-time */
       created_at: string
-      /** Format: date-time */
-      execution_updated_at: string
-      /** Format: date-time */
-      publication_updated_at: string
-      /** Format: date-time */
-      published_at: string | null
       failure_code: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
+      /** @description User-visible notices caused by this run's coordination events, in creation order. */
+      notices: components['schemas']['RunNoticeSummary'][]
+    }
+    ExecutionSummary: {
+      /**
+       * @description The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it under the same identity. `disconnected` means automatic recovery stopped after its finite budget without a conclusive answer, so it is not a failure.
+       * @enum {string}
+       */
+      status:
+        | 'pending'
+        | 'queued'
+        | 'running'
+        | 'uncertain'
+        | 'disconnected'
+        | 'succeeded'
+        | 'skipped'
+        | 'failed'
+      /**
+       * Format: date-time
+       * @description Immutable instant the prepared Runner input was accepted and execution began; null while the run is still pending, and also null for `skipped`, which is concluded without ever having started. Written once, so a recovery replay does not move it.
+       */
+      started_at: string | null
+      /**
+       * Format: date-time
+       * @description Immutable instant the execution axis reached a terminal state (`succeeded`, `failed`, or `skipped`); null while it is pending, queued, running, uncertain, or disconnected. Together with `started_at` it times the phase (only when `started_at` is non-null, since `skipped` has an end without a start).
+       */
+      finished_at: string | null
+      /**
+       * Format: date-time
+       * @description Last time the execution axis was written: a polling confirmation, a state transition, or a submission/recovery write. This is the observation freshness the console reports ("observed Ns ago"), not a phase bound — use `started_at` and `finished_at` for that.
+       */
+      updated_at: string
+    }
+    PublicationSummary: {
+      /** @enum {string} */
+      status:
+        | 'pending'
+        | 'publishing'
+        | 'uncertain'
+        | 'disconnected'
+        | 'published'
+        | 'failed'
+        | 'skipped'
+      /**
+       * Format: date-time
+       * @description Immutable instant the publication phase began (the work was first claimed); null while it is pending, and null for `skipped`, which is concluded without ever having started. A retryable failure that returns the row to pending and claims it again does not move it.
+       */
+      started_at: string | null
+      /**
+       * Format: date-time
+       * @description Immutable instant the publication axis reached a terminal state (`published`, `failed`, or `skipped`); null while it is pending or publishing. It is set for every terminal outcome. The instant the result became visible is this field read together with `status: published`.
+       */
+      finished_at: string | null
+      /**
+       * Format: date-time
+       * @description Last time the publication axis was written, including claim heartbeats. This is the activity freshness the console reports, not a phase bound — use `started_at` and `finished_at` for that. Unlike them it keeps advancing while a long publication runs.
+       */
+      updated_at: string
+    }
+    ReviewRunEvent: {
+      /** @description Monotonic identifier; also the tie-breaker within one occurred_at. */
+      event_id: number
+      /** @enum {string} */
+      axis: 'execution' | 'preparation' | 'publication'
+      /** @description State before the transition; null for the first event on an axis. */
+      from_status: string | null
+      to_status: string
+      /** @description Machine-readable cause for a failure or reversion, when there is one. */
+      reason_code: string | null
+      /** Format: date-time */
+      occurred_at: string
+    }
+    /** @description One run the system stopped working on by itself, and the axis it is parked on. A queue that listed only preparation left an operator unable to find a run whose execution or publication stalled. */
+    ParkedRun: {
+      run_id: string
+      /** @enum {string} */
+      axis: 'preparation' | 'execution' | 'publication'
+      /**
+       * @description Why automation stopped. A publication parks when a step's reconciliation budget is spent; the steps themselves record which one and what its last failure was.
+       * @enum {string}
+       */
+      reason:
+        | 'EXECUTION_ALREADY_ADVANCED'
+        | 'SUBMISSION_RECOVERY_EXHAUSTED'
+        | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
+    }
+    /** @description Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — the Control Plane drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary. */
+    PreparationSummary: {
+      /**
+       * @description Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own "in progress" state and is unrelated to the Runner, which is only submitted to once preparation reaches `submitted`.
+       * @enum {string}
+       */
+      status:
+        | 'pending'
+        | 'preparing'
+        | 'uncertain'
+        | 'disconnected'
+        | 'submitted'
+        | 'failed'
+      attempt_count: number
+      /** @description Non-null only while `status` is `disconnected`: the reason the run's own records do not admit the transition an expired lease would make, so automatic work cannot conclude it. It names that conflict and nothing else - what an operator may do about it is the `disconnected` state's business, not this field's. The value today is `EXECUTION_ALREADY_ADVANCED`. */
+      disconnect_reason: string | null
+      /**
+       * Format: date-time
+       * @description Immutable instant the preparation phase began (a preparer first claimed the work); null while it is still pending. A retry that returns the row to pending and claims it again does not move it, so it is a safe start bound for the phase.
+       */
+      started_at: string | null
+      /**
+       * Format: date-time
+       * @description Immutable instant the preparation phase reached a terminal state (`submitted` or `failed`); null while it is pending or preparing. Distinct from `updated_at`, which also moves on claim heartbeats and input checkpoints and cannot mark the phase end.
+       */
+      finished_at: string | null
+      /**
+       * Format: date-time
+       * @description Last time the preparation axis was written, including claim heartbeats and input checkpoints. This is the activity freshness the console reports, not a phase bound — use `started_at` and `finished_at` for that. A preparation that is still being built keeps advancing here even though its bounds do not.
+       */
+      updated_at: string
+      failure_code: string | null
     }
     ArtifactStorage:
       | {
@@ -214,6 +332,15 @@ export interface components {
     }
     /** @description The referenced run was not found. */
     RunNotFound: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description The run is not in a state this operation may act on, such as abandoning a run that is not blocked. */
+    Conflict: {
       headers: {
         [name: string]: unknown
       }
@@ -324,15 +451,21 @@ export interface operations {
           cursor?: string
           /** @enum {string} */
           execution_status?:
-            | 'preparing'
-            | 'recovering'
+            | 'pending'
             | 'queued'
             | 'running'
+            | 'uncertain'
             | 'succeeded'
+            | 'skipped'
             | 'failed'
           /** @enum {string} */
           publication_status?:
             'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+          /**
+           * @description Matches the run's redacted preparation summary by state. Every readable run carries that summary, so the filter never has to decide what a missing one means: a stored run that lacks its preparation row is corrupt, is dropped from list reads, and therefore cannot appear under any value of this filter.
+           * @enum {string}
+           */
+          preparation_status?: 'pending' | 'preparing' | 'submitted' | 'failed'
           /** @enum {string} */
           workflow?:
             'issue-review' | 'pull-request-review' | 'repository-review'
@@ -459,6 +592,36 @@ export interface operations {
           'application/json': {
             run_id: string
             publication_steps: components['schemas']['ObservedPublicationStep'][]
+          }
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
+      500: components['responses']['InternalError']
+    }
+  }
+  listRunEvents: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The run's coordination events, oldest first. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            run_id: string
+            events: components['schemas']['ReviewRunEvent'][]
           }
         }
       }
@@ -647,7 +810,7 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
-  claimNextPreparationFailureNotice: {
+  claimNextRunNotice: {
     parameters: {
       query?: never
       header?: never
@@ -656,36 +819,47 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description The claimed failure notice, or null when none is available. */
+      /** @description The claimed notice, or null when none is available. */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/json':
-            components['schemas']['PreparationFailureNoticeWork'] | null
+          'application/json': components['schemas']['RunNoticeWork'] | null
         }
       }
       401: components['responses']['Unauthorized']
       500: components['responses']['InternalError']
     }
   }
-  completePreparationFailureNotice: {
+  completeRunNotice: {
     parameters: {
       query?: never
       header?: never
       path: {
-        /** @description The run identifier Control Plane assigned at admission (a UUID). */
-        runId: string
+        /** @description The claimed notice identifier. */
+        noticeId: string
       }
       cookie?: never
     }
     requestBody: {
       content: {
-        'application/json': {
-          token: string
-          delivered: boolean
-        }
+        'application/json':
+          | {
+              token: string
+              /** @enum {boolean} */
+              delivered: true
+              /**
+               * Format: uri
+               * @description The comment the requester can read.
+               */
+              comment_url: string
+            }
+          | {
+              token: string
+              /** @enum {boolean} */
+              delivered: false
+            }
       }
     }
     responses: {
@@ -874,6 +1048,48 @@ export interface operations {
       500: components['responses']['InternalError']
     }
   }
+  settleExhaustedPublicationStep: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+        /** @description The publication step key, as supplied at initializePublicationSteps. */
+        stepKey: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          token: string
+          /** @description Whether the connector found the side effect already present on the remote system. `false` means the connector looked and confirmed it is absent. */
+          found: boolean
+          /** @description The remote object the connector matched when `found` is true; ignored otherwise. */
+          remote_object?: {
+            id?: string | null
+            url?: string | null
+          }
+        }
+      }
+    }
+    responses: {
+      /** @description Whether this call concluded the step. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': boolean
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
   failPublicationStep: {
     parameters: {
       query?: never
@@ -1036,6 +1252,129 @@ export interface operations {
       400: components['responses']['InvalidRequest']
       401: components['responses']['Unauthorized']
       404: components['responses']['RunNotFound']
+      500: components['responses']['InternalError']
+    }
+  }
+  listParkedRuns: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Parked runs, oldest first. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            blocks: components['schemas']['ParkedRun'][]
+          }
+        }
+      }
+      401: components['responses']['Unauthorized']
+      500: components['responses']['InternalError']
+    }
+  }
+  abandonBlockedPreparation: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          /** @description Why this run is being abandoned; recorded on every event it writes. */
+          reason: string
+        }
+      }
+    }
+    responses: {
+      /** @description The run after its open axes were concluded. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReviewRunRecord']
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
+      409: components['responses']['Conflict']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
+  giveUpDisconnectedRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          /** @description Why this outcome is being given up on; recorded on every event it writes. */
+          reason: string
+        }
+      }
+    }
+    responses: {
+      /** @description The run after the decision concluded its disconnected axis. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReviewRunRecord']
+        }
+      }
+      400: components['responses']['InvalidRequest']
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
+      409: components['responses']['Conflict']
+      413: components['responses']['PayloadTooLarge']
+      500: components['responses']['InternalError']
+    }
+  }
+  resumeDisconnectedRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The run identifier Control Plane assigned at admission (a UUID). */
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The run after its disconnected axis was handed back to automatic recovery. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReviewRunRecord']
+        }
+      }
+      401: components['responses']['Unauthorized']
+      404: components['responses']['RunNotFound']
+      409: components['responses']['Conflict']
       500: components['responses']['InternalError']
     }
   }

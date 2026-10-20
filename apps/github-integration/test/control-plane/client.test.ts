@@ -8,20 +8,38 @@ import {
   type ReviewRunRecord
 } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import { asErrorWithResponse, errorCode } from '../../src/utils/error-utils.js'
 
 const preparingRun: ReviewRunRecord = {
   run_id: 'run-1',
   workflow: 'repository-review',
   publish_context: {},
-  runner_status: 'preparing',
-  publication_status: 'pending',
+  preparation: {
+    status: 'submitted',
+    attempt_count: 1,
+    started_at: '2026-01-01T00:00:01.000Z',
+    finished_at: '2026-01-01T00:00:02.000Z',
+    updated_at: '2026-01-01T00:00:03.000Z',
+    failure_code: null,
+    disconnect_reason: null
+  },
+  execution: {
+    status: 'pending',
+    started_at: null,
+    finished_at: null,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  },
+  publication: {
+    status: 'pending',
+    started_at: null,
+    finished_at: null,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  },
   created_at: '2026-10-07T00:00:00.000Z',
-  execution_updated_at: '2026-10-07T00:00:00.000Z',
-  publication_updated_at: '2026-10-07T00:00:00.000Z',
-  published_at: null,
   failure_code: null,
   failure_message: null,
   artifact_storage: null,
+  notices: [],
   ingress_kind: 'github_actions_dispatch',
   ingress_key: 'octo/example:dispatch-1'
 }
@@ -97,7 +115,7 @@ test('repository preparation can replace the admitted empty publish context', as
     preparation_input_version: 'v1',
     preparation_input: { kind: 'test' }
   })
-  assert.strictEqual(admission.record.runner_status, 'preparing')
+  assert.strictEqual(admission.record.execution.status, 'pending')
 
   await controlPlaneClient.submitPreparedRun(
     'run-1',
@@ -199,7 +217,6 @@ test('an invalid claimed publish context is persisted as terminal failure', asyn
       ) {
         return Response.json({
           ...preparingRun,
-          publication_status: 'publishing',
           workflow_result: {},
           claim_token: 'claim-1',
           publish_context: {}
@@ -282,5 +299,47 @@ test('void operations accept the empty 200 body the real server sends', async (t
       message: 'x'
     }),
     undefined
+  )
+})
+
+test('a Control Plane refusal carries the HTTP status that tells it apart from a fault', async (t) => {
+  // Classification downstream separates two errors carrying the same `code`: Control Plane
+  // refusing the claim (409 — a verdict, terminal) from the same code on a request that never got
+  // an answer (no status — retryable). Only the status tells them apart, so the client must report
+  // the status it received. Without it every refusal looks like a transport fault and the
+  // publication re-claims the same spent step on every poll, forever.
+  const previousUrl = process.env.CONTROL_PLANE_SERVICE_URL
+  const previousToken = process.env.CONTROL_PLANE_SERVICE_TOKEN
+  process.env.CONTROL_PLANE_SERVICE_URL = 'http://control-plane.test'
+  process.env.CONTROL_PLANE_SERVICE_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousUrl === undefined) delete process.env.CONTROL_PLANE_SERVICE_URL
+    else process.env.CONTROL_PLANE_SERVICE_URL = previousUrl
+    if (previousToken === undefined)
+      delete process.env.CONTROL_PLANE_SERVICE_TOKEN
+    else process.env.CONTROL_PLANE_SERVICE_TOKEN = previousToken
+  })
+
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json(
+      {
+        error: 'Publication step has no attempts left; reconcile first.',
+        code: 'PUBLICATION_STEP_RETRY_EXHAUSTED'
+      },
+      { status: 409 }
+    )
+  )
+
+  const error = await controlPlaneClient
+    .requirePublicationStepClaim('run-1', 'claim-1', 'issue:draft-pr')
+    .then(
+      () => assert.fail('the refusal must be raised'),
+      (raised: unknown) => raised
+    )
+  assert.strictEqual(errorCode(error), 'PUBLICATION_STEP_RETRY_EXHAUSTED')
+  assert.strictEqual(
+    asErrorWithResponse(error).status,
+    409,
+    'the client reports the status Control Plane answered with'
   )
 })

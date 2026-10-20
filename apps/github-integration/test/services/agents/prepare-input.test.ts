@@ -8,18 +8,15 @@ import test from 'node:test'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
-import type { GitHubAppOctokit } from '../../../src/github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { IssueContext } from '../../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../../src/github/pull-request-service.js'
 import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/artifacts/git-workspace.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { fakeGitHub, githubJson } from '../../github-client.js'
 
 const execFileAsync = promisify(execFile)
 
-/** A Contents API response for "no .sec-review/setup.yml on the default branch". */
-function setupDeclarationNotFound(): never {
-  throw Object.assign(new Error('Not Found'), { status: 404 })
-}
 const PRIVATE_RUNNER_INPUT_KEYS = new Set([
   'runArtifactsPath',
   'analyzer_artifacts_path',
@@ -112,13 +109,20 @@ function assertPathIsWithin(parent: string, candidate: string): void {
   assert.strictEqual(relative.startsWith(`..${path.sep}`), false)
 }
 
-async function assertRunnerInputArtifact({
+/** Assert the archive behind a prepared input.
+ *
+ * Generic over the input type so a caller can pass its concrete `*ReviewInput` without widening it
+ * to `Record<string, unknown>` first; only `input_bundle` is read here.
+ */
+async function assertRunnerInputArtifact<
+  T extends { input_bundle: { media_type: string; uri: string } }
+>({
   input,
   inputBundleRoot,
   inputPath,
   runId
 }: {
-  input: Record<string, unknown>
+  input: T
   inputBundleRoot: string
   inputPath: string
   runId: string
@@ -165,52 +169,54 @@ async function assertRunnerInputArtifact({
 function repositoryOctokit(refs: {
   base_sha: string
   head_sha: string
-}): GitHubAppOctokit {
-  return {
-    auth: async () => ({ token: 'test-token' }),
-    request: async () => ({ data: 'diff --git a/src/app.ts b/src/app.ts\n' }),
-    rest: {
-      repos: {
-        get: async () => ({
-          data: {
-            full_name: 'octo/demo',
-            default_branch: 'main',
-            html_url: '',
-            private: false
+}): Octokit {
+  return fakeGitHub(({ url }) => {
+    const parsed = new URL(url)
+    const pathname = parsed.pathname
+    if (pathname.includes('/compare/')) {
+      return githubJson({
+        status: 'ahead',
+        files: [
+          {
+            filename: 'src/app.ts',
+            status: 'modified',
+            additions: 1,
+            deletions: 1,
+            changes: 2
           }
-        }),
-        getBranch: async ({ branch }: { branch: string }) => ({
-          data: { commit: { sha: branch === 'main' ? refs.head_sha : branch } }
-        }),
-        getCommit: async ({ ref }: { ref: string }) => ({ data: { sha: ref } }),
-        getContent: async () => setupDeclarationNotFound(),
-        compareCommitsWithBasehead: async () => ({
-          data: {
-            status: 'ahead',
-            files: [
-              {
-                filename: 'src/app.ts',
-                status: 'modified',
-                additions: 1,
-                deletions: 1,
-                changes: 2
-              }
-            ],
-            commits: [
-              {
-                sha: refs.head_sha,
-                commit: {
-                  message: 'head',
-                  author: { name: 'Test User', date: '2026-09-29T00:00:00Z' }
-                },
-                author: { login: 'tester' }
-              }
-            ]
+        ],
+        commits: [
+          {
+            sha: refs.head_sha,
+            commit: {
+              message: 'head',
+              author: { name: 'Test User', date: '2026-09-29T00:00:00Z' }
+            },
+            author: { login: 'tester' }
           }
-        })
-      }
+        ]
+      })
     }
-  } as unknown as GitHubAppOctokit
+    if (pathname.includes('/branches/')) {
+      const branch = decodeURIComponent(pathname.split('/branches/')[1] ?? '')
+      return githubJson({
+        commit: { sha: branch === 'main' ? refs.head_sha : branch }
+      })
+    }
+    if (pathname.includes('/commits/')) {
+      const ref = decodeURIComponent(pathname.split('/commits/')[1] ?? '')
+      return githubJson({ sha: ref })
+    }
+    if (pathname.includes('/contents/')) {
+      return githubJson({ message: 'Not Found' }, 404)
+    }
+    return githubJson({
+      full_name: 'octo/demo',
+      default_branch: 'main',
+      html_url: '',
+      private: false
+    })
+  }).octokit
 }
 
 test(
@@ -265,33 +271,15 @@ test(
       )
       const head_sha = head_sha_stdout.trim()
 
-      const octokit = {
-        auth: async () => ({
-          token: 'test-installation-token'
-        }),
-        rest: {
-          repos: {
-            get: async () => ({
-              data: {
-                default_branch: 'main'
-              }
-            }),
-            getBranch: async () => ({
-              data: {
-                commit: {
-                  sha: head_sha
-                }
-              }
-            }),
-            getContent: async () => setupDeclarationNotFound()
-          },
-          issues: {
-            listEventsForTimeline: async () => ({
-              data: []
-            })
-          }
-        }
-      } as unknown as GitHubAppOctokit
+      const octokit = fakeGitHub(({ url }) => {
+        const pathname = new URL(url).pathname
+        if (pathname.includes('/contents/'))
+          return githubJson({ message: 'Not Found' }, 404)
+        if (pathname.includes('/branches/'))
+          return githubJson({ commit: { sha: head_sha } })
+        if (pathname.includes('/timeline')) return githubJson([])
+        return githubJson({ default_branch: 'main' })
+      }).octokit
 
       const issue: IssueContext = {
         action: 'opened',
@@ -325,7 +313,7 @@ test(
       })
       assert.strictEqual(prepared.input.issue.repo_full_name, 'octo/demo')
       await assertRunnerInputArtifact({
-        input: prepared.input as unknown as Record<string, unknown>,
+        input: prepared.input,
         inputBundleRoot: prepared.input_bundle_root,
         inputPath: prepared.input_path,
         runId: prepared.run_id
@@ -410,29 +398,29 @@ test(
         base_repo_full_name: 'octo/demo',
         from_fork: false
       }
-      const octokit = {
-        auth: async () => ({ token: 'test-token' }),
-        graphql: async () => ({
-          repository: {
-            pullRequest: {
-              commits: {
-                pageInfo: { hasNextPage: false },
-                nodes: [{ commit: { oid: refs.head_sha } }]
+      const octokit = fakeGitHub(({ url }) => {
+        const pathname = new URL(url).pathname
+        if (pathname === '/graphql') {
+          return githubJson({
+            data: {
+              repository: {
+                pullRequest: {
+                  commits: {
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    nodes: [{ commit: { oid: refs.head_sha } }]
+                  }
+                }
               }
             }
-          }
-        }),
-        rest: {
-          repos: {
-            get: async () => ({ data: { default_branch: 'main' } }),
-            getBranch: async () => ({
-              data: { commit: { sha: refs.head_sha } }
-            }),
-            getContent: async () => setupDeclarationNotFound()
-          },
-          issues: { listEventsForTimeline: async () => ({ data: [] }) }
+          })
         }
-      } as unknown as GitHubAppOctokit
+        if (pathname.includes('/contents/'))
+          return githubJson({ message: 'Not Found' }, 404)
+        if (pathname.includes('/branches/'))
+          return githubJson({ commit: { sha: refs.head_sha } })
+        if (pathname.includes('/timeline')) return githubJson([])
+        return githubJson({ default_branch: 'main' })
+      }).octokit
       const prepared = await preparePullRequestReviewInput({
         run_id: 'run-pr-fixture',
         octokit,
@@ -453,7 +441,7 @@ test(
         ]
       })
       await assertRunnerInputArtifact({
-        input: prepared.input as unknown as Record<string, unknown>,
+        input: prepared.input,
         inputBundleRoot: prepared.input_bundle_root,
         inputPath: prepared.input_path,
         runId: prepared.run_id
@@ -512,7 +500,7 @@ test(
         scan_mode: 'full'
       })
       await assertRunnerInputArtifact({
-        input: full.input as unknown as Record<string, unknown>,
+        input: full.input,
         inputBundleRoot: full.input_bundle_root,
         inputPath: full.input_path,
         runId: full.run_id
@@ -566,7 +554,7 @@ test(
         head_sha: refs.head_sha
       })
       await assertRunnerInputArtifact({
-        input: incremental.input as unknown as Record<string, unknown>,
+        input: incremental.input,
         inputBundleRoot: incremental.input_bundle_root,
         inputPath: incremental.input_path,
         runId: incremental.run_id

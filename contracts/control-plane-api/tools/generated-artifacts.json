@@ -11,6 +11,7 @@
         "control-plane/src/contract-types-generated.ts",
         "control-plane/src/error-codes-generated.ts",
         "apps/github-integration/src/control-plane/control-plane-api.ts",
+        "apps/control-plane-ui/src/control-plane-api-types.ts",
         "apps/control-plane-ui/src/list-run-query-params.ts"
       ]
     },
@@ -22,6 +23,16 @@
       "outputs": [
         "contracts/control-plane-api/v1/observed-run.schema.json",
         "contracts/control-plane-api/v1/review-run-record.schema.json"
+      ]
+    },
+    {
+      "name": "state-machines",
+      "script": "contracts/control-plane-api/tools/src/generate-state-machines.ts",
+      "command": "pnpm --dir contracts/control-plane-api/tools run generate",
+      "inputs": ["contracts/control-plane-api/openapi.yaml"],
+      "outputs": [
+        "apps/control-plane-ui/src/state-machines.generated.ts",
+        "control-plane/src/state-machines.generated.ts"
       ]
     }
   ]

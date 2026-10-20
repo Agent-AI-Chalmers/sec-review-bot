@@ -1,27 +1,14 @@
-import { getGitHubAppMetadata } from './github-app-metadata-service.js'
+import {
+  currentAppBotLogin,
+  getGitHubAppMetadata,
+  normalizeLogin
+} from './github-app-metadata-service.js'
 import { logInfo } from '../utils/logger.js'
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {}
-}
-
-function normalizeLogin(login: unknown): string | null {
-  return typeof login === 'string' && login.trim() !== ''
-    ? login.trim().toLowerCase()
-    : null
-}
-
-function getCandidateBotLogins(): string[] {
-  const appMetadata = getGitHubAppMetadata()
-
-  return [
-    appMetadata.bot_login,
-    appMetadata.slug ? `${appMetadata.slug}-bot[bot]` : null
-  ]
-    .map(normalizeLogin)
-    .filter((login): login is string => Boolean(login))
 }
 
 export function isSelfOriginatedWebhookEvent(payload: unknown): boolean {
@@ -33,7 +20,17 @@ export function isSelfOriginatedWebhookEvent(payload: unknown): boolean {
     return false
   }
 
-  return getCandidateBotLogins().includes(sender_login)
+  // If the app metadata is not loaded we cannot tell our own bot from another, and treating
+  // our own event as external can loop (a review this app just published triggers another
+  // review). Fail closed rather than process an unattributable bot event.
+  //
+  // Be aware of the blast radius: with no metadata this returns true for EVERY bot sender, so
+  // no bot-originated webhook is handled at all. The running service cannot reach this state —
+  // `app.ts` refuses to start without `/app` metadata — but a script or test that calls the
+  // guard on its own will see bot events silently skipped rather than processed.
+  const expectedLogin = currentAppBotLogin()
+  if (expectedLogin === null) return true
+  return sender_login === expectedLogin
 }
 
 export function logSkippedSelfOriginatedEvent(

@@ -23,7 +23,7 @@ const { CONTROL_PLANE_FASTIFY_OPTIONS, registerControlPlaneRoutes } =
 const SERVICE_TOKEN = 'service-token'
 const READ_TOKEN = 'read-token'
 
-async function buildApp(store: Record<string, unknown>) {
+async function buildApp(store: Record<string, unknown>, adminToken?: string) {
   // Same options as the real server, so validation behaviour (notably additionalProperties)
   // is exercised as deployed rather than with Fastify's defaults.
   const app = Fastify(CONTROL_PLANE_FASTIFY_OPTIONS)
@@ -32,7 +32,8 @@ async function buildApp(store: Record<string, unknown>) {
   await registerControlPlaneRoutes(app, {
     store: store as never,
     serviceToken: SERVICE_TOKEN,
-    readToken: READ_TOKEN
+    readToken: READ_TOKEN,
+    ...(adminToken === undefined ? {} : { adminToken })
   })
   await app.ready()
   return app
@@ -311,6 +312,68 @@ test('schema validation names which part of the request failed', async () => {
   }
 })
 
+test('the completion route keeps the comment_url its branch requires', async () => {
+  // `oneOf` plus Fastify's default `removeAdditional: true` is a trap: ajv strips the fields a
+  // branch does not declare before deciding which branch matches, so `delivered:true` would lose
+  // its `comment_url`, fall through to the other branch, and the handler would then reject the
+  // call it just accepted. The server configures `removeAdditional: false` for exactly this
+  // reason; this test pins the consequence on the wire, which the store-level tests cannot see
+  // because they never go through schema validation.
+  const completed: unknown[][] = []
+  const app = await buildApp({
+    completeRunNotice: async (...args: unknown[]) => {
+      completed.push(args)
+      return true
+    }
+  })
+  try {
+    const delivered = await app.inject({
+      method: 'POST',
+      url: `/v1/run-notices/notice-http-1/complete`,
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: {
+        token: 'notice-claim',
+        delivered: true,
+        comment_url: 'https://github.com/o/r/issues/1#issuecomment-9'
+      }
+    })
+    assert.strictEqual(delivered.statusCode, 200)
+    assert.deepStrictEqual(completed, [
+      [
+        'notice-http-1',
+        'notice-claim',
+        true,
+        'https://github.com/o/r/issues/1#issuecomment-9'
+      ]
+    ])
+
+    // The other branch must reject a URL rather than silently dropping it.
+    const notDelivered = await app.inject({
+      method: 'POST',
+      url: `/v1/run-notices/notice-http-1/complete`,
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: {
+        token: 'notice-claim',
+        delivered: false,
+        comment_url: 'https://github.com/o/r/issues/1#issuecomment-9'
+      }
+    })
+    assert.strictEqual(
+      notDelivered.statusCode,
+      400,
+      'an undelivered notice must not carry a comment_url'
+    )
+  } finally {
+    await app.close()
+  }
+})
+
 test('an operation with no response body sends an empty 200, not a null body', async () => {
   // The contract declares no content for these; returning `null` produced a literal "null"
   // body that disagreed with the generated `void` type.
@@ -335,7 +398,7 @@ test('an operation with no response body sends an empty 200, not a null body', a
 test('a failure notice completion forwards an intentional skip through the HTTP route', async () => {
   const completions: unknown[][] = []
   const app = await buildApp({
-    completePreparationFailureNotice: async (...args: unknown[]) => {
+    completeRunNotice: async (...args: unknown[]) => {
       completions.push(args)
       return true
     }
@@ -343,7 +406,7 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
   try {
     const response = await app.inject({
       method: 'POST',
-      url: '/v1/runs/3f2504e0-4f89-41d3-9a0c-0305e82c3301/preparation/failure-notice/complete',
+      url: '/v1/run-notices/notice-http-2/complete',
       headers: {
         authorization: `Bearer ${SERVICE_TOKEN}`,
         'content-type': 'application/json'
@@ -353,7 +416,8 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
     assert.strictEqual(response.statusCode, 200)
     assert.strictEqual(response.json(), true)
     assert.deepStrictEqual(completions, [
-      ['3f2504e0-4f89-41d3-9a0c-0305e82c3301', 'notice-claim', false]
+      // An undelivered notice carries no URL, so the store sees three arguments, not four.
+      ['notice-http-2', 'notice-claim', false]
     ])
   } finally {
     await app.close()
@@ -431,10 +495,11 @@ test('an undeclared body field is rejected, matching the contract', async () => 
     admitReviewRun: async () => {
       handlerCalls += 1
       return {
+        // This test only needs body validation to reject the request before the handler's
+        // result is read, so the record is the minimum the shape needs.
         record: {
           run_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
-          workflow: 'issue-review',
-          runner_status: 'preparing'
+          workflow: 'issue-review'
         },
         created: true,
         preparation_token: 'token'
@@ -645,6 +710,212 @@ test('a request body over the size limit is a 413 with the declared envelope', a
     assert.deepStrictEqual(response.json(), {
       error: 'Request body is too large.'
     })
+  } finally {
+    await app.close()
+  }
+})
+
+test('the admin surface is absent unless an admin token is configured', async () => {
+  // An unconfigured deployment must not advertise an operator surface. Answering 401 would say
+  // "this route exists, you just lack the credential", which is exactly the information a
+  // deployment that deliberately has no admin route should not leak. The check runs before
+  // routing, because fastify-openapi-glue rewrites any security-handler failure into its own
+  // 401 regardless of the status the handler chose.
+  const runId = '0123abcd-4567-89ef-0123-456789abcdef'
+  const path = `/v1/admin/runs/${runId}/abandon`
+  const body = { reason: 'operator says stop' }
+
+  const unconfigured = await buildApp({ connectorId: 'github-app:test' })
+  try {
+    for (const headers of [
+      {},
+      { authorization: `Bearer ${SERVICE_TOKEN}` },
+      { authorization: 'Bearer any-other-value' }
+    ]) {
+      const response = await unconfigured.inject({
+        method: 'POST',
+        url: path,
+        headers: { ...headers, 'content-type': 'application/json' },
+        payload: body
+      })
+      assert.strictEqual(
+        response.statusCode,
+        404,
+        `an unconfigured admin surface must not exist (tried ${JSON.stringify(headers)})`
+      )
+      assert.deepStrictEqual(response.json(), { error: 'not_found' })
+    }
+  } finally {
+    await unconfigured.close()
+  }
+
+  // Configured: the credential must be the admin token. In particular the service token, which
+  // a component holds, must not reach an operator decision.
+  const adminToken = 'admin-token'
+  // One record shaped as each decision returns it: abandoning concludes preparation as
+  // `failed`, resuming hands it back as `uncertain`.
+  const adminRecord = (preparationStatus: 'failed' | 'uncertain') => ({
+    run_id: runId,
+    workflow: 'issue-review',
+    preparation: {
+      status: preparationStatus,
+      attempt_count: 1,
+      disconnect_reason: null,
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+      failure_code:
+        preparationStatus === 'failed' ? 'EXECUTION_ALREADY_ADVANCED' : null
+    },
+    execution: {
+      status: 'succeeded',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publication: {
+      status: 'skipped',
+      started_at: null,
+      finished_at: null,
+      updated_at: '2026-01-01T00:00:00.000Z'
+    },
+    publish_context: {},
+    created_at: '2026-01-01T00:00:00.000Z',
+    failure_code: null,
+    failure_message: null,
+    artifact_storage: null,
+    notices: []
+  })
+  const store = {
+    connectorId: 'github-app:test',
+    abandonBlockedPreparation: async () => adminRecord('failed'),
+    resumeDisconnectedRun: async () => adminRecord('uncertain')
+  }
+  const configured = await buildApp(store, adminToken)
+  try {
+    const anonymous = await configured.inject({
+      method: 'POST',
+      url: path,
+      headers: { 'content-type': 'application/json' },
+      payload: body
+    })
+    assert.strictEqual(anonymous.statusCode, 401)
+    const viaService = await configured.inject({
+      method: 'POST',
+      url: path,
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: body
+    })
+    assert.strictEqual(
+      viaService.statusCode,
+      401,
+      'the service token must not reach an operator decision'
+    )
+    const accepted = await configured.inject({
+      method: 'POST',
+      url: path,
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json'
+      },
+      payload: body
+    })
+    assert.strictEqual(accepted.statusCode, 200)
+    assert.strictEqual(
+      (accepted.json() as { preparation: { status: string } }).preparation
+        .status,
+      'failed'
+    )
+
+    // Resuming is an operator decision too, and it goes through the same credential gate. It
+    // posts no body, so the route must not require one.
+    const resumePath = `/v1/admin/runs/${runId}/resume`
+    const anonymousResume = await configured.inject({
+      method: 'POST',
+      url: resumePath
+    })
+    assert.strictEqual(anonymousResume.statusCode, 401)
+    const viaServiceResume = await configured.inject({
+      method: 'POST',
+      url: resumePath,
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
+    })
+    assert.strictEqual(viaServiceResume.statusCode, 401)
+    const resumed = await configured.inject({
+      method: 'POST',
+      url: resumePath,
+      headers: { authorization: `Bearer ${adminToken}` }
+    })
+    assert.strictEqual(resumed.statusCode, 200)
+  } finally {
+    await configured.close()
+  }
+})
+
+test('the resume route answers 409 for a run that is not disconnected', async () => {
+  // The store decides eligibility; this pins that a refusal surfaces as the contract's 409
+  // rather than an opaque fault, so the console can explain what happened.
+  const app = await buildApp(
+    {
+      connectorId: 'github-app:test',
+      resumeDisconnectedRun: async () => {
+        throw Object.assign(
+          new Error('Review run x has no disconnected axis to resume.'),
+          { statusCode: 409 }
+        )
+      }
+    },
+    'admin-token'
+  )
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/admin/runs/0123abcd-4567-89ef-0123-456789abcdef/resume',
+      headers: { authorization: 'Bearer admin-token' }
+    })
+    assert.strictEqual(response.statusCode, 409)
+  } finally {
+    await app.close()
+  }
+})
+
+test('the blocked preparation queue is readable with the read token', async () => {
+  // Knowing a run is stuck is not privileged: the console must be able to surface the queue
+  // without holding an operator credential. Only acting on it is admin-gated.
+  const app = await buildApp({
+    connectorId: 'github-app:test',
+    listParkedRuns: async () => [
+      {
+        run_id: 'run-1',
+        axis: 'preparation',
+        reason: 'EXECUTION_ALREADY_ADVANCED'
+      }
+    ]
+  })
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/runs/parked',
+      headers: { authorization: `Bearer ${READ_TOKEN}` }
+    })
+    assert.strictEqual(response.statusCode, 200)
+    assert.deepStrictEqual(response.json(), {
+      blocks: [
+        {
+          run_id: 'run-1',
+          axis: 'preparation',
+          reason: 'EXECUTION_ALREADY_ADVANCED'
+        }
+      ]
+    })
+    const anonymous = await app.inject({
+      method: 'GET',
+      url: '/v1/runs/parked'
+    })
+    assert.strictEqual(anonymous.statusCode, 401)
   } finally {
     await app.close()
   }

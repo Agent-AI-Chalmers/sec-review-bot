@@ -7,7 +7,7 @@ import {
   splitRepoFullName
 } from '../../github/repository-service.js'
 import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type {
   TestChangesPolicy,
   RepositoryReviewInput
@@ -48,7 +48,7 @@ function normalizeScanMode(value: unknown): RepositoryScanMode {
 }
 
 async function materializeWorkspace(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   repo: RepositoryContext,
   workspace_path: string,
   refs: string[]
@@ -84,7 +84,7 @@ export async function prepareRepositoryReviewInput({
   test_changes = null
 }: {
   run_id: string
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   repo_full_name: string
   trusted_default_branch: TrustedDefaultBranch
   target_branch?: string | null

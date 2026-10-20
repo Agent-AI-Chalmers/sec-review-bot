@@ -4,18 +4,23 @@ import type { EmitterWebhookEvent } from '@octokit/webhooks'
 
 import { startIssueReviewCommand } from '../../../triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../../triggers/pull-request-review.js'
-import { extractCommentCommand } from '../../../github/comment-command-service.js'
+import {
+  extractCommentCommand,
+  recognizedMentions,
+  unmatchedMentions
+} from '../../../github/comment-command-service.js'
 import { authorizeManualCommentCommand } from '../../../github/manual-command-authorization.js'
 import { extractIssueContext } from '../../../github/issue-service.js'
 import { getPullRequestContext } from '../../../github/pull-request-service.js'
 import { resolveTrustedDefaultBranch } from '../../../github/default-branch-service.js'
-import type { GitHubAppOctokit } from '../../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import {
   isSelfOriginatedWebhookEvent,
   logSkippedSelfOriginatedEvent
 } from '../../../github/webhook-origin-guard.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
+import { createLogThrottle } from '../../../utils/log-throttle.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
 import {
   type TrustedRefHandlerDeps,
@@ -26,7 +31,7 @@ type IssueCommentCreatedWebhookEvent = Pick<
   EmitterWebhookEvent<'issue_comment.created'>,
   'id' | 'payload'
 > & {
-  octokit: unknown
+  octokit: Octokit
 }
 
 interface HandlerDeps extends TrustedRefHandlerDeps {
@@ -34,6 +39,32 @@ interface HandlerDeps extends TrustedRefHandlerDeps {
   getPullRequestContextFn?: typeof getPullRequestContext
   startIssueReviewCommandFn?: typeof startIssueReviewCommand
   startPullRequestReviewCommandFn?: typeof startPullRequestReviewCommand
+  /** Injectable so a test can drive the throttle's clock instead of the process-global default. */
+  unmatchedMentionThrottleFn?: (key: string) => boolean
+}
+
+// The unrecognised-mention diagnostic is triggered by arbitrary comment text, so it is throttled
+// per repository: one line per repro every 5 minutes, remembering at most 200 repos. Without a
+// cap, anyone able to comment could turn a diagnostic into an unbounded log stream.
+const unmatchedMentionThrottle = createLogThrottle({
+  minIntervalMs: 5 * 60_000,
+  maxKeys: 200
+})
+
+/** The repository full name from the webhook payload, or a stable fallback.
+ *
+ * The throttle is keyed by repository so a noisy one cannot suppress another's first report. A
+ * payload without a repository name falls back to a fixed key, which is acceptable: such an event
+ * is malformed and not attributable to a specific repository anyway. */
+function mentionThrottleKey(payload: unknown): string {
+  const repository =
+    typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+      ? (payload as { repository?: { full_name?: unknown } }).repository
+      : undefined
+  const full_name = repository?.full_name
+  return typeof full_name === 'string' && full_name.trim() !== ''
+    ? full_name.trim().toLowerCase()
+    : '(unknown-repository)'
 }
 
 export async function handleIssueCommentCreated({
@@ -51,7 +82,8 @@ export async function handleIssueCommentCreatedWithDeps(
     resolveTrustedDefaultBranchFn = resolveTrustedDefaultBranch,
     getPullRequestContextFn = getPullRequestContext,
     startIssueReviewCommandFn = startIssueReviewCommand,
-    startPullRequestReviewCommandFn = startPullRequestReviewCommand
+    startPullRequestReviewCommandFn = startPullRequestReviewCommand,
+    unmatchedMentionThrottleFn = unmatchedMentionThrottle
   }: HandlerDeps = {}
 ): Promise<void> {
   if (isSelfOriginatedWebhookEvent(payload)) {
@@ -59,13 +91,31 @@ export async function handleIssueCommentCreatedWithDeps(
     return
   }
 
-  const command = extractCommentCommand(
+  const commentBody =
     typeof payload === 'object' && payload !== null && !Array.isArray(payload)
       ? (payload as { comment?: { body?: unknown } }).comment?.body
       : null
-  )
+  const command = extractCommentCommand(commentBody)
 
   if (!command) {
+    // The app answers only `@<slug>` and `@<slug>[bot]`. A comment that addressed some other
+    // `@…` spelling would otherwise be dropped with no trace, making a renamed or misspelled
+    // mention indistinguishable from "the app is down". Log it as a diagnostic; it is not an
+    // error, because most comments mention nobody in particular.
+    const mentions = unmatchedMentions(commentBody)
+    // Only the first sighting per repository per window is logged; the parse itself still runs
+    // so behaviour does not depend on whether the line was emitted.
+    if (
+      mentions.length > 0 &&
+      unmatchedMentionThrottleFn(mentionThrottleKey(payload))
+    ) {
+      logInfo('workflow_skipped', {
+        event: 'issue_comment.created',
+        reason: 'comment_mention_not_recognized',
+        mentions,
+        recognized_mentions: recognizedMentions()
+      })
+    }
     return
   }
 
@@ -75,7 +125,7 @@ export async function handleIssueCommentCreatedWithDeps(
     // Manual comment commands can publish PR reviews, suggestions, commits, or draft PRs;
     // require the commenter to have repository write access before starting any workflow.
     const authorization = await authorizeManualCommentCommandFn({
-      octokit: octokit as GitHubAppOctokit,
+      octokit,
       owner_login: issue.owner_login,
       repo_name: issue.repo_name,
       sender_login:
@@ -103,7 +153,7 @@ export async function handleIssueCommentCreatedWithDeps(
     // Resolve the trusted default branch once for this run; both the issue and
     // PR paths below reuse it instead of re-resolving.
     const trusted_default_branch = await resolveTrustedDefaultBranchFn(
-      octokit as GitHubAppOctokit,
+      octokit,
       { owner_login: issue.owner_login, repo_name: issue.repo_name }
     )
 
@@ -130,7 +180,7 @@ export async function handleIssueCommentCreatedWithDeps(
         delivery_id: id,
         test_changes: command.test_changes,
         resolve_pr: async () =>
-          await getPullRequestContextFn(octokit as GitHubAppOctokit, {
+          await getPullRequestContextFn(octokit, {
             owner_login: issue.owner_login,
             repo_name: issue.repo_name,
             pr_number: issue.issue_number

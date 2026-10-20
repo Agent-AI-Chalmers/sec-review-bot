@@ -14,6 +14,7 @@
     "invalid-review-run-record-missing-publication-status.json": "review-run-record.schema.json",
     "invalid-review-run-record-available-without-artifact.json": "review-run-record.schema.json",
     "invalid-review-run-record-error-with-artifact.json": "review-run-record.schema.json",
-    "invalid-review-run-record-available-with-error-code.json": "review-run-record.schema.json"
+    "invalid-review-run-record-available-with-error-code.json": "review-run-record.schema.json",
+    "invalid-observed-run-comment-url-not-a-uri.json": "observed-run.schema.json"
   }
 }

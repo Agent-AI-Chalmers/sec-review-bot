@@ -7,7 +7,7 @@ import {
   startPreparationClaimHeartbeat
 } from '../control-plane/preparation-claim.js'
 
-import type { GitHubAppOctokit } from '../github/octokit.js'
+import type { Octokit } from 'octokit'
 import {
   getRepositoryRefSha,
   splitRepoFullName
@@ -24,6 +24,7 @@ import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
 import { logInfo } from '../utils/logger.js'
 import { asErrorMessage } from '../utils/error-utils.js'
+import { installationOctokitForRepo } from '../github/installation-client.js'
 
 export interface RepositoryReviewDispatchPayload {
   repo_full_name?: unknown
@@ -116,7 +117,7 @@ export async function resolveRepositoryReviewDispatch({
   octokit,
   payload
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   payload: RepositoryReviewDispatchPayload
 }): Promise<ResolvedRepositoryReviewDispatch> {
   const validated = validateRepositoryReviewDispatchContract(payload)
@@ -214,7 +215,7 @@ export interface DispatchedRepositoryReview {
 }
 
 interface DispatchRepositoryReviewCommandDeps {
-  getInstallationOctokit: (repo_full_name: string) => Promise<GitHubAppOctokit>
+  getInstallationOctokit: (repo_full_name: string) => Promise<Octokit>
   resolve_dispatch: typeof resolveRepositoryReviewDispatch
   submit_run: typeof startRepositoryReviewRun
   store: {
@@ -236,20 +237,6 @@ interface DispatchRepositoryReviewCommandDeps {
   }
 }
 
-async function getRepositoryInstallationOctokit(
-  app: App,
-  repo_full_name: string
-): Promise<GitHubAppOctokit> {
-  const { owner_login, repo_name } = splitRepoFullName(repo_full_name)
-  const installation = await app.octokit.rest.apps.getRepoInstallation({
-    owner: owner_login,
-    repo: repo_name
-  })
-  return (await app.getInstallationOctokit(
-    installation.data.id
-  )) as unknown as GitHubAppOctokit
-}
-
 export async function dispatchRepositoryReview({
   app,
   payload,
@@ -260,7 +247,7 @@ export async function dispatchRepositoryReview({
 }: DispatchRepositoryReviewCommandArgs): Promise<DispatchedRepositoryReview> {
   const {
     getInstallationOctokit = async (repo_full_name) =>
-      getRepositoryInstallationOctokit(app, repo_full_name),
+      installationOctokitForRepo(app, repo_full_name),
     resolve_dispatch = resolveRepositoryReviewDispatch,
     submit_run = startRepositoryReviewRun,
     store = controlPlaneClient
@@ -311,7 +298,7 @@ export async function dispatchRepositoryReview({
     preparationToken
   )
 
-  let octokit: GitHubAppOctokit
+  let octokit: Octokit
   let resolved: Awaited<ReturnType<typeof resolveRepositoryReviewDispatch>>
   try {
     octokit = await getInstallationOctokit(repo_full_name)
@@ -483,7 +470,7 @@ async function resolveHeadSha({
   target_branch,
   head_sha
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   owner_login: string
   repo_name: string
   target_branch: string
@@ -510,7 +497,7 @@ async function resolveManualBaseSha({
   repo_name,
   base_sha
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   owner_login: string
   repo_name: string
   base_sha: unknown
@@ -533,7 +520,7 @@ async function resolveScheduledBaseSha({
   head_sha,
   schedule
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   owner_login: string
   repo_name: string
   head_sha: string

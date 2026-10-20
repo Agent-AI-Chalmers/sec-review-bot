@@ -17,6 +17,16 @@ const DETERMINISTIC_CONTROL_PLANE_PUBLICATION_CODES = new Set<string>([
   RUNNER_PUBLISH_ERROR_CODES.publication_step_not_claimable
 ])
 
+/** Whether the failure is about reaching the service, not about what it answered.
+ *
+ * The exhaustion code is a decision the Control Plane makes; a fault that never got an answer
+ * from it (no status) or that a proxy answered (500 and above) says nothing about that decision.
+ * A 4xx means the request reached Control Plane and was refused, which is a real answer. */
+function isTransportFault(error: unknown): boolean {
+  const status = asErrorWithResponse(error).status
+  return status === undefined || status >= 500
+}
+
 function isRateLimitOrAbuseLimit(error: unknown): boolean {
   const errorInfo = asErrorWithResponse(error)
   const headers = errorInfo.response?.headers ?? {}
@@ -44,15 +54,22 @@ export function classifyPublicationFailure(
       reason: 'deterministic-publish-result'
     }
   }
-  // A publication step that exhausted its retry budget is terminal. Retrying the
-  // whole publication re-claims the same terminal_failed step and fails the same
-  // way, so it must fail rather than loop.
+  // An exhausted step that reached this classification was reconciled first: the publish paths
+  // only propagate the exhaustion error after looking for the remote effect and finding none.
+  // Re-claiming would be refused again (no attempt is left), so it must fail rather than loop.
+  //
+  // A transport fault is the one exception. The publish paths reach this branch by rethrowing
+  // whatever the claim call threw, and Control Plane answers this same code whether the budget is
+  // spent or the request never arrived: a timeout, a 5xx, or a dropped connection carries it too.
+  // Treating that as a verdict would end a publication whose steps were never refused, so a fault
+  // with no HTTP status, or one a proxy or load balancer answered, stays retryable and the next
+  // owner re-reads the step instead.
   if (
     errorCode(error) ===
     RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
   ) {
     return {
-      retry: false,
+      retry: isTransportFault(error),
       code: errorCode(error),
       reason: 'publication-step-retry-exhausted'
     }

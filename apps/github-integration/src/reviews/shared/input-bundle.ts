@@ -18,7 +18,7 @@ import {
   WORKSPACE_SNAPSHOT_TAR_NAME,
   createWorkspaceSnapshotTar
 } from '../../artifacts/git-workspace.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import { writeInputBundleManifest } from '../../runner/input-bundle-manifest.js'
 import {
   MAX_SETUP_DECLARATION_BYTES,
@@ -101,7 +101,7 @@ export async function readSetupDeclaration({
   owner_login,
   repo_name
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   default_sha: string
   owner_login: string
   repo_name: string
@@ -161,7 +161,7 @@ async function readRepositoryFileAtSha({
   sha,
   path
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   owner_login: string
   repo_name: string
   sha: string

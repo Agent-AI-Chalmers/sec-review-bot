@@ -45,7 +45,7 @@ function publicationStepCodesFromContract(): string[] {
     .sort()
 }
 
-test('every Control Plane publication-step code is known and terminal', () => {
+test('every Control Plane publication-step code is known and terminal when refused', () => {
   const codes = publicationStepCodesFromContract()
   assert.ok(codes.length > 0, 'expected publication-step codes')
 
@@ -55,12 +55,28 @@ test('every Control Plane publication-step code is known and terminal', () => {
       known.has(code),
       `${code} is missing from RUNNER_PUBLISH_ERROR_CODES`
     )
-    // A Control Plane deterministic error carries only a `code`; it has no HTTP status, so
-    // a missing classification here would resolve to `retry: true`.
+    // Control Plane answers every one of these with a 409 (server.ts maps
+    // `DeterministicControlPlaneError` to 409), and a stored run re-enters the same condition on
+    // every claim. A missing classification would resolve to `retry: true` and loop forever, so
+    // this asserts the exact shape the client produces for that refusal.
     assert.strictEqual(
-      classifyPublicationFailure({ code }).retry,
+      classifyPublicationFailure({ code, status: 409 }).retry,
       false,
       `${code} must be classified as terminal (retry: false)`
     )
   }
+
+  // The exhaustion signal is the one code whose meaning depends on who answered: a proxy in front
+  // of Control Plane can relay it without Control Plane having decided anything, and a publication
+  // whose steps were never refused must not be ended by that. The step-set codes above are
+  // deliberately status-blind instead — retrying a changed step set re-derives the same set
+  // forever — so this exception is about exhaustion alone, not a general rule for the enum.
+  assert.strictEqual(
+    classifyPublicationFailure({
+      code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+      status: 503
+    }).retry,
+    true,
+    'an exhaustion signal relayed by a proxy says nothing about the step budget'
+  )
 })

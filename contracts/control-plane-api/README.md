@@ -15,7 +15,7 @@ Use these documents:
 
 The Control Plane produces each observed run from `observeRun()` and each record from `rowToRecord()`. The record carries `failure_message`, which the redacted read shape deliberately drops, so it only ever crosses the service-token boundary.
 
-The GitHub integration imports Control Plane's shapes directly, so its view of the record is the same type rather than a hand-written copy. The console instead pins its own `Run` type to the committed fixture, so the two callers keep their own compile-time ties to the one schema.
+The GitHub integration imports Control Plane's shapes directly, so its view of the record is the same type rather than a hand-written copy. The console consumes types generated from the same schema, and a committed fixture pins them at compile time, so the two callers keep their own compile-time ties to the one schema.
 
 Both sides of a request are typed from the contract too, not only the response: the integration's client takes the contract's own `operationId` and derives each request body and success value from it, and the Control Plane's route handlers read `request.body` and `request.params` through their operation's types (`control-plane/src/route-types.ts`). Renaming a request field in [openapi.yaml](openapi.yaml) therefore fails both typechecks, rather than leaving a call site that compiles while the field is quietly ignored.
 
@@ -24,17 +24,18 @@ Both sides of a request are typed from the contract too, not only the response: 
 Consumers can rely on:
 
 - the field names and required fields of an observed run;
-- the two status axes, `execution_status` and `publication_status`, as separate values;
+- the three lifecycle axes as nested objects: the redacted `preparation` summary, and `execution` / `publication`. Each reports its own `status`, `started_at`, `finished_at`, and `updated_at` (the axis' last write, not a phase bound); the query parameters that filter them keep the established `*_status` spelling;
 - the `artifact_storage` variants: absent; an error variant whose status is `unavailable` or `failed`, with optional `error_code` and `message`; or `available` with a stored bundle.
 
 The following are not part of this contract:
 
 - internal store records, such as the row shape persisted in Postgres;
+- connector-owned preparation input, claim tokens, connector identities, and full reconciliation identities;
 - anything the console derives for display, such as relative times or phase durations.
 
 ## Enforcement
 
-The console pins its own `Run` type to the fixture at build time: if the fixture gains, loses, or renames a field, the console stops compiling until its type follows. That check lives in `apps/control-plane-ui/test/observed-run-fixture-types.ts` and compares key sets rather than values, because TypeScript widens JSON strings and a value-level assignment would reject a correct fixture.
+The console's `Run` type is generated from the contract, and a committed fixture pins it at build time: if the fixture gains, loses, or renames a field, the console stops compiling until the generated type and the fixture agree again. That check compares key sets rather than values, because TypeScript widens JSON strings and a value-level assignment would reject a correct fixture.
 
 The Control Plane owns the value-level half in `control-plane/test/observed-run-contract.test.ts`: it validates every fixture as the manifest claims, and validates what `observeRun()` actually returns. The type↔schema binding needs no separate key-set comparison because both derive from the same `ObservedRun` in the contract (`openapi.yaml`). A status outside the schema enums, a broken pattern, or a malformed timestamp therefore fails the suite instead of reaching the console.
 

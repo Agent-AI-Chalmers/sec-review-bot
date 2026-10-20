@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "dev-fixtures.ts", "vite.config.ts"]
 }

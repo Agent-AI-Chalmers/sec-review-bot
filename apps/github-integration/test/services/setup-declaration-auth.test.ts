@@ -6,9 +6,10 @@ import path from 'node:path'
 import test from 'node:test'
 import { promisify } from 'node:util'
 
-import type { GitHubAppOctokit } from '../../src/github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
+import { fakeGitHub, githubFile, githubJson } from '../github-client.js'
 
 // The setup declaration is read for private repositories too. The read goes
 // through the same installation-authenticated octokit the preparer already
@@ -63,7 +64,7 @@ async function createGitFixture(root: string): Promise<GitFixture> {
 }
 
 interface OctokitRecording {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   contentRequests: Array<{
     owner?: string
     repo?: string
@@ -83,69 +84,68 @@ function octokitWithSetupDeclaration(
     path: string
     ref?: string
   }> = []
-  const octokit = {
-    auth: async () => ({ token: 'test-installation-token' }),
-    request: async () => ({ data: '' }),
-    graphql: async () => ({
-      repository: {
-        pullRequest: {
-          commits: {
-            pageInfo: { hasNextPage: false },
-            nodes: [{ commit: { oid: sha } }]
-          }
-        }
-      }
-    }),
-    rest: {
-      repos: {
-        get: async () => ({
-          data: {
-            full_name: 'octo/demo',
-            default_branch: 'main',
-            html_url: '',
-            private: true
-          }
-        }),
-        getBranch: async () => ({ data: { commit: { sha } } }),
-        getCommit: async ({ ref }: { ref: string }) => ({ data: { sha: ref } }),
-        getContent: async ({
-          owner,
-          repo,
-          path,
-          ref
-        }: {
-          owner?: string
-          repo?: string
-          path: string
-          ref?: string
-        }) => {
-          contentRequests.push({
-            ...(owner !== undefined ? { owner } : {}),
-            ...(repo !== undefined ? { repo } : {}),
-            path,
-            ...(ref !== undefined ? { ref } : {})
-          })
-          const content = files[path]
-          if (content === undefined) {
-            throw Object.assign(new Error('Not Found'), { status: 404 })
-          }
-          return {
-            data: {
-              type: 'file',
-              content: Buffer.from(content, 'utf8').toString('base64')
+  const { octokit } = fakeGitHub(({ url }) => {
+    const parsed = new URL(url)
+    const pathname = parsed.pathname
+    if (pathname === '/graphql') {
+      // The PR commits query: one page, one commit, no next page.
+      return githubJson({
+        data: {
+          repository: {
+            pullRequest: {
+              commits: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [{ commit: { oid: sha } }]
+              }
             }
           }
-        },
-        compareCommitsWithBasehead: async () => ({
-          data: { status: 'ahead', files: [], commits: [] }
-        }),
-        listCommits: async () => ({ data: [] }),
-        listContributors: async () => ({ data: [] })
-      },
-      issues: { listEventsForTimeline: async () => ({ data: [] }) },
-      pulls: { listFiles: async () => ({ data: [] }) }
+        }
+      })
     }
-  } as unknown as GitHubAppOctokit
+    // Any repository, so a test can assert which identity (base repo, not the payload's) the
+    // declaration read follows.
+    const repoMatch = /^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(pathname)
+    const owner = repoMatch?.[1] ?? ''
+    const repo = repoMatch?.[2] ?? ''
+    const tail = repoMatch?.[3] ?? ''
+
+    if (tail.startsWith('/contents/')) {
+      const path = decodeURIComponent(tail.slice('/contents/'.length))
+      const ref = parsed.searchParams.get('ref') ?? undefined
+      contentRequests.push({
+        owner,
+        repo,
+        path,
+        ...(ref !== undefined ? { ref } : {})
+      })
+      const content = files[path]
+      if (content === undefined)
+        return githubJson({ message: 'Not Found' }, 404)
+      return githubFile(content, path)
+    }
+    if (tail.startsWith('/commits/')) {
+      const ref = decodeURIComponent(tail.slice('/commits/'.length))
+      return githubJson({ sha: ref })
+    }
+    if (tail.startsWith('/compare/')) {
+      return githubJson({ status: 'ahead', files: [], commits: [] })
+    }
+    if (tail.startsWith('/commits')) return githubJson([])
+    if (tail.startsWith('/contributors')) return githubJson([])
+    if (tail.startsWith('/branches/')) {
+      return githubJson({ commit: { sha } })
+    }
+    if (tail === '' || tail === '/') {
+      return githubJson({
+        full_name: 'octo/demo',
+        default_branch: 'main',
+        html_url: '',
+        private: true
+      })
+    }
+    // issues timeline and pull file listings
+    return githubJson([])
+  })
   return { octokit, contentRequests }
 }
 

@@ -5,16 +5,35 @@ import { classifyPublicationFailure } from '../../src/control-plane/publication-
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../src/runner/publish-error-code.js'
 
 test('a publication step that exhausted its retry budget fails rather than retries', () => {
-  // Control Plane throws PUBLICATION_STEP_RETRY_EXHAUSTED once a step is
-  // terminal_failed. The integration receives a plain error carrying only that
-  // code. Classifying it as retryable would re-claim the same terminal_failed
-  // step and fail the same way forever, so it must be terminal.
+  // Control Plane throws PUBLICATION_STEP_RETRY_EXHAUSTED once a step has no attempt left, and
+  // answers the refusal with a 409. Classifying it as retryable would re-claim the same step and
+  // fail the same way forever, so a refusal must be terminal.
   const error = Object.assign(
     new Error('Publication step exhausted its retry budget: issue:draft-pr'),
-    { code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted }
+    {
+      code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+      status: 409
+    }
   )
   assert.deepStrictEqual(classifyPublicationFailure(error), {
     retry: false,
+    code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
+    reason: 'publication-step-retry-exhausted'
+  })
+})
+
+test('the same exhaustion code carried by a proxy answer stays retryable', () => {
+  // The publish paths rethrow whatever the claim call threw. A proxy or load balancer answering
+  // 502/503 in front of Control Plane can relay the same code without Control Plane having
+  // decided anything about the step, so treating a 5xx as a verdict would end a publication whose
+  // steps were never refused. (A client-side timeout does not carry this code at all: the client
+  // raises `CONTROL_PLANE_REQUEST_TIMEOUT` for those, which is already retryable.)
+  const relayed = Object.assign(new Error('Bad Gateway'), {
+    code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+    status: 503
+  })
+  assert.deepStrictEqual(classifyPublicationFailure(relayed), {
+    retry: true,
     code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
     reason: 'publication-step-retry-exhausted'
   })

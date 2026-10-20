@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import type { GitHubAppOctokit } from '../../../src/github/octokit.js'
+import type { Octokit } from 'octokit'
 import { readSetupDeclaration } from '../../../src/reviews/shared/input-bundle.js'
+import { fakeGitHub, githubFile, githubJson } from '../../github-client.js'
 
 /**
  * Read setup declarations through an octokit whose Contents API is served by a
@@ -13,26 +14,20 @@ import { readSetupDeclaration } from '../../../src/reviews/shared/input-bundle.j
 function octokitForContent(
   files: Record<string, string>,
   requests: Array<{ path: string; ref?: string }> = []
-): GitHubAppOctokit {
-  return {
-    rest: {
-      repos: {
-        getContent: async ({ path, ref }: { path: string; ref?: string }) => {
-          requests.push({ path, ...(ref !== undefined ? { ref } : {}) })
-          const content = files[path]
-          if (content === undefined) {
-            throw Object.assign(new Error('Not Found'), { status: 404 })
-          }
-          return {
-            data: {
-              type: 'file',
-              content: Buffer.from(content, 'utf8').toString('base64')
-            }
-          }
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+): Octokit {
+  return fakeGitHub((request) => {
+    const parsed = new URL(request.url)
+    const query = parsed.searchParams
+    const path = decodeURIComponent(
+      parsed.pathname.split('/contents/')[1] ?? ''
+    )
+    const ref = query.get('ref') ?? undefined
+    requests.push({ path, ...(ref !== undefined ? { ref } : {}) })
+    const content = files[path]
+    // A missing entry is a real 404, the only status that means "no declaration".
+    if (content === undefined) return githubJson({ message: 'Not Found' }, 404)
+    return githubFile(content, path)
+  }).octokit
 }
 
 test('readSetupDeclaration returns the declaration text from the default branch SHA', async () => {
@@ -126,15 +121,11 @@ test('readSetupDeclaration propagates a non-404 read failure instead of skipping
   // Only a 404 means "no declaration". Any other failure (403, 5xx, network)
   // must fail input preparation loudly rather than silently reviewing the
   // repository without the environment the default branch declared.
-  const octokit = {
-    rest: {
-      repos: {
-        getContent: async () => {
-          throw Object.assign(new Error('Forbidden'), { status: 403 })
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  // 403 is a real HTTP reply, so Octokit maps it to a RequestError with that status - which is
+  // what the code under test must distinguish from a 404.
+  const octokit = fakeGitHub(() =>
+    githubJson({ message: 'Forbidden' }, 403)
+  ).octokit
 
   await assert.rejects(
     () =>
@@ -153,21 +144,13 @@ test('readSetupDeclaration ignores a symlink entry, whose content is the target 
   // and `content` set to the base64 of the *target path* (not the file body).
   // Treating it as a declaration would feed a path string to the parser; the
   // reader must treat any non-`file` entry as "no declaration".
-  const octokit = {
-    rest: {
-      repos: {
-        getContent: async () => ({
-          data: {
-            type: 'symlink',
-            target: '../shared/setup.yml',
-            content: Buffer.from('../shared/setup.yml', 'utf8').toString(
-              'base64'
-            )
-          }
-        })
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  const octokit = fakeGitHub(() =>
+    githubJson({
+      type: 'symlink',
+      target: '../shared/setup.yml',
+      content: Buffer.from('../shared/setup.yml', 'utf8').toString('base64')
+    })
+  ).octokit
 
   const declaration = await readSetupDeclaration({
     octokit,
@@ -180,21 +163,15 @@ test('readSetupDeclaration ignores a symlink entry, whose content is the target 
 })
 
 test('readSetupDeclaration treats a directory entry as absent', async () => {
-  const octokit = {
-    rest: {
-      repos: {
-        getContent: async () => ({
-          data: [
-            {
-              type: 'file',
-              path: '.sec-review/setup.yml/README.md',
-              content: Buffer.from('x', 'utf8').toString('base64')
-            }
-          ]
-        })
+  const octokit = fakeGitHub(() =>
+    githubJson([
+      {
+        type: 'file',
+        path: '.sec-review/setup.yml/README.md',
+        content: Buffer.from('x', 'utf8').toString('base64')
       }
-    }
-  } as unknown as GitHubAppOctokit
+    ])
+  ).octokit
 
   const declaration = await readSetupDeclaration({
     octokit,

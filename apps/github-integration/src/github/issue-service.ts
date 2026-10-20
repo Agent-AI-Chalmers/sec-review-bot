@@ -1,4 +1,4 @@
-import type { GitHubAppOctokit } from './octokit.js'
+import type { Octokit } from 'octokit'
 import { isRecord } from '../utils/error-utils.js'
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -142,7 +142,7 @@ function isSameRepositoryPullRequestSource(
 }
 
 async function listTimelineCrossReferencedPullRequestRefs(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   issue: IssueContext
 ): Promise<LinkedPullRequestRef[]> {
   const refs: LinkedPullRequestRef[] = []
@@ -211,7 +211,7 @@ async function listTimelineCrossReferencedPullRequestRefs(
 }
 
 export async function fetchTimelineLinkedPullRequests(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   issue: IssueContext
 ): Promise<{
   source: 'issue-timeline-cross-references'

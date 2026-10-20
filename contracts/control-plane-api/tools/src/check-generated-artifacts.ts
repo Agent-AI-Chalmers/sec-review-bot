@@ -9,6 +9,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { generatedArtifacts as schemas } from './generate-schemas.js'
+import { generatedArtifacts as stateMachines } from './generate-state-machines.js'
 import { generatedArtifacts as types } from './generate-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
@@ -25,7 +26,7 @@ export interface StaleArtifact {
 /** Every committed artifact of this family that does not match a fresh render. */
 export async function staleGeneratedArtifacts(): Promise<StaleArtifact[]> {
   const stale: StaleArtifact[] = []
-  for (const artifact of [...types(), ...schemas()]) {
+  for (const artifact of [...types(), ...schemas(), ...stateMachines()]) {
     const output = path.relative(REPO_ROOT, artifact.output)
     const committed = readFileSync(artifact.output, 'utf8')
     if (committed !== (await artifact.render())) {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { Pool } from 'pg'
 
 function databaseUrl(): string {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -65,6 +66,17 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     assert.strictEqual(invalidPublicationStatus.status, 400)
     assert.strictEqual(
       ((await invalidPublicationStatus.json()) as { code?: string }).code,
+      'INVALID_QUERY'
+    )
+    const invalidPreparationStatus = await fetch(
+      `${base}/v1/runs?preparation_status=typo`,
+      {
+        headers: readAuth
+      }
+    )
+    assert.strictEqual(invalidPreparationStatus.status, 400)
+    assert.strictEqual(
+      ((await invalidPreparationStatus.json()) as { code?: string }).code,
       'INVALID_QUERY'
     )
     const invalidWorkflow = await fetch(`${base}/v1/runs?workflow=typo`, {
@@ -153,6 +165,58 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     assert.strictEqual(secondBody.runs.length, 1)
     assert.notStrictEqual(secondBody.runs[0]?.run_id, firstBody.runs[0]?.run_id)
 
+    // The coordination event log is the operator timeline the console renders. Its read path
+    // is new, so pin the whole HTTP surface: authentication, the admission events, oldest-first
+    // ordering, and a run id this connector cannot see reading as 404 rather than empty.
+    const unauthorizedEvents = await fetch(
+      `${base}/v1/runs/${runIds[0]}/events`
+    )
+    assert.strictEqual(unauthorizedEvents.status, 401)
+    const events = await fetch(`${base}/v1/runs/${runIds[0]}/events`, {
+      headers: readAuth
+    })
+    assert.strictEqual(events.status, 200)
+    const eventsBody = (await events.json()) as {
+      run_id: string
+      events: Array<{
+        event_id: number
+        axis: string
+        from_status: string | null
+        to_status: string
+        occurred_at: string
+      }>
+    }
+    assert.strictEqual(eventsBody.run_id, runIds[0])
+    // Admission writes one event per axis inside the admitting transaction.
+    assert.deepStrictEqual(
+      eventsBody.events.map((event) => `${event.axis}:${event.to_status}`),
+      ['execution:pending', 'preparation:preparing', 'publication:pending']
+    )
+    const occurredAt = eventsBody.events.map((event) =>
+      Date.parse(event.occurred_at)
+    )
+    assert.deepStrictEqual(
+      occurredAt,
+      [...occurredAt].sort((left, right) => left - right),
+      'events are returned oldest first'
+    )
+    const unknownRunEvents = await fetch(
+      `${base}/v1/runs/${randomUUID()}/events`,
+      { headers: readAuth }
+    )
+    assert.strictEqual(unknownRunEvents.status, 404)
+    assert.deepStrictEqual(await unknownRunEvents.json(), {
+      error: 'run_not_found'
+    })
+    // The path parameter is contract-validated like every other run id.
+    const malformedRunEvents = await fetch(
+      `${base}/v1/runs/not-a-uuid/events`,
+      {
+        headers: readAuth
+      }
+    )
+    assert.strictEqual(malformedRunEvents.status, 400)
+
     // The created-at range was accepted by the API but never covered, so a broken
     // bound would have filtered silently.
     const past = encodeURIComponent('2000-01-01T00:00:00.000Z')
@@ -183,6 +247,42 @@ test('authenticated run queries are redacted, paginated, and survive a server re
       ((await invalidFrom.json()) as { code?: string }).code,
       'INVALID_QUERY'
     )
+
+    // The event log belongs to the run trunk, so a run whose axis row is unrepresentable still
+    // has a readable history. Before this used the full record projection, which reports that
+    // corruption as "not found", hiding the very timeline an operator needs to diagnose it.
+    const corruptRunId = runIds[1]
+    const writePool = new Pool({ connectionString: databaseUrl() })
+    try {
+      await writePool.query('DELETE FROM executions WHERE run_id=$1', [
+        corruptRunId
+      ])
+      const corruptDetail = await fetch(`${base}/v1/runs/${corruptRunId}`, {
+        headers: readAuth
+      })
+      assert.strictEqual(
+        corruptDetail.status,
+        404,
+        'the record read still treats the corrupt run as unrepresentable'
+      )
+      const corruptEvents = await fetch(
+        `${base}/v1/runs/${corruptRunId}/events`,
+        { headers: readAuth }
+      )
+      assert.strictEqual(
+        corruptEvents.status,
+        200,
+        'the event log stays readable for a corrupt run'
+      )
+      const corruptBody = (await corruptEvents.json()) as {
+        run_id: string
+        events: unknown[]
+      }
+      assert.strictEqual(corruptBody.run_id, corruptRunId)
+      assert.ok(corruptBody.events.length > 0)
+    } finally {
+      await writePool.end()
+    }
 
     await server.close()
     server = await startControlPlaneServer()

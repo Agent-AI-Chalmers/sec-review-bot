@@ -8,6 +8,8 @@ import type {
   TestChangesPolicy
 } from '../../../src/runner/input.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import type { prepareIssueReviewInput } from '../../../src/reviews/issues/prepare-input.js'
+import { unusedGitHub } from '../../github-client.js'
 
 function issueContext(): IssueContext {
   return {
@@ -35,10 +37,9 @@ function fakePrepareInput() {
     review_objective: 'audit' | 'repair'
     test_changes?: TestChangesPolicy
   }> = []
-  const prepare_input = (async (args: {
-    review_objective?: 'audit' | 'repair'
-    test_changes?: TestChangesPolicy
-  }) => {
+  // Typed as the real function so the stub cannot drift from its signature; the parameters the
+  // test does not assert on are accepted and ignored.
+  const prepare_input: typeof prepareIssueReviewInput = async (args) => {
     calls.push({
       review_objective: args.review_objective ?? 'audit',
       ...(args.test_changes ? { test_changes: args.test_changes } : {})
@@ -54,7 +55,7 @@ function fakePrepareInput() {
       input_bundle_root: '/tmp/bundle',
       workspace_ref: 'workspace-ref'
     }
-  }) as never
+  }
   return { calls, prepare_input }
 }
 
@@ -66,7 +67,7 @@ async function runWith(
   await startIssueReviewRun(
     {
       run_id: 'run-issue-1',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       issue: issueContext(),
       trusted_default_branch: {
         default_branch: 'main',

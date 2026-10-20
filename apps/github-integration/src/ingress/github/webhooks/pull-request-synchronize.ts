@@ -11,7 +11,7 @@ import {
   isAutomaticTriggerModeEnabled,
   isRepositoryTriggerConfigError
 } from '../../../github/repo-config-service.js'
-import type { GitHubAppOctokit } from '../../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { TrustedDefaultBranch } from '../../../github/default-branch-service.js'
 import {
   isSelfOriginatedWebhookEvent,
@@ -30,7 +30,7 @@ type PullRequestSynchronizeWebhookEvent = Pick<
   EmitterWebhookEvent<'pull_request.synchronize'>,
   'id' | 'payload'
 > & {
-  octokit: unknown
+  octokit: Octokit
 }
 
 interface HandlerDeps extends TriggerConfigHandlerDeps {
@@ -97,10 +97,7 @@ export async function handlePullRequestSynchronizeWithDeps(
     // Read config from the API-resolved default branch, via base repo identity
     // (never use pr.base_ref, which is payload-derived).
     const id = resolveTrustedRepositoryIdentity(pr)
-    const resolved = await fetchTrustedRepositoryTriggerConfigFn(
-      octokit as GitHubAppOctokit,
-      id
-    )
+    const resolved = await fetchTrustedRepositoryTriggerConfigFn(octokit, id)
     triggerConfig = resolved.config
     trusted_default_branch = {
       default_branch: resolved.default_branch,

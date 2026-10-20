@@ -1,11 +1,12 @@
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
 import { buildDeliveryDraftPrBody } from './renderer.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { FileChange, FileMode, TextEncoding } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import type { RepositoryCaseResult, RepositoryDelivery } from './result.js'
-import { asErrorWithResponse } from '../../utils/error-utils.js'
+import { isBranchAlreadyExists } from '../shared/branch-already-exists.js'
+import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
 
 interface RepositoryContext {
   owner_login: string
@@ -103,7 +104,7 @@ function encodeGitFileContent(content_buffer: Buffer): {
 }
 
 async function buildTreeElements(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   delivery: RepositoryDelivery,
   repo: RepositoryContext,
   assertPublicationClaim: () => Promise<void>
@@ -165,7 +166,7 @@ export async function createRepositoryDeliveryDraftPr({
   case_results = [],
   assert_publication_claim
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   repo: RepositoryContext
   run_id: string
   input: RepositoryReviewInput
@@ -253,30 +254,32 @@ export async function createRepositoryDeliveryDraftPr({
       sha: newCommitResponse.data.sha
     })
   } catch (error) {
-    const errorInfo = asErrorWithResponse(error)
-    if (errorInfo.status !== 422) {
-      throw error
-    }
-
-    // createRef returns 422 both for "reference already exists" (safe to
-    // force-update) and for an invalid ref name (never safe to retry). Only take
-    // the force-update path when GitHub reports the ref already exists; an invalid
-    // ref is a real error that must surface instead of failing identically again.
-    const message = String(
-      errorInfo.response?.data?.message ?? ''
-    ).toLowerCase()
-    if (!message.includes('already exists')) {
+    // An existing run-specific branch is a recovery checkpoint only when it
+    // still has this run's validated contents.
+    if (!isBranchAlreadyExists(error)) {
       throw error
     }
 
     await assert_publication_claim()
-    await octokit.rest.git.updateRef({
+    const existingRef = await octokit.rest.git.getRef({
       owner: repo.owner_login,
       repo: repo.repo_name,
-      ref: `heads/${branch_name}`,
-      sha: newCommitResponse.data.sha,
-      force: true
+      ref: `heads/${branch_name}`
     })
+    const existingCommit = await octokit.rest.git.getCommit({
+      owner: repo.owner_login,
+      repo: repo.repo_name,
+      commit_sha: existingRef.data.object.sha
+    })
+    if (
+      existingCommit.data.tree.sha !== treeResponse.data.sha ||
+      existingCommit.data.parents?.length !== 1 ||
+      existingCommit.data.parents[0]?.sha !== head_sha
+    ) {
+      throw new DeterministicRunnerPublishError(
+        `Existing delivery draft PR branch does not match the validated result for ${String(delivery.delivery_id)}.`
+      )
+    }
   }
 
   await assert_publication_claim()
