@@ -558,10 +558,10 @@ export const messages = {
     state_publication_published_label: '已发布',
     state_publication_uncertain_label: '待确认',
     state_publication_uncertain_desc:
-      '至少有一个步骤可能已经在远端完成了副作用，正在对账。发布的其他部分不受影响；这不是失败。',
+      '至少有一个步骤可能已经在远端完成了副作用，系统正在确认远端结果。发布的其他部分不受影响；这不是失败。',
     state_publication_disconnected_label: '失联',
     state_publication_disconnected_desc:
-      '某个步骤的自动对账没有得出结论就停手了。必须先由 operator 确认远端到底是什么状态，这个 run 才能收尾。',
+      '系统多次尝试确认某个步骤的远端结果，但始终没有得到结论，因此自动处理已经停止。必须先由 operator 决定是否继续，这个 run 才能收尾。',
     state_publication_published_desc: '全部发布成功，结果已可见。',
     state_publication_failed_label: '失败',
     state_publication_failed_desc:
@@ -587,7 +587,7 @@ export const messages = {
 
     edge_publication_publishing_uncertain: '某步骤可能已经在远端生效',
     edge_publication_uncertain_publishing: '该步骤已结算，发布继续进行',
-    edge_publication_uncertain_disconnected: '对账无法得出结论',
+    edge_publication_uncertain_disconnected: '无法确认远端结果',
     edge_publication_disconnected_pending: 'operator 把它放回正常发布队列',
     edge_publication_disconnected_failed:
       'operator 决定停止发布（部分步骤可能已经完成）',
