@@ -543,10 +543,21 @@ function parseNameStatusZ(output: string): {
 }
 
 /**
- * Read `--numstat -z` output: `<added>\t<deleted>\t\0<path>\0`, with an extra path for a rename.
+ * Read `--numstat -z` output.
  *
- * A binary file reports `-` for both counts, which is not a line count; those become 0 so the
- * list stays numeric while the patch keeps the authoritative placeholder.
+ * A record starts with `<added>\t<deleted>\t`. For an ordinary file the path follows that third
+ * field on the same line and the record ends at the next NUL:
+ *
+ *     <added>\t<deleted>\t<path>\0
+ *
+ * A rename or copy leaves the third field empty and puts both paths in their own NUL-terminated
+ * fields:
+ *
+ *     <added>\t<deleted>\t\0<old>\0<new>\0
+ *
+ * Only the new path is keyed, because that is the path the diff and the file list use. A binary
+ * file reports `-` for both counts, which is not a line count; those become 0 so the list stays
+ * numeric while the patch keeps the authoritative placeholder.
  */
 function parseNumstatZ(
   output: string
@@ -555,25 +566,29 @@ function parseNumstatZ(
   const fields = output.split('\0')
   let index = 0
   while (index < fields.length) {
-    const header = fields[index] ?? ''
-    if (header === '') break
+    const record = fields[index] ?? ''
     index += 1
-    const [added, removed] = header.split('\t')
-    const is_rename =
-      (added ?? '').includes('') === false && header.split('\t').length === 3
-    const path = fields[index] ?? ''
+    if (record === '') continue
+
+    const tabs = record.split('\t')
+    const added = tabs[0] ?? ''
+    const removed = tabs[1] ?? ''
+    const inline_path = tabs[2] ?? ''
     const counts_for_file = {
-      additions: added === '-' ? 0 : Number.parseInt(added ?? '', 10) || 0,
-      deletions: removed === '-' ? 0 : Number.parseInt(removed ?? '', 10) || 0
+      additions: added === '-' ? 0 : Number.parseInt(added, 10) || 0,
+      deletions: removed === '-' ? 0 : Number.parseInt(removed, 10) || 0
     }
-    if (is_rename) {
-      const renamed_to = fields[index + 1] ?? ''
-      index += 2
-      counts.set(renamed_to, counts_for_file)
+
+    if (inline_path !== '') {
+      counts.set(inline_path, counts_for_file)
       continue
     }
-    index += 1
-    counts.set(path, counts_for_file)
+    // Rename or copy: the next two NUL fields are the old and new paths.
+    const renamed_from = fields[index] ?? ''
+    const renamed_to = fields[index + 1] ?? ''
+    index += 2
+    if (renamed_from === '' && renamed_to === '') continue
+    counts.set(renamed_to, counts_for_file)
   }
   return counts
 }

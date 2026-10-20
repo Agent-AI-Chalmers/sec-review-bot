@@ -654,3 +654,77 @@ test('exportWorkspaceWindow keeps patches for paths git would quote', async () =
     await fs.rm(root, { recursive: true, force: true })
   }
 })
+
+test('exportWorkspaceWindow reports line counts for ordinary, renamed, and deleted files', async () => {
+  // `--numstat -z` puts an ordinary file's path in the third tab field on the same line, while a
+  // rename leaves that field empty and puts both paths in their own NUL fields. Reading only the
+  // NUL form made every ordinary file's counts miss, so the agent-facing list reported 0/0 for
+  // changes it had just described as modifications.
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'git-workspace-numstat-')
+  )
+  try {
+    const source = path.join(root, 'source')
+    const workspace = path.join(root, 'workspace')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    await fs.writeFile(path.join(source, 'plain.txt'), 'a\nb\nc\n', 'utf8')
+    await fs.writeFile(path.join(source, 'moved.txt'), 'x\ny\n', 'utf8')
+    await fs.writeFile(path.join(source, 'gone.txt'), 'g1\ng2\ng3\n', 'utf8')
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'before'])
+    const base_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await fs.writeFile(
+      path.join(source, 'plain.txt'),
+      'a\nb\nc\nd\ne\n',
+      'utf8'
+    )
+    await git(source, ['mv', 'moved.txt', 'renamed.txt'])
+    await git(source, ['rm', '-q', 'gone.txt'])
+    await git(source, ['add', '-A'])
+    await git(source, ['commit', '-m', 'after'])
+    const head_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await materializeWorkspaceWithCommitHistory({
+      workspace_path: workspace,
+      git_remote_url: source,
+      refs: [base_sha, head_sha]
+    })
+
+    const exported = await exportWorkspaceWindow({
+      workspace_path: workspace,
+      base_sha,
+      head_sha
+    })
+    const by_name = new Map(exported.files.map((file) => [file.filename, file]))
+
+    assert.deepStrictEqual(
+      {
+        additions: by_name.get('plain.txt')?.additions,
+        deletions: by_name.get('plain.txt')?.deletions
+      },
+      { additions: 2, deletions: 0 }
+    )
+    assert.deepStrictEqual(
+      {
+        additions: by_name.get('gone.txt')?.additions,
+        deletions: by_name.get('gone.txt')?.deletions
+      },
+      { additions: 0, deletions: 3 }
+    )
+    // A pure rename changes no lines, and it must still be listed.
+    assert.deepStrictEqual(
+      {
+        status: by_name.get('renamed.txt')?.status,
+        additions: by_name.get('renamed.txt')?.additions,
+        deletions: by_name.get('renamed.txt')?.deletions
+      },
+      { status: 'renamed', additions: 0, deletions: 0 }
+    )
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
