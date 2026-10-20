@@ -5,17 +5,21 @@ import path from 'path'
 import {
   fetchTimelineLinkedIssues,
   resolveTrustedRepositoryIdentity,
-  summarizePullRequestFiles,
-  type PullRequestContext,
-  type PullRequestFile,
-  type PullRequestFileSummary
+  type PullRequestContext
 } from '../../github/pull-request-service.js'
 import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { Octokit } from 'octokit'
-import type { PullRequestReviewInput } from '../../runner/input.js'
+import type {
+  PullRequestReviewInput,
+  PullRequestReviewSubject
+} from '../../runner/input.js'
 import type { TestChangesPolicy } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
-import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
+import {
+  exportWorkspaceWindow,
+  materializeWorkspaceWithCommitHistory
+} from '../../artifacts/git-workspace.js'
+import type { ReviewWindow } from './review-window.js'
 import {
   archiveInputBundle,
   buildGitRemoteUrl,
@@ -25,30 +29,12 @@ import {
   readSetupDeclaration
 } from '../shared/input-bundle.js'
 
-interface NormalizedPullRequestFile {
-  path: string
-  status: string
-  additions: number
-  deletions: number
-  changes: number
-  patch: string | null
-}
-
-interface IncrementalChangedFileEntry {
-  path: string
-  status: string
-  previous_path: string | null
-  additions: number
-  deletions: number
-  changes: number
-}
-
 export interface PreparedPullRequestReview {
   run_id: string
   input: PullRequestReviewInput
   input_path: string
   input_bundle_root: string
-  files: PullRequestFile[]
+  files: Awaited<ReturnType<typeof exportWorkspaceWindow>>['files']
 }
 
 interface PullRequestCommitsConnection {
@@ -67,56 +53,42 @@ interface PullRequestCommitsGraphQLResponse {
   }
 }
 
-function buildPrMetadata(pr: PullRequestContext): Record<string, unknown> {
+/**
+ * Build the pull request subject a review run carries.
+ *
+ * Only fields with a consumer are included: the preparation path, the recovery
+ * path, and the agent prompts. Endpoint URLs, commit counts, and sender identity
+ * had no reader, so keeping them only made the run's subject ambiguous.
+ */
+function buildPrMetadata(
+  pr: PullRequestContext,
+  window: ReviewWindow,
+  commit_shas: string[]
+): PullRequestReviewSubject {
   return {
-    action: pr.action,
+    // These names are the wire contract shared with the local materializer and
+    // the v6 fixture; they are not the names of the fields they are read from.
     owner: pr.owner_login,
     repo: pr.repo_name,
     repo_full_name: pr.repo_full_name,
     number: pr.pr_number,
-    html_url: pr.html_url,
     title: pr.pr_title,
     body: pr.pr_body,
-    author_login: pr.pr_author,
-    is_draft: pr.is_draft,
     base_ref: pr.base_ref,
     base_sha: pr.base_sha,
     head_ref: pr.head_ref,
     head_sha: pr.head_sha,
-    previous_head_sha: pr.previous_head_sha ?? null
-  }
-}
-
-function normalizeFiles(files: PullRequestFile[]): NormalizedPullRequestFile[] {
-  return summarizePullRequestFiles(files).map(
-    (file: PullRequestFileSummary) => ({
-      path: file.filename,
-      status: file.status,
-      additions: file.additions,
-      deletions: file.deletions,
-      changes: file.changes,
-      patch: file.patch
-    })
-  )
-}
-
-function buildIncrementalPatchText(files: NormalizedPullRequestFile[]): string {
-  const chunks: string[] = []
-
-  for (const file of files) {
-    if (typeof file.patch !== 'string' || file.patch.trim() === '') {
-      continue
+    commit_shas,
+    // The window this run covers. It labels the materialized `changed-files.json`
+    // and `incremental.patch`; on `synchronize` it is narrower than
+    // base_sha..head_sha, which stays as pull request identity.
+    review_window: {
+      kind: window.kind,
+      base_sha: window.base_sha,
+      head_sha: window.head_sha,
+      reason: window.reason
     }
-
-    chunks.push(
-      `diff --git a/${file.path} b/${file.path}`,
-      `--- a/${file.path}`,
-      `+++ b/${file.path}`,
-      file.patch
-    )
   }
-
-  return chunks.join('\n')
 }
 
 async function listCommitChainRefsForPullRequest({
@@ -192,40 +164,53 @@ async function materializeWorkspaceHistory({
   octokit,
   pr,
   workspace_path,
+  window,
   commit_refs
 }: {
   octokit: Octokit
   pr: PullRequestContext
   workspace_path: string
+  window: ReviewWindow
   commit_refs: string[]
 }): Promise<void> {
   const git_auth_token = await getInstallationAccessToken(octokit)
 
+  // The window's base is part of the comparison, so it has to be present even
+  // when it is not the pull request's own base. On `synchronize` it is the
+  // previous head, which is no longer on the current commit chain and would
+  // otherwise be missing from the workspace entirely.
   await materializeWorkspaceWithCommitHistory({
     workspace_path,
-    refs: [pr.base_sha, ...commit_refs],
+    refs: [pr.base_sha, window.base_sha, ...commit_refs],
     git_remote_url: buildGitRemoteUrl(pr.owner_login, pr.repo_name),
     git_auth_token
   })
 }
 
-async function materializeIncrementalWindowArtifacts(
-  files: NormalizedPullRequestFile[],
+async function materializeIncrementalWindowArtifacts({
+  workspace_path,
+  window,
+  incremental_window_path
+}: {
+  workspace_path: string
+  window: ReviewWindow
   incremental_window_path: string
-): Promise<void> {
-  const changed_files: IncrementalChangedFileEntry[] = files.map((file) => ({
-    path: file.path,
-    status: file.status,
-    previous_path: null,
-    additions: file.additions,
-    deletions: file.deletions,
-    changes: file.changes
-  }))
+}): Promise<Awaited<ReturnType<typeof exportWorkspaceWindow>>['files']> {
+  // One workspace comparison produces the patch and the file list together, so they cannot
+  // describe different change sets. The API cannot serve this role: its compare response caps at
+  // 300 files and the pull request files endpoint at 3000, while the diff has no cap, so a large
+  // run would list fewer files than its patch contains.
+  const { patch: incremental_patch, files: changed_files } =
+    await exportWorkspaceWindow({
+      workspace_path,
+      base_sha: window.base_sha,
+      head_sha: window.head_sha
+    })
 
   await Promise.all([
     fs.writeFile(
       path.join(incremental_window_path, 'incremental.patch'),
-      buildIncrementalPatchText(files),
+      incremental_patch,
       'utf8'
     ),
     fs.writeFile(
@@ -233,7 +218,14 @@ async function materializeIncrementalWindowArtifacts(
       JSON.stringify(
         {
           generated_at: new Date().toISOString(),
-          files: changed_files
+          // `changed-files.json` keeps the `path` field the agent-facing schema describes; the
+          // suggestion set uses `filename`. Both come from one export.
+          files: changed_files.map((file) => ({
+            path: file.filename,
+            status: file.status,
+            additions: file.additions,
+            deletions: file.deletions
+          }))
         },
         null,
         2
@@ -241,26 +233,42 @@ async function materializeIncrementalWindowArtifacts(
       'utf8'
     )
   ])
+  return changed_files
 }
 
 async function materializeHistoryArtifacts({
   octokit,
   pr,
+  window,
+  commit_shas,
   history_path
 }: {
   octokit: Octokit
   pr: PullRequestContext
+  window: ReviewWindow
+  commit_shas: string[]
   history_path: string
 }): Promise<{
-  pr_metadata: Record<string, unknown>
+  pr_metadata: PullRequestReviewSubject
   linkedIssues: Awaited<ReturnType<typeof fetchTimelineLinkedIssues>>
 }> {
-  const pr_metadata = buildPrMetadata(pr)
+  const pr_metadata = buildPrMetadata(pr, window, commit_shas)
   const linkedIssues = await fetchTimelineLinkedIssues(octokit, pr)
 
   await fs.writeFile(
     path.join(history_path, 'pr-metadata.json'),
-    JSON.stringify(pr_metadata, null, 2),
+    // The agent gets the window and the commit list only. Identity fields stay
+    // in the runner input: an agent reading a full identity record spends
+    // context on values it cannot act on, and every extra range-shaped field is
+    // another candidate for what the review boundary is.
+    JSON.stringify(
+      {
+        review_window: pr_metadata.review_window,
+        commit_shas: pr_metadata.commit_shas
+      },
+      null,
+      2
+    ),
     'utf8'
   )
 
@@ -295,18 +303,17 @@ export async function preparePullRequestReviewInput({
   run_id,
   octokit,
   pr,
-  files,
+  window,
   trusted_default_branch,
   test_changes = null
 }: {
   run_id: string
   octokit: Octokit
   pr: PullRequestContext
-  files: PullRequestFile[]
+  window: ReviewWindow
   trusted_default_branch: TrustedDefaultBranch
   test_changes?: TestChangesPolicy | null
 }): Promise<PreparedPullRequestReview> {
-  const normalizedFiles = normalizeFiles(files)
   const input_bundle_root = createInputBundleRoot(
     pr.repo_full_name,
     `pr-${pr.pr_number}`,
@@ -334,6 +341,7 @@ export async function preparePullRequestReviewInput({
     octokit,
     pr,
     workspace_path,
+    window,
     commit_refs: commit_shas
   })
   const default_sha = trusted_default_branch.head_sha
@@ -355,19 +363,20 @@ export async function preparePullRequestReviewInput({
     workspace_path,
     include_incremental_window: true
   })
-  await materializeIncrementalWindowArtifacts(
-    normalizedFiles,
+  const files = await materializeIncrementalWindowArtifacts({
+    workspace_path,
+    window,
     incremental_window_path
-  )
+  })
+
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,
     pr,
+    window,
+    commit_shas,
     history_path
   })
-  const pullRequestMetadata = {
-    ...historyArtifacts.pr_metadata,
-    commit_shas
-  }
+  const pullRequestMetadata = historyArtifacts.pr_metadata
   const input_bundle = await archiveInputBundle({
     input_bundle_root,
     include_incremental_window: true,
@@ -390,6 +399,9 @@ export async function preparePullRequestReviewInput({
   )
   await fs.writeFile(input_path, JSON.stringify(input, null, 2), 'utf8')
 
+  // The suggestion anchoring set comes from the same workspace diff as the patch, so a file the
+  // patch changes is always anchorable. The API's per-file `patch` cannot serve this: it is
+  // omitted for part of a large pull request.
   return {
     run_id,
     input,

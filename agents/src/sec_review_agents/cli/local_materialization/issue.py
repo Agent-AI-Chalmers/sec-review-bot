@@ -60,7 +60,8 @@ def build_local_issue_bundle(
     setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
     run_id = create_local_run_id()
-    issue_number_value = str(issue_number)
+    # The v6 issue schema types `number` as an integer; the pull request path does the same.
+    issue_number_value = int(issue_number)
     default_branch = repo_default_branch(repo_path)
     branch_for_snapshot = (target_branch or default_branch).strip() or default_branch
     ref_process = subprocess.run(
@@ -95,18 +96,15 @@ def build_local_issue_bundle(
     )
     write_input_bundle_manifest(paths, include_incremental_window=False)
 
+    # The runner validates this against the v6 issue schema, which forbids additional
+    # properties, so it carries identity plus what the prompts render and nothing else.
     issue_metadata = {
-        "action": "opened",
         "owner": repo_name.split("/", 1)[0],
         "repo": repo_name.split("/", 1)[-1],
         "repo_full_name": repo_name,
         "number": issue_number_value,
-        "html_url": f"local://{repo_name}/issues/{issue_number_value}",
         "title": title,
         "body": body,
-        "author_login": "local-user",
-        "labels": [],
-        "default_branch": default_branch,
     }
     write_json(history_root / "issue-metadata.json", issue_metadata)
     write_json(

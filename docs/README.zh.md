@@ -58,6 +58,7 @@
 
 #### pull-request-review
 
+- [REVIEW_WINDOW_CONTRACT.md](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.md) / [中文](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.zh.md)：`synchronize` 的审查窗口语义、实测的 GitHub API 行为，以及让 changed files、patch 与 suggestion 锚定共用同一窗口的契约。
 - [SUGGESTION_COMMENT_DESIGN.md](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.md) / [中文](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.zh.md)：PR suggestion comment 映射规则。
 
 #### repository-review

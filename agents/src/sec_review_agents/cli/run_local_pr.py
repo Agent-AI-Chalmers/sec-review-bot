@@ -90,16 +90,6 @@ def parse_args() -> argparse.Namespace:
         help="Head commit SHA for the local PR diff (7-40 hex chars).",
     )
     parser.add_argument(
-        "--event-type",
-        default="local_review",
-        help="Synthetic PR event type passed to the workflow.",
-    )
-    parser.add_argument(
-        "--draft",
-        action="store_true",
-        help="Mark the synthetic local pull request as draft.",
-    )
-    parser.add_argument(
         "--output-dir",
         help=(
             "Directory where materialized local run roots should be created. "
@@ -167,8 +157,6 @@ def main() -> None:
         output_dir=output_dir,
         base_ref=base_sha,
         head_ref=head_sha,
-        event_type=args.event_type,
-        is_draft=args.draft,
         test_changes=args.test_changes,
         setup_declaration_content=setup_declaration_content,
     )

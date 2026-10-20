@@ -122,6 +122,32 @@ async function runGitCommand(
   })
 }
 
+async function runGitCommandCapture(
+  workspace_path: string,
+  args: string[],
+  options: GitCommandOptions = {}
+): Promise<string> {
+  const configArgs = (options.config ?? []).flatMap((item) => ['-c', item])
+  const { stdout } = await execFileAsync('git', [...configArgs, ...args], {
+    cwd: workspace_path,
+    timeout: options.timeout_ms ?? configuredGitTimeoutMs(),
+    // A large diff can exceed the 1 MiB default execFile buffer, which would
+    // fail preparation for exactly the changes this export exists to cover.
+    maxBuffer: DIFF_MAX_OUTPUT_BYTES,
+    env: {
+      ...process.env,
+      ...(options.env ?? {})
+    }
+  })
+  return stdout
+}
+
+// Upper bound for a captured git diff. Preparation builds the diff in memory,
+// so this is also the memory ceiling a single export may consume. The real large
+// pull request measured against this code produced ~7.6 MB, so the bound leaves
+// generous headroom while refusing pathological input instead of buffering it.
+const DIFF_MAX_OUTPUT_BYTES = 128 * 1024 * 1024
+
 export async function retryGitFetch(
   operation: () => Promise<void>,
   sleep: Sleep = delay
@@ -333,6 +359,20 @@ async function materializeWorkspaceFromRealGitHistory({
       )
     }
     await runGitCommand(materialized_path, ['checkout', '--detach', head_ref])
+    // Fetching by SHA leaves no branch pointing at the fetched commits, and the
+    // sanitize step prunes every unreachable object. Without a ref, the base
+    // commit disappears and a later `git diff base...head` fails with an invalid
+    // symmetric difference expression -- exactly the comparison pull-request
+    // review depends on. Pin every requested ref under refs/sec-review/ so the
+    // commits stay reachable; these refs carry no remote URL, credentials, or
+    // fetch metadata, so the sanitize guarantee is preserved.
+    for (const [index, ref] of refs.entries()) {
+      await runGitCommand(materialized_path, [
+        'update-ref',
+        `refs/sec-review/input-${index}`,
+        ref
+      ])
+    }
     await sanitizeMaterializedGitWorkspace(materialized_path)
     await replaceWorkspaceWithMaterializedRepository({
       workspace_path,
@@ -388,6 +428,361 @@ export async function materializeWorkspaceWithCommitHistory({
     refs: normalizedRefs,
     ...(git_auth_token ? { git_auth_token } : {})
   })
+}
+
+/**
+ * Export the pull-request unified diff from a materialized workspace repository.
+ *
+ * The GitHub "list pull request files" API omits `patch` for part of a large
+ * pull request even though the files themselves are returned: renames without
+ * content changes, some additions, and individual files whose diff exceeds the
+ * API's internal size budget. Callers that build the review's incremental patch
+ * from that field therefore drop those changes silently. The workspace already
+ * fetches base and every head commit, so the diff can be regenerated locally and
+ * does not depend on which patches the API chose to return.
+ */
+/**
+ * The `git diff` selectors every workspace export uses.
+ *
+ * The patch and the changed-file list must describe the same change set. Sharing these flags is
+ * what guarantees that: a file the diff renders is a file the list reports, and vice versa.
+ *
+ * Three dots are required. GitHub's `pull_request.base.sha` is the base branch tip, not the point
+ * where the pull request branched off, and it keeps moving as the base branch advances, so a
+ * two-dot diff would render base-branch work as deletions. Three dots diff from the merge base,
+ * which is also what the compare endpoint means by `base...head`.
+ *
+ * `--no-textconv` and `--no-ext-diff` close two independent ways for the diff text to stop being
+ * the diff: a diff driver's textconv prints file content as text, and injected configuration can
+ * set `diff.external`, which still fired under `--no-textconv`. `--binary` must NOT be added: it
+ * emits the binary payload inline as base85 rather than a placeholder.
+ */
+const WORKSPACE_DIFF_ARGS = [
+  'diff',
+  '--no-color',
+  '--no-textconv',
+  '--no-ext-diff',
+  '--find-renames'
+] as const
+
+const WORKSPACE_GIT_CONFIG = ['core.pager=cat', 'diff.noprefix=false']
+
+function requireComparableRefs(
+  base_sha: string,
+  head_sha: string,
+  caller: string
+): void {
+  for (const [label, value] of [
+    ['base_sha', base_sha],
+    ['head_sha', head_sha]
+  ] as const) {
+    if (value.trim() === '' || value.trim().startsWith('-')) {
+      throw new Error(`${caller} requires a valid ${label}.`)
+    }
+  }
+}
+
+/**
+ * Export the files the run's window touches, from the same repository and range as the patch.
+ *
+ * The API's file list is not usable for this: `GET /compare` caps its response at 300 files
+ * (measured: a 340-file pull request returns exactly 300) and the pull request files endpoint
+ * caps at 3000, while the diff has neither limit. Building `changed-files.json` from the API
+ * therefore drops files the patch still contains, which is the window divergence this module
+ * exists to prevent.
+ */
+const GIT_STATUS_NAMES: Record<string, string> = {
+  A: 'added',
+  C: 'copied',
+  D: 'removed',
+  M: 'modified',
+  R: 'renamed',
+  T: 'changed',
+  U: 'unmerged',
+  X: 'unknown',
+  B: 'broken'
+}
+
+/**
+ * Read `--name-status -z` output: `<STATUS>\0<path>\0`, with an extra path for a rename or copy.
+ *
+ * `-z` writes paths as raw bytes with no quoting or escaping. The human-readable form quotes any
+ * path containing a tab, quote, or newline and octal-escapes non-ASCII bytes, which makes the
+ * path unusable as a key unless this module re-implements git's quoting rules.
+ */
+function parseNameStatusZ(output: string): {
+  path: string
+  status: string
+  previous_path: string | null
+}[] {
+  const fields = output.split('\0')
+  const entries: {
+    path: string
+    status: string
+    previous_path: string | null
+  }[] = []
+  let index = 0
+  while (index + 1 < fields.length) {
+    const raw_status = fields[index] ?? ''
+    if (raw_status === '') break
+    index += 1
+    const code = raw_status.charAt(0)
+    const status = GIT_STATUS_NAMES[code] ?? 'unknown'
+    if (code === 'R' || code === 'C') {
+      const previous_path = fields[index] ?? ''
+      const path = fields[index + 1] ?? ''
+      index += 2
+      if (path !== '') entries.push({ path, status, previous_path })
+      continue
+    }
+    const path = fields[index] ?? ''
+    index += 1
+    if (path !== '') entries.push({ path, status, previous_path: null })
+  }
+  return entries
+}
+
+/**
+ * Read `--numstat -z` output.
+ *
+ * A record starts with `<added>\t<deleted>\t`. For an ordinary file the path follows that third
+ * field on the same line and the record ends at the next NUL:
+ *
+ *     <added>\t<deleted>\t<path>\0
+ *
+ * A rename or copy leaves the third field empty and puts both paths in their own NUL-terminated
+ * fields:
+ *
+ *     <added>\t<deleted>\t\0<old>\0<new>\0
+ *
+ * Only the new path is keyed, because that is the path the diff and the file list use. A binary
+ * file reports `-` for both counts, which is not a line count; those become 0 so the list stays
+ * numeric while the patch keeps the authoritative placeholder.
+ */
+function parseNumstatZ(
+  output: string
+): Map<string, { additions: number; deletions: number }> {
+  const counts = new Map<string, { additions: number; deletions: number }>()
+  const fields = output.split('\0')
+  let index = 0
+  while (index < fields.length) {
+    const record = fields[index] ?? ''
+    index += 1
+    if (record === '') continue
+
+    // Split at the first two tabs only: `-z` disables quoting, so it also stops escaping tabs
+    // inside the path itself. Splitting on every tab would truncate a path like `file\tname.txt`
+    // to `file`, and its counts would never match the name-status entry.
+    const first_tab = record.indexOf('\t')
+    const second_tab =
+      first_tab === -1 ? -1 : record.indexOf('\t', first_tab + 1)
+    const added = first_tab === -1 ? '' : record.slice(0, first_tab)
+    const removed =
+      second_tab === -1 ? '' : record.slice(first_tab + 1, second_tab)
+    const inline_path = second_tab === -1 ? '' : record.slice(second_tab + 1)
+    const counts_for_file = {
+      additions: added === '-' ? 0 : Number.parseInt(added, 10) || 0,
+      deletions: removed === '-' ? 0 : Number.parseInt(removed, 10) || 0
+    }
+
+    if (inline_path !== '') {
+      counts.set(inline_path, counts_for_file)
+      continue
+    }
+    // Rename or copy: the next two NUL fields are the old and new paths.
+    const renamed_from = fields[index] ?? ''
+    const renamed_to = fields[index + 1] ?? ''
+    index += 2
+    if (renamed_from === '' && renamed_to === '') continue
+    counts.set(renamed_to, counts_for_file)
+  }
+  return counts
+}
+
+export async function exportWorkspaceChangedFiles({
+  workspace_path,
+  base_sha,
+  head_sha
+}: {
+  workspace_path: string
+  base_sha: string
+  head_sha: string
+}): Promise<
+  { path: string; status: string; additions: number; deletions: number }[]
+> {
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceChangedFiles')
+  const range = `${base_sha.trim()}...${head_sha.trim()}`
+  const name_status = await runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, '--name-status', '-z', range],
+    { config: WORKSPACE_GIT_CONFIG }
+  )
+  const numstat = await runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, '--numstat', '-z', range],
+    { config: WORKSPACE_GIT_CONFIG }
+  )
+  const counts = parseNumstatZ(numstat)
+  return parseNameStatusZ(name_status).map((entry) => ({
+    path: entry.path,
+    status: entry.status,
+    ...(counts.get(entry.path) ?? { additions: 0, deletions: 0 })
+  }))
+}
+
+/**
+ * Every artifact a run needs from one workspace comparison.
+ *
+ * The patch, the file list, and the per-file slices must describe the same change set, and
+ * computing them together makes that structural rather than a convention. The work is a fixed
+ * number of git invocations regardless of file count, which matters because a pull request can
+ * carry thousands of files.
+ */
+export async function exportWorkspaceWindow({
+  workspace_path,
+  base_sha,
+  head_sha
+}: {
+  workspace_path: string
+  base_sha: string
+  head_sha: string
+}): Promise<{
+  patch: string
+  files: {
+    filename: string
+    status: string
+    additions: number
+    deletions: number
+    patch: string | null
+  }[]
+}> {
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceWindow')
+  const range = `${base_sha.trim()}...${head_sha.trim()}`
+
+  const [entries, patch] = await Promise.all([
+    exportWorkspaceChangedFiles({ workspace_path, base_sha, head_sha }),
+    exportWorkspaceDiff({ workspace_path, base_sha, head_sha })
+  ])
+  const ordered_paths = await runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, '--name-only', '-z', range],
+    { config: WORKSPACE_GIT_CONFIG }
+  ).then((output) => output.split('\0').filter((path) => path !== ''))
+
+  // The diff's sections appear in the same order as `--name-only -z`, so the paths pair with the
+  // sections positionally. Reading the paths from git in raw form avoids parsing the human
+  // `diff --git` header, which quotes any path containing a tab, quote, or non-ASCII byte.
+  const sections = splitDiffIntoSections(patch)
+  if (sections.length !== ordered_paths.length) {
+    // Pairing is positional, so a mismatch means the assumption no longer holds and every patch
+    // would be dropped silently -- the failure this whole export exists to prevent. Fail loudly
+    // instead of returning a suggestion set that cannot anchor anything.
+    throw new Error(
+      `workspace diff sections (${sections.length}) do not match changed files (${ordered_paths.length})`
+    )
+  }
+  const patch_by_path = new Map<string, string>()
+  ordered_paths.forEach((file_path, index) => {
+    const section = sections[index]
+    if (section !== undefined) patch_by_path.set(file_path, section)
+  })
+
+  return {
+    patch,
+    files: entries.map((entry) => {
+      const file_patch = patch_by_path.get(entry.path)
+      return {
+        filename: entry.path,
+        status: entry.status,
+        additions: entry.additions,
+        deletions: entry.deletions,
+        // A binary file's hunk is the "Binary files ... differ" placeholder, which carries no
+        // anchorable lines; report it as absent rather than as a patch that cannot be mapped.
+        patch:
+          file_patch === undefined || file_patch.includes('Binary files')
+            ? null
+            : file_patch
+      }
+    })
+  }
+}
+
+/**
+ * Split a unified diff at each `diff --git` line, keeping the line with its section.
+ *
+ * A diff with no changes is the empty string, which must produce no sections: `''.split('\n')`
+ * yields one empty line, and counting that as a section would report a change where there is
+ * none.
+ */
+function splitDiffIntoSections(diff: string): string[] {
+  if (diff === '') return []
+  const sections: string[] = []
+  let current: string[] = []
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      if (current.length > 0) sections.push(current.join('\n'))
+      current = [line]
+      continue
+    }
+    current.push(line)
+  }
+  if (current.length > 0) sections.push(current.join('\n'))
+  return sections
+}
+
+export async function exportWorkspaceDiff({
+  workspace_path,
+  base_sha,
+  head_sha
+}: {
+  workspace_path: string
+  base_sha: string
+  head_sha: string
+}): Promise<string> {
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceDiff')
+
+  // `--no-color` keeps the output machine-readable; `--find-renames` preserves
+  // the rename relationship the API metadata also carries.
+  //
+  // Three dots (`base...head`) are required, and they are not interchangeable
+  // with two. GitHub's `pull_request.base.sha` is the base branch tip, not the
+  // point where the PR branched off, and it keeps moving as the base branch
+  // advances. A two-dot diff compares the two commits as trees, so once the head
+  // is behind the base it renders changes that only landed on the base branch as
+  // if the PR deleted them. Three dots diff the merge base instead, which is the
+  // change set the pull request actually introduces; it is also what GitHub's own
+  // compare endpoint means by `base...head`, which the repository incremental
+  // path already relies on. Computing the merge base through `...` keeps this to
+  // one git invocation and matches GitHub's semantics exactly.
+  //
+  // This requires a merge base to exist, so the workspace must not be shallow.
+  // Multi-ref materialization deliberately fetches without `--depth`; a shallow
+  // workspace makes git fail with "no merge base" rather than emit a partial or
+  // empty diff, which is the intended loud failure.
+  //
+  // `--no-textconv` and `--no-ext-diff` are both required, and they are not the
+  // same guard: each closes a different way for the diff text to stop being the
+  // diff. A binary file must never be rendered as text, and there are two
+  // independent paths that can do it:
+  //
+  // - Textconv: a `diff=<driver>` attribute plus `diff.<driver>.textconv` makes
+  //   git pipe file content through a command and diff the printed result. A
+  //   binary file then shows up as text lines instead of the "Binary files ...
+  //   differ" placeholder. `--no-textconv` disables it.
+  // - External diff: `diff.external` (or `diff.<driver>.command`) replaces diff
+  //   generation entirely with an arbitrary command's output. Measured here,
+  //   this still fired under `--no-textconv`, because the external command never
+  //   goes through the textconv path at all. `--no-ext-diff` disables it.
+  //
+  // Neither flag implies the other, and a repository or injected configuration
+  // can supply either mechanism. `--binary` must NOT be added: it emits the
+  // binary payload inline as base85, which measured larger than the default
+  // placeholder and defeats the purpose of keeping binary content out of the diff.
+  return runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, `${base_sha.trim()}...${head_sha.trim()}`],
+    { config: WORKSPACE_GIT_CONFIG }
+  )
 }
 
 export async function createWorkspaceSnapshotTar({

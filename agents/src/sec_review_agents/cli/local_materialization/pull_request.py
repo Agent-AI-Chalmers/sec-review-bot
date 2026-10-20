@@ -228,8 +228,6 @@ def build_local_pull_request_bundle(
     output_dir: Path,
     base_ref: str,
     head_ref: str = "HEAD",
-    event_type: str = "local_review",
-    is_draft: bool = False,
     test_changes: str = "allow",
     setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
@@ -273,14 +271,6 @@ def build_local_pull_request_bundle(
         "prs": [],
     }
 
-    commit_count_output = subprocess.run(
-        ["git", "rev-list", "--count", f"{base_sha}..{head_sha}"],
-        cwd=repo_path,
-        check=False,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    commit_count = int(commit_count_output or "0")
     commit_shas_output = subprocess.run(
         ["git", "rev-list", f"{base_sha}..{head_sha}"],
         cwd=repo_path,
@@ -291,33 +281,43 @@ def build_local_pull_request_bundle(
     commit_shas = [
         line.strip() for line in commit_shas_output.splitlines() if line.strip()
     ]
-    additions = sum(file["additions"] for file in files)
-    deletions = sum(file["deletions"] for file in files)
-
-    pr_metadata = {
-        "action": event_type,
+    # The runner validates this object against the v6 pull request schema, so it carries exactly
+    # the subject the GitHub producer builds and nothing else: the contract forbids additional
+    # properties, and the local path has no webhook payload to explain extra fields.
+    #
+    # A local run always covers the whole pull request, so the review window is the pull request
+    # range itself. Reporting it keeps this file shaped like the GitHub producer's, which is what
+    # the scope prompts read.
+    review_window = {
+        "kind": "full",
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+        "reason": "pull-request-scope",
+    }
+    pr_subject = {
         "owner": owner_login,
         "repo": repo_short_name,
         "repo_full_name": repo_name,
         "number": pr_number_value,
-        "html_url": f"local://{repo_name}/pull/{pr_number_value}",
         "title": title,
         "body": body,
-        "author_login": "local-user",
-        "is_draft": is_draft,
         "base_ref": base_ref,
         "base_sha": base_sha,
         "head_ref": head_ref,
         "head_sha": head_sha,
         "commit_shas": commit_shas,
-        "previous_head_sha": None,
-        "commits": commit_count,
-        "changed_files": len(files),
-        "additions": additions,
-        "deletions": deletions,
+        "review_window": review_window,
     }
 
-    write_json(history_root / "pr-metadata.json", pr_metadata)
+    # The agent reads the window and the commit list only; identity fields stay in the runner
+    # input, matching what the GitHub producer writes here.
+    write_json(
+        history_root / "pr-metadata.json",
+        {
+            "review_window": review_window,
+            "commit_shas": commit_shas,
+        },
+    )
     write_json(history_root / "linked-context.json", linked_issues)
 
     input_bundle = archive_input_bundle(manifest_paths, include_incremental_window=True)
@@ -327,7 +327,7 @@ def build_local_pull_request_bundle(
             "objective": "audit",
             "test_changes": test_changes,
         },
-        "pr": pr_metadata,
+        "pr": pr_subject,
         "input_bundle": input_bundle,
         **(
             {"setup_declaration": setup_declaration_content}

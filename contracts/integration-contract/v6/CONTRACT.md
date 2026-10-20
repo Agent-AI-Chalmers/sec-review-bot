@@ -31,92 +31,29 @@ The caller owns the input bundle. The runner/stages own runtime state such as `a
 
 The `tar.zst` archive must contain `manifest.json`, the workspace snapshot, history, and any declared incremental window. The manifest declares bundle-relative paths; the runner parses them into internal local `bundle_paths`. Callers must not provide `bundle_paths` directly.
 
-```ts
-interface InputBundleArtifactRef {
-  uri: string // file: or s3:
-  digest: `sha256:${string}`
-  media_type: 'application/tar+zstd'
-  size_bytes: number
-}
-```
+The `input_bundle` object shape is defined by [`common.schema.json`](schemas/common.schema.json); `uri` accepts a `file:` or `s3:` reference.
 
-Repository scan target:
-
-```ts
-interface RepositoryScanTarget {
-  target_branch: string
-  default_branch: string
-  event_type: 'manual' | 'scheduled'
-  scan_mode: 'full' | 'incremental'
-  base_sha: string | null
-  head_sha: string
-  commit_shas: string[]
-}
-```
+Repository scan target (`scan_target` in [`repository-review-input.schema.json`](schemas/repository-review-input.schema.json)):
 
 - `target_branch` is the branch/ref label selected by the caller.
 - `base_sha` / `head_sha` / `commit_shas` describe the scan delta window, corresponding semantically to PR workflow base/head/commit context.
   - for full scans, `base_sha` is `null` and `commit_shas` is empty;
   - for incremental scans, `base_sha..head_sha` defines the window, and `commit_shas` describes the commits in that window.
 
-Repository scan scope:
+Repository scan scope (`scan_scope` in the same schema) declares `paths_ignore` and `incremental_changed_files`.
 
-```ts
-interface RepositoryScanScope {
-  paths_ignore: string[]
-  incremental_changed_files: Array<{
-    path: string
-    status: string
-    previous_path: string | null
-  }>
-}
-```
+Each workflow input has its own schema:
 
-Review intent:
+| Workflow | Schema |
+| --- | --- |
+| `issue-review` | [`issue-review-input.schema.json`](schemas/issue-review-input.schema.json) |
+| `pull-request-review` | [`pull-request-review-input.schema.json`](schemas/pull-request-review-input.schema.json) |
+| `repository-review` | [`repository-review-input.schema.json`](schemas/repository-review-input.schema.json) |
 
-```ts
-interface ReviewIntent {
-  objective: 'audit' | 'repair'
-  test_changes?: 'allow' | 'deny'
-}
-```
+Pull request inputs carry a `pr` subject describing the pull request as this run sees it. Two of its fields deserve a note because the schema cannot express their relationship:
 
-Issue workflows use:
-
-```ts
-interface IssueReviewInput {
-  contract_version: 'v6'
-  input_bundle: InputBundleArtifactRef
-  review_intent: ReviewIntent
-  issue: Record<string, unknown>
-  setup_declaration?: string
-}
-```
-
-Pull request workflows use:
-
-```ts
-interface PullRequestReviewInput {
-  contract_version: 'v6'
-  input_bundle: InputBundleArtifactRef
-  review_intent: ReviewIntent
-  pr: Record<string, unknown>
-  setup_declaration?: string
-}
-```
-
-Repository workflows use:
-
-```ts
-interface RepositoryReviewInput {
-  contract_version: 'v6'
-  input_bundle: InputBundleArtifactRef
-  review_intent: ReviewIntent
-  scan_target: RepositoryScanTarget
-  scan_scope: RepositoryScanScope
-  setup_declaration?: string
-}
-```
+- `base_sha` and `head_sha` identify the pull request itself and stay constant for the run.
+- `review_window` states the range the run covers. On `synchronize` it is narrower than `base_sha..head_sha`, because the run covers only the commits pushed since the previous review. `review_window.reason` records why a run fell back to the full range.
 
 The runner validates input at the process boundary. All workflows require these common fields:
 
@@ -138,20 +75,7 @@ The runner validates input at the process boundary. All workflows require these 
 
 `setup_declaration` is an optional string carrying the repository's setup declaration (the contents of `.sec-review/setup.yml` on the base-repo default branch). It is inline declaration text, not a path: callers fetch the file and pass its contents. Omission means the environment stays unbootstrapped. The declaration is parsed strictly and executed inside the sandbox before the agent starts. Trust in its provenance is the caller's responsibility: it comes from the base-repo default branch, and the runner does not re-verify it against a source.
 
-Each workflow also requires:
-
-| Workflow | Required fields |
-| --- | --- |
-| `issue-review` | `issue` |
-| `pull-request-review` | `pr` |
-| `repository-review` | `scan_target`; `scan_scope` |
-
-`repository-review` uses `scan_target` and `scan_scope` as its explicit cost and coverage boundary:
-
-| Object | Required fields |
-| --- | --- |
-| `scan_target` | `target_branch`; `default_branch`; `event_type`; `scan_mode`; `base_sha`; `head_sha`; `commit_shas` |
-| `scan_scope` | `paths_ignore`; `incremental_changed_files` |
+`repository-review` uses `scan_target` and `scan_scope` as its explicit cost and coverage boundary.
 
 The `scan_mode` selects the window shape:
 
@@ -170,54 +94,7 @@ Repository scan scope controls cost and coverage. The runner must not guess it:
 
 ### ReviewRecord
 
-`ReviewRecord` is the shared review result shape used by issue, pull request, and repository workflows:
-
-```ts
-interface ReviewRecord {
-  analysis: {
-    verdict: 'no-actionable-finding' | 'inconclusive' | 'plausible-risk' | 'confirmed-defect' | 'confirmed-vulnerability' | null
-    overview: string | null
-    narratives: Array<Record<string, unknown>>
-  }
-  mitigation: {
-    overview: string | null
-    changed_files: string[]
-    file_changes: Array<
-      | {
-          path: string
-          status: 'upsert'
-          content: string
-          content_encoding: 'utf-8' | 'base64'
-          mode?: '100644' | '100755'
-        }
-      | {
-          path: string
-          status: 'deleted'
-        }
-    >
-    patch_diff: string | null
-  }
-  verification: {
-    overview: string | null
-    review_target_claim: string | null
-    validation_level: 'static' | 'logic-simulated' | 'runtime-partial' | 'runtime-endpoint' | null
-    patch_coverage: 'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | 'no-patch' | 'not-applicable' | null
-    regression_status: 'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved' | null
-    resolution_next_step: 'none' | 'retry-ai' | 'manual-review' | null
-    patch_findings: string[]
-    verification_findings: string[]
-    residual_risks: string[]
-  }
-  cvss: {
-    outcome: 'scored' | 'not-scored' | 'skipped' | null
-    base_score: number | null
-    severity: string | null
-    vector: string | null
-    overview: string | null
-    not_scored_reason: string | null
-  } | null
-}
-```
+`ReviewRecord` is the shared review result shape used by issue, pull request, and repository workflows. Its field types and enum values are defined by [`review-record.schema.json`](schemas/review-record.schema.json).
 
 Issue and PR presentation use `ReviewRecord` directly. Repository case presentation uses case IDs plus the analysis, mitigation, verification, and CVSS projections from `ReviewRecord`.
 
@@ -239,14 +116,7 @@ Workflow: `issue-review`
 
 Input keeps the existing issue input contract and expresses review intent through `review_intent`. This is the workflow where `review_intent.objective = "repair"` changes analyzer stance and the mitigation gate.
 
-Core result shape:
-
-```ts
-interface IssueWorkflowResult {
-  contract_version: 'v6'
-  review_record: ReviewRecord
-}
-```
+The result shape is defined by [`issue-review-result.schema.json`](schemas/issue-review-result.schema.json).
 
 The `two-stage` and `single-agent` issue strategies (`--strategy` on the local issue CLI) are local evaluation / ablation paths. They start as local-only Temporal workflows on the `issue-review` workflow, but they are not part of the standard public runner contract.
 
@@ -256,14 +126,7 @@ Callers must render issue comments, decide whether a patch exists, and create dr
 
 Workflow: `pull-request-review`
 
-Core result shape:
-
-```ts
-interface PullRequestWorkflowResult {
-  contract_version: 'v6'
-  review_record: ReviewRecord
-}
-```
+The result shape is defined by [`pull-request-review-result.schema.json`](schemas/pull-request-review-result.schema.json).
 
 Callers must render PR comments and decide whether to publish suggestions from `review_record`.
 
@@ -277,71 +140,15 @@ Repository review is composed of `scan -> case review -> delivery`:
 - `case_results[].review_record` is the case-level review output.
 - `deliveries[]` contains repository delivery results and publishable artifacts produced by delivery execution.
 
-Core result shape:
-
-```ts
-interface RepositoryReviewWorkflowResult {
-  contract_version: 'v6'
-  scan_summary: ScanSummary
-  case_results: RepositoryCaseResult[]
-  deliveries: RepositoryDelivery[]
-}
-```
-
-`ScanSummary`:
-
-```ts
-interface ScanSummary {
-  scannable_file_count: number
-  scanned_file_count: number
-  skipped_file_count: number
-  candidate_count: number
-  case_count: number
-  suppressed_candidate_count: number
-}
-```
-
-`RepositoryCaseResult`:
-
-```ts
-interface RepositoryCaseResult {
-  case_id: string
-  disposition: 'keep' | 'blocked' | string
-  reason: string | null
-  review_record: ReviewRecord
-}
-```
-
-`case_results[]` expresses case-level public results through `case_id`, `disposition`, `reason`, and `review_record`.
+The result shape is defined by [`repository-review-result.schema.json`](schemas/repository-review-result.schema.json). `case_results[]` expresses case-level public results through `case_id`, `disposition`, `reason`, and `review_record`.
 
 The GitHub summary renderer can render confirmed cases that did not reach the delivery gate as blocked case cards from `case_results[]`.
 
 ### Repository Deliveries
 
-`RepositoryReviewWorkflowResult.deliveries[]` contains `RepositoryDelivery` items.
+`deliveries[]` items are `RepositoryDelivery` objects defined by the repository result schema.
 
-```ts
-interface RepositoryDelivery {
-  delivery_id: string
-  case_ids: string[]
-  patch_diff: string
-  file_changes: Array<
-    | {
-        path: string
-        status: 'upsert'
-        content: string
-        content_encoding: 'utf-8' | 'base64'
-        mode?: '100644' | '100755'
-      }
-    | {
-        path: string
-        status: 'deleted'
-      }
-  >
-}
-```
-
-`RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry the generated `patch_diff` and final `file_changes`; display file paths are derived from `file_changes[].path`. `file_changes` is authoritative for applying content; `patch_diff` is the diff/reference view and must not be used to reconstruct publishable file contents. `case_ids` links back to case-level review details in top-level `case_results[]`.
+A `RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry the generated `patch_diff` and final `file_changes`; display file paths are derived from `file_changes[].path`. `file_changes` is authoritative for applying content; `patch_diff` is the diff/reference view and must not be used to reconstruct publishable file contents. `case_ids` links back to case-level review details in top-level `case_results[]`.
 
 ### Validation Ownership
 

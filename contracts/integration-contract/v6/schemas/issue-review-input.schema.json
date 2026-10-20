@@ -21,7 +21,39 @@
       "$ref": "common.schema.json#/$defs/reviewIntent"
     },
     "issue": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "repo",
+        "repo_full_name",
+        "number",
+        "title",
+        "body"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "repo_full_name": {
+          "type": "string"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
     },
     "setup_declaration": {
       "$ref": "common.schema.json#/$defs/setupDeclarationText"

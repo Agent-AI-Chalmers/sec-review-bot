@@ -25,5 +25,17 @@
     "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
     "invalid-review-record-trailing-slash-path.json": "review-record.schema.json",
     "invalid-issue-review-input-blank-setup-declaration.json": "issue-review-input.schema.json"
+  },
+  "invalid_fixture_error_paths": {
+    "invalid-issue-review-input-repair-mode-field.json": "review_intent",
+    "invalid-issue-review-input-blank-setup-declaration.json": "setup_declaration",
+    "invalid-repository-review-input-blank-commit-sha.json": "scan_target.commit_shas.0",
+    "invalid-repository-review-input-blank-ignore.json": "scan_scope.paths_ignore.0",
+    "invalid-repository-review-input-blank-target-branch.json": "scan_target.target_branch",
+    "invalid-repository-review-input-empty-ignore.json": "scan_scope.paths_ignore.0",
+    "invalid-repository-review-input-extra-change-field.json": "scan_scope.incremental_changed_files.0",
+    "invalid-repository-review-input-max-file-bytes.json": "scan_scope",
+    "invalid-repository-review-input-missing-previous-path.json": "scan_scope.incremental_changed_files.0",
+    "invalid-review-record-trailing-slash-path.json": "mitigation.file_changes.0"
   }
 }

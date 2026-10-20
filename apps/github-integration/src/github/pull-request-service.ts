@@ -297,6 +297,43 @@ export async function listFilesChangedBetweenCommits(
   return response.data.files ?? []
 }
 
+/**
+ * Compare two commits and report whether the base is an ancestor of the head.
+ *
+ * A pull request `synchronize` window is an endpoint transition: the new head is
+ * normally built on top of the previous head. A force-push breaks that premise,
+ * and the two commits then sit on diverged histories, so the compare reports
+ * commits on both sides (`behind_by` is non-zero). Callers use this to refuse a
+ * push window that no longer describes an incremental change.
+ */
+export async function compareCommitsBetween(
+  octokit: Octokit,
+  {
+    owner_login,
+    repo_name,
+    previous_head_sha,
+    current_head_sha
+  }: {
+    owner_login: string
+    repo_name: string
+    previous_head_sha: string
+    current_head_sha: string
+  }
+): Promise<{ files: PullRequestFile[]; previous_head_is_ancestor: boolean }> {
+  const response = await octokit.rest.repos.compareCommitsWithBasehead({
+    owner: owner_login,
+    repo: repo_name,
+    basehead: `${previous_head_sha}...${current_head_sha}`
+  })
+
+  return {
+    files: response.data.files ?? [],
+    // `behind_by` counts commits reachable from the base but not from the head,
+    // which is exactly "the head does not contain the base".
+    previous_head_is_ancestor: (response.data.behind_by ?? 0) === 0
+  }
+}
+
 export function summarizePullRequestFiles(
   files: PullRequestFile[]
 ): PullRequestFileSummary[] {

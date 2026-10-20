@@ -118,9 +118,7 @@ def build_patcheval_issue_bundle_from_case(
         "location_oracle" if location_oracle else "end_to_end"
     )
     run_id = create_local_run_id()
-    issue_number_value = "1"
     public_repo_name = f"local/{case.repo_name}"
-    default_branch = None
     paths = build_run_paths(output_dir, run_id)
 
     if paths.local_root_path.exists():
@@ -140,18 +138,16 @@ def build_patcheval_issue_bundle_from_case(
     )
     write_input_bundle_manifest(paths, include_incremental_window=False)
 
+    # The runner validates this against the v6 issue schema, which forbids additional
+    # properties, so it carries identity plus what the prompts render and nothing else.
     issue_metadata = {
-        "action": "opened",
         "owner": public_repo_name.split("/", 1)[0],
         "repo": public_repo_name.split("/", 1)[-1],
         "repo_full_name": public_repo_name,
-        "number": issue_number_value,
-        "html_url": f"local://issue/{issue_number_value}",
+        # The v6 issue schema types `number` as an integer.
+        "number": 1,
         "title": case.issue_title(issue_mode),
         "body": case.issue_body(issue_mode),
-        "author_login": "local-user",
-        "labels": [],
-        "default_branch": default_branch,
     }
     write_json(history_root / "issue-metadata.json", issue_metadata)
     write_json(

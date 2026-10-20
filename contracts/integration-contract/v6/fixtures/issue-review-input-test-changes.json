@@ -11,6 +11,9 @@
     "test_changes": "deny"
   },
   "issue": {
+    "owner": "octo-org",
+    "repo": "example",
+    "repo_full_name": "octo-org/example",
     "number": 102,
     "title": "Unsafe redirect in callback handler",
     "body": "Please review the callback redirect validation."

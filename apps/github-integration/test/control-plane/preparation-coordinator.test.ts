@@ -615,3 +615,143 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
     assert.match(failures[0]!.message, /issue\.issue_author/)
   }
 })
+
+/** A pull request payload shaped like the one admission persists. */
+function admittedPullRequestPayload(): Record<string, unknown> {
+  return {
+    action: 'synchronize',
+    previous_head_sha: 'prev1111',
+    repo_name: 'demo',
+    repo_full_name: 'octo/demo',
+    owner_login: 'octo',
+    sender_login: 'alice',
+    pr_number: 7,
+    pr_title: 'Update app',
+    pr_body: 'body',
+    pr_author: 'alice',
+    is_draft: false,
+    base_ref: 'main',
+    base_sha: 'base0000',
+    head_ref: 'feature',
+    head_sha: 'head0000',
+    commits: 2,
+    changed_files: 1,
+    additions: 1,
+    deletions: 1,
+    html_url: 'https://example.test/octo/demo/pull/7',
+    api_url: 'https://api.test/repos/octo/demo/pulls/7',
+    commits_url: 'https://api.test/repos/octo/demo/pulls/7/commits',
+    review_comments_url: 'https://api.test/repos/octo/demo/pulls/7/comments',
+    comments_url: 'https://api.test/repos/octo/demo/pulls/7/comments',
+    issue_url: 'https://api.test/repos/octo/demo/issues/7',
+    head_repo_full_name: 'octo/demo',
+    base_repo_full_name: 'octo/demo',
+    from_fork: false
+  }
+}
+
+test('a claimed synchronize preparation recovers from the payload admission persisted', async () => {
+  // Admission persists the parsed webhook payload, before any preparation has run,
+  // so the stored subject has no window and no commit list yet. The recovery path
+  // must accept that shape: rejecting it fails every pull request recovery between
+  // admission and a completed preparation. It must also keep the synchronize
+  // window: re-reading the pull request loses the webhook `before` commit and
+  // silently widens the run to the whole pull request.
+  const client = fakeGitHub(({ url }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/comments')) return githubJson([])
+    return githubJson({
+      id: 7,
+      number: 7,
+      title: 'Update app',
+      body: 'body',
+      draft: false,
+      html_url: 'https://example.test/octo/demo/pull/7',
+      user: { login: 'alice' },
+      base: {
+        ref: 'main',
+        sha: 'newbase0',
+        repo: { full_name: 'octo/demo', owner: { login: 'octo' } }
+      },
+      head: {
+        ref: 'feature',
+        sha: 'newhead0',
+        repo: { full_name: 'octo/demo' }
+      }
+    })
+  })
+  const { app } = fakeApp({
+    respond: () => githubJson({ id: 1 }),
+    installationOctokit: client.octokit as never
+  })
+  const failures: string[] = []
+  let claimed = false
+  const store = {
+    claimNextPreparation: async () => {
+      if (claimed) return null
+      claimed = true
+      return {
+        run_id: 'run-recover',
+        claim_token: 'claim-token',
+        attempt_count: 1,
+        workflow: 'pull-request-review' as const,
+        input_version: 'v1' as const,
+        input: {
+          kind: 'github_pull_request_review',
+          pr: admittedPullRequestPayload(),
+          trusted_default_branch: {
+            default_branch: 'main',
+            head_sha: 'base0000'
+          },
+          event_type: 'synchronize',
+          test_changes: null
+        }
+      } as never
+    },
+    claimNextRunNotice: async () => null,
+    failPreparation: async (_run: string, _token: string, error: unknown) => {
+      failures.push(String((error as { message?: string })?.message ?? error))
+      return true
+    },
+    renewPreparationClaim: async () => true,
+    preparationHeartbeatIntervalMs: () => 60_000,
+    ...(() => {
+      const unreached = (name: string): never => {
+        throw new Error(`the ${name} branch should not be reached in this test`)
+      }
+      return {
+        admitReviewRun: async () => unreached('admitReviewRun'),
+        submitPreparedRun: async () => unreached('submitPreparedRun')
+      }
+    })()
+  }
+
+  await prepareReviewRunsOnce({
+    app,
+    store: store as never,
+    preferFailureNotice: false
+  })
+
+  // Preparation itself is exercised elsewhere; this test is about whether the
+  // recovery path accepts the admitted payload at all. A validation rejection
+  // names the missing field, so only that is treated as a failure here.
+  const validation_failures = failures.filter((message) =>
+    /^Preparation input is missing /.test(message)
+  )
+  assert.deepStrictEqual(
+    validation_failures,
+    [],
+    `recovery rejected the admitted payload: ${validation_failures.join('; ')}`
+  )
+  // The recovered run must not narrow to a freshly fetched pull request: the
+  // webhook `before` commit only exists in the persisted payload.
+  assert.strictEqual(
+    client.requests.some(
+      (request) =>
+        request.method === 'GET' &&
+        /\/pulls\/7$/.test(new URL(request.url).pathname)
+    ),
+    false,
+    'recovery must not re-read the pull request'
+  )
+})

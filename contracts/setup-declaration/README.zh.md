@@ -2,6 +2,8 @@
 
 语言：[English](README.md) | 中文
 
+本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 本 family 持有仓库用来告诉审查沙箱在 agent 启动前如何准备自己的格式：`.sec-review/setup.yml` 声明。
 
 使用这些文档：

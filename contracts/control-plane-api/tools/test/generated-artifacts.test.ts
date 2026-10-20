@@ -4,7 +4,7 @@
 // lands. If it drifts from the generators it guards nothing, so the manifest and the code
 // check each other rather than each being trusted alone.
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
@@ -25,7 +25,7 @@ const MANIFEST_PATH = path.join(
 )
 
 interface Manifest {
-  generators: Array<{ name: string; outputs: string[] }>
+  generators: Array<{ name: string; inputs: string[]; outputs: string[] }>
 }
 
 const ACTUAL_OUTPUTS: Record<string, string[]> = {
@@ -59,6 +59,21 @@ test('the manifest lists exactly the artifacts the generators write', () => {
       [...outputs].sort(),
       `manifest outputs for ${name} do not match the generator`
     )
+  }
+})
+
+test('every input the manifest names exists', () => {
+  // `inputs` states what a generator reads. A path that does not exist is a false statement
+  // about the generation relationship: either the input was moved, or the declaration was
+  // never accurate. Both make the manifest useless for deciding what to regenerate.
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
+  for (const generator of manifest.generators) {
+    for (const input of generator.inputs) {
+      assert.ok(
+        existsSync(path.join(REPO_ROOT, input)),
+        `${generator.name} declares input ${input}, which does not exist`
+      )
+    }
   }
 })
 

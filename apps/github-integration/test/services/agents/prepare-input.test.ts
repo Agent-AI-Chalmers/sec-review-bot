@@ -51,7 +51,7 @@ test.after(async () => {
 
 async function createGitFixture(
   root: string
-): Promise<{ base_sha: string; head_sha: string }> {
+): Promise<{ base_sha: string; head_sha: string; mid_sha: string }> {
   const remote = path.join(root, 'octo', 'demo.git')
   const source = path.join(root, 'source')
   await fs.mkdir(path.dirname(remote), { recursive: true })
@@ -73,11 +73,22 @@ async function createGitFixture(
   const { stdout: base } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
     cwd: source
   })
+  // A second commit gives `synchronize` a previous head that is neither the
+  // pull request base nor the current head, which is the shape that exposes a
+  // workspace missing the window base.
   await fs.writeFile(
     path.join(source, 'src', 'app.ts'),
     'export const value = 2\n'
   )
   await execFileAsync('git', ['commit', '-am', 'head'], { cwd: source })
+  const { stdout: mid } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+    cwd: source
+  })
+  await fs.writeFile(
+    path.join(source, 'src', 'app.ts'),
+    'export const value = 3\n'
+  )
+  await execFileAsync('git', ['commit', '-am', 'pushed'], { cwd: source })
   const { stdout: head } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
     cwd: source
   })
@@ -86,7 +97,11 @@ async function createGitFixture(
     cwd: source
   })
   await execFileAsync('git', ['push', 'origin', 'main'], { cwd: source })
-  return { base_sha: base.trim(), head_sha: head.trim() }
+  return {
+    base_sha: base.trim(),
+    head_sha: head.trim(),
+    mid_sha: mid.trim()
+  }
 }
 
 function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
@@ -368,6 +383,8 @@ test(
       const refs = await createGitFixture(tempRoot)
       const { preparePullRequestReviewInput } =
         await import('../../../src/reviews/pull-requests/prepare-input.js')
+      const { fullReviewWindow } =
+        await import('../../../src/reviews/pull-requests/review-window.js')
       const pr: PullRequestContext = {
         action: 'opened',
         previous_head_sha: null,
@@ -425,20 +442,14 @@ test(
         run_id: 'run-pr-fixture',
         octokit,
         pr,
+        window: fullReviewWindow({
+          base_sha: pr.base_sha,
+          head_sha: pr.head_sha
+        }),
         trusted_default_branch: {
           default_branch: 'main',
           head_sha: refs.head_sha
-        },
-        files: [
-          {
-            filename: 'src/app.ts',
-            status: 'modified',
-            additions: 1,
-            deletions: 1,
-            changes: 2,
-            patch: '@@ -1 +1 @@'
-          }
-        ]
+        }
       })
       await assertRunnerInputArtifact({
         input: prepared.input,
@@ -449,6 +460,44 @@ test(
       assert.strictEqual(prepared.input.pr.repo_full_name, 'octo/demo')
       assert.strictEqual('pullRequest' in prepared.input, false)
       assert.strictEqual('repository' in prepared.input, false)
+      // The file handed to the agent carries only what a review can act on.
+      // Identity fields stay in the runner input; putting them in this file
+      // spends agent context and offers extra ranges that can be mistaken for
+      // the review boundary.
+      const agent_metadata = JSON.parse(
+        await fs.readFile(
+          path.join(prepared.input_bundle_root, 'history', 'pr-metadata.json'),
+          'utf8'
+        )
+      ) as Record<string, unknown>
+      assert.deepStrictEqual(Object.keys(agent_metadata).sort(), [
+        'commit_shas',
+        'review_window'
+      ])
+      assert.strictEqual(
+        (agent_metadata['review_window'] as Record<string, unknown>)['kind'],
+        'full'
+      )
+
+      // The runner input carries the review subject, not the raw webhook
+      // payload: no endpoint URLs, commit counts, or sender identity.
+      assert.strictEqual(prepared.input.pr.repo_full_name, 'octo/demo')
+      assert.strictEqual(prepared.input.pr.base_sha, refs.base_sha)
+      assert.deepStrictEqual(Object.keys(prepared.input.pr).sort(), [
+        'base_ref',
+        'base_sha',
+        'body',
+        'commit_shas',
+        'head_ref',
+        'head_sha',
+        'number',
+        'owner',
+        'repo',
+        'repo_full_name',
+        'review_window',
+        'title'
+      ])
+
       const manifest = JSON.parse(
         await fs.readFile(
           path.join(prepared.input_bundle_root, 'manifest.json'),
@@ -572,6 +621,149 @@ test(
         )
       ) as Record<string, unknown>
       assert.strictEqual('incremental_window' in incrementalManifest, true)
+    } finally {
+      if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
+      else process.env['GITHUB_SERVER_URL'] = previousServer
+      await fs.rm(tempRoot, { recursive: true, force: true })
+    }
+  }
+)
+
+test(
+  'a push window keeps the patch and changed files on the same range',
+  { concurrency: false },
+  async () => {
+    // The regression this prevents: `changed-files.json` describing only the
+    // pushed commits while `incremental.patch` covered the whole pull request.
+    // The analyzer is told to derive causality from both, so a mismatch makes it
+    // suppress real changes or produce findings that cannot be anchored. Here the
+    // window is deliberately narrowed to the last commit, and the patch must
+    // shrink with it.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pr-push-'))
+    const previousServer = process.env['GITHUB_SERVER_URL']
+    process.env['GITHUB_SERVER_URL'] = `file://${tempRoot}`
+    try {
+      const refs = await createGitFixture(tempRoot)
+      const { preparePullRequestReviewInput } =
+        await import('../../../src/reviews/pull-requests/prepare-input.js')
+      const { pushReviewWindow } =
+        await import('../../../src/reviews/pull-requests/review-window.js')
+      const pr: PullRequestContext = {
+        action: 'synchronize',
+        previous_head_sha: refs.mid_sha,
+        repo_name: 'demo',
+        repo_full_name: 'octo/demo',
+        owner_login: 'octo',
+        sender_login: 'alice',
+        pr_number: 8,
+        pr_title: 'Push one commit',
+        pr_body: 'body',
+        pr_author: 'alice',
+        is_draft: false,
+        base_ref: 'main',
+        base_sha: refs.base_sha,
+        head_ref: 'main',
+        head_sha: refs.head_sha,
+        commits: 2,
+        changed_files: 1,
+        additions: 1,
+        deletions: 1,
+        html_url: '',
+        api_url: '',
+        commits_url: '',
+        review_comments_url: '',
+        comments_url: '',
+        issue_url: '',
+        head_repo_full_name: 'octo/demo',
+        base_repo_full_name: 'octo/demo',
+        from_fork: false
+      }
+      const octokit = fakeGitHub(({ url }) => {
+        const pathname = new URL(url).pathname
+        if (pathname === '/graphql') {
+          return githubJson({
+            data: {
+              repository: {
+                pullRequest: {
+                  commits: {
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    nodes: [{ commit: { oid: refs.head_sha } }]
+                  }
+                }
+              }
+            }
+          })
+        }
+        if (pathname.includes('/contents/'))
+          return githubJson({ message: 'Not Found' }, 404)
+        if (pathname.includes('/branches/'))
+          return githubJson({ commit: { sha: refs.head_sha } })
+        if (pathname.includes('/timeline')) return githubJson([])
+        return githubJson({ default_branch: 'main' })
+      }).octokit
+
+      // The previous head deliberately differs from the pull request's own base:
+      // on a real `synchronize` it is an earlier commit of the same branch, which
+      // no other ref points at. When the two were equal, a workspace that never
+      // fetched the window base still worked by coincidence.
+      const window = pushReviewWindow({
+        previous_head_sha: refs.mid_sha,
+        head_sha: refs.head_sha
+      })
+      const prepared = await preparePullRequestReviewInput({
+        run_id: 'run-pr-push',
+        octokit,
+        pr,
+        window,
+        trusted_default_branch: {
+          default_branch: 'main',
+          head_sha: refs.head_sha
+        }
+      })
+
+      const changed_files = JSON.parse(
+        await fs.readFile(
+          path.join(
+            prepared.input_bundle_root,
+            'incremental-window',
+            'changed-files.json'
+          ),
+          'utf8'
+        )
+      ) as { files: Array<{ path: string }> }
+      const patch = await fs.readFile(
+        path.join(
+          prepared.input_bundle_root,
+          'incremental-window',
+          'incremental.patch'
+        ),
+        'utf8'
+      )
+
+      assert.deepStrictEqual(
+        changed_files.files.map((item) => item.path),
+        ['src/app.ts']
+      )
+      // The patch must be exactly the push window, not the whole pull request.
+      // The fixture is base=1, mid=2, head=3, so a push window over mid..head
+      // shows 2 -> 3 and a full-window patch would show 1 -> 3 instead.
+      assert.match(patch, /^-export const value = 2$/m)
+      assert.match(patch, /^\+export const value = 3$/m)
+      assert.doesNotMatch(patch, /value = 1/)
+      const hunk_count = (patch.match(/^@@/gm) ?? []).length
+      assert.strictEqual(hunk_count, 1)
+
+      // The third artifact -- the file set suggestion anchoring uses -- must agree with the
+      // other two. When it came from the API's per-file list, a large run could anchor against a
+      // narrower set than the patch covered, and the three would describe different changes.
+      assert.deepStrictEqual(
+        prepared.files.map((item: { filename: string }) => item.filename),
+        changed_files.files.map((item) => item.path)
+      )
+      assert.match(
+        prepared.files[0]?.patch ?? '',
+        /^\+export const value = 3$/m
+      )
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer

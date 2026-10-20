@@ -144,7 +144,14 @@ function issueReviewInput(): IssueReviewInput & Record<string, unknown> {
       size_bytes: 1
     },
     review_intent: { objective: 'audit' },
-    issue: {}
+    issue: {
+      owner: 'octo',
+      repo: 'demo',
+      repo_full_name: 'octo/demo',
+      number: 7,
+      title: 'Update app',
+      body: null
+    }
   } satisfies IssueReviewInput
 }
 
@@ -160,7 +167,25 @@ function pullRequestReviewInput(): PullRequestReviewInput &
       size_bytes: 1
     },
     review_intent: { objective: 'audit' },
-    pr: {}
+    pr: {
+      owner: 'octo',
+      repo: 'demo',
+      repo_full_name: 'octo/demo',
+      number: 7,
+      title: 'Update app',
+      body: null,
+      base_ref: 'main',
+      base_sha: 'a'.repeat(40),
+      head_ref: 'feature',
+      head_sha: 'b'.repeat(40),
+      commit_shas: ['b'.repeat(40)],
+      review_window: {
+        kind: 'full',
+        base_sha: 'a'.repeat(40),
+        head_sha: 'b'.repeat(40),
+        reason: 'pull-request-scope'
+      }
+    }
   } satisfies PullRequestReviewInput
 }
 

@@ -10,8 +10,22 @@
     "objective": "audit"
   },
   "pr": {
+    "owner": "octo-org",
+    "repo": "example",
+    "repo_full_name": "octo-org/example",
     "number": 42,
     "title": "Harden webhook signature validation",
-    "repo_full_name": "octo-org/example"
+    "body": "Rejects events whose signature does not match.",
+    "base_ref": "main",
+    "base_sha": "1111111111111111111111111111111111111111",
+    "head_ref": "harden-signature",
+    "head_sha": "2222222222222222222222222222222222222222",
+    "commit_shas": ["2222222222222222222222222222222222222222"],
+    "review_window": {
+      "kind": "full",
+      "base_sha": "1111111111111111111111111111111111111111",
+      "head_sha": "2222222222222222222222222222222222222222",
+      "reason": "pull-request-scope"
+    }
   }
 }

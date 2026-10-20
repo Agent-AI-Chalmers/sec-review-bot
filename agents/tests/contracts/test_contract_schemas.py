@@ -86,13 +86,43 @@ def test_runner_rejects_result_missing_required_fields() -> None:
         )
 
 
-def test_v6_invalid_contract_fixtures_are_rejected_by_json_schemas() -> None:
-    for fixture_name, schema_name in invalid_fixture_schemas().items():
+def invalid_fixture_error_paths() -> dict[str, str]:
+    error_paths = contract_fixture_manifest().get("invalid_fixture_error_paths")
+    assert isinstance(error_paths, dict)
+    return error_paths
+
+
+def test_v6_invalid_contract_fixtures_fail_where_their_name_says() -> None:
+    """Each invalid fixture must isolate the rule its name states.
+
+    "It was rejected" is too weak: a fixture that also violates an unrelated required field
+    passes even when the rule under test stops being enforced, because the schema still rejects
+    it for the other reason. Pinning the failing location is what keeps each fixture measuring
+    one rule.
+    """
+    error_paths = invalid_fixture_error_paths()
+    invalid = invalid_fixture_schemas()
+    assert set(error_paths) == set(
+        invalid
+    ), "every invalid fixture must declare where it is expected to fail"
+
+    for fixture_name, schema_name in invalid.items():
         validator = contract_validator(schema_name)
 
-        errors = list(validator.iter_errors(contract_fixture(fixture_name)))
-
+        errors = sorted(
+            validator.iter_errors(contract_fixture(fixture_name)),
+            key=lambda error: list(error.path),
+        )
         assert errors != [], f"{fixture_name} unexpectedly matched {schema_name}"
+
+        expected = error_paths[fixture_name]
+        failing = {
+            ".".join(str(part) for part in error.absolute_path) or "<root>"
+            for error in errors
+        }
+        assert failing == {
+            expected
+        }, f"{fixture_name} should fail only at {expected}, but failed at {sorted(failing)}"
 
 
 @pytest.mark.parametrize("value", ["allow", "deny"])

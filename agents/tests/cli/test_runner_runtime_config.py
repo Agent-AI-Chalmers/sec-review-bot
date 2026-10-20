@@ -14,7 +14,14 @@ def _issue_input() -> dict:
     return {
         "contract_version": CONTRACT_VERSION,
         "review_intent": {"objective": "audit"},
-        "issue": {"number": 1},
+        "issue": {
+            "owner": "octo",
+            "repo": "demo",
+            "repo_full_name": "octo/demo",
+            "number": 1,
+            "title": "Issue",
+            "body": None,
+        },
         "input_bundle": write_test_input_bundle(local_root),
     }
 

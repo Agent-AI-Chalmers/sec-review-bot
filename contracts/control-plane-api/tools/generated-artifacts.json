@@ -6,7 +6,12 @@
       "name": "types",
       "script": "contracts/control-plane-api/tools/src/generate-types.ts",
       "command": "pnpm --dir contracts/control-plane-api/tools run generate",
-      "inputs": ["contracts/control-plane-api/openapi.yaml"],
+      "inputs": [
+        "contracts/control-plane-api/openapi.yaml",
+        "control-plane/.prettierrc.json",
+        "apps/github-integration/.prettierrc.json",
+        "apps/control-plane-ui/.prettierrc.json"
+      ],
       "outputs": [
         "control-plane/src/contract-types-generated.ts",
         "control-plane/src/error-codes-generated.ts",

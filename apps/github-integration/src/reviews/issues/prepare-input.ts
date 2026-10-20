@@ -45,34 +45,28 @@ async function writeJsonArtifact(
 async function materializeHistoryArtifacts({
   octokit,
   issue,
-  history_path,
-  workspace_ref,
-  default_branch
+  history_path
 }: {
   octokit: Octokit
   issue: IssueContext
   history_path: string
-  workspace_ref: string
-  default_branch: string
 }): Promise<{
-  issueMetadata: Record<string, unknown>
+  issueMetadata: IssueReviewInput['issue']
   linkedPullRequests: Awaited<
     ReturnType<typeof fetchTimelineLinkedPullRequests>
   >
 }> {
+  // The runner validates this against the v6 issue schema, which forbids additional
+  // properties. Identity fields plus what the prompts render; `default_branch` and
+  // `workspace_ref` are already consumed when the bundle is built, so recording them here
+  // would add fields no consumer reads.
   const issueMetadata = {
-    action: issue.action,
     owner: issue.owner_login,
     repo: issue.repo_name,
     repo_full_name: issue.repo_full_name,
     number: issue.issue_number,
-    html_url: issue.html_url,
     title: issue.issue_title,
-    body: issue.issue_body,
-    author_login: issue.issue_author,
-    labels: issue.labels,
-    default_branch,
-    workspace_ref
+    body: issue.issue_body
   }
   const linkedPullRequests = await fetchTimelineLinkedPullRequests(
     octokit,
@@ -122,7 +116,7 @@ export async function prepareIssueReviewInput({
   input_bundle_root: string
   workspace_ref: string
 }> {
-  const { default_branch, head_sha: workspace_ref } = trusted_default_branch
+  const { head_sha: workspace_ref } = trusted_default_branch
   const input_bundle_root = createInputBundleRoot(
     issue.repo_full_name,
     `issue-${issue.issue_number}`,
@@ -152,9 +146,7 @@ export async function prepareIssueReviewInput({
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,
     issue,
-    history_path,
-    workspace_ref,
-    default_branch
+    history_path
   })
   const input_bundle = await archiveInputBundle({
     input_bundle_root,
