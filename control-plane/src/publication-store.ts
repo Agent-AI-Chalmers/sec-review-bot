@@ -235,13 +235,21 @@ export class PublicationStore {
       )
       const row = result.rows[0]
       if (row === undefined) return null
-      // Parked steps become reconcilable again. Only the reconciliation budget is refreshed; the
-      // attempt budget stays spent, so the connector re-checks the remote rather than repeating
-      // the write. The event log records axes, not steps (`appendEvent` has no step field), so
-      // the axis transitions are what describe this; the step rows are the step's record.
+      // The resume returns the attempt budget, which is what makes it "published again" rather
+      // than "keep publishing": a spent budget refuses the write, so without this the connector
+      // could only ever reconcile, and would conclude a step it found absent as failed.
+      //
+      // There is deliberately no cap on how often this can be granted. The caller is an operator
+      // holding the admin token, and that authority is theirs: capping it here would replace their
+      // judgment with a constant, while still leaving the same power available to whoever can
+      // change the constant. What the system owes them instead is a record - every resume appends
+      // its own event - so the decision is visible after the fact rather than blocked in advance.
+      // Parked steps become attemptable and reconcilable again: the status returns to `pending`
+      // so a claim can start the side effect, and both budgets are refreshed. Steps that already
+      // succeeded are untouched - the run continues from where it stopped, it does not start over.
       await client.query(
         `UPDATE publication_steps
-         SET status='uncertain', claimed_by=NULL, recovery_attempt_count=0,
+         SET status='pending', claimed_by=NULL, attempt_count=0, recovery_attempt_count=0,
              updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
         [runId, this.connectorId]

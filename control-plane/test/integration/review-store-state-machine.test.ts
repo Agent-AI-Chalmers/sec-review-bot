@@ -3594,6 +3594,207 @@ test('giving up on a disconnected publication fails rather than skipping', async
   }
 })
 
+test('an operator resume publishes the parked steps again instead of only reconciling', async () => {
+  // The contract calls the publication branch of resume "published again": the operator is
+  // handing this run back to automatic recovery, the same way the preparation and execution
+  // branches reset the budget that made their axis stop. A resume that only refreshes the
+  // reconciliation budget cannot publish again - the attempt budget is what refuses the write,
+  // and a spent budget means the connector may only look, so a step it finds absent ends the
+  // publication instead of retrying it. That is "keep publishing", not "publish again".
+  //
+  // The operator decision therefore returns the attempt budget as well, so the next owner may
+  // write the side effect again. It is not capped: the admin token is the operator's own
+  // authority, and what the system owes them is a record of each decision, not a limit on it.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.claimPublication(runId)
+    assert.notStrictEqual(token, null)
+    await store.initializePublicationSteps(runId, token as string, [
+      'issue:summary-comment'
+    ])
+    await store.requirePublicationStepClaim(
+      runId,
+      token as string,
+      'issue:summary-comment'
+    )
+    // The publisher exhausted its attempts and the reconciliation budget, so the step parked.
+    await pool.query(
+      `UPDATE publication_steps SET status='disconnected', attempt_count=3,
+         recovery_attempt_count=3, claimed_by=NULL WHERE run_id=$1`,
+      [runId]
+    )
+    await pool.query(
+      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+       WHERE run_id=$1`,
+      [runId]
+    )
+
+    await store.resumeDisconnectedRun(runId)
+    const revived = (
+      await pool.query<{ status: string; attempt_count: number }>(
+        `SELECT status, attempt_count FROM publication_steps WHERE run_id=$1`,
+        [runId]
+      )
+    ).rows[0]
+    assert.strictEqual(
+      revived?.status,
+      'pending',
+      'the parked step is attemptable again, not merely reconcilable'
+    )
+    assert.strictEqual(
+      revived?.attempt_count,
+      0,
+      'the operator decision returns the attempt budget, so the step may be published again'
+    )
+    const resumedAxis = (
+      await pool.query<{ status: string }>(
+        `SELECT status FROM publications WHERE run_id=$1`,
+        [runId]
+      )
+    ).rows[0]?.status
+    assert.strictEqual(
+      resumedAxis,
+      'uncertain',
+      'the axis stays visible for an operator until the resumed publisher moves it'
+    )
+
+    // The connector can now claim the step and write the side effect, which the spent budget
+    // refused before the resume.
+    const resumedToken = (
+      await pool.query<{ claim_token: string }>(
+        `SELECT claim_token FROM publications WHERE run_id=$1`,
+        [runId]
+      )
+    ).rows[0]?.claim_token
+    assert.ok(resumedToken)
+    await store.requirePublicationStepClaim(
+      runId,
+      resumedToken,
+      'issue:summary-comment'
+    )
+    assert.strictEqual(
+      (
+        await pool.query<{ status: string }>(
+          `SELECT status FROM publication_steps WHERE run_id=$1`,
+          [runId]
+        )
+      ).rows[0]?.status,
+      'running',
+      'the resumed run publishes again instead of only reconciling'
+    )
+
+    // The operator's authority is not capped: parking the run again lets them hand it back again,
+    // and each decision is recorded as its own event rather than being refused in advance.
+    await pool.query(
+      `UPDATE publication_steps SET status='disconnected', attempt_count=3, claimed_by=NULL
+       WHERE run_id=$1`,
+      [runId]
+    )
+    await pool.query(
+      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+       WHERE run_id=$1`,
+      [runId]
+    )
+    await store.resumeDisconnectedRun(runId)
+    const resumedTwice = await store.listEvents(runId)
+    assert.strictEqual(
+      resumedTwice.filter(
+        (event) => event.reason_code === 'PUBLICATION_RESUMED_BY_OPERATOR'
+      ).length,
+      2,
+      'each operator decision is on the record'
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
+test('a takeover settles a step its predecessor left uncertain instead of failing the run', async () => {
+  // The sequence the other tests stop short of: a publisher dies while a step is uncertain, its
+  // lease expires, and another owner takes the publication over. The takeover re-derives the step
+  // keys, re-claims the step, and - because the attempt budget is spent - is told to reconcile.
+  // When the reconciliation finds the side effect, the publication must go on to publish.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.claimPublication(runId)
+    assert.notStrictEqual(token, null)
+    await store.initializePublicationSteps(runId, token as string, [
+      'issue:summary-comment'
+    ])
+    await store.requirePublicationStepClaim(
+      runId,
+      token as string,
+      'issue:summary-comment'
+    )
+    // Spend the attempt budget and leave the step uncertain: the last attempt may or may not have
+    // taken effect, and its publisher never concluded either way.
+    await pool.query(
+      `UPDATE publication_steps
+       SET status='uncertain', attempt_count=3, claimed_by=NULL
+       WHERE run_id=$1`,
+      [runId]
+    )
+    await pool.query(
+      `UPDATE publications SET status='uncertain',
+         claimed_at=clock_timestamp()-($2*interval '1 millisecond'), claim_token=NULL
+       WHERE run_id=$1`,
+      [runId, 600_000]
+    )
+
+    const takeover = await store.claimPublication(runId)
+    assert.notStrictEqual(takeover, null, 'an expired lease is taken over')
+    await store.initializePublicationSteps(runId, takeover as string, [
+      'issue:summary-comment'
+    ])
+
+    await assert.rejects(
+      store.requirePublicationStepClaim(
+        runId,
+        takeover as string,
+        'issue:summary-comment'
+      ),
+      (error: unknown) => {
+        assert.strictEqual(
+          (error as { code?: string }).code,
+          'PUBLICATION_STEP_RETRY_EXHAUSTED',
+          'a spent step is offered for reconciliation'
+        )
+        return true
+      }
+    )
+
+    // The connector looked and found the comment: the step succeeded after all.
+    assert.strictEqual(
+      await store.settleExhaustedPublicationStep(
+        runId,
+        takeover as string,
+        'issue:summary-comment',
+        {
+          found: true,
+          remote: { id: '42', url: 'https://example.test/c/42' }
+        }
+      ),
+      true
+    )
+    assert.strictEqual(
+      await store.completePublication(runId, takeover as string),
+      true,
+      'the publication still finishes once its only step is settled'
+    )
+    const finalRun = await store.getRun(runId)
+    assert.strictEqual(finalRun?.publication.status, 'published')
+    assert.strictEqual(finalRun?.failure_code, null, 'no failure was recorded')
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
 test('an operator resume completes on a pool that has exactly one connection', async () => {
   // The resume is a decision the operator makes on a run nobody is working, but the database may
   // still be busy: a small pool is a normal deployment choice, and nothing stops the resume from
@@ -3722,12 +3923,12 @@ test('a disconnected publication is parked until an operator resumes it', async 
     // no owner and no writer - which is exactly why the operator resume exists.
     assert.strictEqual(await store.claimPublication(runId), null)
 
-    // The operator resume grants a fresh *reconciliation* budget: the parked step returns to
-    // `uncertain` so the connector can look at the remote system once more. It does not grant a
-    // new attempt - re-running a side effect whose outcome nobody established is exactly what
-    // disconnection exists to prevent - so the attempt count stays spent.
-    // `recovery_attempt_count` is internal (the summary deliberately does not publish it), so the
-    // budget is read from the row that actually holds it.
+    // The operator resume hands the parked work back to automatic recovery, which is what the
+    // contract promises ("published again"): the parked step becomes attemptable again and both
+    // budgets are refreshed. It is the operator's decision that unparks a side effect whose
+    // outcome nobody established - automation never does this on its own - and it is recorded as
+    // its own event. `recovery_attempt_count` is internal (the summary deliberately does not
+    // publish it), so the budgets are read from the row that actually holds them.
     const readStep = async (): Promise<{
       status: string
       attempt_count: number
@@ -3748,15 +3949,18 @@ test('a disconnected publication is parked until an operator resumes it', async 
         attempt_count: number
         recovery_attempt_count: number
       }
-    const steppedBefore = await readStep()
     const resumed = await store.resumeDisconnectedRun(runId)
     assert.strictEqual(
       resumed.publication.status,
       'uncertain',
-      'the axis reports what the revived step is, so the run stays visible to reconciliation'
+      'the axis stays visible for an operator until the resumed publisher moves it'
     )
     const revived = await readStep()
-    assert.strictEqual(revived.status, 'uncertain')
+    assert.strictEqual(
+      revived.status,
+      'pending',
+      'the parked step is attemptable again, not merely reconcilable'
+    )
     assert.strictEqual(
       revived.recovery_attempt_count,
       0,
@@ -3764,14 +3968,12 @@ test('a disconnected publication is parked until an operator resumes it', async 
     )
     assert.strictEqual(
       revived.attempt_count,
-      steppedBefore.attempt_count,
-      'it refreshes no attempt budget: the side effect may not be repeated'
+      0,
+      'and the attempt budget, so the side effect can be published again'
     )
 
-    // A resumed run is claimable again, and re-claiming its step is still refused because the
-    // attempt budget is spent. That refusal is what makes the connector reconcile instead of
-    // re-running the write, and it must not be a dead end: `retry_exhausted` is what tells it to
-    // look, so the step is reconcilable rather than reported as unsettled.
+    // The resumed run publishes instead of only looking: the claim its spent budget refused is
+    // granted now, which is the difference between "published again" and "keep publishing".
     const resumedToken = (
       await pool.query<{ claim_token: string }>(
         `SELECT claim_token FROM publications WHERE run_id=$1`,
@@ -3779,21 +3981,12 @@ test('a disconnected publication is parked until an operator resumes it', async 
       )
     ).rows[0]?.claim_token
     assert.ok(resumedToken)
-    await assert.rejects(
-      store.requirePublicationStepClaim(
-        runId,
-        resumedToken,
-        'issue:summary-comment'
-      ),
-      (error: unknown) => {
-        assert.strictEqual(
-          (error as { code?: string }).code,
-          'PUBLICATION_STEP_RETRY_EXHAUSTED',
-          'the resumed step is offered for reconciliation, not reported as unsettled'
-        )
-        return true
-      }
+    await store.requirePublicationStepClaim(
+      runId,
+      resumedToken,
+      'issue:summary-comment'
     )
+    assert.strictEqual(await readStep().then((step) => step.status), 'running')
 
     // The resume is on the record.
     const events = await store.listEvents(runId)
@@ -3806,44 +3999,26 @@ test('a disconnected publication is parked until an operator resumes it', async 
       )
     )
 
-    // The connector looks and finds nothing: only that answer may end the step. Once it does,
-    // the published run fails terminally instead of looping.
+    // The resumed attempt finishes the way a first attempt would: recording its result ends the
+    // step and lets the publication conclude, so a resumed run reaches a real outcome rather
+    // than stopping at reconciliation.
     assert.strictEqual(
-      await store.settleExhaustedPublicationStep(
+      await store.completePublicationStep(
         runId,
         resumedToken,
         'issue:summary-comment',
-        { found: false }
+        { id: '7', url: 'https://example.test/c/7' }
       ),
       true
     )
-    await assert.rejects(
-      (async () => {
-        try {
-          await store.requirePublicationStepClaim(
-            runId,
-            resumedToken,
-            'issue:summary-comment'
-          )
-        } catch (error) {
-          // Mirrors the publication coordinator: classify, then commit the terminal failure.
-          await store.failPublication(
-            runId,
-            resumedToken,
-            {
-              code: (error as { code?: string }).code ?? null,
-              message: 'step could not be reconciled'
-            },
-            { retry: false }
-          )
-          throw error
-        }
-      })()
+    assert.strictEqual(
+      await store.completePublication(runId, resumedToken),
+      true
     )
     assert.strictEqual(
       (await store.getRun(runId))?.publication.status,
-      'failed',
-      'settling an unsettled step fails the run instead of looping'
+      'published',
+      'the resumed publication finishes'
     )
   } finally {
     await pool.end()
