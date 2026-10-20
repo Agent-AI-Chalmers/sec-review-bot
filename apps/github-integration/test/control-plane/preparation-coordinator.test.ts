@@ -302,7 +302,11 @@ test('a process without the GitHub installation concludes the notice, which the 
   })
 
   assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
-  assert.strictEqual(claimed, 1, 'the claim is per connector, so this process takes it')
+  assert.strictEqual(
+    claimed,
+    1,
+    'the claim is per connector, so this process takes it'
+  )
   assert.deepStrictEqual(
     completed,
     [['notice-test', 'notice-token', false]],
