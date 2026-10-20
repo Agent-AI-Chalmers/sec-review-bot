@@ -438,27 +438,63 @@ try {
       // published one must render the multi-step delivery list.
       await page.getByLabel('Workflow').selectOption('repository-review')
       await page.getByLabel('Publication').selectOption('published')
-      // Wait until the filters have been applied to the list, so the first row we
-      // open is actually a published repository review rather than a stale row.
-      await waitUntil(
-        async () =>
-          (
-            (await page
-              .locator('tbody tr:first-child td:nth-child(2)')
-              .textContent()) ?? ''
-          ).trim() === 'Repository review',
-        `${name} the repository-review filter must apply to the list`
-      )
+      // Wait until the filters have been applied to the list, so the first row we open is
+      // actually a published repository review rather than a stale row.
+      //
+      // Both filters have to be observed: the workflow alone is not evidence that the request
+      // came back. The unfiltered list already has a `repository-review` run at the top (an
+      // active one), so waiting on the workflow column alone passes against the list rendered
+      // before the filters were ever applied - and the run this test then opens has no
+      // publication start to show. Read the publication cell of that same row instead, which
+      // only says `Published` once the filtered response is on screen.
+      await waitUntil(async () => {
+        const firstRow = page.locator('tbody tr:first-child')
+        if ((await firstRow.count()) === 0) return false
+        const workflowCell = (
+          (await firstRow.locator('td:nth-child(2)').textContent()) ?? ''
+        ).trim()
+        const publicationCell = (
+          (await firstRow.locator('td:nth-child(5)').textContent()) ?? ''
+        ).trim()
+        return (
+          workflowCell === 'Repository review' &&
+          publicationCell.includes('Published')
+        )
+      }, `${name} the repository-review and published filters must both apply to the list`)
       await page.locator('tbody tr:first-child td a').first().click()
       await page.waitForSelector('.run-progress-timeline')
-      assert.match(
+      const publicationBody =
         (await page
           .locator('.run-progress-timeline .mantine-Timeline-itemBody')
           .nth(3)
-          .textContent()) ?? '',
-        /took/,
-        `${name} a finished phase must read as a duration`
-      )
+          .textContent()) ?? ''
+      if (!/took/.test(publicationBody)) {
+        // The publication phase renders its timestamp and elapsed time only when
+        // `publication.started_at` is set, so an empty body means the run the list led us to
+        // had no start for that phase. That is either the fixtures losing a timestamp or the
+        // list leading somewhere other than the filtered row; the two are indistinguishable
+        // from the rendered text alone, so report both: what was on screen, and what the
+        // server says about the run the page opened.
+        const runId = decodeURIComponent(new URL(page.url()).pathname)
+          .split('/')
+          .pop()
+        const served = await page.evaluate(async (id) => {
+          const response = await fetch(`/api/runs/${encodeURIComponent(id)}`)
+          if (!response.ok) return { status: response.status }
+          const { run } = await response.json()
+          return {
+            status: response.status,
+            workflow: run.workflow,
+            publication: run.publication,
+            execution: run.execution,
+            preparation_status: run.preparation?.status
+          }
+        }, runId)
+        assert.fail(
+          `${name} a finished phase must read as a duration: opened ${runId}, timeline ` +
+            `body ${JSON.stringify(publicationBody)}, server ${JSON.stringify(served)}`
+        )
+      }
       // The artifact reads as one row with the download trailing. Compare centres, not
       // tops: the facts use different font sizes, so their tops differ on the same line.
       const artifact = await page.evaluate(() => {

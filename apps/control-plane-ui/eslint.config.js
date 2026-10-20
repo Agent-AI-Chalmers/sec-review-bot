@@ -37,7 +37,9 @@ export default defineConfig(
         fetch: 'readonly',
         getComputedStyle: 'readonly',
         localStorage: 'readonly',
-        navigator: 'readonly'
+        navigator: 'readonly',
+        // The smoke script parses the page URL to name the run it opened.
+        URL: 'readonly'
       }
     }
   },
