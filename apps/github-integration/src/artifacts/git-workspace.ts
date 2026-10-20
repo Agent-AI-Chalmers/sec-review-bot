@@ -570,10 +570,16 @@ function parseNumstatZ(
     index += 1
     if (record === '') continue
 
-    const tabs = record.split('\t')
-    const added = tabs[0] ?? ''
-    const removed = tabs[1] ?? ''
-    const inline_path = tabs[2] ?? ''
+    // Split at the first two tabs only: `-z` disables quoting, so it also stops escaping tabs
+    // inside the path itself. Splitting on every tab would truncate a path like `file\tname.txt`
+    // to `file`, and its counts would never match the name-status entry.
+    const first_tab = record.indexOf('\t')
+    const second_tab =
+      first_tab === -1 ? -1 : record.indexOf('\t', first_tab + 1)
+    const added = first_tab === -1 ? '' : record.slice(0, first_tab)
+    const removed =
+      second_tab === -1 ? '' : record.slice(first_tab + 1, second_tab)
+    const inline_path = second_tab === -1 ? '' : record.slice(second_tab + 1)
     const counts_for_file = {
       additions: added === '-' ? 0 : Number.parseInt(added, 10) || 0,
       deletions: removed === '-' ? 0 : Number.parseInt(removed, 10) || 0

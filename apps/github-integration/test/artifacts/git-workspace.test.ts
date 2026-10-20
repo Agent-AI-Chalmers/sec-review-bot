@@ -728,3 +728,53 @@ test('exportWorkspaceWindow reports line counts for ordinary, renamed, and delet
     await fs.rm(root, { recursive: true, force: true })
   }
 })
+
+test('exportWorkspaceWindow keeps line counts for a path containing a tab', async () => {
+  // `-z` disables git's quoting, which also stops it escaping a tab inside the path:
+  //   `<added>\t<deleted>\tfile\tname.txt\0`
+  // Splitting the record on every tab truncates the path to `file`, so its counts never match
+  // the name-status entry and fall back to 0/0 for a file the patch clearly modifies. Only the
+  // first two tabs delimit the counts.
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'git-workspace-tab-path-')
+  )
+  try {
+    const source = path.join(root, 'source')
+    const workspace = path.join(root, 'workspace')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    const tabbed = 'file\tname.txt'
+    await fs.writeFile(path.join(source, tabbed), 'a\n', 'utf8')
+    await git(source, ['add', '-A'])
+    await git(source, ['commit', '-m', 'before'])
+    const base_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await fs.writeFile(path.join(source, tabbed), 'a\nb\nc\n', 'utf8')
+    await git(source, ['add', '-A'])
+    await git(source, ['commit', '-m', 'after'])
+    const head_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await materializeWorkspaceWithCommitHistory({
+      workspace_path: workspace,
+      git_remote_url: source,
+      refs: [base_sha, head_sha]
+    })
+
+    const exported = await exportWorkspaceWindow({
+      workspace_path: workspace,
+      base_sha,
+      head_sha
+    })
+    const entry = exported.files.find((file) => file.filename === tabbed)
+    assert.ok(entry !== undefined, 'the tab path is missing from the file list')
+    assert.deepStrictEqual(
+      { additions: entry.additions, deletions: entry.deletions },
+      { additions: 2, deletions: 0 }
+    )
+    assert.match(entry.patch ?? '', /\+b/)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
