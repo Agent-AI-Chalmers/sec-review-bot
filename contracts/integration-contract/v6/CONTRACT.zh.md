@@ -33,92 +33,29 @@ v6 Runner 支持本地 `file:` 和持久的 `s3:` URI。Storage endpoint、regio
 
 `tar.zst` archive 必须包含 `manifest.json`、workspace snapshot、history 和声明的 incremental window。manifest 声明 bundle-relative path；runner 将其解析成内部本地 `bundle_paths`。调用方不得直接提供 `bundle_paths`。
 
-```ts
-interface InputBundleArtifactRef {
-  uri: string // file: or s3:
-  digest: `sha256:${string}`
-  media_type: 'application/tar+zstd'
-  size_bytes: number
-}
-```
+`input_bundle` 的对象结构由 [`common.schema.json`](schemas/common.schema.json) 定义；`uri` 接受 `file:` 或 `s3:` 引用。
 
-Repository scan target：
-
-```ts
-interface RepositoryScanTarget {
-  target_branch: string
-  default_branch: string
-  event_type: 'manual' | 'scheduled'
-  scan_mode: 'full' | 'incremental'
-  base_sha: string | null
-  head_sha: string
-  commit_shas: string[]
-}
-```
+Repository scan target（[`repository-review-input.schema.json`](schemas/repository-review-input.schema.json) 中的 `scan_target`）：
 
 - `target_branch` 是调用方选择的 branch/ref 标签。
 - `base_sha` / `head_sha` / `commit_shas` 描述 scan delta window，对应 PR workflow 的 base/head/commit context。
   - full scan 中 `base_sha` 为 `null`、`commit_shas` 为空；
   - incremental scan 中以 `base_sha..head_sha` 为准，`commit_shas` 说明“这个区间里具体有哪些 commit”。
 
-Repository scan scope：
+Repository scan scope（同一 schema 中的 `scan_scope`）声明 `paths_ignore` 与 `incremental_changed_files`。
 
-```ts
-interface RepositoryScanScope {
-  paths_ignore: string[]
-  incremental_changed_files: Array<{
-    path: string
-    status: string
-    previous_path: string | null
-  }>
-}
-```
+每种 workflow input 都有自己的 schema：
 
-Review intent：
+| Workflow | Schema |
+| --- | --- |
+| `issue-review` | [`issue-review-input.schema.json`](schemas/issue-review-input.schema.json) |
+| `pull-request-review` | [`pull-request-review-input.schema.json`](schemas/pull-request-review-input.schema.json) |
+| `repository-review` | [`repository-review-input.schema.json`](schemas/repository-review-input.schema.json) |
 
-```ts
-interface ReviewIntent {
-  objective: 'audit' | 'repair'
-  test_changes?: 'allow' | 'deny'
-}
-```
+Pull request input 携带 `pr` subject，描述本次 run 所看到的 pull request。其中两个字段的关系无法由 schema 表达，因此需要单独说明：
 
-Issue workflow 使用：
-
-```ts
-interface IssueReviewInput {
-  contract_version: 'v6'
-  input_bundle: InputBundleArtifactRef
-  review_intent: ReviewIntent
-  issue: Record<string, unknown>
-  setup_declaration?: string
-}
-```
-
-Pull request workflow 使用：
-
-```ts
-interface PullRequestReviewInput {
-  contract_version: 'v6'
-  input_bundle: InputBundleArtifactRef
-  review_intent: ReviewIntent
-  pr: Record<string, unknown>
-  setup_declaration?: string
-}
-```
-
-Repository workflow 使用：
-
-```ts
-interface RepositoryReviewInput {
-  contract_version: 'v6'
-  input_bundle: InputBundleArtifactRef
-  review_intent: ReviewIntent
-  scan_target: RepositoryScanTarget
-  scan_scope: RepositoryScanScope
-  setup_declaration?: string
-}
-```
+- `base_sha` 与 `head_sha` 标识 pull request 本身，在一次 run 内保持不变。
+- `review_window` 说明本次 run 覆盖的范围。`synchronize` 下它窄于 `base_sha..head_sha`，因为该 run 只覆盖上次审查后推送的提交。`review_window.reason` 记录 run 为何回退到完整范围。
 
 runner 会在进程边界校验 input。所有 workflow 都需要这些共同字段：
 
@@ -140,20 +77,7 @@ runner 会在进程边界校验 input。所有 workflow 都需要这些共同字
 
 `setup_declaration` 是可选字符串，携带仓库的 setup 声明（即 base repo 默认分支上 `.sec-review/setup.yml` 的内容）。它是内联的声明文本，不是路径：调用方读取文件后传入其内容。省略表示环境不做引导。声明会被严格解析，并在 agent 启动前在沙箱内执行。来源可信性由调用方负责：它来自 base repo 默认分支，runner 不会再去核对来源。
 
-除这些共同字段外，各 workflow 还需要：
-
-| workflow | 必填字段 |
-| --- | --- |
-| `issue-review` | `issue` |
-| `pull-request-review` | `pr` |
-| `repository-review` | `scan_target`; `scan_scope` |
-
-`repository-review` 用 `scan_target` 和 `scan_scope` 明确声明扫描成本与覆盖范围：
-
-| 对象 | 必填字段 |
-| --- | --- |
-| `scan_target` | `target_branch`; `default_branch`; `event_type`; `scan_mode`; `base_sha`; `head_sha`; `commit_shas` |
-| `scan_scope` | `paths_ignore`; `incremental_changed_files` |
+`repository-review` 用 `scan_target` 和 `scan_scope` 明确声明扫描成本与覆盖范围。
 
 `scan_mode` 决定窗口形状：
 
@@ -172,54 +96,7 @@ Repository scan scope 用来控制成本和覆盖面，不能由 runner 猜测�
 
 ### ReviewRecord
 
-`ReviewRecord` 是 issue、pull request 和 repository workflow 共享的 review 结果结构：
-
-```ts
-interface ReviewRecord {
-  analysis: {
-    verdict: 'no-actionable-finding' | 'inconclusive' | 'plausible-risk' | 'confirmed-defect' | 'confirmed-vulnerability' | null
-    overview: string | null
-    narratives: Array<Record<string, unknown>>
-  }
-  mitigation: {
-    overview: string | null
-    changed_files: string[]
-    file_changes: Array<
-      | {
-          path: string
-          status: 'upsert'
-          content: string
-          content_encoding: 'utf-8' | 'base64'
-          mode?: '100644' | '100755'
-        }
-      | {
-          path: string
-          status: 'deleted'
-        }
-    >
-    patch_diff: string | null
-  }
-  verification: {
-    overview: string | null
-    review_target_claim: string | null
-    validation_level: 'static' | 'logic-simulated' | 'runtime-partial' | 'runtime-endpoint' | null
-    patch_coverage: 'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | 'no-patch' | 'not-applicable' | null
-    regression_status: 'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved' | null
-    resolution_next_step: 'none' | 'retry-ai' | 'manual-review' | null
-    patch_findings: string[]
-    verification_findings: string[]
-    residual_risks: string[]
-  }
-  cvss: {
-    outcome: 'scored' | 'not-scored' | 'skipped' | null
-    base_score: number | null
-    severity: string | null
-    vector: string | null
-    overview: string | null
-    not_scored_reason: string | null
-  } | null
-}
-```
+`ReviewRecord` 是 issue、pull request 和 repository workflow 共享的 review 结果结构。其字段类型与 enum 取值由 [`review-record.schema.json`](schemas/review-record.schema.json) 定义。
 
 Issue / PR presentation 直接使用 `ReviewRecord`。Repository case presentation 使用 case IDs 以及 `ReviewRecord` 的 analysis、mitigation、verification、CVSS 投影。
 
@@ -241,14 +118,7 @@ Workflow：`issue-review`
 
 输入仍使用现有 issue input contract，并通过 `review_intent` 表达 review intent。这个 workflow 中，`review_intent.objective = "repair"` 会改变 analyzer stance 和 mitigation gate。
 
-核心结果结构：
-
-```ts
-interface IssueWorkflowResult {
-  contract_version: 'v6'
-  review_record: ReviewRecord
-}
-```
+结果结构由 [`issue-review-result.schema.json`](schemas/issue-review-result.schema.json) 定义。
 
 `two-stage` 和 `single-agent` 两种 issue 策略（本地 issue CLI 的 `--strategy`）是本地评测 / ablation 专用路径：它们在 `issue-review` workflow 上作为 local-only Temporal workflow 启动，但不属于标准公开 runner contract。
 
@@ -258,14 +128,7 @@ interface IssueWorkflowResult {
 
 Workflow：`pull-request-review`
 
-核心结果结构：
-
-```ts
-interface PullRequestWorkflowResult {
-  contract_version: 'v6'
-  review_record: ReviewRecord
-}
-```
+结果结构由 [`pull-request-review-result.schema.json`](schemas/pull-request-review-result.schema.json) 定义。
 
 调用方必须从 `review_record` 渲染 PR 评论、判断是否发布 suggestions。
 
@@ -279,69 +142,13 @@ Repository review 由 `scan -> case review -> delivery` 组成：
 - `case_results[].review_record` 是每个 case 的 case-level review 输出。
 - `deliveries[]` 是 delivery execution 产出的 repository delivery 结果和可发布产物。
 
-核心结果结构：
-
-```ts
-interface RepositoryReviewWorkflowResult {
-  contract_version: 'v6'
-  scan_summary: ScanSummary
-  case_results: RepositoryCaseResult[]
-  deliveries: RepositoryDelivery[]
-}
-```
-
-`ScanSummary`：
-
-```ts
-interface ScanSummary {
-  scannable_file_count: number
-  scanned_file_count: number
-  skipped_file_count: number
-  candidate_count: number
-  case_count: number
-  suppressed_candidate_count: number
-}
-```
-
-`RepositoryCaseResult`：
-
-```ts
-interface RepositoryCaseResult {
-  case_id: string
-  disposition: 'keep' | 'blocked' | string
-  reason: string | null
-  review_record: ReviewRecord
-}
-```
-
-`case_results[]` 通过 `case_id`、`disposition`、`reason` 和 `review_record` 表达 case 级公开结果。
+结果结构由 [`repository-review-result.schema.json`](schemas/repository-review-result.schema.json) 定义。`case_results[]` 通过 `case_id`、`disposition`、`reason` 和 `review_record` 表达 case 级公开结果。
 
 GitHub summary renderer 可以从 `case_results[]` 渲染已确认但未达到 delivery gate 的 blocked case。
 
 ### Repository deliveries
 
-`RepositoryReviewWorkflowResult.deliveries[]` 包含 `RepositoryDelivery` 条目。
-
-```ts
-interface RepositoryDelivery {
-  delivery_id: string
-  case_ids: string[]
-  patch_diff: string
-  file_changes: Array<
-    | {
-        path: string
-        status: 'upsert'
-        content: string
-        content_encoding: 'utf-8' | 'base64'
-        mode?: '100644' | '100755'
-      }
-    | {
-        path: string
-        status: 'deleted'
-      }
-  >
-}
-```
+`deliveries[]` 条目是 repository result schema 中定义的 `RepositoryDelivery` 对象。
 
 调用方发布 repository delivery draft PR 时应使用 `RepositoryDelivery`。每个 delivery 必须携带生成的 `patch_diff` 和最终 `file_changes`；展示文件路径从 `file_changes[].path` 派生。`file_changes` 是应用文件内容的权威表示；`patch_diff` 是 diff/reference 视图，不得用于重建可发布的文件内容。`case_ids` 用于关联顶层 `case_results[]` 中的 case-level review 详情。
 
