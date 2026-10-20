@@ -1578,7 +1578,19 @@ export function devFixtures(): Plugin {
                 (run.created_at === cursor.createdAt &&
                   run.run_id < cursor.runId))
           )
-          const page = filtered.slice(0, limit)
+          // The store walks pages by `(created_at, run_id)` descending, and the cursor below is
+          // that same ordering; the fixture must apply it before slicing, or the cursor compares
+          // against rows that were never ahead of it. The run list is built in scenario order,
+          // and an active run's timestamp is anchored near now rather than at its newest
+          // historical slot, so array order is not creation order. Without this sort the
+          // predicate `created_at < cursor.createdAt` matched everything and every page repeated
+          // the first one.
+          const ordered = [...filtered].sort((left, right) =>
+            left.created_at === right.created_at
+              ? right.run_id.localeCompare(left.run_id)
+              : right.created_at.localeCompare(left.created_at)
+          )
+          const page = ordered.slice(0, limit)
           const last = page.at(-1)
           const nextCursor =
             last === undefined || page.length < limit
