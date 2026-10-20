@@ -146,7 +146,6 @@ async function materializePullRequestReviewInput({
     octokit,
     trusted_default_branch,
     pr,
-    files,
     window,
     test_changes
   })

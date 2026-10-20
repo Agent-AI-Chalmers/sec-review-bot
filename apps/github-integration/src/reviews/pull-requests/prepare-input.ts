@@ -5,10 +5,7 @@ import path from 'path'
 import {
   fetchTimelineLinkedIssues,
   resolveTrustedRepositoryIdentity,
-  summarizePullRequestFiles,
-  type PullRequestContext,
-  type PullRequestFile,
-  type PullRequestFileSummary
+  type PullRequestContext
 } from '../../github/pull-request-service.js'
 import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { Octokit } from 'octokit'
@@ -19,8 +16,10 @@ import type {
 import type { TestChangesPolicy } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import {
-  materializeWorkspaceWithCommitHistory,
-  exportWorkspaceDiff
+  exportWorkspaceChangedFiles,
+  exportWorkspaceDiff,
+  exportWorkspaceFilesWithPatch,
+  materializeWorkspaceWithCommitHistory
 } from '../../artifacts/git-workspace.js'
 import type { ReviewWindow } from './review-window.js'
 import {
@@ -32,29 +31,12 @@ import {
   readSetupDeclaration
 } from '../shared/input-bundle.js'
 
-interface NormalizedPullRequestFile {
-  path: string
-  status: string
-  additions: number
-  deletions: number
-  changes: number
-}
-
-interface IncrementalChangedFileEntry {
-  path: string
-  status: string
-  previous_path: string | null
-  additions: number
-  deletions: number
-  changes: number
-}
-
 export interface PreparedPullRequestReview {
   run_id: string
   input: PullRequestReviewInput
   input_path: string
   input_bundle_root: string
-  files: PullRequestFile[]
+  files: Awaited<ReturnType<typeof exportWorkspaceFilesWithPatch>>
 }
 
 interface PullRequestCommitsConnection {
@@ -109,18 +91,6 @@ function buildPrMetadata(
       reason: window.reason
     }
   }
-}
-
-function normalizeFiles(files: PullRequestFile[]): NormalizedPullRequestFile[] {
-  return summarizePullRequestFiles(files).map(
-    (file: PullRequestFileSummary) => ({
-      path: file.filename,
-      status: file.status,
-      additions: file.additions,
-      deletions: file.deletions,
-      changes: file.changes
-    })
-  )
 }
 
 async function listCommitChainRefsForPullRequest({
@@ -222,32 +192,22 @@ async function materializeWorkspaceHistory({
 async function materializeIncrementalWindowArtifacts({
   workspace_path,
   window,
-  files,
   incremental_window_path
 }: {
   workspace_path: string
   window: ReviewWindow
-  files: NormalizedPullRequestFile[]
   incremental_window_path: string
 }): Promise<void> {
-  const changed_files: IncrementalChangedFileEntry[] = files.map((file) => ({
-    path: file.path,
-    status: file.status,
-    previous_path: null,
-    additions: file.additions,
-    deletions: file.deletions,
-    changes: file.changes
-  }))
-
-  // The workspace holds real base and head commits, so the patch is regenerated
-  // from git instead of from the API's per-file `patch` field. GitHub omits that
-  // field for part of a large pull request (renames without content changes,
-  // some additions, and individual files with a large diff), so assembling the
-  // patch from it silently drops changes the review is supposed to cover.
-  //
-  // The range comes from the run's single resolved window, never from `pr`
-  // directly, so this patch and the `files` above describe the same change set.
+  // Both artifacts come from the workspace repository and the same diff selectors, so they
+  // cannot describe different change sets. The API cannot serve this role: its compare response
+  // caps at 300 files and the pull request files endpoint at 3000, while the diff has no cap, so
+  // a large run would list fewer files than its patch contains.
   const incremental_patch = await exportWorkspaceDiff({
+    workspace_path,
+    base_sha: window.base_sha,
+    head_sha: window.head_sha
+  })
+  const changed_files = await exportWorkspaceChangedFiles({
     workspace_path,
     base_sha: window.base_sha,
     head_sha: window.head_sha
@@ -341,7 +301,6 @@ export async function preparePullRequestReviewInput({
   run_id,
   octokit,
   pr,
-  files,
   window,
   trusted_default_branch,
   test_changes = null
@@ -349,12 +308,10 @@ export async function preparePullRequestReviewInput({
   run_id: string
   octokit: Octokit
   pr: PullRequestContext
-  files: PullRequestFile[]
   window: ReviewWindow
   trusted_default_branch: TrustedDefaultBranch
   test_changes?: TestChangesPolicy | null
 }): Promise<PreparedPullRequestReview> {
-  const normalizedFiles = normalizeFiles(files)
   const input_bundle_root = createInputBundleRoot(
     pr.repo_full_name,
     `pr-${pr.pr_number}`,
@@ -407,8 +364,16 @@ export async function preparePullRequestReviewInput({
   await materializeIncrementalWindowArtifacts({
     workspace_path,
     window,
-    files: normalizedFiles,
     incremental_window_path
+  })
+
+  // The suggestion anchoring set comes from the same workspace diff as the patch, so a file the
+  // patch changes is always anchorable. The API's per-file `patch` cannot serve this: it is
+  // omitted for part of a large pull request.
+  const files = await exportWorkspaceFilesWithPatch({
+    workspace_path,
+    base_sha: window.base_sha,
+    head_sha: window.head_sha
   })
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,
@@ -440,6 +405,9 @@ export async function preparePullRequestReviewInput({
   )
   await fs.writeFile(input_path, JSON.stringify(input, null, 2), 'utf8')
 
+  // The suggestion anchoring set comes from the same workspace diff as the patch, so a file the
+  // patch changes is always anchorable. The API's per-file `patch` cannot serve this: it is
+  // omitted for part of a large pull request.
   return {
     run_id,
     input,

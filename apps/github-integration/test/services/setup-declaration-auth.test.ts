@@ -315,8 +315,7 @@ test(
           base_sha: pr.base_sha,
           head_sha: pr.head_sha
         }),
-        trusted_default_branch: { default_branch: 'main', head_sha },
-        files: []
+        trusted_default_branch: { default_branch: 'main', head_sha }
       })
       assert.strictEqual(prepared.input.setup_declaration, DECLARATION)
       assert.deepStrictEqual(contentRequests, [

@@ -449,17 +449,7 @@ test(
         trusted_default_branch: {
           default_branch: 'main',
           head_sha: refs.head_sha
-        },
-        files: [
-          {
-            filename: 'src/app.ts',
-            status: 'modified',
-            additions: 1,
-            deletions: 1,
-            changes: 2,
-            patch: '@@ -1 +1 @@'
-          }
-        ]
+        }
       })
       await assertRunnerInputArtifact({
         input: prepared.input,
@@ -728,17 +718,7 @@ test(
         trusted_default_branch: {
           default_branch: 'main',
           head_sha: refs.head_sha
-        },
-        files: [
-          {
-            filename: 'src/app.ts',
-            status: 'modified',
-            additions: 1,
-            deletions: 1,
-            changes: 2,
-            patch: '@@ -1 +1 @@'
-          }
-        ]
+        }
       })
 
       const changed_files = JSON.parse(
@@ -772,6 +752,18 @@ test(
       assert.doesNotMatch(patch, /value = 1/)
       const hunk_count = (patch.match(/^@@/gm) ?? []).length
       assert.strictEqual(hunk_count, 1)
+
+      // The third artifact -- the file set suggestion anchoring uses -- must agree with the
+      // other two. When it came from the API's per-file list, a large run could anchor against a
+      // narrower set than the patch covered, and the three would describe different changes.
+      assert.deepStrictEqual(
+        prepared.files.map((item) => item.filename),
+        changed_files.files.map((item) => item.path)
+      )
+      assert.match(
+        prepared.files[0]?.patch ?? '',
+        /^\+export const value = 3$/m
+      )
     } finally {
       if (previousServer === undefined) delete process.env['GITHUB_SERVER_URL']
       else process.env['GITHUB_SERVER_URL'] = previousServer

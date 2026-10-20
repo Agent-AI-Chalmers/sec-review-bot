@@ -441,6 +441,199 @@ export async function materializeWorkspaceWithCommitHistory({
  * fetches base and every head commit, so the diff can be regenerated locally and
  * does not depend on which patches the API chose to return.
  */
+/**
+ * The `git diff` selectors every workspace export uses.
+ *
+ * The patch and the changed-file list must describe the same change set. Sharing these flags is
+ * what guarantees that: a file the diff renders is a file the list reports, and vice versa.
+ *
+ * Three dots are required. GitHub's `pull_request.base.sha` is the base branch tip, not the point
+ * where the pull request branched off, and it keeps moving as the base branch advances, so a
+ * two-dot diff would render base-branch work as deletions. Three dots diff from the merge base,
+ * which is also what the compare endpoint means by `base...head`.
+ *
+ * `--no-textconv` and `--no-ext-diff` close two independent ways for the diff text to stop being
+ * the diff: a diff driver's textconv prints file content as text, and injected configuration can
+ * set `diff.external`, which still fired under `--no-textconv`. `--binary` must NOT be added: it
+ * emits the binary payload inline as base85 rather than a placeholder.
+ */
+const WORKSPACE_DIFF_ARGS = [
+  'diff',
+  '--no-color',
+  '--no-textconv',
+  '--no-ext-diff',
+  '--find-renames'
+] as const
+
+const WORKSPACE_GIT_CONFIG = ['core.pager=cat', 'diff.noprefix=false']
+
+function requireComparableRefs(
+  base_sha: string,
+  head_sha: string,
+  caller: string
+): void {
+  for (const [label, value] of [
+    ['base_sha', base_sha],
+    ['head_sha', head_sha]
+  ] as const) {
+    if (value.trim() === '' || value.trim().startsWith('-')) {
+      throw new Error(`${caller} requires a valid ${label}.`)
+    }
+  }
+}
+
+/**
+ * Export the files the run's window touches, from the same repository and range as the patch.
+ *
+ * The API's file list is not usable for this: `GET /compare` caps its response at 300 files
+ * (measured: a 340-file pull request returns exactly 300) and the pull request files endpoint
+ * caps at 3000, while the diff has neither limit. Building `changed-files.json` from the API
+ * therefore drops files the patch still contains, which is the window divergence this module
+ * exists to prevent.
+ */
+export async function exportWorkspaceChangedFiles({
+  workspace_path,
+  base_sha,
+  head_sha
+}: {
+  workspace_path: string
+  base_sha: string
+  head_sha: string
+}): Promise<
+  { path: string; status: string; additions: number; deletions: number }[]
+> {
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceChangedFiles')
+  const range = `${base_sha.trim()}...${head_sha.trim()}`
+
+  const name_status = await runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, '--name-status', range],
+    { config: WORKSPACE_GIT_CONFIG }
+  )
+  const numstat = await runGitCommandCapture(
+    workspace_path,
+    [...WORKSPACE_DIFF_ARGS, '--numstat', range],
+    { config: WORKSPACE_GIT_CONFIG }
+  )
+
+  return parseChangedFiles(name_status, numstat)
+}
+
+const GIT_STATUS_NAMES: Record<string, string> = {
+  A: 'added',
+  C: 'copied',
+  D: 'removed',
+  M: 'modified',
+  R: 'renamed',
+  T: 'changed',
+  U: 'unmerged',
+  X: 'unknown',
+  B: 'broken'
+}
+
+/**
+ * Combine `--name-status` and `--numstat` into one entry per file.
+ *
+ * `--numstat` reports binary files as `-`, which is not a line count; those become 0 so the list
+ * stays numeric and the patch still carries the authoritative placeholder.
+ */
+function parseChangedFiles(
+  name_status: string,
+  numstat: string
+): { path: string; status: string; additions: number; deletions: number }[] {
+  const counts = new Map<string, { additions: number; deletions: number }>()
+  for (const line of numstat.split('\n')) {
+    if (line === '') continue
+    const fields = line.split('\t')
+    const added = fields[0]
+    const removed = fields[1]
+    const path = fields.at(-1)
+    if (added === undefined || removed === undefined || path === undefined) {
+      continue
+    }
+    counts.set(path, {
+      additions: added === '-' ? 0 : Number.parseInt(added, 10) || 0,
+      deletions: removed === '-' ? 0 : Number.parseInt(removed, 10) || 0
+    })
+  }
+
+  const files: {
+    path: string
+    status: string
+    additions: number
+    deletions: number
+  }[] = []
+  for (const line of name_status.split('\n')) {
+    if (line === '') continue
+    const fields = line.split('\t')
+    const code = fields[0]?.charAt(0) ?? ''
+    const path = fields.at(-1)
+    if (code === '' || path === undefined) continue
+    const counts_for_path = counts.get(path) ?? { additions: 0, deletions: 0 }
+    files.push({
+      path,
+      status: GIT_STATUS_NAMES[code] ?? 'unknown',
+      additions: counts_for_path.additions,
+      deletions: counts_for_path.deletions
+    })
+  }
+  return files
+}
+
+/**
+ * Export one entry per changed file, carrying that file's diff hunks.
+ *
+ * The suggestion anchoring needs a per-file `patch` to map a mitigation hunk onto PR-visible
+ * lines. The API returns that field for most files but omits it for part of a large pull request,
+ * and its file list is capped, so files the patch changes can end up unanchorable. Splitting the
+ * workspace diff keeps the two in step: every file the diff touches appears here with its hunks.
+ */
+export async function exportWorkspaceFilesWithPatch({
+  workspace_path,
+  base_sha,
+  head_sha
+}: {
+  workspace_path: string
+  base_sha: string
+  head_sha: string
+}): Promise<
+  {
+    filename: string
+    status: string
+    additions: number
+    deletions: number
+    patch: string | null
+  }[]
+> {
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceFilesWithPatch')
+  const range = `${base_sha.trim()}...${head_sha.trim()}`
+  const entries = await exportWorkspaceChangedFiles({
+    workspace_path,
+    base_sha,
+    head_sha
+  })
+
+  const per_file = await Promise.all(
+    entries.map(async (entry) => {
+      const patch = await runGitCommandCapture(
+        workspace_path,
+        [...WORKSPACE_DIFF_ARGS, range, '--', entry.path],
+        { config: WORKSPACE_GIT_CONFIG }
+      )
+      return {
+        filename: entry.path,
+        status: entry.status,
+        additions: entry.additions,
+        deletions: entry.deletions,
+        // A binary file's hunk is the "Binary files ... differ" placeholder, which carries no
+        // anchorable lines; report it as absent rather than as a patch that cannot be mapped.
+        patch: patch.includes('Binary files') ? null : patch
+      }
+    })
+  )
+  return per_file
+}
+
 export async function exportWorkspaceDiff({
   workspace_path,
   base_sha,
@@ -450,14 +643,7 @@ export async function exportWorkspaceDiff({
   base_sha: string
   head_sha: string
 }): Promise<string> {
-  for (const [label, value] of [
-    ['base_sha', base_sha],
-    ['head_sha', head_sha]
-  ] as const) {
-    if (value.trim() === '' || value.trim().startsWith('-')) {
-      throw new Error(`exportWorkspaceDiff requires a valid ${label}.`)
-    }
-  }
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceDiff')
 
   // `--no-color` keeps the output machine-readable; `--find-renames` preserves
   // the rename relationship the API metadata also carries.
@@ -498,17 +684,8 @@ export async function exportWorkspaceDiff({
   // placeholder and defeats the purpose of keeping binary content out of the diff.
   return runGitCommandCapture(
     workspace_path,
-    [
-      'diff',
-      '--no-color',
-      '--no-textconv',
-      '--no-ext-diff',
-      '--find-renames',
-      `${base_sha.trim()}...${head_sha.trim()}`
-    ],
-    {
-      config: ['core.pager=cat', 'diff.noprefix=false']
-    }
+    [...WORKSPACE_DIFF_ARGS, `${base_sha.trim()}...${head_sha.trim()}`],
+    { config: WORKSPACE_GIT_CONFIG }
   )
 }
 
