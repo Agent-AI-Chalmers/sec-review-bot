@@ -11,6 +11,7 @@ import test from 'node:test'
 import { parse } from 'yaml'
 
 import { staleGeneratedArtifacts } from '../src/check-generated-artifacts.js'
+import { generatedArtifacts as workflowInputTypes } from '../src/generate-workflow-input-types.js'
 import { generatedArtifacts as types } from '../src/generate-types.js'
 import { REPO_ROOT } from '../src/repo-root.js'
 
@@ -27,7 +28,10 @@ interface Manifest {
 }
 
 const ACTUAL_OUTPUTS: Record<string, string[]> = {
-  types: types().map((a) => path.relative(REPO_ROOT, a.output))
+  types: types().map((a) => path.relative(REPO_ROOT, a.output)),
+  'workflow-input-types': workflowInputTypes().map((a) =>
+    path.relative(REPO_ROOT, a.output)
+  )
 }
 
 test('every committed artifact matches a fresh render', async () => {

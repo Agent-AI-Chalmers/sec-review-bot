@@ -12,7 +12,10 @@ import {
 } from '../../github/pull-request-service.js'
 import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import type { Octokit } from 'octokit'
-import type { PullRequestReviewInput } from '../../runner/input.js'
+import type {
+  PullRequestReviewInput,
+  PullRequestReviewSubject
+} from '../../runner/input.js'
 import type { TestChangesPolicy } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import {
@@ -70,30 +73,35 @@ interface PullRequestCommitsGraphQLResponse {
   }
 }
 
+/**
+ * Build the pull request subject a review run carries.
+ *
+ * Only fields with a consumer are included: the preparation path, the recovery
+ * path, and the agent prompts. Endpoint URLs, commit counts, and sender identity
+ * had no reader, so keeping them only made the run's subject ambiguous.
+ */
 function buildPrMetadata(
   pr: PullRequestContext,
-  window: ReviewWindow
-): Record<string, unknown> {
+  window: ReviewWindow,
+  commit_shas: string[]
+): PullRequestReviewSubject {
   return {
-    action: pr.action,
+    // These names are the wire contract shared with the local materializer and
+    // the v6 fixture; they are not the names of the fields they are read from.
     owner: pr.owner_login,
     repo: pr.repo_name,
     repo_full_name: pr.repo_full_name,
     number: pr.pr_number,
-    html_url: pr.html_url,
     title: pr.pr_title,
     body: pr.pr_body,
-    author_login: pr.pr_author,
-    is_draft: pr.is_draft,
     base_ref: pr.base_ref,
     base_sha: pr.base_sha,
     head_ref: pr.head_ref,
     head_sha: pr.head_sha,
-    previous_head_sha: pr.previous_head_sha ?? null,
-    // The window this run actually covers. It labels the materialized
-    // `changed-files.json` and `incremental.patch`; it is not a second source of
-    // truth for them. For a `synchronize` run it is narrower than base_sha..
-    // head_sha above, which stays as pull request identity.
+    commit_shas,
+    // The window this run covers. It labels the materialized `changed-files.json`
+    // and `incremental.patch`; on `synchronize` it is narrower than
+    // base_sha..head_sha, which stays as pull request identity.
     review_window: {
       kind: window.kind,
       base_sha: window.base_sha,
@@ -270,22 +278,35 @@ async function materializeHistoryArtifacts({
   octokit,
   pr,
   window,
+  commit_shas,
   history_path
 }: {
   octokit: Octokit
   pr: PullRequestContext
   window: ReviewWindow
+  commit_shas: string[]
   history_path: string
 }): Promise<{
-  pr_metadata: Record<string, unknown>
+  pr_metadata: PullRequestReviewSubject
   linkedIssues: Awaited<ReturnType<typeof fetchTimelineLinkedIssues>>
 }> {
-  const pr_metadata = buildPrMetadata(pr, window)
+  const pr_metadata = buildPrMetadata(pr, window, commit_shas)
   const linkedIssues = await fetchTimelineLinkedIssues(octokit, pr)
 
   await fs.writeFile(
     path.join(history_path, 'pr-metadata.json'),
-    JSON.stringify(pr_metadata, null, 2),
+    // The agent gets the window and the commit list only. Identity fields stay
+    // in the runner input: an agent reading a full identity record spends
+    // context on values it cannot act on, and every extra range-shaped field is
+    // another candidate for what the review boundary is.
+    JSON.stringify(
+      {
+        review_window: pr_metadata.review_window,
+        commit_shas: pr_metadata.commit_shas
+      },
+      null,
+      2
+    ),
     'utf8'
   )
 
@@ -393,12 +414,10 @@ export async function preparePullRequestReviewInput({
     octokit,
     pr,
     window,
+    commit_shas,
     history_path
   })
-  const pullRequestMetadata = {
-    ...historyArtifacts.pr_metadata,
-    commit_shas
-  }
+  const pullRequestMetadata = historyArtifacts.pr_metadata
   const input_bundle = await archiveInputBundle({
     input_bundle_root,
     include_incremental_window: true,

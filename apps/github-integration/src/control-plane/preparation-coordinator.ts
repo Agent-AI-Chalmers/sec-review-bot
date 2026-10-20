@@ -140,8 +140,15 @@ function requireIssueContext(value: unknown, label = 'issue'): IssueContext {
   }
 }
 
-/** The pull-request fields the recovered pull-request path reads. */
-function requirePullRequestContext(
+/**
+ * The pull request fields a recovered run reads.
+ *
+ * This is the parsed webhook payload shape that admission persists, not the
+ * review subject: the subject is a preparation output (it carries the resolved
+ * window and the commit list), while this input exists before preparation
+ * starts. They are separate lifecycles and must not share a validator.
+ */
+function requirePersistedPullRequest(
   value: unknown,
   label = 'pr'
 ): PullRequestContext {
@@ -189,8 +196,6 @@ function requirePullRequestContext(
     from_fork: requireBooleanField(record, 'from_fork', label)
   }
 }
-
-/** A field declared `string | null`: it must be present and either a string or null. */
 function optionalStringOrNull(
   record: Record<string, unknown>,
   field: string,
@@ -263,8 +268,14 @@ async function executeClaimedPreparation({
     kind === 'github_pull_request_review' &&
     work.workflow === 'pull-request-review'
   ) {
+    // A persisted payload is the snapshot this run was admitted for. It is used
+    // as-is rather than re-read: a fresh read has no webhook `before` commit, so a
+    // `synchronize` would lose its push window and silently widen to the whole
+    // pull request, and a push landing during downtime would move the head under
+    // the same run id. Only the reference form, which never captured a snapshot,
+    // resolves the pull request now.
     const persistedPr = isRecord(input.pr)
-      ? requirePullRequestContext(input.pr)
+      ? requirePersistedPullRequest(input.pr)
       : null
     const reference =
       persistedPr === null

@@ -1,64 +1,43 @@
-import { type ContractVersion } from './contract-version.js'
+import type {
+  InputBundleArtifactRef,
+  IssueReviewInput,
+  PullRequestReviewInput,
+  RepositoryReviewInput,
+  RepositoryScanScope,
+  RepositoryScanTarget,
+  ReviewIntent
+} from './integration-contract-types-generated.js'
 
-// GitHub integration prepared input shapes. The Python runner normalizer remains the
-// authoritative runtime contract.
+// GitHub integration prepared input shapes.
+//
+// The transport shapes are generated from `contracts/integration-contract/v6/schemas`; this
+// module re-exports them and adds the local vocabulary the integration needs. Do not restate a
+// transport field here: a hand-maintained copy is how the producer and the schemas drifted apart
+// before the projection existed.
 
-export interface RepositoryScanTarget {
-  target_branch: string
-  default_branch: string
-  event_type: 'manual' | 'scheduled'
-  scan_mode: 'full' | 'incremental'
-  base_sha: string | null
-  head_sha: string
-  commit_shas: string[]
+export type {
+  InputBundleArtifactRef,
+  IssueReviewInput,
+  PullRequestReviewInput,
+  RepositoryReviewInput,
+  RepositoryScanScope,
+  RepositoryScanTarget,
+  ReviewIntent
 }
 
-export interface RepositoryScanScope {
-  paths_ignore: string[]
-  incremental_changed_files: Array<{
-    path: string
-    status: string
-    previous_path: string | null
-  }>
-}
+export type TestChangesPolicy = NonNullable<ReviewIntent['test_changes']>
+export type ReviewObjective = ReviewIntent['objective']
 
-export type TestChangesPolicy = 'allow' | 'deny'
-export type ReviewObjective = 'audit' | 'repair'
+/**
+ * The pull request subject a `pull-request-review` run carries.
+ *
+ * `review_window` states the range the run covers. It is not derivable from `base_sha` and
+ * `head_sha`, which identify the pull request itself and stay wider than the run on
+ * `synchronize`.
+ */
+export type PullRequestReviewSubject = PullRequestReviewInput['pr']
 
-export interface ReviewIntent {
-  objective: ReviewObjective
-  test_changes?: TestChangesPolicy
-}
+/** The change range a run covers. */
+export type ReviewWindowReference = PullRequestReviewSubject['review_window']
 
 export const INPUT_BUNDLE_MEDIA_TYPE = 'application/tar+zstd' as const
-
-export interface InputBundleArtifactRef {
-  uri: string
-  digest: `sha256:${string}`
-  media_type: typeof INPUT_BUNDLE_MEDIA_TYPE
-  size_bytes: number
-}
-
-interface RunnerWorkflowInputBase {
-  contract_version: ContractVersion
-  input_bundle: InputBundleArtifactRef
-  review_intent: ReviewIntent
-  /**
-   * Inline setup declaration text (the contents of `.sec-review/setup.yml` on
-   * the base-repo default branch). Omitted when the repository has none.
-   */
-  setup_declaration?: string
-}
-
-export interface IssueReviewInput extends RunnerWorkflowInputBase {
-  issue: Record<string, unknown>
-}
-
-export interface PullRequestReviewInput extends RunnerWorkflowInputBase {
-  pr: Record<string, unknown>
-}
-
-export interface RepositoryReviewInput extends RunnerWorkflowInputBase {
-  scan_target: RepositoryScanTarget
-  scan_scope: RepositoryScanScope
-}

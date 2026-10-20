@@ -8,6 +8,20 @@
       "command": "pnpm --dir contracts/integration-contract/tools run generate",
       "inputs": ["contracts/integration-contract/openapi.json"],
       "outputs": ["control-plane/src/runner-api-schema.ts"]
+    },
+    {
+      "name": "workflow-input-types",
+      "script": "contracts/integration-contract/tools/src/generate-workflow-input-types.ts",
+      "command": "pnpm --dir contracts/integration-contract/tools run generate",
+      "inputs": [
+        "contracts/integration-contract/v6/schemas/issue-review-input.schema.json",
+        "contracts/integration-contract/v6/schemas/pull-request-review-input.schema.json",
+        "contracts/integration-contract/v6/schemas/repository-review-input.schema.json",
+        "contracts/integration-contract/v6/schemas/common.schema.json"
+      ],
+      "outputs": [
+        "apps/github-integration/src/runner/integration-contract-types-generated.ts"
+      ]
     }
   ]
 }
