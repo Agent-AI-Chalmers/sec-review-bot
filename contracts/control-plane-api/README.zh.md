@@ -17,7 +17,7 @@
 
 Control Plane 通过 `observeRun()` 产出每个 observed run，通过 `rowToRecord()` 产出每条记录。记录携带 `failure_message`，而脱敏后的读取形状刻意丢弃了它，因此它只跨越 service token 那条边界。
 
-GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图就是同一个类型，而不是手写的副本。控制台则把自己的 `Run` 类型钉在提交的 fixture 上，于是两个调用方各自对同一份 schema 保留自己的编译期绑定。
+GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图就是同一个类型，而不是手写的副本。控制台则消费由同一份 schema 生成的类型，并由提交的 fixture 在编译期钉住它们，于是两个调用方各自对同一份 schema 保留自己的编译期绑定。
 
 请求的两侧也都由契约定型，而不只是响应：集成的客户端接收契约自己的 `operationId`，并据此推导每个请求体与成功返回值；Control Plane 的路由处理器则通过各自操作的类型（`control-plane/src/route-types.ts`）读取 `request.body` 与 `request.params`。因此在 [openapi.yaml](openapi.yaml) 里改一个请求字段名会让两侧的 typecheck 都失败，而不是留下一个仍能编译、字段却被静默忽略的调用点。
 
@@ -37,7 +37,7 @@ GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图
 
 ## 执行方式
 
-控制台在构建期把自己的 `Run` 类型钉在本 fixture 上：如果 fixture 增加、删除或改名了某个字段，控制台会停止编译，直到它的类型跟上。该检查位于 `apps/control-plane-ui/test/observed-run-fixture-types.ts`，比较的是**键集合**而不是值，因为 TypeScript 会放宽 JSON 字符串，值层面的赋值会拒绝一个正确的 fixture。
+控制台的 `Run` 类型由契约生成，并由本 fixture 在构建期钉住：如果 fixture 增加、删除或改名了某个字段，控制台会停止编译，直到生成类型与 fixture 重新一致。该检查比较的是**键集合**而不是值，因为 TypeScript 会放宽 JSON 字符串，值层面的赋值会拒绝一个正确的 fixture。
 
 值层面的一半由 Control Plane 在 `control-plane/test/observed-run-contract.test.ts` 中承担：它按 manifest 的声明校验每个 fixture，并校验 `observeRun()` 的真实输出。类型与 schema 的绑定不再需要单独的键集合对照，因为两者都源自契约（`openapi.yaml`）里同一个 `ObservedRun`。因此，schema 枚举之外的某个状态、被破坏的 pattern、或格式错误的 timestamp 都会让测试失败，而不是流到控制台。
 

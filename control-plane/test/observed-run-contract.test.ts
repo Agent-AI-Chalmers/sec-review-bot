@@ -198,6 +198,60 @@ function recordWith(
   } as ReviewRunRecord
 }
 
+test('the redacted read never carries a field the observed schema does not declare', () => {
+  // `observeRun` forwards the axis objects it is given rather than re-listing their fields, so
+  // the redaction boundary is the schema, not the function body: anything the record grows that
+  // the read contract does not declare would travel to the read surface verbatim. The value-level
+  // test below already rejects such an object; this one compares key sets so the failure names
+  // the unexpected field instead of reporting an opaque schema violation. Together they keep the
+  // rule that a new internal field must enter the read contract or stay off the record.
+  const record = recordWith(null)
+  const observed = observeRun(record) as unknown as Record<string, unknown>
+  assert.deepStrictEqual(
+    Object.keys(observed).sort(),
+    [
+      'artifact_storage',
+      'created_at',
+      'execution',
+      'failure_code',
+      'failure_notice',
+      'preparation',
+      'publication',
+      'run_id',
+      'workflow'
+    ],
+    'the observed run must carry exactly the fields its schema declares'
+  )
+  // The connector-owned record fields are the ones that must not survive redaction.
+  for (const dropped of [
+    'publish_context',
+    'runner_input',
+    'failure_message'
+  ]) {
+    assert.ok(
+      !(dropped in observed),
+      `${dropped} is record-only and must not reach the redacted read`
+    )
+  }
+  // Nested axis objects are forwarded as-is, so checking only the top-level keys would miss the
+  // case that matters most: an internal field attached to an axis. The preparation summary is
+  // the axis most likely to grow one, and every field it carries must be one the schema names.
+  const preparation = observed.preparation as Record<string, unknown>
+  assert.deepStrictEqual(
+    Object.keys(preparation).sort(),
+    [
+      'attempt_count',
+      'expiry_blocked_reason',
+      'failure_code',
+      'finished_at',
+      'started_at',
+      'status',
+      'updated_at'
+    ],
+    'every preparation field must be a field the read contract declares'
+  )
+})
+
 test('what observeRun returns validates against the shared schema', () => {
   // The schema is only a contract while the producer's own output satisfies it. This is
   // the check that would catch a status the schema's enum does not list.
