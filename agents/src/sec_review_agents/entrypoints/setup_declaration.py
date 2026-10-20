@@ -123,7 +123,7 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
         # accepted or rejected identically on both sides. In particular
         # `on`/`yes`/`no`/`off`/`y`/`n` are plain strings under 1.2, not
         # booleans, so a `run: on` is a command string rather than a parse error.
-        parsed: Any = yaml.load(content, Loader=yamlcore.CCoreLoader)
+        parsed: object = yaml.load(content, Loader=yamlcore.CCoreLoader)
     except yaml.YAMLError as error:
         raise SetupDeclarationError(
             f"Setup declaration is not valid YAML: {error}"
