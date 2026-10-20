@@ -2,6 +2,8 @@
 
 语言：[English](REVIEW_WINDOW_CONTRACT.md) | 中文
 
+本文是 [REVIEW_WINDOW_CONTRACT.md](REVIEW_WINDOW_CONTRACT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 ## 问题
 
 一次 pull request 审查 run 会物化三个都用来描述同一份变更的产物：
