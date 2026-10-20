@@ -19,6 +19,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     is_docker_runtime_available,
 )
 from sec_review_agents.filesystem.path_views import workspace_view
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
     BootstrapStatus,
     bootstrap_environment,
@@ -66,7 +67,7 @@ async def test_declaration_installs_dependencies_usable_by_later_commands(
         path_views=[workspace_view(host_path=workspace, writable=True)],
     )
     assert isinstance(backend, DockerSandboxBackend)
-    try:
+    async with amanaged_backend(backend):
         # Resolve the package mirror instead of running `apk update`. A DNS lookup answers
         # "is there a network" in under a second; `apk update` downloads an index first, so on
         # a slow link it spends minutes doing the very work this check is trying to avoid. The
@@ -84,11 +85,7 @@ async def test_declaration_installs_dependencies_usable_by_later_commands(
         assert result.status is BootstrapStatus.COMPLETED, result.reason
         # A later command in the same container can use what the declaration installed, and can
         # act on the mounted workspace while doing it.
-        check = backend.execute(
-            "cd /workspace && jq -r '.name + \"-ok\"' input.json"
-        )
-    finally:
-        backend.close()
+        check = backend.execute("cd /workspace && jq -r '.name + \"-ok\"' input.json")
 
     assert check.exit_code == 0, check.output
     assert "e2e-ok" in check.output

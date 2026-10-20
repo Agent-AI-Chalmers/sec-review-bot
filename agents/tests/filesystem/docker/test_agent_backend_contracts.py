@@ -50,7 +50,7 @@ def test_repository_analyzer_docker_tmp_write_and_execute_contract(
 
     marker = uuid.uuid4().hex
     tmp_file = f"/tmp/ghsb-docker-{marker}.txt"
-    try:
+    with backend:
         write_result = backend.write(tmp_file, "ok")
         assert write_result.error is None
 
@@ -59,8 +59,6 @@ def test_repository_analyzer_docker_tmp_write_and_execute_contract(
             "expected file to exist in container /tmp, "
             f"got output: {execute_result.output}"
         )
-    finally:
-        backend.close()
 
 
 def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None:
@@ -79,12 +77,10 @@ def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None
         )
     assert isinstance(backend, DockerSandboxBackend)
 
-    try:
+    with backend:
         assert hasattr(backend, "execute")
         execute_result = backend.execute("pwd")
         assert execute_result.exit_code == 0, (
             "expected verifier backend execute to succeed, "
             f"got output: {execute_result.output}"
         )
-    finally:
-        backend.close()

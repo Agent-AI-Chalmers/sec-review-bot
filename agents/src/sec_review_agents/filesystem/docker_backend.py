@@ -24,11 +24,14 @@
 import asyncio
 import base64
 import json
+import logging
 import os
 import shlex
 import subprocess
 import uuid
 from dataclasses import dataclass
+from types import TracebackType
+from typing import Self
 
 from deepagents.backends.protocol import (
     EditResult,
@@ -79,6 +82,11 @@ from sec_review_agents.filesystem.unix_paths import (
     unix_path_has_prefix,
 )
 from sec_review_agents.utils.env import env_value, parse_bool_env, parse_int_env
+
+# Standard-library logging, not the project's structlog wrapper: `filesystem` is a foundational
+# package and may not import `observability`. A cleanup failure during an exceptional exit has
+# no other channel, and silence is what makes a stranded container invisible.
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -227,21 +235,63 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         """Finish backend cleanup and stop the owned Docker container."""
         if self._closed:
             return
-        self._closed = True
+        # The two failures mean different things, so the flags are decided separately:
+        #
+        # - removing the container failed: nothing was torn down and the caller can retry, so
+        #   this backend stays open;
+        # - removing the container succeeded but `finalize` raised: the container is gone and
+        #   saying otherwise would have the caller believe it is still running.
         try:
             self.finalize()
         finally:
             self.container.close()
+            if self.container.closed:
+                self._closed = True
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        # A container outlives the interpreter that started it, so a missed cleanup strands it
+        # rather than failing loudly. The two exit paths disagree about what a cleanup failure
+        # means, so they are handled separately:
+        #
+        # - normal exit: nothing else is reporting a problem, so a cleanup failure is the only
+        #   signal the caller has that the sandbox may still be running. It must propagate.
+        # - exceptional exit: the block's exception is what the caller needs to see. A cleanup
+        #   failure is logged instead of replacing it, and the original exception propagates
+        #   with its type unchanged.
+        del exc_type, traceback
+        if exc_value is None:
+            self.close()
+            return
+
+        try:
+            self.close()
+        except Exception:
+            _logger.warning(
+                "Docker sandbox cleanup failed for %s while another exception was propagating",
+                self.container_name,
+                exc_info=True,
+            )
 
     async def aclose(self) -> None:
         """Finish backend cleanup without blocking the async caller."""
         if self._closed:
             return
-        self._closed = True
+        # Same split as `close`: a failed removal stays retryable, a completed removal is
+        # recorded even when `afinalize` raised.
         try:
             await self.afinalize()
         finally:
             await asyncio.to_thread(self.container.close)
+            if self.container.closed:
+                self._closed = True
 
     @property
     def id(self) -> str:
