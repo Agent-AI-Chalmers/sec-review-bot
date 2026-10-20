@@ -81,35 +81,3 @@ export async function listEvents(
     occurred_at: iso(row.occurred_at)
   }))
 }
-
-/** Append several transitions in one statement.
- *
- * Callers that expire a batch of runs would otherwise do three round trips per row while holding
- * one transaction. Every event still belongs to the same client and transaction, so the log and
- * the snapshots stay atomic; only the number of statements changes. An empty batch is a no-op,
- * which keeps callers from guarding the call themselves. */
-export async function appendEvents(
-  client: PoolClient,
-  events: AppendEventArgs[]
-): Promise<void> {
-  if (events.length === 0) return
-  const values: unknown[] = []
-  const rows = events.map((event, index) => {
-    const base = index * 6
-    values.push(
-      event.runId,
-      event.connectorId,
-      event.axis,
-      event.fromStatus,
-      event.toStatus,
-      event.reasonCode ?? null
-    )
-    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
-  })
-  await client.query(
-    `INSERT INTO review_run_events
-       (run_id, connector_id, axis, from_status, to_status, reason_code)
-     VALUES ${rows.join(', ')}`,
-    values
-  )
-}
