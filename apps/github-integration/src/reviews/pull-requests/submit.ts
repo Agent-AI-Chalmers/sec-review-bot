@@ -1,6 +1,6 @@
 import {
   type PullRequestContext,
-  listFilesChangedBetweenCommits,
+  compareCommitsBetween,
   listPullRequestFiles
 } from '../../github/pull-request-service.js'
 import { resolveReviewWindowFiles, type ReviewWindow } from './review-window.js'
@@ -47,7 +47,7 @@ async function resolveEventWindow({
     pr,
     event_type,
     list_push_window_files: (base_sha) =>
-      listFilesChangedBetweenCommits(octokit, {
+      compareCommitsBetween(octokit, {
         owner_login: pr.owner_login,
         repo_name: pr.repo_name,
         previous_head_sha: base_sha,

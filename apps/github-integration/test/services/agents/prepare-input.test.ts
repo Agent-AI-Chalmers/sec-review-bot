@@ -51,7 +51,7 @@ test.after(async () => {
 
 async function createGitFixture(
   root: string
-): Promise<{ base_sha: string; head_sha: string }> {
+): Promise<{ base_sha: string; head_sha: string; mid_sha: string }> {
   const remote = path.join(root, 'octo', 'demo.git')
   const source = path.join(root, 'source')
   await fs.mkdir(path.dirname(remote), { recursive: true })
@@ -73,11 +73,22 @@ async function createGitFixture(
   const { stdout: base } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
     cwd: source
   })
+  // A second commit gives `synchronize` a previous head that is neither the
+  // pull request base nor the current head, which is the shape that exposes a
+  // workspace missing the window base.
   await fs.writeFile(
     path.join(source, 'src', 'app.ts'),
     'export const value = 2\n'
   )
   await execFileAsync('git', ['commit', '-am', 'head'], { cwd: source })
+  const { stdout: mid } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+    cwd: source
+  })
+  await fs.writeFile(
+    path.join(source, 'src', 'app.ts'),
+    'export const value = 3\n'
+  )
+  await execFileAsync('git', ['commit', '-am', 'pushed'], { cwd: source })
   const { stdout: head } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
     cwd: source
   })
@@ -86,7 +97,11 @@ async function createGitFixture(
     cwd: source
   })
   await execFileAsync('git', ['push', 'origin', 'main'], { cwd: source })
-  return { base_sha: base.trim(), head_sha: head.trim() }
+  return {
+    base_sha: base.trim(),
+    head_sha: head.trim(),
+    mid_sha: mid.trim()
+  }
 }
 
 function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
@@ -607,7 +622,7 @@ test(
         await import('../../../src/reviews/pull-requests/review-window.js')
       const pr: PullRequestContext = {
         action: 'synchronize',
-        previous_head_sha: refs.base_sha,
+        previous_head_sha: refs.mid_sha,
         repo_name: 'demo',
         repo_full_name: 'octo/demo',
         owner_login: 'octo',
@@ -659,8 +674,12 @@ test(
         return githubJson({ default_branch: 'main' })
       }).octokit
 
+      // The previous head deliberately differs from the pull request's own base:
+      // on a real `synchronize` it is an earlier commit of the same branch, which
+      // no other ref points at. When the two were equal, a workspace that never
+      // fetched the window base still worked by coincidence.
       const window = pushReviewWindow({
-        previous_head_sha: refs.base_sha,
+        previous_head_sha: refs.mid_sha,
         head_sha: refs.head_sha
       })
       const prepared = await preparePullRequestReviewInput({
@@ -708,11 +727,11 @@ test(
         ['src/app.ts']
       )
       // The patch must be exactly the push window, not the whole pull request.
-      // The fixture's head commit rewrites the same single line, so any patch
-      // that reaches further back than the push would need a different marker
-      // than the one expected here. Assert the concrete range instead of prose.
-      assert.match(patch, /^-export const value = 1$/m)
-      assert.match(patch, /^\+export const value = 2$/m)
+      // The fixture is base=1, mid=2, head=3, so a push window over mid..head
+      // shows 2 -> 3 and a full-window patch would show 1 -> 3 instead.
+      assert.match(patch, /^-export const value = 2$/m)
+      assert.match(patch, /^\+export const value = 3$/m)
+      assert.doesNotMatch(patch, /value = 1/)
       const hunk_count = (patch.match(/^@@/gm) ?? []).length
       assert.strictEqual(hunk_count, 1)
     } finally {

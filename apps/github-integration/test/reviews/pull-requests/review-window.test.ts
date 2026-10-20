@@ -22,7 +22,7 @@ test('a non-synchronize event always uses the full pull request window', async (
     pr: { base_sha: 'base', head_sha: 'head', previous_head_sha: 'deadbeef' },
     list_push_window_files: async () => {
       calls.push('push')
-      return [file('pushed.ts')]
+      return { files: [file('pushed.ts')], previous_head_is_ancestor: true }
     },
     list_full_window_files: async () => {
       calls.push('full')
@@ -48,7 +48,7 @@ test('a synchronize with a usable push window keeps the push window', async () =
     pr: { base_sha: 'base', head_sha: 'head', previous_head_sha: 'cafe1234' },
     list_push_window_files: async (base_sha) => {
       assert.strictEqual(base_sha, 'cafe1234')
-      return [file('pushed.ts')]
+      return { files: [file('pushed.ts')], previous_head_is_ancestor: true }
     },
     list_full_window_files: async () => {
       throw new Error('the full window must not be fetched')
@@ -84,6 +84,19 @@ test('a synchronize without a previous head falls back to the full window', asyn
   )
 })
 
+function httpError(
+  status: number
+): Error & { status: number; response: unknown } {
+  return Object.assign(new Error(`HTTP ${status}`), {
+    status,
+    response: {
+      status,
+      headers: {},
+      data: { message: `HTTP ${status}`, errors: [] }
+    }
+  })
+}
+
 test('an unreachable previous head falls back instead of failing the run', async () => {
   // The compare endpoint answers 404 when the base commit is no longer
   // reachable, which surfaces as a rejected promise. Falling back keeps the run
@@ -94,7 +107,7 @@ test('an unreachable previous head falls back instead of failing the run', async
     event_type: 'synchronize',
     pr: { base_sha: 'base', head_sha: 'head', previous_head_sha: 'gone1234' },
     list_push_window_files: async () => {
-      throw new Error('Not Found')
+      throw httpError(404)
     },
     list_full_window_files: async () => {
       full_calls += 1
@@ -121,12 +134,99 @@ test('a synchronize that changed no files falls back to the full window', async 
   const result = await resolveReviewWindowFiles({
     event_type: 'synchronize',
     pr: { base_sha: 'base', head_sha: 'head', previous_head_sha: 'same1234' },
-    list_push_window_files: async () => [],
+    list_push_window_files: async () => ({
+      files: [],
+      previous_head_is_ancestor: true
+    }),
     list_full_window_files: async () => [file('whole-pr.ts')]
   })
 
   assert.strictEqual(result.window.kind, 'full')
   assert.strictEqual(result.window.reason, 'synchronize-no-files-changed')
+  assert.deepStrictEqual(
+    result.files.map((item: PullRequestFile) => item.filename),
+    ['whole-pr.ts']
+  )
+})
+
+test('compare failures other than 404 propagate instead of triggering a full review', async () => {
+  // Falling back on any error would hide real faults and, worse, silently spend
+  // a whole pull request review whenever GitHub answers 403/429/5xx or the
+  // request merely times out. Each of those must surface to the caller.
+  for (const status of [403, 429, 500, 503]) {
+    let full_calls = 0
+    await assert.rejects(
+      resolveReviewWindowFiles({
+        event_type: 'synchronize',
+        pr: {
+          base_sha: 'base',
+          head_sha: 'head',
+          previous_head_sha: 'prev1234'
+        },
+        list_push_window_files: async () => {
+          throw httpError(status)
+        },
+        list_full_window_files: async () => {
+          full_calls += 1
+          return [file('whole-pr.ts')]
+        }
+      }),
+      (error: Error) => error.message === `HTTP ${status}`
+    )
+    assert.strictEqual(full_calls, 0, `HTTP ${status} must not fetch files`)
+  }
+})
+
+test('a compare failure without an HTTP status propagates', async () => {
+  // A timeout or programming error carries no status, and must not be read as
+  // "the previous head is unreachable".
+  let full_calls = 0
+  await assert.rejects(
+    resolveReviewWindowFiles({
+      event_type: 'synchronize',
+      pr: {
+        base_sha: 'base',
+        head_sha: 'head',
+        previous_head_sha: 'prev1234'
+      },
+      list_push_window_files: async () => {
+        throw new TypeError('fetch failed')
+      },
+      list_full_window_files: async () => {
+        full_calls += 1
+        return [file('whole-pr.ts')]
+      }
+    }),
+    /fetch failed/
+  )
+  assert.strictEqual(full_calls, 0)
+})
+
+test('a force-pushed previous head falls back instead of reviewing a broken window', async () => {
+  // A force-push replaces the history the push window assumes: the previous head
+  // is no longer an ancestor of the current head, the workspace cannot contain
+  // it, and the diff range stops describing an incremental change. Continue with
+  // the full window rather than review a range the artifacts cannot support.
+  let full_calls = 0
+  const result = await resolveReviewWindowFiles({
+    event_type: 'synchronize',
+    pr: { base_sha: 'base', head_sha: 'head', previous_head_sha: 'old1234' },
+    list_push_window_files: async () => ({
+      files: [file('stale.ts')],
+      previous_head_is_ancestor: false
+    }),
+    list_full_window_files: async () => {
+      full_calls += 1
+      return [file('whole-pr.ts')]
+    }
+  })
+
+  assert.strictEqual(full_calls, 1)
+  assert.strictEqual(result.window.kind, 'full')
+  assert.strictEqual(
+    result.window.reason,
+    'synchronize-previous-head-not-ancestor'
+  )
   assert.deepStrictEqual(
     result.files.map((item: PullRequestFile) => item.filename),
     ['whole-pr.ts']

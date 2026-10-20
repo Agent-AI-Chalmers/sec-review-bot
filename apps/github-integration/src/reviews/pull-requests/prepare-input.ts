@@ -70,7 +70,10 @@ interface PullRequestCommitsGraphQLResponse {
   }
 }
 
-function buildPrMetadata(pr: PullRequestContext): Record<string, unknown> {
+function buildPrMetadata(
+  pr: PullRequestContext,
+  window: ReviewWindow
+): Record<string, unknown> {
   return {
     action: pr.action,
     owner: pr.owner_login,
@@ -86,7 +89,17 @@ function buildPrMetadata(pr: PullRequestContext): Record<string, unknown> {
     base_sha: pr.base_sha,
     head_ref: pr.head_ref,
     head_sha: pr.head_sha,
-    previous_head_sha: pr.previous_head_sha ?? null
+    previous_head_sha: pr.previous_head_sha ?? null,
+    // The window this run actually covers. It labels the materialized
+    // `changed-files.json` and `incremental.patch`; it is not a second source of
+    // truth for them. For a `synchronize` run it is narrower than base_sha..
+    // head_sha above, which stays as pull request identity.
+    review_window: {
+      kind: window.kind,
+      base_sha: window.base_sha,
+      head_sha: window.head_sha,
+      reason: window.reason
+    }
   }
 }
 
@@ -175,18 +188,24 @@ async function materializeWorkspaceHistory({
   octokit,
   pr,
   workspace_path,
+  window,
   commit_refs
 }: {
   octokit: Octokit
   pr: PullRequestContext
   workspace_path: string
+  window: ReviewWindow
   commit_refs: string[]
 }): Promise<void> {
   const git_auth_token = await getInstallationAccessToken(octokit)
 
+  // The window's base is part of the comparison, so it has to be present even
+  // when it is not the pull request's own base. On `synchronize` it is the
+  // previous head, which is no longer on the current commit chain and would
+  // otherwise be missing from the workspace entirely.
   await materializeWorkspaceWithCommitHistory({
     workspace_path,
-    refs: [pr.base_sha, ...commit_refs],
+    refs: [pr.base_sha, window.base_sha, ...commit_refs],
     git_remote_url: buildGitRemoteUrl(pr.owner_login, pr.repo_name),
     git_auth_token
   })
@@ -250,16 +269,18 @@ async function materializeIncrementalWindowArtifacts({
 async function materializeHistoryArtifacts({
   octokit,
   pr,
+  window,
   history_path
 }: {
   octokit: Octokit
   pr: PullRequestContext
+  window: ReviewWindow
   history_path: string
 }): Promise<{
   pr_metadata: Record<string, unknown>
   linkedIssues: Awaited<ReturnType<typeof fetchTimelineLinkedIssues>>
 }> {
-  const pr_metadata = buildPrMetadata(pr)
+  const pr_metadata = buildPrMetadata(pr, window)
   const linkedIssues = await fetchTimelineLinkedIssues(octokit, pr)
 
   await fs.writeFile(
@@ -340,6 +361,7 @@ export async function preparePullRequestReviewInput({
     octokit,
     pr,
     workspace_path,
+    window,
     commit_refs: commit_shas
   })
   const default_sha = trusted_default_branch.head_sha
@@ -370,6 +392,7 @@ export async function preparePullRequestReviewInput({
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,
     pr,
+    window,
     history_path
   })
   const pullRequestMetadata = {

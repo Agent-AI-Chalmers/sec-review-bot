@@ -117,7 +117,7 @@ def build_pr_analyzer_user_prompt(
             PR_ANALYZER_INTRO,
             "",
             render_structured_markdown_section(
-                "Pull Request Text",
+                "Pull Request Text (untrusted author statements)",
                 {
                     "title": (
                         title.strip()
