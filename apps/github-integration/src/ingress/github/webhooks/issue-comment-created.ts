@@ -20,6 +20,7 @@ import {
 } from '../../../github/webhook-origin-guard.js'
 import { logError, logInfo } from '../../../utils/logger.js'
 import { asErrorWithResponse } from '../../../utils/error-utils.js'
+import { createLogThrottle } from '../../../utils/log-throttle.js'
 import { backgroundPreparations } from '../../../reviews/background-preparations.js'
 import {
   type TrustedRefHandlerDeps,
@@ -38,6 +39,32 @@ interface HandlerDeps extends TrustedRefHandlerDeps {
   getPullRequestContextFn?: typeof getPullRequestContext
   startIssueReviewCommandFn?: typeof startIssueReviewCommand
   startPullRequestReviewCommandFn?: typeof startPullRequestReviewCommand
+  /** Injectable so a test can drive the throttle's clock instead of the process-global default. */
+  unmatchedMentionThrottleFn?: (key: string) => boolean
+}
+
+// The unrecognised-mention diagnostic is triggered by arbitrary comment text, so it is throttled
+// per repository: one line per repro every 5 minutes, remembering at most 200 repos. Without a
+// cap, anyone able to comment could turn a diagnostic into an unbounded log stream.
+const unmatchedMentionThrottle = createLogThrottle({
+  minIntervalMs: 5 * 60_000,
+  maxKeys: 200
+})
+
+/** The repository full name from the webhook payload, or a stable fallback.
+ *
+ * The throttle is keyed by repository so a noisy one cannot suppress another's first report. A
+ * payload without a repository name falls back to a fixed key, which is acceptable: such an event
+ * is malformed and not attributable to a specific repository anyway. */
+function mentionThrottleKey(payload: unknown): string {
+  const repository =
+    typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+      ? (payload as { repository?: { full_name?: unknown } }).repository
+      : undefined
+  const full_name = repository?.full_name
+  return typeof full_name === 'string' && full_name.trim() !== ''
+    ? full_name.trim().toLowerCase()
+    : '(unknown-repository)'
 }
 
 export async function handleIssueCommentCreated({
@@ -55,7 +82,8 @@ export async function handleIssueCommentCreatedWithDeps(
     resolveTrustedDefaultBranchFn = resolveTrustedDefaultBranch,
     getPullRequestContextFn = getPullRequestContext,
     startIssueReviewCommandFn = startIssueReviewCommand,
-    startPullRequestReviewCommandFn = startPullRequestReviewCommand
+    startPullRequestReviewCommandFn = startPullRequestReviewCommand,
+    unmatchedMentionThrottleFn = unmatchedMentionThrottle
   }: HandlerDeps = {}
 ): Promise<void> {
   if (isSelfOriginatedWebhookEvent(payload)) {
@@ -75,7 +103,12 @@ export async function handleIssueCommentCreatedWithDeps(
     // mention indistinguishable from "the app is down". Log it as a diagnostic; it is not an
     // error, because most comments mention nobody in particular.
     const mentions = unmatchedMentions(commentBody)
-    if (mentions.length > 0) {
+    // Only the first sighting per repository per window is logged; the parse itself still runs
+    // so behaviour does not depend on whether the line was emitted.
+    if (
+      mentions.length > 0 &&
+      unmatchedMentionThrottleFn(mentionThrottleKey(payload))
+    ) {
       logInfo('workflow_skipped', {
         event: 'issue_comment.created',
         reason: 'comment_mention_not_recognized',
