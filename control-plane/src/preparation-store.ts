@@ -361,14 +361,14 @@ export class PreparationStore {
       failure_code: string | null
     }>(
       `UPDATE preparations
-       SET status=CASE WHEN $3 THEN 'failed' ELSE 'pending' END,
+       SET status=CASE WHEN $3::boolean THEN 'failed' ELSE 'pending' END,
            claim_token=NULL, claimed_at=NULL, available_at=clock_timestamp(),
-           failure_code=CASE WHEN $3 THEN
+           failure_code=CASE WHEN $3::boolean THEN
              COALESCE(last_failure_code, 'PREPARATION_RETRY_EXHAUSTED') ELSE NULL END,
-           failure_message=CASE WHEN $3 THEN
+           failure_message=CASE WHEN $3::boolean THEN
              COALESCE(last_failure_message,
                'Preparation claim lease expired after the retry budget was exhausted.') ELSE NULL END,
-           finished_at=CASE WHEN $3 THEN clock_timestamp() ELSE NULL END,
+           finished_at=CASE WHEN $3::boolean THEN clock_timestamp() ELSE NULL END,
            updated_at=clock_timestamp()
        WHERE run_id=$1 AND connector_id=$2 AND status='preparing'
        RETURNING run_id, status, failure_code`,
