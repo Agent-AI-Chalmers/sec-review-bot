@@ -7,6 +7,7 @@ import test from 'node:test'
 
 import { handlePullRequestReviewRun } from '../../../src/reviews/pull-requests/publish.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
+import type { PublicationStepStore } from '../../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
@@ -15,15 +16,30 @@ import { fakeGitHub, githubJson } from '../../github-client.js'
 // fixtures pretend to be; the one test about missing metadata clears it explicitly.
 setGitHubAppMetadata({ slug: 'web-sec-bot' })
 
+/** A publication-step store whose single step is a complete record.
+ *
+ * `satisfies` is what makes this a check rather than a decoration: the publisher reads
+ * `attempt_count` and `remote_object_id` off these rows, so an incomplete fixture would silently
+ * hand it `undefined`. */
 const stepStore = {
   initializePublicationSteps: async () => {},
   listPublicationSteps: async () => [
-    { step_key: 'pull-request:review', status: 'pending' }
+    {
+      step_key: 'pull-request:review',
+      status: 'pending' as const,
+      attempt_count: 0,
+      last_attempt_at: null,
+      failure_count: 0,
+      remote_object_id: null,
+      remote_object_url: null,
+      failure_code: null,
+      failure_message: null
+    }
   ],
   requirePublicationStepClaim: async () => {},
   completePublicationStep: async () => true,
   failPublicationStep: async () => true
-}
+} satisfies PublicationStepStore
 
 function pullRequestContext(
   overrides: Record<string, unknown> = {}
@@ -145,7 +161,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
       contract_version: CONTRACT_VERSION,
       review_record: review_record()
     },
-    store: store as never,
+    store: store,
     claim_token: 'test-claim',
     assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
@@ -239,7 +255,7 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
         }
       })
     },
-    store: stepStore as never,
+    store: stepStore,
     claim_token: 'test-claim',
     assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
@@ -307,7 +323,7 @@ test('pull request publish approves when analysis is not confirmed', async () =>
         }
       })
     },
-    store: stepStore as never,
+    store: stepStore,
     claim_token: 'test-claim',
     assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
@@ -356,7 +372,7 @@ test('pull request publish comments instead of approving a PR authored by the ap
           }
         })
       },
-      store: stepStore as never,
+      store: stepStore,
       claim_token: 'test-claim',
       assert_publication_claim: async () => {},
       installation_octokit_for_repo: async () => octokit
@@ -418,7 +434,7 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
         }
       })
     },
-    store: stepStore as never,
+    store: stepStore,
     claim_token: 'test-claim',
     assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
@@ -475,7 +491,7 @@ test('pull request publish falls back to comment when own PR approval error is i
         }
       })
     },
-    store: stepStore as never,
+    store: stepStore,
     claim_token: 'test-claim',
     assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
@@ -548,7 +564,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
         }
       })
     },
-    store: stepStore as never,
+    store: stepStore,
     claim_token: 'test-claim',
     assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => octokit
@@ -604,7 +620,7 @@ test('pull request publish does not create a fallback review after an uncertain 
           }
         })
       },
-      store: stepStore as never,
+      store: stepStore,
       claim_token: 'test-claim',
       assert_publication_claim: async () => {},
       installation_octokit_for_repo: async () => octokit
@@ -658,7 +674,7 @@ test('an unattributable PR author is never approved', async () => {
             }
           })
         },
-        store: stepStore as never,
+        store: stepStore,
         claim_token: 'test-claim',
         assert_publication_claim: async () => {},
         installation_octokit_for_repo: async () => octokit

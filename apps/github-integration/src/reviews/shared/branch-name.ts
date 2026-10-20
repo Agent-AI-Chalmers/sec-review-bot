@@ -7,9 +7,14 @@ export function sanitizeBranchSegment(value: unknown): string {
   // `delivery_id` such as `a..b`, `..`, or `.lock` used to survive this sanitizer
   // and produce a branch name `git check-ref-format` rejects (createRef -> 422 ->
   // no draft PR). Replacing dots with `-` makes every dot form ref-safe.
-  return String(value ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9_/-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^[-/]+|[-/]+$/g, '')
+  return (
+    String(value ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_/-]+/g, '-')
+      // Collapse runs of dashes and slashes separately: a doubled slash (`a//b`) is also rejected
+      // by `git check-ref-format`, and leaving it would produce a ref GitHub answers 422 to.
+      .replace(/-+/g, '-')
+      .replace(/\/{2,}/g, '/')
+      .replace(/^[-/]+|[-/]+$/g, '')
+  )
 }

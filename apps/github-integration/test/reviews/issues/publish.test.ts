@@ -3,6 +3,10 @@ import test from 'node:test'
 
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
+import type {
+  PublicationStepRecord,
+  PublicationStepStore
+} from '../../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
@@ -45,7 +49,9 @@ function buildHarness() {
   const createdPullRequests: unknown[] = []
   const createdComments: unknown[] = []
   const initializedSteps: string[][] = []
-  const steps = new Map<string, { step_key: string; status: string }>()
+  // A complete step record: the publisher reads `attempt_count` and `remote_object_id`, so a
+  // partial fixture would hand it `undefined` (this shape is enforced by `satisfies` below).
+  const steps = new Map<string, PublicationStepRecord>()
 
   const store = {
     initializePublicationSteps: async (
@@ -55,19 +61,23 @@ function buildHarness() {
     ) => {
       initializedSteps.push(keys)
       for (const key of keys)
-        steps.set(key, { step_key: key, status: 'pending' })
+        steps.set(key, {
+          step_key: key,
+          status: 'pending',
+          attempt_count: 0,
+          last_attempt_at: null,
+          failure_count: 0,
+          remote_object_id: null,
+          remote_object_url: null,
+          failure_code: null,
+          failure_message: null
+        })
     },
-    listPublicationSteps: async () =>
-      Array.from(steps.values()).map((item) => ({
-        step_key: item.step_key,
-        status: item.status,
-        remote_object_id: null,
-        remote_object_url: null
-      })),
+    listPublicationSteps: async () => Array.from(steps.values()),
     requirePublicationStepClaim: async () => {},
     completePublicationStep: async () => true,
     failPublicationStep: async () => true
-  }
+  } satisfies PublicationStepStore
 
   const { octokit } = fakeGitHub(({ method, url, body }) => {
     const pathname = new URL(url).pathname
@@ -132,7 +142,7 @@ async function runPublish(open_pr: boolean) {
       contract_version: CONTRACT_VERSION,
       review_record: issueReviewRecordWithPatch()
     },
-    store: harness.store as never,
+    store: harness.store,
     claim_token: 'claim',
     assert_publication_claim: async () => {},
     installation_octokit_for_repo: async () => harness.octokit

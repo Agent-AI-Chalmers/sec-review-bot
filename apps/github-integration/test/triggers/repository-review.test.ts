@@ -21,6 +21,32 @@ import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
  * something the real service never would. Building the record here keeps one definition and
  * lets the `ReviewRunRecord` type police it.
  */
+
+/** A complete `RepositoryReviewInput`, the second argument of `on_prepared`. */
+function repositoryReviewInput(): RepositoryReviewInput &
+  Record<string, unknown> {
+  return {
+    contract_version: CONTRACT_VERSION,
+    input_bundle: {
+      uri: 's3://bucket/input.tar.zst',
+      digest: `sha256:${'a'.repeat(64)}`,
+      media_type: 'application/tar+zstd',
+      size_bytes: 1
+    },
+    review_intent: { objective: 'audit' },
+    scan_target: {
+      target_branch: 'main',
+      default_branch: 'main',
+      event_type: 'manual',
+      scan_mode: 'full',
+      base_sha: null,
+      head_sha: 'head-sha',
+      commit_shas: []
+    },
+    scan_scope: { paths_ignore: [], incremental_changed_files: [] }
+  } satisfies RepositoryReviewInput
+}
+
 function admittedRecord(
   overrides: Partial<ReviewRunRecord> & { run_id: string }
 ): ReviewRunRecord {
@@ -62,8 +88,12 @@ const preparationClaim = {
   preparationHeartbeatIntervalMs: async () => 60_000
 }
 import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
-import type { ReviewRunRecord } from '../../src/control-plane/client.js'
+import type {
+  ReviewRunRecord,
+  ReviewRunAdmission
+} from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import type { RepositoryReviewInput } from '../../src/runner/input.js'
 import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
 
 function fakeApp(): App {
@@ -228,9 +258,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           workflow: 'repository-review',
           event_type: 'manual'
         }
-        args.on_prepared?.(submitted, {
-          contract_version: CONTRACT_VERSION
-        } as never)
+        args.on_prepared?.(submitted, repositoryReviewInput())
         return submitted
       },
       store: {
@@ -241,7 +269,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
             record: admittedRecord({ ...run, run_id: 'run-1' }),
             created: true,
             preparation_token: 'claim'
-          } as never
+          } satisfies ReviewRunAdmission
         },
         submitPreparedRun: (run_id, _token, context, input) =>
           saved_runs.push({ run_id, context, input }),
@@ -282,7 +310,9 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
   })
   assert.deepStrictEqual(saved_runs[1], {
     run_id: 'run-1',
-    input: { contract_version: CONTRACT_VERSION },
+    // The submission carries the full prepared input; this asserts it is the one on_prepared
+    // was given, rather than a partial object the real code could never produce.
+    input: repositoryReviewInput(),
     context: {
       repo: {
         owner_login: 'octo',
@@ -386,19 +416,10 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
           admitReviewRun: (run) => {
             transitions.push(['pending', withoutPreparationInput(run)])
             return {
-              record: {
-                ...run,
-                run_id: 'run-invalid-window',
-                execution: {
-                  status: 'pending',
-                  started_at: null,
-                  finished_at: null,
-                  updated_at: '2026-01-01T00:00:00.000Z'
-                }
-              },
+              record: admittedRecord({ ...run, run_id: 'run-invalid-window' }),
               created: true,
               preparation_token: 'claim'
-            } as never
+            } satisfies ReviewRunAdmission
           },
           submitPreparedRun: () =>
             assert.fail('invalid dispatch must not queue a run'),
@@ -488,19 +509,10 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           admitReviewRun: (run) => {
             transitions.push(['pending', withoutPreparationInput(run)])
             return {
-              record: {
-                ...run,
-                run_id: 'run-repo-failed',
-                execution: {
-                  status: 'pending',
-                  started_at: null,
-                  finished_at: null,
-                  updated_at: '2026-01-01T00:00:00.000Z'
-                }
-              },
+              record: admittedRecord({ ...run, run_id: 'run-repo-failed' }),
               created: true,
               preparation_token: 'claim'
-            } as never
+            } satisfies ReviewRunAdmission
           },
           submitPreparedRun: () =>
             assert.fail('failed review must not be queued'),
@@ -581,7 +593,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
               workflow: 'repository-review',
               event_type: 'manual'
             },
-            { contract_version: CONTRACT_VERSION } as never
+            repositoryReviewInput()
           )
           throw error
         },
@@ -589,19 +601,10 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: {
-                ...run,
-                run_id: 'run-repo-uncertain',
-                execution: {
-                  status: 'pending',
-                  started_at: null,
-                  finished_at: null,
-                  updated_at: '2026-01-01T00:00:00.000Z'
-                }
-              },
+              record: admittedRecord({ ...run, run_id: 'run-repo-uncertain' }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) =>

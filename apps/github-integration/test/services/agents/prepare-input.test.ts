@@ -109,13 +109,20 @@ function assertPathIsWithin(parent: string, candidate: string): void {
   assert.strictEqual(relative.startsWith(`..${path.sep}`), false)
 }
 
-async function assertRunnerInputArtifact({
+/** Assert the archive behind a prepared input.
+ *
+ * Generic over the input type so a caller can pass its concrete `*ReviewInput` without widening it
+ * to `Record<string, unknown>` first; only `input_bundle` is read here.
+ */
+async function assertRunnerInputArtifact<
+  T extends { input_bundle: { media_type: string; uri: string } }
+>({
   input,
   inputBundleRoot,
   inputPath,
   runId
 }: {
-  input: Record<string, unknown>
+  input: T
   inputBundleRoot: string
   inputPath: string
   runId: string
@@ -306,7 +313,7 @@ test(
       })
       assert.strictEqual(prepared.input.issue.repo_full_name, 'octo/demo')
       await assertRunnerInputArtifact({
-        input: prepared.input as unknown as Record<string, unknown>,
+        input: prepared.input,
         inputBundleRoot: prepared.input_bundle_root,
         inputPath: prepared.input_path,
         runId: prepared.run_id
@@ -434,7 +441,7 @@ test(
         ]
       })
       await assertRunnerInputArtifact({
-        input: prepared.input as unknown as Record<string, unknown>,
+        input: prepared.input,
         inputBundleRoot: prepared.input_bundle_root,
         inputPath: prepared.input_path,
         runId: prepared.run_id
@@ -493,7 +500,7 @@ test(
         scan_mode: 'full'
       })
       await assertRunnerInputArtifact({
-        input: full.input as unknown as Record<string, unknown>,
+        input: full.input,
         inputBundleRoot: full.input_bundle_root,
         inputPath: full.input_path,
         runId: full.run_id
@@ -547,7 +554,7 @@ test(
         head_sha: refs.head_sha
       })
       await assertRunnerInputArtifact({
-        input: incremental.input as unknown as Record<string, unknown>,
+        input: incremental.input,
         inputBundleRoot: incremental.input_bundle_root,
         inputPath: incremental.input_path,
         runId: incremental.run_id

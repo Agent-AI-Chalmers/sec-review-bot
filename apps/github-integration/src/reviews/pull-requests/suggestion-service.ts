@@ -530,17 +530,14 @@ export async function publishSuggestionReview(
 ): Promise<SuggestionPublishedResult> {
   const published: SuggestionPublishedResult = {
     published_at: new Date().toISOString(),
-    ...(await publishPullRequestSuggestionReview(
-      octokit as Parameters<typeof publishPullRequestSuggestionReview>[0],
-      {
-        pr,
-        review_body,
-        event,
-        candidates,
-        marker,
-        assert_publication_claim
-      }
-    ))
+    ...(await publishPullRequestSuggestionReview(octokit, {
+      pr,
+      review_body,
+      event,
+      candidates,
+      marker,
+      assert_publication_claim
+    }))
   }
 
   return published

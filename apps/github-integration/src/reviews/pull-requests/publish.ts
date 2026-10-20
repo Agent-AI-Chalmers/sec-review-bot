@@ -24,7 +24,7 @@ import { asErrorWithResponse, asErrorMessage } from '../../utils/error-utils.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { isCurrentAppBotLogin } from '../../github/github-app-metadata-service.js'
 import { assertWorkflowResult } from '../../runner/contract-schema.js'
-import type { ControlPlaneClient } from '../../control-plane/client.js'
+import type { PublicationStepStore } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
   isPublicationClaimLostError,
@@ -108,7 +108,7 @@ export async function handlePullRequestReviewRun({
 }: {
   run: CompletedRunnerRun
   result: unknown
-  store: ControlPlaneClient
+  store: PublicationStepStore
   claim_token: string
   assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo
@@ -242,7 +242,7 @@ async function publishPullRequestReviewResult({
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   workflow_result: PullRequestReviewWorkflowResult
   run_id: string
-  store: ControlPlaneClient
+  store: PublicationStepStore
   claim_token: string
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {

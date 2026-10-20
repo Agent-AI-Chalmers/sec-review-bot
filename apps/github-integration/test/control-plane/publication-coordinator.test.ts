@@ -7,11 +7,38 @@ import {
 } from '../../src/control-plane/publication-coordinator.js'
 import { PublicationClaimLostError } from '../../src/control-plane/publication-claim.js'
 import type {
-  ControlPlaneClient,
+  PublicationCoordinatorStore,
+  PublicationHeartbeatStore,
   PublicationWork
 } from '../../src/control-plane/client.js'
 import { fakeApp } from '../github-app-stubs.js'
 import { githubJson } from '../github-client.js'
+
+/**
+ * The publication-step members `publishReviewRunsOnce` may reach but a lease-failure test never
+ * triggers. They fail loudly if that path is entered, which is clearer than a silent stub.
+ */
+function unreachedPublicationSteps(): Pick<
+  PublicationCoordinatorStore,
+  | 'initializePublicationSteps'
+  | 'listPublicationSteps'
+  | 'requirePublicationStepClaim'
+  | 'completePublicationStep'
+  | 'failPublicationStep'
+> {
+  const unreached = (name: string): never => {
+    throw new Error(`the ${name} step should not be reached in this test`)
+  }
+  return {
+    initializePublicationSteps: async () =>
+      unreached('initializePublicationSteps'),
+    listPublicationSteps: async () => unreached('listPublicationSteps'),
+    requirePublicationStepClaim: async () =>
+      unreached('requirePublicationStepClaim'),
+    completePublicationStep: async () => unreached('completePublicationStep'),
+    failPublicationStep: async () => unreached('failPublicationStep')
+  }
+}
 
 test('publisher starts no GitHub work when its initial lease renewal fails', async () => {
   let installationLookups = 0
@@ -57,7 +84,7 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
     renewPublicationClaim: async () => {
       throw new Error('Control Plane unavailable')
     },
-    publicationHeartbeatIntervalMs: () => 60_000,
+    publicationHeartbeatIntervalMs: async () => 60_000,
     completePublication: async () => {
       completionAttempts += 1
       return true
@@ -67,8 +94,9 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
         'A lease failure must not be converted into publication failure.'
       )
     },
-    connectorId: 'github-app:test'
-  } as unknown as ControlPlaneClient
+    connectorId: 'github-app:test',
+    ...unreachedPublicationSteps()
+  } satisfies PublicationCoordinatorStore
   const { app, requests } = fakeApp({
     respond: () => {
       installationLookups += 1
@@ -138,8 +166,8 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
         resolveHeartbeat = resolve
       })
     },
-    publicationHeartbeatIntervalMs: () => 1
-  } as unknown as ControlPlaneClient
+    publicationHeartbeatIntervalMs: async () => 1
+  } satisfies PublicationHeartbeatStore
 
   await assert.rejects(
     withPublicationHeartbeat(store, work, async (assertOwned) => {

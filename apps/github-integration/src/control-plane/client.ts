@@ -505,5 +505,72 @@ export type ControlPlaneClient = Pick<
   | 'failPreparation'
 >
 
+/** The publication-step slice of the client.
+ *
+ * A publisher drives the step protocol and nothing else: it never admits runs, claims
+ * preparation, or reads a run back. Naming the slice here means a caller (and a test double)
+ * only has to provide what the protocol actually uses, and a misspelled or missing member is a
+ * compile error rather than a runtime "not a function".
+ *
+ * `Pick` over the concrete client keeps each member's exact signature - including return types -
+ * so this cannot drift from the real implementation. */
+export type PublicationStepStore = Pick<
+  ControlPlaneClient,
+  | 'initializePublicationSteps'
+  | 'listPublicationSteps'
+  | 'requirePublicationStepClaim'
+  | 'completePublicationStep'
+  | 'failPublicationStep'
+>
+
+/** The preparation-coordinator slice.
+ *
+ * It claims preparation work and settles failure notices, and it also hands the same store to the
+ * trigger commands it runs, so the slice includes what those commands need (`admitReviewRun`,
+ * `submitPreparedRun`, the preparation lease, and the optional input checkpoint). Naming the union
+ * here keeps the coordinator from requiring the whole 22-method client just to call four of them. */
+export type PreparationCoordinatorStore = Pick<
+  ControlPlaneClient,
+  | 'claimNextPreparation'
+  | 'claimNextRunFailureNotice'
+  | 'completeRunFailureNotice'
+  | 'failPreparation'
+  | 'admitReviewRun'
+  | 'submitPreparedRun'
+  | 'renewPreparationClaim'
+  | 'preparationHeartbeatIntervalMs'
+> & {
+  checkpointPreparationInput?: ControlPlaneClient['checkpointPreparationInput']
+}
+
+/** The heartbeat slice: what a lease keeper needs, and nothing else.
+ *
+ * `withPublicationHeartbeat` only renews a claim and asks how often to; it never publishes. Naming
+ * this slice lets that helper stay usable (and testable) without a store that can do everything. */
+export type PublicationHeartbeatStore = Pick<
+  ControlPlaneClient,
+  'renewPublicationClaim' | 'publicationHeartbeatIntervalMs'
+>
+
+/** The publication-coordinator slice.
+ *
+ * It claims publishable work, keeps the lease and concludes it - and hands the same store to the
+ * publisher, which drives the step protocol. The slice therefore includes `PublicationStepStore`,
+ * so one type covers the coordinator's own calls and the protocol it delegates to. */
+export type PublicationCoordinatorStore = Pick<
+  ControlPlaneClient,
+  | 'connectorId'
+  | 'claimNextPublication'
+  | 'renewPublicationClaim'
+  | 'publicationHeartbeatIntervalMs'
+  | 'completePublication'
+  | 'failPublication'
+  | 'initializePublicationSteps'
+  | 'listPublicationSteps'
+  | 'requirePublicationStepClaim'
+  | 'completePublicationStep'
+  | 'failPublicationStep'
+>
+
 export const controlPlaneClient: ControlPlaneClient =
   new HttpControlPlaneClient()

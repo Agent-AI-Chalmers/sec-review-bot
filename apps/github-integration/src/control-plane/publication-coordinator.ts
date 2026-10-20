@@ -14,7 +14,8 @@ import {
 } from './publication-claim.js'
 import {
   controlPlaneClient,
-  type ControlPlaneClient,
+  type PublicationCoordinatorStore,
+  type PublicationHeartbeatStore,
   type PublicationWork
 } from './client.js'
 import { installationOctokitForRepo } from '../github/installation-client.js'
@@ -24,7 +25,7 @@ export interface PublicationCoordinator {
 }
 interface Options {
   app: App
-  store?: ControlPlaneClient
+  store?: PublicationCoordinatorStore
   intervalMs?: number
 }
 
@@ -38,7 +39,7 @@ function pollIntervalMs(): number {
 
 async function publishWork(
   app: App,
-  store: ControlPlaneClient,
+  store: PublicationCoordinatorStore,
   work: PublicationWork,
   assertOwned: () => Promise<void>
 ): Promise<void> {
@@ -58,7 +59,7 @@ async function publishWork(
 }
 
 export async function withPublicationHeartbeat(
-  store: ControlPlaneClient,
+  store: PublicationHeartbeatStore,
   work: PublicationWork,
   operation: (assertOwned: () => Promise<void>) => Promise<void>
 ): Promise<boolean> {
@@ -122,7 +123,7 @@ export async function publishReviewRunsOnce({
   store = controlPlaneClient
 }: {
   app: App
-  store?: ControlPlaneClient
+  store?: PublicationCoordinatorStore
 }): Promise<void> {
   // Hold the claim briefly rather than returning immediately: a run that becomes
   // publishable mid-interval is picked up as soon as it does, and the poll timer above

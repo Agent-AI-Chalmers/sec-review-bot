@@ -2,7 +2,7 @@ import { createIssueCommentUnlessMarkerExists } from '../../github/comment-servi
 import { findRepositorySecuritySummaryIssue } from '../../github/repository-service.js'
 import type { Octokit } from 'octokit'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
-import type { ControlPlaneClient } from '../../control-plane/client.js'
+import type { PublicationStepStore } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
   isPublicationClaimLostError,
@@ -173,7 +173,7 @@ export async function publishDeliveryDraftPrs({
   deliveries: RepositoryDelivery[]
   case_results: RepositoryCaseResult[]
   event_type: 'manual' | 'scheduled'
-  store: ControlPlaneClient
+  store: PublicationStepStore
   claim_token: string
   assert_publication_claim: () => Promise<void>
   create_delivery_draft_pr?: typeof createRepositoryDeliveryDraftPr
@@ -337,7 +337,7 @@ async function publishRepositoryReviewResult({
   scan_target?: PersistedRepositoryScanTarget
   workflow_result: RepositoryWorkflowResult
   event_type: 'manual' | 'scheduled'
-  store: ControlPlaneClient
+  store: PublicationStepStore
   claim_token: string
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {
@@ -494,7 +494,7 @@ export async function handleRepositoryReviewRun({
 }: {
   run: CompletedRunnerRun
   result: unknown
-  store: ControlPlaneClient
+  store: PublicationStepStore
   claim_token: string
   assert_publication_claim: () => Promise<void>
   installation_octokit_for_repo: InstallationOctokitForRepo

@@ -4,8 +4,36 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { prepareReviewRunsOnce } from '../../src/control-plane/preparation-coordinator.js'
+import type { PreparationCoordinatorStore } from '../../src/control-plane/client.js'
 import { fakeApp } from '../github-app-stubs.js'
 import { fakeGitHub, githubJson } from '../github-client.js'
+
+/**
+ * The members `prepareReviewRunsOnce` may reach but a notice-only test never triggers.
+ *
+ * The coordinator can take either branch (deliver a failure notice, or claim and execute
+ * preparation), so its store type includes both. A test that exercises only the notice branch
+ * still has to satisfy the type; these members fail loudly if the unreached branch is somehow
+ * entered, which is more informative than a silent `undefined`.
+ */
+function unreachedPreparationMembers(): Pick<
+  PreparationCoordinatorStore,
+  | 'admitReviewRun'
+  | 'submitPreparedRun'
+  | 'renewPreparationClaim'
+  | 'preparationHeartbeatIntervalMs'
+> {
+  const unreached = (name: string): never => {
+    throw new Error(`the ${name} branch should not be reached in this test`)
+  }
+  return {
+    admitReviewRun: async () => unreached('admitReviewRun'),
+    submitPreparedRun: async () => unreached('submitPreparedRun'),
+    renewPreparationClaim: async () => unreached('renewPreparationClaim'),
+    preparationHeartbeatIntervalMs: () =>
+      unreached('preparationHeartbeatIntervalMs')
+  }
+}
 
 test('terminal preparation notice reaches a pull request reconstructed from pr_reference', async () => {
   // A real App whose transport answers the installation lookup; the installation client it
@@ -35,6 +63,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
           pr_number: 7
         }
       },
+      failure_stage: 'preparation' as const,
       failure_code: 'PREPARATION_RETRY_EXHAUSTED',
       claim_token: 'notice-token'
     }),
@@ -42,13 +71,13 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
       completed.push(args)
       return true
     },
-    claimNextPreparation: async () => assert.fail('notice takes priority')
+    claimNextPreparation: async () => assert.fail('notice takes priority'),
+    failPreparation: async () =>
+      assert.fail('notice path must not fail preparation'),
+    ...unreachedPreparationMembers()
   }
 
-  assert.strictEqual(
-    await prepareReviewRunsOnce({ app, store: store as never }),
-    true
-  )
+  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
   // The installation lookup is the only request the App itself makes.
   assert.strictEqual(requests.length, 1)
   assert.match(requests[0]!.url, /\/repos\/octo\/example\/installation$/)
@@ -83,6 +112,7 @@ test('preparation-first scheduling falls back to a terminal notice when no prepa
       return {
         run_id: 'run-without-reply-target',
         input: {},
+        failure_stage: 'preparation' as const,
         failure_code: 'PREPARATION_RETRY_EXHAUSTED',
         claim_token: 'notice-claim'
       }
@@ -90,14 +120,16 @@ test('preparation-first scheduling falls back to a terminal notice when no prepa
     completeRunFailureNotice: async () => {
       calls.push('complete-notice')
       return true
-    }
+    },
+    failPreparation: async () => assert.fail('no preparation should fail here'),
+    ...unreachedPreparationMembers()
   }
 
   assert.strictEqual(
     await prepareReviewRunsOnce({
       // Nothing here may reach GitHub: any request would surface as a recorded request.
       app: fakeApp().app,
-      store: store as never,
+      store,
       preferFailureNotice: false
     }),
     true
@@ -139,7 +171,7 @@ test('a repository scan failure reports into the repository summary issue', asyn
         payload: { repo_full_name: 'octo/example' },
         verified_repository: 'octo/example'
       },
-      failure_stage: 'preparation',
+      failure_stage: 'preparation' as const,
       failure_code: 'PREPARATION_RETRY_EXHAUSTED',
       claim_token: 'notice-token'
     }),
@@ -147,13 +179,13 @@ test('a repository scan failure reports into the repository summary issue', asyn
       completed.push(args)
       return true
     },
-    claimNextPreparation: async () => assert.fail('notice takes priority')
+    claimNextPreparation: async () => assert.fail('notice takes priority'),
+    failPreparation: async () =>
+      assert.fail('notice path must not fail preparation'),
+    ...unreachedPreparationMembers()
   }
 
-  assert.strictEqual(
-    await prepareReviewRunsOnce({ app, store: store as never }),
-    true
-  )
+  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
   const created = client.requests.find(
     (request) =>
       request.method === 'POST' &&
@@ -186,7 +218,7 @@ test('an unrecoverable notice concludes instead of being retried forever', async
         kind: 'github_repository_review',
         verified_repository: 'octo/example'
       },
-      failure_stage: 'preparation',
+      failure_stage: 'preparation' as const,
       failure_code: 'PREPARATION_RETRY_EXHAUSTED',
       claim_token: 'notice-token'
     }),
@@ -194,7 +226,10 @@ test('an unrecoverable notice concludes instead of being retried forever', async
       completed.push(args)
       return true
     },
-    claimNextPreparation: async () => assert.fail('notice takes priority')
+    claimNextPreparation: async () => assert.fail('notice takes priority'),
+    failPreparation: async () =>
+      assert.fail('notice path must not fail preparation'),
+    ...unreachedPreparationMembers()
   }
   // A 404 from the installation lookup is what GitHub answers for "this app is not installed";
   // retrying can never change it, so the notice must be concluded as undelivered.
@@ -202,10 +237,7 @@ test('an unrecoverable notice concludes instead of being retried forever', async
     respond: () => githubJson({ message: 'Not Found' }, 404)
   })
 
-  assert.strictEqual(
-    await prepareReviewRunsOnce({ app, store: store as never }),
-    true
-  )
+  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
   assert.deepStrictEqual(
     completed,
     [
@@ -228,7 +260,7 @@ test('a transient notice failure stays claimable for another attempt', async () 
         kind: 'github_repository_review',
         verified_repository: 'octo/example'
       },
-      failure_stage: 'preparation',
+      failure_stage: 'preparation' as const,
       failure_code: 'PREPARATION_RETRY_EXHAUSTED',
       claim_token: 'notice-token'
     }),
@@ -236,20 +268,137 @@ test('a transient notice failure stays claimable for another attempt', async () 
       completed.push(args)
       return true
     },
-    claimNextPreparation: async () => assert.fail('notice takes priority')
+    claimNextPreparation: async () => assert.fail('notice takes priority'),
+    failPreparation: async () =>
+      assert.fail('notice path must not fail preparation'),
+    ...unreachedPreparationMembers()
   }
   // A 5xx is transient: the notice must stay claimed so the next lease retries it.
   const { app } = fakeApp({
     respond: () => githubJson({ message: 'Server Error' }, 503)
   })
 
-  assert.strictEqual(
-    await prepareReviewRunsOnce({ app, store: store as never }),
-    true
-  )
+  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
   assert.deepStrictEqual(
     completed,
     [],
     'a transient failure leaves the notice claimed for the next lease'
   )
+})
+
+test('a recovered preparation with a malformed persisted issue is rejected, not cast', async () => {
+  // The issue record is replayed from storage, so it is untyped JSON. A missing field must fail as
+  // invalid preparation input rather than produce a context whose fields are `undefined`.
+  const store = {
+    claimNextRunFailureNotice: async () => null,
+    claimNextPreparation: async () => ({
+      run_id: 'run-malformed-issue',
+      workflow: 'issue-review' as const,
+      input_version: 'v1',
+      attempt_count: 1,
+      claim_token: 'token',
+      input: {
+        kind: 'github_issue_review',
+        // `repo_full_name` and the rest are missing.
+        issue: { issue_number: 1 },
+        trusted_default_branch: { default_branch: 'main', head_sha: 'sha' },
+        event_type: 'opened',
+        review_objective: null,
+        test_changes: null,
+        open_pr: null
+      }
+    }),
+    ...unreachedPreparationMembers()
+  }
+
+  // The coordinator concludes the failed attempt through `failPreparation` rather than throwing:
+  // one bad record must not abort the whole pass.
+  const failures: Array<{ message: string }> = []
+  const failing = {
+    ...store,
+    completeRunFailureNotice: async () => true,
+    failPreparation: async (
+      _runId: string,
+      _token: string,
+      failure: { message: string }
+    ) => {
+      failures.push(failure)
+      return { retry_scheduled: false }
+    }
+  }
+
+  await prepareReviewRunsOnce({
+    app: fakeApp().app,
+    store: failing,
+    preferFailureNotice: false
+  })
+
+  assert.strictEqual(failures.length, 1)
+  assert.match(failures[0]!.message, /Preparation input .*issue\./)
+})
+
+test('a recovered preparation with a malformed trusted default branch is rejected', async () => {
+  const store = {
+    claimNextRunFailureNotice: async () => null,
+    claimNextPreparation: async () => ({
+      run_id: 'run-malformed-branch',
+      workflow: 'issue-review' as const,
+      input_version: 'v1',
+      attempt_count: 1,
+      claim_token: 'token',
+      input: {
+        kind: 'github_issue_review',
+        issue: {
+          action: 'opened',
+          repo_name: 'example',
+          repo_full_name: 'octo/example',
+          owner_login: 'octo',
+          sender_login: undefined,
+          default_branch: 'main',
+          issue_number: 1,
+          issue_title: 'title',
+          issue_body: null,
+          issue_author: undefined,
+          issue_state: 'open',
+          labels: [],
+          html_url: 'https://example.test/issues/1',
+          api_url: 'https://api.example.test/issues/1',
+          comments_url: 'https://api.example.test/issues/1/comments',
+          is_pull_request: false
+        },
+        // `head_sha` missing.
+        trusted_default_branch: { default_branch: 'main' },
+        event_type: 'opened',
+        review_objective: null,
+        test_changes: null,
+        open_pr: null
+      }
+    }),
+    ...unreachedPreparationMembers()
+  }
+
+  const failures: Array<{ message: string }> = []
+  const failing = {
+    ...store,
+    completeRunFailureNotice: async () => true,
+    failPreparation: async (
+      _runId: string,
+      _token: string,
+      failure: { message: string }
+    ) => {
+      failures.push(failure)
+      return { retry_scheduled: false }
+    }
+  }
+
+  await prepareReviewRunsOnce({
+    // The installation lookup must succeed: the issue is validated first, then the installation
+    // is resolved, and only then is the trusted branch read.
+    app: fakeApp({ respond: () => githubJson({ id: 1 }) }).app,
+    store: failing,
+    preferFailureNotice: false
+  })
+
+  assert.strictEqual(failures.length, 1)
+  assert.match(failures[0]!.message, /trusted_default_branch\.head_sha/)
 })

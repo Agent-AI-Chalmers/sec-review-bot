@@ -7,6 +7,7 @@ import {
 } from '../../../src/reviews/repositories/delivery-draft-pr.js'
 import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
 import { PublicationClaimLostError } from '../../../src/control-plane/publication-claim.js'
+import { fakeGitHub, githubJson } from '../../github-client.js'
 
 test('repository delivery branch identity includes both run and delivery', () => {
   const delivery = { delivery_id: 'case/shared' } as RepositoryDelivery
@@ -24,8 +25,6 @@ import type { FileMode } from '../../../src/reviews/file-change.js'
 type CreateRepositoryDeliveryDraftPrParams = Parameters<
   typeof createRepositoryDeliveryDraftPrWithClaim
 >[0]
-type CreateRepositoryDeliveryDraftPrOctokit =
-  CreateRepositoryDeliveryDraftPrParams['octokit']
 type CreateRepositoryDeliveryDraftPrRepo =
   CreateRepositoryDeliveryDraftPrParams['repo']
 type CreateRepositoryDeliveryDraftPrInput =
@@ -40,8 +39,15 @@ async function createRepositoryDeliveryDraftPr(
   })
 }
 
+/**
+ * A real GitHub client whose transport answers the git/pulls endpoints the delivery draft-PR
+ * path uses, recording what would actually go over the wire.
+ */
 function createOctokitMock({
-  existingPullRequests = []
+  existingPullRequests = [],
+  lostPullResponse = false,
+  createRefMessage,
+  existingCommitTreeSha = 'tree-sha'
 }: {
   existingPullRequests?: Array<{
     title: string
@@ -49,6 +55,12 @@ function createOctokitMock({
     html_url: string
     number: number
   }>
+  /** Create the PR, then lose the response: the retry must recognise the existing PR. */
+  lostPullResponse?: boolean
+  /** Answer `git.createRef` with this 422 payload message (a duplicate or invalid ref). */
+  createRefMessage?: string
+  /** Tree sha the already-existing branch commit points at. */
+  existingCommitTreeSha?: string
 } = {}) {
   const calls = {
     blobs: [] as Array<{ content: string; encoding: 'utf-8' | 'base64' }>,
@@ -66,93 +78,99 @@ function createOctokitMock({
     }>
   }
 
-  return {
-    calls,
-    rest: {
-      git: {
-        createBlob: async ({
-          content,
-          encoding
-        }: {
-          content: string
-          encoding: 'utf-8' | 'base64'
-        }) => {
-          calls.blobs.push({ content, encoding })
-          return { data: { sha: `blob-${calls.blobs.length}` } }
-        },
-        getCommit: async ({ commit_sha }: { commit_sha: string }) => ({
-          data:
-            commit_sha === 'existing-commit-sha'
-              ? {
-                  tree: { sha: 'tree-sha' },
-                  parents: [{ sha: 'base-sha' }]
-                }
-              : { tree: { sha: 'base-tree-sha' } }
-        }),
-        createTree: async ({
-          tree
-        }: {
-          tree: Array<{
-            path: string
-            mode: FileMode
-            type: 'blob'
-            sha: string | null
-          }>
-        }) => {
-          calls.trees.push(tree)
-          return { data: { sha: 'tree-sha' } }
-        },
-        createCommit: async ({
-          message,
-          tree,
-          parents
-        }: {
-          message: string
-          tree: string
-          parents: string[]
-        }) => {
-          calls.commits.push({ message, tree, parents })
-          return { data: { sha: 'commit-sha' } }
-        },
-        createRef: async ({ ref, sha }: { ref: string; sha: string }) => {
-          calls.refs.push({ ref, sha })
-          return { data: {} }
-        },
-        getRef: async () => ({
-          data: { object: { sha: 'existing-commit-sha' } }
-        }),
-        updateRef: async () => ({ data: {} })
-      },
-      pulls: {
-        list: async () => ({ data: existingPullRequests }),
-        create: async ({
-          title,
-          head,
-          base,
-          body,
-          draft
-        }: {
-          title: string
-          head: string
-          base: string
-          body: string | null
-          draft: boolean
-        }) => {
-          calls.pulls.push({ title, head, base, body, draft })
-          return {
-            data: {
-              html_url: 'https://example.test/pull/1',
-              number: 1
-            }
-          }
-        }
-      }
+  // The list is mutable so a retry after a lost create response can see the PR that was made.
+  const createdPullRequests = [...existingPullRequests]
+  const readRefs: string[] = []
+  const updatedRefs: string[] = []
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    const payload = (body ?? {}) as Record<string, unknown>
+
+    if (pathname.endsWith('/git/blobs')) {
+      calls.blobs.push({
+        content: String(payload.content),
+        encoding: payload.encoding as 'utf-8' | 'base64'
+      })
+      return githubJson({ sha: `blob-${calls.blobs.length}` })
     }
-  }
+    if (pathname.endsWith('/git/trees')) {
+      calls.trees.push(
+        (payload.tree ?? []) as Array<{
+          path: string
+          mode: FileMode
+          type: 'blob'
+          sha: string | null
+        }>
+      )
+      return githubJson({ sha: 'tree-sha' })
+    }
+    if (pathname.endsWith('/git/commits')) {
+      calls.commits.push({
+        message: String(payload.message),
+        tree: String(payload.tree),
+        parents: (payload.parents ?? []) as string[]
+      })
+      return githubJson({ sha: 'commit-sha' })
+    }
+    if (pathname.endsWith('/git/refs')) {
+      if (createRefMessage !== undefined)
+        return githubJson({ message: createRefMessage }, 422)
+      calls.refs.push({
+        ref: `refs/${String(payload.ref)}`,
+        sha: String(payload.sha)
+      })
+      return githubJson({})
+    }
+    const refMatch = /\/git\/ref\/(.+)$/.exec(pathname)
+    if (refMatch) {
+      const ref = decodeURIComponent(refMatch[1] ?? '')
+      if (method === 'GET') {
+        readRefs.push(ref)
+        return githubJson({ object: { sha: 'existing-commit-sha' } })
+      }
+      updatedRefs.push(ref)
+      return githubJson({})
+    }
+    if (pathname.includes('/git/commits/')) {
+      const sha = decodeURIComponent(pathname.split('/git/commits/')[1] ?? '')
+      return githubJson(
+        sha === 'existing-commit-sha'
+          ? {
+              tree: { sha: existingCommitTreeSha },
+              parents: [{ sha: 'base-sha' }]
+            }
+          : { tree: { sha: 'base-tree-sha' } }
+      )
+    }
+    if (pathname.endsWith('/pulls') && method === 'GET')
+      return githubJson(createdPullRequests)
+    if (pathname.endsWith('/pulls') && method === 'POST') {
+      if (lostPullResponse) {
+        createdPullRequests.push({
+          title: String(payload.title),
+          body: (payload.body ?? null) as string | null,
+          html_url: 'https://example.test/pull/lost-response',
+          number: 42
+        })
+        return githubJson({ message: 'lost response after creation' }, 502)
+      }
+      calls.pulls.push({
+        title: String(payload.title),
+        head: String(payload.head),
+        base: String(payload.base),
+        body: (payload.body ?? null) as string | null,
+        draft: Boolean(payload.draft)
+      })
+      return githubJson({ html_url: 'https://example.test/pull/1', number: 1 })
+    }
+    return githubJson({ default_branch: 'main' })
+  })
+
+  return { octokit, calls, readRefs, updatedRefs }
 }
 
 test('delivery-draft-pr publishes deleted entries without reading workspace', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls } = createOctokitMock()
   const repo: CreateRepositoryDeliveryDraftPrRepo = {
     owner_login: 'octo-org',
     repo_name: 'example-repo',
@@ -181,7 +199,7 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
   }
 
   const result = await createRepositoryDeliveryDraftPr({
-    octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+    octokit,
     repo,
     run_id: 'run-delete',
     input,
@@ -189,9 +207,9 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
   })
 
   assert.strictEqual(result.reused, false)
-  assert.strictEqual(octokit.calls.blobs.length, 1)
-  assert.strictEqual(octokit.calls.trees.length, 1)
-  assert.deepStrictEqual(octokit.calls.trees[0], [
+  assert.strictEqual(calls.blobs.length, 1)
+  assert.strictEqual(calls.trees.length, 1)
+  assert.deepStrictEqual(calls.trees[0], [
     {
       path: 'src/app.txt',
       mode: '100755',
@@ -205,18 +223,18 @@ test('delivery-draft-pr publishes deleted entries without reading workspace', as
       sha: null
     }
   ])
-  assert.strictEqual(octokit.calls.commits.length, 1)
-  assert.strictEqual(octokit.calls.refs.length, 1)
-  assert.strictEqual(octokit.calls.pulls.length, 1)
+  assert.strictEqual(calls.commits.length, 1)
+  assert.strictEqual(calls.refs.length, 1)
+  assert.strictEqual(calls.pulls.length, 1)
 })
 
 test('delivery-draft-pr stops before the next GitHub write after claim loss', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls } = createOctokitMock()
   let ownershipChecks = 0
 
   await assert.rejects(
     createRepositoryDeliveryDraftPrWithClaim({
-      octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+      octokit,
       repo: {
         owner_login: 'octo-org',
         repo_name: 'example-repo',
@@ -246,35 +264,19 @@ test('delivery-draft-pr stops before the next GitHub write after claim loss', as
     PublicationClaimLostError
   )
 
-  assert.strictEqual(octokit.calls.blobs.length, 1)
-  assert.strictEqual(octokit.calls.trees.length, 0)
-  assert.strictEqual(octokit.calls.commits.length, 0)
-  assert.strictEqual(octokit.calls.refs.length, 0)
-  assert.strictEqual(octokit.calls.pulls.length, 0)
+  assert.strictEqual(calls.blobs.length, 1)
+  assert.strictEqual(calls.trees.length, 0)
+  assert.strictEqual(calls.commits.length, 0)
+  assert.strictEqual(calls.refs.length, 0)
+  assert.strictEqual(calls.pulls.length, 0)
 })
 
 test('delivery-draft-pr reuses a PR when the create response is lost', async () => {
-  const octokit = createOctokitMock()
-  const existing: Array<{
-    title: string
-    body: string | null
-    html_url: string
-    number: number
-  }> = []
-  let createAttempts = 0
-  octokit.rest.pulls.list = async () => ({ data: existing })
-  octokit.rest.pulls.create = async (args) => {
-    createAttempts += 1
-    existing.push({
-      title: args.title,
-      body: args.body,
-      html_url: 'https://example.test/pull/lost-response',
-      number: 42
-    })
-    throw new Error('response lost after GitHub created the pull request')
-  }
+  // The transport creates the PR and then fails, which is what a dropped connection looks like.
+  // The retry must find the PR it already made instead of creating a second one.
+  const { octokit, calls } = createOctokitMock({ lostPullResponse: true })
   const args = {
-    octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+    octokit,
     repo: {
       owner_login: 'octo-org',
       repo_name: 'example-repo',
@@ -297,15 +299,15 @@ test('delivery-draft-pr reuses a PR when the create response is lost', async () 
     } satisfies RepositoryDelivery
   }
 
-  await assert.rejects(createRepositoryDeliveryDraftPr(args), /response lost/)
+  await assert.rejects(createRepositoryDeliveryDraftPr(args))
   const retry = await createRepositoryDeliveryDraftPr(args)
-  assert.strictEqual(createAttempts, 1)
   assert.strictEqual(retry.reused, true)
   assert.strictEqual(retry.number, 42)
+  assert.deepStrictEqual(calls.pulls, [], 'no second PR may be created')
 })
 
 test('delivery-draft-pr uses scan target branch as PR base when provided', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls } = createOctokitMock()
   const repo: CreateRepositoryDeliveryDraftPrRepo = {
     owner_login: 'octo-org',
     repo_name: 'example-repo',
@@ -332,19 +334,19 @@ test('delivery-draft-pr uses scan target branch as PR base when provided', async
   }
 
   await createRepositoryDeliveryDraftPr({
-    octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+    octokit,
     repo,
     run_id: 'run-target-branch',
     input,
     delivery
   })
 
-  assert.strictEqual(octokit.calls.pulls.length, 1)
-  assert.strictEqual(octokit.calls.pulls[0]?.base, 'release/2026-q2')
+  assert.strictEqual(calls.pulls.length, 1)
+  assert.strictEqual(calls.pulls[0]?.base, 'release/2026-q2')
 })
 
 test('delivery-draft-pr rejects unsafe file paths before publishing git objects', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls } = createOctokitMock()
   const repo: CreateRepositoryDeliveryDraftPrRepo = {
     owner_login: 'octo-org',
     repo_name: 'example-repo',
@@ -369,7 +371,7 @@ test('delivery-draft-pr rejects unsafe file paths before publishing git objects'
 
   await assert.rejects(
     createRepositoryDeliveryDraftPr({
-      octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+      octokit,
       repo,
       run_id: 'run-unsafe-path',
       input,
@@ -378,15 +380,15 @@ test('delivery-draft-pr rejects unsafe file paths before publishing git objects'
     /Sensitive repository file path/
   )
 
-  assert.strictEqual(octokit.calls.blobs.length, 0)
-  assert.strictEqual(octokit.calls.trees.length, 0)
-  assert.strictEqual(octokit.calls.commits.length, 0)
-  assert.strictEqual(octokit.calls.refs.length, 0)
-  assert.strictEqual(octokit.calls.pulls.length, 0)
+  assert.strictEqual(calls.blobs.length, 0)
+  assert.strictEqual(calls.trees.length, 0)
+  assert.strictEqual(calls.commits.length, 0)
+  assert.strictEqual(calls.refs.length, 0)
+  assert.strictEqual(calls.pulls.length, 0)
 })
 
 test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR', async () => {
-  const octokit = createOctokitMock({
+  const { octokit, calls } = createOctokitMock({
     existingPullRequests: [
       {
         title: 'Existing delivery',
@@ -420,7 +422,7 @@ test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR'
 
   await assert.rejects(
     createRepositoryDeliveryDraftPr({
-      octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+      octokit,
       repo,
       run_id: 'run-unsafe-existing-pr',
       input,
@@ -429,11 +431,11 @@ test('delivery-draft-pr rejects unsafe file paths before reusing an existing PR'
     /Sensitive repository file path/
   )
 
-  assert.strictEqual(octokit.calls.blobs.length, 0)
-  assert.strictEqual(octokit.calls.trees.length, 0)
-  assert.strictEqual(octokit.calls.commits.length, 0)
-  assert.strictEqual(octokit.calls.refs.length, 0)
-  assert.strictEqual(octokit.calls.pulls.length, 0)
+  assert.strictEqual(calls.blobs.length, 0)
+  assert.strictEqual(calls.trees.length, 0)
+  assert.strictEqual(calls.commits.length, 0)
+  assert.strictEqual(calls.refs.length, 0)
+  assert.strictEqual(calls.pulls.length, 0)
 })
 
 function minimalDelivery(deliveryId: string): RepositoryDelivery {
@@ -453,26 +455,12 @@ function minimalDelivery(deliveryId: string): RepositoryDelivery {
 }
 
 test('delivery-draft-pr reads an existing ref without force-updating it', async () => {
-  const octokit = createOctokitMock()
-  let getRefCalls = 0
-  let updateRefCalls = 0
-  octokit.rest.git.createRef = async () => {
-    throw {
-      status: 422,
-      response: { status: 422, data: { message: 'Reference already exists' } }
-    }
-  }
-  octokit.rest.git.updateRef = async () => {
-    updateRefCalls += 1
-    return { data: {} }
-  }
-  octokit.rest.git.getRef = async () => {
-    getRefCalls += 1
-    return { data: { object: { sha: 'existing-commit-sha' } } }
-  }
+  const { octokit, readRefs, updatedRefs } = createOctokitMock({
+    createRefMessage: 'Reference already exists'
+  })
 
   await createRepositoryDeliveryDraftPr({
-    octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+    octokit,
     repo: {
       owner_login: 'octo-org',
       repo_name: 'example-repo',
@@ -483,34 +471,19 @@ test('delivery-draft-pr reads an existing ref without force-updating it', async 
     delivery: minimalDelivery('delivery-ref-exists')
   })
 
-  assert.strictEqual(getRefCalls, 1)
-  assert.strictEqual(updateRefCalls, 0)
+  assert.strictEqual(readRefs.length, 1)
+  assert.deepStrictEqual(updatedRefs, [])
 })
 
 test('delivery-draft-pr does not create a PR from an existing branch with a different tree', async () => {
-  const octokit = createOctokitMock()
-  const originalGetCommit = octokit.rest.git.getCommit
-  octokit.rest.git.createRef = async () => {
-    throw {
-      status: 422,
-      response: { status: 422, data: { message: 'Reference already exists' } }
-    }
-  }
-  octokit.rest.git.getCommit = async ({ commit_sha }) => {
-    if (commit_sha === 'existing-commit-sha') {
-      return {
-        data: {
-          tree: { sha: 'different-tree-sha' },
-          parents: [{ sha: 'base-sha' }]
-        }
-      }
-    }
-    return await originalGetCommit({ commit_sha })
-  }
+  const { octokit, calls } = createOctokitMock({
+    createRefMessage: 'Reference already exists',
+    existingCommitTreeSha: 'different-tree-sha'
+  })
 
   await assert.rejects(
     createRepositoryDeliveryDraftPr({
-      octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+      octokit,
       repo: {
         owner_login: 'octo-org',
         repo_name: 'example-repo',
@@ -522,26 +495,17 @@ test('delivery-draft-pr does not create a PR from an existing branch with a diff
     }),
     /Existing delivery draft PR branch does not match/
   )
-  assert.strictEqual(octokit.calls.pulls.length, 0)
+  assert.strictEqual(calls.pulls.length, 0)
 })
 
 test('delivery-draft-pr does not force-update a createRef 422 that is not "already exists"', async () => {
-  const octokit = createOctokitMock()
-  let updateRefCalls = 0
-  octokit.rest.git.createRef = async () => {
-    throw {
-      status: 422,
-      response: { status: 422, data: { message: 'Reference name is invalid' } }
-    }
-  }
-  octokit.rest.git.updateRef = async () => {
-    updateRefCalls += 1
-    return { data: {} }
-  }
+  const { octokit, updatedRefs } = createOctokitMock({
+    createRefMessage: 'Reference name is invalid'
+  })
 
   await assert.rejects(
     createRepositoryDeliveryDraftPr({
-      octokit: octokit as unknown as CreateRepositoryDeliveryDraftPrOctokit,
+      octokit,
       repo: {
         owner_login: 'octo-org',
         repo_name: 'example-repo',
@@ -554,5 +518,5 @@ test('delivery-draft-pr does not force-update a createRef 422 that is not "alrea
     (error: unknown) => (error as { status?: unknown }).status === 422
   )
 
-  assert.strictEqual(updateRefCalls, 0)
+  assert.deepStrictEqual(updatedRefs, [])
 })

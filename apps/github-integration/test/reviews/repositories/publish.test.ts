@@ -6,8 +6,8 @@ import { REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE } from '../../../src/reviews/re
 
 import { publishDeliveryDraftPrs } from '../../../src/reviews/repositories/publish.js'
 import type {
-  ControlPlaneClient,
-  PublicationStepRecord
+  PublicationStepRecord,
+  PublicationStepStore
 } from '../../../src/control-plane/client.js'
 import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
 import { fakeGitHub, githubJson, unusedGitHub } from '../../github-client.js'
@@ -61,6 +61,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
   const claimed: string[] = []
   const completed: string[] = []
   const store = {
+    initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
     requirePublicationStepClaim: async (
       _runId: string,
@@ -78,7 +79,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
       return true
     },
     failPublicationStep: async () => true
-  } as unknown as ControlPlaneClient
+  } satisfies PublicationStepStore
 
   const published = await publishDeliveryDraftPrs({
     octokit: unusedGitHub().octokit,
@@ -87,7 +88,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
       repo_name: 'example',
       repo_full_name: 'octo/example',
       default_branch: 'main'
-    } as never,
+    },
     run_id: 'run-1',
     workspace_ref: 'main',
     deliveries: [delivery('delivery-a'), delivery('delivery-b')],
@@ -122,6 +123,7 @@ test('repository delivery continues after a deterministic failure', async () => 
   const failures: Array<{ stepKey: string; retry: boolean | undefined }> = []
   const attempted: string[] = []
   const store = {
+    initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
     requirePublicationStepClaim: async () => {},
     completePublicationStep: async () => true,
@@ -135,7 +137,7 @@ test('repository delivery continues after a deterministic failure', async () => 
       failures.push({ stepKey, retry: options.retry })
       return true
     }
-  } as unknown as ControlPlaneClient
+  } satisfies PublicationStepStore
 
   const published = await publishDeliveryDraftPrs({
     octokit: unusedGitHub().octokit,
@@ -144,7 +146,7 @@ test('repository delivery continues after a deterministic failure', async () => 
       repo_name: 'example',
       repo_full_name: 'octo/example',
       default_branch: 'main'
-    } as never,
+    },
     run_id: 'run-1',
     workspace_ref: 'main',
     deliveries: [delivery('delivery-a'), delivery('delivery-b')],
@@ -196,6 +198,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
   ]
   const claimed: string[] = []
   const store = {
+    initializePublicationSteps: async () => {},
     listPublicationSteps: async () => steps,
     requirePublicationStepClaim: async (
       _runId: string,
@@ -206,7 +209,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
     },
     completePublicationStep: async () => true,
     failPublicationStep: async () => true
-  } as unknown as ControlPlaneClient
+  } satisfies PublicationStepStore
 
   const published = await publishDeliveryDraftPrs({
     octokit: unusedGitHub().octokit,
@@ -215,7 +218,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
       repo_name: 'example',
       repo_full_name: 'octo/example',
       default_branch: 'main'
-    } as never,
+    },
     run_id: 'run-1',
     workspace_ref: 'main',
     deliveries: [delivery('delivery-a'), delivery('delivery-b')],

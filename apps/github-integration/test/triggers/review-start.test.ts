@@ -5,12 +5,20 @@ import test from 'node:test'
 
 import { startIssueReviewCommand } from '../../src/triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-review.js'
+import type { SubmittedPullRequestReviewRun } from '../../src/reviews/pull-requests/submit.js'
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
-import type { ReviewRunRecord } from '../../src/control-plane/client.js'
+import type {
+  IssueReviewInput,
+  PullRequestReviewInput
+} from '../../src/runner/input.js'
+import type {
+  ReviewRunAdmission,
+  ReviewRunRecord
+} from '../../src/control-plane/client.js'
 import { unusedGitHub } from '../github-client.js'
 
 /** An admitted run record as the Control Plane returns it, with the axis shapes spelled once.
@@ -121,6 +129,41 @@ function pullRequestContext(): PullRequestContext {
   }
 }
 
+/** A complete `IssueReviewInput`, the second argument of `on_prepared`.
+ *
+ * `satisfies` keeps this honest: the trigger reads the field set, so an incomplete stub would
+ * silently hand it `undefined` where the real submission always supplies a value.
+ */
+function issueReviewInput(): IssueReviewInput & Record<string, unknown> {
+  return {
+    contract_version: CONTRACT_VERSION,
+    input_bundle: {
+      uri: 's3://bucket/input.tar.zst',
+      digest: `sha256:${'a'.repeat(64)}`,
+      media_type: 'application/tar+zstd',
+      size_bytes: 1
+    },
+    review_intent: { objective: 'audit' },
+    issue: {}
+  } satisfies IssueReviewInput
+}
+
+/** A complete `PullRequestReviewInput`, the second argument of `on_prepared` for PR runs. */
+function pullRequestReviewInput(): PullRequestReviewInput &
+  Record<string, unknown> {
+  return {
+    contract_version: CONTRACT_VERSION,
+    input_bundle: {
+      uri: 's3://bucket/input.tar.zst',
+      digest: `sha256:${'a'.repeat(64)}`,
+      media_type: 'application/tar+zstd',
+      size_bytes: 1
+    },
+    review_intent: { objective: 'audit' },
+    pr: {}
+  } satisfies PullRequestReviewInput
+}
+
 test('startIssueReviewCommand starts and persists a queued issue review run', async () => {
   const issue = issueContext()
   const transitions: unknown[] = []
@@ -152,9 +195,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           event_type: 'opened' as const,
           open_pr: false
         }
-        await on_prepared?.(prepared, {
-          contract_version: CONTRACT_VERSION
-        } as never)
+        await on_prepared?.(prepared, issueReviewInput())
         return prepared
       },
       store: {
@@ -235,9 +276,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
           workflow: 'pull-request-review',
           event_type: 'manual_review' as const
         }
-        await on_prepared?.(prepared, {
-          contract_version: CONTRACT_VERSION
-        } as never)
+        await on_prepared?.(prepared, pullRequestReviewInput())
         return prepared
       },
       store: {
@@ -368,7 +407,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
               event_type: 'opened',
               open_pr: false
             },
-            { contract_version: CONTRACT_VERSION } as never
+            issueReviewInput()
           )
           throw error
         },
@@ -376,19 +415,10 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: {
-                ...run,
-                run_id: 'run-uncertain',
-                execution: {
-                  status: 'pending',
-                  started_at: null,
-                  finished_at: null,
-                  updated_at: '2026-01-01T00:00:00.000Z'
-                }
-              },
+              record: admittedRecord({ ...run, run_id: 'run-uncertain' }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) =>
@@ -427,7 +457,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
               workflow: 'pull-request-review',
               event_type: 'opened'
             },
-            { contract_version: CONTRACT_VERSION } as never
+            pullRequestReviewInput()
           )
           throw error
         },
@@ -435,19 +465,10 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
           ...preparationClaim,
           admitReviewRun: (run) =>
             ({
-              record: {
-                ...run,
-                run_id: 'run-pr-uncertain',
-                execution: {
-                  status: 'pending',
-                  started_at: null,
-                  finished_at: null,
-                  updated_at: '2026-01-01T00:00:00.000Z'
-                }
-              },
+              record: admittedRecord({ ...run, run_id: 'run-pr-uncertain' }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: (run_id, _token, context, input) =>
             transitions.push(['prepared', run_id, context, input]),
           failPreparation: (run_id, _token, failure) =>
@@ -494,19 +515,10 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
           admitReviewRun: (run) => {
             transitions.push(['pending', 'run-context-failure'])
             return {
-              record: {
-                ...run,
-                run_id: 'run-context-failure',
-                execution: {
-                  status: 'pending',
-                  started_at: null,
-                  finished_at: null,
-                  updated_at: '2026-01-01T00:00:00.000Z'
-                }
-              },
+              record: admittedRecord({ ...run, run_id: 'run-context-failure' }),
               created: true,
               preparation_token: 'claim'
-            } as never
+            } satisfies ReviewRunAdmission
           },
           submitPreparedRun: () =>
             assert.fail('failed context lookup must not queue'),
@@ -553,7 +565,13 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
       start_review: async ({ pr: preparedPr }) => {
         assert.strictEqual(preparedPr, pr)
         assert.strictEqual(checkpoints.length, 1)
-        return { run_id: 'run-checkpoint' } as never
+        return {
+          pr: preparedPr,
+          run_id: 'run-checkpoint',
+          files: [],
+          workflow: 'pull-request-review',
+          event_type: 'manual_review'
+        } satisfies SubmittedPullRequestReviewRun
       },
       store: {
         ...preparationClaim,
@@ -562,7 +580,7 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
             record: admittedRecord({ ...run, run_id: 'run-checkpoint' }),
             created: true,
             preparation_token: 'claim'
-          }) as never,
+          }) satisfies ReviewRunAdmission,
         checkpointPreparationInput: async (...args) => {
           checkpoints.push(args)
         },
@@ -701,7 +719,7 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
               }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: () =>
             assert.fail('invalid setup must not be queued'),
           failPreparation: (run_id, _token, error) =>
@@ -753,7 +771,7 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
               }),
               created: true,
               preparation_token: 'claim'
-            }) as never,
+            }) satisfies ReviewRunAdmission,
           submitPreparedRun: () =>
             assert.fail('invalid setup must not be queued'),
           failPreparation: (run_id, _token, error) =>

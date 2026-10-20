@@ -5,9 +5,9 @@ import { createDraftPullRequestFromIssueReviewRecord as createDraftPullRequestWi
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import type { FileMode } from '../../../src/reviews/file-change.js'
 import { PublicationClaimLostError } from '../../../src/control-plane/publication-claim.js'
+import { fakeGitHub, githubJson } from '../../github-client.js'
 
 type CreateDraftPrParams = Parameters<typeof createDraftPullRequestWithClaim>[0]
-type CreateDraftPrOctokit = CreateDraftPrParams['octokit']
 type CreateDraftPrIssue = CreateDraftPrParams['issue']
 type TestMitigation = Omit<
   Partial<ReviewRecord['mitigation']>,
@@ -54,9 +54,17 @@ function reviewRecordWithMitigation(mitigation: TestMitigation): ReviewRecord {
   } as ReviewRecord
 }
 
+/**
+ * A real GitHub client whose transport answers the git/pulls endpoints the issue draft-PR path
+ * uses, recording the same call shapes the assertions below read.
+ *
+ * Running the real client means the request bodies are built by the SDK, so each recorded call is
+ * what would actually go over the wire rather than what a hand-written mock was told to return.
+ */
 function createOctokitMock({
   existingPullRequests = [],
-  createRefError
+  branchAlreadyExists = false,
+  existingCommitTreeSha = 'tree-sha'
 }: {
   existingPullRequests?: Array<{
     title: string
@@ -64,7 +72,10 @@ function createOctokitMock({
     html_url: string
     number: number
   }>
-  createRefError?: Error & { status?: number }
+  /** Answer `git.createRef` with the real 422 "Reference already exists". */
+  branchAlreadyExists?: boolean
+  /** Tree sha the already-existing branch commit points at. */
+  existingCommitTreeSha?: string
 } = {}) {
   const calls = {
     blobs: [] as Array<{ content: string; encoding: 'utf-8' | 'base64' }>,
@@ -84,114 +95,97 @@ function createOctokitMock({
     }>
   }
 
-  return {
-    calls,
-    rest: {
-      git: {
-        createBlob: async ({
-          content,
-          encoding
-        }: {
-          content: string
-          encoding: 'utf-8' | 'base64'
-        }) => {
-          calls.blobs.push({ content, encoding })
-          return { data: { sha: `blob-${calls.blobs.length}` } }
-        },
-        getCommit: async ({ commit_sha }: { commit_sha: string }) => ({
-          data:
-            commit_sha === 'existing-commit-sha'
-              ? {
-                  tree: { sha: 'tree-sha' },
-                  parents: [{ sha: 'base-sha' }]
-                }
-              : { tree: { sha: 'base-tree-sha' } }
-        }),
-        createTree: async ({
-          tree
-        }: {
-          tree: Array<{
-            path: string
-            mode: FileMode
-            type: 'blob'
-            sha: string | null
-          }>
-        }) => {
-          calls.trees.push(tree)
-          return { data: { sha: 'tree-sha' } }
-        },
-        createCommit: async ({
-          message,
-          tree,
-          parents
-        }: {
-          message: string
-          tree: string
-          parents: string[]
-        }) => {
-          calls.commits.push({ message, tree, parents })
-          return { data: { sha: 'commit-sha' } }
-        },
-        createRef: async ({ ref, sha }: { ref: string; sha: string }) => {
-          calls.refs.push({ ref, sha })
-          if (createRefError) {
-            throw createRefError
-          }
-          return { data: {} }
-        },
-        getRef: async ({ ref }: { ref: string }) => {
-          calls.readRefs.push(ref)
-          return { data: { object: { sha: 'existing-commit-sha' } } }
-        },
-        updateRef: async ({
-          ref,
-          sha,
-          force
-        }: {
-          ref: string
-          sha: string
-          force: boolean
-        }) => {
-          calls.updatedRefs.push({ ref, sha, force })
-          return { data: {} }
-        }
-      },
-      repos: {
-        get: async () => ({ data: { default_branch: 'main' } }),
-        getBranch: async () => ({
-          data: { commit: { sha: 'resolved-default-sha' } }
-        })
-      },
-      pulls: {
-        list: async () => ({ data: existingPullRequests }),
-        create: async ({
-          title,
-          head,
-          base,
-          body,
-          draft
-        }: {
-          title: string
-          head: string
-          base: string
-          body: string
-          draft: boolean
-        }) => {
-          calls.pulls.push({ title, head, base, body, draft })
-          return {
-            data: {
-              html_url: 'https://example.test/pull/1',
-              number: 1
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    const payload = (body ?? {}) as Record<string, unknown>
+
+    if (pathname.endsWith('/git/blobs')) {
+      calls.blobs.push({
+        content: String(payload.content),
+        encoding: payload.encoding as 'utf-8' | 'base64'
+      })
+      return githubJson({ sha: `blob-${calls.blobs.length}` })
     }
-  }
+    if (pathname.endsWith('/git/trees')) {
+      calls.trees.push(
+        (payload.tree ?? []) as Array<{
+          path: string
+          mode: FileMode
+          type: 'blob'
+          sha: string | null
+        }>
+      )
+      return githubJson({ sha: 'tree-sha' })
+    }
+    if (pathname.endsWith('/git/commits')) {
+      calls.commits.push({
+        message: String(payload.message),
+        tree: String(payload.tree),
+        parents: (payload.parents ?? []) as string[]
+      })
+      return githubJson({ sha: 'commit-sha' })
+    }
+    // `git.getRef`/`git.updateRef` use `/git/ref/{ref}` (singular); `git.createRef` uses
+    // `/git/refs`. The ref segment is percent-encoded, so it is decoded before recording.
+    const refMatch = /\/git\/ref\/(.+)$/.exec(pathname)
+    if (refMatch) {
+      const ref = decodeURIComponent(refMatch[1] ?? '')
+      if (method === 'GET') {
+        calls.readRefs.push(ref)
+        return githubJson({ object: { sha: 'existing-commit-sha' } })
+      }
+      calls.updatedRefs.push({
+        ref,
+        sha: String(payload.sha),
+        force: Boolean(payload.force)
+      })
+      return githubJson({})
+    }
+    if (pathname.endsWith('/git/refs')) {
+      calls.refs.push({
+        ref: `refs/${String(payload.ref)}`,
+        sha: String(payload.sha)
+      })
+      // A 422 "Reference already exists" is what GitHub answers for a duplicate branch.
+      // A real duplicate-ref reply: `isBranchAlreadyExists` reads `response.data.message`.
+      if (branchAlreadyExists)
+        return githubJson({ message: 'Reference already exists' }, 422)
+      return githubJson({})
+    }
+    if (pathname.includes('/git/commits/')) {
+      const sha = decodeURIComponent(pathname.split('/git/commits/')[1] ?? '')
+      return githubJson(
+        sha === 'existing-commit-sha'
+          ? {
+              tree: { sha: existingCommitTreeSha },
+              parents: [{ sha: 'base-sha' }]
+            }
+          : { tree: { sha: 'base-tree-sha' } }
+      )
+    }
+    if (pathname.endsWith('/pulls') && method === 'GET')
+      return githubJson(existingPullRequests)
+    if (pathname.endsWith('/pulls') && method === 'POST') {
+      calls.pulls.push({
+        title: String(payload.title),
+        head: String(payload.head),
+        base: String(payload.base),
+        body: String(payload.body ?? ''),
+        draft: Boolean(payload.draft)
+      })
+      return githubJson({ html_url: 'https://example.test/pull/1', number: 1 })
+    }
+    if (pathname.includes('/branches/')) {
+      return githubJson({ commit: { sha: 'resolved-default-sha' } })
+    }
+    return githubJson({ default_branch: 'main' })
+  })
+
+  return { octokit, calls }
 }
 
 test('issue draft PR reuses an existing run branch PR without creating git objects', async () => {
-  const octokit = createOctokitMock({
+  const { octokit, calls: harness } = createOctokitMock({
     existingPullRequests: [
       {
         title: 'Existing fix',
@@ -202,7 +196,7 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
     ]
   })
   const result = await createDraftPullRequestFromIssueReviewRecord({
-    octokit: octokit as unknown as CreateDraftPrOctokit,
+    octokit,
     issue: {
       issue_number: 42,
       owner_login: 'octo-org',
@@ -223,18 +217,14 @@ test('issue draft PR reuses an existing run branch PR without creating git objec
   })
 
   assert.strictEqual(result?.number, 9)
-  assert.strictEqual(octokit.calls.blobs.length, 0)
-  assert.strictEqual(octokit.calls.commits.length, 0)
+  assert.strictEqual(harness.blobs.length, 0)
+  assert.strictEqual(harness.commits.length, 0)
 })
 
 test('issue draft PR retry reuses a branch left by a partial prior attempt without overwriting it', async () => {
-  // The real 422 from `git.createRef` carries its reason in the response payload; the top-level
-  // message is not a GitHub statement and must not be what the recovery check reads.
-  const createRefError = Object.assign(new Error('Request failed'), {
-    status: 422,
-    response: { status: 422, data: { message: 'Reference already exists' } }
+  const { octokit, calls: harness } = createOctokitMock({
+    branchAlreadyExists: true
   })
-  const octokit = createOctokitMock({ createRefError })
   const review_record = reviewRecordWithMitigation({
     file_changes: [
       {
@@ -248,7 +238,7 @@ test('issue draft PR retry reuses a branch left by a partial prior attempt witho
   review_record.verification.patch_coverage = 'full'
 
   const result = await createDraftPullRequestFromIssueReviewRecord({
-    octokit: octokit as unknown as CreateDraftPrOctokit,
+    octokit,
     issue: {
       issue_number: 42,
       owner_login: 'octo-org',
@@ -260,36 +250,23 @@ test('issue draft PR retry reuses a branch left by a partial prior attempt witho
   })
 
   assert.strictEqual(result?.number, 1)
-  assert.deepStrictEqual(octokit.calls.readRefs, [
+  assert.deepStrictEqual(harness.readRefs, [
     'heads/sec-review-bot/issue-42-12345678'
   ])
-  assert.deepStrictEqual(octokit.calls.updatedRefs, [])
+  assert.deepStrictEqual(harness.updatedRefs, [])
 })
 
 test('issue draft PR does not create a PR from an existing branch with a different tree', async () => {
-  // The real 422 from `git.createRef` carries its reason in the response payload; the top-level
-  // message is not a GitHub statement and must not be what the recovery check reads.
-  const createRefError = Object.assign(new Error('Request failed'), {
-    status: 422,
-    response: { status: 422, data: { message: 'Reference already exists' } }
+  // The existing branch commit has different contents from this run's tree, so recovery must
+  // refuse to reuse it.
+  const { octokit, calls: harness } = createOctokitMock({
+    branchAlreadyExists: true,
+    existingCommitTreeSha: 'different-tree-sha'
   })
-  const octokit = createOctokitMock({ createRefError })
-  const originalGetCommit = octokit.rest.git.getCommit
-  octokit.rest.git.getCommit = async ({ commit_sha }) => {
-    if (commit_sha === 'existing-commit-sha') {
-      return {
-        data: {
-          tree: { sha: 'different-tree-sha' },
-          parents: [{ sha: 'base-sha' }]
-        }
-      }
-    }
-    return await originalGetCommit({ commit_sha })
-  }
 
   await assert.rejects(
     createDraftPullRequestFromIssueReviewRecord({
-      octokit: octokit as unknown as CreateDraftPrOctokit,
+      octokit,
       issue: {
         issue_number: 42,
         owner_login: 'octo-org',
@@ -310,16 +287,16 @@ test('issue draft PR does not create a PR from an existing branch with a differe
     }),
     /Existing draft PR branch does not match/
   )
-  assert.strictEqual(octokit.calls.pulls.length, 0)
+  assert.strictEqual(harness.pulls.length, 0)
 })
 
 test('issue draft PR stops before the next GitHub write after claim loss', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls: harness } = createOctokitMock()
   let ownershipChecks = 0
 
   await assert.rejects(
     createDraftPullRequestWithClaim({
-      octokit: octokit as unknown as CreateDraftPrOctokit,
+      octokit,
       issue: {
         issue_number: 42,
         owner_login: 'octo-org',
@@ -346,15 +323,15 @@ test('issue draft PR stops before the next GitHub write after claim loss', async
     PublicationClaimLostError
   )
 
-  assert.strictEqual(octokit.calls.blobs.length, 1)
-  assert.strictEqual(octokit.calls.trees.length, 0)
-  assert.strictEqual(octokit.calls.commits.length, 0)
-  assert.strictEqual(octokit.calls.refs.length, 0)
-  assert.strictEqual(octokit.calls.pulls.length, 0)
+  assert.strictEqual(harness.blobs.length, 1)
+  assert.strictEqual(harness.trees.length, 0)
+  assert.strictEqual(harness.commits.length, 0)
+  assert.strictEqual(harness.refs.length, 0)
+  assert.strictEqual(harness.pulls.length, 0)
 })
 
 test('issue draft PR publishes from review_record file_changes without workspace reads', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls: harness } = createOctokitMock()
   const issue: CreateDraftPrIssue = {
     issue_number: 42,
     issue_title: 'Fix unsafe path',
@@ -380,7 +357,7 @@ test('issue draft PR publishes from review_record file_changes without workspace
   review_record.verification.patch_coverage = 'full'
   review_record.verification.regression_status = 'not-run'
   const result = await createDraftPullRequestFromIssueReviewRecord({
-    octokit: octokit as unknown as CreateDraftPrOctokit,
+    octokit,
     issue,
     run_id: 'run-12345678',
     workspace_ref: 'base-sha',
@@ -388,13 +365,13 @@ test('issue draft PR publishes from review_record file_changes without workspace
   })
 
   assert.strictEqual(result?.html_url, 'https://example.test/pull/1')
-  assert.deepStrictEqual(octokit.calls.blobs, [
+  assert.deepStrictEqual(harness.blobs, [
     {
       content: 'fixed\n',
       encoding: 'utf-8'
     }
   ])
-  assert.deepStrictEqual(octokit.calls.trees[0], [
+  assert.deepStrictEqual(harness.trees[0], [
     {
       path: 'src/app.txt',
       mode: '100755',
@@ -408,31 +385,31 @@ test('issue draft PR publishes from review_record file_changes without workspace
       sha: null
     }
   ])
-  assert.deepStrictEqual(octokit.calls.commits, [
+  assert.deepStrictEqual(harness.commits, [
     {
       message: 'Mitigate issue #42',
       tree: 'tree-sha',
       parents: ['base-sha']
     }
   ])
-  assert.strictEqual(octokit.calls.pulls[0]?.draft, true)
+  assert.strictEqual(harness.pulls[0]?.draft, true)
   // The PR base is the API-resolved default branch, not the webhook payload's
   // repository.default_branch (which the trusted flow refuses elsewhere too).
-  assert.strictEqual(octokit.calls.pulls[0]?.base, 'main')
+  assert.strictEqual(harness.pulls[0]?.base, 'main')
   // The opening status lines come from the shared vocabulary, so this body stays
   // comparable with the PR review comment and the repository delivery bodies.
-  assert.match(octokit.calls.pulls[0]?.body ?? '', /- Analysis: `unknown`/)
+  assert.match(harness.pulls[0]?.body ?? '', /- Analysis: `unknown`/)
   assert.match(
-    octokit.calls.pulls[0]?.body ?? '',
+    harness.pulls[0]?.body ?? '',
     /- Verification: `full coverage; not recorded; checks not run`/
   )
-  assert.match(octokit.calls.pulls[0]?.body ?? '', /Verifier assessed patch=/)
+  assert.match(harness.pulls[0]?.body ?? '', /Verifier assessed patch=/)
 })
 
 test('issue draft PR is not promoted when file_changes are absent', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls: harness } = createOctokitMock()
   const result = await createDraftPullRequestFromIssueReviewRecord({
-    octokit: octokit as unknown as CreateDraftPrOctokit,
+    octokit,
     issue: {
       issue_number: 42,
       owner_login: 'octo-org',
@@ -446,12 +423,12 @@ test('issue draft PR is not promoted when file_changes are absent', async () => 
   })
 
   assert.strictEqual(result, null)
-  assert.strictEqual(octokit.calls.blobs.length, 0)
-  assert.strictEqual(octokit.calls.trees.length, 0)
+  assert.strictEqual(harness.blobs.length, 0)
+  assert.strictEqual(harness.trees.length, 0)
 })
 
 test('issue draft PR ignores unsafe display changed_files when file_changes are safe', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls: harness } = createOctokitMock()
   const issue: CreateDraftPrIssue = {
     issue_number: 42,
     issue_title: 'Fix unsafe path',
@@ -476,7 +453,7 @@ test('issue draft PR ignores unsafe display changed_files when file_changes are 
   review_record.verification.patch_coverage = 'full'
 
   const result = await createDraftPullRequestFromIssueReviewRecord({
-    octokit: octokit as unknown as CreateDraftPrOctokit,
+    octokit,
     issue,
     run_id: 'run-12345678',
     workspace_ref: 'base-sha',
@@ -484,7 +461,7 @@ test('issue draft PR ignores unsafe display changed_files when file_changes are 
   })
 
   assert.strictEqual(result?.html_url, 'https://example.test/pull/1')
-  assert.deepStrictEqual(octokit.calls.trees[0], [
+  assert.deepStrictEqual(harness.trees[0], [
     {
       path: 'src/app.txt',
       mode: '100644',
@@ -495,7 +472,7 @@ test('issue draft PR ignores unsafe display changed_files when file_changes are 
 })
 
 test('issue draft PR rejects unsupported file modes', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls: harness } = createOctokitMock()
   const review_record = reviewRecordWithMitigation({
     changed_files: ['src/app.txt'],
     file_changes: [
@@ -513,7 +490,7 @@ test('issue draft PR rejects unsupported file modes', async () => {
   await assert.rejects(
     async () =>
       createDraftPullRequestFromIssueReviewRecord({
-        octokit: octokit as unknown as CreateDraftPrOctokit,
+        octokit,
         issue: {
           issue_number: 42,
           owner_login: 'octo-org',
@@ -525,12 +502,12 @@ test('issue draft PR rejects unsupported file modes', async () => {
       }),
     /unsupported file mode/
   )
-  assert.strictEqual(octokit.calls.blobs.length, 0)
-  assert.strictEqual(octokit.calls.trees.length, 0)
+  assert.strictEqual(harness.blobs.length, 0)
+  assert.strictEqual(harness.trees.length, 0)
 })
 
 test('issue draft PR rejects deleted file changes with mode', async () => {
-  const octokit = createOctokitMock()
+  const { octokit, calls: harness } = createOctokitMock()
   const review_record = reviewRecordWithMitigation({
     changed_files: ['src/remove.txt'],
     file_changes: [
@@ -546,7 +523,7 @@ test('issue draft PR rejects deleted file changes with mode', async () => {
   await assert.rejects(
     async () =>
       createDraftPullRequestFromIssueReviewRecord({
-        octokit: octokit as unknown as CreateDraftPrOctokit,
+        octokit,
         issue: {
           issue_number: 42,
           owner_login: 'octo-org',
@@ -558,8 +535,8 @@ test('issue draft PR rejects deleted file changes with mode', async () => {
       }),
     /deleted but also included a mode/
   )
-  assert.strictEqual(octokit.calls.blobs.length, 0)
-  assert.strictEqual(octokit.calls.trees.length, 0)
+  assert.strictEqual(harness.blobs.length, 0)
+  assert.strictEqual(harness.trees.length, 0)
 })
 
 for (const [path, message] of [
@@ -567,7 +544,7 @@ for (const [path, message] of [
   ['.github/workflows/pwn.yml', /Sensitive repository file path/]
 ] as const) {
   test(`issue draft PR rejects unsafe repository path ${path}`, async () => {
-    const octokit = createOctokitMock()
+    const { octokit, calls: harness } = createOctokitMock()
     const review_record = reviewRecordWithMitigation({
       file_changes: [
         {
@@ -583,7 +560,7 @@ for (const [path, message] of [
     await assert.rejects(
       async () =>
         createDraftPullRequestFromIssueReviewRecord({
-          octokit: octokit as unknown as CreateDraftPrOctokit,
+          octokit,
           issue: {
             issue_number: 42,
             owner_login: 'octo-org',
@@ -595,7 +572,7 @@ for (const [path, message] of [
         }),
       message
     )
-    assert.strictEqual(octokit.calls.blobs.length, 0)
-    assert.strictEqual(octokit.calls.trees.length, 0)
+    assert.strictEqual(harness.blobs.length, 0)
+    assert.strictEqual(harness.trees.length, 0)
   })
 }

@@ -8,13 +8,19 @@ import {
   RepositoryTriggerConfigError
 } from '../../src/github/repo-config-service.js'
 import type { Octokit } from 'octokit'
-import { fakeGitHub, githubFile, githubJson } from '../github-client.js'
+import {
+  fakeGitHub,
+  githubFile,
+  githubJson,
+  type RecordedRequest
+} from '../github-client.js'
 
 type Content_by_path = Record<string, string | Error>
 
-function createOctokitWithContent(
-  contentByPath: Content_by_path = {}
-): Octokit {
+function createOctokitWithContent(contentByPath: Content_by_path = {}): {
+  octokit: Octokit
+  requests: RecordedRequest[]
+} {
   return fakeGitHub(({ url }) => {
     const path = decodeURIComponent(
       new URL(url).pathname.split('/contents/')[1] ?? ''
@@ -25,13 +31,13 @@ function createOctokitWithContent(
     if (source instanceof Error)
       return githubJson({ message: source.message }, 500)
     return githubFile(source, path)
-  }).octokit
+  })
 }
 
 const CONFIG_PATH = '.sec-review/config.yml'
 
 test('fetchRepositoryTriggerConfig falls back to manual_only when config file is missing', async () => {
-  const octokit = createOctokitWithContent({})
+  const { octokit } = createOctokitWithContent({})
 
   const config = await fetchRepositoryTriggerConfig(octokit, {
     owner_login: 'octo',
@@ -50,7 +56,7 @@ test('fetchRepositoryTriggerConfig falls back to manual_only when config file is
 })
 
 test('fetchRepositoryTriggerConfig parses automatic trigger mode from repository config', async () => {
-  const octokit = createOctokitWithContent({
+  const { octokit } = createOctokitWithContent({
     [CONFIG_PATH]: [
       'sec_review_bot:',
       '  trigger_mode: automatic',
@@ -77,7 +83,7 @@ test('fetchRepositoryTriggerConfig parses automatic trigger mode from repository
 })
 
 test('fetchRepositoryTriggerConfig parses manual_only trigger mode from repository config', async () => {
-  const octokit = createOctokitWithContent({
+  const { octokit } = createOctokitWithContent({
     [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: manual_only'].join('\n')
   })
 
@@ -98,7 +104,7 @@ test('fetchRepositoryTriggerConfig parses manual_only trigger mode from reposito
 })
 
 test('fetchRepositoryTriggerConfig throws RepositoryTriggerConfigError for invalid YAML', async () => {
-  const octokit = createOctokitWithContent({
+  const { octokit } = createOctokitWithContent({
     [CONFIG_PATH]: 'sec_review_bot: [broken'
   })
 
@@ -125,7 +131,7 @@ test('fetchRepositoryTriggerConfig throws RepositoryTriggerConfigError for inval
 })
 
 test('fetchRepositoryTriggerConfig throws for missing sec_review_bot.trigger_mode', async () => {
-  const octokit = createOctokitWithContent({
+  const { octokit } = createOctokitWithContent({
     [CONFIG_PATH]: 'sec_review_bot: {}'
   })
 
@@ -147,7 +153,7 @@ test('fetchRepositoryTriggerConfig throws for missing sec_review_bot.trigger_mod
 })
 
 test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', async () => {
-  const octokit = createOctokitWithContent({
+  const { octokit } = createOctokitWithContent({
     [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: always_on'].join('\n')
   })
 
@@ -169,7 +175,7 @@ test('fetchRepositoryTriggerConfig throws for invalid trigger_mode enum value', 
 })
 
 test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async () => {
-  const octokit = createOctokitWithContent({
+  const { octokit } = createOctokitWithContent({
     [CONFIG_PATH]: [
       'sec_review_bot:',
       '  trigger_mode: automatic',
@@ -195,27 +201,9 @@ test('fetchRepositoryTriggerConfig throws for invalid paths_ignore shape', async
 })
 
 test('reads the .sec-review/config.yml path', async () => {
-  const readPaths: string[] = []
-  const octokit = createOctokitWithContent({
+  const { octokit, requests } = createOctokitWithContent({
     [CONFIG_PATH]: ['sec_review_bot:', '  trigger_mode: automatic'].join('\n')
   })
-  const originalGetContent = (
-    octokit as unknown as {
-      rest: {
-        repos: { getContent: (args: { path: string }) => Promise<unknown> }
-      }
-    }
-  ).rest.repos.getContent
-  ;(
-    octokit as unknown as {
-      rest: {
-        repos: { getContent: (args: { path: string }) => Promise<unknown> }
-      }
-    }
-  ).rest.repos.getContent = async (args: { path: string }) => {
-    readPaths.push(args.path)
-    return originalGetContent(args)
-  }
 
   const config = await fetchRepositoryTriggerConfig(octokit, {
     owner_login: 'octo',
@@ -225,11 +213,19 @@ test('reads the .sec-review/config.yml path', async () => {
 
   assert.strictEqual(config.trigger_mode, 'automatic')
   assert.strictEqual(config.path, CONFIG_PATH)
-  assert.deepStrictEqual(readPaths, [CONFIG_PATH])
+  // The Contents API path is part of the request URL, so the recorded request proves which file
+  // was read without replacing the client's method.
+  assert.strictEqual(requests.length, 1)
+  assert.ok(
+    decodeURIComponent(new URL(requests[0]!.url).pathname).endsWith(
+      `/contents/${CONFIG_PATH}`
+    ),
+    requests[0]!.url
+  )
 })
 
 test('invalid YAML in the config path is rejected', async () => {
-  const octokit = createOctokitWithContent({
+  const { octokit } = createOctokitWithContent({
     [CONFIG_PATH]: 'sec_review_bot: [broken'
   })
 
