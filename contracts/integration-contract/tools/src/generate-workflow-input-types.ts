@@ -373,12 +373,17 @@ const STRUCTURAL_KEYS = new Set([
 ])
 
 function limitName(path: string[]): string | null {
-  if (path.some((part) => part === 'allOf' || part === 'if' || part === 'then')) {
+  if (
+    path.some((part) => part === 'allOf' || part === 'if' || part === 'then')
+  ) {
     return null
   }
   const parts = path.filter((part) => !STRUCTURAL_KEYS.has(part))
   if (parts.length === 0) return null
-  return `MAX_${parts.join('_').replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase()}`
+  return `MAX_${parts
+    .join('_')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .toUpperCase()}`
 }
 
 function renderFile(): string {
