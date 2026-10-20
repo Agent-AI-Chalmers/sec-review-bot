@@ -207,13 +207,13 @@ export class ExecutionStore {
    *
    * The take is an UPDATE gated on the budget *and* the claim, so a caller that read an outdated
    * count cannot conclude a run that a concurrent owner has just taken, and two owners cannot
-   * both conclude the same row. Returns the token this caller would have taken, or null when the
-   * row is not (or no longer) over budget. */
+   * both conclude the same row. Returns whether this caller is the one that disconnected it, or
+   * false when the row is not (or no longer) over budget. It deliberately returns no claim token:
+   * `disconnected` holds no claim, so a token here would name an owner that never existed. */
   async disconnectExhaustedSubmissionRecovery(
     runId: string,
     maxAttempts: number
-  ): Promise<string | null> {
-    const token = crypto.randomUUID()
+  ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       const result = await client.query<{ run_id: string }>(
         `
@@ -229,7 +229,7 @@ export class ExecutionStore {
       `,
         [runId, this.connectorId, maxAttempts, this.claimTimeoutMs]
       )
-      if (result.rows[0] === undefined) return null
+      if (result.rows[0] === undefined) return false
       const eventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -246,7 +246,7 @@ export class ExecutionStore {
         axis: 'execution',
         reasonCode: 'SUBMISSION_RECOVERY_EXHAUSTED'
       })
-      return token
+      return true
     })
   }
 

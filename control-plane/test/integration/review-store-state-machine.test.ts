@@ -3427,12 +3427,12 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
     // disconnects it.
     assert.strictEqual(
       await store.disconnectExhaustedSubmissionRecovery(runId, 8),
-      null,
+      false,
       'a run that has not spent its budget is not disconnected'
     )
-    assert.notStrictEqual(
+    assert.strictEqual(
       await store.disconnectExhaustedSubmissionRecovery(runId, 0),
-      null,
+      true,
       'a spent budget disconnects the run'
     )
     assert.strictEqual(
@@ -3489,9 +3489,9 @@ test('giving up on a disconnected execution stops waiting without claiming it ne
       code: 'SUBMISSION_STATE_UNCERTAIN',
       message: 'unknown'
     })
-    assert.notStrictEqual(
+    assert.strictEqual(
       await store.disconnectExhaustedSubmissionRecovery(runId, 0),
-      null
+      true
     )
 
     await assert.rejects(

@@ -62,7 +62,7 @@ function store(
       return 0
     },
     async disconnectExhaustedSubmissionRecovery() {
-      return null
+      return false
     },
     async recordUnknownRecoveryOutcome() {
       return true
@@ -184,7 +184,7 @@ test('an uncertain submission disconnects once its replay budget is spent', asyn
       },
       async disconnectExhaustedSubmissionRecovery(_runId, maxAttempts) {
         assert.strictEqual(maxAttempts, MAX_SUBMISSION_RECOVERY_ATTEMPTS)
-        return 'disconnect-claim'
+        return true
       }
     }),
     run()
@@ -202,7 +202,7 @@ test('a replay budget that is not spent yet leaves the run to the normal replay 
       },
       async disconnectExhaustedSubmissionRecovery() {
         taken = true
-        return 'exhausted-claim'
+        return true
       }
     }),
     run()
@@ -226,7 +226,7 @@ test('losing the race to another owner reports nothing', async () => {
         return MAX_SUBMISSION_RECOVERY_ATTEMPTS
       },
       async disconnectExhaustedSubmissionRecovery() {
-        return null
+        return false
       }
     }),
     run()

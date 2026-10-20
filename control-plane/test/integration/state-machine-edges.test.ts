@@ -267,12 +267,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
-    assert.notStrictEqual(
+    assert.strictEqual(
       await store.disconnectExhaustedSubmissionRecovery(
         uncertainDisconnects.runId,
         0
       ),
-      null
+      true
     )
     // execution: disconnected -> uncertain when an operator hands it back. Without this the run
     // would stay parked forever: automatic recovery only claims `uncertain`.
@@ -287,12 +287,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
-    assert.notStrictEqual(
+    assert.strictEqual(
       await store.disconnectExhaustedSubmissionRecovery(
         giveUpExecution.runId,
         0
       ),
-      null
+      true
     )
     await store.giveUpDisconnectedRun(
       giveUpExecution.runId,

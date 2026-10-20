@@ -103,5 +103,5 @@ export async function concludeExhaustedSubmissionRecovery(
     run.run_id,
     MAX_SUBMISSION_RECOVERY_ATTEMPTS
   )
-  return disconnected === null ? null : { status: 'disconnected' }
+  return disconnected ? { status: 'disconnected' } : null
 }

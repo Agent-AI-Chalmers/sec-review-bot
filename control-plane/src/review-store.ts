@@ -1468,7 +1468,7 @@ export class ReviewRunStore {
   async disconnectExhaustedSubmissionRecovery(
     runId: string,
     maxAttempts: number
-  ): Promise<string | null> {
+  ): Promise<boolean> {
     return await this.executions.disconnectExhaustedSubmissionRecovery(
       runId,
       maxAttempts
