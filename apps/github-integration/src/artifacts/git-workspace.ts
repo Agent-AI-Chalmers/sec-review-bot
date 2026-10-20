@@ -583,12 +583,14 @@ function parseChangedFiles(
 /**
  * Export one entry per changed file, carrying that file's diff hunks.
  *
- * The suggestion anchoring needs a per-file `patch` to map a mitigation hunk onto PR-visible
- * lines. The API returns that field for most files but omits it for part of a large pull request,
- * and its file list is capped, so files the patch changes can end up unanchorable. Splitting the
- * workspace diff keeps the two in step: every file the diff touches appears here with its hunks.
+ * The suggestion anchoring needs a per-file slice of the diff to map a mitigation hunk onto
+ * PR-visible lines. That slice is cut out of the workspace diff the run already exported, rather
+ * than by running `git diff -- <path>` per file: a 340-file pull request would otherwise start
+ * 340 concurrent processes, each allowed a 128 MiB buffer, and the endpoint's 3000-file ceiling
+ * would make that worse. Slicing also keeps this set derived from the same text as the patch, so
+ * the two cannot disagree about what changed.
  */
-export async function exportWorkspaceFilesWithPatch({
+export async function exportWorkspaceWindow({
   workspace_path,
   base_sha,
   head_sha
@@ -596,42 +598,93 @@ export async function exportWorkspaceFilesWithPatch({
   workspace_path: string
   base_sha: string
   head_sha: string
-}): Promise<
-  {
+}): Promise<{
+  patch: string
+  files: {
     filename: string
     status: string
     additions: number
     deletions: number
     patch: string | null
   }[]
-> {
-  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceFilesWithPatch')
-  const range = `${base_sha.trim()}...${head_sha.trim()}`
+}> {
+  requireComparableRefs(base_sha, head_sha, 'exportWorkspaceWindow')
   const entries = await exportWorkspaceChangedFiles({
     workspace_path,
     base_sha,
     head_sha
   })
+  const diff = await exportWorkspaceDiff({
+    workspace_path,
+    base_sha,
+    head_sha
+  })
+  const sections = splitDiffByFile(diff)
 
-  const per_file = await Promise.all(
-    entries.map(async (entry) => {
-      const patch = await runGitCommandCapture(
-        workspace_path,
-        [...WORKSPACE_DIFF_ARGS, range, '--', entry.path],
-        { config: WORKSPACE_GIT_CONFIG }
-      )
-      return {
-        filename: entry.path,
-        status: entry.status,
-        additions: entry.additions,
-        deletions: entry.deletions,
-        // A binary file's hunk is the "Binary files ... differ" placeholder, which carries no
-        // anchorable lines; report it as absent rather than as a patch that cannot be mapped.
-        patch: patch.includes('Binary files') ? null : patch
-      }
-    })
-  )
-  return per_file
+  const files = entries.map((entry) => {
+    const patch = sections.get(entry.path)
+    return {
+      filename: entry.path,
+      status: entry.status,
+      additions: entry.additions,
+      deletions: entry.deletions,
+      // A binary file's hunk is the "Binary files ... differ" placeholder, which carries no
+      // anchorable lines; report it as absent rather than as a patch that cannot be mapped.
+      patch:
+        patch === undefined || patch.includes('Binary files') ? null : patch
+    }
+  })
+
+  return { patch: diff, files }
+}
+
+/**
+ * Split a unified diff into one entry per file, keyed by the file's new-side path.
+ *
+ * `diff --git a/<old> b/<new>` starts each section. The new path is the last token, and for a
+ * rename it is the destination, which is the path the diff and the file list use. A path
+ * containing spaces is quoted by git, so the header is not simply split on spaces.
+ */
+function splitDiffByFile(diff: string): Map<string, string> {
+  const sections = new Map<string, string>()
+  let current_path: string | null = null
+  let current_lines: string[] = []
+
+  const flush = (): void => {
+    if (current_path !== null) {
+      sections.set(current_path, current_lines.join('\n'))
+    }
+  }
+
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      flush()
+      current_lines = [line]
+      const target = line.slice('diff --git '.length)
+      // `a/... b/...` -- the destination is the second half, after the " b/" marker.
+      const marker = target.lastIndexOf(' b/')
+      current_path =
+        marker === -1 ? null : unquoteGitPath(target.slice(marker + 3))
+      continue
+    }
+    current_lines.push(line)
+  }
+  flush()
+  return sections
+}
+
+/** Undo git's C-style quoting for paths that contain spaces, quotes, or control characters. */
+function unquoteGitPath(value: string): string {
+  if (!value.startsWith('"') || !value.endsWith('"')) return value
+  const body = value.slice(1, -1)
+  const escapes: Record<string, string> = {
+    n: '\n',
+    t: '\t',
+    r: '\r',
+    '"': '"',
+    '\\': '\\'
+  }
+  return body.replace(/\\(.)/g, (_match, char: string) => escapes[char] ?? char)
 }
 
 export async function exportWorkspaceDiff({

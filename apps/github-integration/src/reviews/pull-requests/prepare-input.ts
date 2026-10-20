@@ -16,9 +16,7 @@ import type {
 import type { TestChangesPolicy } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import {
-  exportWorkspaceChangedFiles,
-  exportWorkspaceDiff,
-  exportWorkspaceFilesWithPatch,
+  exportWorkspaceWindow,
   materializeWorkspaceWithCommitHistory
 } from '../../artifacts/git-workspace.js'
 import type { ReviewWindow } from './review-window.js'
@@ -36,7 +34,7 @@ export interface PreparedPullRequestReview {
   input: PullRequestReviewInput
   input_path: string
   input_bundle_root: string
-  files: Awaited<ReturnType<typeof exportWorkspaceFilesWithPatch>>
+  files: Awaited<ReturnType<typeof exportWorkspaceWindow>>['files']
 }
 
 interface PullRequestCommitsConnection {
@@ -197,21 +195,17 @@ async function materializeIncrementalWindowArtifacts({
   workspace_path: string
   window: ReviewWindow
   incremental_window_path: string
-}): Promise<void> {
-  // Both artifacts come from the workspace repository and the same diff selectors, so they
-  // cannot describe different change sets. The API cannot serve this role: its compare response
-  // caps at 300 files and the pull request files endpoint at 3000, while the diff has no cap, so
-  // a large run would list fewer files than its patch contains.
-  const incremental_patch = await exportWorkspaceDiff({
-    workspace_path,
-    base_sha: window.base_sha,
-    head_sha: window.head_sha
-  })
-  const changed_files = await exportWorkspaceChangedFiles({
-    workspace_path,
-    base_sha: window.base_sha,
-    head_sha: window.head_sha
-  })
+}): Promise<Awaited<ReturnType<typeof exportWorkspaceWindow>>['files']> {
+  // One workspace comparison produces the patch and the file list together, so they cannot
+  // describe different change sets. The API cannot serve this role: its compare response caps at
+  // 300 files and the pull request files endpoint at 3000, while the diff has no cap, so a large
+  // run would list fewer files than its patch contains.
+  const { patch: incremental_patch, files: changed_files } =
+    await exportWorkspaceWindow({
+      workspace_path,
+      base_sha: window.base_sha,
+      head_sha: window.head_sha
+    })
 
   await Promise.all([
     fs.writeFile(
@@ -224,7 +218,14 @@ async function materializeIncrementalWindowArtifacts({
       JSON.stringify(
         {
           generated_at: new Date().toISOString(),
-          files: changed_files
+          // `changed-files.json` keeps the `path` field the agent-facing schema describes; the
+          // suggestion set uses `filename`. Both come from one export.
+          files: changed_files.map((file) => ({
+            path: file.filename,
+            status: file.status,
+            additions: file.additions,
+            deletions: file.deletions
+          }))
         },
         null,
         2
@@ -232,6 +233,7 @@ async function materializeIncrementalWindowArtifacts({
       'utf8'
     )
   ])
+  return changed_files
 }
 
 async function materializeHistoryArtifacts({
@@ -361,20 +363,12 @@ export async function preparePullRequestReviewInput({
     workspace_path,
     include_incremental_window: true
   })
-  await materializeIncrementalWindowArtifacts({
+  const files = await materializeIncrementalWindowArtifacts({
     workspace_path,
     window,
     incremental_window_path
   })
 
-  // The suggestion anchoring set comes from the same workspace diff as the patch, so a file the
-  // patch changes is always anchorable. The API's per-file `patch` cannot serve this: it is
-  // omitted for part of a large pull request.
-  const files = await exportWorkspaceFilesWithPatch({
-    workspace_path,
-    base_sha: window.base_sha,
-    head_sha: window.head_sha
-  })
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,
     pr,

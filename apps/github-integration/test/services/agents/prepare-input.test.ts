@@ -757,7 +757,7 @@ test(
       // other two. When it came from the API's per-file list, a large run could anchor against a
       // narrower set than the patch covered, and the three would describe different changes.
       assert.deepStrictEqual(
-        prepared.files.map((item) => item.filename),
+        prepared.files.map((item: { filename: string }) => item.filename),
         changed_files.files.map((item) => item.path)
       )
       assert.match(
