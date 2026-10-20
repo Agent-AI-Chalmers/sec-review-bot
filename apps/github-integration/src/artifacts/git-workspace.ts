@@ -122,6 +122,32 @@ async function runGitCommand(
   })
 }
 
+async function runGitCommandCapture(
+  workspace_path: string,
+  args: string[],
+  options: GitCommandOptions = {}
+): Promise<string> {
+  const configArgs = (options.config ?? []).flatMap((item) => ['-c', item])
+  const { stdout } = await execFileAsync('git', [...configArgs, ...args], {
+    cwd: workspace_path,
+    timeout: options.timeout_ms ?? configuredGitTimeoutMs(),
+    // A large diff can exceed the 1 MiB default execFile buffer, which would
+    // fail preparation for exactly the changes this export exists to cover.
+    maxBuffer: DIFF_MAX_OUTPUT_BYTES,
+    env: {
+      ...process.env,
+      ...(options.env ?? {})
+    }
+  })
+  return stdout
+}
+
+// Upper bound for a captured git diff. Preparation builds the diff in memory,
+// so this is also the memory ceiling a single export may consume. The real large
+// pull request measured against this code produced ~7.6 MB, so the bound leaves
+// generous headroom while refusing pathological input instead of buffering it.
+const DIFF_MAX_OUTPUT_BYTES = 128 * 1024 * 1024
+
 export async function retryGitFetch(
   operation: () => Promise<void>,
   sleep: Sleep = delay
@@ -333,6 +359,20 @@ async function materializeWorkspaceFromRealGitHistory({
       )
     }
     await runGitCommand(materialized_path, ['checkout', '--detach', head_ref])
+    // Fetching by SHA leaves no branch pointing at the fetched commits, and the
+    // sanitize step prunes every unreachable object. Without a ref, the base
+    // commit disappears and a later `git diff base...head` fails with an invalid
+    // symmetric difference expression -- exactly the comparison pull-request
+    // review depends on. Pin every requested ref under refs/sec-review/ so the
+    // commits stay reachable; these refs carry no remote URL, credentials, or
+    // fetch metadata, so the sanitize guarantee is preserved.
+    for (const [index, ref] of refs.entries()) {
+      await runGitCommand(materialized_path, [
+        'update-ref',
+        `refs/sec-review/input-${index}`,
+        ref
+      ])
+    }
     await sanitizeMaterializedGitWorkspace(materialized_path)
     await replaceWorkspaceWithMaterializedRepository({
       workspace_path,
@@ -388,6 +428,88 @@ export async function materializeWorkspaceWithCommitHistory({
     refs: normalizedRefs,
     ...(git_auth_token ? { git_auth_token } : {})
   })
+}
+
+/**
+ * Export the pull-request unified diff from a materialized workspace repository.
+ *
+ * The GitHub "list pull request files" API omits `patch` for part of a large
+ * pull request even though the files themselves are returned: renames without
+ * content changes, some additions, and individual files whose diff exceeds the
+ * API's internal size budget. Callers that build the review's incremental patch
+ * from that field therefore drop those changes silently. The workspace already
+ * fetches base and every head commit, so the diff can be regenerated locally and
+ * does not depend on which patches the API chose to return.
+ */
+export async function exportWorkspaceDiff({
+  workspace_path,
+  base_sha,
+  head_sha
+}: {
+  workspace_path: string
+  base_sha: string
+  head_sha: string
+}): Promise<string> {
+  for (const [label, value] of [
+    ['base_sha', base_sha],
+    ['head_sha', head_sha]
+  ] as const) {
+    if (value.trim() === '' || value.trim().startsWith('-')) {
+      throw new Error(`exportWorkspaceDiff requires a valid ${label}.`)
+    }
+  }
+
+  // `--no-color` keeps the output machine-readable; `--find-renames` preserves
+  // the rename relationship the API metadata also carries.
+  //
+  // Three dots (`base...head`) are required, and they are not interchangeable
+  // with two. GitHub's `pull_request.base.sha` is the base branch tip, not the
+  // point where the PR branched off, and it keeps moving as the base branch
+  // advances. A two-dot diff compares the two commits as trees, so once the head
+  // is behind the base it renders changes that only landed on the base branch as
+  // if the PR deleted them. Three dots diff the merge base instead, which is the
+  // change set the pull request actually introduces; it is also what GitHub's own
+  // compare endpoint means by `base...head`, which the repository incremental
+  // path already relies on. Computing the merge base through `...` keeps this to
+  // one git invocation and matches GitHub's semantics exactly.
+  //
+  // This requires a merge base to exist, so the workspace must not be shallow.
+  // Multi-ref materialization deliberately fetches without `--depth`; a shallow
+  // workspace makes git fail with "no merge base" rather than emit a partial or
+  // empty diff, which is the intended loud failure.
+  //
+  // `--no-textconv` and `--no-ext-diff` are both required, and they are not the
+  // same guard: each closes a different way for the diff text to stop being the
+  // diff. A binary file must never be rendered as text, and there are two
+  // independent paths that can do it:
+  //
+  // - Textconv: a `diff=<driver>` attribute plus `diff.<driver>.textconv` makes
+  //   git pipe file content through a command and diff the printed result. A
+  //   binary file then shows up as text lines instead of the "Binary files ...
+  //   differ" placeholder. `--no-textconv` disables it.
+  // - External diff: `diff.external` (or `diff.<driver>.command`) replaces diff
+  //   generation entirely with an arbitrary command's output. Measured here,
+  //   this still fired under `--no-textconv`, because the external command never
+  //   goes through the textconv path at all. `--no-ext-diff` disables it.
+  //
+  // Neither flag implies the other, and a repository or injected configuration
+  // can supply either mechanism. `--binary` must NOT be added: it emits the
+  // binary payload inline as base85, which measured larger than the default
+  // placeholder and defeats the purpose of keeping binary content out of the diff.
+  return runGitCommandCapture(
+    workspace_path,
+    [
+      'diff',
+      '--no-color',
+      '--no-textconv',
+      '--no-ext-diff',
+      '--find-renames',
+      `${base_sha.trim()}...${head_sha.trim()}`
+    ],
+    {
+      config: ['core.pager=cat', 'diff.noprefix=false']
+    }
+  )
 }
 
 export async function createWorkspaceSnapshotTar({

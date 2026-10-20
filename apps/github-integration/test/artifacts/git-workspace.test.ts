@@ -9,6 +9,7 @@ import { promisify } from 'node:util'
 import {
   configuredGitTimeoutMs,
   createWorkspaceSnapshotTar,
+  exportWorkspaceDiff,
   materializeWorkspaceWithCommitHistory,
   retryGitFetch,
   withConfiguredGitFetchProxy
@@ -293,6 +294,304 @@ test('a git command that exceeds the timeout is killed, not left running', async
     } else {
       process.env['GITHUB_INTEGRATION_GIT_TIMEOUT_MS'] = previous
     }
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('exportWorkspaceDiff returns changes the files API omits its patch for', async () => {
+  // The motivating regression: GitHub returns a large pull request's file list
+  // but leaves `patch` null for some entries, so a patch assembled from the API
+  // silently drops them from the review. The workspace has real commits, so the
+  // exported diff must still contain every change -- here a renamed file with no
+  // content change and a large rewritten file, both of which lose their patch.
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'sec-review-git-workspace-test-')
+  )
+  try {
+    const source = path.join(root, 'source')
+    const workspace = path.join(root, 'workspace')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    await fs.writeFile(path.join(source, 'old-name.md'), 'stable\n', 'utf8')
+    await fs.writeFile(
+      path.join(source, 'big.html'),
+      'line\n'.repeat(20_000),
+      'utf8'
+    )
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'before'])
+    const base_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await git(source, ['mv', 'old-name.md', 'new-name.md'])
+    await fs.writeFile(
+      path.join(source, 'big.html'),
+      'changed line\n'.repeat(20_000),
+      'utf8'
+    )
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'after'])
+    const head_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await materializeWorkspaceWithCommitHistory({
+      workspace_path: workspace,
+      git_remote_url: source,
+      refs: [base_sha, head_sha]
+    })
+
+    const diff = await exportWorkspaceDiff({
+      workspace_path: workspace,
+      base_sha,
+      head_sha
+    })
+
+    // Both changes survive, and the large file's content is neither truncated
+    // nor cut short by an execFile output-buffer limit: every rewritten line of
+    // big.html must appear.
+    assert.match(diff, /rename from old-name\.md/)
+    assert.match(diff, /rename to new-name\.md/)
+    assert.match(diff, /b\/big\.html/)
+    const changed_lines = diff.match(/^\+changed line$/gm) ?? []
+    assert.strictEqual(changed_lines.length, 20_000)
+    assert.match(diff, /changed line\n\+changed line\n/)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('exportWorkspaceDiff rejects refs that are empty or look like options', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'git-diff-ref-test-'))
+  try {
+    await git(root, ['init'])
+    for (const [base_sha, head_sha] of [
+      ['', 'HEAD'],
+      ['HEAD', ''],
+      ['--output=/tmp/x', 'HEAD']
+    ] as const) {
+      await assert.rejects(() =>
+        exportWorkspaceDiff({ workspace_path: root, base_sha, head_sha })
+      )
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+async function makeBinaryDiffWorkspace(root: string): Promise<{
+  workspace: string
+  base_sha: string
+  head_sha: string
+}> {
+  const source = path.join(root, 'source')
+  const workspace = path.join(root, 'workspace')
+  await fs.mkdir(source, { recursive: true })
+  await git(source, ['init'])
+  await git(source, ['config', 'user.name', 'Test User'])
+  await git(source, ['config', 'user.email', 'test@example.com'])
+  // A NUL byte in the first 8 KiB is what makes git treat the file as binary.
+  await fs.writeFile(
+    path.join(source, 'blob.bin'),
+    Buffer.from([0x00, 0x01, 0x02, 0x03, 0x41, 0x00, 0x0a])
+  )
+  await git(source, ['add', '.'])
+  await git(source, ['commit', '-m', 'before'])
+  const base_sha = await git(source, ['rev-parse', 'HEAD'])
+  await fs.writeFile(
+    path.join(source, 'blob.bin'),
+    Buffer.from([0x00, 0x01, 0x02, 0x03, 0x5a, 0x00, 0x0a])
+  )
+  await git(source, ['commit', '-am', 'after'])
+  const head_sha = await git(source, ['rev-parse', 'HEAD'])
+  await materializeWorkspaceWithCommitHistory({
+    workspace_path: workspace,
+    git_remote_url: source,
+    refs: [base_sha, head_sha]
+  })
+  return { workspace, base_sha, head_sha }
+}
+
+test('exportWorkspaceDiff ignores an external diff command injected through the environment', async () => {
+  // GIT_CONFIG_* environment variables outrank the -c options this module passes.
+  // Setting diff.external there replaces the diff entirely with the output of an
+  // arbitrary command, which bypassed --no-textconv when measured. The export must
+  // ignore that injection, so the binary placeholder still has to appear.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'git-binary-env-'))
+  try {
+    const { workspace, base_sha, head_sha } =
+      await makeBinaryDiffWorkspace(root)
+
+    const previous = new Map<string, string | undefined>()
+    for (const name of [
+      'GIT_CONFIG_COUNT',
+      'GIT_CONFIG_KEY_0',
+      'GIT_CONFIG_VALUE_0'
+    ]) {
+      previous.set(name, process.env[name])
+    }
+    process.env['GIT_CONFIG_COUNT'] = '1'
+    process.env['GIT_CONFIG_KEY_0'] = 'diff.external'
+    process.env['GIT_CONFIG_VALUE_0'] = '/bin/echo INJECTED-EXTERNAL-DIFF'
+    try {
+      // Guard the guard: the injection is real, so removing the sanitizer turns
+      // this test red rather than leaving it vacuously green.
+      const injected = await execFileAsync(
+        'git',
+        ['diff', '--no-color', `${base_sha}..${head_sha}`],
+        {
+          cwd: workspace
+        }
+      )
+      assert.match(injected.stdout, /INJECTED-EXTERNAL-DIFF/)
+
+      const diff = await exportWorkspaceDiff({
+        workspace_path: workspace,
+        base_sha,
+        head_sha
+      })
+      assert.doesNotMatch(diff, /INJECTED-EXTERNAL-DIFF/)
+      assert.match(diff, /Binary files .* differ/)
+    } finally {
+      for (const [name, value] of previous) {
+        if (value === undefined) {
+          delete process.env[name]
+        } else {
+          process.env[name] = value
+        }
+      }
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('exportWorkspaceDiff ignores a repository diff driver that expands binary files', async () => {
+  // A checked-in .gitattributes can map a path to a diff driver whose textconv
+  // command is configured in the repository's own git config, so no injected
+  // configuration is needed. The textconv below echoes each side's payload,
+  // which makes the sides differ and forces git to print binary content as text
+  // lines when the driver runs. This is the textconv path; --no-ext-diff does
+  // not cover it, so the assertion here is what pins --no-textconv in place.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'git-binary-attr-'))
+  try {
+    const source = path.join(root, 'source')
+    const workspace = path.join(root, 'workspace')
+    const textconv_path = path.join(root, 'textconv.sh')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    await fs.writeFile(path.join(source, '.gitattributes'), '* diff=evil\n')
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'attributes'])
+    await fs.writeFile(
+      path.join(source, 'blob.bin'),
+      Buffer.from([0x00, 0x01, 0x41, 0x00, 0x0a])
+    )
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'before'])
+    const base_sha = await git(source, ['rev-parse', 'HEAD'])
+    await fs.writeFile(
+      path.join(source, 'blob.bin'),
+      Buffer.from([0x00, 0x01, 0x5a, 0x00, 0x0a])
+    )
+    await git(source, ['commit', '-am', 'after'])
+    const head_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await fs.writeFile(
+      textconv_path,
+      '#!/bin/sh\necho "TEXTCONV-EXPANDED payload=$(od -An -c "$1" | tr -d " \\n")"\n',
+      { encoding: 'utf8', mode: 0o700 }
+    )
+
+    await materializeWorkspaceWithCommitHistory({
+      workspace_path: workspace,
+      git_remote_url: source,
+      refs: [base_sha, head_sha]
+    })
+    await git(workspace, ['config', 'diff.evil.textconv', textconv_path])
+
+    // Guard the guard: the fixture must be able to produce the attack, so
+    // dropping --no-textconv turns this test red instead of leaving it green.
+    const expanded = await git(workspace, [
+      'diff',
+      '--no-color',
+      `${base_sha}..${head_sha}`
+    ])
+    assert.match(expanded, /TEXTCONV-EXPANDED/)
+
+    const diff = await exportWorkspaceDiff({
+      workspace_path: workspace,
+      base_sha,
+      head_sha
+    })
+    assert.doesNotMatch(diff, /TEXTCONV-EXPANDED/)
+    assert.match(diff, /Binary files .* differ/)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('exportWorkspaceDiff excludes changes that only landed on the base branch', async () => {
+  // GitHub reports `pull_request.base.sha` as the base branch tip, not the point
+  // where the PR branched off. When the base branch advances after the branch
+  // point, a two-dot diff compares the two trees and renders the base branch's
+  // own new work as if the PR deleted it, so the agent would review and report
+  // changes that are not part of the pull request. The diff must be computed from
+  // the merge base instead.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'git-diverge-test-'))
+  try {
+    const source = path.join(root, 'source')
+    const workspace = path.join(root, 'workspace')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init', '-b', 'main'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    await fs.writeFile(path.join(source, 'app.txt'), 'base line\n', 'utf8')
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'branch point'])
+    await git(source, ['branch', 'feature'])
+
+    // The base branch moves on after the PR branched off.
+    await fs.writeFile(
+      path.join(source, 'app.txt'),
+      'base line\nbase-branch-only line\n',
+      'utf8'
+    )
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'base branch work'])
+    const base_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    // The PR adds its own line on top of the branch point.
+    await git(source, ['checkout', 'feature'])
+    await fs.writeFile(
+      path.join(source, 'app.txt'),
+      'base line\npr-only line\n',
+      'utf8'
+    )
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'pr work'])
+    const head_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    await materializeWorkspaceWithCommitHistory({
+      workspace_path: workspace,
+      git_remote_url: source,
+      refs: [base_sha, head_sha]
+    })
+
+    // The fixture must really be the reported failure mode rather than a
+    // fast-forward: the base branch tip is not an ancestor of the PR head, so a
+    // two-dot comparison of the two trees would show the base branch's own line
+    // as a PR deletion. The assertion below therefore fails if the export ever
+    // reverts to two dots.
+    const diff = await exportWorkspaceDiff({
+      workspace_path: workspace,
+      base_sha,
+      head_sha
+    })
+    assert.match(diff, /\+pr-only line/)
+    assert.doesNotMatch(diff, /base-branch-only line/)
+  } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
 })

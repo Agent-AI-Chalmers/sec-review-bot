@@ -15,7 +15,10 @@ import type { Octokit } from 'octokit'
 import type { PullRequestReviewInput } from '../../runner/input.js'
 import type { TestChangesPolicy } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
-import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
+import {
+  materializeWorkspaceWithCommitHistory,
+  exportWorkspaceDiff
+} from '../../artifacts/git-workspace.js'
 import {
   archiveInputBundle,
   buildGitRemoteUrl,
@@ -31,7 +34,6 @@ interface NormalizedPullRequestFile {
   additions: number
   deletions: number
   changes: number
-  patch: string | null
 }
 
 interface IncrementalChangedFileEntry {
@@ -94,29 +96,9 @@ function normalizeFiles(files: PullRequestFile[]): NormalizedPullRequestFile[] {
       status: file.status,
       additions: file.additions,
       deletions: file.deletions,
-      changes: file.changes,
-      patch: file.patch
+      changes: file.changes
     })
   )
-}
-
-function buildIncrementalPatchText(files: NormalizedPullRequestFile[]): string {
-  const chunks: string[] = []
-
-  for (const file of files) {
-    if (typeof file.patch !== 'string' || file.patch.trim() === '') {
-      continue
-    }
-
-    chunks.push(
-      `diff --git a/${file.path} b/${file.path}`,
-      `--- a/${file.path}`,
-      `+++ b/${file.path}`,
-      file.patch
-    )
-  }
-
-  return chunks.join('\n')
 }
 
 async function listCommitChainRefsForPullRequest({
@@ -209,10 +191,17 @@ async function materializeWorkspaceHistory({
   })
 }
 
-async function materializeIncrementalWindowArtifacts(
-  files: NormalizedPullRequestFile[],
+async function materializeIncrementalWindowArtifacts({
+  workspace_path,
+  pr,
+  files,
+  incremental_window_path
+}: {
+  workspace_path: string
+  pr: PullRequestContext
+  files: NormalizedPullRequestFile[]
   incremental_window_path: string
-): Promise<void> {
+}): Promise<void> {
   const changed_files: IncrementalChangedFileEntry[] = files.map((file) => ({
     path: file.path,
     status: file.status,
@@ -222,10 +211,21 @@ async function materializeIncrementalWindowArtifacts(
     changes: file.changes
   }))
 
+  // The workspace holds real base and head commits, so the patch is regenerated
+  // from git instead of from the API's per-file `patch` field. GitHub omits that
+  // field for part of a large pull request (renames without content changes,
+  // some additions, and individual files with a large diff), so assembling the
+  // patch from it silently drops changes the review is supposed to cover.
+  const incremental_patch = await exportWorkspaceDiff({
+    workspace_path,
+    base_sha: pr.base_sha,
+    head_sha: pr.head_sha
+  })
+
   await Promise.all([
     fs.writeFile(
       path.join(incremental_window_path, 'incremental.patch'),
-      buildIncrementalPatchText(files),
+      incremental_patch,
       'utf8'
     ),
     fs.writeFile(
@@ -355,10 +355,12 @@ export async function preparePullRequestReviewInput({
     workspace_path,
     include_incremental_window: true
   })
-  await materializeIncrementalWindowArtifacts(
-    normalizedFiles,
+  await materializeIncrementalWindowArtifacts({
+    workspace_path,
+    pr,
+    files: normalizedFiles,
     incremental_window_path
-  )
+  })
   const historyArtifacts = await materializeHistoryArtifacts({
     octokit,
     pr,
