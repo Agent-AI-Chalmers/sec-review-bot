@@ -1,4 +1,4 @@
-import type { GitHubAppOctokit } from './octokit.js'
+import type { Octokit } from 'octokit'
 
 interface RepoParts {
   owner_login: string
@@ -41,7 +41,7 @@ function splitRepoFullName(repo_full_name: string): RepoParts {
 }
 
 export async function getRepositoryRefSha(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   { owner_login, repo_name, ref }: RepoParts & { ref: string }
 ): Promise<string> {
   const normalizedRef = String(ref || '').trim()
@@ -67,7 +67,7 @@ export async function getRepositoryRefSha(
 }
 
 export async function listOpenRepositorySecurityPullRequests(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   { owner_login, repo_name }: RepoParts
 ): Promise<OpenRepositorySecurityPullRequest[]> {
   const items: OpenRepositorySecurityPullRequest[] = []
@@ -111,7 +111,7 @@ export async function listOpenRepositorySecurityPullRequests(
 }
 
 export async function findRepositorySecuritySummaryIssue(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   { owner_login, repo_name, title }: RepoParts & { title: string }
 ): Promise<RepositoryIssue | null> {
   let page = 1

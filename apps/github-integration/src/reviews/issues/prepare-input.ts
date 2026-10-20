@@ -8,7 +8,7 @@ import {
 } from '../../github/issue-service.js'
 import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { IssueReviewInput, TestChangesPolicy } from '../../runner/input.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
@@ -21,7 +21,7 @@ import {
 } from '../shared/input-bundle.js'
 
 async function materializeWorkspace(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   issue: IssueContext,
   workspace_path: string,
   ref: string
@@ -49,7 +49,7 @@ async function materializeHistoryArtifacts({
   workspace_ref,
   default_branch
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   issue: IssueContext
   history_path: string
   workspace_ref: string
@@ -110,7 +110,7 @@ export async function prepareIssueReviewInput({
   test_changes
 }: {
   run_id: string
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   issue: IssueContext
   trusted_default_branch: TrustedDefaultBranch
   review_objective?: 'audit' | 'repair'

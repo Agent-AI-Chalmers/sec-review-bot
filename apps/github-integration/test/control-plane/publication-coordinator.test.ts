@@ -10,6 +10,8 @@ import type {
   ControlPlaneClient,
   PublicationWork
 } from '../../src/control-plane/client.js'
+import { fakeApp } from '../github-app-stubs.js'
+import { githubJson } from '../github-client.js'
 
 test('publisher starts no GitHub work when its initial lease renewal fails', async () => {
   let installationLookups = 0
@@ -67,20 +69,14 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
     },
     connectorId: 'github-app:test'
   } as unknown as ControlPlaneClient
-  const app = {
-    octokit: {
-      rest: {
-        apps: {
-          getRepoInstallation: async () => {
-            installationLookups += 1
-            return { data: { id: 1 } }
-          }
-        }
-      }
+  const { app, requests } = fakeApp({
+    respond: () => {
+      installationLookups += 1
+      return githubJson({ id: 1 })
     }
-  }
+  })
 
-  await publishReviewRunsOnce({ app: app as never, store })
+  await publishReviewRunsOnce({ app, store })
 
   // The pass asks Control Plane to hold the claim, so a run that becomes publishable
   // mid-interval is picked up then instead of at the next poll.
@@ -90,6 +86,8 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
   )
   assert.strictEqual(installationLookups, 0)
   assert.strictEqual(completionAttempts, 0)
+  // Nothing was asked of GitHub at all: a failed lease renewal stops the pass before any lookup.
+  assert.deepStrictEqual(requests, [])
 })
 
 test('explicit ownership checks share a failing in-flight heartbeat', async () => {

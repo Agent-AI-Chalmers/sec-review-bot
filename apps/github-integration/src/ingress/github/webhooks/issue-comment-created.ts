@@ -13,7 +13,7 @@ import { authorizeManualCommentCommand } from '../../../github/manual-command-au
 import { extractIssueContext } from '../../../github/issue-service.js'
 import { getPullRequestContext } from '../../../github/pull-request-service.js'
 import { resolveTrustedDefaultBranch } from '../../../github/default-branch-service.js'
-import type { GitHubAppOctokit } from '../../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import {
   isSelfOriginatedWebhookEvent,
   logSkippedSelfOriginatedEvent
@@ -31,7 +31,7 @@ type IssueCommentCreatedWebhookEvent = Pick<
   EmitterWebhookEvent<'issue_comment.created'>,
   'id' | 'payload'
 > & {
-  octokit: unknown
+  octokit: Octokit
 }
 
 interface HandlerDeps extends TrustedRefHandlerDeps {
@@ -125,7 +125,7 @@ export async function handleIssueCommentCreatedWithDeps(
     // Manual comment commands can publish PR reviews, suggestions, commits, or draft PRs;
     // require the commenter to have repository write access before starting any workflow.
     const authorization = await authorizeManualCommentCommandFn({
-      octokit: octokit as GitHubAppOctokit,
+      octokit,
       owner_login: issue.owner_login,
       repo_name: issue.repo_name,
       sender_login:
@@ -153,7 +153,7 @@ export async function handleIssueCommentCreatedWithDeps(
     // Resolve the trusted default branch once for this run; both the issue and
     // PR paths below reuse it instead of re-resolving.
     const trusted_default_branch = await resolveTrustedDefaultBranchFn(
-      octokit as GitHubAppOctokit,
+      octokit,
       { owner_login: issue.owner_login, repo_name: issue.repo_name }
     )
 
@@ -180,7 +180,7 @@ export async function handleIssueCommentCreatedWithDeps(
         delivery_id: id,
         test_changes: command.test_changes,
         resolve_pr: async () =>
-          await getPullRequestContextFn(octokit as GitHubAppOctokit, {
+          await getPullRequestContextFn(octokit, {
             owner_login: issue.owner_login,
             repo_name: issue.repo_name,
             pr_number: issue.issue_number

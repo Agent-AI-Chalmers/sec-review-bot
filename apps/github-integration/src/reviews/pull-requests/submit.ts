@@ -3,7 +3,7 @@ import {
   listFilesChangedBetweenCommits,
   listPullRequestFiles
 } from '../../github/pull-request-service.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { preparePullRequestReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
@@ -34,7 +34,7 @@ async function listSynchronizeScopeFiles({
   octokit,
   pr
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   pr: PullRequestContext
 }) {
   if (pr.previous_head_sha) {
@@ -62,7 +62,7 @@ async function resolveEventFiles({
   pr,
   event_type
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   pr: PullRequestContext
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 }) {
@@ -97,7 +97,7 @@ async function materializePullRequestReviewInput({
   test_changes = null
 }: {
   run_id: string
-  octokit: unknown
+  octokit: Octokit
   pr: PullRequestContext
   trusted_default_branch: TrustedDefaultBranch
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
@@ -129,7 +129,7 @@ async function materializePullRequestReviewInput({
   }
 
   const files = await resolveEventFiles({
-    octokit: octokit as GitHubAppOctokit,
+    octokit,
     pr,
     event_type
   })
@@ -147,7 +147,7 @@ async function materializePullRequestReviewInput({
 
   const prepared = await preparePullRequestReviewInput({
     run_id,
-    octokit: octokit as GitHubAppOctokit,
+    octokit,
     trusted_default_branch,
     pr,
     files,
@@ -190,7 +190,7 @@ async function materializePullRequestReviewInput({
 
 export async function startPullRequestReviewRun(args: {
   run_id: string
-  octokit: unknown
+  octokit: Octokit
   pr: PullRequestContext
   trusted_default_branch: TrustedDefaultBranch
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'

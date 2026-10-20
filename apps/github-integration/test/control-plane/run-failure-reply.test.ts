@@ -4,46 +4,57 @@ import test from 'node:test'
 
 import { sendRunFailureReply } from '../../src/control-plane/run-failure-reply.js'
 import { repositoryFullName } from '../../src/github/repository-service.js'
+import type { Octokit } from 'octokit'
+import { fakeGitHub, githubJson } from '../github-client.js'
 
+/**
+ * A real client whose transport serves the endpoints `sendRunFailureReply` uses, recording what it
+ * was asked to create.
+ *
+ * `installed` is the set of repositories GitHub answers for; anything else is a 404, which is how
+ * a real installation behaves for a repository it cannot see.
+ */
 function stubOctokit(
   report: {
     created: Array<{ owner: string; repo: string }>
     commented: number[]
-    /** Repositories this installation may see; anything else answers 404 like GitHub does. */
     installed?: string[]
   },
   options: { repoLookupFailsWith?: number } = {}
-): never {
+): Octokit {
   const installed = new Set(report.installed ?? [])
-  return {
-    rest: {
-      repos: {
-        get: async ({ owner, repo }: { owner: string; repo: string }) => {
-          if (options.repoLookupFailsWith !== undefined) {
-            throw Object.assign(new Error('lookup failed'), {
-              status: options.repoLookupFailsWith
-            })
-          }
-          if (!installed.has(`${owner}/${repo}`)) {
-            throw Object.assign(new Error('Not Found'), { status: 404 })
-          }
-          return { data: { full_name: `${owner}/${repo}` } }
-        }
-      },
-      issues: {
-        listForRepo: async () => ({ data: [] }),
-        create: async (args: { owner: string; repo: string }) => {
-          report.created.push({ owner: args.owner, repo: args.repo })
-          return { data: { number: 9 } }
-        },
-        listComments: async () => ({ data: [] }),
-        createComment: async (args: { issue_number: number }) => {
-          report.commented.push(args.issue_number)
-          return { data: { id: 1, html_url: 'https://example.test/comment/1' } }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url }) => {
+    const parsed = new URL(url)
+    const pathname = parsed.pathname
+    const repoMatch = /^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(pathname)
+    const owner = repoMatch?.[1] ?? ''
+    const repo = repoMatch?.[2] ?? ''
+    const tail = repoMatch?.[3] ?? ''
+
+    // The installation guard reads the repository first.
+    if (tail === '') {
+      if (options.repoLookupFailsWith !== undefined)
+        return githubJson(
+          { message: 'Server Error' },
+          options.repoLookupFailsWith
+        )
+      if (!installed.has(`${owner}/${repo}`))
+        return githubJson({ message: 'Not Found' }, 404)
+      return githubJson({ full_name: `${owner}/${repo}` })
     }
-  } as never
+    if (tail.endsWith('/issues') && method === 'GET') return githubJson([])
+    if (tail.endsWith('/issues') && method === 'POST') {
+      report.created.push({ owner, repo })
+      return githubJson({ number: 9 })
+    }
+    if (tail.endsWith('/comments') && method === 'GET') return githubJson([])
+    if (tail.endsWith('/comments') && method === 'POST') {
+      report.commented.push(Number(tail.split('/').at(-2)))
+      return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
+    }
+    return githubJson({})
+  })
+  return octokit
 }
 
 test('a repository failure target must be exactly owner/repo', async () => {
@@ -197,7 +208,7 @@ test('a transient repository lookup fault stays retryable', async () => {
       failure_stage: 'preparation',
       failure_code: 'PREPARATION_RETRY_EXHAUSTED'
     }),
-    /lookup failed/
+    /Server Error/
   )
   assert.deepStrictEqual(report.created, [])
 })

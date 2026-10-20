@@ -1,6 +1,6 @@
 import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
 import { findRepositorySecuritySummaryIssue } from '../../github/repository-service.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
 import type { ControlPlaneClient } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
@@ -56,7 +56,7 @@ interface DraftPullRequestSummary {
   reused: boolean
 }
 
-type InstallationOctokitForRepo = (repo_full_name: string) => Promise<unknown>
+type InstallationOctokitForRepo = (repo_full_name: string) => Promise<Octokit>
 type CompletedRunnerRun = {
   run_id: string
   publish_context: Record<string, unknown>
@@ -165,7 +165,7 @@ export async function publishDeliveryDraftPrs({
   assert_publication_claim,
   create_delivery_draft_pr = createRepositoryDeliveryDraftPr
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   repo: RepositoryContext
   run_id: string
   workspace_ref: string
@@ -293,7 +293,7 @@ export async function publishDeliveryDraftPrs({
 }
 
 export async function ensureSummaryIssueNumber(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   repo: RepositoryContext,
   assertPublicationClaim: () => Promise<void>
 ): Promise<number> {
@@ -330,7 +330,7 @@ async function publishRepositoryReviewResult({
   claim_token,
   assert_publication_claim
 }: {
-  octokit: unknown
+  octokit: Octokit
   repo: RepositoryContext
   run_id: string
   workspace_ref: string
@@ -341,7 +341,7 @@ async function publishRepositoryReviewResult({
   claim_token: string
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {
-  const github = octokit as GitHubAppOctokit
+  const github = octokit
   const deliveryStepKeys = (workflow_result.deliveries ?? []).map(
     (delivery) => `repository:delivery:${String(delivery.delivery_id ?? '')}`
   )

@@ -7,54 +7,25 @@ import {
   isRepositoryTriggerConfigError,
   RepositoryTriggerConfigError
 } from '../../src/github/repo-config-service.js'
-import type { GitHubAppOctokit } from '../../src/github/octokit.js'
-
-interface TestErrorWithStatus extends Error {
-  status?: number
-}
+import type { Octokit } from 'octokit'
+import { fakeGitHub, githubFile, githubJson } from '../github-client.js'
 
 type Content_by_path = Record<string, string | Error>
 
 function createOctokitWithContent(
   contentByPath: Content_by_path = {}
-): GitHubAppOctokit {
-  return {
-    auth: async () => ({}),
-    graphql: async () => ({}),
-    request: async () => ({ data: {} }),
-    rest: {
-      git: {},
-      issues: {},
-      pulls: {},
-      repos: {
-        getContent: async ({ path }: { path: string }) => {
-          if (!(path in contentByPath)) {
-            const error: TestErrorWithStatus = new Error('Not found')
-            error.status = 404
-            throw error
-          }
-
-          const source = contentByPath[path]
-          if (typeof source === 'undefined') {
-            const error: TestErrorWithStatus = new Error('Not found')
-            error.status = 404
-            throw error
-          }
-
-          if (source instanceof Error) {
-            throw source
-          }
-
-          return {
-            data: {
-              type: 'file',
-              content: Buffer.from(source, 'utf-8').toString('base64')
-            }
-          }
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+): Octokit {
+  return fakeGitHub(({ url }) => {
+    const path = decodeURIComponent(
+      new URL(url).pathname.split('/contents/')[1] ?? ''
+    )
+    const source = contentByPath[path]
+    // A missing entry is a real 404, which is what GitHub answers for an absent file.
+    if (source === undefined) return githubJson({ message: 'Not Found' }, 404)
+    if (source instanceof Error)
+      return githubJson({ message: source.message }, 500)
+    return githubFile(source, path)
+  }).octokit
 }
 
 const CONFIG_PATH = '.sec-review/config.yml'
@@ -280,21 +251,13 @@ test('fetchRepositoryTriggerConfig rejects a non-file entry instead of parsing i
   // exists but is not a regular file, so the config read fails strictly (like a
   // present-but-invalid config) rather than silently parsing the target path or
   // falling back to defaults.
-  const octokit = {
-    rest: {
-      repos: {
-        getContent: async () => ({
-          data: {
-            type: 'symlink',
-            target: '.sec-review/other.yml',
-            content: Buffer.from('.sec-review/other.yml', 'utf-8').toString(
-              'base64'
-            )
-          }
-        })
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  const octokit = fakeGitHub(() =>
+    githubJson({
+      type: 'symlink',
+      target: '.sec-review/other.yml',
+      content: Buffer.from('.sec-review/other.yml', 'utf-8').toString('base64')
+    })
+  ).octokit
 
   await assert.rejects(
     () =>

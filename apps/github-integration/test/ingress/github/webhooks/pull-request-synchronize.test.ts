@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { handlePullRequestSynchronizeWithDeps } from '../../../../src/ingress/github/webhooks/pull-request-synchronize.js'
+import { unusedGitHub } from '../../../github-client.js'
 
 function createPayload({ fromFork = false, draft = false } = {}) {
   return {
@@ -53,7 +54,7 @@ test('skip automatic review for fork PRs before fetching config or starting a re
   await handlePullRequestSynchronizeWithDeps(
     {
       id: 'delivery-fork-sync',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createPayload({ fromFork: true })
     },
     {
@@ -77,7 +78,7 @@ test('reads trigger config from the trusted default branch resolved by the API',
   await handlePullRequestSynchronizeWithDeps(
     {
       id: 'delivery-same-repo',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createPayload({ fromFork: false })
     },
     {
@@ -111,7 +112,7 @@ test('starts a review for same-repo PRs when automatic mode is enabled', async (
   await handlePullRequestSynchronizeWithDeps(
     {
       id: 'delivery-auto',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createPayload({ fromFork: false })
     },
     {

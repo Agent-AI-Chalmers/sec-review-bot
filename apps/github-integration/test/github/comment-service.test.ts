@@ -6,8 +6,22 @@ import {
   createPullRequestReviewUnlessMarkerExists
 } from '../../src/github/comment-service.js'
 import { setGitHubAppMetadata } from '../../src/github/github-app-metadata-service.js'
-import type { GitHubAppOctokit } from '../../src/github/octokit.js'
 import { PublicationClaimLostError } from '../../src/control-plane/publication-claim.js'
+import { fakeGitHub, githubJson } from '../github-client.js'
+
+/** Records how many times a comment- or review-creating request reached the API. */
+function countingGitHub(respond: Parameters<typeof fakeGitHub>[0]) {
+  const counts = { createComment: 0, createReview: 0 }
+  const harness = fakeGitHub((request) => {
+    if (request.method === 'POST') {
+      const path = new URL(request.url).pathname
+      if (/\/comments$/.test(path)) counts.createComment += 1
+      if (/\/reviews$/.test(path)) counts.createReview += 1
+    }
+    return respond(request)
+  })
+  return { ...harness, counts }
+}
 
 const assertPublicationClaim = async (): Promise<void> => {}
 
@@ -16,32 +30,18 @@ test.beforeEach(() => {
 })
 
 test('createIssueCommentUnlessMarkerExists skips creation when marker already exists', async () => {
-  let createCalls = 0
-  const octokit = {
-    rest: {
-      issues: {
-        listComments: async () => ({
-          data: [
-            {
-              id: 123,
-              body: '<!-- sec-review-bot:repository-summary-run:run-1 -->\nold body',
-              html_url: 'https://example.test/comment/123',
-              user: { login: 'sec-review-bot[bot]', type: 'Bot' }
-            }
-          ]
-        }),
-        createComment: async () => {
-          createCalls += 1
-          return {
-            data: {
-              id: 456,
-              html_url: 'https://example.test/comment/456'
-            }
-          }
+  const { octokit, counts } = countingGitHub(({ method }) => {
+    if (method === 'GET')
+      return githubJson([
+        {
+          id: 123,
+          body: '<!-- sec-review-bot:repository-summary-run:run-1 -->\nold body',
+          html_url: 'https://example.test/comment/123',
+          user: { login: 'sec-review-bot[bot]', type: 'Bot' }
         }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+      ])
+    return githubJson({ id: 456, html_url: 'https://example.test/comment/456' })
+  })
 
   const result = await createIssueCommentUnlessMarkerExists(octokit, {
     owner_login: 'octo',
@@ -54,37 +54,23 @@ test('createIssueCommentUnlessMarkerExists skips creation when marker already ex
 
   assert.strictEqual(result.id, 123)
   assert.strictEqual(result.reused, true)
-  assert.strictEqual(createCalls, 0)
+  assert.strictEqual(counts.createComment, 0)
 })
 
 test('createIssueCommentUnlessMarkerExists does not reuse another bot marker', async () => {
-  let createCalls = 0
   const marker = '<!-- sec-review-bot:repository-summary-run:run-1 -->'
-  const octokit = {
-    rest: {
-      issues: {
-        listComments: async () => ({
-          data: [
-            {
-              id: 123,
-              body: `${marker}\nother bot body`,
-              html_url: 'https://example.test/comment/123',
-              user: { login: 'other-bot[bot]', type: 'Bot' }
-            }
-          ]
-        }),
-        createComment: async () => {
-          createCalls += 1
-          return {
-            data: {
-              id: 456,
-              html_url: 'https://example.test/comment/456'
-            }
-          }
+  const { octokit, counts } = countingGitHub(({ method }) => {
+    if (method === 'GET')
+      return githubJson([
+        {
+          id: 123,
+          body: `${marker}\nother bot body`,
+          html_url: 'https://example.test/comment/123',
+          user: { login: 'other-bot[bot]', type: 'Bot' }
         }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+      ])
+    return githubJson({ id: 456, html_url: 'https://example.test/comment/456' })
+  })
 
   const result = await createIssueCommentUnlessMarkerExists(octokit, {
     owner_login: 'octo',
@@ -97,29 +83,15 @@ test('createIssueCommentUnlessMarkerExists does not reuse another bot marker', a
 
   assert.strictEqual(result.id, 456)
   assert.strictEqual(result.reused, false)
-  assert.strictEqual(createCalls, 1)
+  assert.strictEqual(counts.createComment, 1)
 })
 
 test('createIssueCommentUnlessMarkerExists creates when marker is absent', async () => {
-  let createCalls = 0
-  const octokit = {
-    rest: {
-      issues: {
-        listComments: async () => ({
-          data: []
-        }),
-        createComment: async () => {
-          createCalls += 1
-          return {
-            data: {
-              id: 456,
-              html_url: 'https://example.test/comment/456'
-            }
-          }
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  const { octokit, counts } = countingGitHub(({ method }) =>
+    method === 'GET'
+      ? githubJson([])
+      : githubJson({ id: 456, html_url: 'https://example.test/comment/456' })
+  )
 
   const result = await createIssueCommentUnlessMarkerExists(octokit, {
     owner_login: 'octo',
@@ -132,24 +104,15 @@ test('createIssueCommentUnlessMarkerExists creates when marker is absent', async
 
   assert.strictEqual(result.id, 456)
   assert.strictEqual(result.reused, false)
-  assert.strictEqual(createCalls, 1)
+  assert.strictEqual(counts.createComment, 1)
 })
 
 test('issue comment creation stops after marker lookup when publication claim is lost', async () => {
-  let createCalls = 0
-  const octokit = {
-    rest: {
-      issues: {
-        listComments: async () => ({ data: [] }),
-        createComment: async () => {
-          createCalls += 1
-          return {
-            data: { id: 456, html_url: 'https://example.test/comment/456' }
-          }
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  const { octokit, counts } = countingGitHub(({ method }) =>
+    method === 'GET'
+      ? githubJson([])
+      : githubJson({ id: 456, html_url: 'https://example.test/comment/456' })
+  )
 
   await assert.rejects(
     createIssueCommentUnlessMarkerExists(octokit, {
@@ -164,33 +127,24 @@ test('issue comment creation stops after marker lookup when publication claim is
     }),
     PublicationClaimLostError
   )
-  assert.strictEqual(createCalls, 0)
+  assert.strictEqual(counts.createComment, 0)
 })
 
 test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', async () => {
-  let createCalls = 0
   const marker = '<!-- sec-review-bot:pull-request-review-run:run-1 -->'
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({
-          data: [
-            {
-              id: 123,
-              body: `${marker}\nold body`,
-              html_url: 'https://example.test/review/123',
-              state: 'CHANGES_REQUESTED',
-              user: { login: 'sec-review-bot[bot]', type: 'Bot' }
-            }
-          ]
-        }),
-        createReview: async () => {
-          createCalls += 1
-          throw new Error('createReview should not be called')
+  const { octokit, counts } = countingGitHub(({ method }) => {
+    if (method === 'GET')
+      return githubJson([
+        {
+          id: 123,
+          body: `${marker}\nold body`,
+          html_url: 'https://example.test/review/123',
+          state: 'CHANGES_REQUESTED',
+          user: { login: 'sec-review-bot[bot]', type: 'Bot' }
         }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+      ])
+    throw new Error('createReview should not be called')
+  })
 
   const result = await createPullRequestReviewUnlessMarkerExists(octokit, {
     owner_login: 'octo',
@@ -210,29 +164,20 @@ test('createPullRequestReviewUnlessMarkerExists reuses a marked bot review', asy
     state: 'CHANGES_REQUESTED',
     reused: true
   })
-  assert.strictEqual(createCalls, 0)
+  assert.strictEqual(counts.createReview, 0)
 })
 
 test('createPullRequestReviewUnlessMarkerExists creates when marker is absent', async () => {
-  let createCalls = 0
   const marker = '<!-- sec-review-bot:pull-request-review-run:run-1 -->'
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async () => {
-          createCalls += 1
-          return {
-            data: {
-              id: 456,
-              html_url: 'https://example.test/review/456',
-              state: 'CHANGES_REQUESTED'
-            }
-          }
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  const { octokit, counts } = countingGitHub(({ method }) =>
+    method === 'GET'
+      ? githubJson([])
+      : githubJson({
+          id: 456,
+          html_url: 'https://example.test/review/456',
+          state: 'CHANGES_REQUESTED'
+        })
+  )
 
   const result = await createPullRequestReviewUnlessMarkerExists(octokit, {
     owner_login: 'octo',
@@ -248,37 +193,29 @@ test('createPullRequestReviewUnlessMarkerExists creates when marker is absent', 
 
   assert.strictEqual(result.id, 456)
   assert.strictEqual(result.reused, false)
-  assert.strictEqual(createCalls, 1)
+  assert.strictEqual(counts.createReview, 1)
 })
 
 test('approval fallback rechecks publication ownership before creating a comment review', async () => {
-  let createCalls = 0
   let ownershipChecks = 0
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async () => {
-          createCalls += 1
-          if (createCalls === 1) {
-            throw {
-              response: {
-                status: 422,
-                data: { message: 'Cannot approve your own pull request' }
-              }
-            }
-          }
-          return {
-            data: {
-              id: 456,
-              html_url: 'https://example.test/review/456',
-              state: 'COMMENTED'
-            }
-          }
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  let reviewAttempts = 0
+  const { octokit, counts } = countingGitHub(({ method }) => {
+    if (method === 'GET') return githubJson([])
+    reviewAttempts += 1
+    // The first attempt is rejected the way GitHub rejects approving your own PR. Returning a
+    // response (rather than throwing) is what a real API does, so Octokit maps it to a
+    // RequestError with status 422 and the code under test takes its fallback path.
+    if (reviewAttempts === 1)
+      return githubJson(
+        { message: 'Cannot approve your own pull request' },
+        422
+      )
+    return githubJson({
+      id: 456,
+      html_url: 'https://example.test/review/456',
+      state: 'COMMENTED'
+    })
+  })
 
   await createPullRequestReviewUnlessMarkerExists(octokit, {
     owner_login: 'octo',
@@ -294,6 +231,6 @@ test('approval fallback rechecks publication ownership before creating a comment
     }
   })
 
-  assert.strictEqual(createCalls, 2)
+  assert.strictEqual(counts.createReview, 2)
   assert.strictEqual(ownershipChecks, 2)
 })

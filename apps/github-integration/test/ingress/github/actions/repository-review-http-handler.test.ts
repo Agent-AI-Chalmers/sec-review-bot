@@ -4,7 +4,8 @@ import test from 'node:test'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { App } from 'octokit'
 
-import { appWithInstallationOctokit } from '../../../github-app-stubs.js'
+import { fakeApp as fakeGitHubApp } from '../../../github-app-stubs.js'
+import { githubJson } from '../../../github-client.js'
 import { RepositoryReviewDispatchValidationError } from '../../../../src/triggers/repository-review.js'
 
 process.env.APP_ID = process.env.APP_ID || '123456'
@@ -61,28 +62,14 @@ function captureResponse(): ServerResponse & {
 }
 
 function fakeApp(): App {
-  return appWithInstallationOctokit({
-    installation_octokit: {
-      rest: {
-        repos: {
-          getBranch: async () => ({
-            data: {
-              commit: {
-                sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-              }
-            }
-          }),
-          getCommit: async ({ ref }: { ref: string }) => ({
-            data: {
-              sha: String(ref)
-            }
-          })
-        }
-      }
-    },
-    expected_owner: 'octo',
-    expected_repo: 'example'
-  })
+  // `dispatchReview` is injected in every test, so the App only has to answer the installation
+  // lookup; the branch and commit reads the real dispatch would make never happen.
+  return fakeGitHubApp({
+    respond: ({ url }) =>
+      /^\/repos\/[^/]+\/[^/]+\/installation$/.test(new URL(url).pathname)
+        ? githubJson({ id: 123 })
+        : githubJson({ message: 'Not Found' }, 404)
+  }).app
 }
 
 test('repository dispatch forwards test_changes to repository review submission', async () => {

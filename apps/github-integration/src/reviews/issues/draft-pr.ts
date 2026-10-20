@@ -4,7 +4,7 @@ import {
   hasReviewRecordPatchReadyForPromotion,
   normalizePromotionFilePath
 } from './renderer.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { ReviewRecord } from '../review-record.js'
 import type { FileChange, FileMode } from '../file-change.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
@@ -100,7 +100,7 @@ function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
 }
 
 async function buildTreeElementsFromFileChanges(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   file_changes: FileChange[],
   issue: IssueContext,
   assertPublicationClaim: () => Promise<void>
@@ -156,7 +156,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
   review_record,
   assert_publication_claim
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   issue: IssueContext
   run_id: string
   workspace_ref: string

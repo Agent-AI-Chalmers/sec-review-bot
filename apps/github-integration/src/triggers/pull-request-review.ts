@@ -18,6 +18,7 @@ import {
   startPullRequestReviewRun,
   type SubmittedPullRequestReviewRun
 } from '../reviews/pull-requests/submit.js'
+import type { Octokit } from 'octokit'
 
 type PullRequestReviewEventType =
   'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
@@ -49,7 +50,7 @@ interface StartPullRequestReviewCommandDeps {
 }
 
 interface StartPullRequestReviewCommandArgs {
-  octokit: unknown
+  octokit: Octokit
   pr?: PullRequestContext
   resolve_pr?: () => Promise<PullRequestContext>
   trusted_default_branch: TrustedDefaultBranch

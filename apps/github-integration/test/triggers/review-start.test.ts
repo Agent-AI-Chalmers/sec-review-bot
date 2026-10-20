@@ -11,6 +11,7 @@ import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
 import type { ReviewRunRecord } from '../../src/control-plane/client.js'
+import { unusedGitHub } from '../github-client.js'
 
 /** An admitted run record as the Control Plane returns it, with the axis shapes spelled once.
  *
@@ -125,7 +126,7 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
   const transitions: unknown[] = []
 
   const submitted = await startIssueReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     issue,
     event_type: 'opened',
@@ -210,7 +211,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
   const transitions: unknown[] = []
 
   const submitted = await startPullRequestReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     pr,
     event_type: 'manual_review',
@@ -294,7 +295,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
 
   await assert.rejects(
     startPullRequestReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
@@ -351,7 +352,7 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
 
   await assert.rejects(
     startIssueReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       issue: issueContext(),
       event_type: 'opened',
@@ -411,7 +412,7 @@ test('startPullRequestReviewCommand preserves an uncertain Runner submission for
 
   await assert.rejects(
     startPullRequestReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
@@ -466,7 +467,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
 
   await assert.rejects(
     startPullRequestReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',
       delivery_id: 'delivery-context-failure',
@@ -532,7 +533,7 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
   const pr = pullRequestContext()
   const checkpoints: unknown[][] = []
   await startPullRequestReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     event_type: 'manual_review',
     delivery_id: 'delivery-checkpoint',
@@ -594,7 +595,7 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
 test('startPullRequestReviewCommand reuses a webhook delivery without starting another review', async () => {
   let starts = 0
   const submitted = await startPullRequestReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     pr: pullRequestContext(),
     event_type: 'opened',
@@ -634,7 +635,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
 test('startIssueReviewCommand reuses a webhook delivery without starting another review', async () => {
   let starts = 0
   const submitted = await startIssueReviewCommand({
-    octokit: {},
+    octokit: unusedGitHub().octokit,
     trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
     issue: issueContext(),
     event_type: 'opened',
@@ -676,7 +677,7 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
 
   await assert.rejects(
     startPullRequestReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       pr: pullRequestContext(),
       event_type: 'opened',
@@ -728,7 +729,7 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
 
   await assert.rejects(
     startIssueReviewCommand({
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       issue: issueContext(),
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',

@@ -1,4 +1,4 @@
-import type { GitHubAppOctokit } from './octokit.js'
+import type { Octokit } from 'octokit'
 
 /**
  * Resolve the default branch of the repository under review via the GitHub API.
@@ -26,7 +26,7 @@ export interface TrustedDefaultBranchArgs {
  * Throws on any failure (403/404/timeout/rate-limit/...); never reads payload.
  */
 export async function resolveTrustedDefaultBranch(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   { owner_login, repo_name }: TrustedDefaultBranchArgs
 ): Promise<TrustedDefaultBranch> {
   const repository = await octokit.rest.repos.get({

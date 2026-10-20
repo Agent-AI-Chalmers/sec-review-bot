@@ -11,7 +11,7 @@ import {
   type PullRequestFileSummary
 } from '../../github/pull-request-service.js'
 import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { PullRequestReviewInput } from '../../runner/input.js'
 import type { TestChangesPolicy } from '../../runner/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
@@ -123,7 +123,7 @@ async function listCommitChainRefsForPullRequest({
   octokit,
   pr
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   pr: PullRequestContext
 }): Promise<string[]> {
   const query = `
@@ -194,7 +194,7 @@ async function materializeWorkspaceHistory({
   workspace_path,
   commit_refs
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   pr: PullRequestContext
   workspace_path: string
   commit_refs: string[]
@@ -248,7 +248,7 @@ async function materializeHistoryArtifacts({
   pr,
   history_path
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   pr: PullRequestContext
   history_path: string
 }): Promise<{
@@ -300,7 +300,7 @@ export async function preparePullRequestReviewInput({
   test_changes = null
 }: {
   run_id: string
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   pr: PullRequestContext
   files: PullRequestFile[]
   trusted_default_branch: TrustedDefaultBranch

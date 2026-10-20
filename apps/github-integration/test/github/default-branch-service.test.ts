@@ -6,7 +6,7 @@ import {
   type TrustedDefaultBranch
 } from '../../src/github/default-branch-service.js'
 import { resolveTrustedRepositoryIdentity } from '../../src/github/pull-request-service.js'
-import type { GitHubAppOctokit } from '../../src/github/octokit.js'
+import { fakeGitHub, githubFile, githubJson } from '../github-client.js'
 
 interface RepoGetCall {
   owner: string
@@ -19,8 +19,10 @@ interface BranchGetCall extends RepoGetCall {
 function makeOctokit(options: {
   default_branch?: string
   head_sha?: string
-  getThrows?: Error
-  branchThrows?: Error
+  /** An HTTP error status for the repository metadata call (a real API reply, so Octokit maps it
+   * to a RequestError with that status instead of retrying a thrown network fault). */
+  getStatus?: number
+  branchStatus?: number
   onRepoGet?: (call: RepoGetCall) => void
   onBranchGet?: (call: BranchGetCall) => void
 }) {
@@ -28,35 +30,40 @@ function makeOctokit(options: {
     repoGet: [] as RepoGetCall[],
     branchGet: [] as BranchGetCall[]
   }
-  const octokit = {
-    rest: {
-      repos: {
-        get: async ({ owner, repo }: RepoGetCall) => {
-          calls.repoGet.push({ owner, repo })
-          options.onRepoGet?.({ owner, repo })
-          if (options.getThrows) throw options.getThrows
-          return { data: { default_branch: options.default_branch ?? 'main' } }
-        },
-        getContent: async () => ({
-          data: {
-            type: 'file',
-            content: Buffer.from(
-              'sec_review_bot:\n  trigger_mode: manual_only\n'
-            ).toString('base64')
-          }
-        }),
-        getBranch: async ({ owner, repo, branch }: BranchGetCall) => {
-          calls.branchGet.push({ owner, repo, branch })
-          options.onBranchGet?.({ owner, repo, branch })
-          if (options.branchThrows) throw options.branchThrows
-          return {
-            data: { commit: { sha: options.head_sha ?? 'default-sha' } }
-          }
-        }
-      }
+  const { octokit, requests } = fakeGitHub(({ url }) => {
+    // GET /repos/{owner}/{repo}            -> repository metadata
+    // GET /repos/{owner}/{repo}/branches/{branch} -> branch head
+    // GET /repos/{owner}/{repo}/contents/{path}   -> the config file
+    const match = /\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(
+      new URL(url).pathname
+    )
+    const owner = match?.[1] ?? ''
+    const repo = match?.[2] ?? ''
+    const tail = match?.[3] ?? ''
+
+    const branchMatch = /^\/branches\/(.+)$/.exec(tail)
+    if (branchMatch) {
+      const branch = decodeURIComponent(branchMatch[1] ?? '')
+      calls.branchGet.push({ owner, repo, branch })
+      options.onBranchGet?.({ owner, repo, branch })
+      if (options.branchStatus !== undefined)
+        return githubJson({ message: 'not found' }, options.branchStatus)
+      return githubJson({
+        commit: { sha: options.head_sha ?? 'default-sha' }
+      })
     }
-  } as unknown as GitHubAppOctokit
-  return { octokit, calls }
+
+    if (tail.startsWith('/contents/')) {
+      return githubFile('sec_review_bot:\n  trigger_mode: manual_only\n')
+    }
+
+    calls.repoGet.push({ owner, repo })
+    options.onRepoGet?.({ owner, repo })
+    if (options.getStatus !== undefined)
+      return githubJson({ message: 'forbidden' }, options.getStatus)
+    return githubJson({ default_branch: options.default_branch ?? 'main' })
+  })
+  return { octokit, calls, requests }
 }
 
 // Invariant 3: branch name/SHA resolved by API, not from any payload field.
@@ -84,26 +91,26 @@ test('resolveTrustedDefaultBranch resolves the default branch via the API', asyn
 
 // Invariant 4: API failure -> explicit failure, no fallback.
 test('resolveTrustedDefaultBranch throws when the repository API call fails', async () => {
-  const { octokit } = makeOctokit({ getThrows: new Error('403 rate limited') })
+  const { octokit } = makeOctokit({ getStatus: 403 })
   await assert.rejects(
     () =>
       resolveTrustedDefaultBranch(octokit, {
         owner_login: 'octo',
         repo_name: 'example'
       }),
-    /403 rate limited/
+    (e: { status?: number }) => e.status === 403
   )
 })
 
 test('resolveTrustedDefaultBranch throws when the branch API call fails', async () => {
-  const { octokit } = makeOctokit({ branchThrows: new Error('404 not found') })
+  const { octokit } = makeOctokit({ branchStatus: 404 })
   await assert.rejects(
     () =>
       resolveTrustedDefaultBranch(octokit, {
         owner_login: 'octo',
         repo_name: 'example'
       }),
-    /404 not found/
+    (e: { status?: number }) => e.status === 404
   )
 })
 

@@ -4,13 +4,13 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { App } from 'octokit'
 
-import { appWithInstallationOctokit } from '../github-app-stubs.js'
+import { fakeApp as fakeGitHubApp } from '../github-app-stubs.js'
 import {
   dispatchRepositoryReview,
   resolveRepositoryReviewDispatch,
   RepositoryReviewDispatchValidationError
 } from '../../src/triggers/repository-review.js'
-import type { GitHubAppOctokit } from '../../src/github/octokit.js'
+import type { Octokit } from 'octokit'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 
 /** An admitted run record as the Control Plane returns it, with the axis shapes spelled once.
@@ -64,59 +64,54 @@ const preparationClaim = {
 import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
 import type { ReviewRunRecord } from '../../src/control-plane/client.js'
 import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
 
 function fakeApp(): App {
-  return appWithInstallationOctokit({
-    installation_octokit: {
-      installation_id: 123
-    } as unknown as GitHubAppOctokit,
-    expected_owner: 'octo',
-    expected_repo: 'example'
-  })
+  // Every test below injects `deps.getInstallationOctokit`, so the App only has to answer the
+  // installation *lookup*; the client it would otherwise hand back is never reached.
+  return fakeGitHubApp({
+    respond: ({ url }) => {
+      const match = /^\/repos\/([^/]+)\/([^/]+)\/installation$/.exec(
+        new URL(url).pathname
+      )
+      if (!match) return githubJson({ message: 'Not Found' }, 404)
+      return githubJson({ id: 123 })
+    }
+  }).app
 }
 
-function octokitWithRefs(): GitHubAppOctokit {
-  return {
-    rest: {
-      repos: {
-        getBranch: async ({ branch }: { branch: string }) => {
-          if (branch !== 'main') {
-            throw new Error('not a branch')
-          }
-          return {
-            data: {
-              commit: {
-                sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-              }
-            }
-          }
-        },
-        getCommit: async ({ ref }: { ref: string }) => ({
-          data: {
-            sha:
-              ref === 'aaaaaaaa'
-                ? 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-                : ref === 'cccccccc'
-                  ? 'cccccccccccccccccccccccccccccccccccccccc'
-                  : String(ref)
-          }
-        }),
-        listCommits: async () => ({
-          data: [
-            {
-              sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-              commit: {
-                message: 'base',
-                author: {
-                  date: '2026-05-24T00:00:00Z'
-                }
-              }
-            }
-          ]
-        })
-      }
+function octokitWithRefs(): Octokit {
+  return fakeGitHub(({ url }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.includes('/branches/')) {
+      const branch = decodeURIComponent(pathname.split('/branches/')[1] ?? '')
+      // Only `main` is a branch; anything else is a real 404 from GitHub.
+      if (branch !== 'main') return githubJson({ message: 'Not Found' }, 404)
+      return githubJson({
+        commit: { sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }
+      })
     }
-  } as unknown as GitHubAppOctokit
+    if (pathname.includes('/commits/')) {
+      const ref = decodeURIComponent(pathname.split('/commits/')[1] ?? '')
+      return githubJson({
+        sha:
+          ref === 'aaaaaaaa'
+            ? 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+            : ref === 'cccccccc'
+              ? 'cccccccccccccccccccccccccccccccccccccccc'
+              : ref
+      })
+    }
+    if (pathname.endsWith('/commits')) {
+      return githubJson([
+        {
+          sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          commit: { message: 'base', author: { date: '2026-05-24T00:00:00Z' } }
+        }
+      ])
+    }
+    return githubJson({})
+  }).octokit
 }
 
 test('repository dispatch request resolves scheduled incremental window in the app layer', async () => {
@@ -173,7 +168,7 @@ test('repository dispatch request resolves manual incremental refs from raw payl
 })
 
 test('dispatchRepositoryReview resolves, submits, and persists a queued repository review run', async () => {
-  const octokit = { test: 'octokit' } as unknown as GitHubAppOctokit
+  const { octokit } = unusedGitHub()
   const saved_runs: unknown[] = []
   const submit_calls: unknown[] = []
   const resolved = {
@@ -379,7 +374,7 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
         correlation_id: 'actions-invalid-window'
       },
       deps: {
-        getInstallationOctokit: async () => ({}) as GitHubAppOctokit,
+        getInstallationOctokit: async () => unusedGitHub().octokit,
         resolve_dispatch: async () => {
           throw new Error('manual incremental scan requires base_sha.')
         },
@@ -473,7 +468,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
         correlation_id: 'actions-run-failed'
       },
       deps: {
-        getInstallationOctokit: async () => ({}) as GitHubAppOctokit,
+        getInstallationOctokit: async () => unusedGitHub().octokit,
         resolve_dispatch: async () => ({
           repo_full_name: 'octo/example',
           target_branch: 'main',
@@ -552,7 +547,7 @@ test('dispatchRepositoryReview preserves an uncertain Runner submission for repl
         correlation_id: 'actions-run-uncertain'
       },
       deps: {
-        getInstallationOctokit: async () => ({}) as GitHubAppOctokit,
+        getInstallationOctokit: async () => unusedGitHub().octokit,
         resolve_dispatch: async () => ({
           repo_full_name: 'octo/example',
           target_branch: 'main',

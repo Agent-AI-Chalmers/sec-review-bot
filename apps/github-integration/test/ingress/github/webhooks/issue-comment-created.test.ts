@@ -9,6 +9,7 @@ import type { SubmittedIssueReviewRun } from '../../../../src/reviews/issues/sub
 import type { SubmittedPullRequestReviewRun } from '../../../../src/reviews/pull-requests/submit.js'
 import { handleIssueCommentCreatedWithDeps } from '../../../../src/ingress/github/webhooks/issue-comment-created.js'
 import { createLogThrottle } from '../../../../src/utils/log-throttle.js'
+import { unusedGitHub } from '../../../github-client.js'
 
 setGitHubAppMetadata({
   id: 1,
@@ -132,7 +133,7 @@ test('issue-comment-created skips manual command when commenter lacks write perm
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload()
     },
     {
@@ -170,7 +171,7 @@ test('issue-comment-created starts an audited issue manual review for write comm
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review'
       })
@@ -213,7 +214,7 @@ test('issue-comment-created forwards the open-pr opt-in for issue reviews', asyn
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-draft-pr',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review --open-pr'
       })
@@ -242,7 +243,7 @@ test('issue-comment-created starts pull request manual review for write commente
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review',
         is_pull_request: true
@@ -282,7 +283,7 @@ test('issue-comment-created delegates PR context loading until after command adm
   await handleIssueCommentCreatedWithDeps(
     {
       id: 'delivery-pr-context',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueCommentPayload({
         body: '@sec-review-bot review',
         is_pull_request: true
@@ -348,7 +349,7 @@ test('an unrecognized mention logs at most once per repository per window', asyn
         await handleIssueCommentCreatedWithDeps(
           {
             id: `delivery-${repository}-${attempt}`,
-            octokit: {},
+            octokit: unusedGitHub().octokit,
             payload: {
               ...payload,
               repository: { ...payload.repository, full_name: repository }

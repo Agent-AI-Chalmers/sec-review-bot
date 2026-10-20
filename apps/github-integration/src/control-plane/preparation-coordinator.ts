@@ -16,10 +16,7 @@ import {
   type PullRequestContext
 } from '../github/pull-request-service.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
-import {
-  repositoryFullName,
-  splitRepoFullName
-} from '../github/repository-service.js'
+import { repositoryFullName } from '../github/repository-service.js'
 import { isRecord } from '../utils/error-utils.js'
 import { logError, logInfo } from '../utils/logger.js'
 import {
@@ -27,6 +24,7 @@ import {
   InvalidPreparationInputError
 } from './preparation-failure.js'
 import { sendRunFailureReply } from './run-failure-reply.js'
+import { installationOctokitForRepo } from '../github/installation-client.js'
 
 interface PreparationCoordinator {
   stop: () => Promise<void>
@@ -38,18 +36,6 @@ function pollIntervalMs(): number {
     10
   )
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 5000
-}
-
-async function installationOctokitForRepo(
-  app: App,
-  repoFullName: string
-): Promise<unknown> {
-  const { owner_login, repo_name } = splitRepoFullName(repoFullName)
-  const installation = await app.octokit.rest.apps.getRepoInstallation({
-    owner: owner_login,
-    repo: repo_name
-  })
-  return await app.getInstallationOctokit(installation.data.id)
 }
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
@@ -135,7 +121,7 @@ async function executeClaimedPreparation({
     )
     const pr =
       persistedPr ??
-      (await getPullRequestContext(octokit as never, {
+      (await getPullRequestContext(octokit, {
         owner_login,
         repo_name,
         pr_number: Number(reference?.pr_number)
@@ -231,7 +217,7 @@ async function deliverNextRunFailureNotice({
       repo === null
         ? null
         : await sendRunFailureReply(
-            (await installationOctokitForRepo(app, repo)) as never,
+            await installationOctokitForRepo(app, repo),
             {
               run_id: notice.run_id,
               input,

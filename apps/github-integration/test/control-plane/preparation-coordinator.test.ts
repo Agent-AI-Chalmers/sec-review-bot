@@ -4,44 +4,25 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { prepareReviewRunsOnce } from '../../src/control-plane/preparation-coordinator.js'
+import { fakeApp } from '../github-app-stubs.js'
+import { fakeGitHub, githubJson } from '../github-client.js'
 
 test('terminal preparation notice reaches a pull request reconstructed from pr_reference', async () => {
-  const calls: unknown[] = []
-  const app = {
-    octokit: {
-      rest: {
-        apps: {
-          getRepoInstallation: async (args: unknown) => {
-            calls.push(['installation', args])
-            return { data: { id: 42 } }
-          }
-        }
-      }
-    },
-    getInstallationOctokit: async () => ({
-      rest: {
-        // The reply path verifies a target repository against the installation before writing.
-        repos: {
-          get: async (args: unknown) => {
-            calls.push(['repos.get', args])
-            return { data: { full_name: 'octo/example' } }
-          }
-        },
-        issues: {
-          listComments: async (args: unknown) => {
-            calls.push(['list', args])
-            return { data: [] }
-          },
-          createComment: async (args: unknown) => {
-            calls.push(['create', args])
-            return {
-              data: { id: 9, html_url: 'https://example.test/comment/9' }
-            }
-          }
-        }
-      }
-    })
-  }
+  // A real App whose transport answers the installation lookup; the installation client it
+  // hands back is a real Octokit over a second fake transport, so every GitHub call below is a
+  // real request this test can assert on.
+  const client = fakeGitHub(({ method, url }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/comments') && method === 'GET')
+      return githubJson([])
+    if (pathname.endsWith('/comments'))
+      return githubJson({ id: 9, html_url: 'https://example.test/comment/9' })
+    return githubJson({ full_name: 'octo/example' })
+  })
+  const { app, requests } = fakeApp({
+    respond: () => githubJson({ id: 42 }),
+    installationOctokit: client.octokit
+  })
   const completed: unknown[] = []
   const store = {
     claimNextRunFailureNotice: async () => ({
@@ -65,25 +46,25 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   }
 
   assert.strictEqual(
-    await prepareReviewRunsOnce({ app: app as never, store: store as never }),
+    await prepareReviewRunsOnce({ app, store: store as never }),
     true
   )
-  assert.deepStrictEqual(calls.slice(0, 3), [
-    ['installation', { owner: 'octo', repo: 'example' }],
-    ['repos.get', { owner: 'octo', repo: 'example' }],
+  // The installation lookup is the only request the App itself makes.
+  assert.strictEqual(requests.length, 1)
+  assert.match(requests[0]!.url, /\/repos\/octo\/example\/installation$/)
+  // The reply path then verifies the repository and posts the notice through the client.
+  assert.deepStrictEqual(
+    client.requests.map(
+      (request) => `${request.method} ${new URL(request.url).pathname}`
+    ),
     [
-      'list',
-      {
-        owner: 'octo',
-        repo: 'example',
-        issue_number: 7,
-        per_page: 100,
-        page: 1
-      }
+      'GET /repos/octo/example',
+      'GET /repos/octo/example/issues/7/comments',
+      'POST /repos/octo/example/issues/7/comments'
     ]
-  ])
-  const create = calls[3] as ['create', { body: string }]
-  assert.match(create[1].body, /run-pr-reference/)
+  )
+  const posted = client.requests[2]!.body as { body: string }
+  assert.match(posted.body, /run-pr-reference/)
   assert.deepStrictEqual(completed, [
     // The comment that was posted, so the console can link the requester to it.
     ['run-pr-reference', 'notice-token', true, 'https://example.test/comment/9']
@@ -114,7 +95,8 @@ test('preparation-first scheduling falls back to a terminal notice when no prepa
 
   assert.strictEqual(
     await prepareReviewRunsOnce({
-      app: {} as never,
+      // Nothing here may reach GitHub: any request would surface as a recorded request.
+      app: fakeApp().app,
       store: store as never,
       preferFailureNotice: false
     }),
@@ -128,53 +110,26 @@ test('a repository scan failure reports into the repository summary issue', asyn
   // a schedule. Its success path reports into the repository's summary issue, so a failure has
   // to be readable in the same place; otherwise whoever started the scan sees nothing, and the
   // outcome exists only inside the Control Plane.
-  const calls: Array<[string, unknown]> = []
-  const app = {
-    octokit: {
-      rest: {
-        apps: {
-          getRepoInstallation: async (args: unknown) => {
-            calls.push(['installation', args])
-            return { data: { id: 42 } }
-          }
+  const client = fakeGitHub(({ method, url }) => {
+    const pathname = new URL(url).pathname
+    // The summary issue already exists: the reply must comment on it, not create a new one.
+    if (pathname.endsWith('/issues') && method === 'GET')
+      return githubJson([
+        {
+          number: 77,
+          title: '[sec-review-bot] Repository Security Review Summary'
         }
-      }
-    },
-    getInstallationOctokit: async () => ({
-      rest: {
-        // The reply path verifies the target repository against the installation before writing.
-        repos: {
-          get: async (args: unknown) => {
-            calls.push(['repos.get', args])
-            return { data: { full_name: 'octo/example' } }
-          }
-        },
-        issues: {
-          listForRepo: async (args: unknown) => {
-            calls.push(['list-for-repo', args])
-            return {
-              data: [
-                {
-                  number: 77,
-                  title: '[sec-review-bot] Repository Security Review Summary'
-                }
-              ]
-            }
-          },
-          listComments: async (args: unknown) => {
-            calls.push(['list-comments', args])
-            return { data: [] }
-          },
-          createComment: async (args: unknown) => {
-            calls.push(['create-comment', args])
-            return {
-              data: { id: 5, html_url: 'https://example.test/comment/5' }
-            }
-          }
-        }
-      }
-    })
-  }
+      ])
+    if (pathname.endsWith('/comments') && method === 'GET')
+      return githubJson([])
+    if (pathname.endsWith('/comments') && method === 'POST')
+      return githubJson({ id: 5, html_url: 'https://example.test/comment/5' })
+    return githubJson({ full_name: 'octo/example' })
+  })
+  const { app } = fakeApp({
+    respond: () => githubJson({ id: 42 }),
+    installationOctokit: client.octokit
+  })
   const completed: unknown[] = []
   const store = {
     claimNextRunFailureNotice: async () => ({
@@ -196,15 +151,18 @@ test('a repository scan failure reports into the repository summary issue', asyn
   }
 
   assert.strictEqual(
-    await prepareReviewRunsOnce({ app: app as never, store: store as never }),
+    await prepareReviewRunsOnce({ app, store: store as never }),
     true
   )
-  const created = calls.find(([kind]) => kind === 'create-comment')
+  const created = client.requests.find(
+    (request) =>
+      request.method === 'POST' &&
+      new URL(request.url).pathname.endsWith('/comments')
+  )
   assert.ok(created, 'the failure must be posted as a comment')
-  const body = created[1] as { body: string; issue_number: number }
-  assert.strictEqual(
-    body.issue_number,
-    77,
+  const body = created.body as { body: string }
+  assert.ok(
+    new URL(created.url).pathname.includes('/issues/77/'),
     'it reports into the existing summary issue, not a new one'
   )
   assert.match(body.body, /run-repository/)
@@ -238,23 +196,14 @@ test('an unrecoverable notice concludes instead of being retried forever', async
     },
     claimNextPreparation: async () => assert.fail('notice takes priority')
   }
-  const app = {
-    octokit: {
-      rest: {
-        apps: {
-          getRepoInstallation: async () => {
-            throw Object.assign(new Error('Not Found'), { status: 404 })
-          }
-        }
-      }
-    },
-    getInstallationOctokit: async () => {
-      throw new Error('unused: the installation lookup already failed')
-    }
-  }
+  // A 404 from the installation lookup is what GitHub answers for "this app is not installed";
+  // retrying can never change it, so the notice must be concluded as undelivered.
+  const { app } = fakeApp({
+    respond: () => githubJson({ message: 'Not Found' }, 404)
+  })
 
   assert.strictEqual(
-    await prepareReviewRunsOnce({ app: app as never, store: store as never }),
+    await prepareReviewRunsOnce({ app, store: store as never }),
     true
   )
   assert.deepStrictEqual(
@@ -289,23 +238,13 @@ test('a transient notice failure stays claimable for another attempt', async () 
     },
     claimNextPreparation: async () => assert.fail('notice takes priority')
   }
-  const app = {
-    octokit: {
-      rest: {
-        apps: {
-          getRepoInstallation: async () => {
-            throw Object.assign(new Error('Server Error'), { status: 503 })
-          }
-        }
-      }
-    },
-    getInstallationOctokit: async () => {
-      throw new Error('unused: the installation lookup already failed')
-    }
-  }
+  // A 5xx is transient: the notice must stay claimed so the next lease retries it.
+  const { app } = fakeApp({
+    respond: () => githubJson({ message: 'Server Error' }, 503)
+  })
 
   assert.strictEqual(
-    await prepareReviewRunsOnce({ app: app as never, store: store as never }),
+    await prepareReviewRunsOnce({ app, store: store as never }),
     true
   )
   assert.deepStrictEqual(

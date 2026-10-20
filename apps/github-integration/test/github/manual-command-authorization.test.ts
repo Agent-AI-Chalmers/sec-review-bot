@@ -5,16 +5,11 @@ import {
   authorizeManualCommentCommand,
   normalizeRepositoryPermission
 } from '../../src/github/manual-command-authorization.js'
-import type { GitHubAppOctokit } from '../../src/github/octokit.js'
+import type { Octokit } from 'octokit'
+import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
 
-function octokitWithPermission(permission: string): GitHubAppOctokit {
-  return {
-    rest: {
-      repos: {
-        getCollaboratorPermissionLevel: async () => ({ data: { permission } })
-      }
-    }
-  } as unknown as GitHubAppOctokit
+function octokitWithPermission(permission: string): Octokit {
+  return fakeGitHub(() => githubJson({ permission })).octokit
 }
 
 test('normalizes unknown repository permissions conservatively', () => {
@@ -65,17 +60,9 @@ test('manual comment authorization denies triage permission', async () => {
 })
 
 test('manual comment authorization denies missing sender without GitHub lookup', async () => {
-  let lookupCalled = false
-  const octokit = {
-    rest: {
-      repos: {
-        getCollaboratorPermissionLevel: async () => {
-          lookupCalled = true
-          throw new Error('lookup should not be called')
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  // `unusedGitHub` throws if the code under test reaches GitHub, so `lookupCalled` staying false
+  // is proven by the request never arriving rather than by a stub being bypassed.
+  const { octokit, requests } = unusedGitHub()
 
   const decision = await authorizeManualCommentCommand({
     octokit,
@@ -87,19 +74,14 @@ test('manual comment authorization denies missing sender without GitHub lookup',
   assert.strictEqual(decision.allowed, false)
   assert.strictEqual(decision.permission, 'unknown')
   assert.strictEqual(decision.reason, 'missing-sender')
-  assert.strictEqual(lookupCalled, false)
+  assert.strictEqual(requests.length, 0, 'no GitHub request may be made')
 })
 
 test('manual comment authorization denies when permission lookup fails', async () => {
-  const octokit = {
-    rest: {
-      repos: {
-        getCollaboratorPermissionLevel: async () => {
-          throw new Error('GitHub unavailable')
-        }
-      }
-    }
-  } as unknown as GitHubAppOctokit
+  // A real API failure is an HTTP error status, which Octokit maps to a RequestError.
+  const octokit = fakeGitHub(() =>
+    githubJson({ message: 'unavailable' }, 500)
+  ).octokit
 
   const decision = await authorizeManualCommentCommand({
     octokit,

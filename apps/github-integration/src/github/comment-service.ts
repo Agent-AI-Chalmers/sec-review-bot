@@ -1,4 +1,9 @@
-import type { GitHubAppOctokit, GitHubPullRequestReview } from './octokit.js'
+import type { Octokit } from 'octokit'
+
+/** A single pull-request review, as the SDK returns it. */
+type GitHubPullRequestReview = Awaited<
+  ReturnType<Octokit['rest']['pulls']['listReviews']>
+>['data'][number]
 import { wasAuthoredByCurrentAppBot } from './github-app-metadata-service.js'
 import { asErrorWithResponse } from '../utils/error-utils.js'
 
@@ -80,7 +85,7 @@ function isOwnPullRequestApprovalError(error: unknown): boolean {
 }
 
 async function createIssueComment(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   { owner_login, repo_name, issue_number, body }: CreateIssueCommentArgs,
   assertPublicationClaim: () => Promise<void>
 ): Promise<{ id: number; html_url: string }> {
@@ -96,7 +101,7 @@ async function createIssueComment(
 }
 
 async function findIssueCommentByMarker(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   {
     owner_login,
     repo_name,
@@ -140,7 +145,7 @@ async function findIssueCommentByMarker(
 }
 
 export async function createIssueCommentUnlessMarkerExists(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   {
     owner_login,
     repo_name,
@@ -178,7 +183,7 @@ export async function createIssueCommentUnlessMarkerExists(
 }
 
 async function createPullRequestReview(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   {
     owner_login,
     repo_name,
@@ -202,9 +207,7 @@ async function createPullRequestReview(
     comments
   }
 
-  let response: Awaited<
-    ReturnType<GitHubAppOctokit['rest']['pulls']['createReview']>
-  >
+  let response: Awaited<ReturnType<Octokit['rest']['pulls']['createReview']>>
   try {
     await assert_publication_claim()
     response = await octokit.rest.pulls.createReview(request)
@@ -224,7 +227,7 @@ async function createPullRequestReview(
 }
 
 async function findPullRequestReviewByMarker(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   {
     owner_login,
     repo_name,
@@ -268,7 +271,7 @@ async function findPullRequestReviewByMarker(
 }
 
 export async function createPullRequestReviewUnlessMarkerExists(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   args: CreatePullRequestReviewUnlessMarkerExistsArgs
 ): Promise<{ id: number; html_url: string; state: string; reused: boolean }> {
   const existing = await findPullRequestReviewByMarker(octokit, args)

@@ -8,6 +8,7 @@ import test from 'node:test'
 import { handlePullRequestReviewRun } from '../../../src/reviews/pull-requests/publish.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { fakeGitHub, githubJson } from '../../github-client.js'
 
 // Publish paths now share the fail-closed attribution check, so the app must know its own bot
 // login or publishing a PR review refuses to run. The suite's default metadata is the app the
@@ -104,29 +105,32 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
       return true
     }
   }
-  const octokit = {
-    rest: {
-      issues: {
-        createComment: async (args: unknown) => {
-          issueComments.push(args)
-          return { data: { id: 1, html_url: 'https://example.test/comment/1' } }
-        }
-      },
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async (args: unknown) => {
-          pullReviews.push(args)
-          return {
-            data: {
-              id: 2,
-              html_url: 'https://example.test/review/2',
-              state: 'COMMENTED'
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/comments') && method === 'POST') {
+      issueComments.push(body)
+      return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
-  }
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      const match = /\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)\/reviews$/.exec(
+        pathname
+      )
+      pullReviews.push({
+        owner: match?.[1],
+        repo: match?.[2],
+        pull_number: Number(match?.[3]),
+        ...(body as Record<string, unknown>)
+      })
+      return githubJson({
+        id: 2,
+        html_url: 'https://example.test/review/2',
+        state: 'COMMENTED'
+      })
+    }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   await handlePullRequestReviewRun({
     run: {
@@ -190,23 +194,20 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
 
 test('pull request publish leaves plausible risks as non-blocking comments', async () => {
   const pullReviews: unknown[] = []
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async (args: unknown) => {
-          pullReviews.push(args)
-          return {
-            data: {
-              id: 2,
-              html_url: 'https://example.test/review/2',
-              state: 'COMMENTED'
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      pullReviews.push(body)
+      return githubJson({
+        id: 2,
+        html_url: 'https://example.test/review/2',
+        state: 'COMMENTED'
+      })
     }
-  }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   await handlePullRequestReviewRun({
     run: {
@@ -251,29 +252,24 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
 test('pull request publish approves when analysis is not confirmed', async () => {
   const issueComments: unknown[] = []
   const pullReviews: unknown[] = []
-  const octokit = {
-    rest: {
-      issues: {
-        createComment: async (args: unknown) => {
-          issueComments.push(args)
-          return { data: { id: 1, html_url: 'https://example.test/comment/1' } }
-        }
-      },
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async (args: unknown) => {
-          pullReviews.push(args)
-          return {
-            data: {
-              id: 2,
-              html_url: 'https://example.test/review/2',
-              state: 'APPROVED'
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/comments') && method === 'POST') {
+      issueComments.push(body)
+      return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
     }
-  }
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      pullReviews.push(body)
+      return githubJson({
+        id: 2,
+        html_url: 'https://example.test/review/2',
+        state: 'APPROVED'
+      })
+    }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   await handlePullRequestReviewRun({
     run: {
@@ -325,23 +321,20 @@ test('pull request publish approves when analysis is not confirmed', async () =>
 test('pull request publish comments instead of approving a PR authored by the app bot', async () => {
   setGitHubAppMetadata({ slug: 'web-sec-bot' })
   const pullReviews: unknown[] = []
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async (args: unknown) => {
-          pullReviews.push(args)
-          return {
-            data: {
-              id: 3,
-              html_url: 'https://example.test/review/3',
-              state: 'COMMENTED'
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      pullReviews.push(body)
+      return githubJson({
+        id: 2,
+        html_url: 'https://example.test/review/2',
+        state: 'COMMENTED'
+      })
     }
-  }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   try {
     await handlePullRequestReviewRun({
@@ -382,35 +375,29 @@ test('pull request publish comments instead of approving a PR authored by the ap
 
 test('pull request publish falls back to comment when GitHub rejects own PR approval', async () => {
   const pullReviews: unknown[] = []
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async (args: unknown) => {
-          pullReviews.push(args)
-          if ((args as { event: string }).event === 'APPROVE') {
-            const error = new Error('Unprocessable Entity')
-            Object.assign(error, {
-              response: {
-                status: 422,
-                data: {
-                  errors: ['Review Can not approve your own pull request']
-                }
-              }
-            })
-            throw error
-          }
-          return {
-            data: {
-              id: 3,
-              html_url: 'https://example.test/review/3',
-              state: 'COMMENTED'
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      pullReviews.push(body)
+      // Approving your own PR is a real 422 from GitHub, so the client must fall back to COMMENT.
+      if ((body as { event?: string } | undefined)?.event === 'APPROVE')
+        return githubJson(
+          {
+            message: 'Unprocessable Entity',
+            errors: ['Review Can not approve your own pull request']
+          },
+          422
+        )
+      return githubJson({
+        id: 3,
+        html_url: 'https://example.test/review/3',
+        state: 'COMMENTED'
+      })
     }
-  }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   await handlePullRequestReviewRun({
     run: {
@@ -445,36 +432,29 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
 
 test('pull request publish falls back to comment when own PR approval error is in response message', async () => {
   const pullReviews: unknown[] = []
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async (args: unknown) => {
-          pullReviews.push(args)
-          if ((args as { event: string }).event === 'APPROVE') {
-            const error = new Error('Unprocessable Entity')
-            Object.assign(error, {
-              response: {
-                status: 422,
-                data: {
-                  message: 'Review cannot approve your own pull request',
-                  errors: []
-                }
-              }
-            })
-            throw error
-          }
-          return {
-            data: {
-              id: 3,
-              html_url: 'https://example.test/review/3',
-              state: 'COMMENTED'
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      pullReviews.push(body)
+      // Same 422, but the explanation is in `message` rather than `errors`.
+      if ((body as { event?: string } | undefined)?.event === 'APPROVE')
+        return githubJson(
+          {
+            message: 'Review cannot approve your own pull request',
+            errors: []
+          },
+          422
+        )
+      return githubJson({
+        id: 3,
+        html_url: 'https://example.test/review/3',
+        state: 'COMMENTED'
+      })
     }
-  }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   await handlePullRequestReviewRun({
     run: {
@@ -509,23 +489,20 @@ test('pull request publish falls back to comment when own PR approval error is i
 
 test('pull request publish leaves confirmed risks as non-blocking comments with inline suggestions', async () => {
   const pullReviews: unknown[] = []
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async (args: unknown) => {
-          pullReviews.push(args)
-          return {
-            data: {
-              id: 2,
-              html_url: 'https://example.test/review/2',
-              state: 'COMMENTED'
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      pullReviews.push(body)
+      return githubJson({
+        id: 2,
+        html_url: 'https://example.test/review/2',
+        state: 'COMMENTED'
+      })
     }
-  }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   await handlePullRequestReviewRun({
     run: {
@@ -587,17 +564,16 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
 
 test('pull request publish does not create a fallback review after an uncertain suggestion submission', async () => {
   let createCalls = 0
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async () => {
-          createCalls += 1
-          throw new Error('connection reset after request body was sent')
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      createCalls += 1
+      throw new Error('connection reset after request body was sent')
     }
-  }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   await assert.rejects(
     handlePullRequestReviewRun({
@@ -646,23 +622,20 @@ test('an unattributable PR author is never approved', async () => {
   // path, which used to have its own copy of the check that silently answered "not ours".
   setGitHubAppMetadata()
   const pullReviews: unknown[] = []
-  const octokit = {
-    rest: {
-      pulls: {
-        listReviews: async () => ({ data: [] }),
-        createReview: async (args: unknown) => {
-          pullReviews.push(args)
-          return {
-            data: {
-              id: 4,
-              html_url: 'https://example.test/review/4',
-              state: 'COMMENTED'
-            }
-          }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    if (pathname.endsWith('/reviews') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/reviews') && method === 'POST') {
+      pullReviews.push(body)
+      return githubJson({
+        id: 2,
+        html_url: 'https://example.test/review/2',
+        state: 'COMMENTED'
+      })
     }
-  }
+    if (pathname.endsWith('/files')) return githubJson([])
+    return githubJson({})
+  })
 
   try {
     await assert.rejects(

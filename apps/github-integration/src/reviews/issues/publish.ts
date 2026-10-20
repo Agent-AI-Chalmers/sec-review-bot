@@ -4,7 +4,7 @@ import {
 } from '../../runner/contract-version.js'
 import { createIssueCommentUnlessMarkerExists } from '../../github/comment-service.js'
 import type { PersistedIssue } from '../../control-plane/publish-context.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import { createDraftPullRequestFromIssueReviewRecord } from './draft-pr.js'
 import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
 import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
@@ -47,7 +47,7 @@ export interface IssueReviewWorkflowResult {
   [key: string]: unknown
 }
 
-type InstallationOctokitForRepo = (repo_full_name: string) => Promise<unknown>
+type InstallationOctokitForRepo = (repo_full_name: string) => Promise<Octokit>
 type CompletedRunnerRun = {
   run_id: string
   publish_context: Record<string, unknown>
@@ -126,7 +126,7 @@ async function publishIssueReviewResult({
   claim_token,
   assert_publication_claim
 }: {
-  octokit: unknown
+  octokit: Octokit
   issue: PersistedIssue
   run_id: string
   workspace_ref: string
@@ -138,7 +138,7 @@ async function publishIssueReviewResult({
   assert_publication_claim: () => Promise<void>
 }): Promise<void> {
   let draftPullRequest: IssueDraftPullRequest | null = null
-  const github = octokit as GitHubAppOctokit
+  const github = octokit
 
   const review_record = workflow_result.review_record
 

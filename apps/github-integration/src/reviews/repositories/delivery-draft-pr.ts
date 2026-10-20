@@ -1,6 +1,6 @@
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
 import { buildDeliveryDraftPrBody } from './renderer.js'
-import type { GitHubAppOctokit } from '../../github/octokit.js'
+import type { Octokit } from 'octokit'
 import type { FileChange, FileMode, TextEncoding } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
@@ -104,7 +104,7 @@ function encodeGitFileContent(content_buffer: Buffer): {
 }
 
 async function buildTreeElements(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   delivery: RepositoryDelivery,
   repo: RepositoryContext,
   assertPublicationClaim: () => Promise<void>
@@ -166,7 +166,7 @@ export async function createRepositoryDeliveryDraftPr({
   case_results = [],
   assert_publication_claim
 }: {
-  octokit: GitHubAppOctokit
+  octokit: Octokit
   repo: RepositoryContext
   run_id: string
   input: RepositoryReviewInput

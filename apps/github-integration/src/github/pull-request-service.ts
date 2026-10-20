@@ -1,4 +1,4 @@
-import type { GitHubAppOctokit } from './octokit.js'
+import type { Octokit } from 'octokit'
 import { isRecord } from '../utils/error-utils.js'
 import { splitRepoFullName } from './repository-service.js'
 
@@ -209,7 +209,7 @@ export function extractPullRequestContext(
 }
 
 export async function getPullRequestContext(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   {
     owner_login,
     repo_name,
@@ -243,7 +243,7 @@ export async function getPullRequestContext(
 }
 
 export async function listPullRequestFiles(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   {
     owner_login,
     repo_name,
@@ -275,7 +275,7 @@ export async function listPullRequestFiles(
 }
 
 export async function listFilesChangedBetweenCommits(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   {
     owner_login,
     repo_name,
@@ -332,7 +332,7 @@ function isSameRepositoryIssueSource(
 }
 
 async function listTimelineCrossReferencedIssueRefs(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   pr: PullRequestContext
 ): Promise<LinkedIssueRef[]> {
   const refs: LinkedIssueRef[] = []
@@ -400,7 +400,7 @@ async function listTimelineCrossReferencedIssueRefs(
 }
 
 export async function fetchTimelineLinkedIssues(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   pr: PullRequestContext
 ): Promise<{
   source: 'pr-timeline-cross-references'

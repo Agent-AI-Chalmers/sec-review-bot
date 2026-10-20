@@ -18,6 +18,7 @@ import { controlPlaneClient } from '../control-plane/client.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
+import type { Octokit } from 'octokit'
 
 type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
@@ -44,7 +45,7 @@ interface StartIssueReviewCommandDeps {
 }
 
 interface StartIssueReviewCommandArgs {
-  octokit: unknown
+  octokit: Octokit
   issue: IssueContext
   trusted_default_branch: TrustedDefaultBranch
   event_type: IssueReviewEventType

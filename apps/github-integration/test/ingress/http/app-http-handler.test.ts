@@ -5,6 +5,13 @@ import test from 'node:test'
 import type { App } from 'octokit'
 
 import { createAppHttpHandler } from '../../../src/ingress/http/app-http-handler.js'
+import { fakeApp as fakeGitHubApp } from '../../github-app-stubs.js'
+import { githubJson } from '../../github-client.js'
+
+/** A real App; the dispatch handler is stubbed in every test here, so its transport is unused. */
+function unusedApp(): App {
+  return fakeGitHubApp({ respond: () => githubJson({ id: 123 }) }).app
+}
 
 function requestFor(
   url: string,
@@ -51,7 +58,7 @@ function captureResponse(): ServerResponse & {
 test('app HTTP handler routes repository dispatch requests before webhook middleware', async () => {
   const calls: string[] = []
   const handler = createAppHttpHandler({
-    app: {} as App,
+    app: unusedApp(),
     port: 3000,
     repository_review_dispatch_path: '/repository-review-dispatch',
     repository_review_dispatch_handler: async () => {
@@ -73,7 +80,7 @@ test('app HTTP handler routes repository dispatch requests before webhook middle
 test('app HTTP handler delegates non-dispatch requests to webhook middleware', async () => {
   const calls: string[] = []
   const handler = createAppHttpHandler({
-    app: {} as App,
+    app: unusedApp(),
     port: 3000,
     repository_review_dispatch_path: '/repository-review-dispatch',
     repository_review_dispatch_handler: async () => {
@@ -92,7 +99,7 @@ test('app HTTP handler delegates non-dispatch requests to webhook middleware', a
 test('app HTTP handler rejects malformed request URLs', async () => {
   const response = captureResponse()
   const handler = createAppHttpHandler({
-    app: {} as App,
+    app: unusedApp(),
     port: 3000,
     repository_review_dispatch_path: '/repository-review-dispatch',
     repository_review_dispatch_handler: async () => {

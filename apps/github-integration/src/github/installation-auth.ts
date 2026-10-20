@@ -1,7 +1,7 @@
-import type { GitHubAppOctokit } from './octokit.js'
+import type { Octokit } from 'octokit'
 
 export async function getInstallationAccessToken(
-  octokit: GitHubAppOctokit
+  octokit: Octokit
 ): Promise<string> {
   const authResult = await octokit.auth({
     type: 'installation'

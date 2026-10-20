@@ -2,7 +2,6 @@ import { clearInterval } from 'node:timers'
 import type { App } from 'octokit'
 
 import { startReviewRunCoordinatorLoop } from '../control-plane/coordinator.js'
-import { splitRepoFullName } from '../github/repository-service.js'
 import { handleIssueReviewRun } from '../reviews/issues/publish.js'
 import { handlePullRequestReviewRun } from '../reviews/pull-requests/publish.js'
 import { handleRepositoryReviewRun } from '../reviews/repositories/publish.js'
@@ -18,6 +17,7 @@ import {
   type ControlPlaneClient,
   type PublicationWork
 } from './client.js'
+import { installationOctokitForRepo } from '../github/installation-client.js'
 
 export interface PublicationCoordinator {
   stop: () => Promise<void>
@@ -34,18 +34,6 @@ function pollIntervalMs(): number {
     10
   )
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 15_000
-}
-
-async function installationOctokitForRepo(
-  app: App,
-  repoFullName: string
-): Promise<unknown> {
-  const { owner_login, repo_name } = splitRepoFullName(repoFullName)
-  const installation = await app.octokit.rest.apps.getRepoInstallation({
-    owner: owner_login,
-    repo: repo_name
-  })
-  return await app.getInstallationOctokit(installation.data.id)
 }
 
 async function publishWork(

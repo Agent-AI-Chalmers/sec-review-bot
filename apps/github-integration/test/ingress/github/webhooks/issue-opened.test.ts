@@ -4,6 +4,7 @@ import test from 'node:test'
 import { handleIssueOpenedWithDeps } from '../../../../src/ingress/github/webhooks/issue-opened.js'
 import { setGitHubAppMetadata } from '../../../../src/github/github-app-metadata-service.js'
 import { RepositoryTriggerConfigError } from '../../../../src/github/repo-config-service.js'
+import { unusedGitHub } from '../../../github-client.js'
 
 function automaticConfig() {
   return {
@@ -68,7 +69,7 @@ test('issue-opened skips automatic workflow when trigger mode is manual_only', a
   await handleIssueOpenedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueOpenedPayload()
     },
     {
@@ -92,7 +93,7 @@ test('issue-opened skips self-originated payload before issue extraction', async
     await handleIssueOpenedWithDeps(
       {
         id: 'delivery-test',
-        octokit: {},
+        octokit: unusedGitHub().octokit,
         payload: {
           sender: {
             login: 'sec-review-bot[bot]',
@@ -121,7 +122,7 @@ test('issue-opened runs automatic workflow when trigger mode is automatic', asyn
   await handleIssueOpenedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createIssueOpenedPayload()
     },
     {
@@ -156,7 +157,7 @@ test('issue-opened rethrows invalid repository trigger config error', async () =
     handleIssueOpenedWithDeps(
       {
         id: 'delivery-test',
-        octokit: {},
+        octokit: unusedGitHub().octokit,
         payload: createIssueOpenedPayload()
       },
       {

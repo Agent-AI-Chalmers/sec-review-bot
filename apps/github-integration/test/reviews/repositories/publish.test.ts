@@ -10,6 +10,7 @@ import type {
   PublicationStepRecord
 } from '../../../src/control-plane/client.js'
 import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
+import { fakeGitHub, githubJson, unusedGitHub } from '../../github-client.js'
 
 function delivery(delivery_id: string): RepositoryDelivery {
   return {
@@ -80,7 +81,7 @@ test('repository delivery recovery skips succeeded steps and resumes the failed 
   } as unknown as ControlPlaneClient
 
   const published = await publishDeliveryDraftPrs({
-    octokit: {} as never,
+    octokit: unusedGitHub().octokit,
     repo: {
       owner_login: 'octo',
       repo_name: 'example',
@@ -137,7 +138,7 @@ test('repository delivery continues after a deterministic failure', async () => 
   } as unknown as ControlPlaneClient
 
   const published = await publishDeliveryDraftPrs({
-    octokit: {} as never,
+    octokit: unusedGitHub().octokit,
     repo: {
       owner_login: 'octo',
       repo_name: 'example',
@@ -208,7 +209,7 @@ test('repository delivery recovery skips terminal failures and reaches later wor
   } as unknown as ControlPlaneClient
 
   const published = await publishDeliveryDraftPrs({
-    octokit: {} as never,
+    octokit: unusedGitHub().octokit,
     repo: {
       owner_login: 'octo',
       repo_name: 'example',
@@ -242,35 +243,40 @@ test('repository delivery recovery skips terminal failures and reaches later wor
 test('summary issue lookup reuses an issue when the create response is lost', async () => {
   let created = false
   let createAttempts = 0
-  const octokit = {
-    rest: {
-      issues: {
-        listForRepo: async () => ({
-          data: created
-            ? [
-                {
-                  number: 17,
-                  title: REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE,
-                  pull_request: undefined
-                }
-              ]
-            : []
-        }),
-        create: async () => {
-          createAttempts += 1
-          created = true
-          throw new Error('response lost after issue creation')
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url }) => {
+    const pathname = new URL(url).pathname
+    if (method === 'GET' && /\/issues$/.test(pathname)) {
+      return githubJson(
+        created
+          ? [
+              {
+                number: 17,
+                title: REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE,
+                pull_request: undefined
+              }
+            ]
+          : []
+      )
     }
-  }
+    if (method === 'POST' && /\/issues$/.test(pathname)) {
+      createAttempts += 1
+      created = true
+      // The response is lost after GitHub created the issue: a transport-level failure.
+      throw new Error('response lost after issue creation')
+    }
+    return githubJson({})
+  })
   const repo = {
     owner_login: 'octo',
     repo_name: 'example',
     default_branch: 'main'
   }
   const ensure = () =>
-    ensureSummaryIssueNumber(octokit as never, repo as never, async () => {})
+    ensureSummaryIssueNumber(
+      octokit,
+      { ...repo, repo_full_name: `${repo.owner_login}/${repo.repo_name}` },
+      async () => {}
+    )
   await assert.rejects(ensure(), /response lost/)
   assert.strictEqual(await ensure(), 17)
   assert.strictEqual(createAttempts, 1)

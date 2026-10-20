@@ -4,6 +4,7 @@ import test from 'node:test'
 import { handlePullRequestOpenedWithDeps } from '../../../../src/ingress/github/webhooks/pull-request-opened.js'
 import { setGitHubAppMetadata } from '../../../../src/github/github-app-metadata-service.js'
 import { RepositoryTriggerConfigError } from '../../../../src/github/repo-config-service.js'
+import { unusedGitHub } from '../../../github-client.js'
 
 function automaticConfig() {
   return {
@@ -91,7 +92,7 @@ test('pull-request-opened skips automatic workflow when trigger mode is manual_o
   await handlePullRequestOpenedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createPullRequestOpenedPayload()
     },
     {
@@ -115,7 +116,7 @@ test('pull-request-opened skips self-originated payload before pull request extr
     await handlePullRequestOpenedWithDeps(
       {
         id: 'delivery-test',
-        octokit: {},
+        octokit: unusedGitHub().octokit,
         payload: {
           sender: {
             login: 'sec-review-bot[bot]',
@@ -144,7 +145,7 @@ test('pull-request-opened runs automatic workflow when trigger mode is automatic
   await handlePullRequestOpenedWithDeps(
     {
       id: 'delivery-test',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createPullRequestOpenedPayload()
     },
     {
@@ -178,7 +179,7 @@ test('pull-request-opened rethrows invalid repository trigger config error', asy
     handlePullRequestOpenedWithDeps(
       {
         id: 'delivery-test',
-        octokit: {},
+        octokit: unusedGitHub().octokit,
         payload: createPullRequestOpenedPayload()
       },
       {
@@ -202,7 +203,7 @@ test('pull-request-opened skips automatic review for fork PRs', async () => {
   await handlePullRequestOpenedWithDeps(
     {
       id: 'delivery-fork',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       payload: createPullRequestOpenedPayload({ fromFork: true })
     },
     {

@@ -4,6 +4,7 @@ import test from 'node:test'
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { fakeGitHub, githubJson } from '../../github-client.js'
 
 function issueReviewRecordWithPatch(): ReviewRecord {
   return {
@@ -68,42 +69,36 @@ function buildHarness() {
     failPublicationStep: async () => true
   }
 
-  const octokit = {
-    rest: {
-      repos: {
-        // The draft-PR base is resolved via API, not from the payload/persisted
-        // default_branch; keep the mock's resolved value aligned with the fixture.
-        get: async () => ({ data: { default_branch: 'main' } }),
-        getBranch: async () => ({
-          data: { commit: { sha: 'resolved-default-sha' } }
-        })
-      },
-      pulls: {
-        list: async () => ({ data: [] }),
-        create: async (args: unknown) => {
-          createdPullRequests.push(args)
-          return {
-            data: { html_url: 'https://example.test/pull/1', number: 1 }
-          }
-        }
-      },
-      git: {
-        createBlob: async () => ({ data: { sha: 'blob-sha' } }),
-        getCommit: async () => ({ data: { tree: { sha: 'base-tree-sha' } } }),
-        createTree: async () => ({ data: { sha: 'tree-sha' } }),
-        createCommit: async () => ({ data: { sha: 'commit-sha' } }),
-        createRef: async () => ({ data: {} }),
-        updateRef: async () => ({ data: {} })
-      },
-      issues: {
-        listComments: async () => ({ data: [] }),
-        createComment: async (args: unknown) => {
-          createdComments.push(args)
-          return { data: { id: 1, html_url: 'https://example.test/comment/1' } }
-        }
-      }
+  const { octokit } = fakeGitHub(({ method, url, body }) => {
+    const pathname = new URL(url).pathname
+    // The draft-PR base is resolved via the API, not from the payload/persisted
+    // default_branch; keep the mock's resolved value aligned with the fixture.
+    if (pathname.includes('/branches/')) {
+      return githubJson({ commit: { sha: 'resolved-default-sha' } })
     }
-  }
+    if (pathname.endsWith('/pulls') && method === 'GET') return githubJson([])
+    if (pathname.endsWith('/pulls') && method === 'POST') {
+      createdPullRequests.push(body)
+      return githubJson({
+        html_url: 'https://example.test/pull/1',
+        number: 1
+      })
+    }
+    if (pathname.includes('/comments') && method === 'GET')
+      return githubJson([])
+    if (pathname.includes('/comments') && method === 'POST') {
+      createdComments.push(body)
+      return githubJson({ id: 1, html_url: 'https://example.test/comment/1' })
+    }
+    if (pathname.includes('/git/blobs')) return githubJson({ sha: 'blob-sha' })
+    if (pathname.includes('/git/commits/'))
+      return githubJson({ tree: { sha: 'base-tree-sha' } })
+    if (pathname.includes('/git/trees')) return githubJson({ sha: 'tree-sha' })
+    if (pathname.includes('/git/commits'))
+      return githubJson({ sha: 'commit-sha' })
+    if (pathname.includes('/git/refs')) return githubJson({})
+    return githubJson({ default_branch: 'main' })
+  })
 
   return {
     store,

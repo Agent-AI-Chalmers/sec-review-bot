@@ -8,6 +8,7 @@ import type {
   TestChangesPolicy
 } from '../../../src/runner/input.js'
 import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { unusedGitHub } from '../../github-client.js'
 
 function issueContext(): IssueContext {
   return {
@@ -66,7 +67,7 @@ async function runWith(
   await startIssueReviewRun(
     {
       run_id: 'run-issue-1',
-      octokit: {},
+      octokit: unusedGitHub().octokit,
       issue: issueContext(),
       trusted_default_branch: {
         default_branch: 'main',

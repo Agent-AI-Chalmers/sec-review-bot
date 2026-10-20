@@ -3,7 +3,7 @@
 // result that could not be delivered. The wording follows `failure_stage` so the reply says how
 // far the run actually got instead of always claiming it never started.
 import { createIssueCommentUnlessMarkerExists } from '../github/comment-service.js'
-import type { GitHubAppOctokit } from '../github/octokit.js'
+import type { Octokit } from 'octokit'
 import { asErrorWithResponse, isRecord } from '../utils/error-utils.js'
 import { ensureSummaryIssueNumber } from '../reviews/repositories/publish.js'
 import { repositoryFullName } from '../github/repository-service.js'
@@ -80,7 +80,7 @@ function repositoryScope(input: Record<string, unknown>): {
  * fault is rethrown and stays retryable: a transient GitHub outage must not discard a terminal
  * outcome. */
 async function assertRepositoryIsInstalled(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   target: { owner_login: string; repo_name: string }
 ): Promise<void> {
   try {
@@ -126,7 +126,7 @@ const STAGE_SENTENCE: Record<RunFailureStage, string> = {
  * This performs a public write (it may create the issue), so `sendRunFailureReply` verifies the
  * repository against the installation before calling it. */
 async function ensureRepositorySummaryIssue(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   scope: { owner_login: string; repo_name: string }
 ): Promise<number> {
   const repo = {
@@ -144,7 +144,7 @@ export interface RunFailureReplyResult {
 }
 
 export async function sendRunFailureReply(
-  octokit: GitHubAppOctokit,
+  octokit: Octokit,
   args: {
     run_id: string
     input: Record<string, unknown>
