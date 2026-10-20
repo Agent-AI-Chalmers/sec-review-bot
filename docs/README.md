@@ -56,6 +56,7 @@ The main public workflow IDs are `issue-review`, `pull-request-review`, and `rep
 
 #### pull-request-review
 
+- [REVIEW_WINDOW_CONTRACT.md](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.md): Review window semantics for `synchronize`, measured GitHub API behavior, and the contract that keeps changed files, patch, and suggestion anchoring on one window.
 - [SUGGESTION_COMMENT_DESIGN.md](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.md): PR suggestion comment mapping rules.
 
 #### repository-review
