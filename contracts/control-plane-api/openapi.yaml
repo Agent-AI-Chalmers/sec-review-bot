@@ -976,10 +976,9 @@ x-state-machines:
       # walking every step. So `disconnected` is reachable only after at least one step was
       # `uncertain`; a publisher whose steps all settled cleanly never passes through it.
       - { from: uncertain, to: disconnected, label: reconciliation could not conclude }
-      # An operator hands a parked publication back, as for the other axes: its `disconnected`
-      # steps return to `uncertain` with a fresh reconciliation budget, so the axis goes back to
-      # `uncertain` with them. The attempt budget stays spent, which is why no write is repeated.
-      - { from: disconnected, to: uncertain, reason: PUBLICATION_RESUMED_BY_OPERATOR, label: resumed by an operator }
+      # An operator hands a parked publication back to the normal claim queue. No hidden owner is
+      # created: the publisher that claims `pending` receives the token it needs to perform work.
+      - { from: disconnected, to: pending, reason: PUBLICATION_RESUMED_BY_OPERATOR, label: resumed by an operator }
       # Giving up stops publishing what remains. It cannot say nothing was published: a step in
       # this state may already have taken effect remotely, and the axis ends as `failed` rather
       # than `skipped` precisely so that no reader concludes the result was never delivered.
@@ -2383,8 +2382,8 @@ paths:
         because such a row has always spent that budget and would otherwise be concluded as
         failed by the next command without ever being attempted again. A disconnected execution
         returns to `uncertain` with its replay budget reset, for the same reason: the replays
-        stopped precisely because that budget was spent. A disconnected publication is re-claimed
-        and published again: its parked steps become attemptable with both budgets reset, so the
+        stopped precisely because that budget was spent. A disconnected publication returns to
+        the normal claim queue: its parked steps become attemptable with both budgets reset, so the
         side effects they name are issued once more. Steps that already succeeded are not reset -
         the run resumes where it stopped instead of starting over. Nothing is repaired and no
         outcome is asserted either way.

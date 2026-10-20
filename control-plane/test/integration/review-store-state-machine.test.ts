@@ -3656,18 +3656,13 @@ test('an operator resume publishes the parked steps again instead of only reconc
     ).rows[0]?.status
     assert.strictEqual(
       resumedAxis,
-      'uncertain',
-      'the axis stays visible for an operator until the resumed publisher moves it'
+      'pending',
+      'the axis returns to the normal claim queue without inventing an owner'
     )
 
-    // The connector can now claim the step and write the side effect, which the spent budget
-    // refused before the resume.
-    const resumedToken = (
-      await pool.query<{ claim_token: string }>(
-        `SELECT claim_token FROM publications WHERE run_id=$1`,
-        [runId]
-      )
-    ).rows[0]?.claim_token
+    // The normal selector gives the real publisher the claim token it needs. The resume route
+    // itself returns no credential and therefore must not leave a hidden live lease behind.
+    const resumedToken = await store.claimPublication(runId)
     assert.ok(resumedToken)
     await store.requirePublicationStepClaim(
       runId,
@@ -3840,7 +3835,7 @@ test('an operator resume completes on a pool that has exactly one connection', a
     ])
     assert.strictEqual(
       (resumed as { publication: { status: string } }).publication.status,
-      'uncertain',
+      'pending',
       'the operator decision took effect'
     )
   } finally {
@@ -3852,12 +3847,8 @@ test('a disconnected publication is parked until an operator resumes it', async 
   // A step parked after its reconciliation budget ran out excludes the whole publication from
   // every automatic claim, which is what keeps a side effect with an unknown remote outcome from
   // being repeated. It also means nothing can ever retry the run, so the operator resume has to
-  // re-claim the publication — and re-claiming the parked step must then be refused instead of
-  // running the side effect again.
+  // return the publication to the normal claim queue.
   const store = await createStore()
-  // A second connection reads the claim the store wrote. The record model deliberately never
-  // carries credentials, so the fixture reads the column the way the publisher holding the
-  // lease would.
   const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const runId = await createSuccessfulRun(store)
@@ -3952,8 +3943,8 @@ test('a disconnected publication is parked until an operator resumes it', async 
     const resumed = await store.resumeDisconnectedRun(runId)
     assert.strictEqual(
       resumed.publication.status,
-      'uncertain',
-      'the axis stays visible for an operator until the resumed publisher moves it'
+      'pending',
+      'the axis is immediately claimable by the normal publisher'
     )
     const revived = await readStep()
     assert.strictEqual(
@@ -3974,12 +3965,7 @@ test('a disconnected publication is parked until an operator resumes it', async 
 
     // The resumed run publishes instead of only looking: the claim its spent budget refused is
     // granted now, which is the difference between "published again" and "keep publishing".
-    const resumedToken = (
-      await pool.query<{ claim_token: string }>(
-        `SELECT claim_token FROM publications WHERE run_id=$1`,
-        [runId]
-      )
-    ).rows[0]?.claim_token
+    const resumedToken = await store.claimPublication(runId)
     assert.ok(resumedToken)
     await store.requirePublicationStepClaim(
       runId,
@@ -3994,7 +3980,7 @@ test('a disconnected publication is parked until an operator resumes it', async 
       events.some(
         (event) =>
           event.axis === 'publication' &&
-          event.to_status === 'uncertain' &&
+          event.to_status === 'pending' &&
           event.reason_code === 'PUBLICATION_RESUMED_BY_OPERATOR'
       )
     )

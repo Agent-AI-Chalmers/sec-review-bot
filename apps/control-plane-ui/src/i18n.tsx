@@ -149,7 +149,7 @@ export const messages = {
     disconnectedPublicationBody:
       'Publishing stopped on a step whose result could not be confirmed. Some of this run may already exist on GitHub, and nothing automatic will establish which, so the decision is yours.',
     disconnectedPublicationOutcomeResume:
-      'Resume claims the publication again so it is attempted once more. The step that could not be confirmed is then settled as failed rather than run again, so no side effect is repeated.',
+      'Resume returns the publication to the normal queue with fresh attempt budgets. A publisher will claim it and issue the parked steps again.',
     disconnectedPublicationOutcomeGiveUp:
       'Giving up stops publishing: the run is concluded as failed, and whatever already exists on GitHub stays there.',
     giveUpRun: 'Give up',
@@ -162,7 +162,7 @@ export const messages = {
     resumeRun: 'Resume',
     resumeTitle: 'Resume this run',
     resumeExplainer:
-      'This hands the run back to automatic recovery instead of ending it. A disconnected preparation returns to Uncertain with a fresh attempt budget, so recovery can establish what the previous attempt left behind. A disconnected publication is claimed again and published once more; a step whose reconciliation already ran out is then settled as failed rather than run again. If the same contradiction is still there, the run stops here again.',
+      'This hands the run back to automatic recovery instead of ending it. A disconnected preparation returns to Uncertain with a fresh attempt budget. A disconnected publication returns to the normal queue with fresh attempt budgets, so its parked steps are issued again. If recovery still cannot reach a conclusion, the run stops here again.',
     resumeConfirm: 'Resume run',
     sessionExpired: 'Your session expired. Sign in again, then retry.',
     parkedRunsTitle: 'These runs need your review',
@@ -325,8 +325,8 @@ export const messages = {
       'the step was settled, so publishing continues',
     edge_publication_uncertain_disconnected:
       'reconciliation could not conclude',
-    edge_publication_disconnected_uncertain:
-      'an operator handed it back to reconciliation with a fresh budget',
+    edge_publication_disconnected_pending:
+      'an operator returned it to the normal publication queue',
     edge_publication_disconnected_failed:
       'an operator stopped publishing (some steps may already exist)',
     stateMachinesTitle: 'State machines',
@@ -469,7 +469,7 @@ export const messages = {
     disconnectedPublicationBody:
       '某个步骤的结果无法确认，发布停在了那里。这个 run 的部分内容可能已经出现在 GitHub 上，而不会有任何自动处理去查明到底是哪些，因此需要你来决定。',
     disconnectedPublicationOutcomeResume:
-      '「恢复」会重新认领这次发布，再尝试一次。无法确认的那个步骤会被判为失败，而不会再执行一遍，所以不会重复产生副作用。',
+      '「恢复」会把发布放回正常队列并刷新尝试预算。发布器取得认领后，会再次执行停住的步骤。',
     disconnectedPublicationOutcomeGiveUp:
       '「放弃」是不再发布：这个 run 以失败收尾，已经存在于 GitHub 上的内容保持原样。',
     giveUpRun: '放弃',
@@ -482,7 +482,7 @@ export const messages = {
     resumeRun: '恢复',
     resumeTitle: '恢复这个 run',
     resumeExplainer:
-      '这会把 run 交回自动流程，而不是结束它。失联的准备阶段会回到「待确认」并获得新的尝试预算，由自动恢复查明上一次尝试留下了什么。失联的发布会被重新认领并再发布一次；其中对账次数已耗尽的步骤会被判为失败，而不会再执行一遍。如果同一处矛盾仍然存在，run 会再次停在这里。',
+      '这会把 run 交回自动流程，而不是结束它。失联的准备阶段会回到「待确认」并获得新的尝试预算。失联的发布会回到正常队列并刷新尝试预算，停住的步骤会再次执行。如果自动恢复仍无法得出结论，run 会再次停在这里。',
     resumeConfirm: '恢复',
     sessionExpired: '会话已过期。请重新登录后再试。',
     parkedRunsTitle: '这些 run 需要你审计',
@@ -588,8 +588,7 @@ export const messages = {
     edge_publication_publishing_uncertain: '某步骤可能已经在远端生效',
     edge_publication_uncertain_publishing: '该步骤已结算，发布继续进行',
     edge_publication_uncertain_disconnected: '对账无法得出结论',
-    edge_publication_disconnected_uncertain:
-      'operator 把它交回对账，并获得新的对账预算',
+    edge_publication_disconnected_pending: 'operator 把它放回正常发布队列',
     edge_publication_disconnected_failed:
       'operator 决定停止发布（部分步骤可能已经完成）',
     edge_preparation_preparing_failed:

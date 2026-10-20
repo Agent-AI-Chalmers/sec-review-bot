@@ -353,7 +353,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       },
       {
         from: 'disconnected',
-        to: 'uncertain',
+        to: 'pending',
         reason: 'PUBLICATION_RESUMED_BY_OPERATOR',
         label: 'resumed by an operator'
       },

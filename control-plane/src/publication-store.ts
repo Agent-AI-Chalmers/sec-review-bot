@@ -8,11 +8,8 @@
 // a single-axis write. Do not reintroduce a publication-only selection here: a version that
 // duplicated the SQL without a caller is what this comment replaces.
 //
-// The one exception is `claimDisconnectedPublication`: that claim is about a row this store
-// already owns (a publication parked because one of its own steps is `disconnected`), it needs
-// no execution join, and it exists only so an operator can hand that work back.
-import crypto from 'node:crypto'
-
+// Resuming a disconnected publication is still a single-axis write: it returns the row to
+// `pending`, where the normal cross-axis selector can claim it after checking execution.
 import { Pool, type PoolClient } from 'pg'
 
 import {
@@ -185,38 +182,20 @@ export class PublicationStore {
     return result.rowCount === 1
   }
 
-  /** Hand a publication back to automatic reconciliation, on an operator's decision.
+  /** Hand a publication back to automatic recovery, on an operator's decision.
    *
    * A publication is excluded from every claim while any step is `disconnected`
    * (`claimPublication`/`claimNextPublication`), which is correct for automation: the step's
    * remote outcome is unknown, so re-running it unsupervised could duplicate a side effect. It
    * also means nothing can ever retry the run, so an operator needs a way to hand the work back.
    *
-   * What this grants is a fresh *reconciliation* budget, not a fresh side effect. Each
-   * `disconnected` step returns to `uncertain` with `recovery_attempt_count` reset, so the
-   * publish path asks the remote once more whether the effect exists. `attempt_count` is left
-   * alone on purpose: it is what refuses a new attempt, and resetting it would let the operator's
-   * decision re-run a side effect whose outcome nobody established. The counterpart is
-   * `ExecutionStore.resumeDisconnectedSubmissionRecovery`, which resets its own budget for the
-   * same reason — an operator decision that changes only a status grants no work. */
-  async claimDisconnectedPublication(runId: string): Promise<string | null> {
-    return await transaction(
-      this.pool,
-      async (client) => await this.claimDisconnectedOn(client, runId)
-    )
-  }
-
-  /** The same decision, on a transaction the caller already opened.
-   *
-   * An operator resume is one transaction: it re-claims the publication and then reads the record
-   * it returns, and both must see the same snapshot. Opening a second transaction for the claim
-   * deadlocks whenever the caller holds the pool's only connection, which a small pool makes an
-   * ordinary deployment shape rather than a test contrivance. */
-  async claimDisconnectedOn(
+   * The parked steps become fresh pending work, but this operation does not claim them. The
+   * normal publication selector must perform the execution-axis checks and return the claim token
+   * to the publisher that will actually use it. */
+  async resumeDisconnectedOn(
     client: PoolClient,
     runId: string
-  ): Promise<string | null> {
-    const token = crypto.randomUUID()
+  ): Promise<boolean> {
     {
       const result = await client.query<{ from_status: string }>(
         `WITH previous AS (
@@ -225,16 +204,15 @@ export class PublicationStore {
            FOR UPDATE
          )
          UPDATE publications p
-         SET status='publishing', claim_token=$3, claimed_at=clock_timestamp(),
-             started_at=COALESCE(p.started_at, clock_timestamp()),
+         SET status='pending', claim_token=NULL, claimed_at=NULL,
              updated_at=clock_timestamp()
          FROM previous
          WHERE p.run_id=previous.run_id
          RETURNING previous.status AS from_status`,
-        [runId, this.connectorId, token]
+        [runId, this.connectorId]
       )
       const row = result.rows[0]
-      if (row === undefined) return null
+      if (row === undefined) return false
       // The resume returns the attempt budget, which is what makes it "published again" rather
       // than "keep publishing": a spent budget refuses the write, so without this the connector
       // could only ever reconcile, and would conclude a step it found absent as failed.
@@ -254,24 +232,15 @@ export class PublicationStore {
          WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
         [runId, this.connectorId]
       )
-      // The axis goes back to `uncertain`, not to `publishing`: reviving the steps is what ends
-      // the operator's wait, and `uncertain` is what the steps now are. Forcing `publishing`
-      // would claim an unattended run, and the next step write would move the axis back anyway,
-      // recording a transition nothing caused.
-      await client.query(
-        `UPDATE publications SET status='uncertain', updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2`,
-        [runId, this.connectorId]
-      )
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
         axis: 'publication',
         fromStatus: row.from_status,
-        toStatus: 'uncertain',
+        toStatus: 'pending',
         reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
       })
-      return token
+      return true
     }
   }
 
@@ -544,10 +513,10 @@ export class PublicationStore {
       await derivePublicationStatus(client, this.connectorId, runId)
       return needsReconciliation
     })
-    // A `disconnected` step never reaches here: `claimDisconnectedPublication` returns it to
-    // `uncertain` when an operator resumes it, and every other route into `disconnected` parks
-    // the publication itself, which excludes it from every claim. So the only reason a step is
-    // refused below is a spent attempt budget, and reconciliation is always what is offered.
+    // A `disconnected` step never reaches here: an operator resume returns it to `pending`, and
+    // every other route into `disconnected` parks the publication itself, which excludes it from
+    // every claim. So the only reason a step is refused below is a spent attempt budget, and
+    // reconciliation is always what is offered.
     if (exhausted) {
       // Exhaustion alone is NOT a conclusion. A `running` step means an owner started the side
       // effect and may have completed it on the remote system before dying, and a `failed` step's

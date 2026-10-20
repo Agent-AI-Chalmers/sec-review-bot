@@ -641,7 +641,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       'operator stopped publishing'
     )
 
-    // publication: disconnected -> uncertain when an operator hands a parked publication back.
+    // publication: disconnected -> pending when an operator returns parked work to the queue.
     // The steps return to `uncertain` with a fresh reconciliation budget, so the axis follows
     // them; the attempt budget stays spent, which is what keeps the side effect from running
     // again.
@@ -694,7 +694,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     await store.resumeDisconnectedRun(resumedPublication.runId)
     assert.strictEqual(
       (await store.getRun(resumedPublication.runId))?.publication.status,
-      'uncertain'
+      'pending'
     )
     assert.strictEqual(
       (await store.getRun(blocked.runId))?.preparation?.status,

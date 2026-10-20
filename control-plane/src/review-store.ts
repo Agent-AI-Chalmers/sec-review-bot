@@ -1144,8 +1144,7 @@ export class ReviewRunStore {
   async resumeDisconnectedPublication(runId: string): Promise<ReviewRunRecord> {
     this.ready()
     return await transaction(this.pool, async (client) => {
-      const token = await this.publications.claimDisconnectedOn(client, runId)
-      if (token === null)
+      if (!(await this.publications.resumeDisconnectedOn(client, runId)))
         throw Object.assign(
           new Error(`Review run ${runId} is not a disconnected publication.`),
           { statusCode: 409 }
@@ -1970,14 +1969,6 @@ export class ReviewRunStore {
       stepKey,
       remote
     )
-  }
-  /** Take ownership of a publication whose step reconciliation stopped; see the store.
-   *
-   * The claim is about one publication row, so it stays an operator action rather than a
-   * normal claim: no automatic selector will pick a run whose step is `disconnected`. */
-  async claimDisconnectedPublication(runId: string): Promise<string | null> {
-    this.ready()
-    return await this.publications.claimDisconnectedPublication(runId)
   }
   /** Conclude an exhausted step from what the connector found remotely; see the store. */
   async settleExhaustedPublicationStep(
