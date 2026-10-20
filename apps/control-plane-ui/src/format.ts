@@ -86,6 +86,20 @@ const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
   GITHUB_VALIDATION_REJECTED: 'failureCodeGithubValidationRejected'
 }
 
+/** The message to show when abandoning a blocked run fails.
+ *
+ * The abandon route can answer 401 for three unrelated reasons: the BFF rejected the supplied
+ * admin token (`admin_token_required`), the operator's session cookie is no longer valid
+ * (`unauthorized`, emitted by the BFF's own /api/* gate), or the Control Plane itself answered
+ * 401 and the BFF proxied that status through. Only the first means the token was wrong; the
+ * others would send the operator to re-type a token that was fine. */
+export function abandonFailureMessageKey(error: unknown): Message {
+  if (!(error instanceof ApiError)) return 'abandonFailed'
+  if (error.code === 'admin_token_required') return 'abandonWrongToken'
+  if (error.code === 'unauthorized') return 'sessionExpired'
+  return 'abandonFailed'
+}
+
 /** Explain a failure code, or return the code itself when it is not one coordination assigns. */
 export function failureCodeLabel(
   code: string,

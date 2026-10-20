@@ -68,7 +68,8 @@ import {
   observationAgeMs,
   isObservationStale,
   safeExternalUrl,
-  workflowLabel
+  workflowLabel,
+  abandonFailureMessageKey
 } from './format.js'
 
 interface Step {
@@ -207,11 +208,7 @@ function AbandonDialog({
       await abandonBlockedRun(runId, reason.trim(), adminToken.trim())
       await onDone()
     } catch (error) {
-      setFailure(
-        error instanceof ApiError && error.status === 401
-          ? t('abandonWrongToken')
-          : t('abandonFailed')
-      )
+      setFailure(t(abandonFailureMessageKey(error)))
     } finally {
       setSubmitting(false)
     }

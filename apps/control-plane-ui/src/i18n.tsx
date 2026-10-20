@@ -109,6 +109,7 @@ export const messages = {
     abandonConfirm: 'Abandon run',
     abandonWrongToken: 'That admin token was rejected.',
     abandonFailed: 'The run could not be abandoned.',
+    sessionExpired: 'Your session expired. Sign in again, then retry.',
     blockedPreparationsTitle: 'These runs need your review',
     blockedPreparationsBody:
       'Each of them is in a state combination that cannot legally occur, so the system cannot finish them on its own. Someone has to examine each one and decide what should happen.',
@@ -357,6 +358,7 @@ export const messages = {
     abandonConfirm: '放弃',
     abandonWrongToken: 'Admin token 被拒绝。',
     abandonFailed: '放弃失败。',
+    sessionExpired: '会话已过期。请重新登录后再试。',
     blockedPreparationsTitle: '这些 run 需要你审计',
     blockedPreparationsBody:
       '它们各自处于一种不可能出现的状态组合，系统无法自行收尾。需要有人逐个查看，判断该怎么处理。',
