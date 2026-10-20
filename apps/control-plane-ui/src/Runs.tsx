@@ -85,9 +85,9 @@ export function Runs(): React.JSX.Element {
     next_cursor: string | null
   }>()
   const [error, setError] = React.useState<unknown>()
-  // Runs coordination has stopped retrying. They are not part of the run list's normal
-  // pagination, and an operator needs to see them before the list, so they load separately and
-  // a failure here never hides the list itself.
+  // Runs coordination has stopped retrying on any axis. They are not part of the run list's
+  // normal pagination, and an operator needs to see them before the list, so they load
+  // separately and a failure here never hides the list itself.
   const [blocked, setBlocked] = React.useState<ParkedRun[]>([])
   React.useEffect(() => {
     let cancelled = false

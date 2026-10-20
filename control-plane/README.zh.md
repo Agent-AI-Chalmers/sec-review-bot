@@ -124,7 +124,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 | `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN`  | 脱敏的 run 详情                   |
 | `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`  | Publication step 摘要             |
 | `GET /v1/runs/parked`                    | `CONTROL_PLANE_READ_TOKEN`  | 协调已停止重试的 run 列表         |
-| `POST /v1/admin/runs/:run_id/abandon`    | `CONTROL_PLANE_ADMIN_TOKEN` | 放弃一个 blocked preparation      |
+| `POST /v1/admin/runs/:run_id/abandon`    | `CONTROL_PLANE_ADMIN_TOKEN` | 放弃因矛盾而停下的准备阶段        |
 | `POST /v1/admin/runs/:run_id/give-up`    | `CONTROL_PLANE_ADMIN_TOKEN` | 不再等待一个 disconnected run     |
 | `POST /v1/admin/runs/:run_id/resume`     | `CONTROL_PLANE_ADMIN_TOKEN` | 把 disconnected 轴交回自动恢复    |
 

@@ -948,9 +948,10 @@ export class ReviewRunStore {
    * its ingress identity all remain, so a replay of the same webhook still resolves to this run
    * instead of starting a new one.
    *
-   * Only a blocked preparation is eligible. That restriction is what keeps this from becoming a
-   * general state-jumping endpoint: it can only finish a transition coordination already proved
-   * impossible.
+   * Only a preparation parked by a contradiction (`disconnected`) is eligible. A run parked on
+   * execution or publication is ended with `giveUpDisconnectedRun` instead. That restriction is
+   * what keeps this from becoming a general state-jumping endpoint: it can only finish a
+   * transition coordination already proved impossible.
    *
    * `reason` is required and recorded on every event, so an abandonment always names why. */
   async abandonBlockedPreparation(

@@ -114,17 +114,17 @@ Temporal history, PostgreSQL coordination state, and object-storage artifacts ar
 
 ## HTTP API
 
-| Endpoint                                 | Authentication              | Purpose                                  |
-| ---------------------------------------- | --------------------------- | ---------------------------------------- |
-| `GET /healthz`                           | None                        | Process health                           |
-| `GET /readyz`                            | None                        | PostgreSQL-backed coordination readiness |
-| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN`  | Filtered, cursor-paginated run list      |
-| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN`  | Redacted run detail                      |
-| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`  | Publication-step summary                 |
-| `GET /v1/runs/parked`                    | `CONTROL_PLANE_READ_TOKEN`  | Runs coordination stopped retrying       |
-| `POST /v1/admin/runs/:run_id/abandon`    | `CONTROL_PLANE_ADMIN_TOKEN` | Abandon one blocked preparation          |
-| `POST /v1/admin/runs/:run_id/give-up`    | `CONTROL_PLANE_ADMIN_TOKEN` | Stop waiting for one disconnected run    |
-| `POST /v1/admin/runs/:run_id/resume`     | `CONTROL_PLANE_ADMIN_TOKEN` | Hand a disconnected axis to recovery     |
+| Endpoint                                 | Authentication              | Purpose                                    |
+| ---------------------------------------- | --------------------------- | ------------------------------------------ |
+| `GET /healthz`                           | None                        | Process health                             |
+| `GET /readyz`                            | None                        | PostgreSQL-backed coordination readiness   |
+| `GET /v1/runs?...`                       | `CONTROL_PLANE_READ_TOKEN`  | Filtered, cursor-paginated run list        |
+| `GET /v1/runs/:run_id`                   | `CONTROL_PLANE_READ_TOKEN`  | Redacted run detail                        |
+| `GET /v1/runs/:run_id/publication-steps` | `CONTROL_PLANE_READ_TOKEN`  | Publication-step summary                   |
+| `GET /v1/runs/parked`                    | `CONTROL_PLANE_READ_TOKEN`  | Runs coordination stopped retrying         |
+| `POST /v1/admin/runs/:run_id/abandon`    | `CONTROL_PLANE_ADMIN_TOKEN` | Abandon a preparation parked by a conflict |
+| `POST /v1/admin/runs/:run_id/give-up`    | `CONTROL_PLANE_ADMIN_TOKEN` | Stop waiting for one disconnected run      |
+| `POST /v1/admin/runs/:run_id/resume`     | `CONTROL_PLANE_ADMIN_TOKEN` | Hand a disconnected axis to recovery       |
 
 The write surface — admission, submission, preparation and publication claims and their terminal outcomes — is a set of REST routes whose request/response shapes, security, and error codes are the hand-written [openapi.yaml](../contracts/control-plane-api/openapi.yaml) contract; that document is the single source of truth for the whole surface, not this table.
 
@@ -132,7 +132,7 @@ The contract is **enforced on requests**: routing, path/query/body validation, a
 
 Read responses omit `runner_input` and `publish_context`. The UI BFF holds the read token; browser code receives neither Control Plane token.
 
-The service token authenticates components coordinating a run; the read token authenticates redacted reads; a third, optional admin token authenticates the operator surface under `/v1/admin`. The three are deliberately not nested: holding the service token does not reach an admin route, and the admin token cannot admit runs or move a run through its normal lifecycle. `/v1/admin` exists only when `CONTROL_PLANE_ADMIN_TOKEN` is configured — otherwise the paths answer 404 rather than 401, so an unconfigured deployment does not advertise an operator surface at all. Reading the blocked-preparation queue needs only the read token, because knowing a run is stuck is not privileged; only the decision to abandon it is.
+The service token authenticates components coordinating a run; the read token authenticates redacted reads; a third, optional admin token authenticates the operator surface under `/v1/admin`. The three are deliberately not nested: holding the service token does not reach an admin route, and the admin token cannot admit runs or move a run through its normal lifecycle. `/v1/admin` exists only when `CONTROL_PLANE_ADMIN_TOKEN` is configured — otherwise the paths answer 404 rather than 401, so an unconfigured deployment does not advertise an operator surface at all. Reading the parked-run queue needs only the read token, because knowing a run is stuck is not privileged; only the decisions that conclude one are.
 
 Read responses report three independent lifecycle axes as nested objects of the same shape: `preparation`, `execution`, and `publication`. Each carries its own `status`, `started_at`, `finished_at`, and `updated_at`. The preparation summary adds `attempt_count` and its terminal `failure_code`, but never its opaque input, claim token, or connector identity. `notices` is an ordered list: every entry is tied to the source transition event and can therefore report multiple distinct outcomes for one run without deduplicating them away.
 

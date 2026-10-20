@@ -2267,11 +2267,12 @@ paths:
         An operator decision, not a repair: conclude a blocked run's open axes so it stops
         holding unwinnable work. Execution is left untouched (a recorded result and its
         `workflow_result` stay), nothing is deleted, and the run keeps its ingress identity so a
-        replay still resolves to it. Only a run listed by `listParkedRuns` is
-        eligible; that restriction is what keeps this from becoming a general state-jumping
-        endpoint, so a leaked admin token can at most abandon runs the system already proved it
-        cannot finish. Requires the admin token; the route does not exist when none is
-        configured.
+        replay still resolves to it. Only a run whose preparation is parked by a contradiction
+        is eligible - the case this decision exists for; a run parked on execution or publication
+        is ended with `giveUp` instead. That single-eligibility restriction is what keeps this
+        from becoming a general state-jumping endpoint: the route can only finish a transition
+        coordination already proved impossible, and a leaked admin token can at most conclude
+        such a run. Requires the admin token; the route does not exist when none is configured.
       security:
         - adminToken: []
       parameters:

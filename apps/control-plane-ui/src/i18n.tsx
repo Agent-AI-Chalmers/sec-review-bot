@@ -167,7 +167,7 @@ export const messages = {
     sessionExpired: 'Your session expired. Sign in again, then retry.',
     parkedRunsTitle: 'These runs need your review',
     parkedRunsBody:
-      'Automatic work stopped on each of these runs and will not continue by itself. The axis that stopped is named beside each one; opening a run shows what the conflict is and which decisions the server accepts for it.',
+      'Automatic work stopped on each of these runs and will not continue by itself. The axis that stopped is named beside each one, because the accepted decisions differ: a run parked on preparation can be resumed only while its execution has not started, while a run parked on execution or publication can be resumed or given up. Opening a run shows the decision the server accepts for it.',
     axisExecution: 'Execution',
     axisPreparation: 'Preparation',
     axisPublication: 'Publication',
@@ -487,7 +487,7 @@ export const messages = {
     sessionExpired: '会话已过期。请重新登录后再试。',
     parkedRunsTitle: '这些 run 需要你审计',
     parkedRunsBody:
-      '这些 run 的自动处理都已停下，不会自行继续。每条旁边标明了停下的是哪一轴；打开某个 run 可以看到具体冲突，以及服务端允许对它做哪些决定。',
+      '这些 run 的自动处理都已停下，不会自行继续。每条旁边标明了停下的是哪一轴，因为服务端接受的决定取决于这一轴：停在准备轴的 run 只有在执行尚未开始时才能恢复，停在执行轴或发布轴的 run 可以恢复，也可以放弃。打开某个 run 可以看到服务端接受的决定。',
     axisExecution: '执行',
     axisPreparation: '准备',
     axisPublication: '发布',
