@@ -19,6 +19,7 @@ import {
   materializeWorkspaceWithCommitHistory,
   exportWorkspaceDiff
 } from '../../artifacts/git-workspace.js'
+import type { ReviewWindow } from './review-window.js'
 import {
   archiveInputBundle,
   buildGitRemoteUrl,
@@ -193,12 +194,12 @@ async function materializeWorkspaceHistory({
 
 async function materializeIncrementalWindowArtifacts({
   workspace_path,
-  pr,
+  window,
   files,
   incremental_window_path
 }: {
   workspace_path: string
-  pr: PullRequestContext
+  window: ReviewWindow
   files: NormalizedPullRequestFile[]
   incremental_window_path: string
 }): Promise<void> {
@@ -216,10 +217,13 @@ async function materializeIncrementalWindowArtifacts({
   // field for part of a large pull request (renames without content changes,
   // some additions, and individual files with a large diff), so assembling the
   // patch from it silently drops changes the review is supposed to cover.
+  //
+  // The range comes from the run's single resolved window, never from `pr`
+  // directly, so this patch and the `files` above describe the same change set.
   const incremental_patch = await exportWorkspaceDiff({
     workspace_path,
-    base_sha: pr.base_sha,
-    head_sha: pr.head_sha
+    base_sha: window.base_sha,
+    head_sha: window.head_sha
   })
 
   await Promise.all([
@@ -296,6 +300,7 @@ export async function preparePullRequestReviewInput({
   octokit,
   pr,
   files,
+  window,
   trusted_default_branch,
   test_changes = null
 }: {
@@ -303,6 +308,7 @@ export async function preparePullRequestReviewInput({
   octokit: Octokit
   pr: PullRequestContext
   files: PullRequestFile[]
+  window: ReviewWindow
   trusted_default_branch: TrustedDefaultBranch
   test_changes?: TestChangesPolicy | null
 }): Promise<PreparedPullRequestReview> {
@@ -357,7 +363,7 @@ export async function preparePullRequestReviewInput({
   })
   await materializeIncrementalWindowArtifacts({
     workspace_path,
-    pr,
+    window,
     files: normalizedFiles,
     incremental_window_path
   })

@@ -1,6 +1,6 @@
-# Pull Request 审查窗口契约
+# Pull Request Review Window Contract
 
-Language: [English](REVIEW_WINDOW_CONTRACT.md) | 中文
+语言：[English](REVIEW_WINDOW_CONTRACT.md) | 中文
 
 ## 问题
 

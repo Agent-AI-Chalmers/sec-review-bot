@@ -305,10 +305,16 @@ test(
       }
       const { preparePullRequestReviewInput } =
         await import('../../src/reviews/pull-requests/prepare-input.js')
+      const { fullReviewWindow } =
+        await import('../../src/reviews/pull-requests/review-window.js')
       const prepared = await preparePullRequestReviewInput({
         run_id: 'run-pr-auth',
         octokit,
         pr,
+        window: fullReviewWindow({
+          base_sha: pr.base_sha,
+          head_sha: pr.head_sha
+        }),
         trusted_default_branch: { default_branch: 'main', head_sha },
         files: []
       })
