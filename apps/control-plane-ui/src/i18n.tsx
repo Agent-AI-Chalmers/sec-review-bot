@@ -558,7 +558,7 @@ export const messages = {
     state_publication_published_label: '已发布',
     state_publication_uncertain_label: '待确认',
     state_publication_uncertain_desc:
-      '某次远端写入可能已经成功，但结果没有记录下来。对于这个步骤，系统只查询远端实际状态，不会再次执行写入。',
+      '某次远端写入可能已经成功，但系统没有记录到结果。故而正在查询远端实际结果（此时不会再次发起相同的写入）。',
     state_publication_disconnected_label: '失联',
     state_publication_disconnected_desc:
       '系统多次尝试确认某个步骤的远端结果，但始终没有得到结论，因此自动处理已经停止。必须先由 operator 决定是否继续，这个 run 才能收尾。',
