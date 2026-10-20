@@ -1892,6 +1892,35 @@ test('concurrent claimNextPublication consumers cannot own the same ready run', 
   }
 })
 
+test('claimNextPublication does not treat an execution that left succeeded as publishable', async () => {
+  // The claim's UPDATE re-states the full publishable predicate (execution succeeded with a
+  // result), not only the publication status. This pins the observable consequence: a run whose
+  // execution axis is no longer successful is never selected as publishable work, and its
+  // publication stays untouched.
+  const connectorId = `publisher:${randomUUID()}`
+  const store = await createStore({ connectorId })
+  const observer = new Pool({ connectionString: requireTestDatabase() })
+  const runId = await createSuccessfulRun(store, `run-${randomUUID()}`)
+  try {
+    await observer.query(
+      `UPDATE executions SET status='failed' WHERE run_id=$1 AND connector_id=$2`,
+      [runId, connectorId]
+    )
+    assert.strictEqual(
+      await store.claimNextPublication(),
+      null,
+      'an execution that is not succeeded is not publishable'
+    )
+    assert.strictEqual(
+      (await store.getRun(runId))?.publication.status,
+      'pending'
+    )
+  } finally {
+    await observer.end()
+    await store.close()
+  }
+})
+
 test('a retryable publication failure makes the run claimable again', async () => {
   // The counterpart to `spends retry budget only for the current publication owner`, which
   // asserts the retryable failure is accepted: this asserts the run becomes claimable again

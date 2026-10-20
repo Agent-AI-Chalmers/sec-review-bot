@@ -1438,22 +1438,44 @@ export class ReviewRunStore {
       if (candidateRow === undefined) return null
       const runId = candidateRow.run_id
       const token = crypto.randomUUID()
-      // Restate the claimable condition instead of relying on the SELECT's row lock alone.
+      // Restate the FULL claimable condition instead of relying on the SELECT's row lock alone.
       // The lock makes this safe today; repeating the predicate keeps it safe if the two
-      // statements are ever split, and it guarantees the UPDATE cannot silently overwrite a
-      // terminal publication state that the SELECT could no longer have selected. The
-      // `status` equality pins the row the event's `from_status` was captured from, so the
-      // audit log cannot claim an origin the row no longer had.
+      // statements are ever split, and it guarantees the UPDATE can only succeed on a row the
+      // SELECT could legitimately have chosen. That matters for more than the status: a row
+      // selected as an expired `publishing` lease must still be expired here, or a concurrent
+      // claimant that just renewed it would have its healthy lease overwritten. `status=$4`
+      // additionally pins the row the event's `from_status` was captured from, so the audit log
+      // cannot claim an origin the row no longer had.
+      //
+      // The execution join is repeated for the same reason: it pins the exact set of columns the
+      // SELECT filtered on, so if these statements are ever split (or the SELECT's predicate
+      // drifts) the UPDATE alone still refuses a row whose execution is not successful with a
+      // stored result. It is not a substitute for the SELECT's `FOR UPDATE` lock, which is what
+      // serialises concurrent writers today.
       const claimed = await client.query(
         `
-        UPDATE publications SET status='publishing', claim_token=$3,
+        UPDATE publications p SET status='publishing', claim_token=$3,
           claimed_at=clock_timestamp(),
-          started_at=COALESCE(started_at, clock_timestamp()),
+          started_at=COALESCE(p.started_at, clock_timestamp()),
           failure_code=NULL, failure_message=NULL,
           updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2 AND status=$4
+        FROM executions e
+        WHERE p.run_id=$1 AND p.connector_id=$2 AND p.status=$4
+          AND e.run_id=p.run_id AND e.connector_id=p.connector_id
+          AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
+          AND (
+            $4='pending'
+            OR ($4='publishing'
+              AND p.claimed_at <= clock_timestamp()-($5*interval '1 millisecond'))
+          )
       `,
-        [runId, this.connectorId, token, candidateRow.status]
+        [
+          runId,
+          this.connectorId,
+          token,
+          candidateRow.status,
+          this.claimTimeoutMs
+        ]
       )
       if (claimed.rowCount !== 1)
         throw new Error(
