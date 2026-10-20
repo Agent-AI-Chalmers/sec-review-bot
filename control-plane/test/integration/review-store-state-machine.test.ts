@@ -3798,6 +3798,60 @@ test('a disconnected publication is parked until an operator resumes it', async 
   }
 })
 
+test('a takeover re-derives the step set its predecessor stored instead of failing as changed', async () => {
+  // The publish paths recompute their step keys on every attempt and pass them to
+  // initializePublicationSteps, which rejects any set that differs from the stored one with a
+  // *terminal* code. A run whose publisher died while its steps were uncertain is taken over and
+  // enters that same path again, so a takeover must be able to re-derive what was written. If it
+  // cannot, the publication fails its own retry and neither resume nor give-up can recover it.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.claimPublication(runId)
+    assert.notStrictEqual(token, null)
+    await store.initializePublicationSteps(runId, token as string, [
+      'issue:draft-pr',
+      'issue:summary-comment'
+    ])
+
+    // The publisher's lease expires while its steps are uncertain, and another owner claims the
+    // publication. This is the ordinary takeover path, not an operator resume.
+    await pool.query(
+      `UPDATE publications SET claimed_at=clock_timestamp()-($2*interval '1 millisecond')
+       WHERE run_id=$1`,
+      [runId, 600_000]
+    )
+    const takeover = await store.claimPublication(runId)
+    assert.notStrictEqual(takeover, null, 'an expired lease is taken over')
+
+    // The new owner re-runs the same derivation its predecessor did.
+    await store.initializePublicationSteps(runId, takeover as string, [
+      'issue:draft-pr',
+      'issue:summary-comment'
+    ])
+
+    // And when its derivation no longer names a step the run already stored, the stored steps
+    // stay the run's steps. The set was fixed at the first claim; a later attempt cannot shrink
+    // it, or the step it drops would be lost while the run reports publishing something it no
+    // longer tracks. Rejecting the takeover instead would be worse: it is a terminal verdict
+    // reached by the run's own retry.
+    await store.initializePublicationSteps(runId, takeover as string, [
+      'issue:summary-comment'
+    ])
+    assert.deepStrictEqual(
+      (await store.listPublicationSteps(runId))
+        .map((step) => (step as { step_key: string }).step_key)
+        .sort(),
+      ['issue:draft-pr', 'issue:summary-comment'],
+      'the takeover keeps every step the run stored'
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
 test('abandoning a run that is no longer disconnected answers 409, not an opaque fault', async () => {
   // The endpoint only ever concludes a run that is still waiting on an operator. When the row
   // has moved on, the request names a run in a state this operation may not act on: that is a
