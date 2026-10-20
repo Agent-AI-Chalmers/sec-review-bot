@@ -51,14 +51,23 @@ def test_review_backends_mount_materialized_memory_view_when_configured(
         encoding="utf-8",
     )
 
-    with patch.dict(
-        "os.environ",
-        {
-            "AGENT_SANDBOX_BACKEND": "local",
-            "AGENT_MEMORY_DIR": str(memory_source),
-            "AGENT_MEMORY_MATERIALIZED_ROOT": str(memory_materialized),
-        },
-        clear=False,
+    with (
+        # The memory view is what this test checks, so the sandbox is pinned rather
+        # than resolved: `local` is not a deployment value, and the real
+        # resolution would look for Docker.
+        patch(
+            "sec_review_agents.filesystem.backend_selection."
+            "selected_sandbox_backend_kind",
+            return_value="local",
+        ),
+        patch.dict(
+            "os.environ",
+            {
+                "AGENT_MEMORY_DIR": str(memory_source),
+                "AGENT_MEMORY_MATERIALIZED_ROOT": str(memory_materialized),
+            },
+            clear=False,
+        ),
     ):
         backends = (
             create_issue_analyzer_backend(

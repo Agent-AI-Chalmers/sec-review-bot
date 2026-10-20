@@ -114,10 +114,9 @@ def test_setup_declaration_content_for_backend_docker_only(monkeypatch) -> None:
         == "setup:\n  - run: echo hi\n"
     )
 
+    # bwrap is the non-docker backend an operator can still select; `local` is
+    # no longer a deployment value.
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "bwrap")
-    assert setup_declaration_content_for_backend(prepared_input) is None
-
-    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "local")
     assert setup_declaration_content_for_backend(prepared_input) is None
 
 

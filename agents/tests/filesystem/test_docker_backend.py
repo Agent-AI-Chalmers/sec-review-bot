@@ -268,22 +268,6 @@ def test_sandbox_backend_defaults_to_docker_when_available() -> None:
         assert selected_sandbox_backend_kind() == "docker"
 
 
-def test_sandbox_backend_auto_falls_back_to_host_when_docker_is_unavailable() -> None:
-    with (
-        patch.dict("os.environ", {}, clear=True),
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.shutil.which",
-            return_value=None,
-        ),
-    ):
-        assert selected_sandbox_backend_kind() == "local"
-
-
-def test_sandbox_backend_can_be_forced_to_local() -> None:
-    with patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "local"}, clear=True):
-        assert selected_sandbox_backend_kind() == "local"
-
-
 def test_sandbox_backend_can_be_forced_to_docker_without_probe() -> None:
     with (
         patch.dict(
@@ -304,7 +288,7 @@ def test_sandbox_backend_rejects_unknown_mode() -> None:
         patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "host"}, clear=True),
         pytest.raises(
             ValueError,
-            match="AGENT_SANDBOX_BACKEND must be one of: auto, docker, local, bwrap",
+            match="AGENT_SANDBOX_BACKEND must be one of: auto, docker, bwrap",
         ),
     ):
         selected_sandbox_backend_kind()

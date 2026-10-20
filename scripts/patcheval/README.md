@@ -31,7 +31,7 @@ python -m scripts.patcheval.run_patcheval \
 
 The adapter materializes a PatchEval case, converts it into a standard `issue-review` runner request, dispatches the normal runner, and writes the workflow result next to the materialized run.
 
-PatchEval cases specify benchmark Docker images. The adapter enables workspace-image override only for this local evaluation process, so production runner requests still cannot choose arbitrary images. With the default sandbox policy, Docker is used automatically when it is available; otherwise the workflow falls back to host-local execution.
+PatchEval cases specify benchmark Docker images. The adapter enables workspace-image override only for this local evaluation process, so production runner requests still cannot choose arbitrary images. A PatchEval case needs a sandbox that runs the benchmark's own commands, so a Docker runtime is required: with the default sandbox policy Docker is selected automatically, and the run fails with an error when the runtime is not available. There is no host-local fallback, because a workflow with no shell cannot exercise the case at all.
 
 For comparable PatchEval results, run with Docker sandbox execution:
 

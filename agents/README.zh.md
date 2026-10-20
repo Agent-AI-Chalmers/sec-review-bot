@@ -278,16 +278,13 @@ Agent 可以声明自己需要的 skills。runner 启动 agent 时会自动准�
 
 ## Sandbox 运行环境
 
-agent 的正常运行环境优先是 Docker sandbox。本地 filesystem backend 是 fallback，主要用于 Docker 不可用或开发者显式关闭 sandbox 的场景。
+审查代码的 agent stage 必须运行在能够执行命令的 sandbox 里，否则它无法运行测试、读取历史或复现发现。具体用哪个 sandbox 属于部署配置：
 
-默认策略：
+- `AGENT_SANDBOX_BACKEND` 不设置或设置为 `auto`：Docker runtime 可用时使用 Docker sandbox，不可用则报错并说明缺的是什么
+- `AGENT_SANDBOX_BACKEND=docker`：要求使用 Docker sandbox
+- `AGENT_SANDBOX_BACKEND=bwrap`：显式启用 bubblewrap（仅 Linux/WSL2；`auto` 永远不会选中它）
 
-- `AGENT_SANDBOX_BACKEND` 不设置或设置为 `auto`：自动探测 Docker，可用则使用
-  Docker sandbox，不可用才退回本地 filesystem backend
-- `AGENT_SANDBOX_BACKEND=docker`：强制 Docker sandbox
-- `AGENT_SANDBOX_BACKEND=local`：显式使用本地 fallback
-
-需要运行测试、reproduction、构建命令或可选运行时服务的 analyzer / mitigator / verifier，都应该在 Docker sandbox 下运行。本地 fallback 有意保持较多限制：它可以暴露挂载文件，支持有边界的读取和配置过的写入，但不应被当成完整运行时验证环境。
+没有任何取值可以选择本地 filesystem backend。它没有 shell，把它交给审查代码的 stage，等于悄悄让那一步无法执行任何命令。不需要 shell 的 stage 会自行选择它，因此这不是部署配置。
 
 benchmark 和本地调试可以设置 `runtime.workspace_image`，指定承载目标代码库的隔离容器镜像。
 
