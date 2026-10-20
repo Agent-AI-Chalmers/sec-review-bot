@@ -14,6 +14,10 @@ import path from 'node:path'
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { REPO_ROOT } from './repo-root.js'
 
+/** The print width the owning package's prettier config uses. */
+const PRINT_WIDTH = 80
+
+
 type JsonSchema = Record<string, unknown>
 
 const SCHEMA_DIR = path.join(
@@ -209,12 +213,16 @@ function renderObject(
       const keyText = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)
         ? key
         : literal(key)
-      return `${inner}${keyText}${optional}: ${renderType(
-        value,
-        inner,
-        common,
-        `${where}.${key}`
-      )}`
+      const rendered = renderType(value, inner, common, `${where}.${key}`)
+      const inline = `${inner}${keyText}${optional}: ${rendered}`
+      // Keep the emitted text within the print width the owning package formats to. Only a union
+      // that is otherwise on one line can be moved to its own line; an object already spans
+      // lines and carries its own indentation.
+      const isInlineUnion = !rendered.includes('\n') && rendered.includes(' | ')
+      if (inline.length <= PRINT_WIDTH || !isInlineUnion) {
+        return inline
+      }
+      return `${inner}${keyText}${optional}:\n${inner}  ${rendered}`
     }
   )
   if (lines.length === 0) return 'Record<string, unknown>'
