@@ -20,6 +20,13 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
     },
     getInstallationOctokit: async () => ({
       rest: {
+        // The reply path verifies a target repository against the installation before writing.
+        repos: {
+          get: async (args: unknown) => {
+            calls.push(['repos.get', args])
+            return { data: { full_name: 'octo/example' } }
+          }
+        },
         issues: {
           listComments: async (args: unknown) => {
             calls.push(['list', args])
@@ -61,8 +68,9 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
     await prepareReviewRunsOnce({ app: app as never, store: store as never }),
     true
   )
-  assert.deepStrictEqual(calls.slice(0, 2), [
+  assert.deepStrictEqual(calls.slice(0, 3), [
     ['installation', { owner: 'octo', repo: 'example' }],
+    ['repos.get', { owner: 'octo', repo: 'example' }],
     [
       'list',
       {
@@ -74,7 +82,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
       }
     ]
   ])
-  const create = calls[2] as ['create', { body: string }]
+  const create = calls[3] as ['create', { body: string }]
   assert.match(create[1].body, /run-pr-reference/)
   assert.deepStrictEqual(completed, [
     // The comment that was posted, so the console can link the requester to it.
@@ -134,6 +142,13 @@ test('a repository scan failure reports into the repository summary issue', asyn
     },
     getInstallationOctokit: async () => ({
       rest: {
+        // The reply path verifies the target repository against the installation before writing.
+        repos: {
+          get: async (args: unknown) => {
+            calls.push(['repos.get', args])
+            return { data: { full_name: 'octo/example' } }
+          }
+        },
         issues: {
           listForRepo: async (args: unknown) => {
             calls.push(['list-for-repo', args])

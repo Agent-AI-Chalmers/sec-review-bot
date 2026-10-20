@@ -5,12 +5,31 @@ import test from 'node:test'
 import { sendRunFailureReply } from '../../src/control-plane/run-failure-reply.js'
 import { repositoryFullName } from '../../src/github/repository-service.js'
 
-function stubOctokit(report: {
-  created: Array<{ owner: string; repo: string }>
-  commented: number[]
-}): never {
+function stubOctokit(
+  report: {
+    created: Array<{ owner: string; repo: string }>
+    commented: number[]
+    /** Repositories this installation may see; anything else answers 404 like GitHub does. */
+    installed?: string[]
+  },
+  options: { repoLookupFailsWith?: number } = {}
+): never {
+  const installed = new Set(report.installed ?? [])
   return {
     rest: {
+      repos: {
+        get: async ({ owner, repo }: { owner: string; repo: string }) => {
+          if (options.repoLookupFailsWith !== undefined) {
+            throw Object.assign(new Error('lookup failed'), {
+              status: options.repoLookupFailsWith
+            })
+          }
+          if (!installed.has(`${owner}/${repo}`)) {
+            throw Object.assign(new Error('Not Found'), { status: 404 })
+          }
+          return { data: { full_name: `${owner}/${repo}` } }
+        }
+      },
       issues: {
         listForRepo: async () => ({ data: [] }),
         create: async (args: { owner: string; repo: string }) => {
@@ -42,7 +61,12 @@ test('a repository failure target must be exactly owner/repo', async () => {
   ]) {
     const report = {
       created: [] as Array<{ owner: string; repo: string }>,
-      commented: [] as number[]
+      commented: [] as number[],
+      // Mark every plausible target installed, so this assertion is about *resolution* and not
+      // about the installation guard accidentally rejecting the value.
+      installed: ['octo', 'octo/example', 'a/b', 'example'].map((repo) =>
+        repo.includes('/') ? repo : `x/${repo}`
+      )
     }
     const result = await sendRunFailureReply(stubOctokit(report), {
       run_id: 'run-repository',
@@ -68,7 +92,8 @@ test('a repository failure target tolerates surrounding whitespace', async () =>
   // to agree, or the name would keep the spaces and address a repository that does not exist.
   const report = {
     created: [] as Array<{ owner: string; repo: string }>,
-    commented: [] as number[]
+    commented: [] as number[],
+    installed: ['octo/example']
   }
   const result = await sendRunFailureReply(stubOctokit(report), {
     run_id: 'run-repository',
@@ -101,7 +126,8 @@ test('the reply target and the installation lookup agree on what names a reposit
   ]) {
     const report = {
       created: [] as Array<{ owner: string; repo: string }>,
-      commented: [] as number[]
+      commented: [] as number[],
+      installed: ['octo/example']
     }
     const result = await sendRunFailureReply(stubOctokit(report), {
       run_id: 'run-agreement',
@@ -116,4 +142,62 @@ test('the reply target and the installation lookup agree on what names a reposit
       `${JSON.stringify(verified_repository)} must resolve the same way on both paths`
     )
   }
+})
+
+test('a target repository outside the installation is refused before any write', async () => {
+  // Persisted state names a repository this app is not installed on. The installation-scoped
+  // client answers 404, so the reply path must refuse rather than create a summary issue or a
+  // comment there - otherwise a bad persisted value becomes a public write in a foreign repo.
+  for (const input of [
+    { kind: 'github_repository_review', verified_repository: 'attacker/repo' },
+    {
+      kind: 'github_issue_review',
+      issue: { owner_login: 'attacker', repo_name: 'repo', issue_number: 1 }
+    },
+    {
+      kind: 'github_pull_request_review',
+      pr_reference: { owner_login: 'attacker', repo_name: 'repo', pr_number: 2 }
+    }
+  ]) {
+    const report = {
+      created: [] as Array<{ owner: string; repo: string }>,
+      commented: [] as number[],
+      installed: ['octo/example']
+    }
+    await assert.rejects(
+      sendRunFailureReply(stubOctokit(report), {
+        run_id: 'run-foreign',
+        input,
+        failure_stage: 'preparation',
+        failure_code: 'PREPARATION_RETRY_EXHAUSTED'
+      }),
+      /not installed on this app/,
+      `${JSON.stringify(input)} must be refused`
+    )
+    assert.deepStrictEqual(report.created, [], 'no issue may be created')
+    assert.deepStrictEqual(report.commented, [], 'no comment may be posted')
+  }
+})
+
+test('a transient repository lookup fault stays retryable', async () => {
+  // A 5xx from the repository lookup is the GitHub outage case: the notice must remain
+  // retryable, so the error propagates unchanged (no deterministic status of 403/404 attached).
+  const report = {
+    created: [] as Array<{ owner: string; repo: string }>,
+    commented: [] as number[],
+    installed: ['octo/example']
+  }
+  await assert.rejects(
+    sendRunFailureReply(stubOctokit(report, { repoLookupFailsWith: 502 }), {
+      run_id: 'run-transient',
+      input: {
+        kind: 'github_repository_review',
+        verified_repository: 'octo/example'
+      },
+      failure_stage: 'preparation',
+      failure_code: 'PREPARATION_RETRY_EXHAUSTED'
+    }),
+    /lookup failed/
+  )
+  assert.deepStrictEqual(report.created, [])
 })
