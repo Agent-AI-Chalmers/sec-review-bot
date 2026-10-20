@@ -55,12 +55,10 @@ def test_docker_execute_bounds_large_init_commit_diff_output(tmp_path: Path) -> 
         )
 
     assert isinstance(backend, DockerSandboxBackend)
-    try:
+    with backend:
         result = backend.execute(
             "git show --stat --patch --root HEAD",
         )
-    finally:
-        backend.close()
 
     assert result.exit_code == 0
     assert result.truncated
@@ -93,15 +91,13 @@ def test_docker_transfers_reject_symlink_escape_between_routes(tmp_path: Path) -
     )
 
     assert isinstance(backend, DockerSandboxBackend)
-    try:
+    with backend:
         result = backend.execute("ln -s /outside /workspace/link")
         assert result.exit_code == 0
         download = backend.download_files(["/workspace/link/secret.txt"])[0]
         upload = backend.upload_files([("/workspace/link/secret.txt", b"overwritten")])[
             0
         ]
-    finally:
-        backend.close()
 
     assert download.error == "permission_denied"
     assert download.content is None

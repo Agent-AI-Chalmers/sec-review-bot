@@ -19,6 +19,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     is_docker_runtime_available,
 )
 from sec_review_agents.filesystem.path_views import workspace_view
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
     BootstrapStatus,
     bootstrap_environment,
@@ -59,12 +60,10 @@ async def test_bootstrap_applies_working_directory_and_env(tmp_path: Path) -> No
             "      NODE_ENV: development",
         ]
     )
-    try:
+    async with amanaged_backend(backend):
         result = await bootstrap_environment(
             backend, setup_declaration_content=setup_declaration
         )
-    finally:
-        backend.close()
 
     assert result.status is BootstrapStatus.COMPLETED
     output = result.steps[0].output
@@ -80,13 +79,11 @@ async def test_bootstrap_applies_working_directory_and_env(tmp_path: Path) -> No
 )
 async def test_bootstrap_marks_incomplete_on_nonzero_step(tmp_path: Path) -> None:
     backend = _backend(tmp_path, "bootstrap-it-fail")
-    try:
+    async with amanaged_backend(backend):
         result = await bootstrap_environment(
             backend,
             setup_declaration_content="setup:\n  - run: 'exit 7'\n  - run: echo never\n",
         )
-    finally:
-        backend.close()
 
     assert result.status is BootstrapStatus.INCOMPLETE
     assert len(result.steps) == 1

@@ -67,14 +67,11 @@ def _build_changed_files(repo_path: Path, base_ref: str, head_ref: str) -> list[
             current_path = (parts[2] if len(parts) > 2 else "").strip()
         if not current_path:
             continue
-        if status_raw.startswith("R"):
-            status = "renamed"
-        elif status_raw.startswith("A"):
-            status = "added"
-        elif status_raw.startswith("D"):
-            status = "deleted"
-        else:
-            status = "modified"
+        status = _GIT_STATUS_TO_CHANGE.get(status_raw[0])
+        if status is None:
+            raise ValueError(
+                f"git reported status {status_raw!r}, which has no scan-scope meaning."
+            )
         files.append(
             {
                 "path": current_path,
@@ -84,6 +81,19 @@ def _build_changed_files(repo_path: Path, base_ref: str, head_ref: str) -> list[
         )
     files.sort(key=lambda item: str(item.get("path") or ""))
     return files
+
+
+# The scan scope's change vocabulary, mirroring `changedFileStatus` in the integration contract.
+# `T` is a type change (ordinary file to symlink, or a transition to or from a submodule), not a
+# content change, so it keeps its own name instead of collapsing into `modified`.
+_GIT_STATUS_TO_CHANGE = {
+    "A": "added",
+    "C": "copied",
+    "D": "deleted",
+    "M": "modified",
+    "R": "renamed",
+    "T": "type_changed",
+}
 
 
 def _materialize_incremental_artifacts(
@@ -125,8 +135,7 @@ def _materialize_incremental_artifacts(
             "git",
             "log",
             "--no-merges",
-            "--date=iso-strict",
-            "--pretty=format:%H%x09%s%x09%an%x09%cI",
+            "--pretty=format:%H",
             f"{base_ref}..{head_ref}",
         ],
         cwd=repo_path,
@@ -134,28 +143,10 @@ def _materialize_incremental_artifacts(
         capture_output=True,
         text=True,
     ).stdout.strip()
-    commits = []
-    for line in commits_output.splitlines():
-        if not line.strip():
-            continue
-        parts = line.split("\t")
-        commits.append(
-            {
-                "sha": (parts[0] if len(parts) > 0 else "").strip(),
-                "title": (parts[1] if len(parts) > 1 else "").strip(),
-                "author": (parts[2] if len(parts) > 2 else "").strip(),
-                "committed_at": (parts[3] if len(parts) > 3 else "").strip(),
-            }
-        )
-    filtered_commits = [item for item in commits if item["sha"]]
-    write_json(
-        history_root / "commits.json",
-        {
-            "base_sha": base_ref,
-            "head_sha": head_ref,
-            "commits": filtered_commits,
-        },
-    )
+    # Only the commit identities travel with the run, matching the GitHub producer, which also
+    # carries `commit_shas` and nothing else.
+    commit_shas = [line.strip() for line in commits_output.splitlines() if line.strip()]
+
     write_json(
         history_root / "scan-window.json",
         {
@@ -168,7 +159,7 @@ def _materialize_incremental_artifacts(
             "generated_at": utc_now_iso(),
         },
     )
-    return changed_files, [item["sha"] for item in filtered_commits]
+    return changed_files, commit_shas
 
 
 def build_local_repository_security_bundle(

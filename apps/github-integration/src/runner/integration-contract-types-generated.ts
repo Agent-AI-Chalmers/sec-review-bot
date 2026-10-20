@@ -27,10 +27,17 @@ export interface RepositoryScanScope {
   paths_ignore: string[]
   incremental_changed_files: {
     path: string
-    status: string
+    status:
+      'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed'
     previous_path: string | null
   }[]
 }
+
+export const MAX_SCAN_TARGET_COMMIT_SHAS = 20000
+export const MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES = 5000
+export const MAX_SETUP_DECLARATION_TEXT = 65536
+export const MAX_WORKFLOW_INPUT_BYTES = 1500000
+export const MAX_PR_COMMIT_SHAS = 20000
 
 export interface IssueReviewInput {
   contract_version: 'v6'

@@ -1,10 +1,9 @@
-"""End-to-end: a real declaration installs real dependencies in the sandbox.
+"""End-to-end: a real declaration installs a tool the sandbox can then use.
 
 Bootstrap runs the declaration with network access, then a later command in the
 same container can use the installed dependencies -- the property that makes a
-setup declaration useful. It uses the small integration image and installs node/npm
-via the declaration itself, so it needs both Docker and network and is skipped
-when either is unavailable.
+setup declaration useful. It installs a small tool via the declaration itself, so it
+needs both Docker and network and is skipped when the sandbox has no network.
 """
 
 from pathlib import Path
@@ -20,6 +19,7 @@ from sec_review_agents.filesystem.docker_runtime import (
     is_docker_runtime_available,
 )
 from sec_review_agents.filesystem.path_views import workspace_view
+from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
     BootstrapStatus,
     bootstrap_environment,
@@ -48,16 +48,16 @@ async def test_declaration_installs_dependencies_usable_by_later_commands(
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    (workspace / "package.json").write_text(
-        '{"name":"e2e","version":"1.0.0","dependencies":{"is-odd":"3.0.1"}}',
-        encoding="utf-8",
+    (workspace / "input.json").write_text(
+        '{"name": "e2e", "ready": false}', encoding="utf-8"
     )
+    # The property under test is that a declaration's installs are usable by a later command in
+    # the same container. `jq` proves it as well as a Node toolchain does, and it installs in a
+    # couple of seconds instead of pulling a full runtime and an npm dependency tree.
     setup_declaration = "\n".join(
         [
             "setup:",
-            "  - run: apk add --no-cache nodejs npm",
-            "    timeout_seconds: 240",
-            "  - run: npm install --no-audit --no-fund",
+            "  - run: apk add --no-cache jq",
             "    timeout_seconds: 240",
         ]
     )
@@ -67,9 +67,15 @@ async def test_declaration_installs_dependencies_usable_by_later_commands(
         path_views=[workspace_view(host_path=workspace, writable=True)],
     )
     assert isinstance(backend, DockerSandboxBackend)
-    try:
+    async with amanaged_backend(backend):
+        # Resolve the package mirror instead of running `apk update`. A DNS lookup answers
+        # "is there a network" in under a second; `apk update` downloads an index first, so on
+        # a slow link it spends minutes doing the very work this check is trying to avoid. The
+        # timeout stays as a backstop for a sandbox that cannot even reach a resolver.
         probe = backend.execute(
-            "apk update >/dev/null 2>&1 && echo NET_OK || echo NET_FAIL"
+            "getent hosts dl-cdn.alpinelinux.org >/dev/null 2>&1 "
+            "&& echo NET_OK || echo NET_FAIL",
+            timeout=30,
         )
         if "NET_OK" not in probe.output:
             pytest.skip("sandbox has no network; bootstrap requires it")
@@ -77,12 +83,9 @@ async def test_declaration_installs_dependencies_usable_by_later_commands(
             backend, setup_declaration_content=setup_declaration
         )
         assert result.status is BootstrapStatus.COMPLETED, result.reason
-        # A later command in the same container can use the installed dependency.
-        check = backend.execute(
-            "cd /workspace && node -e \"require('is-odd'); console.log('dep-ok')\""
-        )
-    finally:
-        backend.close()
+        # A later command in the same container can use what the declaration installed, and can
+        # act on the mounted workspace while doing it.
+        check = backend.execute("cd /workspace && jq -r '.name + \"-ok\"' input.json")
 
     assert check.exit_code == 0, check.output
-    assert "dep-ok" in check.output
+    assert "e2e-ok" in check.output

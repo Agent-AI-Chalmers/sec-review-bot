@@ -390,7 +390,9 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/nonBlankString"
-          }
+          },
+          "maxItems": 20000,
+          "$comment": "Bounded because the list is inlined into the workflow input; see scanScope.incremental_changed_files."
         }
       }
     },
@@ -423,7 +425,7 @@
                 "$ref": "#/$defs/nonBlankString"
               },
               "status": {
-                "$ref": "#/$defs/nonBlankString"
+                "$ref": "#/$defs/changedFileStatus"
               },
               "previous_path": {
                 "type": [
@@ -431,8 +433,53 @@
                   "null"
                 ]
               }
-            }
-          }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "renamed",
+                        "copied"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "previous_path": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "not": {
+                        "enum": [
+                          "renamed",
+                          "copied"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "previous_path": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "maxItems": 5000,
+          "$comment": "Bounded because every entry is inlined into the workflow input: the whole list crosses Temporal and is persisted, so an unbounded list fails late in transport instead of here."
         }
       }
     },
@@ -541,6 +588,23 @@
       "maxLength": 65536,
       "pattern": ".*\\S.*",
       "$comment": "Inline setup declaration text (`.sec-review/setup.yml`). Non-blank and bounded: the text travels inside the workflow input, so an unbounded file would grow the submission without limit. The real cap is 64 KiB of UTF-8 bytes, enforced by both producers before parse and by the runner's parser; this `maxLength` counts characters, so it can only admit a few extra multi-byte characters as a backstop -- the byte cap still rejects them loudly (before submission in the integration, at parse in the runner)."
+    },
+    "changedFileStatus": {
+      "type": "string",
+      "enum": [
+        "added",
+        "modified",
+        "deleted",
+        "renamed",
+        "copied",
+        "type_changed"
+      ],
+      "$comment": "The scan scope's change vocabulary, independent of how a producer learns it. Git reports D/R/C/T and the compare API reports 'removed'; producers project those into these values."
+    },
+    "workflowInputBytes": {
+      "type": "integer",
+      "const": 1500000,
+      "$comment": "Hard ceiling on the UTF-8 size of a serialized workflow input, including the pull request, issue and repository shapes. Prose constraints like maxItems bound the number of entries but not their size: a path may be long, so 5000 entries can still serialize to tens of megabytes. The producer measures the finished input against this value, because the input travels through Temporal and is persisted, and both fail far from the cause when the payload is too large. 1500000 leaves headroom under Temporal's 2 MiB blob limit for the envelope."
     }
   }
 }

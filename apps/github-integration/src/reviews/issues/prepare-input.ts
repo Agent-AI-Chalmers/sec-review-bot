@@ -9,10 +9,14 @@ import {
 import { type TrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import type { Octokit } from 'octokit'
-import type { IssueReviewInput, TestChangesPolicy } from '../../runner/input.js'
+import type {
+  InputBundleArtifactRef,
+  IssueReviewInput,
+  TestChangesPolicy
+} from '../../runner/input.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
-  archiveInputBundle,
+  archiveInputBundleAndPublish,
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
@@ -148,21 +152,24 @@ export async function prepareIssueReviewInput({
     issue,
     history_path
   })
-  const input_bundle = await archiveInputBundle({
+  // The bundle is published only after the input that references it fits, so a failure here
+  // cannot leave an unreferenced immutable bundle behind.
+  const { input } = await archiveInputBundleAndPublish<IssueReviewInput>({
     input_bundle_root,
     include_incremental_window: false,
-    run_id
+    run_id,
+    workflow: 'issue review',
+    build_input: (reference: InputBundleArtifactRef): IssueReviewInput => ({
+      contract_version: CONTRACT_VERSION,
+      review_intent: {
+        objective: review_objective,
+        ...(test_changes ? { test_changes } : {})
+      },
+      issue: historyArtifacts.issueMetadata,
+      input_bundle: reference,
+      ...(setup_declaration ? { setup_declaration } : {})
+    })
   })
-  const input: IssueReviewInput = {
-    contract_version: CONTRACT_VERSION,
-    review_intent: {
-      objective: review_objective,
-      ...(test_changes ? { test_changes } : {})
-    },
-    issue: historyArtifacts.issueMetadata,
-    input_bundle,
-    ...(setup_declaration ? { setup_declaration } : {})
-  }
 
   const input_path = path.join(input_bundle_root, 'issue-review-input.json')
   await writeJsonArtifact(input_path, input)

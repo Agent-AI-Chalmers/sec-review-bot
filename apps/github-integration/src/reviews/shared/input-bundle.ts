@@ -10,9 +10,13 @@ import { createZstdCompress } from 'zlib'
 
 import {
   INPUT_BUNDLE_MEDIA_TYPE,
+  MAX_WORKFLOW_INPUT_BYTES,
   type InputBundleArtifactRef
 } from '../../runner/input.js'
-import { publishInputBundle } from '../../artifacts/input-storage.js'
+import {
+  publishedInputBundleReference,
+  publishInputBundle
+} from '../../artifacts/input-storage.js'
 
 import {
   WORKSPACE_SNAPSHOT_TAR_NAME,
@@ -30,6 +34,27 @@ import { asErrorWithResponse, isRecord } from '../../utils/error-utils.js'
 import { input_bundle_staging_root } from '../../config.js'
 
 const execFileAsync = promisify(execFile)
+
+/**
+ * Refuse a workflow input that will not survive transport.
+ *
+ * The schema's `maxItems` bounds how many entries an input carries, not how large it is: a Git
+ * path can be thousands of bytes, so a few thousand entries can serialize to tens of megabytes.
+ * The input travels through Temporal and is persisted, and both fail far from the cause when the
+ * payload is too large, so the size is checked here, against the bound the contract declares.
+ */
+export function assertWorkflowInputFits(
+  input: unknown,
+  workflow: string
+): void {
+  const bytes = Buffer.byteLength(JSON.stringify(input), 'utf8')
+  if (bytes > MAX_WORKFLOW_INPUT_BYTES) {
+    throw new Error(
+      `${workflow} input is ${bytes} bytes, which exceeds the workflow input limit of ` +
+        `${MAX_WORKFLOW_INPUT_BYTES}`
+    )
+  }
+}
 
 export function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, '-')
@@ -201,12 +226,10 @@ async function readRepositoryFileAtSha({
 
 export async function archiveInputBundle({
   input_bundle_root,
-  include_incremental_window,
-  run_id
+  include_incremental_window
 }: {
   input_bundle_root: string
   include_incremental_window: boolean
-  run_id: string
 }): Promise<InputBundleArtifactRef> {
   const tarPath = `${input_bundle_root}.tar`
   const archivePath = `${tarPath}.zst`
@@ -249,5 +272,59 @@ export async function archiveInputBundle({
     recursive: true,
     force: true
   })
-  return await publishInputBundle(reference, run_id)
+  return reference
+}
+
+/**
+ * Archive the bundle, confirm the input that references it fits, then publish.
+ *
+ * The order matters: publishing first would leave an immutable, unreferenced bundle behind
+ * whenever the input turns out to be too large. The bundle has to exist before the input can be
+ * sized, because the input carries the bundle's digest, so publication is the step that waits.
+ */
+export async function archiveInputBundleAndPublish<T>({
+  input_bundle_root,
+  include_incremental_window,
+  run_id,
+  build_input,
+  workflow,
+  publish = publishInputBundle,
+  project_published = publishedInputBundleReference
+}: {
+  input_bundle_root: string
+  include_incremental_window: boolean
+  run_id: string
+  build_input: (reference: InputBundleArtifactRef) => T
+  workflow: string
+  /** The publication step, injectable so a test can observe that it runs last. */
+  publish?: typeof publishInputBundle
+  /**
+   * The projection from the archived reference to the published one. Injectable because the
+   * real projection depends on process configuration: under the file-backed store it returns
+   * the reference unchanged, so a test could not otherwise exercise the URI rewrite that the S3
+   * store performs.
+   */
+  project_published?: typeof publishedInputBundleReference
+}): Promise<{
+  input: T
+  input_bundle: InputBundleArtifactRef
+}> {
+  const local_reference = await archiveInputBundle({
+    input_bundle_root,
+    include_incremental_window
+  })
+  // The published URI is known before the upload (it is derived from the run id), so the input
+  // can be built against the reference that will actually be submitted and sized once, before
+  // anything reaches object storage. A local `file:` URI in the input would be unreadable from a
+  // remote worker, and an oversized input rejected after publication would leave an immutable
+  // bundle with nothing pointing at it.
+  const published_reference = project_published(local_reference, run_id)
+  const input = build_input(published_reference)
+  assertWorkflowInputFits(input, workflow)
+
+  await publish(local_reference, run_id)
+  return {
+    input,
+    input_bundle: published_reference
+  }
 }

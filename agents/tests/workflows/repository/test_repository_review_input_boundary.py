@@ -56,7 +56,6 @@ def test_repository_review_input_renders_incremental_evidence_paths() -> None:
     assert "`/incremental-window/changed-files.json`" in markdown
     assert "`/incremental-window/incremental.patch`" in markdown
     assert "`/history/scan-window.json`" in markdown
-    assert "`/history/commits.json`" in markdown
 
 
 def test_repository_fix_prompts_consume_prepared_review_input() -> None:

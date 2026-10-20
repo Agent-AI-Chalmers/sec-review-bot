@@ -321,6 +321,14 @@ def _build_scan_manifest(
     return entries, skipped
 
 
+# The scan scope's change vocabulary, mirroring `changedFileStatus` in the integration contract.
+# `deleted` is the only status that removes a file from discovery; the rest describe how a file
+# changed and all of them are scanned.
+INCREMENTAL_CHANGED_FILE_STATUSES = frozenset(
+    {"added", "modified", "deleted", "renamed", "copied", "type_changed"}
+)
+
+
 def _load_incremental_changed_files(
     scan_scope: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -451,9 +459,13 @@ def _build_incremental_scan_manifest(
             continue
         seen_paths.add(normalized_path_text)
         status = str(item.get("status") or "").strip().lower()
-        if not status:
+        if status not in INCREMENTAL_CHANGED_FILE_STATUSES:
+            # A status outside the contract means the producer and this consumer disagree about
+            # the vocabulary. Skipping it (or scanning it) would silently change which files are
+            # analyzed, so the disagreement has to stop the run.
             raise ValueError(
-                "Repository incremental discovery received an empty changed-file status."
+                "Repository incremental discovery received an unsupported changed-file status "
+                f"{status!r}; expected one of {sorted(INCREMENTAL_CHANGED_FILE_STATUSES)}."
             )
         if status == "deleted":
             continue

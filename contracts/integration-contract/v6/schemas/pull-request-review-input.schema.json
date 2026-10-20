@@ -89,7 +89,9 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "maxItems": 20000,
+          "$comment": "Bounded because the list is inlined into the workflow input. A pull request's commits are paginated, so nothing else limits this."
         },
         "review_window": {
           "type": "object",

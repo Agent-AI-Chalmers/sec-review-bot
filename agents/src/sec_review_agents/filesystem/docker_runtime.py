@@ -115,20 +115,35 @@ class DockerContainerResource:
                 raise
             self._initialized = True
 
+    @property
+    def closed(self) -> bool:
+        """Whether the container is known to be gone.
+
+        Callers that own a backend need this to keep their own lifecycle in step: when removing
+        the container succeeded but a later step failed, the container is still gone and must not
+        be reported as running.
+        """
+        return self._closed
+
     def close(self) -> None:
         with self._lifecycle_lock:
             if self._closed:
                 return
-
-            self._closed = True
             if not self._initialized:
+                # Nothing was started, so there is nothing to remove and no failure to retry.
+                self._closed = True
                 return
 
             remove_container(
                 container_name=self.container_name,
                 timeout_ms=self.timeout_ms,
             )
+            # Both flags describe observed state, so they are set only once the container is
+            # actually gone. Marking closed before `remove_container` succeeded made a failed
+            # removal permanent: every later `close()` returned early while the container kept
+            # running, and the caller had no way to tell.
             self._initialized = False
+            self._closed = True
 
 
 def create_docker_container_resource(

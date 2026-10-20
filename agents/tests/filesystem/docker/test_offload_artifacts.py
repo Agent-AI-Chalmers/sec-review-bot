@@ -46,7 +46,7 @@ def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
         backend_kind="docker",
     )
     assert isinstance(backend, DockerSandboxBackend)
-    try:
+    with backend:
         middleware = FilesystemMiddleware(
             backend=backend,
             human_message_token_limit_before_evict=1,
@@ -80,8 +80,6 @@ def test_deepagents_human_message_offload_is_readable_in_docker() -> None:
         assert read_result.error is None
         assert read_result.file_data is not None
         assert read_result.file_data["content"] == payload
-    finally:
-        backend.close()
 
 
 @pytest.mark.skipif(
@@ -95,7 +93,7 @@ def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
         backend_kind="docker",
     )
     assert isinstance(backend, DockerSandboxBackend)
-    try:
+    with backend:
         middleware = FilesystemMiddleware(
             backend=backend,
             tool_token_limit_before_evict=1,
@@ -126,5 +124,3 @@ def test_deepagents_tool_result_offload_is_readable_in_docker() -> None:
         assert read_result.error is None
         assert read_result.file_data is not None
         assert read_result.file_data["content"] == payload
-    finally:
-        backend.close()

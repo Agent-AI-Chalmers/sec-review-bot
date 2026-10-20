@@ -3,49 +3,34 @@ import path from 'path'
 
 import type { Octokit } from 'octokit'
 
-export interface RepositoryContext {
-  owner_login: string
-  repo_name: string
-}
+import { exportWorkspaceWindow } from '../../artifacts/git-workspace.js'
+import type { RepositoryScanScope } from '../../runner/input.js'
+import type { RepositoryContext } from './submit.js'
 
-export interface ChangedFileRecord {
-  path: string
-  status: string
-  previous_path: string | null
-  additions: number
-  deletions: number
-  changes: number
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-}
-
-async function writeJsonArtifact(
-  artifact_path: string,
-  value: unknown
-): Promise<void> {
-  await fs.writeFile(artifact_path, JSON.stringify(value, null, 2), 'utf8')
-}
+/**
+ * One entry of `changed-files.json`.
+ *
+ * The three identity fields are the contract's, and their type comes from the schema through
+ * `RepositoryScanScope`, so `status` cannot drift to a value the scan scope does not accept. The
+ * line counts are artifact-only: the runner's scan scope does not carry them.
+ */
+export type ChangedFileRecord =
+  RepositoryScanScope['incremental_changed_files'][number] & {
+    additions: number
+    deletions: number
+    changes: number
+  }
 
 export async function materializeIncrementalArtifacts({
-  octokit,
-  repo,
+  workspace_path,
   incremental_window_path,
   history_path,
-  run_id,
-  event_type,
   base_sha,
   head_sha
 }: {
-  octokit: Octokit
-  repo: RepositoryContext
+  workspace_path: string
   incremental_window_path: string
   history_path: string
-  run_id: string
-  event_type: 'manual' | 'scheduled'
   base_sha: string
   head_sha: string
 }): Promise<{
@@ -55,115 +40,44 @@ export async function materializeIncrementalArtifacts({
   await fs.mkdir(incremental_window_path, { recursive: true })
   await fs.mkdir(history_path, { recursive: true })
 
-  const compare = await octokit.rest.repos.compareCommitsWithBasehead({
-    owner: repo.owner_login,
-    repo: repo.repo_name,
-    basehead: `${base_sha}...${head_sha}`
+  // The workspace already holds both commits, so the patch and the file list come from the same
+  // local comparison. The API cannot serve them: `GET /compare` caps its file list at 300 and its
+  // diff media type at roughly 3 MB, truncating mid-file, so a large window would produce a patch
+  // and a file list describing different change sets -- and a patch that is not valid.
+  const {
+    patch: patchText,
+    files,
+    commit_shas
+  } = await exportWorkspaceWindow({
+    workspace_path,
+    base_sha,
+    head_sha
   })
-  const files = Array.isArray(compare.data?.files) ? compare.data.files : []
-  const commitsRaw = Array.isArray(compare.data?.commits)
-    ? (compare.data.commits as unknown[])
-    : []
-
-  const compareDiff = await octokit.request(
-    'GET /repos/{owner}/{repo}/compare/{basehead}',
-    {
-      owner: repo.owner_login,
-      repo: repo.repo_name,
-      basehead: `${base_sha}...${head_sha}`,
-      headers: {
-        accept: 'application/vnd.github.v3.diff'
-      }
-    }
-  )
-  const patchText = typeof compareDiff.data === 'string' ? compareDiff.data : ''
   await fs.writeFile(
     path.join(incremental_window_path, 'incremental.patch'),
     patchText,
     'utf8'
   )
 
-  const changed_files: ChangedFileRecord[] = []
-  for (const item of files) {
-    const currentPath = String(item?.filename ?? '').trim()
-    if (!currentPath) {
-      continue
-    }
-    const statusRaw = String(item?.status ?? '')
-      .trim()
-      .toLowerCase()
-    const status =
-      statusRaw === 'renamed'
-        ? 'renamed'
-        : statusRaw === 'added'
-          ? 'added'
-          : statusRaw === 'removed'
-            ? 'deleted'
-            : 'modified'
-    const additions = Number.isFinite(Number(item?.additions))
-      ? Number(item?.additions)
-      : 0
-    const deletions = Number.isFinite(Number(item?.deletions))
-      ? Number(item?.deletions)
-      : 0
-    const changes = Number.isFinite(Number(item?.changes))
-      ? Number(item?.changes)
-      : additions + deletions
-    changed_files.push({
-      path: currentPath,
-      status,
-      previous_path: String(item?.previous_filename ?? '').trim() || null,
-      additions,
-      deletions,
-      changes
-    })
-  }
+  // The workspace export already reports the contract's status vocabulary and keeps the
+  // previous path for a rename or copy, so this is a projection into the artifact's shape and not
+  // a second translation. Re-deriving either value here is what made `removed` reach discovery.
+  const changed_files: ChangedFileRecord[] = files
+    .map((file) => ({
+      path: file.filename,
+      status: file.status,
+      previous_path: file.previous_path,
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.additions + file.deletions
+    }))
+    .sort((a, b) => a.path.localeCompare(b.path))
 
-  changed_files.sort((a, b) => a.path.localeCompare(b.path))
-
-  await writeJsonArtifact(
+  await fs.writeFile(
     path.join(incremental_window_path, 'changed-files.json'),
-    {
-      base_sha,
-      head_sha,
-      files: changed_files
-    }
+    JSON.stringify({ base_sha, head_sha, files: changed_files }, null, 2),
+    'utf8'
   )
-
-  const commits = commitsRaw
-    .map((item) => {
-      const commit = asRecord(asRecord(item).commit)
-      const commitAuthor = asRecord(commit.author)
-      const author = asRecord(asRecord(item).author)
-      const message = String(commit.message ?? '').trim()
-      const title = message.split('\n')[0] ?? ''
-      return {
-        sha: String(asRecord(item).sha ?? '').trim(),
-        title: String(title).trim(),
-        author: String(author.login ?? commitAuthor.name ?? '').trim(),
-        committed_at: String(commitAuthor.date ?? '').trim()
-      }
-    })
-    .filter((item) => item.sha !== '')
-  const commit_shas = commits
-    .map((item) => item.sha)
-    .filter((sha) => sha !== '')
-
-  await writeJsonArtifact(path.join(history_path, 'commits.json'), {
-    base_sha,
-    head_sha,
-    commits
-  })
-
-  await writeJsonArtifact(path.join(history_path, 'scan-window.json'), {
-    run_id,
-    event_type,
-    scan_mode: 'incremental',
-    base_sha,
-    head_sha,
-    changed_file_count: changed_files.length,
-    generated_at: new Date().toISOString()
-  })
 
   return {
     changed_files,

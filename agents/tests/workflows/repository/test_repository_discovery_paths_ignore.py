@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from sec_review_agents.scan_stages.discovery.stage import (
     _build_incremental_scan_manifest,
     _build_scan_manifest,
@@ -130,3 +132,45 @@ def test_incremental_scan_manifest_scans_only_changed_files(tmp_path: Path) -> N
     assert entry_paths == {"src/main.ts"}
     assert skipped_reasons.get("src/ignored.min.js") == "paths-ignore"
     assert "src/deleted.ts" not in skipped_reasons
+
+
+def test_incremental_discovery_rejects_a_status_outside_the_contract(
+    tmp_path: Path,
+) -> None:
+    """A status the contract does not define must stop discovery, not be guessed at.
+
+    `removed` is the compare API's word for a deletion. When it reached discovery the file was
+    scanned instead of skipped, because only `deleted` is recognized as gone -- and nothing
+    reported the mismatch. Failing here names the disagreement.
+    """
+    input_data = _input_data(tmp_path, [])
+    workspace = Path(input_data["input_bundle_root_path"]) / "workspace"
+
+    with pytest.raises(ValueError, match="unsupported changed-file status"):
+        _build_incremental_scan_manifest(
+            workspace_root=workspace,
+            scan_scope={"paths_ignore": []},
+            changed_files=[
+                {"path": "src/app.ts", "status": "removed", "previous_path": None}
+            ],
+            discovery_artifacts_path=Path(input_data["artifact_paths"]["discovery"]),
+        )
+
+
+def test_incremental_discovery_skips_a_deleted_file(tmp_path: Path) -> None:
+    """`deleted` is the one status that removes a file from discovery."""
+    input_data = _input_data(tmp_path, [])
+    workspace = Path(input_data["input_bundle_root_path"]) / "workspace"
+    (workspace / "src" / "gone.ts").write_text("export const gone = 1\n", "utf8")
+
+    entries, skipped = _build_incremental_scan_manifest(
+        workspace_root=workspace,
+        scan_scope={"paths_ignore": []},
+        changed_files=[
+            {"path": "src/gone.ts", "status": "deleted", "previous_path": None}
+        ],
+        discovery_artifacts_path=Path(input_data["artifact_paths"]["discovery"]),
+    )
+
+    assert entries == []
+    assert skipped == []

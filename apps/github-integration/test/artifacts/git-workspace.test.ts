@@ -778,3 +778,57 @@ test('exportWorkspaceWindow keeps line counts for a path containing a tab', asyn
     await fs.rm(root, { recursive: true, force: true })
   }
 })
+
+test('exportWorkspaceWindow lists every commit in the range, past the compare page size', async () => {
+  // The compare API returns at most 250 commits per page, so a long window cannot be described
+  // by a single call. The workspace holds the history, and `git rev-list` has no page size: the
+  // list must match the range exactly however many commits it contains.
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'git-workspace-many-commits-')
+  )
+  try {
+    const source = path.join(root, 'source')
+    const workspace = path.join(root, 'workspace')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    await fs.writeFile(path.join(source, 'f.txt'), 'start\n', 'utf8')
+    await git(source, ['add', '.'])
+    await git(source, ['commit', '-m', 'base'])
+    const base_sha = await git(source, ['rev-parse', 'HEAD'])
+
+    // 260 commits clears the compare endpoint's 250-commit page.
+    await execFileAsync(
+      'bash',
+      [
+        '-c',
+        'for i in $(seq 1 260); do echo "line$i" >> f.txt; ' +
+          'git -c user.name=t -c user.email=t@t commit -qam "c$i"; done'
+      ],
+      { cwd: source }
+    )
+    const head_sha = await git(source, ['rev-parse', 'HEAD'])
+    const expected = Number(
+      await git(source, ['rev-list', '--count', `${base_sha}..${head_sha}`])
+    )
+    assert.ok(expected > 250, `fixture only produced ${expected} commits`)
+
+    await materializeWorkspaceWithCommitHistory({
+      workspace_path: workspace,
+      git_remote_url: source,
+      refs: [base_sha, head_sha]
+    })
+
+    const exported = await exportWorkspaceWindow({
+      workspace_path: workspace,
+      base_sha,
+      head_sha
+    })
+    assert.strictEqual(exported.commit_shas.length, expected)
+    // `--reverse` keeps the list in application order, ending at the head commit.
+    assert.strictEqual(exported.commit_shas.at(-1), head_sha)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
