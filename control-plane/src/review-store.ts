@@ -1135,13 +1135,12 @@ export class ReviewRunStore {
     )
   }
 
-  /** Hand a parked publication back to automatic reconciliation.
+  /** Hand a parked publication back to automatic recovery.
    *
    * The counterpart of `resumeDisconnectedPreparation` for the other axis that can park. Like
-   * it, this grants a fresh reconciliation budget rather than a fresh side effect: the parked
-   * steps return to `uncertain` with their reconciliation budget reset, so the connector looks
-   * at the remote system again, while the attempt budget stays spent so the write is not
-   * repeated. */
+   * it, this returns the budgets the park consumed: the parked steps become attemptable again,
+   * so the side effects they name are issued once more rather than only looked for. Steps that
+   * already succeeded keep their status, so the run resumes where it stopped. */
   async resumeDisconnectedPublication(runId: string): Promise<ReviewRunRecord> {
     this.ready()
     return await transaction(this.pool, async (client) => {
