@@ -23,7 +23,7 @@ For a given run there are exactly two candidate windows:
 | Full PR | `base_sha...head_sha` | Everything the pull request introduces relative to the merge base. |
 | Push | `previous_head_sha..head_sha` | Only the commits added by the `synchronize` event that triggered this run. |
 
-`previous_head_sha` comes from the webhook `before` field. The `synchronize` payload type requires both `after` and `before`:
+`previous_head_sha` comes from the [`before` field of the `pull_request` webhook](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request). The `synchronize` payload type requires both `after` and `before`, as pinned in this repository's `@octokit/openapi-webhooks-types` dependency:
 
 ```ts
 "webhook-pull-request-synchronize": {
@@ -34,7 +34,7 @@ For a given run there are exactly two candidate windows:
 }
 ```
 
-That type is the only normative statement available; the webhook documentation does not describe what `before` means when the branch was force-pushed.
+That type is the only normative statement available. The webhook documentation says nothing about what `before` means when the branch was force-pushed, and the [compare endpoint](https://docs.github.com/en/rest/commits/commits#compare-two-commits) documents its own `basehead` parameter but not the reachability of the commits behind it.
 
 ## Measured API Behavior
 
@@ -44,7 +44,7 @@ These behaviors were verified against the live API rather than inferred from doc
 
 GitHub reports `pull_request.base.sha` as the **current tip of the base branch**, not the point where the branch forked. Measured: four different open pull requests on `apache/hbase` all returned the same `base.sha` (`09474ab7...`), which is the `master` tip.
 
-Consequently the base and head commits can be on diverged histories. A two-dot diff (`base..head`) compares the two trees, so work that landed on the base branch after the fork renders as if the pull request deleted it. A three-dot diff (`base...head`) diffs from the merge base and matches the pull request's actual change set. This is the same semantics as the GitHub compare endpoint, whose `basehead` parameter is documented as `BASE...HEAD`.
+Consequently the base and head commits can be on diverged histories. A two-dot diff (`base..head`) compares the two trees, so work that landed on the base branch after the fork renders as if the pull request deleted it. A three-dot diff (`base...head`) diffs from the merge base and matches the pull request's actual change set. This is the same semantics as the [GitHub compare endpoint](https://docs.github.com/en/rest/commits/commits#compare-two-commits), whose `basehead` parameter is documented as `BASE...HEAD`.
 
 A three-dot diff requires a merge base, so the workspace must not be shallow. Multi-ref materialization fetches without `--depth` for this reason.
 
@@ -54,13 +54,13 @@ Fetching a specific commit SHA creates no branch or tag pointing at it. The exis
 
 ### The files API omits `patch` on large pull requests
 
-`GET /repos/{owner}/{repo}/pulls/{number}/files` returns every changed path but leaves `patch` empty for part of a large pull request. Measured on `apache/hbase` #7722: 340 files returned, 93 without a patch, including the largest ones. The list is capped at 3000 files.
+The [`GET /repos/{owner}/{repo}/pulls/{number}/files`](https://docs.github.com/en/rest/pulls/pulls#list-files-for-a-pull-request) endpoint returns every changed path but leaves `patch` empty for part of a large pull request. Measured on `apache/hbase` #7722: 340 files returned, 93 without a patch, including the largest ones. The documented response cap is 3000 files.
 
 Building the patch from that field therefore drops changes silently. The patch is now exported from the workspace repository instead, which yields all 340 files for the same pull request.
 
 ### Compare against an unreachable base fails, it does not return empty
 
-`GET /repos/{owner}/{repo}/compare/{basehead}` behaves differently for the two situations that matter:
+[`GET /repos/{owner}/{repo}/compare/{basehead}`](https://docs.github.com/en/rest/commits/commits#compare-two-commits) behaves differently for the two situations that matter:
 
 | Situation | Response |
 | --- | --- |
@@ -131,16 +131,3 @@ Two guards accompany the contract:
 2. **Never mix windows.** A run whose file list comes from one window and whose patch comes from another is rejected rather than published, because the resulting analyzer instructions contradict each other and the suggestion anchoring silently drops changes.
 
 Not adopted: an ancestry check to detect force-push. GitHub does not document the reachability guarantee for `before`, PR-Agent does not perform such a check, and an ancestry test would require the commit to be fetched first. The 404 fallback above covers the observable failure without relying on undocumented behavior.
-
-## Sources
-
-- GitHub Docs, "Pull request reviews": <https://docs.coderabbit.ai/overview/pull-request-review.md>
-- GitHub Docs, "Compare two commits": <https://docs.github.com/en/rest/commits/commits#compare-two-commits>
-- GitHub Docs, "Webhook events and payloads": <https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request>
-- GitHub Docs, "List pull request files": <https://docs.github.com/en/rest/pulls/pulls#list-files-for-a-pull-request>
-- `@octokit/openapi-webhooks-types`, `webhook-pull-request-synchronize`: pinned in `apps/github-integration`
-- PR-Agent, GitHub app handler: <https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/servers/github_app.py>
-- PR-Agent, reviewer: <https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/tools/pr_reviewer.py>
-- PR-Agent, GitHub provider: <https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/git_providers/github_provider.py>
-- PR-Agent, default configuration: <https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/settings/configuration.toml>
-- Koan, incremental review proposal: <https://github.com/Anantys-oss/koan/issues/666>

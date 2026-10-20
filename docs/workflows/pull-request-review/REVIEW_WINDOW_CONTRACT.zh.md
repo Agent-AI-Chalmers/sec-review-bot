@@ -23,7 +23,7 @@ Language: [English](REVIEW_WINDOW_CONTRACT.md) | 中文
 | 完整 PR | `base_sha...head_sha` | pull request 相对 merge base 引入的全部变更。 |
 | Push | `previous_head_sha..head_sha` | 仅触发本次 run 的 `synchronize` 事件新增的提交。 |
 
-`previous_head_sha` 来自 webhook 的 `before` 字段。`synchronize` 载荷类型要求同时存在 `after` 与 `before`：
+`previous_head_sha` 来自 [`pull_request` webhook 的 `before` 字段](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)。`synchronize` 载荷类型要求同时存在 `after` 与 `before`，其定义来自本仓库锁定的 `@octokit/openapi-webhooks-types`：
 
 ```ts
 "webhook-pull-request-synchronize": {
@@ -34,7 +34,7 @@ Language: [English](REVIEW_WINDOW_CONTRACT.md) | 中文
 }
 ```
 
-这个类型是唯一可得的规范性陈述；webhook 文档并未描述分支被 force-push 后 `before` 的含义。
+这个类型是唯一可得的规范性陈述。webhook 文档对分支被 force-push 后 `before` 的含义没有任何说明，而 [compare 端点](https://docs.github.com/en/rest/commits/commits#compare-two-commits) 只文档化了它自己的 `basehead` 参数，没有说明其背后提交的可达性。
 
 ## 实测的 API 行为
 
@@ -44,7 +44,7 @@ Language: [English](REVIEW_WINDOW_CONTRACT.md) | 中文
 
 GitHub 把 `pull_request.base.sha` 报告为**目标分支当前 tip**，而不是分支分叉点。实测：`apache/hbase` 上四个不同的开放 pull request 都返回同一个 `base.sha`（`09474ab7...`），即 `master` 的 tip。
 
-因此 base 与 head 可能位于已经分叉的历史上。两点 diff（`base..head`）比较的是两棵树，于是分叉之后落在目标分支上的工作会被渲染成 pull request 的删除。三点 diff（`base...head`）从 merge base 开始比较，与 pull request 的真实变更集合一致。这与 GitHub compare 端点语义相同，其 `basehead` 参数文档明确写为 `BASE...HEAD`。
+因此 base 与 head 可能位于已经分叉的历史上。两点 diff（`base..head`）比较的是两棵树，于是分叉之后落在目标分支上的工作会被渲染成 pull request 的删除。三点 diff（`base...head`）从 merge base 开始比较，与 pull request 的真实变更集合一致。这与 [GitHub compare 端点](https://docs.github.com/en/rest/commits/commits#compare-two-commits) 语义相同，其 `basehead` 参数文档明确写为 `BASE...HEAD`。
 
 三点 diff 需要 merge base 存在，因此 workspace 不能是浅克隆。多 ref 物化因而不加 `--depth`。
 
@@ -54,13 +54,13 @@ GitHub 把 `pull_request.base.sha` 报告为**目标分支当前 tip**，而不�
 
 ### 大 pull request 上文件列表 API 会省略 `patch`
 
-`GET /repos/{owner}/{repo}/pulls/{number}/files` 会返回所有变更路径，但对大 pull request 中的一部分文件把 `patch` 留空。实测 `apache/hbase` #7722：返回 340 个文件，其中 93 个没有 patch，且包括最大的那几个。该列表上限为 3000 个文件。
+[`GET /repos/{owner}/{repo}/pulls/{number}/files`](https://docs.github.com/en/rest/pulls/pulls#list-files-for-a-pull-request) 会返回所有变更路径，但对大 pull request 中的一部分文件把 `patch` 留空。实测 `apache/hbase` #7722：返回 340 个文件，其中 93 个没有 patch，且包括最大的那几个。文档记载的响应上限为 3000 个文件。
 
 因此用该字段拼装 patch 会静默丢弃变更。现在 patch 改为从 workspace 仓库导出，同一个 pull request 可得到全部 340 个文件。
 
 ### 对不可达的 base 执行 compare 会失败，而不是返回空
 
-`GET /repos/{owner}/{repo}/compare/{basehead}` 在两种关键情形下行为不同：
+[`GET /repos/{owner}/{repo}/compare/{basehead}`](https://docs.github.com/en/rest/commits/commits#compare-two-commits) 在两种关键情形下行为不同：
 
 | 情形 | 响应 |
 | --- | --- |
@@ -131,16 +131,3 @@ GitHub 把 `pull_request.base.sha` 报告为**目标分支当前 tip**，而不�
 2. **绝不混用窗口**。一个 run 如果文件列表来自一个窗口、patch 来自另一个窗口，应被拒绝而不是发布，因为它产生的 analyzer 指令自相矛盾，且 suggestion 锚定会静默丢弃变更。
 
 不采用：用祖先关系检测 force-push。GitHub 未文档化 `before` 的可达性保证，PR-Agent 也不做此类检查，且祖先判定需要先把提交 fetch 下来。上述 404 回退已覆盖可观测到的失败，而无需依赖未文档化的行为。
-
-## 来源
-
-- CodeRabbit 文档，"Pull Request Reviews"：<https://docs.coderabbit.ai/overview/pull-request-review.md>
-- GitHub 文档，"Compare two commits"：<https://docs.github.com/en/rest/commits/commits#compare-two-commits>
-- GitHub 文档，"Webhook events and payloads"：<https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request>
-- GitHub 文档，"List pull request files"：<https://docs.github.com/en/rest/pulls/pulls#list-files-for-a-pull-request>
-- `@octokit/openapi-webhooks-types` 中的 `webhook-pull-request-synchronize`：锁定于 `apps/github-integration`
-- PR-Agent，GitHub app 处理器：<https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/servers/github_app.py>
-- PR-Agent，reviewer：<https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/tools/pr_reviewer.py>
-- PR-Agent，GitHub provider：<https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/git_providers/github_provider.py>
-- PR-Agent，默认配置：<https://github.com/qodo-ai/pr-agent/blob/main/pr_agent/settings/configuration.toml>
-- Koan，增量审查提案：<https://github.com/Anantys-oss/koan/issues/666>
