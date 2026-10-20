@@ -825,7 +825,14 @@ def test_prepare_runner_run_activity_maps_missing_manifest_to_input_error(
                     tmp_path / "missing-manifest", include_manifest=False
                 ),
                 "review_intent": {"objective": "audit"},
-                "issue": {"number": 1},
+                "issue": {
+                    "owner": "octo",
+                    "repo": "demo",
+                    "repo_full_name": "octo/demo",
+                    "number": 1,
+                    "title": "Issue",
+                    "body": None,
+                },
             },
             timeout_seconds=60,
         )

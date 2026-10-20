@@ -470,6 +470,44 @@ test(
       assert.strictEqual(prepared.input.pr.repo_full_name, 'octo/demo')
       assert.strictEqual('pullRequest' in prepared.input, false)
       assert.strictEqual('repository' in prepared.input, false)
+      // The file handed to the agent carries only what a review can act on.
+      // Identity fields stay in the runner input; putting them in this file
+      // spends agent context and offers extra ranges that can be mistaken for
+      // the review boundary.
+      const agent_metadata = JSON.parse(
+        await fs.readFile(
+          path.join(prepared.input_bundle_root, 'history', 'pr-metadata.json'),
+          'utf8'
+        )
+      ) as Record<string, unknown>
+      assert.deepStrictEqual(Object.keys(agent_metadata).sort(), [
+        'commit_shas',
+        'review_window'
+      ])
+      assert.strictEqual(
+        (agent_metadata['review_window'] as Record<string, unknown>)['kind'],
+        'full'
+      )
+
+      // The runner input carries the review subject, not the raw webhook
+      // payload: no endpoint URLs, commit counts, or sender identity.
+      assert.strictEqual(prepared.input.pr.repo_full_name, 'octo/demo')
+      assert.strictEqual(prepared.input.pr.base_sha, refs.base_sha)
+      assert.deepStrictEqual(Object.keys(prepared.input.pr).sort(), [
+        'base_ref',
+        'base_sha',
+        'body',
+        'commit_shas',
+        'head_ref',
+        'head_sha',
+        'number',
+        'owner',
+        'repo',
+        'repo_full_name',
+        'review_window',
+        'title'
+      ])
+
       const manifest = JSON.parse(
         await fs.readFile(
           path.join(prepared.input_bundle_root, 'manifest.json'),

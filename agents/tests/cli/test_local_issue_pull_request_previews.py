@@ -9,7 +9,14 @@ from sec_review_agents.cli.local_previewing.shared import render_analysis_narrat
 
 def _materialized_input(local_root: Path) -> dict:
     return {
-        "issue": {"number": 7, "title": "Dangerous preview endpoint"},
+        "issue": {
+            "owner": "octo",
+            "repo": "demo",
+            "repo_full_name": "octo/demo",
+            "number": 7,
+            "title": "Dangerous preview endpoint",
+            "body": None,
+        },
         "pr": {"number": 11},
         "input_bundle_root_path": str(local_root),
     }
