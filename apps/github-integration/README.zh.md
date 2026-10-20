@@ -194,6 +194,8 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 
 `schedule` 触发默认按 incremental scan 处理，并由 App 侧根据 cron 推导扫描窗口；手动 incremental 必须显式提供 `base_sha`。
 
+仓库级运行没有可供回复的对话线程，因此它的结果和失败都落在该仓库长期存在的 summary issue（`[sec-review-bot] Repository Security Review Summary`）上。成功扫描会在此追加结果评论；任一阶段失败的运行会追加一条注明失败阶段与原因的评论。若某仓库从未成功完成过扫描，首次失败会创建该 issue，使一直失败的扫描仍然可见，而不是静默消失。
+
 补充说明：
 
 - 手动命令接受普通 issue comment 和 pull request 页面 Conversation 标签下的 comment。

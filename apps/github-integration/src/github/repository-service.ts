@@ -147,4 +147,21 @@ export async function findRepositorySecuritySummaryIssue(
   }
 }
 
+/** Normalize a value claiming to be a repository's full name, or null when it is not exactly
+ * `owner/repo`.
+ *
+ * Failure notices are read back from persisted state and can carry a value produced by an
+ * earlier release, so callers cannot assume it is well formed. Splitting opportunistically would
+ * be worse than rejecting it: `owner/repo/extra` truncated to `owner/repo` reports the outcome
+ * into a different repository than the one that was scanned. Both the installation lookup and
+ * the reply target therefore resolve the value through this one function, so they cannot
+ * disagree about whether a notice names a repository at all. */
+export function repositoryFullName(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const segments = value.trim().split('/')
+  if (segments.length !== 2) return null
+  const [owner, repo] = segments
+  return owner && repo ? `${owner}/${repo}` : null
+}
+
 export { splitRepoFullName }

@@ -193,6 +193,8 @@ Manual `workflow_dispatch` supports:
 
 `schedule` triggers default to incremental scan, and the App derives the scan window from the cron schedule. Manual incremental scans must explicitly provide `base_sha`.
 
+A repository-level run has no conversation to reply in, so both its results and its failures land in the repository's long-lived summary issue (`[sec-review-bot] Repository Security Review Summary`). A successful scan appends a result comment there; a run that fails at any stage appends a failure comment naming the stage and reason. The first failure in a repository that has never completed a scan creates that issue, so a scan that never works is still visible instead of failing silently.
+
 Additional notes:
 
 - Manual commands are accepted from normal issue comments and comments on the Pull Request page's Conversation tab.
