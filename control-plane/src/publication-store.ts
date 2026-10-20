@@ -15,6 +15,7 @@ import {
 } from './errors.js'
 import type { PublicationStepRecord } from './shapes.js'
 import { appendEvent } from './review-run-events.js'
+import { transaction } from './transaction.js'
 
 /**
  * Why every `publication_steps` write takes the publication row lock FIRST.
@@ -55,24 +56,6 @@ import { appendEvent } from './review-run-events.js'
  * UPDATE open in a second session and assert the step write waits), not by raising the load.
  */
 const MAX_PUBLICATION_STEP_FAILURES = 3
-
-async function transaction<T>(
-  pool: Pool,
-  operation: (client: PoolClient) => Promise<T>
-): Promise<T> {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    const result = await operation(client)
-    await client.query('COMMIT')
-    return result
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
-}
 
 export class PublicationStore {
   constructor(

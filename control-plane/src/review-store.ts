@@ -53,6 +53,7 @@ import { PublicationStore } from './publication-store.js'
 import { abandonInFlightPublication } from './publication-abandon.js'
 import { appendEvent, listEvents } from './review-run-events.js'
 import { ExecutionStore } from './execution-store.js'
+import { transaction } from './transaction.js'
 
 export type {
   CreateReviewRunArgs,
@@ -350,24 +351,6 @@ function projectRunRows(rows: ReviewRunRow[]): RunRowsProjection {
   }
   return { runs, dropped }
 }
-async function transaction<T>(
-  pool: Pool,
-  operation: (client: PoolClient) => Promise<T>
-): Promise<T> {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    const result = await operation(client)
-    await client.query('COMMIT')
-    return result
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
-}
-
 export class ReviewRunStore {
   private readonly pool: Pool
   readonly connectorId: string

@@ -9,29 +9,12 @@
 // Reading the full run record is likewise not here: the record projection spans all three axes
 // and lives with `ReviewRunStore`.
 import crypto from 'node:crypto'
-import { Pool, type PoolClient } from 'pg'
+import { Pool } from 'pg'
 
 import type { RunnerArtifactStorage } from './contracts.js'
 import { appendEvent } from './review-run-events.js'
 import { normalizeArtifactStorage } from './shapes.js'
-
-async function transaction<T>(
-  pool: Pool,
-  operation: (client: PoolClient) => Promise<T>
-): Promise<T> {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    const result = await operation(client)
-    await client.query('COMMIT')
-    return result
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
-}
+import { transaction } from './transaction.js'
 
 export class ExecutionStore {
   constructor(

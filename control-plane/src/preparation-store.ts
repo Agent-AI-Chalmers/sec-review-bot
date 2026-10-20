@@ -12,6 +12,7 @@ import {
 } from './publication-abandon.js'
 import { skipPendingExecutions } from './execution-skip.js'
 import type { RunFailureNoticeWork } from './shapes.js'
+import { transaction } from './transaction.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -59,24 +60,6 @@ class ExpiryUnreconcilableError extends Error {
 }
 
 const MAX_PREPARATION_ATTEMPTS = 8
-
-async function transaction<T>(
-  pool: Pool,
-  operation: (client: PoolClient) => Promise<T>
-): Promise<T> {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    const result = await operation(client)
-    await client.query('COMMIT')
-    return result
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
-}
 
 export class PreparationStore {
   constructor(
