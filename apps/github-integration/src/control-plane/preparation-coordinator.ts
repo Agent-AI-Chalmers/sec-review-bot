@@ -63,8 +63,10 @@ function requireText(value: unknown, label: string): string {
  * checks below name the fields the recovery path actually reads, so a bad record is rejected as
  * invalid preparation input instead of being handed on.
  *
- * Only the fields this path uses are required; that is deliberate, so an older record that lacks a
- * field this code never reads still recovers. */
+ * Every field the recovered context declares is required: there is no forward compatibility for
+ * older records that omit one. A record missing a field is rejected rather than filled in with a
+ * default, so a schema change surfaces as an explicit preparation failure instead of a silently
+ * degraded review. */
 
 function requireStringField(
   record: Record<string, unknown>,
@@ -103,17 +105,12 @@ function requireBooleanField(
 /** The issue fields the recovered issue-review path reads. */
 function requireIssueContext(value: unknown, label = 'issue'): IssueContext {
   const record = requireRecord(value, label)
-  const sender_login = record.sender_login
-  const issue_author = record.issue_author
+  // `sender_login` and `issue_author` are `string` in the extracted context (the extractor
+  // normalises an absent login to `''`), so the persisted record must carry a string. Omitting
+  // them is not treated as "unknown": the record is rejected.
+  const sender_login = requireStringField(record, 'sender_login', label)
+  const issue_author = requireStringField(record, 'issue_author', label)
   const issue_body = record.issue_body
-  if (sender_login !== undefined && typeof sender_login !== 'string')
-    throw new InvalidPreparationInputError(
-      `Preparation input has an invalid ${label}.sender_login`
-    )
-  if (issue_author !== undefined && typeof issue_author !== 'string')
-    throw new InvalidPreparationInputError(
-      `Preparation input has an invalid ${label}.issue_author`
-    )
   if (issue_body !== null && typeof issue_body !== 'string')
     throw new InvalidPreparationInputError(
       `Preparation input has an invalid ${label}.issue_body`
