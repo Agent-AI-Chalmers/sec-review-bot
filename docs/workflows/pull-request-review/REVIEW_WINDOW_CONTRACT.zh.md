@@ -132,4 +132,6 @@ GitHub 把 `pull_request.base.sha` 报告为**目标分支当前 tip**，而不�
 1. **在无法建立 push 窗口时回退到完整窗口**：`previous_head_sha` 缺失、compare 返回空变更集合，或 compare 以 `404` 失败。这正是当前缺失、且实测 404 行为所要求的那道保护。
 2. **绝不混用窗口**。一个 run 如果文件列表来自一个窗口、patch 来自另一个窗口，应被拒绝而不是发布，因为它产生的 analyzer 指令自相矛盾，且 suggestion 锚定会静默丢弃变更。
 
-不采用：用祖先关系检测 force-push。GitHub 未文档化 `before` 的可达性保证，PR-Agent 也不做此类检查，且祖先判定需要先把提交 fetch 下来。上述 404 回退已覆盖可观测到的失败，而无需依赖未文档化的行为。
+3. **当 push 窗口不是快进时回退到完整窗口。** 前一个 head 不是当前 head 的祖先时，compare 响应会在两侧都报告提交（`behind_by`），这正是 force-push 留下的状态。这样的窗口已不再描述增量变更，workspace 也无从包含被丢弃的 head，因此 run 改为覆盖整个 pull request。
+
+祖先判定读取的是 compare 响应本来就返回的字段，不产生额外请求。GitHub 仍未文档化被 force-push 的提交能保持可解析多久，因此上述 404 回退依然必要而非冗余。
