@@ -238,11 +238,11 @@ export const messages = {
       'Waiting for a successful result before publishing.',
     state_publication_publishing_label: 'Publishing',
     state_publication_publishing_desc:
-      'Publishing the result now (creating the pull request, comments, and so on).',
+      'A publisher owns this run and may issue remote writes, such as creating a pull request or comment.',
     state_publication_published_label: 'Published',
     state_publication_uncertain_label: 'Uncertain',
     state_publication_uncertain_desc:
-      'At least one step may have completed its side effect remotely and is being reconciled. The rest of the publication is unaffected; this is not a failure.',
+      'A remote write may have succeeded without its result being recorded. For that step, the system only checks what exists remotely and does not issue the write again.',
     state_publication_disconnected_label: 'Disconnected',
     state_publication_disconnected_desc:
       'Automatic reconciliation of a step stopped without an answer. An operator has to establish what is actually on the remote system before this run can be concluded.',
@@ -554,11 +554,11 @@ export const messages = {
     state_publication_pending_desc: '等待执行成功后开始发布。',
     state_publication_publishing_label: '发布中',
     state_publication_publishing_desc:
-      '正在把结果发布出去（创建 PR、评论等）。',
+      'publisher 正持有这个 run，可以向远端执行写入，例如创建 PR 或评论。',
     state_publication_published_label: '已发布',
     state_publication_uncertain_label: '待确认',
     state_publication_uncertain_desc:
-      '至少有一个步骤可能已经在远端完成了副作用，系统正在确认远端结果。发布的其他部分不受影响；这不是失败。',
+      '某次远端写入可能已经成功，但结果没有记录下来。对于这个步骤，系统只查询远端实际状态，不会再次执行写入。',
     state_publication_disconnected_label: '失联',
     state_publication_disconnected_desc:
       '系统多次尝试确认某个步骤的远端结果，但始终没有得到结论，因此自动处理已经停止。必须先由 operator 决定是否继续，这个 run 才能收尾。',
