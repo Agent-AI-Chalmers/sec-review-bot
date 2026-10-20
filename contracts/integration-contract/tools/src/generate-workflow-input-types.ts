@@ -17,7 +17,6 @@ import { REPO_ROOT } from './repo-root.js'
 /** The print width the owning package's prettier config uses. */
 const PRINT_WIDTH = 80
 
-
 type JsonSchema = Record<string, unknown>
 
 const SCHEMA_DIR = path.join(

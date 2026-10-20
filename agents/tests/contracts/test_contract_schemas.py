@@ -1,5 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -274,8 +275,8 @@ _REPOSITORY_INCREMENTAL_SCHEMA = fixture_schemas()[
 
 
 def _repository_input_with_changed_files(
-    changed_files: list[dict[str, object]],
-) -> dict[str, object]:
+    changed_files: list[dict[str, Any]],
+) -> dict[str, Any]:
     fixture = deepcopy(contract_fixture("repository-review-input-incremental.json"))
     scan_scope = fixture["scan_scope"]
     assert isinstance(scan_scope, dict)
