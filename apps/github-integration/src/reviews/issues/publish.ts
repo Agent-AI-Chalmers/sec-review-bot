@@ -214,6 +214,9 @@ async function publishIssueReviewResult({
         // draft PR; concluding it as failed without looking would report an existing PR as
         // missing. The head branch is run-specific, so an open PR from it is this step's effect.
         if (!isPublicationStepExhausted(error)) throw error
+        // The same name the creation path builds. Deriving it differently here - as a shorter
+        // run segment, say - would look for this step's side effect under a branch it never
+        // created.
         const branch = buildDraftBranchName(issue, run_id)
         const settled = await settleExhaustedStep({
           store,

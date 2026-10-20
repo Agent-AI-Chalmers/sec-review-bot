@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createDraftPullRequestFromIssueReviewRecord as createDraftPullRequestWithClaim } from '../../../src/reviews/issues/draft-pr.js'
+import {
+  buildDraftBranchName,
+  createDraftPullRequestFromIssueReviewRecord as createDraftPullRequestWithClaim
+} from '../../../src/reviews/issues/draft-pr.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import type { FileMode } from '../../../src/reviews/file-change.js'
 import { PublicationClaimLostError } from '../../../src/control-plane/publication-claim.js'
@@ -250,10 +253,36 @@ test('issue draft PR retry reuses a branch left by a partial prior attempt witho
   })
 
   assert.strictEqual(result?.number, 1)
+  // The whole run id names the branch. A shorter segment (the last 8 characters) is what two
+  // runs can share, and this branch is the publication's idempotency key.
   assert.deepStrictEqual(harness.readRefs, [
-    'heads/sec-review-bot/issue-42-12345678'
+    'heads/sec-review-bot/issue-42-run-12345678'
   ])
   assert.deepStrictEqual(harness.updatedRefs, [])
+})
+
+test('two runs of the same issue never share a draft branch', () => {
+  // The branch is verified and reused on a retry, so a shared name makes one run adopt the
+  // other's branch. Run ids that agree on their last 8 characters are exactly the case a slice
+  // produced, and Control Plane hands out enough of them for that to happen in a busy deployment.
+  const issue = {
+    issue_number: 42,
+    owner_login: 'octo-org',
+    repo_name: 'example'
+  }
+  const first = buildDraftBranchName(
+    issue,
+    'aaaaaaaa-1111-4111-8111-00000000c0de'
+  )
+  const second = buildDraftBranchName(
+    issue,
+    'bbbbbbbb-2222-4222-8222-00000000c0de'
+  )
+  assert.notStrictEqual(first, second)
+  assert.notStrictEqual(
+    buildDraftBranchName(issue, undefined),
+    buildDraftBranchName(issue, 'aaaaaaaa-1111-4111-8111-00000000c0de')
+  )
 })
 
 test('issue draft PR does not create a PR from an existing branch with a different tree', async () => {

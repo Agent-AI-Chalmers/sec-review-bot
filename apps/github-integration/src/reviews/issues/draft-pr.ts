@@ -23,12 +23,15 @@ export function buildDraftBranchName(
   issue: IssueContext,
   run_id: string | undefined
 ): string {
-  // Control Plane assigns a UUID run id, so the last 8 characters are stable, unique enough
-  // for a branch segment, and already hyphen-free at that offset.
-  const shortRunId = String(run_id ?? 'manual').slice(-8)
-  return sanitizeBranchSegment(
-    `sec-review-bot/issue-${issue.issue_number}-${shortRunId}`
-  )
+  // The whole run id, not a slice of it. The branch is the publication's idempotency key: an
+  // existing branch is verified against this run's tree and reused, so a name two runs share
+  // makes one run adopt the other's branch - or, when the trees differ, conclude that its own
+  // validated result "does not match" and fail. The last 8 hex characters of a UUID collide
+  // after about 65k runs, which is reachable in a busy deployment; the full id cannot.
+  // A UUID is already git-ref-safe, but it still goes through the shared sanitizer so every
+  // branch segment this package builds obeys the same ref rules.
+  const runSegment = sanitizeBranchSegment(String(run_id ?? 'manual'))
+  return `sec-review-bot/issue-${issue.issue_number}-${runSegment}`
 }
 
 function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
