@@ -155,6 +155,8 @@ sec_review_bot:
 
 这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review`。
 
+本 app 只回应自己名字的两种拼写：裸 slug，以及 GitHub 分配的 bot login `@<app-slug>[bot]`。它刻意不去猜测 `@<app-slug>-bot` 这类近似写法，因为那样的名字可能属于另一个账号。其他写法都视为普通对话，不做处理。
+
 issue 与 PR conversation comment 共用同一套命令语法；下面的参数在两种场景下解析方式一致，对当前目标没有意义的参数会被忽略（每个参数下已注明）：
 
 ```text

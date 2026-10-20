@@ -154,6 +154,8 @@ A repository can also declare how to prepare a dependency-complete environment f
 
 `<app-slug>` is not a literal placeholder; it is the actual slug registered for the GitHub App. If the app slug is `web-sec-bot`, the real comment is `@web-sec-bot review`.
 
+The app answers two spellings of its own name: the bare slug and the bot login GitHub assigns, `@<app-slug>[bot]`. It deliberately does not guess near-misses such as `@<app-slug>-bot`, because another account could be named that. Anything else is ordinary conversation and is ignored.
+
 Issue and PR conversation comments share one command grammar. The flags below are parsed the same way in both places; a flag that has no meaning for a target is ignored (noted per flag):
 
 ```text

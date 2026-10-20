@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { extractCommentCommand } from '../../src/github/comment-command-service.js'
+import {
+  extractCommentCommand,
+  unmatchedMentions
+} from '../../src/github/comment-command-service.js'
 import { setGitHubAppMetadata } from '../../src/github/github-app-metadata-service.js'
 
 setGitHubAppMetadata({
@@ -178,5 +181,113 @@ test('extractCommentCommand accepts the bot login and bare slug, not invented va
     extractCommentCommand('@sec-review-bot-bot[bot] review'),
     null,
     'an invented -bot[bot] spelling must not be treated as this app'
+  )
+})
+
+test('unmatchedMentions names the mentions an ignored comment addressed', () => {
+  // A comment addressing the app with a spelling it does not answer would otherwise be dropped
+  // with no trace, which reads as "the app is broken". The diagnostic has to list the mention
+  // that was actually written, and stay silent when the comment addressed this app.
+  assert.deepStrictEqual(
+    unmatchedMentions('@sec-review-bot-bot review'),
+    ['sec-review-bot-bot'],
+    'an unaccepted -bot spelling is reported so the reader can see why nothing happened'
+  )
+  assert.deepStrictEqual(
+    unmatchedMentions('@sec-review-bot review'),
+    [],
+    'a recognised mention is not an unmatched one'
+  )
+  assert.deepStrictEqual(
+    unmatchedMentions('@sec-review-bot[bot] review'),
+    [],
+    'the bot login is a recognised mention too'
+  )
+  assert.deepStrictEqual(
+    unmatchedMentions('> @sec-review-bot-bot review'),
+    [],
+    'quoted history is not a mention the reader typed now'
+  )
+  assert.deepStrictEqual(unmatchedMentions('no mention here'), [])
+  assert.deepStrictEqual(
+    unmatchedMentions('please ask @someone-else about this'),
+    ['someone-else']
+  )
+})
+
+test('unmatchedMentions sees a mention wrapped in markdown or punctuation', () => {
+  // Readers wrap handles in markdown constantly. A diagnostic that only understood a bare
+  // `@handle` after whitespace would be silent for exactly the spellings people type, and a
+  // silent diagnostic is worse than none: it looks like the app accepted the command.
+  for (const body of [
+    '(@sec-review-bot-bot) review',
+    '**@sec-review-bot-bot** review',
+    '`@sec-review-bot-bot review`',
+    '_@sec-review-bot-bot_ review',
+    '"@sec-review-bot-bot" review',
+    '- @sec-review-bot-bot',
+    'please @sec-review-bot-bot review.'
+  ]) {
+    assert.deepStrictEqual(
+      unmatchedMentions(body),
+      ['sec-review-bot-bot'],
+      `a wrapped mention must still be reported: ${body}`
+    )
+  }
+  assert.deepStrictEqual(
+    unmatchedMentions('@sec-review-bot-bot: review'),
+    ['sec-review-bot-bot'],
+    'a trailing colon belongs to the sentence, not to the login'
+  )
+})
+
+test('unmatchedMentions sees a mention wrapped in underscore emphasis', () => {
+  // `__bold italic__` is ordinary GitHub markdown, and an underscore-prefixed word followed by a
+  // mention (`x_@bot`) is not an address either. Deciding from the left neighbour alone would
+  // discard both, so the mail-domain shape is what separates them.
+  for (const body of [
+    '__@sec-review-bot-bot__ please review',
+    '__@sec-review-bot-bot',
+    '___@sec-review-bot-bot___',
+    '_@sec-review-bot-bot_'
+  ]) {
+    assert.deepStrictEqual(
+      unmatchedMentions(body),
+      ['sec-review-bot-bot'],
+      `underscore emphasis must not hide the mention: ${body}`
+    )
+  }
+  assert.deepStrictEqual(
+    unmatchedMentions('x_@sec-review-bot-bot'),
+    ['sec-review-bot-bot'],
+    'a word ending in an underscore is not an email local part'
+  )
+})
+
+test('unmatchedMentions ignores email addresses and URL paths', () => {
+  // The left boundary accepts punctuation so markdown works, which makes a naive pattern report
+  // every address as a mention. These shapes carry an `@` but never name an account to notify.
+  for (const body of [
+    'foo@bar.com',
+    'contact me at foo@bar.com please',
+    'see https://user@example.com/path',
+    'https://github.com/@user',
+    '[link](https://x.test/@sec-review-bot-bot)',
+    'mailto:foo@bar.com',
+    'user_name@example.com',
+    'foo_@bar.com',
+    '_@example.com',
+    'EMAIL@EXAMPLE.COM'
+  ]) {
+    assert.deepStrictEqual(
+      unmatchedMentions(body),
+      [],
+      `an address is not a mention: ${body}`
+    )
+  }
+  assert.deepStrictEqual(
+    unmatchedMentions('foo@bar.com then @real-mention'),
+    ['real-mention'],
+    'a real mention next to an address is still reported'
   )
 })

@@ -4,7 +4,11 @@ import type { EmitterWebhookEvent } from '@octokit/webhooks'
 
 import { startIssueReviewCommand } from '../../../triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../../triggers/pull-request-review.js'
-import { extractCommentCommand } from '../../../github/comment-command-service.js'
+import {
+  extractCommentCommand,
+  recognizedMentions,
+  unmatchedMentions
+} from '../../../github/comment-command-service.js'
 import { authorizeManualCommentCommand } from '../../../github/manual-command-authorization.js'
 import { extractIssueContext } from '../../../github/issue-service.js'
 import { getPullRequestContext } from '../../../github/pull-request-service.js'
@@ -59,13 +63,26 @@ export async function handleIssueCommentCreatedWithDeps(
     return
   }
 
-  const command = extractCommentCommand(
+  const commentBody =
     typeof payload === 'object' && payload !== null && !Array.isArray(payload)
       ? (payload as { comment?: { body?: unknown } }).comment?.body
       : null
-  )
+  const command = extractCommentCommand(commentBody)
 
   if (!command) {
+    // The app answers only `@<slug>` and `@<slug>[bot]`. A comment that addressed some other
+    // `@…` spelling would otherwise be dropped with no trace, making a renamed or misspelled
+    // mention indistinguishable from "the app is down". Log it as a diagnostic; it is not an
+    // error, because most comments mention nobody in particular.
+    const mentions = unmatchedMentions(commentBody)
+    if (mentions.length > 0) {
+      logInfo('workflow_skipped', {
+        event: 'issue_comment.created',
+        reason: 'comment_mention_not_recognized',
+        mentions,
+        recognized_mentions: recognizedMentions()
+      })
+    }
     return
   }
 
