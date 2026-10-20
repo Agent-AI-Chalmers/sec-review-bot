@@ -3594,6 +3594,59 @@ test('giving up on a disconnected publication fails rather than skipping', async
   }
 })
 
+test('an operator resume completes on a pool that has exactly one connection', async () => {
+  // The resume is a decision the operator makes on a run nobody is working, but the database may
+  // still be busy: a small pool is a normal deployment choice, and nothing stops the resume from
+  // being the request that takes the last free connection. resumeDisconnectedPublication opens a
+  // transaction, then calls a store method that opens its own; with one connection the inner
+  // acquire waits for a connection the outer transaction will not release until the resume
+  // returns, and the request hangs until the pool times out. Failing to resume is recoverable -
+  // the operator can ask again - so the resume must give the connection back instead of
+  // deadlocking on it.
+  const smallPool = new Pool({
+    connectionString: requireTestDatabase(),
+    max: 1
+  })
+  const store = new ReviewRunStore({
+    pool: smallPool,
+    connectorId: connectorId()
+  })
+  await store.initialize()
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.claimPublication(runId)
+    assert.notStrictEqual(token, null)
+    await store.initializePublicationSteps(runId, token as string, [
+      'issue:summary-comment'
+    ])
+    // Park the publication the way the connector does when it cannot conclude a step.
+    await smallPool.query(
+      `UPDATE publication_steps SET status='disconnected' WHERE run_id=$1`,
+      [runId]
+    )
+    await smallPool.query(
+      `UPDATE publications SET status='disconnected', claim_token=NULL, claimed_at=NULL
+       WHERE run_id=$1`,
+      [runId]
+    )
+
+    // A hang is the failure this test exists for, so bound it rather than waiting forever.
+    const resumed = await Promise.race([
+      store.resumeDisconnectedRun(runId),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('resume did not return')), 5_000)
+      )
+    ])
+    assert.strictEqual(
+      (resumed as { publication: { status: string } }).publication.status,
+      'uncertain',
+      'the operator decision took effect'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
 test('a disconnected publication is parked until an operator resumes it', async () => {
   // A step parked after its reconciliation budget ran out excludes the whole publication from
   // every automatic claim, which is what keeps a side effect with an unknown remote outcome from

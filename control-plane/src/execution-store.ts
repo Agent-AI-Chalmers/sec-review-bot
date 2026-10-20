@@ -9,7 +9,7 @@
 // Reading the full run record is likewise not here: the record projection spans all three axes
 // and lives with `ReviewRunStore`.
 import crypto from 'node:crypto'
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 
 import type { RunnerArtifactStorage } from './contracts.js'
 import { appendEvent } from './review-run-events.js'
@@ -176,7 +176,23 @@ export class ExecutionStore {
    *
    * Returns false when the row is not (or no longer) disconnected. */
   async resumeDisconnectedSubmissionRecovery(runId: string): Promise<boolean> {
-    return await transaction(this.pool, async (client) => {
+    return await transaction(
+      this.pool,
+      async (client) =>
+        await this.resumeDisconnectedSubmissionRecoveryOn(client, runId)
+    )
+  }
+
+  /** The same decision, on a transaction the caller already opened.
+   *
+   * An operator resume re-claims the execution and reads the record it returns in one
+   * transaction. Opening a second transaction for the claim deadlocks when the caller holds the
+   * pool's only connection, so the decision takes the caller's transaction instead. */
+  async resumeDisconnectedSubmissionRecoveryOn(
+    client: PoolClient,
+    runId: string
+  ): Promise<boolean> {
+    {
       const result = await client.query<{ run_id: string }>(
         `UPDATE executions
          SET status='uncertain', claim_token=NULL, claimed_at=NULL,
@@ -195,7 +211,7 @@ export class ExecutionStore {
         reasonCode: 'SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR'
       })
       return true
-    })
+    }
   }
 
   /** Stop automatic recovery for an uncertain submission whose replay budget is exhausted.

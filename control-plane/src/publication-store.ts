@@ -200,8 +200,24 @@ export class PublicationStore {
    * `ExecutionStore.resumeDisconnectedSubmissionRecovery`, which resets its own budget for the
    * same reason — an operator decision that changes only a status grants no work. */
   async claimDisconnectedPublication(runId: string): Promise<string | null> {
+    return await transaction(
+      this.pool,
+      async (client) => await this.claimDisconnectedOn(client, runId)
+    )
+  }
+
+  /** The same decision, on a transaction the caller already opened.
+   *
+   * An operator resume is one transaction: it re-claims the publication and then reads the record
+   * it returns, and both must see the same snapshot. Opening a second transaction for the claim
+   * deadlocks whenever the caller holds the pool's only connection, which a small pool makes an
+   * ordinary deployment shape rather than a test contrivance. */
+  async claimDisconnectedOn(
+    client: PoolClient,
+    runId: string
+  ): Promise<string | null> {
     const token = crypto.randomUUID()
-    return await transaction(this.pool, async (client) => {
+    {
       const result = await client.query<{ from_status: string }>(
         `WITH previous AS (
            SELECT run_id, status FROM publications
@@ -248,7 +264,7 @@ export class PublicationStore {
         reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
       })
       return token
-    })
+    }
   }
 
   async complete(runId: string, token: string): Promise<boolean> {

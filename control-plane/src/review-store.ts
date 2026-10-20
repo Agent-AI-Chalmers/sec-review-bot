@@ -1145,7 +1145,7 @@ export class ReviewRunStore {
   async resumeDisconnectedPublication(runId: string): Promise<ReviewRunRecord> {
     this.ready()
     return await transaction(this.pool, async (client) => {
-      const token = await this.publications.claimDisconnectedPublication(runId)
+      const token = await this.publications.claimDisconnectedOn(client, runId)
       if (token === null)
         throw Object.assign(
           new Error(`Review run ${runId} is not a disconnected publication.`),
@@ -1374,7 +1374,12 @@ export class ReviewRunStore {
   async resumeDisconnectedExecution(runId: string): Promise<ReviewRunRecord> {
     this.ready()
     return await transaction(this.pool, async (client) => {
-      if (!(await this.executions.resumeDisconnectedSubmissionRecovery(runId)))
+      if (
+        !(await this.executions.resumeDisconnectedSubmissionRecoveryOn(
+          client,
+          runId
+        ))
+      )
         throw Object.assign(
           new Error(`Review run ${runId} is not a disconnected execution.`),
           { statusCode: 409 }
