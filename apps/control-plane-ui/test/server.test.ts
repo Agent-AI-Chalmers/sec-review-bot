@@ -683,3 +683,51 @@ test('BFF reports a Control Plane metadata timeout separately', async () => {
     ])
   }
 })
+
+test('BFF does not echo an upstream content-type it would serve as script', async () => {
+  // The upstream `content-type` could be `text/html` if Control Plane were compromised or
+  // misconfigured. Echoing it from the console's own origin would let a browser run the body as
+  // script; the BFF must answer with a fixed JSON type instead, regardless of what it is sent.
+  const upstream = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/html' })
+    response.end('<script>alert(1)</script>')
+  })
+  await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
+  const upstreamAddress = upstream.address()
+  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    controlPlaneToken: 'read-secret',
+    accessToken: 'login-secret'
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const uiAddress = ui.address()
+  assert(uiAddress && typeof uiAddress === 'object')
+  const base = `http://127.0.0.1:${uiAddress.port}`
+  try {
+    const login = await fetch(`${base}/api/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{"token":"login-secret"}'
+    })
+    const cookie = login.headers.get('set-cookie')
+    assert(cookie !== null)
+    const proxied = await fetch(`${base}/api/runs`, { headers: { cookie } })
+    assert.strictEqual(proxied.status, 200)
+    assert.strictEqual(
+      proxied.headers.get('content-type'),
+      'application/json; charset=utf-8',
+      'the upstream text/html must not be echoed'
+    )
+    assert.strictEqual(
+      proxied.headers.get('x-content-type-options'),
+      'nosniff',
+      'nosniff is still set so the body cannot be reinterpreted'
+    )
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => upstream.close(() => resolve()))
+    ])
+  }
+})

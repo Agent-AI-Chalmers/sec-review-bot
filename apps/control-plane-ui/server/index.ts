@@ -132,6 +132,18 @@ function isAllowedReadPath(bffUrl: string): boolean {
   return segments[4] === 'publication-steps' || segments[4] === 'events'
 }
 
+/**
+ * The `content-type` served for a proxied Control Plane response.
+ *
+ * Every proxied route (the reads and the admin write) returns JSON, so the BFF answers with a
+ * fixed JSON media type instead of echoing the upstream `content-type`. The upstream value is
+ * only attacker-influenced if Control Plane is compromised, but copying it verbatim would serve
+ * whatever that response claimed (for example `text/html`) from the console's own origin, where
+ * a browser could run it as script. A constant cannot be mismatched with the body either: the
+ * bytes are forwarded unchanged and the contract says they are JSON.
+ */
+const PROXIED_CONTENT_TYPE = 'application/json; charset=utf-8'
+
 function sendJson(
   response: ServerResponse,
   status: number,
@@ -543,8 +555,7 @@ export function createControlPlaneUiServer({
             }
           )
           response.writeHead(upstream.status, {
-            'content-type':
-              upstream.headers.get('content-type') ?? 'application/json'
+            'content-type': PROXIED_CONTENT_TYPE
           })
           response.end(Buffer.from(await upstream.arrayBuffer()))
         } catch (error) {
@@ -578,8 +589,7 @@ export function createControlPlaneUiServer({
           }
         )
         response.writeHead(upstream.status, {
-          'content-type':
-            upstream.headers.get('content-type') ?? 'application/json'
+          'content-type': PROXIED_CONTENT_TYPE
         })
         response.end(Buffer.from(await upstream.arrayBuffer()))
       } catch (error) {
