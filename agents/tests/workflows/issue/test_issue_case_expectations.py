@@ -8,30 +8,25 @@ test code here.
 import pytest
 
 from tests.workflows.issue.cases.loader import load_issue_cases
-from tests.workflows.issue.cases.models import CaseExpectation
+from tests.workflows.issue.cases.models import CaseExpectation, IssueCase
 from tests.workflows.issue.cases.runner import assert_issue_case_oracle
 
-
-def _examples() -> list[tuple[str, CaseExpectation]]:
-    return [
-        (case.id, example)
-        for case in load_issue_cases()
-        for example in case.expectations
-    ]
+CASES: tuple[IssueCase, ...] = load_issue_cases()
+EXAMPLES: list[tuple[IssueCase, CaseExpectation]] = [
+    (case, example) for case in CASES for example in case.expectations
+]
 
 
 @pytest.mark.parametrize(
-    "case_id, example",
-    _examples(),
-    ids=[f"{case_id}-{example.name}" for case_id, example in _examples()],
+    "case, example",
+    EXAMPLES,
+    ids=[f"{case.id}-{example.name}" for case, example in EXAMPLES],
 )
-def test_issue_case_expectation(case_id: str, example: CaseExpectation) -> None:
-    case = next(c for c in load_issue_cases() if c.id == case_id)
-
+def test_issue_case_expectation(case: IssueCase, example: CaseExpectation) -> None:
     if example.expected == "rejected":
         with pytest.raises(AssertionError):
             assert_issue_case_oracle(case, example.result)
         return
 
     accepted = assert_issue_case_oracle(case, example.result)
-    assert accepted, f"{case_id}: {example.name} expected an accepted finding"
+    assert accepted, f"{case.id}: {example.name} expected an accepted finding"

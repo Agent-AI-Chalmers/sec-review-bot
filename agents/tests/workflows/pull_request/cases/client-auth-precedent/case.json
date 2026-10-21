@@ -58,8 +58,8 @@
         "any_of": [
           "client-side",
           "client side",
-          "currentuser.isadmin",
-          "adminpanel"
+          "currentUser\\.isAdmin",
+          "AdminPanel"
         ],
         "all": [
           "auth|access control"
@@ -67,7 +67,7 @@
         "none_of": [
           "src/server/admin\\.ts",
           "/api/admin/users/:id/role",
-          "updaterole"
+          "updateRole"
         ],
         "files_only": [
           "src/client/AdminPanel.tsx"

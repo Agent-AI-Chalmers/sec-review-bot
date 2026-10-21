@@ -39,12 +39,11 @@
           },
           {
             "verdict": "confirmed-vulnerability",
-            "title": "finding",
-            "overview": "AdminPanel.tsx hides the button when currentUser.isAdmin is false, which is a client-side authorization check.",
+            "title": "AdminPanel enforces admin-only role promotion",
+            "overview": "AdminPanel checks currentUser.isAdmin before rendering the button, and that check is the authorization boundary for role promotion.",
             "locations": [
               {
-                "file": "src/client/AdminPanel.tsx",
-                "line": 1
+                "file": "src/client/AdminPanel.tsx"
               }
             ]
           }

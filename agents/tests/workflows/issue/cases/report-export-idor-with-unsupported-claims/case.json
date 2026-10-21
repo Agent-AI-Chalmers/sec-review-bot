@@ -1,0 +1,26 @@
+{
+  "id": "report-export-idor-with-unsupported-claims",
+  "issue": {
+    "title": "Report export security issue: auth bypass, SQL injection, and missing rate limit",
+    "body": "I think the reports controller has several security problems.\n\n1. `/api/reports/:id/export` lets any logged-in user export any report by changing the id in the URL. The export includes confidential notes, so this looks like an authorization bypass / IDOR.\n2. `/api/reports/search?q=...` looks like SQL injection because the query string is fed into the database search.\n3. Please also add rate limiting to both endpoints because exports may be expensive.\n\nPlease audit the issue and identify which security claims are actually supported by the current code."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-vulnerability"],
+    "expected_mechanism": "The export handler fetches a report by id without an ownership check; the search handler parameterizes its query and no rate-limit gap is a confirmable defect.",
+    "required_evidence": [
+      {
+        "label": "export route is named",
+        "any_of": ["/api/reports/:id/export"]
+      },
+      {
+        "label": "missing ownership check",
+        "any_of": ["idor|authorization|access control"]
+      },
+      {
+        "label": "exported data includes confidential notes",
+        "any_of": ["confidentialnotes"]
+      }
+    ],
+    "required_locations": ["src/server/reports.ts"]
+  }
+}

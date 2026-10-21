@@ -131,11 +131,15 @@ def _matches_forbidden(
     """
     # Patterns are regular expressions, the same as the required ones. A field that switched to
     # substring matching would force its data to follow a rule the JSON does not state.
-    if any(re.search(pattern, text) is None for pattern in rule.all):
+    # Match case-insensitively rather than lowercasing the narrative: a fixture that writes a
+    # real symbol such as `OAuthAccessToken` must not silently stop matching its own pattern.
+    if any(re.search(pattern, text, re.IGNORECASE) is None for pattern in rule.all):
         return False
-    if rule.any_of and not any(re.search(pattern, text) for pattern in rule.any_of):
+    if rule.any_of and not any(
+        re.search(pattern, text, re.IGNORECASE) for pattern in rule.any_of
+    ):
         return False
-    if any(re.search(pattern, text) for pattern in rule.none_of):
+    if any(re.search(pattern, text, re.IGNORECASE) for pattern in rule.none_of):
         return False
     if rule.files_only:
         locations = _location_files(narrative)
@@ -169,7 +173,7 @@ def _narratives_accepted_by(
             narrative
             for narrative in confirmed
             if _matches_forbidden(
-                narrative, json.dumps(narrative, sort_keys=True).lower(), rule
+                narrative, json.dumps(narrative, sort_keys=True), rule
             )
         ]
         assert (
@@ -181,7 +185,7 @@ def _narratives_accepted_by(
         for narrative in confirmed
         if all(
             any(
-                re.search(pattern, json.dumps(narrative, sort_keys=True).lower())
+                re.search(pattern, json.dumps(narrative, sort_keys=True), re.IGNORECASE)
                 for pattern in requirement.any_of
             )
             for requirement in oracle.required

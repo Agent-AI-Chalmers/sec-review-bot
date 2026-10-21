@@ -87,7 +87,10 @@ try:
                             "is_dir": entry.is_dir(follow_symlinks=False),
                         }
                     )
-        except FileNotFoundError, NotADirectoryError, PermissionError:
+        # This file runs on whatever `python3` the sandbox provides, so it cannot use
+        # Python 3.14 syntax. Black under target-version py314 rewrites this tuple of
+        # exception types into the Python 2 `except A, B:` form, which 3.12 rejects.
+        except (FileNotFoundError, NotADirectoryError, PermissionError):  # fmt: skip
             emit({"entries": []})
             sys.exit(0)
         emit({"entries": entries})
@@ -270,7 +273,8 @@ try:
                         )
                 if stop_reason:
                     break
-            except OSError, UnicodeDecodeError:
+            # Same portability constraint as the `ls` handler above.
+            except (OSError, UnicodeDecodeError):  # fmt: skip
                 continue
         emit({"matches": matches, "stop_reason": stop_reason})
         sys.exit(0)
