@@ -143,7 +143,6 @@ def build_pr_verification_user_prompt(
     analysis_result: Mapping[str, Any],
     mitigation_result: Mapping[str, Any] | None,
     workspace_patch: str | None,
-    diff_metadata: Mapping[str, Any],
 ) -> str:
     feedback_retry = verification_feedback_retry_context(retry_context)
     if isinstance(feedback_retry, dict):
@@ -151,7 +150,6 @@ def build_pr_verification_user_prompt(
             pr=pr,
             mitigation_result=mitigation_result,
             workspace_patch=workspace_patch,
-            diff_metadata=diff_metadata,
             feedback_retry=feedback_retry,
         )
 
@@ -160,7 +158,6 @@ def build_pr_verification_user_prompt(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         workspace_patch=workspace_patch,
-        diff_metadata=diff_metadata,
     )
 
 
@@ -179,7 +176,6 @@ def _build_initial_pr_verification_user_prompt(
     analysis_result: Mapping[str, Any],
     mitigation_result: Mapping[str, Any] | None,
     workspace_patch: str | None,
-    diff_metadata: Mapping[str, Any],
 ) -> str:
     title = pr.get("title")
     body = pr.get("body")
@@ -250,12 +246,6 @@ def _build_initial_pr_verification_user_prompt(
             _mitigation_summary(mitigation_result),
             profile="prompt",
         ),
-        "",
-        render_structured_markdown_section(
-            "Pull Request Diff Metadata",
-            diff_metadata,
-            profile="prompt",
-        ),
     ]
     if isinstance(workspace_patch, str) and workspace_patch:
         sections.extend(
@@ -269,7 +259,6 @@ def _build_retry_pr_verification_user_prompt(
     pr: Mapping[str, Any],
     mitigation_result: Mapping[str, Any] | None,
     workspace_patch: str | None,
-    diff_metadata: Mapping[str, Any],
     feedback_retry: Mapping[str, Any],
 ) -> str:
     latest_verifier = feedback_retry.get("latest_verifier")
@@ -331,12 +320,6 @@ def _build_retry_pr_verification_user_prompt(
         render_structured_markdown_section(
             "New Mitigation Summary",
             _mitigation_summary(mitigation_result),
-            profile="prompt",
-        ),
-        "",
-        render_structured_markdown_section(
-            "Pull Request Diff Metadata",
-            diff_metadata,
             profile="prompt",
         ),
     ]

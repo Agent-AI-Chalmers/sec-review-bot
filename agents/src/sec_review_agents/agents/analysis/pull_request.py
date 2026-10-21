@@ -104,7 +104,6 @@ def build_pr_analyzer_filesystem_system_prompt() -> str:
 def build_pr_analyzer_user_prompt(
     *,
     pr: Mapping[str, Any],
-    diff_metadata: Mapping[str, Any],
 ) -> str:
     title = pr.get("title")
     body = pr.get("body")
@@ -158,12 +157,6 @@ def build_pr_analyzer_user_prompt(
                     ),
                     "commit_shas": pr.get("commit_shas") or [],
                 },
-                profile="prompt",
-            ),
-            "",
-            render_structured_markdown_section(
-                "Pull Request Diff Metadata",
-                diff_metadata,
                 profile="prompt",
             ),
         ]

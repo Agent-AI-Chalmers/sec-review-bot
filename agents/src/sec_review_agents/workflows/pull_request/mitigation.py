@@ -5,9 +5,6 @@ from typing import Any
 from sec_review_agents.agents.mitigation import pull_request as pr_mitigation_agent
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
-from sec_review_agents.workflows.pull_request.incremental_window import (
-    load_pr_diff_metadata,
-)
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
     TestChangesPolicy,
@@ -28,7 +25,6 @@ async def mitigate_pull_request(
     runtime_context: RunnerRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
-    diff_metadata = load_pr_diff_metadata(incremental_window_path)
     return await run_mitigation_stage(
         agent_name="pull-request-mitigator",
         mitigator_artifacts_path=mitigator_artifacts_path,
@@ -52,6 +48,5 @@ async def mitigate_pull_request(
             pr=pr,
             retry_context=retry_context,
             analysis_result=analysis_result,
-            diff_metadata=diff_metadata,
         ),
     )
