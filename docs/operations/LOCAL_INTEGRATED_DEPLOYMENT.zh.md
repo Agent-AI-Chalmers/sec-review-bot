@@ -477,12 +477,32 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 
 每条 git 命令和快照命令都受 `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` 约束（默认 `600000`，即 10 分钟），避免远端挂起时无限拖住输入准备。若仓库的冷克隆确实更慢，可以提高该值。
 
-## 排障
+## 为何这样部署
 
-- `403 Resource not accessible by integration`：检查 GitHub App 权限，以及 installation 是否重新批准过新权限。
-- Runner Service 返回 unauthorized：检查仓库 `.env` 中的 `RUNNER_SERVICE_TOKEN`，再重启完整服务。
-- Repository dispatch 鉴权失败：确认 workflow 配置了 `id-token: write`，请求了 `sec-review-bot` OIDC audience，并且 workflow 路径是 `.github/workflows/sec-review-bot.yml`。
-- Run 一直处于 queued：确认至少有一个宿主机 worker 正在运行，并与 Runner Service 使用相同的 `TEMPORAL_TASK_QUEUE`。
-- Worker 读不到 input bundle：检查 RustFS endpoint，并确认安装后的 worker 凭据与 Compose 初始化的只读凭据一致。
-- Worker 把 artifact 写到其他位置：检查 `ops/systemd/deployment.env` 中可选的 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override，再重新运行 `sudo ops/systemd/install.sh "$USER"`。
-- LLM 调用在 workflow 推进前失败：进入 `agents/` 后运行 `uv run sec-review-agents-check-llm-deployments --fail-fast`。
+这套部署由两个运行时承担：Compose 跑负责协调 review 的服务，systemd 跑执行 review 的 worker。哪个组件由哪个运行时承载，取决于该组件要做什么，这也决定了监督能覆盖到哪里。
+
+### worker 跑在宿主机上
+
+worker 是整条链路里唯一会运行被审查仓库代码的组件。它为每次 agent 调用启动一个 Docker 容器，因此需要访问宿主机的 Docker daemon。把它放进 Compose 只有两种做法：把 Docker socket 挂进一个本来就在运行不可信代码的容器，或者在容器内再跑一个特权 daemon。无论哪种，只要某次 review 出了事，影响都会超出沙箱。放在宿主机上，它直接使用 daemon，并由 systemd 监督，因此具备真实的 unit 状态、有上限的重启策略，以及对控制平面的依赖关系。
+
+在 Temporal 的任务队列模型里，worker 部署在宿主上属于常规做法，算不上变通：worker 主动轮询队列，部署在哪里并不影响 workflow 的推进。worker 消失只会让任务延后，不会丢失 workflow 状态。
+
+### 协调服务跑在 Compose 里
+
+PostgreSQL、Temporal、对象存储和三个 HTTP 服务都是普通的长驻容器。Compose 为它们提供镜像固定、基于健康门控的依赖顺序、网络隔离，以及单一配置文件——这些都是 worker 不需要的。
+
+### 同样的形态在别处也存在
+
+执行不可信任务的 runner 系统也这样划分两个角色：
+
+- [GitHub 的 self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service) 安装为宿主机上的服务，每个 job 在容器里启动。
+- [Gitea 的 act runner](https://docs.gitea.com/usage/actions/act-runner) 以宿主 daemon 运行，提供 `docker://`、`kubernetes://` 和 `host` 三种 job 环境，并明确警告 host 模式的 job 没有隔离。
+- [GitLab Runner](https://docs.gitlab.com/runner/executors/) 的 manager 同样位于宿主机，把 job 分派给 Docker。
+
+这三者的控制平面都在机器之外，因此 worker 失败从来不需要传播进去。
+
+### 这样做的代价
+
+本项目的控制平面与 worker 同机，于是两个运行时必须在失败处理上取得一致，而它们在一处并不一致：systemd 会把失败的 worker 报告为失败的 unit，而一个用尽重启次数的 Compose 服务会让 unit 仍显示 `active (running)`。unit 的前台进程只负责跟随日志；Compose 没有办法把单个服务的永久失败转成进程退出，除非同时把所有崩溃都当作整栈失败——而那正是之前把 PostgreSQL 一起拖垮的做法。
+
+因此，健康门控之下的运行期失败要靠检查容器发现，而不是靠 unit 状态——上文的状态检查一节说明了做法。若要在 Compose 内部补上这个缺口，需要一个读取期望服务状态的监督器，而这些期望状态只能存放在服务定义之外。对本地部署而言，运维人员本来就在机器前，这笔取舍并不划算。如果这套部署将来需要无人值守地运行，它会是第一个需要重新评估的地方。
