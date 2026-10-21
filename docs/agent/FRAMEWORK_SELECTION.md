@@ -43,7 +43,7 @@ The graphs built in `runtime/agent_runtime_graph.py` are constructed without a c
 - **Recovery granularity has to account for side effects.** A replayed node writes artifacts and runs commands against a filesystem that is not checkpointed. Artifacts are local stage files with per-attempt cleanup, and transcripts are named by stage attempt, so a replayed node either duplicates work or leaves a half-written stage behind.
 - **The stage is already the durable unit.** Inside one Temporal activity, the container, MCP sessions, bootstrap result, and artifact directory form a single lifecycle that cannot be split at no cost. Recovering within it needs the environment itself to be reconstructible, which is a sandbox design problem, not a graph-state problem.
 
-Putting the agent loop inside the workflow definition, as [Temporal's own agent guidance](https://temporal.io/) describes, runs into the same split: the LLM and tool calls become durable activities, but the container they mutate is still outside any durable state.
+Putting the agent loop inside the workflow definition, as [Temporal's AI cookbook](https://docs.temporal.io/ai-cookbook) describes, runs into the same split: the LLM and tool calls become durable activities, but the container they mutate is still outside any durable state.
 
 These are deliberate boundaries. Temporal owns durability at the stage boundary and treats a stage environment as the property of the activity that created it; LangGraph owns the agent loop inside that boundary and is used without a checkpointer.
 

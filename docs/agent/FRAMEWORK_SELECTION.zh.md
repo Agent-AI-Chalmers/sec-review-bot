@@ -45,7 +45,7 @@ LangGraph 是这一类 agent 系统下面更底层的图运行时，同时它也
 - **恢复粒度必须考虑副作用。** 被重放的节点会往没有 checkpoint 的文件系统里写产物、跑命令。产物是按 attempt 清理的本地阶段文件，transcript 按 stage attempt 命名，所以重放的节点要么重复劳动，要么留下半成品。
 - **阶段本身已经是持久化单元。** 在一个 Temporal activity 内部，容器、MCP 会话、bootstrap 结果和产物目录构成一个无法零成本拆开的生命周期。要在这个粒度内恢复，需要环境本身可重建，这是沙箱设计问题，不是图状态问题。
 
-把 agent loop 放进 workflow definition（[Temporal 的 agent 指引](https://temporal.io/) 描述的做法）会撞上同一个断层：LLM 和工具调用变成了持久化的 activity，但它们修改的容器仍在任何持久化状态之外。
+把 agent loop 放进 workflow definition（[Temporal 的 AI cookbook](https://docs.temporal.io/ai-cookbook) 描述的做法）会撞上同一个断层：LLM 和工具调用变成了持久化的 activity，但它们修改的容器仍在任何持久化状态之外。
 
 这些是有意划定的边界。Temporal 持有阶段边界的持久化，并把阶段环境视为创建它的 activity 的财产；LangGraph 只负责这个边界之内的 agent loop，并且不挂 checkpointer。
 
