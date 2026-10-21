@@ -1,0 +1,166 @@
+{
+  "examples": [
+    {
+      "name": "accepts the server authorization finding",
+      "expected": "accepted",
+      "result": {
+        "verdict": "confirmed-vulnerability",
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "src/server/admin.ts posts /api/admin/users/:id/role and calls updateRole without any authorization check.",
+            "locations": [
+              {
+                "file": "src/server/admin.ts",
+                "line": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a client-only auth finding beside the correct finding",
+      "expected": "forbidden",
+      "result": {
+        "verdict": "confirmed-vulnerability",
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "src/server/admin.ts posts /api/admin/users/:id/role and calls updateRole without any authorization check.",
+            "locations": [
+              {
+                "file": "src/server/admin.ts",
+                "line": 1
+              }
+            ]
+          },
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "AdminPanel.tsx hides the button when currentUser.isAdmin is false, which is a client-side authorization check.",
+            "locations": [
+              {
+                "file": "src/client/AdminPanel.tsx",
+                "line": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "accepts the correct finding while it discusses the client check",
+      "expected": "accepted",
+      "result": {
+        "verdict": "confirmed-vulnerability",
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "src/server/admin.ts posts /api/admin/users/:id/role and calls updateRole without authorization. The AdminPanel client-side check only hides the button and is not an enforcement boundary.",
+            "locations": [
+              {
+                "file": "src/server/admin.ts",
+                "line": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "accepts a server finding anchored at the client file",
+      "expected": "accepted",
+      "result": {
+        "verdict": "confirmed-vulnerability",
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "src/server/admin.ts calls updateRole at /api/admin/users/:id/role without authorization; the AdminPanel client-side check only hides the button.",
+            "locations": [
+              {
+                "file": "src/client/AdminPanel.tsx",
+                "line": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "accepts an unrelated client finding beside the correct finding",
+      "expected": "accepted",
+      "result": {
+        "verdict": "confirmed-vulnerability",
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "src/server/admin.ts posts /api/admin/users/:id/role and calls updateRole without any authorization check.",
+            "locations": [
+              {
+                "file": "src/server/admin.ts",
+                "line": 1
+              }
+            ]
+          },
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "AdminPanel.tsx renders selectedUser.name into the button label as raw HTML, so a crafted display name executes script in the admin UI.",
+            "locations": [
+              {
+                "file": "src/client/AdminPanel.tsx",
+                "line": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a finding that names the file and endpoint but not the update",
+      "expected": "rejected",
+      "result": {
+        "verdict": "confirmed-vulnerability",
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "src/server/admin.ts exposes /api/admin/users/:id/role.",
+            "locations": [
+              {
+                "file": "src/server/admin.ts",
+                "line": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "accepts the evidence in any wording order",
+      "expected": "accepted",
+      "result": {
+        "verdict": "confirmed-vulnerability",
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "The updateRole operation at /api/admin/users/:id/role lacks authorization in src/server/admin.ts.",
+            "locations": [
+              {
+                "file": "src/server/admin.ts",
+                "line": 1
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

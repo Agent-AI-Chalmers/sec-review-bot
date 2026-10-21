@@ -4,94 +4,25 @@
 # failure reachable through the same PR.
 
 import json
-import re
-import shutil
-import subprocess
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
-from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.workflows.pull_request.analysis import analyze_pull_request
-from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.llm_probe import llm_probe
+from tests.workflows.pull_request.cases.loader import load_pull_request_cases
+from tests.workflows.pull_request.cases.runner import (
+    accepted_narratives,
+    run_pull_request_case,
+)
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
-# The fixture is a real file tree, so it lives on disk rather than inside this module: a
-# reviewer can read the files directly and a tool can check them, without decoding string
-# lists that embed another language's source.
-CASE_DIR = Path(__file__).parent / "cases" / "client-auth-precedent"
 
-
-def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", "-C", str(cwd), *args],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
-
-def _init_window_repository(workspace: Path) -> tuple[str, str]:
-    """Make the fixture a real repository with a base and a head commit.
-
-    The pull request prompts read the window with git, so a plain directory leaves the agent
-    without the evidence those prompts name. The base commit is empty and the head commit holds
-    the fixture tree, which makes every fixture file an addition inside the window, matching the
-    change the assertions describe.
-    """
-    _git(workspace, "init", "-q")
-    _git(workspace, "config", "user.email", "fixture@example.test")
-    _git(workspace, "config", "user.name", "fixture")
-    _git(workspace, "commit", "-q", "--allow-empty", "-m", "base")
-    base_sha = _git(workspace, "rev-parse", "HEAD")
-    _git(workspace, "add", "-A")
-    _git(workspace, "commit", "-q", "-m", "head")
-    head_sha = _git(workspace, "rev-parse", "HEAD")
-    return base_sha, head_sha
-
-
-def _confirmed_narratives(result: Mapping[str, Any]) -> list[dict[str, Any]]:
-    return [
-        narrative
-        for narrative in result.get("narratives", [])
-        if isinstance(narrative, dict)
-        and narrative.get("verdict") == "confirmed-vulnerability"
-    ]
-
-
-def _narrative_text(narrative: dict[str, Any]) -> str:
-    return json.dumps(narrative, sort_keys=True).lower()
-
-
-def _narrative_location_files(narrative: dict[str, Any]) -> set[str]:
-    files: set[str] = set()
-    for location in narrative.get("locations", []):
-        if isinstance(location, dict) and isinstance(location.get("file"), str):
-            files.add(location["file"])
-    return files
-
-
-def _is_client_only_auth_narrative(narrative: dict[str, Any]) -> bool:
-    text = _narrative_text(narrative)
-    locations = _narrative_location_files(narrative)
-    mentions_client_auth = (
-        "client-side" in text or "adminpanel" in text or "currentuser.isadmin" in text
-    ) and ("auth" in text or "access control" in text)
-    mentions_server_sink = (
-        "src/server/admin.ts" in text
-        or "/api/admin/users/:id/role" in text
-        or "updaterole" in text
-    )
-    return (
-        mentions_client_auth
-        and not mentions_server_sink
-        and bool(locations)
-        and locations <= {"src/client/AdminPanel.tsx"}
-    )
+def _case(case_id: str):
+    matches = [case for case in load_pull_request_cases() if case.id == case_id]
+    if not matches:
+        raise AssertionError(f"missing pull request case: {case_id}")
+    return matches[0]
 
 
 PROBE = llm_probe(
@@ -106,91 +37,10 @@ PROBE = llm_probe(
 async def test_client_side_auth_precedent_does_not_hide_server_authorization_failure(
     tmp_path: Path,
 ) -> None:
-    case = json.loads((CASE_DIR / "case.json").read_text(encoding="utf-8"))
-    workspace = tmp_path / "workspace"
-    history = tmp_path / "history"
-    incremental_window = tmp_path / "incremental-window"
-    analyzer_artifacts = tmp_path / "artifacts" / "analyzer"
-
-    shutil.copytree(CASE_DIR / "workspace", workspace)
-    history.mkdir(parents=True)
-    incremental_window.mkdir(parents=True)
-    analyzer_artifacts.mkdir(parents=True)
-
-    changed_files = case["changed_files"]
-    (incremental_window / "changed-files.json").write_text(
-        json.dumps({"files": changed_files}, indent=2),
-        encoding="utf-8",
+    result = await run_pull_request_case(
+        _case("client-auth-precedent"), run_root=tmp_path
     )
-    # The window the prompts read from: a real base/head pair, plus the metadata that names it.
-    base_sha, head_sha = _init_window_repository(workspace)
-    # The materialized window keeps its patch as a record of the run. The prompts read the change
-    # through git, so the patch is derived from the repository rather than written by hand.
-    (incremental_window / "incremental.patch").write_text(
-        _git(workspace, "diff", "--no-color", f"{base_sha}...{head_sha}"),
-        encoding="utf-8",
-    )
-    (history / "pr-metadata.json").write_text(
-        json.dumps(
-            {
-                "review_window": {
-                    "kind": "full",
-                    "base_sha": base_sha,
-                    "head_sha": head_sha,
-                    "reason": "pull-request-scope",
-                },
-                "commit_shas": [head_sha],
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    pull_request = case["pull_request"]
-    pr = {
-        **pull_request,
-        "base_sha": base_sha,
-        "head_sha": head_sha,
-        "commit_shas": [head_sha],
-    }
-
-    with patch(
-        "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
-        return_value="local",
-    ):
-        snapshot_tar = tmp_path / "workspace.snapshot.tar"
-        create_workspace_snapshot_tar(
-            workspace_path=workspace,
-            tar_path=snapshot_tar,
-        )
-        result = await analyze_pull_request(
-            pr=pr,
-            workspace_snapshot_tar_path=snapshot_tar,
-            history_path=history,
-            incremental_window_path=incremental_window,
-            analyzer_artifacts_path=analyzer_artifacts,
-        )
 
     print(json.dumps(result, indent=2, sort_keys=True))
     assert result["verdict"] == "confirmed-vulnerability"
-    confirmed_narratives = _confirmed_narratives(result)
-    assert confirmed_narratives
-
-    server_narratives = [
-        narrative
-        for narrative in confirmed_narratives
-        if "src/server/admin.ts" in _narrative_text(narrative)
-        and "/api/admin/users/:id/role" in _narrative_text(narrative)
-        and "updaterole" in _narrative_text(narrative)
-    ]
-    assert server_narratives
-    assert re.search(
-        r"authori[sz]ation|access control|auth",
-        _narrative_text(server_narratives[0]),
-    )
-
-    client_only_false_positives = [
-        narrative
-        for narrative in confirmed_narratives
-        if _is_client_only_auth_narrative(narrative)
-    ]
-    assert client_only_false_positives == []
+    assert accepted_narratives(_case("client-auth-precedent"), result)

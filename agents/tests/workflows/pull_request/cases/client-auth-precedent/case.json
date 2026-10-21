@@ -20,5 +20,59 @@
       "additions": 13,
       "deletions": 0
     }
-  ]
+  ],
+  "oracle": {
+    "acceptable_verdicts": [
+      "confirmed-vulnerability"
+    ],
+    "required": [
+      {
+        "label": "names the server file",
+        "any_of": [
+          "src/server/admin\\.ts"
+        ]
+      },
+      {
+        "label": "names the role endpoint",
+        "any_of": [
+          "/api/admin/users/:id/role"
+        ]
+      },
+      {
+        "label": "names the role update",
+        "any_of": [
+          "updaterole"
+        ]
+      },
+      {
+        "label": "describes an authorization or access-control weakness",
+        "any_of": [
+          "authori[sz]ation",
+          "access control"
+        ]
+      }
+    ],
+    "forbidden": [
+      {
+        "label": "treats the client-side check as the enforcement boundary",
+        "any_of": [
+          "client-side",
+          "client side",
+          "currentuser.isadmin",
+          "adminpanel"
+        ],
+        "all": [
+          "auth|access control"
+        ],
+        "none_of": [
+          "src/server/admin\\.ts",
+          "/api/admin/users/:id/role",
+          "updaterole"
+        ],
+        "files_only": [
+          "src/client/AdminPanel.tsx"
+        ]
+      }
+    ]
+  }
 }

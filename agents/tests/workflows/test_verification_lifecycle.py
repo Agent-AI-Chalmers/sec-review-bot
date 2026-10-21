@@ -44,7 +44,7 @@ async def test_issue_verification_resets_artifacts_before_workspace_prepare_fail
 
 
 @pytest.mark.asyncio
-async def test_pr_verification_resets_artifacts_before_diff_metadata_failure(
+async def test_pr_verification_resets_artifacts_before_workspace_prepare_failure(
     tmp_path: Path,
 ) -> None:
     verifier_artifacts = tmp_path / "verifier"
@@ -58,7 +58,13 @@ async def test_pr_verification_resets_artifacts_before_diff_metadata_failure(
         encoding="utf-8",
     )
 
-    with pytest.raises(FileNotFoundError):
+    # The verifier no longer reads a diff artifact, so a missing one cannot be the failure this
+    # guards. The workspace snapshot is what the stage needs first, and the reset must still have
+    # happened by the time it fails.
+    with pytest.raises(
+        FileNotFoundError,
+        match="Workspace snapshot tar not found",
+    ):
         await verify_pull_request(
             pr={
                 "title": "PR",
