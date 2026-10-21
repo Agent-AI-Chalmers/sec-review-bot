@@ -96,3 +96,38 @@ def test_rejects_when_no_distinct_assignment_exists() -> None:
             _case(first, second),
             {"narratives": [_finding("A", "marker alpha"), _finding("B", "marker")]},
         )
+
+
+def test_unrelated_finding_between_candidates_does_not_break_assignment() -> None:
+    """Candidate indices follow the filtered finding list, not the raw narrative order.
+
+    A finding that is irrelevant to the individual requirements but still carries the shared
+    evidence stays in the candidate list, so requirement candidate indices can have gaps. Sizing
+    the assignment table by requirement count instead of finding count crashed on that gap.
+    """
+    shared = EvidenceRequirement(label="shared", any_of=["marker"])
+    first = _requirement("first", "alpha")
+    third = _requirement("third", "gamma")
+    case = IssueCase(
+        id="assignment-probe",
+        issue=IssueInput(title="probe", body="probe"),
+        oracle=IssueCaseOracle(
+            acceptable_verdicts={"confirmed-vulnerability"},
+            expected_mechanism="constructed for an assignment test",
+            required_evidence=[shared],
+            required_findings=[first, third],
+        ),
+    )
+
+    accepted = assert_issue_case_oracle(
+        case,
+        {
+            "narratives": [
+                _finding("A", "marker alpha"),
+                _finding("B", "marker"),
+                _finding("C", "marker gamma"),
+            ]
+        },
+    )
+
+    assert {finding["title"] for finding in accepted} == {"A", "C"}

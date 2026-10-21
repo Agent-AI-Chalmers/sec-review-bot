@@ -36,7 +36,8 @@ def _assign_requirements_to_findings(
     one-to-one assignment exists. This is Kuhn's augmenting-path search, which rearranges earlier
     assignments when a later requirement needs a contested finding.
     """
-    assigned_finding = [-1] * len(candidates)
+    # Indexed by finding, not by requirement: one slot per candidate finding.
+    assigned_finding = [-1] * finding_count
 
     def augment(requirement: int, visited: list[bool]) -> bool:
         for finding in candidates[requirement]:
