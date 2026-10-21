@@ -43,6 +43,7 @@ interface PublishedDeliveryEntryLike extends DeliveryLike {
 
 interface WorkflowResultLike {
   run_id?: string
+  deletion_review_skipped?: boolean
   scan_summary?: {
     scannable_file_count?: number
     scanned_file_count?: number
@@ -50,6 +51,7 @@ interface WorkflowResultLike {
     candidate_count?: number
     case_count?: number
     suppressed_candidate_count?: number
+    deleted_file_count?: number
   }
   cvss_summary?: {
     scored_case_count?: number
@@ -134,7 +136,10 @@ function buildScanSummaryView(
     skipped_file_count: numericField(summary.skipped_file_count),
     candidate_count: numericField(summary.candidate_count),
     case_count: numericField(summary.case_count),
-    suppressed_candidate_count: numericField(summary.suppressed_candidate_count)
+    suppressed_candidate_count: numericField(
+      summary.suppressed_candidate_count
+    ),
+    deleted_file_count: numericField(summary.deleted_file_count)
   }
 }
 
@@ -195,6 +200,7 @@ export function buildRepositorySummaryWorkflowView(
   const view: WorkflowResultLike & { run_id: string } = {
     run_id: String(options.run_id ?? 'unknown'),
     scan_summary: buildScanSummaryView(input.scan_summary),
+    deletion_review_skipped: input.deletion_review_skipped === true,
     case_results,
     cvss_summary: buildCvssSummaryFromCases(case_results)
   }
@@ -542,6 +548,7 @@ export function renderRepositorySecuritySummaryComment({
     `- Discovery candidates: ${inlineCode(scan_summary.candidate_count ?? 0)}`,
     `- Lightweight cases after triage: ${inlineCode(scan_summary.case_count ?? 0)}`,
     `- Suppressed candidates: ${inlineCode(scan_summary.suppressed_candidate_count ?? 0)}`,
+    `- Deleted files in window: ${inlineCode(scan_summary.deleted_file_count ?? 0)}`,
     `- Keep cases: ${inlineCode(keep_case_count)}`,
     `- Blocked confirmed cases: ${inlineCode(blockedConfirmedCaseCount)}`,
     `- Delivery PRs published this run: ${inlineCode(published_delivery_entries.length)}`,
@@ -559,6 +566,15 @@ export function renderRepositorySecuritySummaryComment({
     '### Scan Summary',
     ''
   ]
+
+  // Shown above the summary, not folded into it: a run whose deletions were never reviewed is a
+  // partial result, and a reader who skims this comment must not take it for a complete one.
+  if (workflow_result?.deletion_review_skipped === true) {
+    lines.push(
+      `> **Deletion review skipped.** This window deleted \`${scan_summary.deleted_file_count ?? 0}\` files, above the review limit, so none of them were reviewed. Narrow the window to cover them.`,
+      ''
+    )
+  }
 
   scanSummaryLines.push(
     `- Case CVSS severities: ${inlineCode(`critical=${cvss_severity_counts.critical ?? 0}`)}, ` +

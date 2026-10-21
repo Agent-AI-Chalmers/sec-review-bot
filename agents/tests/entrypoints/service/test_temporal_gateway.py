@@ -130,9 +130,11 @@ def _valid_workflow_result(workflow: str) -> dict:
                 "candidate_count": 0,
                 "case_count": 0,
                 "suppressed_candidate_count": 0,
+                "deleted_file_count": 0,
             },
             "case_results": [],
             "deliveries": [],
+            "deletion_review_skipped": False,
         }
     return {"contract_version": CONTRACT_VERSION, "review_record": review_record}
 
@@ -392,6 +394,11 @@ def fake_triage_repository(
             }
         ],
     }
+
+
+@activity.defn(name="window_deletion_summary_activity")
+def fake_window_deletion_summary(_request: InternalWorkflowRequest) -> dict:
+    return {"deleted_file_count": 0, "deletion_review_skipped": False}
 
 
 @activity.defn(name="prepare_repository_case_review_inputs_activity")
@@ -917,6 +924,7 @@ async def _run_temporal_backend_test(
                     fake_scan_repository_discovery_chunk,
                     fake_build_repository_discovery_result,
                     fake_triage_repository,
+                    fake_window_deletion_summary,
                     fake_prepare_repository_case_review_inputs,
                     fake_prepare_repository_case,
                     fake_analyze_repository_case,

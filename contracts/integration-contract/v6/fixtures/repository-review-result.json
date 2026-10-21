@@ -6,25 +6,9 @@
     "skipped_file_count": 0,
     "candidate_count": 2,
     "case_count": 1,
-    "suppressed_candidate_count": 1
+    "suppressed_candidate_count": 1,
+    "deleted_file_count": 0
   },
-  "deliveries": [
-    {
-      "delivery_id": "delivery-1",
-      "case_ids": [
-        "case-1"
-      ],
-      "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n--- a/src/webhook.ts\n+++ b/src/webhook.ts\n@@ -1 +1 @@\n-export function verifyRetrySignature() { return false }\n+export function verifyRetrySignature() { return true }\n",
-      "file_changes": [
-        {
-          "path": "src/webhook.ts",
-          "status": "upsert",
-          "content": "export function verifyRetrySignature() { return true }",
-          "content_encoding": "utf-8"
-        }
-      ]
-    }
-  ],
   "case_results": [
     {
       "case_id": "case-1",
@@ -65,5 +49,23 @@
         }
       }
     }
-  ]
+  ],
+  "deliveries": [
+    {
+      "delivery_id": "delivery-1",
+      "case_ids": [
+        "case-1"
+      ],
+      "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n--- a/src/webhook.ts\n+++ b/src/webhook.ts\n@@ -1 +1 @@\n-export function verifyRetrySignature() { return false }\n+export function verifyRetrySignature() { return true }\n",
+      "file_changes": [
+        {
+          "path": "src/webhook.ts",
+          "status": "upsert",
+          "content": "export function verifyRetrySignature() { return true }",
+          "content_encoding": "utf-8"
+        }
+      ]
+    }
+  ],
+  "deletion_review_skipped": false
 }

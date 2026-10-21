@@ -26,6 +26,7 @@ from sec_review_agents.workflows.repository.workflow import (
     prepare_repository_case_review_inputs_activity,
     scan_repository_discovery_chunk_activity,
     triage_repository_activity,
+    window_deletion_summary_activity,
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
 
@@ -50,9 +51,12 @@ async def run_repository_scan_direct(
 ) -> dict[str, Any]:
     discovery_result = await run_repository_discovery_direct(request)
     triage_result = await triage_repository_activity(request, discovery_result)
+    window_deletions = window_deletion_summary_activity(request)
     return {
         "discovery_result": discovery_result,
         "triage_result": triage_result,
+        # The scan's verdict on the window itself, taken before any case exists.
+        **window_deletions,
     }
 
 

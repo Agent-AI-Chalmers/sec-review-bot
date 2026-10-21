@@ -1,4 +1,3 @@
-import fnmatch
 import hashlib
 import os
 from collections.abc import Mapping, Sequence
@@ -26,6 +25,10 @@ from sec_review_agents.scan_stages.discovery.result import (
 )
 from sec_review_agents.utils.env import parse_int_env
 from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
+from sec_review_agents.utils.paths_ignore import (
+    matches_paths_ignore,
+    normalize_paths_ignore,
+)
 
 #########################################################################
 # ====================== File Filtering And Discovery Limits ============
@@ -158,50 +161,6 @@ def _classify_candidate_file(relative_path: Path) -> tuple[bool, str, str]:
     return True, "text-candidate", _path_language(relative_path)
 
 
-def _normalize_paths_ignore(raw_patterns: Any) -> list[str]:
-    if not isinstance(raw_patterns, list):
-        raise ValueError(
-            "Repository discovery requires scan_scope.paths_ignore to be a list."
-        )
-    normalized: list[str] = []
-    for index, item in enumerate(raw_patterns):
-        if not isinstance(item, str):
-            raise ValueError(
-                "Repository discovery requires scan_scope.paths_ignore"
-                f"[{index}] to be a string."
-            )
-        pattern = item.strip().replace("\\", "/")
-        if not pattern:
-            raise ValueError(
-                "Repository discovery requires scan_scope.paths_ignore"
-                f"[{index}] to be non-empty."
-            )
-        normalized.append(pattern)
-    return normalized
-
-
-def _matches_paths_ignore(relative_path: Path, patterns: list[str]) -> bool:
-    normalized_path = relative_path.as_posix()
-    for pattern in patterns:
-        normalized_pattern = pattern.replace("\\", "/")
-        if (
-            "*" not in normalized_pattern
-            and "?" not in normalized_pattern
-            and (
-                normalized_path == normalized_pattern
-                or normalized_path.startswith(f"{normalized_pattern}/")
-            )
-        ):
-            return True
-        if fnmatch.fnmatch(normalized_path, normalized_pattern):
-            return True
-        if not normalized_pattern.startswith("**/") and fnmatch.fnmatch(
-            normalized_path, f"**/{normalized_pattern}"
-        ):
-            return True
-    return False
-
-
 def _resolve_discovery_max_file_bytes() -> tuple[int, str]:
     env_max_file_bytes = parse_int_env(
         os.environ.get("AGENT_DISCOVERY_MAX_FILE_BYTES"), None
@@ -234,7 +193,9 @@ def _build_scan_manifest(
     discovery_artifacts_path: Path,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes()
-    paths_ignore = _normalize_paths_ignore(scan_scope.get("paths_ignore"))
+    paths_ignore = normalize_paths_ignore(
+        scan_scope.get("paths_ignore"), source="Repository discovery"
+    )
     entries: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
 
@@ -251,7 +212,7 @@ def _build_scan_manifest(
             )
             size_bytes = absolute_path.stat().st_size
 
-            if _matches_paths_ignore(relative_path, paths_ignore):
+            if matches_paths_ignore(relative_path, paths_ignore):
                 skipped.append(
                     {
                         "path": relative_path_text,
@@ -394,7 +355,7 @@ def _entry_from_incremental_record(
     exists_now = absolute_path.exists()
     size_bytes = absolute_path.stat().st_size if exists_now else 0
 
-    if _matches_paths_ignore(path_value, paths_ignore):
+    if matches_paths_ignore(path_value, paths_ignore):
         return None, {
             "path": normalized_path,
             "reason": "paths-ignore",
@@ -441,7 +402,9 @@ def _build_incremental_scan_manifest(
     discovery_artifacts_path: Path,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes()
-    paths_ignore = _normalize_paths_ignore(scan_scope.get("paths_ignore"))
+    paths_ignore = normalize_paths_ignore(
+        scan_scope.get("paths_ignore"), source="Repository discovery"
+    )
 
     entries: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []

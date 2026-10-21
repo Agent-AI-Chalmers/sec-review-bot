@@ -262,6 +262,16 @@ def _summary_from_replayed(case_id: str, replayed: dict[str, Any]) -> dict[str, 
     }
 
 
+def _deletion_review_skipped(result: dict[str, Any]) -> bool:
+    value = result.get("deletion_review_skipped")
+    if isinstance(value, bool):
+        return value
+    raise ValueError(
+        "Repository result is missing deletion_review_skipped; "
+        "replay cannot tell whether deletion review ran"
+    )
+
+
 def _repository_result_from_replay(
     *,
     result: dict[str, Any],
@@ -273,12 +283,16 @@ def _repository_result_from_replay(
         "scan_summary": (
             scan_summary
             if isinstance(scan_summary, dict)
-            else build_scan_summary(discovery_result=None, triage_result=None)
+            else build_scan_summary(scan_result=None)
         ),
         "deliveries": [
             item for item in (result.get("deliveries") or []) if isinstance(item, dict)
         ],
         "case_results": case_results,
+        # Rebuilt results satisfy the same contract as a live run, including this field. A missing
+        # value is not "review ran": it means the source result predates the field, and guessing
+        # false would turn an unreviewed window into a reviewed one.
+        "deletion_review_skipped": _deletion_review_skipped(result),
     }
 
 

@@ -300,8 +300,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
         ]
 
         result = build_repository_workflow_result(
-            discovery_result={},
-            triage_result={},
+            scan_result={"discovery_result": {}, "triage_result": {}},
             delivery_result=None,
             case_results=case_results,
         )
@@ -839,8 +838,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
     def test_workflow_result_includes_confirmed_unresolved_case_summaries(self) -> None:
         result = build_repository_workflow_result(
-            discovery_result={},
-            triage_result={},
+            scan_result={"discovery_result": {}, "triage_result": {}},
             delivery_result=None,
             case_results=[
                 {

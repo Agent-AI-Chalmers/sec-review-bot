@@ -184,8 +184,7 @@ def test_repository_result_public_shape() -> None:
         },
     }
     result = build_repository_workflow_result(
-        discovery_result={},
-        triage_result={},
+        scan_result={"discovery_result": {}, "triage_result": {}},
         delivery_result={
             "deliveries": [{"delivery_id": "delivery-1"}],
             "caseDeliveryAssignments": {"case-1": {"status": "single"}},
@@ -202,19 +201,21 @@ def test_repository_result_public_shape() -> None:
 
 def test_repository_workflow_result_builder_output_matches_shared_v6_schema() -> None:
     result = build_repository_workflow_result(
-        discovery_result={
-            "counts": {
-                "scannable_file_count": 12,
-                "scanned_file_count": 12,
-                "skipped_file_count": 0,
-                "candidate_count": 2,
-            }
-        },
-        triage_result={
-            "counts": {
-                "case_count": 1,
-                "suppressed_candidate_count": 1,
-            }
+        scan_result={
+            "discovery_result": {
+                "counts": {
+                    "scannable_file_count": 12,
+                    "scanned_file_count": 12,
+                    "skipped_file_count": 0,
+                    "candidate_count": 2,
+                }
+            },
+            "triage_result": {
+                "counts": {
+                    "case_count": 1,
+                    "suppressed_candidate_count": 1,
+                }
+            },
         },
         delivery_result={
             "deliveries": [
@@ -298,8 +299,7 @@ def test_repository_case_results_drop_internal_case_fields() -> None:
     }
 
     result = build_repository_workflow_result(
-        discovery_result={},
-        triage_result={},
+        scan_result={"discovery_result": {}, "triage_result": {}},
         delivery_result=None,
         case_results=[case_result],
     )
@@ -318,8 +318,7 @@ def test_repository_case_results_drop_internal_case_fields() -> None:
 
 def test_repository_case_results_normalize_partial_review_record_shape() -> None:
     result = build_repository_workflow_result(
-        discovery_result={},
-        triage_result={},
+        scan_result={"discovery_result": {}, "triage_result": {}},
         delivery_result=None,
         case_results=[
             {
@@ -347,8 +346,7 @@ def test_repository_case_results_normalize_partial_review_record_shape() -> None
 
 def test_repository_case_result_reason_is_always_present_and_nullable() -> None:
     result = build_repository_workflow_result(
-        discovery_result={},
-        triage_result={},
+        scan_result={"discovery_result": {}, "triage_result": {}},
         delivery_result=None,
         case_results=[
             {
@@ -371,8 +369,7 @@ def test_repository_case_result_reason_is_always_present_and_nullable() -> None:
 
 def test_repository_blocked_case_result_keeps_required_review_record() -> None:
     result = build_repository_workflow_result(
-        discovery_result={},
-        triage_result={},
+        scan_result={"discovery_result": {}, "triage_result": {}},
         delivery_result=None,
         case_results=[
             {
@@ -400,8 +397,7 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
 def test_repository_case_result_defaults_missing_review_record_to_not_run() -> None:
     """A public case result must carry a schema-valid review_record, never null."""
     result = build_repository_workflow_result(
-        discovery_result={},
-        triage_result={},
+        scan_result={"discovery_result": {}, "triage_result": {}},
         delivery_result=None,
         case_results=[
             {
@@ -442,8 +438,7 @@ def test_repository_case_result_rejects_a_null_public_identity(
     """
     with pytest.raises(ValidationError):
         build_repository_workflow_result(
-            discovery_result={},
-            triage_result={},
+            scan_result={"discovery_result": {}, "triage_result": {}},
             delivery_result=None,
             case_results=[case],
         )

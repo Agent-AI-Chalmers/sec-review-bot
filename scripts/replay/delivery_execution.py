@@ -51,7 +51,22 @@ def _previous_scan_summary(result: dict[str, Any]) -> dict[str, Any]:
     value = result.get("scan_summary")
     if isinstance(value, dict):
         return value
-    return build_scan_summary(discovery_result=None, triage_result=None)
+    return build_scan_summary(scan_result=None)
+
+
+def _previous_deletion_review_skipped(result: dict[str, Any]) -> bool:
+    """Carry the original verdict on whether deletion review ran.
+
+    The schema requires the field, and the delivery replay cannot recompute it: neither the
+    delivery plan nor the case results say anything about the window. Absent means the source
+    result predates the field, which this script cannot repair by guessing.
+    """
+    value = result.get("deletion_review_skipped")
+    if isinstance(value, bool):
+        return value
+    raise ValueError(
+        "Repository result is missing deletion_review_skipped; replay cannot infer it"
+    )
 
 
 def _repository_result_from_delivery_replay(
@@ -69,6 +84,7 @@ def _repository_result_from_delivery_replay(
             if isinstance(item, dict)
         ],
         "case_results": case_results,
+        "deletion_review_skipped": _previous_deletion_review_skipped(previous_result),
     }
 
 

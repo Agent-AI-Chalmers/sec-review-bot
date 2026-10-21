@@ -21,6 +21,7 @@ from sec_review_agents.utils.env import (
 from sec_review_agents.utils.files import persist_json
 from sec_review_agents.workflows.repository.case_execution_input import (
     prepare_case_execution_input,
+    window_deletion_summary,
 )
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
@@ -61,6 +62,59 @@ def _load_existing_result(run_artifacts: Path) -> dict[str, Any] | None:
         return None
     result = read_json(result_path)
     return result if isinstance(result.get("case_results"), list) else None
+
+
+def _window_deletions(
+    *,
+    existing_result: dict[str, Any],
+    replay_input: dict[str, Any],
+) -> dict[str, Any]:
+    """Return the window's deletion reading for the rebuilt result.
+
+    Neither discovery nor triage sees a deletion, so rebuilding from those stages alone would
+    report zero deleted files and an unreviewed window as reviewed. The previous result is
+    therefore the source of truth when it exists, and is cross-checked against the window the
+    run was started with: a disagreement means the artifacts describe different windows, which
+    is not something to paper over. With no previous result -- the first run of this replay --
+    the reading is recomputed from that same window.
+    """
+    recomputed = window_deletion_summary(
+        scan_scope=replay_input.get("scan_scope") or {},
+        scan_mode=str((replay_input.get("scan_target") or {}).get("scan_mode") or ""),
+    )
+    scan_summary = existing_result.get("scan_summary")
+    deleted_file_count = (
+        scan_summary.get("deleted_file_count")
+        if isinstance(scan_summary, dict)
+        else None
+    )
+    skipped = existing_result.get("deletion_review_skipped")
+    if deleted_file_count is None and skipped is None:
+        return recomputed
+    if (
+        isinstance(deleted_file_count, bool)
+        or not isinstance(deleted_file_count, int)
+        or not isinstance(skipped, bool)
+    ):
+        raise TypeError(
+            "Repository result carries an incomplete deletion reading "
+            "(scan_summary.deleted_file_count, deletion_review_skipped); "
+            "replay cannot tell whether deletion review ran"
+        )
+    if (
+        deleted_file_count != recomputed["deleted_file_count"]
+        or skipped != recomputed["deletion_review_skipped"]
+    ):
+        raise ValueError(
+            "Repository result disagrees with the window it was started from: "
+            f"result says {deleted_file_count} deleted / skipped={skipped}, "
+            f"window says {recomputed['deleted_file_count']} deleted / "
+            f"skipped={recomputed['deletion_review_skipped']}"
+        )
+    return {
+        "deleted_file_count": deleted_file_count,
+        "deletion_review_skipped": skipped,
+    }
 
 
 def _case_id(case: dict[str, Any]) -> str:
@@ -293,8 +347,17 @@ async def main() -> None:
     ]
     status = "completed" if len(ordered_case_results) == len(cases) else "in-progress"
     workflow_result = build_repository_workflow_result(
-        discovery_result=discovery_result,
-        triage_result=triage_result,
+        scan_result={
+            "discovery_result": discovery_result,
+            "triage_result": triage_result,
+            # Deletion counts are a reading of the window, not of discovery or triage, so they
+            # survive only in the previous result. Rebuilding without them would turn a window
+            # whose deletions were skipped into one that claims they were reviewed.
+            **_window_deletions(
+                existing_result=existing_result,
+                replay_input=replay_input,
+            ),
+        },
         delivery_result=None,
         case_results=ordered_case_results,
     )

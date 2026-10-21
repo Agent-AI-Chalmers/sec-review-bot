@@ -40,6 +40,9 @@ class ScanSummary(BaseModel):
     candidate_count: int = 0
     case_count: int = 0
     suppressed_candidate_count: int = 0
+    # Files the window removed. Reported here because it explains why an incremental run found
+    # little: deletions never reach discovery, which has no current content to read for them.
+    deleted_file_count: int = 0
 
     model_config = ConfigDict(extra="ignore")
 
@@ -54,6 +57,10 @@ class RepositoryWorkflowResult(BaseModel):
     scan_summary: ScanSummary
     deliveries: list[dict[str, Any]] = Field(default_factory=list)
     case_results: list[RepositoryCaseResult] = Field(default_factory=list)
+    # A window with more deletions than review covers skips deletion review for all of them. The
+    # count is in scan_summary; this says whether it was acted on, so a run whose deletions went
+    # unreviewed cannot read as an ordinary success.
+    deletion_review_skipped: bool = False
 
     model_config = ConfigDict(extra="ignore")
 
@@ -111,11 +118,20 @@ def _repository_case_results(
 
 def build_scan_summary(
     *,
-    discovery_result: Mapping[str, Any] | None,
-    triage_result: Mapping[str, Any] | None,
+    scan_result: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    discovery_counts = mapping_payload(mapping_payload(discovery_result).get("counts"))
-    triage_counts = mapping_payload(mapping_payload(triage_result).get("counts"))
+    """Project the scan stage results into the published summary.
+
+    Everything counted here is something the scan observed about the window, so it is read from
+    the scan result rather than passed alongside it.
+    """
+    scan = mapping_payload(scan_result)
+    discovery_counts = mapping_payload(
+        mapping_payload(scan.get("discovery_result")).get("counts")
+    )
+    triage_counts = mapping_payload(
+        mapping_payload(scan.get("triage_result")).get("counts")
+    )
     return ScanSummary.model_validate(
         {
             "scannable_file_count": discovery_counts.get("scannable_file_count"),
@@ -126,27 +142,34 @@ def build_scan_summary(
             "suppressed_candidate_count": triage_counts.get(
                 "suppressed_candidate_count"
             ),
+            "deleted_file_count": scan.get("deleted_file_count"),
         }
     ).model_dump(mode="json")
 
 
 def build_repository_workflow_result(
     *,
-    discovery_result: Mapping[str, Any] | None,
-    triage_result: Mapping[str, Any] | None,
+    scan_result: Mapping[str, Any] | None,
     delivery_result: Mapping[str, Any] | None,
     case_results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    repository_case_results = _repository_case_results(case_results)
-    repository_scan_summary = build_scan_summary(
-        discovery_result=discovery_result,
-        triage_result=triage_result,
-    )
+    """Assemble the published result from the run's stage outputs.
+
+    Every input is a stage output, so nothing about the window arrives here as a loose argument
+    that the stages never produced.
+    """
+    scan = mapping_payload(scan_result)
+    # The window's deletion reading is produced by the scan but published in two places, and each
+    # placement is deliberate. The count belongs in scan_summary with the other counts. The skip
+    # flag cannot join it there: scan_summary is counts only, and a boolean would break that
+    # shape. It is published at the top level instead, where a consumer reading only the summary
+    # numbers cannot mistake an unreviewed window for a reviewed one.
     return RepositoryWorkflowResult.model_validate(
         {
             "contract_version": CONTRACT_VERSION,
-            "scan_summary": repository_scan_summary,
+            "scan_summary": build_scan_summary(scan_result=scan_result),
             "deliveries": _repository_deliveries(delivery_result),
-            "case_results": repository_case_results,
+            "case_results": _repository_case_results(case_results),
+            "deletion_review_skipped": bool(scan.get("deletion_review_skipped")),
         }
     ).model_dump(mode="json")

@@ -26,6 +26,10 @@ export interface RepositoryWorkflowResult {
   scan_summary: Record<string, unknown>
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]
+  // True when the window removed more files than deletion review covers. The schema makes it
+  // required, and the published comment has to show it: an unreviewed window otherwise reads
+  // exactly like a reviewed one.
+  deletion_review_skipped: boolean
 }
 
 function requirePublishableFileChanges(file_changes: FileChange[]): void {

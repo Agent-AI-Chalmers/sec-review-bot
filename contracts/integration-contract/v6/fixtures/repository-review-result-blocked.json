@@ -6,7 +6,8 @@
     "skipped_file_count": 0,
     "candidate_count": 1,
     "case_count": 1,
-    "suppressed_candidate_count": 0
+    "suppressed_candidate_count": 0,
+    "deleted_file_count": 0
   },
   "case_results": [
     {
@@ -51,5 +52,6 @@
       }
     }
   ],
-  "deliveries": []
+  "deliveries": [],
+  "deletion_review_skipped": false
 }
