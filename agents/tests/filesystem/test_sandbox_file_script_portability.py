@@ -63,14 +63,6 @@ SANDBOX_SCRIPTS = (
 )
 
 
-def _parses(source: str, version: tuple[int, int]) -> bool:
-    try:
-        ast.parse(source, feature_version=version)
-    except SyntaxError:
-        return False
-    return True
-
-
 # Every version from a script's floor up to the interpreter running this test. A sandbox may run
 # any of them, and deriving the range means a host upgrade cannot silently leave a version
 # untested.
@@ -92,4 +84,4 @@ def test_sandbox_script_parses_on_every_supported_python(
     only from 3.14. Every host test kept passing while the sandbox could no longer list files, and
     the declared floor is the version such a rewrite would break.
     """
-    assert _parses(script.build_source(), (3, minor))
+    ast.parse(script.build_source(), feature_version=(3, minor))

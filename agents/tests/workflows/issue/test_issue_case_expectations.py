@@ -11,9 +11,9 @@ from tests.workflows.issue.cases.loader import load_issue_cases
 from tests.workflows.issue.cases.models import CaseExpectation, IssueCase
 from tests.workflows.issue.cases.runner import assert_issue_case_oracle
 
-CASES_BY_ID: dict[str, IssueCase] = {case.id: case for case in load_issue_cases()}
+CASES: tuple[IssueCase, ...] = load_issue_cases()
 EXAMPLES: list[tuple[IssueCase, CaseExpectation]] = [
-    (case, example) for case in CASES_BY_ID.values() for example in case.expectations
+    (case, example) for case in CASES for example in case.expectations
 ]
 
 
@@ -23,7 +23,6 @@ EXAMPLES: list[tuple[IssueCase, CaseExpectation]] = [
     ids=[f"{case.id}-{example.name}" for case, example in EXAMPLES],
 )
 def test_issue_case_expectation(case: IssueCase, example: CaseExpectation) -> None:
-
     if example.expected == "rejected":
         with pytest.raises(AssertionError):
             assert_issue_case_oracle(case, example.result)

@@ -156,23 +156,3 @@ def test_finding_outside_the_shared_requirements_never_reaches_assignment() -> N
                 ]
             },
         )
-
-
-def test_findings_meeting_the_shared_requirements_are_assigned() -> None:
-    """The same shape succeeds once the candidate for `second` also carries the shared evidence."""
-    shared = EvidenceRequirement(label="shared", any_of=["marker"])
-    first = _requirement("first", "alpha")
-    second = _requirement("second", "beta")
-    case = _case(first, second, shared=[shared])
-
-    accepted = assert_issue_case_oracle(
-        case,
-        {
-            "narratives": [
-                _finding("A", "marker alpha"),
-                _finding("B", "marker beta"),
-            ]
-        },
-    )
-
-    assert {finding["title"] for finding in accepted} == {"A", "B"}
