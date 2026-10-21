@@ -8,11 +8,21 @@
 
 一次 pull request 审查 run 会物化三个都用来描述同一份变更的产物：
 
-- `changed-files.json`：限定分析范围的文件列表；
-- `incremental.patch`：analyzer 作为主要证据读取的 diff；
-- 用于锚定 inline suggestion 和 mitigation patch 的 `files` 集合。
+- `changed-files.json`：该窗口的文件列表；
+- `incremental.patch`：该窗口的 diff；
+- 输入中的 `files` 集合，是另一份导出，用于锚定 inline suggestion 和 mitigation patch。
 
-如果这三者描述的是不同的变更窗口，这次 run 就是自相矛盾的。analyzer prompt 要求模型**首先**从 `incremental.patch` 和 `changed-files.json` 推导因果关系，并且只保留与变更文件相关的结论。当两者不一致时，任何 prompt 措辞都无法挽救结果：模型要么因为文件列表里没有而抑制真实的变更，要么产出修复阶段无法锚定到任何 suggestion 目标的结论。
+如果这三者描述的是不同的变更窗口，这次 run 就是自相矛盾的。
+
+### agent 如何得知窗口
+
+agent 通过 workspace 里的 git 读取窗口，边界取自本次 run 自己的范围，并只保留与那里发生的变化相关的结论。git 持有窗口的两端，能回答与 patch 相同的问题，同时允许 agent 只读它需要的那部分改动，而不是一份完整的预渲染 diff：小改动一条命令即可，大改动本来也无法从头读到尾。
+
+### 产物为什么保留
+
+`changed-files.json` 与 `incremental.patch` 是本次 run 审过什么的稳定记录，不必依赖仓库状态重建窗口即可查看。这是 run 自身的属性，不取决于任何消费者，也就不受“让 agent 读什么”影响。
+
+suggestion 锚定是另一件事，它使用输入中的 `files` 集合，由输入准备阶段与 patch 一起导出。
 
 本文记录窗口语义、所涉 GitHub API 的实测行为、审查工具生态的通行做法，以及本项目最终采用的契约。
 

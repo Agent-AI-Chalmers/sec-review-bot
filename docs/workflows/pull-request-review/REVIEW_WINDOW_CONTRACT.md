@@ -6,11 +6,21 @@ Language: English | [中文](REVIEW_WINDOW_CONTRACT.zh.md)
 
 A pull request review run materializes three artifacts that all describe the same change:
 
-- `changed-files.json`, the file list that scopes the analysis;
-- `incremental.patch`, the diff the analyzer reads as primary evidence;
-- the `files` collection that anchors inline suggestions and mitigation patches.
+- `changed-files.json`, the file list for the window;
+- `incremental.patch`, the diff of that window;
+- the input's `files` collection, the separate export that anchors inline suggestions and mitigation patches.
 
-If those three describe different change windows, the run is internally inconsistent. The analyzer prompt instructs the model to derive causality from `incremental.patch` and `changed-files.json` **first** and to keep only findings tied to changed files. When the two disagree, no prompt wording can repair the result: the model either suppresses real changes because they are absent from the file list, or produces findings that the remediation stage cannot anchor to any suggestion target.
+If those three describe different change windows, the run is internally inconsistent.
+
+### How an agent learns the window
+
+An agent reads the window through git in the workspace, using the run's own range boundaries, and keeps only findings tied to what changed there. Git holds both ends of the window, so it answers the same question the patch does, while letting an agent read the part of a change it needs rather than a whole rendered diff: a small change takes one command, and a large change cannot be read end to end.
+
+### Why the artifacts stay
+
+`changed-files.json` and `incremental.patch` are a stable record of what a run reviewed, readable without reconstructing the window from repository state. That is a property of the run, not of any consumer, so it holds regardless of what an agent is told to read.
+
+Suggestion anchoring is a separate concern and uses the input's `files` collection, which input preparation exports alongside the patch.
 
 This document records the window semantics, the measured behavior of the GitHub APIs involved, what the review tooling ecosystem does, and the contract this project adopts.
 
