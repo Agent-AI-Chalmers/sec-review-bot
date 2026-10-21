@@ -468,7 +468,9 @@ export async function materializeWorkspaceWithCommitHistory({
     workspace_path,
     git_remote_url: git_remote_url.trim(),
     refs: normalizedRefs,
-    ...(normalizedWindowBaseSha ? { window_base_sha: normalizedWindowBaseSha } : {}),
+    ...(normalizedWindowBaseSha
+      ? { window_base_sha: normalizedWindowBaseSha }
+      : {}),
     ...(git_auth_token ? { git_auth_token } : {})
   })
 }
