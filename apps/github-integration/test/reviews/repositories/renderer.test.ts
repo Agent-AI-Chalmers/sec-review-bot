@@ -449,7 +449,6 @@ test('repository summary notes shared modified files across deliveries', () => {
   assert.doesNotMatch(body, /Shared modified file `Dockerfile`/)
 })
 
-
 test('repository renderer warns when deletion review was skipped', () => {
   // A window over the deletion limit is a partial result that still completes successfully.
   // If the comment looks the same as a fully reviewed run, a reader has no way to know that none
@@ -476,7 +475,8 @@ test('repository renderer warns when deletion review was skipped', () => {
   assert.match(body, /`250` files/)
   // The warning sits above the summary details, so skimming the top of the comment shows it.
   assert.ok(
-    body.indexOf('Deletion review skipped') < body.indexOf('Scan summary details')
+    body.indexOf('Deletion review skipped') <
+      body.indexOf('Scan summary details')
   )
   assert.match(body, /Deleted files in window: `250`/)
 })

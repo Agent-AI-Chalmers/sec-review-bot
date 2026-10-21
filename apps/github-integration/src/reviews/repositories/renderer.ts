@@ -136,7 +136,9 @@ function buildScanSummaryView(
     skipped_file_count: numericField(summary.skipped_file_count),
     candidate_count: numericField(summary.candidate_count),
     case_count: numericField(summary.case_count),
-    suppressed_candidate_count: numericField(summary.suppressed_candidate_count),
+    suppressed_candidate_count: numericField(
+      summary.suppressed_candidate_count
+    ),
     deleted_file_count: numericField(summary.deleted_file_count)
   }
 }
