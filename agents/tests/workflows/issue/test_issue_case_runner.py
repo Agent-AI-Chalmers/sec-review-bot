@@ -24,13 +24,22 @@ def _requirement(label: str, pattern: str) -> FindingRequirement:
     )
 
 
-def _case(*requirements: FindingRequirement) -> IssueCase:
+def _case(
+    *requirements: FindingRequirement,
+    shared: list[EvidenceRequirement] | None = None,
+) -> IssueCase:
+    """Build a case whose oracle only carries the assignment inputs under test.
+
+    `shared` is the evidence every accepted finding must carry, as opposed to the per-requirement
+    evidence that selects which finding satisfies which requirement.
+    """
     return IssueCase(
         id="assignment-probe",
         issue=IssueInput(title="probe", body="probe"),
         oracle=IssueCaseOracle(
             acceptable_verdicts={"confirmed-vulnerability"},
             expected_mechanism="constructed for an assignment test",
+            required_evidence=shared or [],
             required_findings=list(requirements),
         ),
     )
@@ -108,19 +117,9 @@ def test_unrelated_finding_between_candidates_does_not_break_assignment() -> Non
     shared = EvidenceRequirement(label="shared", any_of=["marker"])
     first = _requirement("first", "alpha")
     third = _requirement("third", "gamma")
-    case = IssueCase(
-        id="assignment-probe",
-        issue=IssueInput(title="probe", body="probe"),
-        oracle=IssueCaseOracle(
-            acceptable_verdicts={"confirmed-vulnerability"},
-            expected_mechanism="constructed for an assignment test",
-            required_evidence=[shared],
-            required_findings=[first, third],
-        ),
-    )
 
     accepted = assert_issue_case_oracle(
-        case,
+        _case(first, third, shared=[shared]),
         {
             "narratives": [
                 _finding("A", "marker alpha"),
