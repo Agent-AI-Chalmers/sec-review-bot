@@ -21,6 +21,7 @@ newer runtime API is avoided. Pair this with the rule that these scripts stay de
 """
 
 import ast
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -82,14 +83,19 @@ def test_sandbox_script_parses_on_its_minimum_python(script: SandboxScript) -> N
     assert _parses(script.build_source(), script.minimum_python)
 
 
-@pytest.mark.parametrize(
-    "script", SANDBOX_SCRIPTS, ids=[script.name for script in SANDBOX_SCRIPTS]
-)
-@pytest.mark.parametrize("minor", [11, 12, 13])
+# Every version from a script's floor up to the interpreter running this test. A sandbox may run
+# any of them, and deriving the range means a host upgrade cannot silently leave a version
+# untested.
+INTERMEDIATE_CASES = [
+    pytest.param(script, minor, id=f"{script.name}-3.{minor}")
+    for script in SANDBOX_SCRIPTS
+    for minor in range(script.minimum_python[1], sys.version_info.minor + 1)
+]
+
+
+@pytest.mark.parametrize(("script", "minor"), INTERMEDIATE_CASES)
 def test_sandbox_script_parses_on_every_intermediate_python(
     script: SandboxScript, minor: int
 ) -> None:
     """A sandbox may run any version between the declared floor and the host interpreter."""
-    if (3, minor) < script.minimum_python:
-        pytest.skip("below this script's declared floor")
     assert _parses(script.build_source(), (3, minor))
