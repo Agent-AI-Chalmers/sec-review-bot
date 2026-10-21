@@ -377,6 +377,22 @@ export class ReviewRunStore {
   } = {}) {
     this.onDroppedRunRow = onDroppedRunRow
     this.pool = pool ?? new Pool({ connectionString })
+    // `pg` emits `error` on the pool when an idle client loses its connection, and an
+    // EventEmitter that emits `error` without a listener throws. A database restart, a
+    // network blip, or the server reaping an idle connection would therefore kill this
+    // process -- taking down every other compose service with it, because the deployment
+    // runs `up --abort-on-container-failure`.
+    //
+    // The event carries no query to fail: the client that died was idle, so whoever needed
+    // it next will get a fresh connection or a normal query error. Log it and keep running
+    // rather than treating a recoverable pool event as a fatal process error.
+    //
+    // Only the message is logged. Printing the Error itself expands the whole pg client --
+    // socket, buffer state, type parsers -- into hundreds of lines per connection, and a
+    // restart severs every pooled connection at once.
+    this.pool.on('error', (error: Error) => {
+      console.error('control_plane_pool_idle_client_error', error.message)
+    })
     this.connectorId = connectorId
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
     this.preparations = new PreparationStore(
