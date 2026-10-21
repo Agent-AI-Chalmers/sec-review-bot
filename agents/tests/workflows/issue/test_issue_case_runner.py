@@ -130,3 +130,49 @@ def test_unrelated_finding_between_candidates_does_not_break_assignment() -> Non
     )
 
     assert {finding["title"] for finding in accepted} == {"A", "C"}
+
+
+def test_finding_outside_the_shared_requirements_never_reaches_assignment() -> None:
+    """Assignment only sees findings that already satisfy the shared evidence and locations.
+
+    The shared fields describe the shape every accepted finding must carry; per-requirement
+    evidence only chooses among findings that already carry it. Here the only finding holding
+    requirement `second`'s evidence lacks the shared evidence, so the run must fail rather than
+    assign it -- a finding that fails the shared conditions is not evidence of anything.
+    """
+    shared = EvidenceRequirement(label="shared", any_of=["marker"])
+    first = _requirement("first", "alpha")
+    second = _requirement("second", "beta")
+    case = _case(first, second, shared=[shared])
+
+    with pytest.raises(AssertionError, match=r"second -> \[\]"):
+        assert_issue_case_oracle(
+            case,
+            {
+                "narratives": [
+                    _finding("A", "marker alpha"),
+                    _finding("B", "marker"),
+                    _finding("C", "beta"),
+                ]
+            },
+        )
+
+
+def test_findings_meeting_the_shared_requirements_are_assigned() -> None:
+    """The same shape succeeds once the candidate for `second` also carries the shared evidence."""
+    shared = EvidenceRequirement(label="shared", any_of=["marker"])
+    first = _requirement("first", "alpha")
+    second = _requirement("second", "beta")
+    case = _case(first, second, shared=[shared])
+
+    accepted = assert_issue_case_oracle(
+        case,
+        {
+            "narratives": [
+                _finding("A", "marker alpha"),
+                _finding("B", "marker beta"),
+            ]
+        },
+    )
+
+    assert {finding["title"] for finding in accepted} == {"A", "B"}
