@@ -18,7 +18,6 @@ def build_prompt(**pr_overrides: Any) -> str:
     }
     return build_pr_analyzer_user_prompt(
         pr=pr,
-        diff_metadata={"changed_file_count": 0, "files": []},
     )
 
 

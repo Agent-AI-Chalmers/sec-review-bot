@@ -1,0 +1,38 @@
+{
+  "examples": [
+    {
+      "name": "accepts a reused nonce and its consequence",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "A constant nonce is reused for every message, so the same key and nonce pair breaks confidentiality and allows tag forgery.",
+            "locations": [
+              {
+                "file": "src/encryption.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects nonce reuse with no stated consequence",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "The nonce is reused across messages.",
+            "locations": [
+              {
+                "file": "src/encryption.py"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

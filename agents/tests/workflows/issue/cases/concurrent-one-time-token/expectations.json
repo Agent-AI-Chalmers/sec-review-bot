@@ -1,0 +1,38 @@
+{
+  "examples": [
+    {
+      "name": "accepts a non-atomic consume that lets both callers proceed",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "The token check is non-atomic, so both concurrent requests proceed and the token is consumed twice.",
+            "locations": [
+              {
+                "file": "src/tokens.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a race claim with no invariant violation",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "There is a race in the check but every caller still waits its turn.",
+            "locations": [
+              {
+                "file": "src/tokens.py"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

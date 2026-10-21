@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from tests.workflows.issue.cases.models import IssueCase
+from tests.workflows.issue.cases.models import IssueCase, IssueCaseExpectations
 
 ISSUE_CASES = Path(__file__).parent
 
@@ -35,6 +35,16 @@ def load_issue_cases() -> tuple[IssueCase, ...]:
             raise AssertionError(
                 f"unknown required locations for {case.id}: {missing_locations}"
             )
+        expectations_path = case_path.parent / "expectations.json"
+        if not expectations_path.is_file():
+            raise AssertionError(f"missing expectations.json for {case.id}")
+        try:
+            expectations = IssueCaseExpectations.model_validate_json(
+                expectations_path.read_text(encoding="utf-8")
+            )
+        except ValidationError as exc:
+            raise AssertionError(f"invalid expectations for {case.id}: {exc}") from exc
+        case._expectations = expectations.examples
         seen_ids.add(case.id)
         cases.append(case)
     if not cases:

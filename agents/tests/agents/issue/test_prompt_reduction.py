@@ -239,7 +239,6 @@ def test_retry_pr_verification_prompt_inlines_original_pr_text() -> None:
         analysis_result={"overview": "analysis"},
         mitigation_result={"overview": "new mitigation"},
         workspace_patch=WORKSPACE_PATCH,
-        diff_metadata={"files": []},
     )
 
     assert "# Pull Request Text" in prompt
@@ -273,7 +272,6 @@ def test_initial_pr_verification_prompt_omits_narratives_section() -> None:
         },
         mitigation_result={"overview": "new mitigation"},
         workspace_patch=WORKSPACE_PATCH,
-        diff_metadata={"files": []},
     )
 
     assert "Analysis Summary" in prompt

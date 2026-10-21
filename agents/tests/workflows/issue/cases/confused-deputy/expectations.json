@@ -1,0 +1,38 @@
+{
+  "examples": [
+    {
+      "name": "accepts a broker that ignores delegated scope",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-defect",
+            "overview": "The broker uses organization-wide authority and does not bind the target to the caller's delegated scope.",
+            "locations": [
+              {
+                "file": "src/export_broker.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a finding that names only the broad authority",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-defect",
+            "overview": "The broker has organization-wide authority.",
+            "locations": [
+              {
+                "file": "src/export_broker.py"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

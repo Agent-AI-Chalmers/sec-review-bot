@@ -129,7 +129,6 @@ def build_pr_mitigation_user_prompt(
     pr: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None,
     analysis_result: Mapping[str, Any],
-    diff_metadata: Mapping[str, Any],
 ) -> str:
     feedback_retry = mitigation_feedback_retry_context(retry_context)
     title = pr.get("title")
@@ -188,12 +187,6 @@ def build_pr_mitigation_user_prompt(
                 ),
                 "commit_shas": pr.get("commit_shas") or [],
             },
-            profile="prompt",
-        ),
-        "",
-        render_structured_markdown_section(
-            "Pull Request Diff Metadata",
-            diff_metadata,
             profile="prompt",
         ),
     ]

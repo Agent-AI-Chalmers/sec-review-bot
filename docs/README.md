@@ -13,6 +13,7 @@ For a project overview, start with the repository [README](../README.md).
 Use these docs when you need agent boundaries, capabilities, or framework decisions.
 
 - [CAPABILITY_BOUNDARIES.md](agent/CAPABILITY_BOUNDARIES.md): Agent capability boundaries, including git-history and external-state limits.
+- [CONTEXT_DELIVERY.md](agent/CONTEXT_DELIVERY.md): Which context an agent receives in its prompt and which it reads on demand, and how each agent here chooses.
 - [SKILLS.md](agent/SKILLS.md): Agent skills selection, preparation, and mounting.
 - [FRAMEWORK_SELECTION.md](agent/FRAMEWORK_SELECTION.md): Agent framework selection.
 - [MEMORY_SYSTEM.md](agent/MEMORY_SYSTEM.md): Agent experience memory extraction and maintenance.

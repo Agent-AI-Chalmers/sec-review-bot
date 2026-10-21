@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
@@ -55,6 +55,27 @@ class IssueCaseOracle(BaseModel):
         return values
 
 
+class CaseExpectation(BaseModel):
+    """One worked example of what the oracle should do with a result.
+
+    `accepted` requires at least one finding to satisfy the oracle; `rejected` requires none to.
+    The issue oracle has no third outcome: it never fails a run for a finding that merely appears,
+    so unlike the pull request oracle there is no `forbidden` verdict to express.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    expected: Literal["accepted", "rejected"]
+    result: dict[str, Any]
+
+
+class IssueCaseExpectations(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    examples: list[CaseExpectation] = Field(min_length=1)
+
+
 class IssueCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -63,6 +84,7 @@ class IssueCase(BaseModel):
     oracle: IssueCaseOracle
 
     _directory: Path = PrivateAttr()
+    _expectations: list[CaseExpectation] = PrivateAttr(default_factory=list)
 
     @field_validator("id")
     @classmethod
@@ -70,6 +92,11 @@ class IssueCase(BaseModel):
         if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value):
             raise ValueError("must use lowercase kebab-case")
         return value
+
+    @property
+    def expectations(self) -> list[CaseExpectation]:
+        """Worked examples of this case's oracle, kept beside the oracle they describe."""
+        return self._expectations
 
     @property
     def workspace_source(self) -> Path:

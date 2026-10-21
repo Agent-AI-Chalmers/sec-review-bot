@@ -9,9 +9,6 @@ from sec_review_agents.review_stages.verification.stage import (
     verification_attempt_label,
 )
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
-from sec_review_agents.workflows.pull_request.incremental_window import (
-    load_pr_diff_metadata,
-)
 
 
 async def verify_pull_request(
@@ -33,7 +30,6 @@ async def verify_pull_request(
         verifier_artifacts_path,
         attempt_label=attempt_label,
     )
-    diff_metadata = load_pr_diff_metadata(incremental_window_path)
     patch_diff = (mitigation_result or {}).get("patch_diff")
     workspace_patch = (
         patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
@@ -43,7 +39,6 @@ async def verify_pull_request(
         retry_context=retry_context,
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
-        diff_metadata=diff_metadata,
         workspace_patch=workspace_patch,
     )
     return await run_verification_stage(

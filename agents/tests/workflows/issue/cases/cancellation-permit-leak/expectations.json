@@ -1,0 +1,47 @@
+{
+  "examples": [
+    {
+      "name": "accepts the permit leak when cancellation bypasses release",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "An unrelated vulnerability.",
+            "locations": [
+              {
+                "file": "src/other.py"
+              }
+            ]
+          },
+          {
+            "verdict": "confirmed-defect",
+            "overview": "Cancellation bypasses release, so semaphore permits are exhausted and availability is lost.",
+            "locations": [
+              {
+                "file": "src/handler.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a finding without the exhaustion consequence",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-defect",
+            "overview": "Cancellation bypasses release but nothing else follows.",
+            "locations": [
+              {
+                "file": "src/handler.py"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

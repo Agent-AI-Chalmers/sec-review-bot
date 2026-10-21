@@ -1,0 +1,38 @@
+{
+  "examples": [
+    {
+      "name": "accepts a reset token accepted as a session credential",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "The token carries no purpose binding, so a reset token is accepted as a session credential and establishes a session.",
+            "locations": [
+              {
+                "file": "src/tokens.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a workflow description with no crossover",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-defect",
+            "overview": "A password reset token is issued to the user.",
+            "locations": [
+              {
+                "file": "src/tokens.py"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
