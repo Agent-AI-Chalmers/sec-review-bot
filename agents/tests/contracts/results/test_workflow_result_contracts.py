@@ -75,12 +75,6 @@ def test_repository_workflow_builder_return_annotation_is_public_payload() -> No
 
 
 def test_repository_workflow_contract_tracks_required_sections() -> None:
-    assert set(RepositoryWorkflowResult.model_fields) == {
-        "contract_version",
-        "scan_summary",
-        "deliveries",
-        "case_results",
-    }
     assert set(ScanSummary.model_fields) == {
         "scannable_file_count",
         "scanned_file_count",
@@ -88,24 +82,36 @@ def test_repository_workflow_contract_tracks_required_sections() -> None:
         "candidate_count",
         "case_count",
         "suppressed_candidate_count",
+        "deleted_file_count",
+    }
+    assert set(RepositoryWorkflowResult.model_fields) == {
+        "contract_version",
+        "scan_summary",
+        "deliveries",
+        "case_results",
+        "deletion_review_skipped",
     }
 
 
 def test_repository_workflow_builder_derives_scan_summary_from_scan_results() -> None:
     result = build_repository_workflow_result(
-        discovery_result={
-            "counts": {
-                "scannable_file_count": 10,
-                "scanned_file_count": 8,
-                "skipped_file_count": 2,
-                "candidate_count": 4,
-            }
-        },
-        triage_result={
-            "counts": {
-                "case_count": 3,
-                "suppressed_candidate_count": 1,
-            }
+        scan_result={
+            "discovery_result": {
+                "counts": {
+                    "scannable_file_count": 10,
+                    "scanned_file_count": 8,
+                    "skipped_file_count": 2,
+                    "candidate_count": 4,
+                }
+            },
+            "triage_result": {
+                "counts": {
+                    "case_count": 3,
+                    "suppressed_candidate_count": 1,
+                }
+            },
+            "deleted_file_count": 5,
+            "deletion_review_skipped": False,
         },
         delivery_result=None,
         case_results=[],
@@ -118,13 +124,17 @@ def test_repository_workflow_builder_derives_scan_summary_from_scan_results() ->
         "candidate_count": 4,
         "case_count": 3,
         "suppressed_candidate_count": 1,
+        "deleted_file_count": 5,
     }
+    assert result["deletion_review_skipped"] is False
 
 
 def test_repository_workflow_builder_emits_json_serializable_public_payload() -> None:
     result = build_repository_workflow_result(
-        discovery_result={"counts": {}},
-        triage_result={"counts": {}},
+        scan_result={
+            "discovery_result": {"counts": {}},
+            "triage_result": {"counts": {}},
+        },
         delivery_result={"deliveries": [{"delivery_id": "partial"}]},
         case_results=[],
     )

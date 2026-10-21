@@ -252,6 +252,7 @@ def prepare_repository_case_review_inputs_activity(
         required_path,
     )
     from sec_review_agents.workflows.repository.case_execution_input import (
+        deleted_repository_cases,
         prepare_case_execution_input,
     )
 
@@ -274,12 +275,31 @@ def prepare_repository_case_review_inputs_activity(
         else None
     )
     cases_artifacts_path = artifact_path(prepared_input["artifact_paths"], "cases")
-    scan_mode = str(prepared_input["scan_target"]["scan_mode"])
+    scan_target = prepared_input["scan_target"]
+    scan_mode = str(scan_target["scan_mode"])
     review_intent = require_review_intent(prepared_input.get("review_intent"))
     timeout_seconds = _repository_case_timeout_seconds(request)
+    # A deleted file has no current content, so no single-file scan can produce a candidate for it.
+    # Its case is built from the window itself and enters the same batch as triaged cases, which
+    # keeps the analyzer as the single place that decides whether any case is a real finding.
+    deletion_cases = (
+        deleted_repository_cases(
+            scan_scope=prepared_input["scan_scope"],
+            base_sha=str(scan_target.get("base_sha") or ""),
+            head_sha=str(scan_target.get("head_sha") or ""),
+        )
+        if scan_mode == "incremental"
+        else []
+    )
+    all_cases = [*cases, *deletion_cases]
+    # Both kinds end up as case workflows under one run id, so a repeated id would make two cases
+    # collide on the same child workflow and artifact directory.
+    case_ids = [str(case.get("case_id") or "") for case in all_cases]
+    if len(set(case_ids)) != len(case_ids):
+        raise ValueError("Repository case ids must be unique within a run.")
     return {
         "max_concurrency": resolve_repository_case_processing_max_concurrency(
-            len(cases)
+            len(all_cases)
         ),
         "case_requests": [
             {
@@ -307,7 +327,7 @@ def prepare_repository_case_review_inputs_activity(
                     request.memory_extraction_registration_enabled
                 ),
             }
-            for index, case in enumerate(cases, start=1)
+            for index, case in enumerate(all_cases, start=1)
         ],
     }
 
@@ -774,8 +794,7 @@ def build_repository_review_result_activity(
         label="artifact_root_path",
     )
     workflow_result = build_repository_workflow_result(
-        discovery_result=scan_result["discovery_result"],
-        triage_result=scan_result["triage_result"],
+        scan_result=scan_result,
         delivery_result=delivery_result,
         case_results=case_results,
     )
@@ -837,6 +856,20 @@ class RepositoryDiscoveryWorkflow:
         )
 
 
+@activity.defn
+def window_deletion_summary_activity(
+    request: InternalWorkflowRequest,
+) -> dict[str, Any]:
+    from sec_review_agents.workflows.repository.case_execution_input import (
+        window_deletion_summary,
+    )
+
+    return window_deletion_summary(
+        scan_scope=request.prepared_input["scan_scope"],
+        scan_mode=str(request.prepared_input["scan_target"]["scan_mode"]),
+    )
+
+
 @workflow.defn
 class RepositoryScanWorkflow:
     @workflow.run
@@ -852,9 +885,17 @@ class RepositoryScanWorkflow:
             discovery_result,
             timeout_seconds=request.timeout_seconds,
         )
+        window_deletions = await execute_activity(
+            window_deletion_summary_activity,
+            request,
+            timeout_seconds=request.timeout_seconds,
+        )
         return {
             "discovery_result": discovery_result,
             "triage_result": triage_result,
+            # Part of the scan's verdict on the window, not of any case: the window's own size
+            # decided it, before discovery or triage ever ran.
+            **window_deletions,
         }
 
 

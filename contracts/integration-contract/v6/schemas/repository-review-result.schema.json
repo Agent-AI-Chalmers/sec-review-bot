@@ -8,7 +8,8 @@
     "contract_version",
     "scan_summary",
     "case_results",
-    "deliveries"
+    "deliveries",
+    "deletion_review_skipped"
   ],
   "properties": {
     "contract_version": {
@@ -28,6 +29,10 @@
       "items": {
         "$ref": "common.schema.json#/$defs/repositoryDelivery"
       }
+    },
+    "deletion_review_skipped": {
+      "$comment": "True when the window removed more files than deletion review covers, so none of its deletions were reviewed. Required so a consumer can never mistake an unreviewed window for an ordinary success. The count itself is scan_summary.deleted_file_count.",
+      "type": "boolean"
     }
   }
 }

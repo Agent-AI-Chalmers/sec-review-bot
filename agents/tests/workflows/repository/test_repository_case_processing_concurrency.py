@@ -50,7 +50,11 @@ def _internal_workflow_request(run_id: str = "run-test") -> InternalWorkflowRequ
     return InternalWorkflowRequest(
         workflow="repository-review",
         run_id=run_id,
-        prepared_input={"run_id": run_id},
+        prepared_input={
+            "run_id": run_id,
+            "scan_target": {"scan_mode": "full"},
+            "scan_scope": {"paths_ignore": [], "incremental_changed_files": []},
+        },
         timeout_seconds=30,
         runtime_context={},
     )
@@ -95,6 +99,8 @@ async def test_direct_repository_scan_awaits_async_triage_activity() -> None:
     assert result == {
         "discovery_result": discovery_result,
         "triage_result": triage_result,
+        "deleted_file_count": 0,
+        "deletion_review_skipped": False,
     }
 
 

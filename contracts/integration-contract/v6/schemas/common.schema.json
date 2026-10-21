@@ -492,7 +492,8 @@
         "skipped_file_count",
         "candidate_count",
         "case_count",
-        "suppressed_candidate_count"
+        "suppressed_candidate_count",
+        "deleted_file_count"
       ],
       "properties": {
         "scannable_file_count": {
@@ -516,6 +517,10 @@
           "minimum": 0
         },
         "suppressed_candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deleted_file_count": {
           "type": "integer",
           "minimum": 0
         }

@@ -88,6 +88,7 @@ from sec_review_agents.workflows.repository.workflow import (
     score_repository_case_cvss_activity,
     triage_repository_activity,
     verify_repository_case_activity,
+    window_deletion_summary_activity,
 )
 
 DEFAULT_MAX_CONCURRENT_ACTIVITIES = 2
@@ -181,6 +182,7 @@ async def run_worker() -> None:
                 scan_repository_discovery_chunk_activity,
                 build_repository_discovery_result_activity,
                 triage_repository_activity,
+                window_deletion_summary_activity,
                 prepare_repository_case_review_inputs_activity,
                 prepare_repository_case_activity,
                 analyze_repository_case_activity,
