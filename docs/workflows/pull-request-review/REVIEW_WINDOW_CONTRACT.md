@@ -50,7 +50,7 @@ A three-dot diff requires a merge base, so the workspace must not be shallow. Mu
 
 ### Fetching by SHA leaves commits unreachable
 
-Fetching a specific commit SHA creates no branch or tag pointing at it. The existing workspace sanitize step prunes unreachable objects (`reflog expire --expire=now --all` followed by `gc --prune=now`), which deleted the base commit and made the comparison fail with `fatal: Invalid symmetric difference expression`. Fetched commits are now pinned under `refs/sec-review/input-N` before sanitizing.
+Fetching a specific commit SHA creates no branch or tag pointing at it. The existing workspace sanitize step prunes unreachable objects (`reflog expire --expire=now --all` followed by `gc --prune=now`), which deleted the base commit and made the comparison fail with `fatal: Invalid symmetric difference expression`. Fetched commits are now pinned under `refs/sec-review/base` and `refs/sec-review/head` before sanitizing, named for their role in the review window. `head` is the last requested ref; `base` is whichever ref matches the caller's explicit `window_base_sha`. A pull request passes its own base before the window base, and on `synchronize` those are different commits, so the first ref is pinned as `pinned-N` rather than assumed to be the window start.
 
 ### The files API omits `patch` on large pull requests
 

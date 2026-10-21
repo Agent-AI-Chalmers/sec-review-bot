@@ -52,7 +52,7 @@ GitHub 把 `pull_request.base.sha` 报告为**目标分支当前 tip**，而不�
 
 ### 按 SHA fetch 会让提交不可达
 
-按具体 commit SHA 执行 fetch 不会创建任何指向它的分支或标签。既有的 workspace 清理步骤会修剪不可达对象（先 `reflog expire --expire=now --all`，再 `gc --prune=now`），这曾把 base commit 删除，使比较失败于 `fatal: Invalid symmetric difference expression`。现在被 fetch 的提交会在清理之前固定到 `refs/sec-review/input-N`。
+按具体 commit SHA 执行 fetch 不会创建任何指向它的分支或标签。既有的 workspace 清理步骤会修剪不可达对象（先 `reflog expire --expire=now --all`，再 `gc --prune=now`），这曾把 base commit 删除，使比较失败于 `fatal: Invalid symmetric difference expression`。现在被 fetch 的提交会在清理之前固定到 `refs/sec-review/base` 与 `refs/sec-review/head`，按其在 review window 中的角色命名。`head` 是最后一个请求的 ref；`base` 是与调用方显式传入的 `window_base_sha` 相匹配的那一个。pull request 会先传自身 base 再传窗口 base，且在 `synchronize` 时两者是不同的提交，因此第一个 ref 会被固定为 `pinned-N`，而不是被假定为窗口起点。
 
 ### 大 pull request 上文件列表 API 会省略 `patch`
 
