@@ -258,13 +258,15 @@ test('repository summary workflow view keeps minimal case fields for rendering',
 
   assert.deepStrictEqual(view, {
     run_id: 'run-1',
+    deletion_review_skipped: false,
     scan_summary: {
       scannable_file_count: 0,
       scanned_file_count: 0,
       skipped_file_count: 0,
       candidate_count: 0,
       case_count: 1,
-      suppressed_candidate_count: 0
+      suppressed_candidate_count: 0,
+      deleted_file_count: 0
     },
     cvss_summary: {
       scored_case_count: 0,
@@ -445,4 +447,59 @@ test('repository summary notes shared modified files across deliveries', () => {
     /These delivery PRs touch the same file; review publish order if publishing them together\./
   )
   assert.doesNotMatch(body, /Shared modified file `Dockerfile`/)
+})
+
+
+test('repository renderer warns when deletion review was skipped', () => {
+  // A window over the deletion limit is a partial result that still completes successfully.
+  // If the comment looks the same as a fully reviewed run, a reader has no way to know that none
+  // of the window's deletions were examined.
+  const body = renderRepositorySecuritySummaryComment({
+    workflow_result: {
+      run_id: 'run-1',
+      deletion_review_skipped: true,
+      scan_summary: {
+        scannable_file_count: 3,
+        scanned_file_count: 3,
+        case_count: 0,
+        suppressed_candidate_count: 0,
+        deleted_file_count: 250
+      },
+      case_results: []
+    },
+    published_delivery_entries: [],
+    event_type: 'scheduled',
+    target_branch: 'main'
+  })
+
+  assert.match(body, /Deletion review skipped/)
+  assert.match(body, /`250` files/)
+  // The warning sits above the summary details, so skimming the top of the comment shows it.
+  assert.ok(
+    body.indexOf('Deletion review skipped') < body.indexOf('Scan summary details')
+  )
+  assert.match(body, /Deleted files in window: `250`/)
+})
+
+test('repository renderer stays quiet when deletion review ran', () => {
+  const body = renderRepositorySecuritySummaryComment({
+    workflow_result: {
+      run_id: 'run-1',
+      deletion_review_skipped: false,
+      scan_summary: {
+        scannable_file_count: 3,
+        scanned_file_count: 3,
+        case_count: 0,
+        suppressed_candidate_count: 0,
+        deleted_file_count: 4
+      },
+      case_results: []
+    },
+    published_delivery_entries: [],
+    event_type: 'scheduled',
+    target_branch: 'main'
+  })
+
+  assert.doesNotMatch(body, /Deletion review skipped/)
+  assert.match(body, /Deleted files in window: `4`/)
 })

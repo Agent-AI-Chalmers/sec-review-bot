@@ -63,10 +63,12 @@ const EMPTY_REPOSITORY_RESULT = {
     skipped_file_count: 0,
     candidate_count: 0,
     case_count: 0,
-    suppressed_candidate_count: 0
+    suppressed_candidate_count: 0,
+    deleted_file_count: 0
   },
   deliveries: [],
-  case_results: []
+  case_results: [],
+  deletion_review_skipped: false
 }
 
 /**
