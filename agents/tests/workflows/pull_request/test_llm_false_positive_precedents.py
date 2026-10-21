@@ -5,6 +5,7 @@
 
 import json
 import re
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,34 @@ from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.llm_probe import llm_probe
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
+
+
+def _git(cwd: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(cwd), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _init_window_repository(workspace: Path) -> tuple[str, str]:
+    """Make the fixture a real repository with a base and a head commit.
+
+    The pull request prompts read the window with git, so a plain directory leaves the agent
+    without the evidence those prompts name. The base commit is empty and the head commit holds
+    the fixture tree, which makes every fixture file an addition inside the window, matching the
+    change the assertions describe.
+    """
+    _git(workspace, "init", "-q")
+    _git(workspace, "config", "user.email", "fixture@example.test")
+    _git(workspace, "config", "user.name", "fixture")
+    _git(workspace, "commit", "-q", "--allow-empty", "-m", "base")
+    base_sha = _git(workspace, "rev-parse", "HEAD")
+    _git(workspace, "add", "-A")
+    _git(workspace, "commit", "-q", "-m", "head")
+    head_sha = _git(workspace, "rev-parse", "HEAD")
+    return base_sha, head_sha
 
 
 def _confirmed_narratives(result: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -193,6 +222,23 @@ async def test_client_side_auth_precedent_does_not_hide_server_authorization_fai
         encoding="utf-8",
     )
 
+    # The window the prompts read from: a real base/head pair, plus the metadata that names it.
+    base_sha, head_sha = _init_window_repository(workspace)
+    (history / "pr-metadata.json").write_text(
+        json.dumps(
+            {
+                "review_window": {
+                    "kind": "full",
+                    "base_sha": base_sha,
+                    "head_sha": head_sha,
+                    "reason": "pull-request-scope",
+                },
+                "commit_shas": [head_sha],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     pr = {
         "title": "Add admin role promotion UI",
         "body": (
@@ -203,10 +249,10 @@ async def test_client_side_auth_precedent_does_not_hide_server_authorization_fai
             "flow is safe."
         ),
         "base_ref": "main",
-        "base_sha": "base-sha",
+        "base_sha": base_sha,
         "head_ref": "admin-role-ui",
-        "head_sha": "head-sha",
-        "commit_shas": ["head-sha"],
+        "head_sha": head_sha,
+        "commit_shas": [head_sha],
     }
 
     with patch(
