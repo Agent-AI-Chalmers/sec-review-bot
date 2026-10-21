@@ -181,8 +181,8 @@
           },
           {
             "verdict": "confirmed-vulnerability",
-            "title": "AdminPanel enforces admin-only role promotion client-side",
-            "overview": "AdminPanel checks currentUser.isAdmin before rendering the button, and that client-side authorization check is the access control boundary for role promotion.",
+            "title": "AdminPanel enforces admin-only role promotion",
+            "overview": "AdminPanel checks currentUser.isAdmin before rendering the button, and that check is the authorization boundary for role promotion.",
             "locations": [
               {
                 "file": "src/client/AdminPanel.tsx"

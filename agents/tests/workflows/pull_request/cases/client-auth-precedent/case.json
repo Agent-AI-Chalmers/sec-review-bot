@@ -56,11 +56,13 @@
       {
         "label": "treats the client-side check as the enforcement boundary",
         "any_of": [
+          "client-side",
+          "client side",
           "currentUser\\.isAdmin",
           "AdminPanel"
         ],
         "all": [
-          "authorization"
+          "auth|access control"
         ],
         "none_of": [
           "src/server/admin\\.ts",
