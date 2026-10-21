@@ -65,6 +65,13 @@ def _assign_requirements_to_findings(
 def assert_issue_case_oracle(
     case: IssueCase, result: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
+    """Assert that a result satisfies the case oracle and return the findings that did.
+
+    Without `required_findings` the return value holds every finding that meets the shared
+    evidence and location requirements. With `required_findings` it holds only the findings
+    assigned to those requirements, one per entry -- so a broad finding that also meets the shared
+    requirements is accepted by the run but not returned.
+    """
     findings = [
         narrative
         for narrative in result.get("narratives", [])
@@ -98,16 +105,18 @@ def assert_issue_case_oracle(
     ]
     assignment = _assign_requirements_to_findings(candidates, len(matching_findings))
     if assignment is None:
-        unmatched = [
-            requirement.label
+        # The candidate matrix is reported even when every requirement has candidates: the
+        # failure is then a conflict over the same finding, and which requirements compete is the
+        # part a reader cannot recover from the findings alone.
+        matrix = "; ".join(
+            f"{requirement.label} -> {options}"
             for requirement, options in zip(
                 case.oracle.required_findings, candidates, strict=True
             )
-            if not options
-        ]
+        )
         raise AssertionError(
             f"{case.id}: findings could not satisfy every required finding"
-            f"{f' (no candidate for {unmatched})' if unmatched else ''}: {matching_findings}"
+            f" (candidates by finding index: {matrix}): {matching_findings}"
         )
 
     return [matching_findings[index] for index in assignment]

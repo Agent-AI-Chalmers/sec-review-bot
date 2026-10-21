@@ -13,7 +13,6 @@ from tests.workflows.issue.llm_helpers import (
     ISSUE_LLM_ENABLED,
     ISSUE_LLM_SKIP_REASON,
     analyze_issue_case,
-    confirmed_narratives,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -34,9 +33,7 @@ async def test_issue_analyzer_keeps_independent_confirmed_claims_as_separate_nar
 
     accepted = assert_issue_case_oracle(CASE, result)
 
-    # Two independent defects keep two distinct priorities; equal priorities would mean the merge
-    # the case exists to prevent.
-    priorities = [finding.get("priority") for finding in accepted]
-    assert len(priorities) >= 2
-    assert len(set(priorities)) == len(priorities)
-    assert len(confirmed_narratives(result)) >= 2
+    # The oracle assigns one requirement per defect, so two accepted findings is the direct
+    # evidence that the run did not merge them. Narrative priority uniqueness is already enforced
+    # by `AnalysisOutput`, so asserting it here would test the schema rather than this probe.
+    assert len(accepted) == 2
