@@ -302,7 +302,12 @@ sudo systemctl enable --now sec-review-bot.target
 
 `sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面和 `sec-review-agents-worker@1.service` 组合起来，使二者可以一起管理。
 
-控制平面包括 GitHub integration、Runner Service 和 Temporal。宿主机 worker 执行 review activity 并创建 Docker sandbox。任一控制平面容器意外退出时，systemd 会重新启动控制平面。
+控制平面包括 GitHub integration、Runner Service 和 Temporal。宿主机 worker 执行 review activity 并创建 Docker sandbox。
+
+启动期失败和运行期失败的监督方式不同，排查时这个区别很关键：
+
+- **启动期。** unit 带健康门控启动 Compose，因此只要某个服务始终无法变为健康、或某个一次性 init 服务（如 `rustfs-init`）失败，这次启动就失败。systemd 会停掉依赖它的 unit 并重试，重试次数有上限；达到上限后 unit 保持 failed，直到运维介入。unit 在其进程一建立时就被视为已启动，而不是在健康门控通过时，因此依赖它的 unit 可能在 Compose 仍在等待期间就启动；宿主机 worker 通过自行重连来度过这段等待。
+- **运行期。** 崩溃的服务会自行重启，重启次数有上限，且不影响栈内其余服务（尤其是 PostgreSQL）。某个服务用尽重启次数后就会停在停止状态，而 **unit 仍显示 `active (running)`**，因为维持日志转发的进程只负责跟随日志，并不监督健康状态。
 
 日常启停和重启只操作 target：
 
@@ -324,6 +329,21 @@ sudo journalctl \
   -u sec-review-bot-control-plane.service \
   -u sec-review-agents-worker@1.service \
   -f
+```
+
+`systemctl status` 反映的是 Compose 进程和 worker 的状态，不是容器的状态。某个服务可能已经停止而 unit 仍显示 `active (running)`，所以还要单独运行 `docker compose --profile app ps --all`。
+
+结果这样读：
+
+- 长驻服务显示 `exited`，表示它已经停止。可能是正常退出（当前配置的重启策略不会重启它），也可能是用尽了重启次数；是哪种要看 journal 和退出状态。
+- 显示 `unhealthy`，表示容器还在运行但健康检查命令失败；启动期 Compose 会因此报错，运行期则不会重启该容器。
+- 即使加了 `--all` 某个服务仍不在列表里，表示 Compose 从未创建它，通常是因为它等待的依赖（`condition: service_healthy` 或 `service_completed_successfully`）始终没有满足。
+
+如果 unit 因反复启动失败而停止，仅修好原因还不够：systemd 记着这次失败，会拒绝再次启动。先清除该记录：
+
+```bash
+sudo systemctl reset-failed sec-review-bot-control-plane.service
+sudo systemctl start sec-review-bot.target
 ```
 
 取消随系统启动并立即停止完整服务：

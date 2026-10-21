@@ -300,7 +300,12 @@ sudo systemctl enable --now sec-review-bot.target
 
 `sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-agents-worker@1.service` so they can be managed together.
 
-The control plane contains GitHub integration, Runner Service, and Temporal. The host worker executes review activities and creates Docker sandboxes. systemd restarts the control plane if one of its containers exits unexpectedly.
+The control plane contains GitHub integration, Runner Service, and Temporal. The host worker executes review activities and creates Docker sandboxes.
+
+Startup and runtime failures are supervised differently, and it matters when diagnosing a run:
+
+- **Startup.** The unit starts Compose with a health gate, so a service that never becomes healthy, or a one-shot init service like `rustfs-init` that fails, fails the start. systemd stops dependent units and retries a bounded number of times; after that the unit stays failed until an operator intervenes. The unit is considered started as soon as its process exists, not when the health gate passes, so dependent units can start while Compose is still waiting; the host worker rides that out by retrying its own connection.
+- **Runtime.** A crashing service restarts on its own, up to a bounded number of attempts, without affecting the rest of the stack — PostgreSQL in particular. Once a service exhausts its attempts it stays stopped, and **the unit still reports `active (running)`**, because the process keeping the journal fed follows logs rather than supervising health.
 
 For routine lifecycle operations, use only the target:
 
@@ -322,6 +327,21 @@ sudo journalctl \
   -u sec-review-bot-control-plane.service \
   -u sec-review-agents-worker@1.service \
   -f
+```
+
+`systemctl status` reports on the Compose process and the worker, not on the containers. A unit can be `active (running)` while a service has stopped, so also run `docker compose --profile app ps --all`.
+
+Read the result as:
+
+- `exited` on a long-running service means it stopped. It either exited cleanly, which the configured restart policy does not retry, or it used up its restart attempts. The journal and the exit status say which.
+- `unhealthy` means the container is running but its health command fails; Compose reported this at startup, and at runtime it does not restart the container.
+- A service absent even with `--all` means Compose never created it, usually because a dependency it waits on (`condition: service_healthy` or `service_completed_successfully`) never satisfied.
+
+If the unit stopped after repeated startup failures, fixing the cause is not enough on its own: systemd remembers the failure and refuses to start it again. Clear that record first:
+
+```bash
+sudo systemctl reset-failed sec-review-bot-control-plane.service
+sudo systemctl start sec-review-bot.target
 ```
 
 Disable automatic startup and stop the complete service immediately:
