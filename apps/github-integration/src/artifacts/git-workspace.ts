@@ -298,15 +298,38 @@ async function replaceWorkspaceWithMaterializedRepository({
   await fs.rename(materialized_path, workspace_path)
 }
 
+/**
+ * Name a requested workspace ref by the role it plays in the review window.
+ *
+ * Only two roles are worth a name: the commit under review (`head`, always the last ref and the
+ * one the workspace checks out) and the window's start (`base`). The window start cannot be read
+ * off the array: a pull request passes its own base first and the review window's base second,
+ * and on `synchronize` those are different commits. So the caller states it, and a ref only
+ * earns `base` by matching that identity. Every other ref exists only to keep its commit
+ * reachable after sanitize and is numbered.
+ */
+function secReviewInputRefName(
+  ref: string,
+  index: number,
+  ref_count: number,
+  window_base_sha: string | undefined
+): string {
+  if (index === ref_count - 1) return 'head'
+  if (window_base_sha !== undefined && ref === window_base_sha) return 'base'
+  return `pinned-${index}`
+}
+
 async function materializeWorkspaceFromRealGitHistory({
   workspace_path,
   git_remote_url,
   refs,
+  window_base_sha,
   git_auth_token
 }: {
   workspace_path: string
   git_remote_url: string
   refs: string[]
+  window_base_sha?: string
   git_auth_token?: string
 }): Promise<void> {
   await fs.mkdir(path.dirname(workspace_path), { recursive: true })
@@ -366,10 +389,13 @@ async function materializeWorkspaceFromRealGitHistory({
     // review depends on. Pin every requested ref under refs/sec-review/ so the
     // commits stay reachable; these refs carry no remote URL, credentials, or
     // fetch metadata, so the sanitize guarantee is preserved.
+    //
+    // The head role is positional: it is the last ref, which is what `checkout` above
+    // already relies on. The base role is not -- see secReviewInputRefName.
     for (const [index, ref] of refs.entries()) {
       await runGitCommand(materialized_path, [
         'update-ref',
-        `refs/sec-review/input-${index}`,
+        `refs/sec-review/${secReviewInputRefName(ref, index, refs.length, window_base_sha)}`,
         ref
       ])
     }
@@ -387,11 +413,16 @@ async function materializeWorkspaceFromRealGitHistory({
 export async function materializeWorkspaceWithCommitHistory({
   workspace_path,
   refs,
+  window_base_sha,
   git_remote_url,
   git_auth_token
 }: {
   workspace_path: string
   refs: string[]
+  // The commit the review window starts at, when it differs from the last ref's history
+  // parent. Callers must pass it rather than let the workspace infer it: pull request
+  // materialization puts the pull request's own base before the window's.
+  window_base_sha?: string
   git_remote_url?: string
   git_auth_token?: string
 }): Promise<void> {
@@ -422,10 +453,24 @@ export async function materializeWorkspaceWithCommitHistory({
   }
   // PR and repository reviews rely on real commit relationships; snapshot
   // archives must not be silently promoted into synthetic git history.
+  const normalizedWindowBaseSha = window_base_sha?.trim() || undefined
+  if (
+    normalizedWindowBaseSha !== undefined &&
+    !normalizedRefs.includes(normalizedWindowBaseSha)
+  ) {
+    // A window base that is not among the refs never gets pinned, so it could be
+    // pruned by sanitize and the base ref would be absent while callers assume it exists.
+    throw new Error(
+      'materializeWorkspaceWithCommitHistory window_base_sha must be one of refs.'
+    )
+  }
   await materializeWorkspaceFromRealGitHistory({
     workspace_path,
     git_remote_url: git_remote_url.trim(),
     refs: normalizedRefs,
+    ...(normalizedWindowBaseSha
+      ? { window_base_sha: normalizedWindowBaseSha }
+      : {}),
     ...(git_auth_token ? { git_auth_token } : {})
   })
 }

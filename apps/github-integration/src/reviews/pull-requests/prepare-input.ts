@@ -184,6 +184,7 @@ async function materializeWorkspaceHistory({
   await materializeWorkspaceWithCommitHistory({
     workspace_path,
     refs: [pr.base_sha, window.base_sha, ...commit_refs],
+    window_base_sha: window.base_sha,
     git_remote_url: buildGitRemoteUrl(pr.owner_login, pr.repo_name),
     git_auth_token
   })

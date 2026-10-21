@@ -54,13 +54,15 @@ async function materializeWorkspace(
   octokit: Octokit,
   repo: RepositoryContext,
   workspace_path: string,
-  refs: string[]
+  refs: string[],
+  window_base_sha: string | null
 ): Promise<void> {
   const git_auth_token = await getInstallationAccessToken(octokit)
 
   await materializeWorkspaceWithCommitHistory({
     workspace_path,
     refs,
+    ...(window_base_sha ? { window_base_sha } : {}),
     git_remote_url: buildGitRemoteUrl(repo.owner_login, repo.repo_name),
     git_auth_token
   })
@@ -187,7 +189,13 @@ export async function prepareRepositoryReviewInput({
     resolvedBaseSha.trim() !== ''
       ? [resolvedBaseSha, resolvedHeadSha]
       : [resolvedHeadSha]
-  await materializeWorkspace(octokit, repo, workspace_path, historyRefs)
+  await materializeWorkspace(
+    octokit,
+    repo,
+    workspace_path,
+    historyRefs,
+    resolvedBaseSha
+  )
 
   if (
     resolvedScanMode === 'incremental' &&

@@ -112,7 +112,8 @@ test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch me
     await materializeWorkspaceWithCommitHistory({
       workspace_path: workspace,
       git_remote_url: source,
-      refs: [base_sha, head_sha]
+      refs: [base_sha, head_sha],
+      window_base_sha: base_sha
     })
 
     assert.strictEqual(await git(workspace, ['rev-parse', 'HEAD']), head_sha)
@@ -120,9 +121,92 @@ test('materializeWorkspaceWithCommitHistory keeps git diffs but removes fetch me
       await git(workspace, ['diff', '--name-only', `${base_sha}..${head_sha}`]),
       'README.md'
     )
+    // The pinned refs are the only thing keeping base reachable after sanitize, so
+    // they must name their role: a caller (or an agent reading the workspace) has to
+    // be able to tell which commit is the window start without knowing the array order.
+    assert.strictEqual(
+      await git(workspace, ['rev-parse', 'refs/sec-review/base']),
+      base_sha
+    )
+    assert.strictEqual(
+      await git(workspace, ['rev-parse', 'refs/sec-review/head']),
+      head_sha
+    )
     assert.strictEqual(await git(workspace, ['remote']), '')
     await assert.rejects(fs.stat(path.join(workspace, '.git', 'FETCH_HEAD')))
     await assert.rejects(fs.stat(path.join(workspace, '.git', 'logs')))
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('materializeWorkspaceWithCommitHistory names the window base, not the first ref', async () => {
+  // Pull request materialization passes [pr.base_sha, window.base_sha, ...], and on
+  // `synchronize` the window base is the previous head, not the pull request's base. Naming
+  // the first ref `base` would make refs/sec-review/base point at the target branch tip, and a
+  // diff against it would review the wrong range while claiming to be the review window.
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'sec-review-git-window-base-test-')
+  )
+  try {
+    const source = path.join(root, 'source')
+    const workspace = path.join(root, 'workspace')
+    await fs.mkdir(source, { recursive: true })
+    await git(source, ['init'])
+    await git(source, ['config', 'user.name', 'Test User'])
+    await git(source, ['config', 'user.email', 'test@example.com'])
+    const commit = async (content: string): Promise<string> => {
+      await fs.writeFile(path.join(source, 'README.md'), content, 'utf8')
+      await git(source, ['add', 'README.md'])
+      await git(source, ['commit', '-m', content])
+      return git(source, ['rev-parse', 'HEAD'])
+    }
+    const pr_base_sha = await commit('pr base\n')
+    const window_base_sha = await commit('previous head\n')
+    const head_sha = await commit('current head\n')
+
+    await materializeWorkspaceWithCommitHistory({
+      workspace_path: workspace,
+      git_remote_url: source,
+      refs: [pr_base_sha, window_base_sha, head_sha],
+      window_base_sha
+    })
+
+    assert.strictEqual(
+      await git(workspace, ['rev-parse', 'refs/sec-review/base']),
+      window_base_sha
+    )
+    assert.strictEqual(
+      await git(workspace, ['rev-parse', 'refs/sec-review/head']),
+      head_sha
+    )
+    // The pull request's own base is still pinned, so its commit survives sanitize; it just
+    // does not claim to be the window base.
+    assert.strictEqual(
+      await git(workspace, ['rev-parse', 'refs/sec-review/pinned-0']),
+      pr_base_sha
+    )
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('materializeWorkspaceWithCommitHistory rejects a window base outside refs', async () => {
+  // A window base that is not among the refs is never fetched, so it cannot be pinned. Failing
+  // here keeps refs/sec-review/base from silently going missing while callers assume it exists.
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'sec-review-git-window-base-reject-test-')
+  )
+  try {
+    await assert.rejects(
+      materializeWorkspaceWithCommitHistory({
+        workspace_path: path.join(root, 'workspace'),
+        git_remote_url: path.join(root, 'source'),
+        refs: ['a'.repeat(40)],
+        window_base_sha: 'b'.repeat(40)
+      }),
+      /window_base_sha must be one of refs/
+    )
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
