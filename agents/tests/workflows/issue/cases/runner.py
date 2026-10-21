@@ -25,6 +25,42 @@ def _anchors_at(finding: Mapping[str, Any], locations: list[str]) -> bool:
     return all(location in finding_locations for location in locations)
 
 
+def _assign_requirements_to_findings(
+    candidates: list[list[int]], finding_count: int
+) -> list[int] | None:
+    """Return one distinct finding index per requirement, or None when no such assignment exists.
+
+    `candidates[i]` lists the findings that can satisfy requirement `i`. A greedy walk is wrong
+    here: a broad requirement can match a finding that a later, narrower requirement is the only
+    one able to use, and taking it first strands the narrow requirement even though a valid
+    one-to-one assignment exists. This is Kuhn's augmenting-path search, which rearranges earlier
+    assignments when a later requirement needs a contested finding.
+    """
+    assigned_finding = [-1] * len(candidates)
+
+    def augment(requirement: int, visited: list[bool]) -> bool:
+        for finding in candidates[requirement]:
+            if visited[finding]:
+                continue
+            visited[finding] = True
+            if assigned_finding[finding] == -1 or augment(
+                assigned_finding[finding], visited
+            ):
+                assigned_finding[finding] = requirement
+                return True
+        return False
+
+    for requirement in range(len(candidates)):
+        if not augment(requirement, [False] * finding_count):
+            return None
+
+    assignment = [-1] * len(candidates)
+    for finding, requirement in enumerate(assigned_finding):
+        if requirement != -1:
+            assignment[requirement] = finding
+    return assignment
+
+
 def assert_issue_case_oracle(
     case: IssueCase, result: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
@@ -45,21 +81,32 @@ def assert_issue_case_oracle(
     ]
     assert matching_findings, findings
 
-    # Each required finding must be satisfied by its own narrative. Assigning greedily is enough
-    # here: requirements are matched against distinct findings, so a run that merges two defects
-    # into one narrative leaves a requirement unmatched and fails.
-    unassigned = list(matching_findings)
-    for requirement in case.oracle.required_findings:
-        for index, finding in enumerate(unassigned):
-            if _matches_requirements(
-                finding, requirement.required_evidence
-            ) and _anchors_at(finding, requirement.required_locations):
-                unassigned.pop(index)
-                break
-        else:
-            raise AssertionError(
-                f"{case.id}: no distinct finding satisfied required finding "
-                f"{requirement.label!r}: {matching_findings}"
-            )
+    if not case.oracle.required_findings:
+        return matching_findings
 
-    return matching_findings
+    # Each required finding must be satisfied by its own narrative. A run that merges two defects
+    # into one narrative leaves a requirement without a distinct finding and fails.
+    candidates = [
+        [
+            index
+            for index, finding in enumerate(matching_findings)
+            if _matches_requirements(finding, requirement.required_evidence)
+            and _anchors_at(finding, requirement.required_locations)
+        ]
+        for requirement in case.oracle.required_findings
+    ]
+    assignment = _assign_requirements_to_findings(candidates, len(matching_findings))
+    if assignment is None:
+        unmatched = [
+            requirement.label
+            for requirement, options in zip(
+                case.oracle.required_findings, candidates, strict=True
+            )
+            if not options
+        ]
+        raise AssertionError(
+            f"{case.id}: findings could not satisfy every required finding"
+            f"{f' (no candidate for {unmatched})' if unmatched else ''}: {matching_findings}"
+        )
+
+    return [matching_findings[index] for index in assignment]
