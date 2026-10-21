@@ -1,6 +1,10 @@
 services:
   rustfs:
     image: rustfs/rustfs:1.0.1
+    # Bounded: a service that cannot start must not restart forever. Five attempts covers a
+    # transient dependency blip; past that the stack needs a human, and the stopped container
+    # stays visible in `docker compose ps --all` instead of hiding behind a restart loop.
+    restart: "on-failure:5"
     user: "${SEC_REVIEW_SERVICE_UID:-1000}:${SEC_REVIEW_SERVICE_GID:-1000}"
     environment:
       RUSTFS_VOLUMES: "/data"
@@ -36,6 +40,7 @@ services:
       - "./ops/rustfs-init:/policies:ro"
   postgres:
     image: postgres:18-alpine
+    restart: "on-failure:5"
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-sec_review_bot}"
       POSTGRES_USER: "${POSTGRES_USER:-sec_review_bot}"
@@ -52,6 +57,7 @@ services:
 
   temporal:
     image: temporalio/temporal:latest
+    restart: "on-failure:5"
     # Match the host service user so the bind-mounted SQLite directory remains
     # writable without making local workflow state world-writable.
     user: "${SEC_REVIEW_SERVICE_UID:-1000}:${SEC_REVIEW_SERVICE_GID:-1000}"
@@ -70,6 +76,7 @@ services:
       - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"
 
   runner-service:
+    restart: "on-failure:5"
     build:
       context: agents
       dockerfile: Dockerfile
@@ -102,6 +109,7 @@ services:
         condition: service_started
 
   control-plane:
+    restart: "on-failure:5"
     profiles: ["app"]
     build:
       context: control-plane
@@ -141,6 +149,7 @@ services:
         condition: service_started
 
   control-plane-ui:
+    restart: "on-failure:5"
     profiles: ["app"]
     build:
       context: apps/control-plane-ui
@@ -177,6 +186,7 @@ services:
         condition: service_completed_successfully
 
   github-integration:
+    restart: "on-failure:5"
     profiles: ["app"]
     build:
       context: apps/github-integration
