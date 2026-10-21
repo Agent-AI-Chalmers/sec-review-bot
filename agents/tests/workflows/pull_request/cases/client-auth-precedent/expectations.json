@@ -161,6 +161,36 @@
           }
         ]
       }
+    },
+    {
+      "name": "rejects a client-only finding written with real symbol casing",
+      "expected": "forbidden",
+      "result": {
+        "verdict": "confirmed-vulnerability",
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "finding",
+            "overview": "src/server/admin.ts posts /api/admin/users/:id/role and calls updateRole without any authorization check.",
+            "locations": [
+              {
+                "file": "src/server/admin.ts",
+                "line": 1
+              }
+            ]
+          },
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "AdminPanel enforces admin-only role promotion client-side",
+            "overview": "AdminPanel checks currentUser.isAdmin before rendering the button, and that client-side authorization check is the access control boundary for role promotion.",
+            "locations": [
+              {
+                "file": "src/client/AdminPanel.tsx"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

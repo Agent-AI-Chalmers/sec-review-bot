@@ -56,18 +56,16 @@
       {
         "label": "treats the client-side check as the enforcement boundary",
         "any_of": [
-          "client-side",
-          "client side",
-          "currentuser.isadmin",
-          "adminpanel"
+          "currentUser\\.isAdmin",
+          "AdminPanel"
         ],
         "all": [
-          "auth|access control"
+          "authorization"
         ],
         "none_of": [
           "src/server/admin\\.ts",
           "/api/admin/users/:id/role",
-          "updaterole"
+          "updateRole"
         ],
         "files_only": [
           "src/client/AdminPanel.tsx"

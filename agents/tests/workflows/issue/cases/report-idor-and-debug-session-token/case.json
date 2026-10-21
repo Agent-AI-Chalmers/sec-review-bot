@@ -5,7 +5,9 @@
     "body": "Please audit two separate security claims in `src/server/reports.ts`.\n\nClaim A: `/api/reports/:id/export` uses `requireUser`, but it appears to fetch reports by id only and returns confidential notes without checking ownership. This may let one authenticated user export another user's report.\n\nClaim B: `/api/admin/debug-session` looks unauthenticated and returns `csrfToken` plus `oauthAccessToken` for an arbitrary `sessionId`. This is not the same exploit path as Claim A; please do not merge it with the report export authorization issue.\n\nThere may also be missing rate limits, but that is just a hardening request."
   },
   "oracle": {
-    "acceptable_verdicts": ["confirmed-vulnerability"],
+    "acceptable_verdicts": [
+      "confirmed-vulnerability"
+    ],
     "expected_mechanism": "The export route lacks an ownership check, and the unauthenticated debug-session route returns session credentials; the two defects need separate repairs.",
     "required_findings": [
       {
@@ -13,28 +15,40 @@
         "required_evidence": [
           {
             "label": "export route is named",
-            "any_of": ["/api/reports/:id/export"]
+            "any_of": [
+              "/api/reports/:id/export"
+            ]
           },
           {
             "label": "missing ownership or authorization check",
-            "any_of": ["idor|authorization|access control"]
+            "any_of": [
+              "idor|authorization|access control"
+            ]
           }
         ],
-        "required_locations": ["src/server/reports.ts"]
+        "required_locations": [
+          "src/server/reports.ts"
+        ]
       },
       {
         "label": "debug session token leak",
         "required_evidence": [
           {
             "label": "debug route is named",
-            "any_of": ["/api/admin/debug-session"]
+            "any_of": [
+              "/api/admin/debug-session"
+            ]
           },
           {
             "label": "session credentials are returned",
-            "any_of": ["oauthaccesstoken"]
+            "any_of": [
+              "OAuthAccessToken"
+            ]
           }
         ],
-        "required_locations": ["src/server/reports.ts"]
+        "required_locations": [
+          "src/server/reports.ts"
+        ]
       }
     ]
   }
