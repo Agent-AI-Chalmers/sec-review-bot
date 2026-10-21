@@ -302,7 +302,12 @@ sudo systemctl enable --now sec-review-bot.target
 
 `sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面和 `sec-review-agents-worker@1.service` 组合起来，使二者可以一起管理。
 
-控制平面包括 GitHub integration、Runner Service 和 Temporal。宿主机 worker 执行 review activity 并创建 Docker sandbox。任一控制平面容器意外退出时，systemd 会重新启动控制平面。
+控制平面包括 GitHub integration、Runner Service 和 Temporal。宿主机 worker 执行 review activity 并创建 Docker sandbox。
+
+启动期失败和运行期失败的监督方式不同，排查时这个区别很关键：
+
+- **启动期。** unit 带健康门控启动 Compose，因此只要某个服务始终无法变为健康、或某个一次性 init 服务（如 `rustfs-init`）失败，这次启动就失败。systemd 会停掉依赖它的 unit 并重试，重试次数有上限；达到上限后 unit 保持 failed，直到运维介入。unit 在其进程一建立时就被视为已启动，而不是在健康门控通过时，因此依赖它的 unit 可能在 Compose 仍在等待期间就启动；宿主机 worker 通过自行重连来度过这段等待。
+- **运行期。** 崩溃的服务会自行重启，重启次数有上限，且不影响栈内其余服务（尤其是 PostgreSQL）。某个服务用尽重启次数后就会停在停止状态，而 **unit 仍显示 `active (running)`**，因为维持日志转发的进程只负责跟随日志，并不监督健康状态。
 
 日常启停和重启只操作 target：
 
@@ -324,6 +329,21 @@ sudo journalctl \
   -u sec-review-bot-control-plane.service \
   -u sec-review-agents-worker@1.service \
   -f
+```
+
+`systemctl status` 反映的是 Compose 进程和 worker 的状态，不是容器的状态。某个服务可能已经停止而 unit 仍显示 `active (running)`，所以还要单独运行 `docker compose --profile app ps --all`。
+
+结果这样读：
+
+- 长驻服务显示 `exited`，表示它已经停止。可能是正常退出（当前配置的重启策略不会重启它），也可能是用尽了重启次数；是哪种要看 journal 和退出状态。
+- 显示 `unhealthy`，表示容器还在运行但健康检查命令失败；启动期 Compose 会因此报错，运行期则不会重启该容器。
+- 即使加了 `--all` 某个服务仍不在列表里，表示 Compose 从未创建它，通常是因为它等待的依赖（`condition: service_healthy` 或 `service_completed_successfully`）始终没有满足。
+
+如果 unit 因反复启动失败而停止，仅修好原因还不够：systemd 记着这次失败，会拒绝再次启动。先清除该记录：
+
+```bash
+sudo systemctl reset-failed sec-review-bot-control-plane.service
+sudo systemctl start sec-review-bot.target
 ```
 
 取消随系统启动并立即停止完整服务：
@@ -457,12 +477,32 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 
 每条 git 命令和快照命令都受 `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` 约束（默认 `600000`，即 10 分钟），避免远端挂起时无限拖住输入准备。若仓库的冷克隆确实更慢，可以提高该值。
 
-## 排障
+## 为何这样部署
 
-- `403 Resource not accessible by integration`：检查 GitHub App 权限，以及 installation 是否重新批准过新权限。
-- Runner Service 返回 unauthorized：检查仓库 `.env` 中的 `RUNNER_SERVICE_TOKEN`，再重启完整服务。
-- Repository dispatch 鉴权失败：确认 workflow 配置了 `id-token: write`，请求了 `sec-review-bot` OIDC audience，并且 workflow 路径是 `.github/workflows/sec-review-bot.yml`。
-- Run 一直处于 queued：确认至少有一个宿主机 worker 正在运行，并与 Runner Service 使用相同的 `TEMPORAL_TASK_QUEUE`。
-- Worker 读不到 input bundle：检查 RustFS endpoint，并确认安装后的 worker 凭据与 Compose 初始化的只读凭据一致。
-- Worker 把 artifact 写到其他位置：检查 `ops/systemd/deployment.env` 中可选的 `SEC_REVIEW_AGENT_ARTIFACT_ROOT` override，再重新运行 `sudo ops/systemd/install.sh "$USER"`。
-- LLM 调用在 workflow 推进前失败：进入 `agents/` 后运行 `uv run sec-review-agents-check-llm-deployments --fail-fast`。
+这套部署由两个运行时承担：Compose 跑负责协调 review 的服务，systemd 跑执行 review 的 worker。哪个组件由哪个运行时承载，取决于该组件要做什么，这也决定了监督能覆盖到哪里。
+
+### worker 跑在宿主机上
+
+worker 是整条链路里唯一会运行被审查仓库代码的组件。它为每次 agent 调用启动一个 Docker 容器，因此需要访问宿主机的 Docker daemon。把它放进 Compose 只有两种做法：把 Docker socket 挂进一个本来就在运行不可信代码的容器，或者在容器内再跑一个特权 daemon。无论哪种，只要某次 review 出了事，影响都会超出沙箱。放在宿主机上，它直接使用 daemon，并由 systemd 监督，因此具备真实的 unit 状态、有上限的重启策略，以及对控制平面的依赖关系。
+
+在 Temporal 的任务队列模型里，worker 部署在宿主上属于常规做法，算不上变通：worker 主动轮询队列，部署在哪里并不影响 workflow 的推进。worker 消失只会让任务延后，不会丢失 workflow 状态。
+
+### 协调服务跑在 Compose 里
+
+PostgreSQL、Temporal、对象存储和三个 HTTP 服务都是普通的长驻容器。Compose 为它们提供镜像固定、基于健康门控的依赖顺序、网络隔离，以及单一配置文件——这些都是 worker 不需要的。
+
+### 同样的形态在别处也存在
+
+执行不可信任务的 runner 系统也这样划分两个角色：
+
+- [GitHub 的 self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service) 安装为宿主机上的服务，每个 job 在容器里启动。
+- [Gitea 的 act runner](https://docs.gitea.com/usage/actions/act-runner) 以宿主 daemon 运行，提供 `docker://`、`kubernetes://` 和 `host` 三种 job 环境，并明确警告 host 模式的 job 没有隔离。
+- [GitLab Runner](https://docs.gitlab.com/runner/executors/) 的 manager 同样位于宿主机，把 job 分派给 Docker。
+
+这三者的控制平面都在机器之外，因此 worker 失败从来不需要传播进去。
+
+### 这样做的代价
+
+本项目的控制平面与 worker 同机，于是两个运行时必须在失败处理上取得一致，而它们在一处并不一致：systemd 会把失败的 worker 报告为失败的 unit，而一个用尽重启次数的 Compose 服务会让 unit 仍显示 `active (running)`。unit 的前台进程只负责跟随日志；Compose 没有办法把单个服务的永久失败转成进程退出，除非同时把所有崩溃都当作整栈失败——而那正是之前把 PostgreSQL 一起拖垮的做法。
+
+因此，健康门控之下的运行期失败要靠检查容器发现，而不是靠 unit 状态——上文的状态检查一节说明了做法。若要在 Compose 内部补上这个缺口，需要一个读取期望服务状态的监督器，而这些期望状态只能存放在服务定义之外。对本地部署而言，运维人员本来就在机器前，这笔取舍并不划算。如果这套部署将来需要无人值守地运行，它会是第一个需要重新评估的地方。
