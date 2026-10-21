@@ -28,7 +28,7 @@ def load_issue_cases() -> tuple[IssueCase, ...]:
             raise AssertionError(f"empty workspace directory for {case.id}")
         missing_locations = [
             location
-            for location in case.oracle.required_locations
+            for location in case.oracle.all_locations()
             if not (case.workspace_source / location).is_file()
         ]
         if missing_locations:
