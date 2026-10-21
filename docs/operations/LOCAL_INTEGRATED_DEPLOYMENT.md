@@ -257,7 +257,7 @@ The same image also supports the optional CodeGraph and Playwright MCP integrati
 AGENT_MCP_ENABLED=true
 ```
 
-For local fallback, install `codegraph` on the host `PATH` and set `AGENT_MCP_ENABLED=true`. CodeGraph tools are attached only to stages that explicitly opt in and expose a writable `/workspace`.
+CodeGraph runs inside the sandbox, so it needs a backend that can execute commands: install `codegraph` in the workspace tools image and set `AGENT_MCP_ENABLED=true`. CodeGraph tools are attached only to stages that explicitly opt in and expose a writable `/workspace`.
 
 ### Integrated Deployment Paths
 

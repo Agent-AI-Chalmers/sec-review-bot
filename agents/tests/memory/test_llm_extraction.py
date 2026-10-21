@@ -142,7 +142,6 @@ async def test_llm_extractor_safety_case(
     system_prompt = _selected_system_prompt()
 
     with (
-        patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "local"}),
         patch(
             "sec_review_agents.agents.memory_extractor.agent."
             "MEMORY_EXTRACTOR_SYSTEM_PROMPT",

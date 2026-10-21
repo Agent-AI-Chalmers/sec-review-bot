@@ -259,7 +259,7 @@ AGENT_PLAYWRIGHT_ENABLED=true
 AGENT_MCP_ENABLED=true
 ```
 
-本地 fallback 下，需要在 host `PATH` 上安装 `codegraph`，并设置 `AGENT_MCP_ENABLED=true`。CodeGraph tools 只会挂到显式 opt in、并且暴露可写 `/workspace` 的阶段。
+CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend：把 `codegraph` 装进 workspace tools 镜像，并设置 `AGENT_MCP_ENABLED=true`。CodeGraph tools 只会挂到显式 opt in、并且暴露可写 `/workspace` 的阶段。
 
 ### 集成部署路径
 

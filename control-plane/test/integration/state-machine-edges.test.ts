@@ -121,7 +121,10 @@ interface RecordedEdge {
  */
 async function recordEveryPath(): Promise<RecordedEdge[]> {
   const runIds: string[] = []
-  const store = await createStore({ claimTimeoutMs: 1 })
+  // A real lease length. Expiry is provoked by backdating `claimed_at` below, never by
+  // shortening the lease: with a millisecond lease every ordinary write races the clock, and
+  // a slow CI worker turns an unrelated assertion into a lost-claim failure.
+  const store = await createStore({ claimTimeoutMs: 5_000 })
   const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const newPreparingRun = async (): Promise<{
@@ -195,7 +198,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
     assert.notStrictEqual(await store.claimNextRunNotice(), null)
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    // Expire the delivering lease by backdating it. Waiting on the clock instead would make
+    // this assertion depend on how fast the worker happens to be.
+    await pool.query(
+      `UPDATE run_notices SET claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE connector_id=$1 AND status='delivering'`,
+      [store.connectorId]
+    )
     assert.notStrictEqual(await store.claimNextRunNotice(), null)
 
     // notice: delivering -> failed when the provider cannot be reached.
@@ -230,8 +239,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // uncertain -> preparing when a preparer picks it up again. The origin state is Control
     // Plane's own bookkeeping: it names the audit event below, and is not published to the
     // connector.
-    await newPreparingRun()
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    const lapsing = await newPreparingRun()
+    await pool.query(
+      `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE run_id=$1`,
+      [lapsing.runId]
+    )
     const expiry = await store.expireStalePreparations()
     assert.ok(expiry.concluded >= 1)
     const fromUncertain = await store.claimNextPreparation()
@@ -349,7 +362,11 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
 
     // publication: pending -> publishing -> publishing (expired lease) -> published.
     const published = await newPublishingRun()
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await pool.query(
+      `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE run_id=$1`,
+      [published.runId]
+    )
     // Re-claiming after the lease expires issues a new token, and the old one is fenced out.
     const renewedToken = await store.claimPublication(published.runId)
     assert.notStrictEqual(renewedToken, null)

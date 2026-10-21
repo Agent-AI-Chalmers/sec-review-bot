@@ -1,5 +1,4 @@
 from pathlib import Path
-from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -122,11 +121,10 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() ->
             status=OBSERVATION_STATUS_PENDING,
         )
 
-    with patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "local"}):
-        result = await maintain_memory_with_result(
-            memory_store_dir=memory_root,
-            deployment=llm_test_deployment(),
-        )
+    result = await maintain_memory_with_result(
+        memory_store_dir=memory_root,
+        deployment=llm_test_deployment(),
+    )
 
     memory_index = (runtime_memory_root / "MEMORY.md").read_text(encoding="utf-8")
     topic_text = "\n".join(

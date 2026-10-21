@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -100,19 +99,18 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
         ],
     )
 
-    with patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "local"}):
-        extraction = await extract_memory_observations_from_paths(
-            [artifacts],
-            memory_store_dir=memory_root,
-            deployment=llm_test_deployment(),
-            job_id="llm-memory-lifecycle-probe-run-1",
-            source_workflow="llm-memory-lifecycle-probe",
-            run_id="run-1",
-        )
-        maintenance = await maintain_memory_with_result(
-            memory_store_dir=memory_root,
-            deployment=llm_test_deployment(),
-        )
+    extraction = await extract_memory_observations_from_paths(
+        [artifacts],
+        memory_store_dir=memory_root,
+        deployment=llm_test_deployment(),
+        job_id="llm-memory-lifecycle-probe-run-1",
+        source_workflow="llm-memory-lifecycle-probe",
+        run_id="run-1",
+    )
+    maintenance = await maintain_memory_with_result(
+        memory_store_dir=memory_root,
+        deployment=llm_test_deployment(),
+    )
 
     runtime_memory_root = memory_content_dir(memory_root)
     observation_files = sorted(memory_observations_dir(memory_root).glob("*.md"))

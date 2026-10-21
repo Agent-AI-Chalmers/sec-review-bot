@@ -7,8 +7,8 @@ from sec_review_agents.cli.local_materialization.common import (
 _DECLARATION = "setup:\n  - run: echo hi\n"
 
 
-def test_returns_none_without_a_path(monkeypatch, capsys) -> None:
-    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "local")
+def test_returns_none_without_a_path(capsys) -> None:
+    # Resolves before the backend is consulted, so no sandbox is needed here.
     assert load_setup_declaration_content(None) is None
     assert capsys.readouterr().err == ""
 
@@ -26,7 +26,7 @@ def test_docker_unreadable_path_is_an_error(monkeypatch, tmp_path) -> None:
         load_setup_declaration_content(tmp_path / "missing.yml")
 
 
-@pytest.mark.parametrize("backend", ["local", "bwrap"])
+@pytest.mark.parametrize("backend", ["bwrap"])
 def test_non_docker_warns_and_ignores(monkeypatch, tmp_path, capsys, backend) -> None:
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", backend)
     path = tmp_path / "setup.yml"
@@ -37,7 +37,7 @@ def test_non_docker_warns_and_ignores(monkeypatch, tmp_path, capsys, backend) ->
     assert backend in err
 
 
-@pytest.mark.parametrize("backend", ["local", "bwrap"])
+@pytest.mark.parametrize("backend", ["bwrap"])
 def test_non_docker_does_not_read_so_missing_path_does_not_raise(
     monkeypatch, tmp_path, capsys, backend
 ) -> None:

@@ -63,18 +63,32 @@ def test_external_tool_selection_rejects_unknown_agent_declaration(
         external_tool_prompt_paths_for(("unknown",))
 
 
-def test_external_tool_prompts_reject_local_backend(monkeypatch) -> None:
-    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "local")
+def test_external_tool_prompts_reject_a_shell_less_backend(monkeypatch) -> None:
+    """An external CLI needs a sandbox that can run it.
+
+    No operator setting resolves to `local` any more, so the check is exercised by
+    forcing the resolution directly: it guards the boundary rather than a
+    reachable configuration.
+    """
     monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
 
-    with pytest.raises(
-        ValueError,
-        match="External CLI tools require an execution-capable sandbox backend",
+    with (
+        patch(
+            "sec_review_agents.runtime.external_tools." "selected_sandbox_backend_kind",
+            return_value="local",
+        ),
+        pytest.raises(
+            ValueError,
+            match="External CLI tools require an execution-capable sandbox backend",
+        ),
     ):
         external_tool_prompt_paths_for(("joern",))
 
 
-def test_external_tool_prompts_reject_auto_local_fallback(monkeypatch) -> None:
+def test_external_tool_prompts_fail_when_no_sandbox_resolves(monkeypatch) -> None:
+    """`auto` with no usable sandbox must not silently pick a text reader."""
+    # Declare the policy under test. A concrete value here (from `agents/.env`, which another
+    # test may have loaded) skips the probe entirely and the check never runs.
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "auto")
     monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
 
@@ -84,10 +98,7 @@ def test_external_tool_prompts_reject_auto_local_fallback(monkeypatch) -> None:
             "is_docker_runtime_available",
             return_value=False,
         ),
-        pytest.raises(
-            ValueError,
-            match="External CLI tools require an execution-capable sandbox backend",
-        ),
+        pytest.raises(ValueError, match="found no usable sandbox"),
     ):
         external_tool_prompt_paths_for(("playwright",))
 

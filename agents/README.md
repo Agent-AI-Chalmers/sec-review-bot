@@ -276,15 +276,13 @@ Agents that require structured output check whether the final state contains `st
 
 ## Sandbox Runtime
 
-The normal agent runtime prefers Docker sandbox. The local filesystem backend is a fallback for Docker-unavailable situations or when a developer explicitly disables sandboxing.
+Agent stages that review code run in a sandbox that can execute commands, because without one they cannot run tests, read history, or reproduce a finding. Which sandbox that is, is deployment configuration:
 
-Default strategy:
+- `AGENT_SANDBOX_BACKEND` unset or `auto`: use the Docker sandbox when the Docker runtime is available, otherwise fail with an error naming what is missing
+- `AGENT_SANDBOX_BACKEND=docker`: require the Docker sandbox
+- `AGENT_SANDBOX_BACKEND=bwrap`: opt into bubblewrap (Linux/WSL2 only; it is never chosen by `auto`)
 
-- `AGENT_SANDBOX_BACKEND` unset or `auto`: detect Docker automatically; use Docker sandbox when available, otherwise fall back to the local filesystem backend
-- `AGENT_SANDBOX_BACKEND=docker`: force Docker sandbox
-- `AGENT_SANDBOX_BACKEND=local`: explicitly use the local fallback
-
-Analyzer / mitigator / verifier stages that need to run tests, reproductions, build commands, or optional runtime services should run under Docker sandbox. The local fallback is intentionally limited: it can expose mounted files for bounded reads and configured writes, but it should not be treated as a complete runtime validation environment.
+There is no value that selects the local filesystem backend. It has no shell, so handing it to a stage that reviews code would quietly remove that stage's ability to run anything. Stages that do not need one select it themselves, so this is not a deployment setting.
 
 Benchmark and local debug runs can set `runtime.workspace_image` to choose the image for the isolated container that hosts the target repository.
 
