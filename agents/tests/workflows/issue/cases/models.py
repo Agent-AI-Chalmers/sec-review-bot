@@ -138,7 +138,7 @@ class IssueCase(BaseModel):
     issue: IssueInput
     oracle: IssueCaseOracle
 
-    _directory: Path = PrivateAttr()
+    _directory: Path | None = PrivateAttr(default=None)
     _expectations: list[CaseExpectation] = PrivateAttr(default_factory=list)
 
     @field_validator("id")
@@ -155,6 +155,10 @@ class IssueCase(BaseModel):
 
     @property
     def workspace_source(self) -> Path:
+        if self._directory is None:
+            raise ValueError(
+                f"case {self.id} has no directory; load it through the loader"
+            )
         return self._directory / "workspace"
 
     def load_workspace_files(self) -> dict[str, str]:
