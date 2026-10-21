@@ -9,9 +9,14 @@ from tests.workflows.issue.cases.models import EvidenceRequirement, IssueCase
 def _matches_requirements(
     finding: Mapping[str, Any], requirements: list[EvidenceRequirement]
 ) -> bool:
-    rendered = json.dumps(finding, sort_keys=True).lower()
+    rendered = json.dumps(finding, sort_keys=True)
+    # Match case-insensitively instead of lowercasing the narrative: a fixture that writes
+    # `OAuthAccessToken` would otherwise stop matching without any error.
     return all(
-        any(re.search(pattern, rendered) for pattern in requirement.any_of)
+        any(
+            re.search(pattern, rendered, re.IGNORECASE)
+            for pattern in requirement.any_of
+        )
         for requirement in requirements
     )
 
