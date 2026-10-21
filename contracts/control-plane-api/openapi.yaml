@@ -302,6 +302,7 @@ components:
         - failure_code
         - failure_message
         - artifact_storage
+        - notices
         - workflow_result
         - claim_token
       properties:
@@ -346,6 +347,11 @@ components:
             - "null"
         artifact_storage:
           $ref: "#/components/schemas/ArtifactStorage"
+        notices:
+          description: User-visible notices caused by this run's coordination events, in creation order.
+          type: array
+          items:
+            $ref: "#/components/schemas/RunNoticeSummary"
         workflow_result: {}
         claim_token:
           type: string
