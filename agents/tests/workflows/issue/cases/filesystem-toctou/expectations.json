@@ -1,0 +1,38 @@
+{
+  "examples": [
+    {
+      "name": "accepts a checked path replaced before use",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "A TOCTOU race lets the path be replaced between the check and the open, so a symlink points outside the allowed root and exposes the secret.",
+            "locations": [
+              {
+                "file": "src/export_reader.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a race with no escape from the root",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "There is a race between check and use.",
+            "locations": [
+              {
+                "file": "src/export_reader.py"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

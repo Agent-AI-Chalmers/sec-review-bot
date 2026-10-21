@@ -1,0 +1,49 @@
+{
+  "examples": [
+    {
+      "name": "rejects evidence split across two findings",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "The authorization context is lost.",
+            "locations": []
+          },
+          {
+            "verdict": "confirmed-defect",
+            "overview": "The mutable queue message carries only project_id.",
+            "locations": [
+              {
+                "file": "src/api.py"
+              },
+              {
+                "file": "src/worker.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "accepts one finding that establishes both stages",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "The api stage drops the tenant so the queue message carries only project_id, and the worker trusts that mutable message for authorization context.",
+            "locations": [
+              {
+                "file": "src/api.py"
+              },
+              {
+                "file": "src/worker.py"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

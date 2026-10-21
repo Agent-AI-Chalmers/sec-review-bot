@@ -1,0 +1,38 @@
+{
+  "examples": [
+    {
+      "name": "accepts development credentials reaching production",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "The trust domain is checked but not bound to the workload identity, so a non-production administrator reaches production.",
+            "locations": [
+              {
+                "file": "src/workload_auth.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a finding anchored in the wrong file",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "overview": "The trust domain is not bound to the workload identity and development reaches production.",
+            "locations": [
+              {
+                "file": "src/other.py"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
