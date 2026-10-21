@@ -1,0 +1,22 @@
+{
+  "id": "invite-replay-and-weak-token",
+  "issue": {
+    "title": "Invite links may allow unexpected extra accounts",
+    "body": "We received a report that a single invite link was associated with several unexpected signups. The reporter also worried that our invite codes might be too easy to guess, but they did not provide token samples or a brute-force trace.\n\nPlease audit the invite creation and redemption flow. If the code supports more than one explanation, keep the confirmed behavior and any unresolved token-strength concern separate instead of turning the whole report into one root cause."
+  },
+  "oracle": {
+    "acceptable_verdicts": ["confirmed-vulnerability", "confirmed-defect"],
+    "expected_mechanism": "Redemption looks an invite up by token and expiry but never consumes it, so one invite can be redeemed repeatedly; token strength depends on an external package the repository does not show.",
+    "required_evidence": [
+      {
+        "label": "invite is reusable",
+        "any_of": ["replay|one-time|one time|redeemed|reuse|multiple"]
+      },
+      {
+        "label": "redemption path creates users",
+        "any_of": ["db\\.users\\.create"]
+      }
+    ],
+    "required_locations": ["src/server/invites.ts"]
+  }
+}

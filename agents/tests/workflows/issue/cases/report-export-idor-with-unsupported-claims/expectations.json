@@ -1,0 +1,58 @@
+{
+  "examples": [
+    {
+      "name": "accepts the export authorization finding",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "Report export lacks an ownership check",
+            "overview": "`/api/reports/:id/export` loads the report by id and returns `confidentialNotes` without an authorization check that the report belongs to the caller, so any authenticated user can export another user's report (IDOR).",
+            "locations": [
+              {
+                "file": "src/server/reports.ts"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a SQL injection claim",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "SQL injection in report search",
+            "overview": "`/api/reports/search` interpolates the query string into the SQL statement.",
+            "locations": [
+              {
+                "file": "src/server/reports.ts"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a missing rate limit claim",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "Missing rate limit on exports",
+            "overview": "The export endpoint has no rate limiting, so a caller can exhaust server resources.",
+            "locations": [
+              {
+                "file": "src/server/reports.ts"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

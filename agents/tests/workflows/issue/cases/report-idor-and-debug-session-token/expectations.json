@@ -1,0 +1,68 @@
+{
+  "examples": [
+    {
+      "name": "accepts both defects as separate narratives",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "Report export lacks an ownership check",
+            "overview": "`/api/reports/:id/export` loads the report by id and returns `confidentialNotes` without an authorization check, so any authenticated user can export another user's report (IDOR).",
+            "locations": [
+              {
+                "file": "src/server/reports.ts"
+              }
+            ]
+          },
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "Unauthenticated debug-session endpoint leaks session credentials",
+            "overview": "`/api/admin/debug-session` has no authentication and returns `csrfToken` and `oauthAccessToken` for any `sessionId`, so a caller can take over the matching session.",
+            "locations": [
+              {
+                "file": "src/server/reports.ts"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a single narrative that merges both defects",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "Report controller authorization and credential exposure",
+            "overview": "Both `/api/reports/:id/export` and `/api/admin/debug-session` are missing authorization; the export returns `confidentialNotes` and the debug route returns `oauthAccessToken`.",
+            "locations": [
+              {
+                "file": "src/server/reports.ts"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a run that only reports the export defect",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "Report export lacks an ownership check",
+            "overview": "`/api/reports/:id/export` loads the report by id and returns `confidentialNotes` without an authorization check (IDOR).",
+            "locations": [
+              {
+                "file": "src/server/reports.ts"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

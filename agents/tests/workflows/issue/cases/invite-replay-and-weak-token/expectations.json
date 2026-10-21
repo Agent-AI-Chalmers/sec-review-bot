@@ -1,0 +1,40 @@
+{
+  "examples": [
+    {
+      "name": "accepts a replay finding on the redemption path",
+      "expected": "accepted",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "Invite token is never consumed, so one link can be redeemed repeatedly",
+            "overview": "`/api/invites/redeem` looks the invite up by token and expiry but never marks `redeemedAt`, so the same invite can be replayed and each redemption reaches `db.users.create`, creating multiple users.",
+            "locations": [
+              {
+                "file": "src/server/invites.ts"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "rejects a finding that only speculates about token strength",
+      "expected": "rejected",
+      "result": {
+        "narratives": [
+          {
+            "verdict": "confirmed-vulnerability",
+            "title": "Invite tokens may be guessable",
+            "overview": "The invite token may have low entropy because `makeInviteToken` comes from an external package the repository does not show.",
+            "locations": [
+              {
+                "file": "src/server/invites.ts"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
