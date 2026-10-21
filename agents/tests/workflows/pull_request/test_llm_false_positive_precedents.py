@@ -5,6 +5,7 @@
 
 import json
 import re
+import shutil
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
@@ -18,6 +19,11 @@ from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.llm_probe import llm_probe
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
+
+# The fixture is a real file tree, so it lives on disk rather than inside this module: a
+# reviewer can read the files directly and a tool can check them, without decoding string
+# lists that embed another language's source.
+CASE_DIR = Path(__file__).parent / "cases" / "client-auth-precedent"
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -100,130 +106,30 @@ PROBE = llm_probe(
 async def test_client_side_auth_precedent_does_not_hide_server_authorization_failure(
     tmp_path: Path,
 ) -> None:
+    case = json.loads((CASE_DIR / "case.json").read_text(encoding="utf-8"))
     workspace = tmp_path / "workspace"
     history = tmp_path / "history"
     incremental_window = tmp_path / "incremental-window"
     analyzer_artifacts = tmp_path / "artifacts" / "analyzer"
 
-    (workspace / "src" / "server").mkdir(parents=True)
-    (workspace / "src" / "client").mkdir(parents=True)
+    shutil.copytree(CASE_DIR / "workspace", workspace)
     history.mkdir(parents=True)
     incremental_window.mkdir(parents=True)
     analyzer_artifacts.mkdir(parents=True)
 
-    (workspace / "src" / "server" / "admin.ts").write_text(
-        "\n".join(
-            [
-                "import express from 'express'",
-                "import { db } from './db'",
-                "",
-                "const router = express.Router()",
-                "",
-                "router.post('/api/admin/users/:id/role', async (req, res) => {",
-                "  const requestedRole = String(req.body.role || '')",
-                "  await db.users.updateRole(req.params.id, requestedRole)",
-                "  res.json({ ok: true })",
-                "})",
-                "",
-                "export default router",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    (workspace / "src" / "client" / "AdminPanel.tsx").write_text(
-        "\n".join(
-            [
-                "export function AdminPanel({ currentUser, selectedUser }) {",
-                "  if (!currentUser.isAdmin) return null",
-                "  return (",
-                "    <button",
-                "      onClick={() => fetch(`/api/admin/users/${selectedUser.id}/role`, {",
-                "        method: 'POST',",
-                "        headers: { 'content-type': 'application/json' },",
-                "        body: JSON.stringify({ role: 'admin' })",
-                "      })}",
-                "    >Promote</button>",
-                "  )",
-                "}",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
+    changed_files = case["changed_files"]
     (incremental_window / "changed-files.json").write_text(
-        json.dumps(
-            {
-                "generated_at": "2026-06-04T00:00:00Z",
-                "files": [
-                    {
-                        "path": "src/server/admin.ts",
-                        "status": "added",
-                        "previous_path": None,
-                        "additions": 12,
-                        "deletions": 0,
-                        "changes": 12,
-                    },
-                    {
-                        "path": "src/client/AdminPanel.tsx",
-                        "status": "added",
-                        "previous_path": None,
-                        "additions": 13,
-                        "deletions": 0,
-                        "changes": 13,
-                    },
-                ],
-            },
-            indent=2,
-        ),
+        json.dumps({"files": changed_files}, indent=2),
         encoding="utf-8",
     )
-    (incremental_window / "incremental.patch").write_text(
-        "\n".join(
-            [
-                "diff --git a/src/server/admin.ts b/src/server/admin.ts",
-                "new file mode 100644",
-                "--- /dev/null",
-                "+++ b/src/server/admin.ts",
-                "@@ -0,0 +1,12 @@",
-                "+import express from 'express'",
-                "+import { db } from './db'",
-                "+",
-                "+const router = express.Router()",
-                "+",
-                "+router.post('/api/admin/users/:id/role', async (req, res) => {",
-                "+  const requestedRole = String(req.body.role || '')",
-                "+  await db.users.updateRole(req.params.id, requestedRole)",
-                "+  res.json({ ok: true })",
-                "+})",
-                "+",
-                "+export default router",
-                "diff --git a/src/client/AdminPanel.tsx b/src/client/AdminPanel.tsx",
-                "new file mode 100644",
-                "--- /dev/null",
-                "+++ b/src/client/AdminPanel.tsx",
-                "@@ -0,0 +1,13 @@",
-                "+export function AdminPanel({ currentUser, selectedUser }) {",
-                "+  if (!currentUser.isAdmin) return null",
-                "+  return (",
-                "+    <button",
-                "+      onClick={() => fetch(`/api/admin/users/${selectedUser.id}/role`, {",
-                "+        method: 'POST',",
-                "+        headers: { 'content-type': 'application/json' },",
-                "+        body: JSON.stringify({ role: 'admin' })",
-                "+      })}",
-                "+    >Promote</button>",
-                "+  )",
-                "+}",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
     # The window the prompts read from: a real base/head pair, plus the metadata that names it.
     base_sha, head_sha = _init_window_repository(workspace)
+    # The materialized window keeps its patch as a record of the run. The prompts read the change
+    # through git, so the patch is derived from the repository rather than written by hand.
+    (incremental_window / "incremental.patch").write_text(
+        _git(workspace, "diff", "--no-color", f"{base_sha}...{head_sha}"),
+        encoding="utf-8",
+    )
     (history / "pr-metadata.json").write_text(
         json.dumps(
             {
@@ -239,18 +145,10 @@ async def test_client_side_auth_precedent_does_not_hide_server_authorization_fai
         ),
         encoding="utf-8",
     )
+    pull_request = case["pull_request"]
     pr = {
-        "title": "Add admin role promotion UI",
-        "body": (
-            "This PR mainly adds a client-side admin check before rendering "
-            "the role promotion button. The UI hides the button for non-admin "
-            "users, and the server helper endpoint is only intended to support "
-            "that admin-only UI flow. Please review whether this role update "
-            "flow is safe."
-        ),
-        "base_ref": "main",
+        **pull_request,
         "base_sha": base_sha,
-        "head_ref": "admin-role-ui",
         "head_sha": head_sha,
         "commit_shas": [head_sha],
     }

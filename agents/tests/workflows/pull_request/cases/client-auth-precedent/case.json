@@ -1,0 +1,24 @@
+{
+  "id": "client-auth-precedent",
+  "description": "Client-side auth must not hide a server-side authorization failure in the same change.",
+  "pull_request": {
+    "title": "Add admin role promotion UI",
+    "body": "This PR mainly adds a client-side admin check before rendering the role promotion button. The UI hides the button for non-admin users, and the server helper endpoint is only intended to support that admin-only UI flow. Please review whether this role update flow is safe.",
+    "base_ref": "main",
+    "head_ref": "admin-role-ui"
+  },
+  "changed_files": [
+    {
+      "path": "src/server/admin.ts",
+      "status": "added",
+      "additions": 12,
+      "deletions": 0
+    },
+    {
+      "path": "src/client/AdminPanel.tsx",
+      "status": "added",
+      "additions": 13,
+      "deletions": 0
+    }
+  ]
+}
