@@ -132,6 +132,7 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
     failure_code: null,
     failure_message: null,
     artifact_storage: null,
+    notices: [],
     workflow_result: {},
     claim_token: 'claim-1'
   } satisfies PublicationWork
@@ -214,6 +215,7 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
     failure_code: null,
     failure_message: null,
     artifact_storage: null,
+    notices: [],
     workflow_result: {},
     claim_token: 'claim-1'
   } satisfies PublicationWork
@@ -296,6 +298,7 @@ test('a reconciliation that loses the step ends the publication instead of holdi
         failure_code: null,
         failure_message: null,
         artifact_storage: null,
+        notices: [],
         workflow_result: EMPTY_REPOSITORY_RESULT,
         claim_token: 'claim-1'
       }) satisfies PublicationWork,

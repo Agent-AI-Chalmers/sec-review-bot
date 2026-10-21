@@ -114,6 +114,8 @@ export interface components {
       failure_code: string | null
       failure_message: string | null
       artifact_storage: components['schemas']['ArtifactStorage']
+      /** @description User-visible notices caused by this run's coordination events, in creation order. */
+      notices: components['schemas']['RunNoticeSummary'][]
       workflow_result: unknown
       claim_token: string
     }
