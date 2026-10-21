@@ -71,18 +71,6 @@ def _parses(source: str, version: tuple[int, int]) -> bool:
     return True
 
 
-@pytest.mark.parametrize(
-    "script", SANDBOX_SCRIPTS, ids=[script.name for script in SANDBOX_SCRIPTS]
-)
-def test_sandbox_script_parses_on_its_minimum_python(script: SandboxScript) -> None:
-    """Black under `target-version = py314` once rewrote a tuple of exception types in
-    `sandbox_file_script_program.py` into the Python 2 `except A, B:` form, which is valid syntax
-    only from 3.14. Every host test kept passing while the sandbox could no longer list files, so
-    the compatibility claim needs a test that names the older grammar explicitly.
-    """
-    assert _parses(script.build_source(), script.minimum_python)
-
-
 # Every version from a script's floor up to the interpreter running this test. A sandbox may run
 # any of them, and deriving the range means a host upgrade cannot silently leave a version
 # untested.
@@ -94,8 +82,14 @@ INTERMEDIATE_CASES = [
 
 
 @pytest.mark.parametrize(("script", "minor"), INTERMEDIATE_CASES)
-def test_sandbox_script_parses_on_every_intermediate_python(
+def test_sandbox_script_parses_on_every_supported_python(
     script: SandboxScript, minor: int
 ) -> None:
-    """A sandbox may run any version between the declared floor and the host interpreter."""
+    """One case per version from the script's floor up to the host interpreter.
+
+    Black under `target-version = py314` once rewrote a tuple of exception types in
+    `sandbox_file_script_program.py` into the Python 2 `except A, B:` form, which is valid syntax
+    only from 3.14. Every host test kept passing while the sandbox could no longer list files, and
+    the declared floor is the version such a rewrite would break.
+    """
     assert _parses(script.build_source(), (3, minor))
