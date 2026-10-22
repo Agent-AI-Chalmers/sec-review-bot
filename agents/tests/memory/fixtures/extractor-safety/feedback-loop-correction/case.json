@@ -1,0 +1,9 @@
+{
+  "id": "feedback-loop-correction",
+  "expect_observation": true,
+  "allow_skip": true,
+  "required_terms": ["tenant"],
+  "required_any_terms": ["lookup", "existence", "before"],
+  "forbidden_terms": ["POST_LOOKUP_GUARD_IS_COMPLETE_4F2A"],
+  "expect_memory_unchanged": true
+}

@@ -28,6 +28,7 @@ from sec_review_agents.memory.state import (
 )
 from sec_review_agents.memory.store import (
     initialize_memory_store,
+    memory_agent_transcript_path,
     memory_observations_dir,
     memory_store_lock,
     resolve_memory_store_dir,
@@ -40,6 +41,7 @@ from sec_review_agents.runtime.transcripts import (
     review_transcripts_root,
     transcript_path,
 )
+from sec_review_agents.utils.files import slug_filename_component
 
 PUBLISHED_TRANSCRIPT_STAGES = {"analyzer", "mitigator", "verifier"}
 
@@ -55,8 +57,13 @@ class TranscriptRef:
     @property
     def label(self) -> str:
         if self.stage == self.attempt:
-            return _slug_component(self.stage)
-        return f"{_slug_component(self.stage)}-{_slug_component(self.attempt)}"
+            return slug_filename_component(self.stage, fallback="transcript")
+        return "-".join(
+            (
+                slug_filename_component(self.stage, fallback="transcript"),
+                slug_filename_component(self.attempt, fallback="transcript"),
+            )
+        )
 
     @property
     def display(self) -> str:
@@ -88,15 +95,6 @@ class MemoryObservationPreviewResult:
     observation_markdown: str | None = None
 
 
-def _slug_component(value: str) -> str:
-    slug = "".join(
-        character.lower() if character.isalnum() else "-" for character in value.strip()
-    ).strip("-")
-    while "--" in slug:
-        slug = slug.replace("--", "-")
-    return slug or "transcript"
-
-
 def observation_id(
     transcript_paths: list[Path],
     *,
@@ -104,7 +102,7 @@ def observation_id(
 ) -> str:
     """Derive a filesystem-safe observation ID from a job ID or transcript paths."""
     if job_id:
-        return _slug_component(job_id)
+        return slug_filename_component(job_id, fallback="transcript")
 
     hasher = hashlib.sha256()
     for path in transcript_paths:
@@ -121,7 +119,7 @@ def resolve_observation_id(
 ) -> str:
     """Resolve the final ID, giving an explicit operator value highest priority."""
     if explicit_observation_id:
-        return _slug_component(explicit_observation_id)
+        return slug_filename_component(explicit_observation_id, fallback="transcript")
     return observation_id([ref.path for ref in transcript_refs], job_id=job_id)
 
 
@@ -252,6 +250,7 @@ async def _generate_memory_observation_for_refs(
     resolved_observation_id: str,
     source_workflow: str | None,
     run_id: str | None,
+    audit_root: Path | None,
 ) -> MemoryObservationPreviewResult:
     with tempfile.TemporaryDirectory(prefix="sec-review-memory-extractor-") as tempdir:
         transcript_root = Path(tempdir) / TRANSCRIPTS_DIRNAME
@@ -271,6 +270,17 @@ async def _generate_memory_observation_for_refs(
                 agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
                 system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
                 user_prompt=build_extractor_prompt(staged_transcripts),
+                transcript_paths=(
+                    (
+                        memory_agent_transcript_path(
+                            audit_root,
+                            agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
+                            run_label=resolved_observation_id,
+                        ),
+                    )
+                    if audit_root is not None
+                    else ()
+                ),
             )
 
         observation_body = str(
@@ -343,6 +353,7 @@ async def _extract_memory_observation_for_refs(
         resolved_observation_id=resolved_observation_id,
         source_workflow=source_workflow,
         run_id=run_id,
+        audit_root=memory_root,
     )
     if preview.skipped or preview.observation_markdown is None:
         return MemoryObservationResult(skipped=True, summary=preview.summary)
@@ -387,8 +398,16 @@ async def preview_memory_observation_from_paths(
     job_id: str | None = None,
     source_workflow: str | None = None,
     run_id: str | None = None,
+    audit_root: Path | None = None,
 ) -> MemoryObservationPreviewResult:
-    """Extract one observation document without publishing it to a memory store."""
+    """Run an experimental extraction without publishing to the memory store.
+
+    This entry point is intended for model probes, prompt experiments, and
+    operator inspection. It runs the real extractor and returns its candidate
+    observation, but does not write an observation file, register pending state,
+    update ``MEMORY.md``, or invoke memory maintenance. When ``audit_root`` is
+    provided, only the extractor's own run transcript is persisted there.
+    """
     transcript_refs = collect_transcript_refs(transcript_paths)
     resolved_observation_id = resolve_observation_id(
         transcript_refs,
@@ -407,6 +426,7 @@ async def preview_memory_observation_from_paths(
         resolved_observation_id=resolved_observation_id,
         source_workflow=source_workflow,
         run_id=run_id,
+        audit_root=audit_root,
     )
 
 

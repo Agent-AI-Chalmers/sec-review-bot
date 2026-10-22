@@ -1,0 +1,8 @@
+{
+  "id": "compaction-summary-conflict",
+  "expect_observation": false,
+  "required_terms": [],
+  "required_any_terms": [],
+  "forbidden_terms": ["COMPACTION_SUMMARY_CANARY_71D4"],
+  "expect_memory_unchanged": true
+}

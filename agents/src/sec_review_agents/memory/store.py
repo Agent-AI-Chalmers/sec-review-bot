@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Literal, overload
+from uuid import uuid4
 
 from sec_review_agents.features import (
     AGENT_MEMORY_ENABLED_ENV,
@@ -13,11 +14,13 @@ from sec_review_agents.features import (
 from sec_review_agents.filesystem.path_views import PathView, memory_view
 from sec_review_agents.memory.state import initialize_memory_state
 from sec_review_agents.utils.env import env_value
+from sec_review_agents.utils.files import slug_filename_component
 
 AGENT_MEMORY_DIR_ENV = "AGENT_MEMORY_DIR"
 AGENT_MEMORY_MATERIALIZED_ROOT_ENV = "AGENT_MEMORY_MATERIALIZED_ROOT"
 MEMORY_DIRNAME = "memory"
 MEMORY_OBSERVATIONS_DIRNAME = "observations"
+MEMORY_AGENT_TRANSCRIPTS_DIRNAME = "agent-transcripts"
 
 _DEFAULT_MEMORY_MATERIALIZED_ROOT: Path | None = None
 
@@ -43,6 +46,9 @@ def initialize_memory_store(memory_store_dir: Path) -> Path:
     content_dir.mkdir(exist_ok=True)
     (content_dir / "topics").mkdir(exist_ok=True)
     (resolved_store_dir / MEMORY_OBSERVATIONS_DIRNAME).mkdir(exist_ok=True)
+    audit_root = resolved_store_dir / MEMORY_AGENT_TRANSCRIPTS_DIRNAME
+    (audit_root / "memory-extractor").mkdir(parents=True, exist_ok=True)
+    (audit_root / "memory-maintainer").mkdir(exist_ok=True)
     initialize_memory_state(resolved_store_dir)
     index_path = content_dir / "MEMORY.md"
     if not index_path.exists():
@@ -56,6 +62,20 @@ def memory_content_dir(memory_store_dir: Path) -> Path:
 
 def memory_observations_dir(memory_store_dir: Path) -> Path:
     return memory_store_dir / MEMORY_OBSERVATIONS_DIRNAME
+
+
+def memory_agent_transcript_path(
+    memory_store_dir: Path,
+    *,
+    agent_name: str,
+    run_label: str,
+) -> Path:
+    """Allocate one non-overwriting audit transcript for a memory-agent run."""
+    agent = slug_filename_component(agent_name, fallback="run")
+    label = slug_filename_component(run_label, fallback="run")
+    root = memory_store_dir / MEMORY_AGENT_TRANSCRIPTS_DIRNAME / agent
+    root.mkdir(parents=True, exist_ok=True)
+    return root / f"{label}-{uuid4().hex}.jsonl"
 
 
 @contextlib.contextmanager

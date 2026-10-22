@@ -7,6 +7,16 @@ from typing import Any
 JSON_SUFFIX = ".json"
 
 
+def slug_filename_component(value: str, *, fallback: str) -> str:
+    """Normalize one filename component while preserving Unicode letters."""
+    slug = "".join(
+        character.lower() if character.isalnum() else "-" for character in value.strip()
+    ).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or fallback
+
+
 def reset_stage_attempt_artifacts(
     root: Path,
     *,

@@ -13,20 +13,12 @@ from uuid import uuid4
 
 from langchain_core.messages import RemoveMessage
 
+from sec_review_agents.utils.files import slug_filename_component
 from sec_review_agents.utils.serialization import json_safe
 
 TRANSCRIPTS_DIRNAME = "transcripts"
 TRANSCRIPT_BASENAME = "transcript"
 TRANSCRIPT_SUFFIX = ".jsonl"
-
-
-def _slug_component(value: str) -> str:
-    slug = "".join(
-        character.lower() if character.isalnum() else "-" for character in value.strip()
-    ).strip("-")
-    while "--" in slug:
-        slug = slug.replace("--", "-")
-    return slug or "unknown"
 
 
 def review_transcripts_root(artifact_root_path: Path) -> Path:
@@ -58,7 +50,12 @@ def transcript_file(
 ) -> Path:
     if order < 1:
         raise ValueError("Transcript order must be >= 1.")
-    suffix = f"{_slug_component(stage)}-{_slug_component(attempt)}"
+    suffix = "-".join(
+        (
+            slug_filename_component(stage, fallback="unknown"),
+            slug_filename_component(attempt, fallback="unknown"),
+        )
+    )
     return transcript_path(transcripts_dir, name=f"{order:04d}-{suffix}")
 
 

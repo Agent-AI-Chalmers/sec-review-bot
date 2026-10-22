@@ -39,6 +39,7 @@ from sec_review_agents.memory.state import (
 )
 from sec_review_agents.memory.store import (
     initialize_memory_store,
+    memory_agent_transcript_path,
     memory_content_dir,
     memory_observations_dir,
     memory_store_lock,
@@ -306,6 +307,13 @@ async def _maintain_memory_with_result_locked(
                 system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
                 user_prompt=build_maintenance_prompt(
                     _maintenance_prompt_observations(selected_rows)
+                ),
+                transcript_paths=(
+                    memory_agent_transcript_path(
+                        memory_store_dir,
+                        agent_name=MEMORY_MAINTAINER_AGENT_NAME,
+                        run_label="maintenance",
+                    ),
                 ),
             )
 

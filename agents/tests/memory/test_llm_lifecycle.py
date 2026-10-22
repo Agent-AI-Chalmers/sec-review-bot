@@ -24,7 +24,27 @@ LIFECYCLE_PROBE = llm_probe(
 
 def _write_transcript(path: Path, records: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(records, separators=(",", ":")) + "\n", encoding="utf-8")
+    lines = []
+    for seq, record in enumerate(records, start=1):
+        message = {
+            "type": record["type"],
+            "id": f"fixture-message-{seq}",
+            "name": None,
+            "content": record["content"],
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "tool_call_chunks": [],
+            "usage_metadata": None,
+        }
+        lines.append(
+            json.dumps(
+                {"seq": seq, "event": "message", "message": message},
+                separators=(",", ":"),
+            )
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _fetch_observation_status(memory_root: Path, observation_id: str) -> str | None:
@@ -51,7 +71,6 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
         transcript_root / "0001-analyzer-initial.jsonl",
         [
             {
-                "index": 0,
                 "type": "system",
                 "content": (
                     "Analyze repository evidence and keep confidence calibrated "
@@ -59,7 +78,6 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
                 ),
             },
             {
-                "index": 1,
                 "type": "ai",
                 "content": (
                     "Analyzer result: high confidence. I believe the uploaded "
@@ -72,7 +90,6 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
         transcript_root / "0002-mitigator-initial.jsonl",
         [
             {
-                "index": 0,
                 "type": "ai",
                 "content": (
                     "Mitigator draft: normalize archive paths before writing "
@@ -85,7 +102,6 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
         transcript_root / "0003-verifier-initial.jsonl",
         [
             {
-                "index": 0,
                 "type": "ai",
                 "content": (
                     "Verifier result: the analyzer's key source-to-sink "
@@ -114,6 +130,12 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
 
     runtime_memory_root = memory_content_dir(memory_root)
     observation_files = sorted(memory_observations_dir(memory_root).glob("*.md"))
+    extractor_transcripts = sorted(
+        (memory_root / "agent-transcripts" / "memory-extractor").glob("*.jsonl")
+    )
+    maintainer_transcripts = sorted(
+        (memory_root / "agent-transcripts" / "memory-maintainer").glob("*.jsonl")
+    )
     memory_index = (runtime_memory_root / "MEMORY.md").read_text(encoding="utf-8")
     topic_files = sorted((runtime_memory_root / "topics").glob("*.md"))
     topic_text = "\n\n".join(
@@ -136,6 +158,8 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
                 f"- maintenance summary: {maintenance.summary}",
                 f"- observation path: {extraction.observation_path}",
                 f"- observation files: {[str(path.relative_to(memory_root)) for path in observation_files]}",
+                f"- extractor transcripts: {[str(path.relative_to(memory_root)) for path in extractor_transcripts]}",
+                f"- maintainer transcripts: {[str(path.relative_to(memory_root)) for path in maintainer_transcripts]}",
                 f"- topic files: {[str(path.relative_to(runtime_memory_root)) for path in topic_files]}",
                 "",
                 "observation:",
@@ -153,6 +177,8 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
     assert not extraction.skipped
     assert extraction.observation_path is not None
     assert maintenance.processed_count == 1
+    assert len(extractor_transcripts) == 1
+    assert len(maintainer_transcripts) == 1
     assert (
         _fetch_observation_status(memory_root, "llm-memory-lifecycle-probe-run-1")
         == "processed"
