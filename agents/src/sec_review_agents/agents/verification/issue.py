@@ -26,7 +26,7 @@ from sec_review_agents.runtime.external_tools import (
     external_tool_prompt_paths_for,
 )
 from sec_review_agents.runtime.runtime_config import (
-    RunnerRuntimeContext,
+    ExecutionRuntimeContext,
     runtime_workspace_image,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
@@ -64,7 +64,7 @@ def create_issue_verification_backend(
     *,
     workspace_root_path: Path,
     history_path: Path,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
 ):
     if not workspace_root_path.is_dir():
         raise FileNotFoundError(

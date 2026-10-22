@@ -7,6 +7,7 @@ import pytest
 from sec_review_agents.entrypoints import contract_schema
 from sec_review_agents.entrypoints.contract_schema import (
     CONTRACT_VERSION,
+    validate_v6_input_bundle_manifest,
     validate_v6_workflow_result,
 )
 from tests.contract_fixtures import (
@@ -65,6 +66,20 @@ def test_v6_contract_fixtures_match_json_schemas() -> None:
         ), f"{fixture_name} failed {schema_name}:\n{format_schema_errors(errors)}"
 
 
+def test_execution_worker_accepts_shared_input_bundle_manifest_fixture() -> None:
+    validate_v6_input_bundle_manifest(contract_fixture("input-bundle-manifest.json"))
+
+
+def test_execution_worker_rejects_removed_input_bundle_kind() -> None:
+    with pytest.raises(
+        ValueError,
+        match="Execution input bundle manifest does not match contract v6",
+    ):
+        validate_v6_input_bundle_manifest(
+            contract_fixture("invalid-input-bundle-manifest-kind.json")
+        )
+
+
 @pytest.mark.parametrize(
     ("workflow", "fixture_name"),
     [
@@ -80,7 +95,7 @@ def test_runner_accepts_shared_v6_workflow_result_fixtures(
 
 
 def test_runner_rejects_result_missing_required_fields() -> None:
-    with pytest.raises(ValueError, match="Runner result does not match contract"):
+    with pytest.raises(ValueError, match="Execution result does not match contract"):
         validate_v6_workflow_result(
             {"contract_version": CONTRACT_VERSION},
             "issue-review",

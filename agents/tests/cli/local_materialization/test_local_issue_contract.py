@@ -61,10 +61,10 @@ def test_local_issue_bundle_passes_the_v6_input_schema(
     ]
 
 
-def test_local_issue_metadata_matches_the_runner_input(
+def test_local_issue_metadata_matches_the_execution_input(
     git_repo: Path, tmp_path: Path
 ) -> None:
-    # The file on disk and the runner input are the same object for issue runs; only the pull
+    # The file on disk and the execution input are the same object for issue runs; only the pull
     # request path narrows the file for the agent.
     bundle = build_local_issue_bundle(
         repo_path=git_repo,

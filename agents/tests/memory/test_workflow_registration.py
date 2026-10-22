@@ -2,8 +2,7 @@ import pytest
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.memory.extraction_workflow import (
-    MemoryExtractionRegistrationRequest,
-    register_memory_extraction,
+    TranscriptBundlePublicationRequest,
 )
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.issue import workflow as issue_workflow
@@ -11,9 +10,7 @@ from sec_review_agents.workflows.pull_request import workflow as pr_workflow
 from sec_review_agents.workflows.repository import workflow as repository_workflow
 
 
-def test_internal_workflow_request_enables_memory_extraction_registration_by_default() -> (
-    None
-):
+def test_internal_workflow_request_enables_memory_extraction_by_default() -> None:
     request = InternalWorkflowRequest(
         workflow="issue-review",
         run_id="run-1",
@@ -22,17 +19,18 @@ def test_internal_workflow_request_enables_memory_extraction_registration_by_def
         runtime_context={},
     )
 
-    assert request.memory_extraction_registration_enabled is True
+    assert request.memory_extraction_enabled is True
 
 
 @pytest.mark.asyncio
-async def test_issue_review_registers_memory_extraction_via_activity(
+async def test_issue_review_publishes_transcripts_and_starts_memory(
     monkeypatch,
 ) -> None:
-    calls: list[MemoryExtractionRegistrationRequest] = []
+    calls: list[tuple[TranscriptBundlePublicationRequest, str, bool]] = []
 
-    async def fake_register(registration):
-        calls.append(registration)
+    async def fake_publish(request, *, source_workflow, start_extractions):
+        calls.append((request, source_workflow, start_extractions))
+        return {"transcript_publication": "published", "extractions": []}
 
     async def fake_execute_activity(activity_fn, *args, timeout_seconds):
         if activity_fn is issue_workflow.build_issue_review_result_activity:
@@ -41,8 +39,8 @@ async def test_issue_review_registers_memory_extraction_via_activity(
 
     monkeypatch.setattr(
         issue_workflow,
-        "register_memory_extraction",
-        fake_register,
+        "publish_and_start_memory_extractions",
+        fake_publish,
     )
     monkeypatch.setattr(issue_workflow, "execute_activity", fake_execute_activity)
 
@@ -55,19 +53,29 @@ async def test_issue_review_registers_memory_extraction_via_activity(
     )
     result = await issue_workflow.IssueReviewWorkflow().run(request)
 
-    assert result == {"ok": True, "result": {"contract_version": CONTRACT_VERSION}}
+    assert result["result"] == {"contract_version": CONTRACT_VERSION}
+    assert result["memory_processing"]["transcript_publication"] == "published"
     assert len(calls) == 1
-    assert calls[0].job_id == "issue-review-run-1"
+    publication, source_workflow, start_extractions = calls[0]
+    assert publication.review_units == [
+        {
+            "review_unit_id": "review",
+            "transcript_root": "/tmp/run-1/artifacts/transcripts",
+        }
+    ]
+    assert source_workflow == "issue-review"
+    assert start_extractions is True
 
 
 @pytest.mark.asyncio
-async def test_pull_request_review_registers_memory_extraction_via_activity(
+async def test_pull_request_review_publishes_transcripts_and_starts_memory(
     monkeypatch,
 ) -> None:
-    calls: list[MemoryExtractionRegistrationRequest] = []
+    calls: list[tuple[TranscriptBundlePublicationRequest, str, bool]] = []
 
-    async def fake_register(registration):
-        calls.append(registration)
+    async def fake_publish(request, *, source_workflow, start_extractions):
+        calls.append((request, source_workflow, start_extractions))
+        return {"transcript_publication": "published", "extractions": []}
 
     async def fake_execute_activity(activity_fn, *args, timeout_seconds):
         if activity_fn is pr_workflow.build_pull_request_review_result_activity:
@@ -76,8 +84,8 @@ async def test_pull_request_review_registers_memory_extraction_via_activity(
 
     monkeypatch.setattr(
         pr_workflow,
-        "register_memory_extraction",
-        fake_register,
+        "publish_and_start_memory_extractions",
+        fake_publish,
     )
     monkeypatch.setattr(pr_workflow, "execute_activity", fake_execute_activity)
 
@@ -90,13 +98,14 @@ async def test_pull_request_review_registers_memory_extraction_via_activity(
     )
     result = await pr_workflow.PullRequestReviewWorkflow().run(request)
 
-    assert result == {"ok": True, "result": {"contract_version": CONTRACT_VERSION}}
+    assert result["result"] == {"contract_version": CONTRACT_VERSION}
     assert len(calls) == 1
-    assert calls[0].job_id == "pull-request-review-run-1"
+    assert calls[0][0].review_units[0]["review_unit_id"] == "review"
+    assert calls[0][1:] == ("pull-request-review", True)
 
 
 @pytest.mark.asyncio
-async def test_repository_review_does_not_register_run_level_memory_extraction(
+async def test_repository_review_without_cases_does_not_publish_empty_bundle(
     monkeypatch,
 ) -> None:
     async def fake_execute_activity(activity_fn, *args, timeout_seconds):
@@ -127,11 +136,79 @@ async def test_repository_review_does_not_register_run_level_memory_extraction(
     )
     result = await repository_workflow.RepositoryReviewWorkflow().run(request)
 
-    assert result == {"ok": True, "result": {"contract_version": CONTRACT_VERSION}}
+    assert result == {
+        "ok": True,
+        "result": {"contract_version": CONTRACT_VERSION},
+        "memory_processing": None,
+    }
 
 
 @pytest.mark.asyncio
-async def test_repository_case_registers_memory_only_after_result_is_built(
+async def test_repository_review_publishes_all_case_units_once(monkeypatch) -> None:
+    publications: list[tuple[TranscriptBundlePublicationRequest, str, bool]] = []
+    child_results = iter(
+        [
+            {"scan": "done"},
+            [
+                {"case_id": "case-a", "disposition": "keep"},
+                {"case_id": "case-b", "disposition": "drop"},
+            ],
+            {"delivery": "done"},
+        ]
+    )
+
+    async def fake_execute_activity(activity_fn, *args, timeout_seconds):
+        if activity_fn is repository_workflow.build_repository_review_result_activity:
+            return {"contract_version": CONTRACT_VERSION}
+        return {}
+
+    async def fake_execute_child_workflow(*_args, **_kwargs):
+        return next(child_results)
+
+    async def fake_publish(request, *, source_workflow, start_extractions):
+        publications.append((request, source_workflow, start_extractions))
+        return {"transcript_publication": "published", "extractions": []}
+
+    monkeypatch.setattr(repository_workflow, "execute_activity", fake_execute_activity)
+    monkeypatch.setattr(
+        repository_workflow.workflow,
+        "execute_child_workflow",
+        fake_execute_child_workflow,
+    )
+    monkeypatch.setattr(
+        repository_workflow,
+        "publish_and_start_memory_extractions",
+        fake_publish,
+    )
+
+    request = InternalWorkflowRequest(
+        workflow="repository-review",
+        run_id="run-1",
+        prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+        timeout_seconds=30,
+        runtime_context={},
+    )
+    result = await repository_workflow.RepositoryReviewWorkflow().run(request)
+
+    assert result["result"] == {"contract_version": CONTRACT_VERSION}
+    assert len(publications) == 1
+    publication, source_workflow, start_extractions = publications[0]
+    assert publication.review_units == [
+        {
+            "review_unit_id": "case-a",
+            "transcript_root": "/tmp/run-1/artifacts/cases/case-a/transcripts",
+        },
+        {
+            "review_unit_id": "case-b",
+            "transcript_root": "/tmp/run-1/artifacts/cases/case-b/transcripts",
+        },
+    ]
+    assert source_workflow == "repository-review"
+    assert start_extractions is True
+
+
+@pytest.mark.asyncio
+async def test_repository_case_does_not_publish_before_parent_run_finishes(
     monkeypatch,
 ) -> None:
     """A failed case must not publish an incomplete transcript for learning."""
@@ -158,21 +235,10 @@ async def test_repository_case_registers_memory_only_after_result_is_built(
             return {"case_id": "case-7", "disposition": "drop"}
         raise AssertionError(f"Unexpected activity: {activity_fn}")
 
-    registrations: list[MemoryExtractionRegistrationRequest] = []
-
-    async def fake_register(registration):
-        registrations.append(registration)
-        events.append("register")
-
     monkeypatch.setattr(
         repository_workflow.workflow,
         "execute_activity",
         fake_execute_activity,
-    )
-    monkeypatch.setattr(
-        repository_workflow,
-        "register_memory_extraction",
-        fake_register,
     )
     monkeypatch.setattr(
         repository_workflow,
@@ -194,65 +260,16 @@ async def test_repository_case_registers_memory_only_after_result_is_built(
         "published_transcripts_path": "unused",
         "timeout_seconds": 30,
         "runtime_context": {},
-        "memory_extraction_registration_enabled": True,
     }
 
     result = await repository_workflow.RepositoryCaseReviewWorkflow().run(request)
 
     assert result == {"case_id": "case-7", "disposition": "drop"}
-    assert events == ["result", "register"]
-    assert registrations == [
-        MemoryExtractionRegistrationRequest(
-            job_id="repository-review-run-1-case-7",
-            source_workflow="repository-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run-1/artifacts/cases/case-7",
-            timeout_seconds=30,
-        )
-    ]
+    assert events == ["result"]
 
 
 @pytest.mark.asyncio
-async def test_register_memory_extraction_swallows_activity_failure(
-    monkeypatch,
-) -> None:
-    registration = MemoryExtractionRegistrationRequest(
-        job_id="issue-review-run-1",
-        source_workflow="issue-review",
-        run_id="run-1",
-        artifact_root_path="/tmp/run-1/artifacts",
-        timeout_seconds=30,
-    )
-    warnings: list[tuple[str, str]] = []
-
-    async def fake_execute_activity(*_args, **_kwargs):
-        raise RuntimeError("temporary ledger failure")
-
-    class FakeLogger:
-        def warning(self, message: str, run_id: str, error: Exception) -> None:
-            warnings.append((message, str(error)))
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.extraction_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.extraction_workflow.workflow.logger",
-        FakeLogger(),
-    )
-
-    await register_memory_extraction(registration)
-
-    assert warnings == [
-        (
-            "Failed to register memory extraction job for %s: %s",
-            "temporary ledger failure",
-        )
-    ]
-
-
-@pytest.mark.asyncio
-async def test_issue_review_does_not_register_memory_when_disabled(
+async def test_issue_review_still_publishes_when_memory_extraction_is_disabled(
     monkeypatch,
 ) -> None:
     request = InternalWorkflowRequest(
@@ -261,18 +278,20 @@ async def test_issue_review_does_not_register_memory_when_disabled(
         prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
         timeout_seconds=30,
         runtime_context={},
-        memory_extraction_registration_enabled=False,
+        memory_extraction_enabled=False,
     )
 
-    calls: list[MemoryExtractionRegistrationRequest] = []
+    calls: list[bool] = []
 
-    async def fake_register(registration):
-        calls.append(registration)
+    async def fake_publish(_request, *, source_workflow, start_extractions):
+        assert source_workflow == "issue-review"
+        calls.append(start_extractions)
+        return {"transcript_publication": "published", "extractions": []}
 
     monkeypatch.setattr(
         issue_workflow,
-        "register_memory_extraction",
-        fake_register,
+        "publish_and_start_memory_extractions",
+        fake_publish,
     )
 
     async def fake_execute_activity(activity_fn, *args, **kwargs):
@@ -284,4 +303,4 @@ async def test_issue_review_does_not_register_memory_when_disabled(
 
     await issue_workflow.IssueReviewWorkflow().run(request)
 
-    assert calls == []
+    assert calls == [False]

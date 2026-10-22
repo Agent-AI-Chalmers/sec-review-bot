@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-`agents/` is the Python side of the project. It contains the runner entrypoints, workflow execution, filesystem and workspace runtime, delivery result generation, and observability.
+`agents/` is the Python side of the project. It contains the Execution Worker entrypoints, workflow execution, filesystem and workspace runtime, delivery result generation, and observability.
 
 ## Setup
 
@@ -50,17 +50,17 @@ When running from this repository, local commands read `agents/.env` and `agents
 
 The local `run-local-*` CLIs and `sec-review-agents-check-llm-deployments` load `agents/.env`, but never overwrite environment variables already set in the process.
 
-`sec-review-agents-service` and `sec-review-agents-worker` do not load `.env` by themselves. Pass their environment through the shell, process supervisor, or CI. The integrated Compose deployment configures Runner Service directly and does not read `agents/.env`.
+`sec-review-agents-execution-worker` does not load `.env` by itself. Pass its environment through the shell, process supervisor, or CI. Execution Gateway is a separate TypeScript service under [`execution-gateway/`](../execution-gateway/README.md).
 
 There is no `.env` path override. `MODEL_PROVIDERS_CONFIG_TOML` has the highest priority for model config; set it only when using another TOML location or when the run layout does not preserve the project-relative path.
 
 `[agent_deployment_bindings]` explicitly binds agents to deployments. Every agent that can run must be declared; undeclared agents fail fast and do not inherit a default model.
 
-Each `[[deployments]]` entry must explicitly declare `max_input_tokens`. The runner does not infer context-window size from LangChain model profiles or provider names; this deployment contract is the source of truth for context-limit behavior.
+Each `[[deployments]]` entry must explicitly declare `max_input_tokens`. The Execution Worker does not infer context-window size from LangChain model profiles or provider names; this deployment contract is the source of truth for context-limit behavior.
 
 ## Capabilities
 
-The Python runner supports:
+The Execution Worker supports:
 
 - `issue-review` workflow
 - issue analyzer / mitigator / verifier
@@ -76,7 +76,7 @@ The Python runner supports:
 Resources live inside the package:
 
 - [`./src/sec_review_agents/resources/`](./src/sec_review_agents/resources/)
-- The runner reads prompts from there, prepares the skills declared for an agent, and mounts them for that agent.
+- The worker reads prompts from there, prepares the skills declared for an agent, and mounts them for that agent.
 
 ## Layout
 
@@ -97,7 +97,7 @@ The Python package is easiest to read by responsibility:
    - `cli/`: commands for development and operations that perform one requested task and exit, plus their local-only support code.
 
 5. Production entrypoints.
-   - `entrypoints/`: long-lived processes started by the deployment system, including the FastAPI service and Temporal worker, plus their run protocol and workflow input preparation boundaries.
+   - `entrypoints/`: the Temporal execution worker plus its execution contract, run protocol, and workflow input preparation boundaries. The HTTP Gateway and managed-memory service are separate TypeScript packages.
 
 6. Runtime support: infrastructure needed to run agents.
    - `runtime/`, `filesystem/`, `workspace/`, `llm/`, `resources/`, `observability/`: agent runtime, filesystem sandbox, workspace artifacts, model config, prompt / skill resources, and diagnostics.
@@ -106,8 +106,7 @@ The Python package is easiest to read by responsibility:
 
 ```mermaid
 flowchart LR
-    http["HTTP caller"] --> service["FastAPI service<br/>Uvicorn"]
-    service <-->|"start / query workflow"| temporal["Temporal Server"]
+    gateway["execution-gateway/<br/>TypeScript + Fastify"] <-->|"start / query workflow"| temporal["Temporal Server"]
 
     local["run-local-*"] --> materialize["Local input materialization"]
     materialize --> direct["Direct execution"]
@@ -118,7 +117,7 @@ flowchart LR
     direct --> execution
 ```
 
-The FastAPI service receives HTTP run requests and uses the Temporal client to start and query workflows; it does not execute agents. Temporal Server persists workflow state and dispatches tasks to the polling worker. Direct local execution bypasses both the HTTP service and Temporal while reusing activity functions; `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and the worker.
+The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows; it does not execute agents. Temporal Server persists workflow state and dispatches tasks to the polling worker. Direct local execution bypasses both the HTTP service and Temporal while reusing activity functions; `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and the worker.
 
 ## Local Runs
 
@@ -208,7 +207,7 @@ sec-review-agents-run-local-repository \
 
 Use `--temporal` only when you specifically want to exercise internal Temporal workflow / activity orchestration.
 
-With `--temporal`, the same local command still prepares input on the developer machine, but the workflow stages run through Temporal workflow / activity scheduling. This is useful when debugging workflow orchestration, retries, activity boundaries, or Temporal-visible state. It still bypasses the HTTP Runner Service, so it is not the same as the full service path.
+With `--temporal`, the same local command still prepares input on the developer machine, but the workflow stages run through Temporal workflow / activity scheduling. This is useful when debugging workflow orchestration, retries, activity boundaries, or Temporal-visible state. It still bypasses the HTTP Execution Gateway, so it is not the same as the full service path.
 
 Before running a `--temporal` local command, start a local Temporal dev server:
 
@@ -216,7 +215,7 @@ Before running a `--temporal` local command, start a local Temporal dev server:
 temporal server start-dev --ip 127.0.0.1 --port 7233
 ```
 
-Then start the runner worker as a host process in another terminal:
+Then start the Execution Worker as a host process in another terminal:
 
 ```bash
 cd agents
@@ -231,12 +230,12 @@ set +a
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
 TEMPORAL_NAMESPACE=default \
 TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-worker
+sec-review-agents-execution-worker
 ```
 
-### Run the Service and Worker Manually
+### Run the Worker Manually
 
-To exercise the complete HTTP service, Temporal, and worker path locally, start all three processes in separate terminals.
+Start Temporal and the worker in separate terminals. Run the independent HTTP service from [`execution-gateway/`](../execution-gateway/README.md).
 
 Minimal local startup shape:
 
@@ -246,31 +245,23 @@ Terminal 1, Temporal Server:
 temporal server start-dev
 ```
 
-Terminal 2, FastAPI service:
+Terminal 2, Temporal Worker:
 
 ```bash
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
 TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-service
+sec-review-agents-execution-worker
 ```
 
-Terminal 3, Temporal Worker:
-
-```bash
-TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-worker
-```
-
-The service owns HTTP, authentication, run request validation, and starting Temporal workflows. The worker polls Temporal for registered workflow and activity tasks and executes them. Model, sandbox, skills, and activity concurrency environment variables belong to the worker runtime.
+The worker polls Temporal for registered workflow and activity tasks and executes them. Model, sandbox, skills, and activity concurrency environment variables belong to the worker runtime.
 
 Docker Compose control-plane startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
 
 ## Agent Runtime Configuration
 
-Agents can declare the skills they need. The runner prepares and mounts the declared skills when it starts an agent. See [Agent Skills](../docs/agent/SKILLS.md) for details.
+Agents can declare the skills they need. The worker prepares and mounts the declared skills when it starts an agent. See [Agent Skills](../docs/agent/SKILLS.md) for details.
 
-`AGENT_MEMORY_DIR` points to the agent memory store. Main agents read the store's `memory/` subtree as `/memory`, including `memory/MEMORY.md` as runtime guidance. Set `AGENT_MEMORY_ENABLED=false` to disable memory end to end: main agents stop reading it, and memory extraction and maintenance stop running. Memory content comes from past review transcripts and is extracted, curated, and maintained for reuse in later reviews. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the design.
+Memory has two mutually exclusive storage modes. Local/offline execution sets `AGENT_MEMORY_DIR`; main agents receive a snapshot of its `memory/` subtree at `/memory`. Managed workers instead set `AGENT_MEMORY_CATALOG_URL` and `AGENT_MEMORY_CATALOG_TOKEN`; they fetch the active immutable memory version from object storage and materialize the same local read-only `/memory` view. A configured service never falls back to `AGENT_MEMORY_DIR`. Set `AGENT_MEMORY_ENABLED=false` to disable memory end to end. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the design principles and lifecycle.
 
 Agents that require structured output check whether the final state contains `structured_response`. If the model only returns plain text and does not produce a structured result, agent middleware appends a correction message inside the LangChain agent loop and retries. Retry count is controlled by `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES`, default `2`. This fallback is separate from provider/API request retry and does not handle schema-parameter validation errors; those remain under LangChain structured-output retry behavior.
 

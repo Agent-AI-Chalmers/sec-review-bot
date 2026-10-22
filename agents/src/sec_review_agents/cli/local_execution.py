@@ -24,7 +24,7 @@ def build_local_workflow_request(
         ),
         timeout_seconds=timeout_seconds,
         runtime_context=runtime_context_from_config(bundle.runtime_config),
-        memory_extraction_registration_enabled=False,
+        memory_extraction_enabled=False,
     )
 
 

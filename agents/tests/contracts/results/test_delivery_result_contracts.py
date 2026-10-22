@@ -1,6 +1,6 @@
 import json
 from annotationlib import Format, get_annotations
-from typing import Any
+from typing import Any, get_args, get_type_hints
 
 import sec_review_agents.delivery_stages.result as delivery_result_module
 from sec_review_agents.delivery_stages.execution.patch_synthesis import (
@@ -21,7 +21,11 @@ from sec_review_agents.delivery_stages.result import (
     build_skipped_delivery_result,
     persist_delivery_result,
 )
-from sec_review_agents.workspace.file_changes import FileChange
+from sec_review_agents.workspace.file_changes import (
+    DeletedFileChange,
+    UpsertFileChange,
+)
+from tests.contract_fixtures import contract_schema
 
 
 def test_delivery_plan_return_annotation_is_public_payload() -> None:
@@ -91,7 +95,14 @@ def test_delivery_result_contract_tracks_required_sections(tmp_path) -> None:
                 "patch_path": None,
                 "patch_diff": "",
                 "changed_files": ["src/app.py"],
-                "file_changes": [{"path": "src/app.py", "status": "modified"}],
+                "file_changes": [
+                    {
+                        "path": "src/app.py",
+                        "status": "upsert",
+                        "content": "print('ok')\n",
+                        "content_encoding": "utf-8",
+                    }
+                ],
                 "applied_case_ids": ["case-1"],
             }
         ],
@@ -134,6 +145,42 @@ def test_delivery_execution_result_builder_tracks_public_fields() -> None:
     }
 
 
+def test_file_change_types_match_shared_schema() -> None:
+    variants = contract_schema("common.schema.json")["$defs"]["fileChange"]["oneOf"]
+    by_status = {
+        variant["properties"]["status"]["const"]: variant for variant in variants
+    }
+    assert set(by_status) == {"deleted", "upsert"}
+
+    deleted_schema = by_status["deleted"]
+    assert DeletedFileChange.__required_keys__ == set(deleted_schema["required"])
+    assert DeletedFileChange.__optional_keys__ == set(
+        deleted_schema["properties"]
+    ) - set(deleted_schema["required"])
+    deleted_annotations = get_type_hints(DeletedFileChange)
+    assert set(get_args(deleted_annotations["status"])) == {"deleted"}
+
+    upsert_schema = by_status["upsert"]
+    assert UpsertFileChange.__required_keys__ == set(upsert_schema["required"])
+    assert UpsertFileChange.__optional_keys__ == set(upsert_schema["properties"]) - set(
+        upsert_schema["required"]
+    )
+    upsert_annotations = get_type_hints(UpsertFileChange)
+    assert set(get_args(upsert_annotations["status"])) == {"upsert"}
+
+    upsert_properties = upsert_schema["properties"]
+    content_encoding = getattr(
+        upsert_annotations["content_encoding"],
+        "__value__",
+        upsert_annotations["content_encoding"],
+    )
+    mode = getattr(upsert_annotations["mode"], "__value__", upsert_annotations["mode"])
+    assert set(get_args(content_encoding)) == set(
+        upsert_properties["content_encoding"]["enum"]
+    )
+    assert set(get_args(mode)) == set(upsert_properties["mode"]["enum"])
+
+
 def test_delivery_execution_result_is_json_serializable_public_payload() -> None:
     result = build_delivery_execution_result(
         delivery_id="delivery-1",
@@ -148,14 +195,6 @@ def test_delivery_execution_result_is_json_serializable_public_payload() -> None
 
     assert type(result) is dict
     json.dumps(result)
-    assert FileChange.__required_keys__ == set()
-    assert FileChange.__optional_keys__ == {
-        "path",
-        "status",
-        "content",
-        "content_encoding",
-        "mode",
-    }
 
 
 def test_delivery_result_builders_emit_json_serializable_public_payloads() -> None:
@@ -177,7 +216,14 @@ def test_delivery_result_builders_emit_json_serializable_public_payloads() -> No
                 "patch_path": None,
                 "patch_diff": "",
                 "changed_files": ["src/app.py"],
-                "file_changes": [{"path": "src/app.py", "status": "modified"}],
+                "file_changes": [
+                    {
+                        "path": "src/app.py",
+                        "status": "upsert",
+                        "content": "print('ok')\n",
+                        "content_encoding": "utf-8",
+                    }
+                ],
                 "applied_case_ids": ["case-1"],
             }
         ],
@@ -208,7 +254,14 @@ def test_delivery_result_persistence_writes_stage_artifacts(tmp_path) -> None:
                 "patch_path": None,
                 "patch_diff": "",
                 "changed_files": ["src/app.py"],
-                "file_changes": [{"path": "src/app.py", "status": "modified"}],
+                "file_changes": [
+                    {
+                        "path": "src/app.py",
+                        "status": "upsert",
+                        "content": "print('ok')\n",
+                        "content_encoding": "utf-8",
+                    }
+                ],
                 "applied_case_ids": ["case-1"],
             }
         ],

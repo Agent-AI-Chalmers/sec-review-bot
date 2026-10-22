@@ -6,7 +6,7 @@ from sec_review_agents.agents.mitigation import issue as issue_mitigation_agent
 from sec_review_agents.review_stages.mitigation.stage import (
     run_mitigation_stage,
 )
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
     TestChangesPolicy,
@@ -22,7 +22,7 @@ async def mitigate_issue_with_self_check(
     published_transcript_path: Path | None = None,
     analysis_result: Mapping[str, Any],
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     return await run_mitigation_stage(

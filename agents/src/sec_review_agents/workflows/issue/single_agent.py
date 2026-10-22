@@ -7,7 +7,7 @@ from typing import Any
 from temporalio import activity, workflow
 
 from sec_review_agents.review_stages.record import build_review_record
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
@@ -28,7 +28,7 @@ async def run_issue_single_agent(
     single_agent_artifacts_path: Path,
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run the single-agent stage and return its raw result.
@@ -234,7 +234,7 @@ async def execute_issue_single_agent(
     single_agent_artifacts_path: Path,
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run the stage and project it into the public ablation result shape."""

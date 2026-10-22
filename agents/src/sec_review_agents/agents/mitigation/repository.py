@@ -28,7 +28,7 @@ from sec_review_agents.runtime.external_tools import (
     external_tool_prompt_paths_for,
 )
 from sec_review_agents.runtime.runtime_config import (
-    RunnerRuntimeContext,
+    ExecutionRuntimeContext,
     runtime_workspace_image,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
@@ -63,7 +63,7 @@ def create_repository_mitigation_backend(
     history_path: Path | None,
     incremental_window_path: Path | None,
     scan_mode: str,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()

@@ -4,7 +4,7 @@ from typing import Any
 
 from sec_review_agents.agents.analysis import pull_request as pr_analysis_agent
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
 
 async def analyze_pull_request(
@@ -15,7 +15,7 @@ async def analyze_pull_request(
     incremental_window_path: Path,
     analyzer_artifacts_path: Path,
     published_transcript_path: Path | None = None,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     return await run_analysis_stage(

@@ -8,7 +8,7 @@ from sec_review_agents.review_stages.verification.stage import (
     run_verification_stage,
     verification_attempt_label,
 )
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
 
 async def verify_pull_request(
@@ -22,7 +22,7 @@ async def verify_pull_request(
     analysis_result: Mapping[str, Any],
     mitigation_result: Mapping[str, Any] | None,
     retry_context: Mapping[str, Any] | None,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     attempt_label = verification_attempt_label(retry_context)

@@ -3,7 +3,7 @@ from typing import Any
 
 from sec_review_agents.agents.analysis import repository as repository_analysis_agent
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
 
 async def analyze_repository_case(
@@ -15,7 +15,7 @@ async def analyze_repository_case(
     published_transcript_path: Path | None = None,
     scan_mode: str,
     review_input: str,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     return await run_analysis_stage(

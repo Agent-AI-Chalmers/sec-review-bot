@@ -4,7 +4,7 @@ from typing import Any
 
 from sec_review_agents.agents.mitigation import pull_request as pr_mitigation_agent
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
     TestChangesPolicy,
@@ -22,7 +22,7 @@ async def mitigate_pull_request(
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None = None,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     return await run_mitigation_stage(

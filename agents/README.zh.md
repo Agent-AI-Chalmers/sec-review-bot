@@ -4,7 +4,7 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-`agents/` 是项目里的 Python 侧。它包含 runner 入口、workflow 执行、filesystem / workspace runtime、delivery 产物生成和 observability。
+`agents/` 是项目里的 Python 侧。它包含 Execution Worker 入口、workflow 执行、filesystem / workspace runtime、delivery 产物生成和 observability。
 
 ## 安装
 
@@ -52,17 +52,17 @@ LLM 配置按 deployment 选择 provider。
 
 本地 `run-local-*` CLI 和 `sec-review-agents-check-llm-deployments` 会加载 `agents/.env`，但不会覆盖进程里已有的环境变量。
 
-`sec-review-agents-service` 和 `sec-review-agents-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。集成 Compose 部署直接配置 Runner Service，不读取 `agents/.env`。
+`sec-review-agents-execution-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。Execution Gateway 是 [`execution-gateway/`](../execution-gateway/README.zh.md) 下独立的 TypeScript 服务。
 
 没有 `.env` 文件路径 override。`MODEL_PROVIDERS_CONFIG_TOML` 是模型配置路径的最高优先级入口；只有想把 TOML 放到其他位置，或运行方式不保留当前项目相对目录结构时，才需要显式设置它。
 
 `[agent_deployment_bindings]` 用来把具体 agent 显式绑定到某个 deployment。所有运行到的 agent 都必须显式声明；未声明的 agent 会 fail fast，不会继承默认模型。
 
-每个 `[[deployments]]` 都必须显式声明 `max_input_tokens`。runner 不会从 LangChain model profile 或 provider 名字推断上下文窗口；这个 deployment contract 才是上下文上限行为的事实来源。
+每个 `[[deployments]]` 都必须显式声明 `max_input_tokens`。Execution Worker 不会从 LangChain model profile 或 provider 名字推断上下文窗口；这个 deployment contract 才是上下文上限行为的事实来源。
 
 ## 能力
 
-Python runner 支持：
+Execution Worker 支持：
 
 - `issue-review` workflow
 - issue analyzer / mitigator / verifier
@@ -78,7 +78,7 @@ Python runner 支持：
 resources 位于 package 内部：
 
 - [`./src/sec_review_agents/resources/`](./src/sec_review_agents/resources/)
-- runner 从这里读取 prompts，并把 agent 声明允许的 skills 准备好、挂给对应 agent 使用
+- worker 从这里读取 prompts，并把 agent 声明允许的 skills 准备好、挂给对应 agent 使用
 
 ## 目录
 
@@ -99,7 +99,7 @@ Python package 按职责读最清楚：
    - `cli/`：用于开发和运维、完成一次指定任务后退出的命令，以及只服务于本地命令的支持代码。
 
 5. 生产 entrypoints。
-   - `entrypoints/`：由部署系统启动的长期运行进程，包括 FastAPI service 和 Temporal worker，以及它们专属的 run protocol 与 workflow input preparation 边界。
+   - `entrypoints/`：Temporal execution worker，以及它的 execution contract、run protocol 和 workflow input preparation 边界。HTTP Gateway 和 managed-memory service 已是独立 TypeScript package。
 
 6. Runtime support：agent 运行所需基础设施。
    - `runtime/`、`filesystem/`、`workspace/`、`llm/`、`resources/`、`observability/`：agent runtime、filesystem sandbox、workspace 产物、模型配置、prompt / skill 资源和诊断支持。
@@ -108,8 +108,7 @@ Python package 按职责读最清楚：
 
 ```mermaid
 flowchart LR
-    http["HTTP 调用方"] --> service["FastAPI service<br/>Uvicorn"]
-    service <-->|"启动 / 查询 workflow"| temporal["Temporal Server"]
+    gateway["execution-gateway/<br/>TypeScript + Fastify"] <-->|"启动 / 查询 workflow"| temporal["Temporal Server"]
 
     local["run-local-*"] --> materialize["本地准备输入"]
     materialize --> direct["Direct execution"]
@@ -120,7 +119,7 @@ flowchart LR
     direct --> execution
 ```
 
-FastAPI service 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow；它不执行 agent。Temporal Server 持久化 workflow 状态，并把任务派发给主动轮询的 worker。Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions；`run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 worker。
+外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow；它不执行 agent。Temporal Server 持久化 workflow 状态，并把任务派发给主动轮询的 worker。Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions；`run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 worker。
 
 ## 本地运行
 
@@ -210,7 +209,7 @@ sec-review-agents-run-local-repository \
 
 只有需要调试内部 Temporal workflow / activity 编排时，才使用 `--temporal`。
 
-显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续 workflow stages 会通过 Temporal workflow / activity 调度执行。这个模式适合调试 workflow 编排、retry、activity 边界或 Temporal 中可见的状态。它仍然绕过 HTTP Runner Service，因此不等同于完整 service path。
+显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续 workflow stages 会通过 Temporal workflow / activity 调度执行。这个模式适合调试 workflow 编排、retry、activity 边界或 Temporal 中可见的状态。它仍然绕过 HTTP Execution Gateway，因此不等同于完整 service path。
 
 运行 `--temporal` local command 前，先启动本地 Temporal dev server：
 
@@ -218,7 +217,7 @@ sec-review-agents-run-local-repository \
 temporal server start-dev --ip 127.0.0.1 --port 7233
 ```
 
-然后另开一个 terminal，把 runner worker 作为宿主机进程启动：
+然后另开一个 terminal，把 Execution Worker 作为宿主机进程启动：
 
 ```bash
 cd agents
@@ -233,12 +232,12 @@ set +a
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
 TEMPORAL_NAMESPACE=default \
 TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-worker
+sec-review-agents-execution-worker
 ```
 
-### 手动启动 Service 和 Worker
+### 手动启动 Worker
 
-需要在本地验证完整的 HTTP service、Temporal 和 worker 路径时，在不同 terminal 中分别启动这三个进程。
+分别启动 Temporal 和 worker。独立 HTTP 服务从 [`execution-gateway/`](../execution-gateway/README.zh.md) 启动。
 
 最小本地启动形状：
 
@@ -248,31 +247,23 @@ sec-review-agents-worker
 temporal server start-dev
 ```
 
-终端 2，FastAPI service：
+终端 2，Temporal Worker：
 
 ```bash
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
 TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-service
+sec-review-agents-execution-worker
 ```
 
-终端 3，Temporal Worker：
-
-```bash
-TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-worker
-```
-
-Service 负责 HTTP、鉴权、run request 校验和启动 Temporal workflow；worker 从 Temporal 获取并执行已注册的 workflow 和 activity task。模型、sandbox、skills 和 activity 并发相关环境变量属于 worker 运行环境。
+Worker 从 Temporal 获取并执行已注册的 workflow 和 activity task。模型、sandbox、skills 和 activity 并发相关环境变量属于 worker 运行环境。
 
 Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
 ## Agent 运行时配置
 
-Agent 可以声明自己需要的 skills。runner 启动 agent 时会自动准备并挂载声明的 skills。更多设计细节见 [Agent Skills](../docs/agent/SKILLS.zh.md)。
+Agent 可以声明自己需要的 skills。worker 启动 agent 时会自动准备并挂载声明的 skills。更多设计细节见 [Agent Skills](../docs/agent/SKILLS.zh.md)。
 
-`AGENT_MEMORY_DIR` 用来指定 agent memory store。主 agent 会把其中的 `memory/` 子树挂载为 `/memory` 使用，其中 `memory/MEMORY.md` 会作为运行时参考。设置 `AGENT_MEMORY_ENABLED=false` 可以整套关闭 memory：主 agent 不再读取它，memory extraction 和 maintenance 也会停止。memory 里的内容来自历史 review transcripts，经过提炼和整理后供后续 review 复用。更多设计见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
+Memory 有两种互斥的存储模式。本地或离线运行设置 `AGENT_MEMORY_DIR`，主 agent 会把其中 `memory/` 子树的快照挂载为 `/memory`。Managed worker 则设置 `AGENT_MEMORY_CATALOG_URL` 和 `AGENT_MEMORY_CATALOG_TOKEN`，从对象存储取得 active immutable memory version，再物化成同样的本地只读 `/memory` 视图。只要配置了 service，就不会回退读取 `AGENT_MEMORY_DIR`。设置 `AGENT_MEMORY_ENABLED=false` 可以整套关闭 memory。设计原则和生命周期见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
 
 需要结构化输出的 agent 会检查最终 state 是否包含 `structured_response`。如果模型只返回普通文本、没有产出结构化结果，agent middleware 会在 LangChain agent loop 内追加一条纠偏消息并重试；重试次数由 `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` 控制，默认 `2`。这层兜底独立于 provider/API 请求重试，不处理 schema 参数校验错误；参数校验错误仍交给 LangChain structured output 自身的 retry 机制。
 

@@ -1,6 +1,6 @@
-"""Per-run runtime overrides accepted by the runner request boundary.
+"""Per-run runtime overrides accepted by the execution request boundary.
 
-Runner transport parses these values, then workflows and backends read them
+The Execution Worker parses these values, then workflows and backends read them
 while building stage runtime resources.
 
 This is the only per-run override channel; everything a deployment sets for all
@@ -14,15 +14,15 @@ from typing import Any, TypedDict
 from sec_review_agents.utils.env import env_value, parse_bool_env
 
 
-class RunnerRuntimeContext(TypedDict, total=False):
+class ExecutionRuntimeContext(TypedDict, total=False):
     workspace_image: str
 
 
 _ALLOWED_RUNTIME_CONFIG_KEYS = frozenset({"workspace_image"})
-ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV = "RUNNER_ALLOW_WORKSPACE_IMAGE_OVERRIDE"
+ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV = "EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE"
 
 
-def runtime_context_from_config(value: Any) -> RunnerRuntimeContext:
+def runtime_context_from_config(value: Any) -> ExecutionRuntimeContext:
     if value is None:
         return {}
     if not isinstance(value, dict):
@@ -36,10 +36,10 @@ def runtime_context_from_config(value: Any) -> RunnerRuntimeContext:
             "runtime contains unsupported key(s): " + ", ".join(unknown_keys)
         )
 
-    context: RunnerRuntimeContext = {}
+    context: ExecutionRuntimeContext = {}
     if "workspace_image" in value:
         if not parse_bool_env(env_value(ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV), False):
-            # Eval harnesses may opt in; production runners should use server config.
+            # Eval harnesses may opt in; production workers should use server config.
             raise ValueError(
                 "runtime.workspace_image override is disabled; set "
                 f"{ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV}=true to allow it."
@@ -51,14 +51,16 @@ def runtime_context_from_config(value: Any) -> RunnerRuntimeContext:
     return context
 
 
-def runtime_workspace_image(runtime_context: RunnerRuntimeContext | None) -> str | None:
+def runtime_workspace_image(
+    runtime_context: ExecutionRuntimeContext | None,
+) -> str | None:
     value = (runtime_context or {}).get("workspace_image")
     return value if isinstance(value, str) and value.strip() else None
 
 
 __all__ = [
     "ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV",
-    "RunnerRuntimeContext",
+    "ExecutionRuntimeContext",
     "runtime_context_from_config",
     "runtime_workspace_image",
 ]

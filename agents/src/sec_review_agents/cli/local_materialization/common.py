@@ -157,7 +157,6 @@ def write_input_bundle_manifest(
 ) -> None:
     manifest: dict[str, Any] = {
         "contract_version": CONTRACT_VERSION,
-        "kind": "runner-input-bundle",
         "workspace": {
             "snapshot": "workspace.snapshot.tar",
         },
@@ -189,7 +188,7 @@ def archive_input_bundle(
     ]
     archive_path.unlink(missing_ok=True)
     # The live checkout is staging state, not bundle content. The uncompressed
-    # workspace snapshot remains inside because Runner reuses it when creating
+    # workspace snapshot remains inside because the Execution Worker reuses it when creating
     # isolated stage workspaces; only the outer transport archive is compressed.
     with tarfile.open(archive_path, mode="w:zst") as archive:
         for entry in entries:

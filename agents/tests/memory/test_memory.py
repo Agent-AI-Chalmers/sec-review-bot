@@ -24,6 +24,7 @@ from sec_review_agents.agents.memory_maintainer.prompts import build_maintenance
 from sec_review_agents.agents.memory_maintainer.tools import (
     build_memory_delete_file_tool,
 )
+from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.filesystem.backend_factory import (
     create_backend_with_path_views,
 )
@@ -717,6 +718,77 @@ def test_materialize_configured_memory_view_locks_source_during_snapshot(
 
     assert snapshot is not None
     assert lock_calls == [(memory_root.resolve(), False)]
+
+
+def test_materialize_managed_active_memory_by_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    materialized_root = tmp_path / "materialized"
+    local_memory = tmp_path / "local-memory"
+    local_memory.mkdir()
+    monkeypatch.setenv(AGENT_MEMORY_DIR_ENV, str(local_memory))
+    monkeypatch.setenv(AGENT_MEMORY_MATERIALIZED_ROOT_ENV, str(materialized_root))
+    reference = ArtifactReference(
+        uri=f"s3://sec-review/memory/versions/{'a' * 64}/memory-tree.v1.tar.zst",
+        digest=f"sha256:{'a' * 64}",
+        media_type="application/tar+zstd",
+        size_bytes=42,
+    )
+    catalog_client = Mock(
+        active_version=Mock(
+            return_value={"revision": 3, "artifact_reference": reference.as_dict()}
+        )
+    )
+    materialize_calls: list[tuple[ArtifactReference, Path]] = []
+
+    def fake_materialize(
+        value: ArtifactReference,
+        *,
+        destination: Path,
+    ) -> Path:
+        materialize_calls.append((value, destination))
+        content_root = destination / "memory"
+        (content_root / "topics").mkdir(parents=True)
+        (content_root / "MEMORY.md").write_text("# Managed\n", encoding="utf-8")
+        return content_root
+
+    with (
+        patch(
+            "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+            return_value=catalog_client,
+        ),
+        patch(
+            "sec_review_agents.memory.version_bundle.materialize_memory_version",
+            side_effect=fake_materialize,
+        ),
+    ):
+        first = materialize_configured_memory_view()
+        second = materialize_configured_memory_view()
+
+    expected = materialized_root / f"managed-{'a' * 64}" / "memory"
+    assert first == expected
+    assert second == expected
+    assert (expected / "MEMORY.md").read_text(encoding="utf-8") == "# Managed\n"
+    assert materialize_calls == [(reference, expected.parent)]
+
+
+def test_managed_memory_without_active_version_does_not_fall_back_locally(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    local_memory = memory_store.initialize_memory_store(tmp_path / "local-memory")
+    monkeypatch.setenv(AGENT_MEMORY_DIR_ENV, str(local_memory))
+    catalog_client = Mock(
+        active_version=Mock(return_value={"revision": 0, "artifact_reference": None})
+    )
+
+    with patch(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        return_value=catalog_client,
+    ):
+        assert materialize_configured_memory_view() is None
+        assert not memory_runtime_available()
 
 
 def test_memory_runtime_unavailable_without_initialized_index(

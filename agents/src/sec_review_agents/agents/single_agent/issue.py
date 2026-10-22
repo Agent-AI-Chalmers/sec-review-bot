@@ -24,7 +24,7 @@ from sec_review_agents.runtime.external_tools import (
     external_tool_prompt_paths_for,
 )
 from sec_review_agents.runtime.runtime_config import (
-    RunnerRuntimeContext,
+    ExecutionRuntimeContext,
     runtime_workspace_image,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
@@ -51,7 +51,7 @@ def create_issue_single_agent_backend(
     *,
     workspace_root: Path,
     history_path: Path,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()

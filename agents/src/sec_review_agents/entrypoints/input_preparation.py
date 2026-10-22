@@ -14,7 +14,7 @@ from sec_review_agents.artifacts.input_storage import (
     download_s3_input_bundle,
 )
 from sec_review_agents.entrypoints.contract_schema import (
-    CONTRACT_VERSION,
+    validate_v6_input_bundle_manifest,
     validate_v6_workflow_input,
 )
 from sec_review_agents.entrypoints.run_protocol import validate_run_id
@@ -78,13 +78,13 @@ def prepare_workflow_input(
     """Turn public workflow input into the filesystem-ready runtime form.
 
     The caller supplies the review target and an input bundle URI. This function
-    keeps that public object unchanged and returns a copy enriched with runner-owned
+    keeps that public object unchanged and returns a copy enriched with worker-owned
     paths: ``input_bundle_root_path``, ``artifact_root_path``, ``artifact_paths``,
     and ``bundle_paths``. All bundle paths are read from the manifest and constrained
     to remain inside the input bundle.
     """
 
-    # Validate before adding runner-owned fields, which are not part of the public
+    # Validate before adding worker-owned fields, which are not part of the public
     # workflow input contract.
     validate_v6_workflow_input(input_data, workflow)
     prepared = deepcopy(input_data)
@@ -102,7 +102,7 @@ def prepare_workflow_input(
         )
     )
 
-    # Artifact paths come from runner configuration, never from caller input.
+    # Artifact paths come from worker configuration, never from caller input.
     _set_workflow_artifact_paths(
         prepared,
         workflow,
@@ -129,17 +129,17 @@ def _materialize_input_bundle(
     expected_run_id: str | None = None,
 ) -> Path:
     if not isinstance(value, dict):
-        raise ValueError("Runner input is missing input_bundle.")
+        raise ValueError("Execution input is missing input_bundle.")
     uri = value.get("uri")
     digest = value.get("digest")
     size_bytes = value.get("size_bytes")
     media_type = value.get("media_type")
     if not isinstance(uri, str) or not uri.strip():
-        raise ValueError("Runner input input_bundle.uri must be non-empty.")
+        raise ValueError("Execution input input_bundle.uri must be non-empty.")
     if not isinstance(size_bytes, int) or isinstance(size_bytes, bool):
-        raise ValueError("Runner input input_bundle.size_bytes must be an integer.")
+        raise ValueError("Execution input input_bundle.size_bytes must be an integer.")
     if media_type != INPUT_BUNDLE_MEDIA_TYPE:
-        raise ValueError("Runner input input_bundle.media_type is unsupported.")
+        raise ValueError("Execution input input_bundle.media_type is unsupported.")
 
     parsed = urlparse(uri.strip())
     if parsed.scheme == "file":
@@ -148,10 +148,10 @@ def _materialize_input_bundle(
             and env_value(ARTIFACT_S3_BUCKET_ENV) is not None
         ):
             raise ValueError(
-                "Runner input input_bundle.uri must use s3 in object-storage mode."
+                "Execution input input_bundle.uri must use s3 in object-storage mode."
             )
         if parsed.netloc not in {"", "localhost"}:
-            raise ValueError("Runner input input_bundle file URI must be local.")
+            raise ValueError("Execution input input_bundle file URI must be local.")
         archive_path = Path(unquote(parsed.path))
         configured_root = env_value(INPUT_BUNDLE_ROOT_ENV)
         resolved_archive = archive_path.expanduser().resolve()
@@ -161,7 +161,7 @@ def _materialize_input_bundle(
                 resolved_archive.relative_to(allowed_root)
             except ValueError as error:
                 raise ValueError(
-                    "Runner input input_bundle.uri must resolve under "
+                    "Execution input input_bundle.uri must resolve under "
                     f"{INPUT_BUNDLE_ROOT_ENV}."
                 ) from error
     elif parsed.scheme == "s3":
@@ -251,7 +251,7 @@ def _set_workflow_artifact_paths(
     else:
         raise AssertionError(f"Unsupported prepared workflow: {workflow}")
 
-    # Prepared workflow input may include runner-owned artifact paths
+    # Prepared workflow input may include worker-owned artifact paths
     # after caller validation. Keep those fields out of caller input.
     input_data["artifact_root_path"] = str(artifact_root)
     input_data["artifact_paths"] = {
@@ -271,7 +271,7 @@ def _resolve_artifact_root(*, run_id: str) -> Path:
             run_artifact_root.relative_to(artifact_root)
         except ValueError as error:
             raise ValueError(
-                f"Runner run_id resolves outside {ARTIFACT_ROOT_ENV}."
+                f"Execution run_id resolves outside {ARTIFACT_ROOT_ENV}."
             ) from error
         return run_artifact_root
     return Path(".agent-artifacts").resolve() / run_id
@@ -290,7 +290,7 @@ def _resolve_run_input_root(*, run_id: str) -> Path:
         run_input_root.relative_to(input_root)
     except ValueError as error:
         raise ValueError(
-            f"Runner run_id resolves outside {RUN_INPUT_ROOT_ENV}."
+            f"Execution run_id resolves outside {RUN_INPUT_ROOT_ENV}."
         ) from error
     return run_input_root
 
@@ -304,14 +304,7 @@ def _set_bundle_paths_from_manifest(
     if not manifest_path.is_file():
         raise ValueError(f"Input bundle manifest not found: {manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(manifest, dict):
-        raise ValueError("Input bundle manifest must be an object.")
-    if manifest.get("contract_version") != CONTRACT_VERSION:
-        raise ValueError(
-            f"Input bundle manifest contract_version must be '{CONTRACT_VERSION}'."
-        )
-    if manifest.get("kind") != "runner-input-bundle":
-        raise ValueError("Input bundle manifest kind must be 'runner-input-bundle'.")
+    validate_v6_input_bundle_manifest(manifest)
 
     bundle_paths: dict[str, str] = {
         "workspace_snapshot_tar_path": str(

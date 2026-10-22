@@ -88,7 +88,9 @@ def _unwrap_runner_response(response: Any) -> dict[str, Any]:
             "Local Temporal workflow failed: "
             + json.dumps(response["error"], ensure_ascii=False)
         )
-    raise RuntimeError("Local Temporal workflow returned an invalid runner response.")
+    raise RuntimeError(
+        "Local Temporal workflow returned an invalid execution response."
+    )
 
 
 __all__ = [

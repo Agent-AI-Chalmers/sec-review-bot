@@ -24,7 +24,7 @@ from sec_review_agents.runtime.backend_cleanup import (
     amanaged_backend,
 )
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.runtime.summarization_middleware import (
     SEC_REVIEW_SUMMARY_PROMPT,
     create_summarization_middleware,
@@ -494,7 +494,7 @@ def test_runtime_workspace_image_reaches_pr_and_repository_docker_backends(
     incremental_window.mkdir(parents=True)
     history.mkdir(parents=True)
     image = "custom-workspace:latest"
-    runtime_context: RunnerRuntimeContext = {
+    runtime_context: ExecutionRuntimeContext = {
         "workspace_image": image,
     }
 

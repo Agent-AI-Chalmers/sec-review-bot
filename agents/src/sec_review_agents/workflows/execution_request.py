@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
 
 @dataclass(frozen=True)
@@ -10,10 +10,10 @@ class InternalWorkflowRequest:
     run_id: str
     prepared_input: dict[str, Any]
     timeout_seconds: int
-    runtime_context: RunnerRuntimeContext
+    runtime_context: ExecutionRuntimeContext
     # Controls only whether this review run registers a pending memory extraction
     # job; scheduled extraction and maintenance are managed separately.
-    memory_extraction_registration_enabled: bool = True
+    memory_extraction_enabled: bool = True
 
 
 __all__ = ["InternalWorkflowRequest"]

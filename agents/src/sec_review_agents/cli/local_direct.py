@@ -1,5 +1,6 @@
 import asyncio
 import sys
+from pathlib import Path
 from typing import Any
 
 from sec_review_agents.cli.local_execution import (
@@ -7,6 +8,10 @@ from sec_review_agents.cli.local_execution import (
     direct_run_for_bundle,
 )
 from sec_review_agents.cli.local_materialization.common import ReviewBundle
+from sec_review_agents.memory.transcript_bundle import (
+    TranscriptReviewUnit,
+    publish_transcript_bundle,
+)
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 
 
@@ -24,7 +29,37 @@ def run_local_direct_workflow(bundle: ReviewBundle) -> dict[str, Any]:
     )
     run_direct = direct_run_for_bundle(bundle)
     result = asyncio.run(run_direct(request))
+    _publish_local_transcripts(bundle)
     return dict(result)
+
+
+def _publish_local_transcripts(bundle: ReviewBundle) -> None:
+    artifact_root = bundle.artifact_root_path
+    if bundle.workflow == "repository-review":
+        units = [
+            TranscriptReviewUnit(
+                review_unit_id=case_root.name,
+                transcript_root=case_root / "transcripts",
+            )
+            for case_root in sorted((artifact_root / "cases").glob("*"))
+            if case_root.is_dir() and list((case_root / "transcripts").glob("*.jsonl"))
+        ]
+    else:
+        transcript_root = artifact_root / "transcripts"
+        units = (
+            [TranscriptReviewUnit("review", transcript_root)]
+            if list(transcript_root.glob("*.jsonl"))
+            else []
+        )
+    if units:
+        # Direct mode is an offline producer even when the shell also carries
+        # managed-deployment S3 settings.
+        publish_transcript_bundle(
+            run_id=bundle.run_id,
+            artifact_root=Path(artifact_root),
+            review_units=units,
+            remote=False,
+        )
 
 
 __all__ = ["run_local_direct_workflow"]
