@@ -18,6 +18,7 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
+from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
 from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -89,8 +90,9 @@ async def run_analysis_stage(
 def reset_analysis_artifacts(*, analyzer_artifacts_path: Path) -> None:
     reset_stage_attempt_artifacts(
         analyzer_artifacts_path,
-        filenames=("analysis-result.json", "transcript.jsonl"),
+        filenames=("analysis-result.json",),
     )
+    remove_transcripts((transcript_path(analyzer_artifacts_path),))
 
 
 def prepare_analysis_transcript(
@@ -98,7 +100,7 @@ def prepare_analysis_transcript(
     analyzer_artifacts_path: Path,
     published_transcript_path: Path | None,
 ) -> tuple[Path, ...]:
-    local_transcript_path = analyzer_artifacts_path / "transcript.jsonl"
+    local_transcript_path = transcript_path(analyzer_artifacts_path)
     if published_transcript_path is None:
         return (local_transcript_path,)
 

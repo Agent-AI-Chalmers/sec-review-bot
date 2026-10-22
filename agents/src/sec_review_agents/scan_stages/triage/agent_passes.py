@@ -17,8 +17,9 @@ from sec_review_agents.agents.triage.prompts import (
 from sec_review_agents.agents.triage.workbench_state import TriageWorkbenchState
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
 from sec_review_agents.scan_stages.triage.batching import triage_candidate_batches
-from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
+from sec_review_agents.utils.files import persist_json
 
 DEFAULT_TRIAGE_PASSES = 2
 DEFAULT_TRIAGE_BATCH_SIZE = 30
@@ -240,12 +241,9 @@ async def _run_repository_triage_agent_pass(
     pass_meta: dict | None = None,
 ) -> dict | None:
     pass_kind: TriagePassKind = "draft" if pass_index <= 0 else "refinement"
-    reset_stage_attempt_artifacts(
-        _triage_pass_artifacts_path(triage_root, pass_meta),
-        filenames=("transcript.jsonl",),
-    )
-    backend = create_repository_triage_backend()
     pass_artifacts_path = _triage_pass_artifacts_path(triage_root, pass_meta)
+    remove_transcripts((transcript_path(pass_artifacts_path),))
+    backend = create_repository_triage_backend()
     async with amanaged_backend(backend):
         agent = await create_repository_triage_agent_graph(
             backend=backend,
@@ -261,7 +259,7 @@ async def _run_repository_triage_agent_pass(
                 pass_kind=pass_kind,
                 draft_origins=draft_origins,
             ),
-            transcript_paths=(pass_artifacts_path / "transcript.jsonl",),
+            transcript_paths=(transcript_path(pass_artifacts_path),),
         )
 
 

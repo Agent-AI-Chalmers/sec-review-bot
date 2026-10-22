@@ -6,8 +6,27 @@ from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_o
 from sec_review_agents.runtime.transcripts import (
     review_stage_transcript_path,
     review_transcripts_root,
+    stage_attempt_transcript_path,
     transcript_file,
+    transcript_path,
 )
+
+
+def test_transcript_paths_own_default_and_attempt_layout(tmp_path: Path) -> None:
+    assert transcript_path(tmp_path) == tmp_path / "transcript.jsonl"
+    assert (
+        stage_attempt_transcript_path(tmp_path, attempt="retry-1")
+        == tmp_path / "transcripts" / "retry-1.jsonl"
+    )
+
+
+@pytest.mark.parametrize("name", ["nested/transcript", "transcript.jsonl"])
+def test_transcript_path_rejects_physical_filename_details(
+    tmp_path: Path,
+    name: str,
+) -> None:
+    with pytest.raises(ValueError, match="plain file stem"):
+        transcript_path(tmp_path, name=name)
 
 
 def test_review_stage_transcript_path_uses_flat_transcripts_directory(

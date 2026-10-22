@@ -34,6 +34,12 @@ from sec_review_agents.memory.store import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from sec_review_agents.runtime.transcripts import (
+    TRANSCRIPT_SUFFIX,
+    TRANSCRIPTS_DIRNAME,
+    review_transcripts_root,
+    transcript_path,
+)
 
 PUBLISHED_TRANSCRIPT_STAGES = {"analyzer", "mitigator", "verifier"}
 
@@ -132,7 +138,8 @@ def _published_transcript_stage_attempt(transcript: Path) -> tuple[str, str]:
     if not order.isdecimal() or stage not in PUBLISHED_TRANSCRIPT_STAGES or not attempt:
         raise ValueError(
             "Published transcript files must be named "
-            "<order>-<stage>-<attempt>.jsonl with stage analyzer, mitigator, or verifier: "
+            f"<order>-<stage>-<attempt>{TRANSCRIPT_SUFFIX} with stage analyzer, "
+            "mitigator, or verifier: "
             f"{transcript}"
         )
     return stage, attempt
@@ -140,11 +147,11 @@ def _published_transcript_stage_attempt(transcript: Path) -> tuple[str, str]:
 
 def collect_published_transcripts(review_artifact_root: Path) -> list[TranscriptRef]:
     """Read the current flat ``transcripts/`` publication layout in filename order."""
-    transcripts_root = review_artifact_root / "transcripts"
+    transcripts_root = review_transcripts_root(review_artifact_root)
     if not transcripts_root.is_dir():
         return []
     refs: list[TranscriptRef] = []
-    for transcript in sorted(transcripts_root.glob("*.jsonl")):
+    for transcript in sorted(transcripts_root.glob(f"*{TRANSCRIPT_SUFFIX}")):
         stage, attempt = _published_transcript_stage_attempt(transcript)
         refs.append(
             TranscriptRef(
@@ -199,9 +206,12 @@ def stage_transcripts(
     entries: list[tuple[str, Path]] = []
     for index, transcript in enumerate(transcripts, start=1):
         source = transcript.path
-        target = destination / f"{index:04d}-{transcript.label}.jsonl"
+        target = transcript_path(
+            destination,
+            name=f"{index:04d}-{transcript.label}",
+        )
         shutil.copy2(source, target)
-        mounted = Path("/transcripts") / target.name
+        mounted = Path("/") / TRANSCRIPTS_DIRNAME / target.name
         entries.append((transcript.display, mounted))
 
     return StagedTranscripts(entries=entries)
@@ -244,7 +254,7 @@ async def _generate_memory_observation_for_refs(
     run_id: str | None,
 ) -> MemoryObservationPreviewResult:
     with tempfile.TemporaryDirectory(prefix="sec-review-memory-extractor-") as tempdir:
-        transcript_root = Path(tempdir) / "transcripts"
+        transcript_root = Path(tempdir) / TRANSCRIPTS_DIRNAME
         staged_transcripts = stage_transcripts(transcript_refs, transcript_root)
         backend = create_memory_extractor_backend(transcript_root=transcript_root)
         model = create_chat_model(

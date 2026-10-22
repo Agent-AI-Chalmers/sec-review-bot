@@ -23,6 +23,10 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
+from sec_review_agents.runtime.transcripts import (
+    remove_transcripts,
+    stage_attempt_transcript_path,
+)
 from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -83,17 +87,21 @@ def reset_verification_attempt_artifacts(
         verifier_artifacts_path,
         filenames=filenames,
     )
-    if attempt_label == "initial":
-        transcript_files = ["transcripts/initial.jsonl"]
-        transcript_files.extend(
-            f"transcripts/retry-{retry_index}.jsonl"
+    transcript_attempts = (
+        ["initial"]
+        + [
+            f"retry-{retry_index}"
             for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
+        ]
+        if attempt_label == "initial"
+        else [attempt_label]
+    )
+    remove_transcripts(
+        stage_attempt_transcript_path(
+            verifier_artifacts_path,
+            attempt=transcript_attempt,
         )
-    else:
-        transcript_files = [f"transcripts/{attempt_label}.jsonl"]
-    reset_stage_attempt_artifacts(
-        verifier_artifacts_path,
-        filenames=transcript_files,
+        for transcript_attempt in transcript_attempts
     )
 
 
@@ -221,8 +229,9 @@ async def run_verification_stage(
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir:
-        local_transcript_path = (
-            verifier_artifacts_path / "transcripts" / f"{attempt_label}.jsonl"
+        local_transcript_path = stage_attempt_transcript_path(
+            verifier_artifacts_path,
+            attempt=attempt_label,
         )
         transcript_paths: tuple[Path, ...] = (local_transcript_path,)
         if published_transcript_path is not None:

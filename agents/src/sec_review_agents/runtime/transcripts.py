@@ -5,6 +5,7 @@ observed and are not replayable snapshots of the current LangGraph state.
 """
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -15,6 +16,8 @@ from langchain_core.messages import RemoveMessage
 from sec_review_agents.utils.serialization import json_safe
 
 TRANSCRIPTS_DIRNAME = "transcripts"
+TRANSCRIPT_BASENAME = "transcript"
+TRANSCRIPT_SUFFIX = ".jsonl"
 
 
 def _slug_component(value: str) -> str:
@@ -30,6 +33,22 @@ def review_transcripts_root(artifact_root_path: Path) -> Path:
     return artifact_root_path / TRANSCRIPTS_DIRNAME
 
 
+def transcript_path(directory: Path, *, name: str = TRANSCRIPT_BASENAME) -> Path:
+    normalized = str(name).strip()
+    if not normalized or Path(normalized).name != normalized or Path(normalized).suffix:
+        raise ValueError(f"Transcript name must be a plain file stem: {name!r}")
+    return directory / f"{normalized}{TRANSCRIPT_SUFFIX}"
+
+
+def stage_attempt_transcript_path(artifact_path: Path, *, attempt: str) -> Path:
+    return transcript_path(review_transcripts_root(artifact_path), name=attempt)
+
+
+def remove_transcripts(paths: Iterable[Path]) -> None:
+    for path in paths:
+        path.unlink(missing_ok=True)
+
+
 def transcript_file(
     transcripts_dir: Path,
     *,
@@ -40,7 +59,7 @@ def transcript_file(
     if order < 1:
         raise ValueError("Transcript order must be >= 1.")
     suffix = f"{_slug_component(stage)}-{_slug_component(attempt)}"
-    return transcripts_dir / f"{order:04d}-{suffix}.jsonl"
+    return transcript_path(transcripts_dir, name=f"{order:04d}-{suffix}")
 
 
 def review_stage_transcript_path(
@@ -194,10 +213,15 @@ class TranscriptWriter:
 
 __all__ = [
     "TRANSCRIPTS_DIRNAME",
+    "TRANSCRIPT_BASENAME",
+    "TRANSCRIPT_SUFFIX",
     "TranscriptWriter",
     "read_transcript_events",
     "read_transcript_messages",
+    "remove_transcripts",
     "review_stage_transcript_path",
     "review_transcripts_root",
+    "stage_attempt_transcript_path",
     "transcript_file",
+    "transcript_path",
 ]

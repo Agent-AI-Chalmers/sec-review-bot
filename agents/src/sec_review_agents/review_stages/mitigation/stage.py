@@ -22,6 +22,10 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
+from sec_review_agents.runtime.transcripts import (
+    remove_transcripts,
+    stage_attempt_transcript_path,
+)
 from sec_review_agents.utils.files import (
     persist_json,
     persist_text_artifact,
@@ -98,17 +102,21 @@ def reset_mitigation_attempt_artifacts(
         mitigator_artifacts_path,
         filenames=filenames,
     )
-    if attempt_label == "initial":
-        transcript_files = ["transcripts/initial.jsonl"]
-        transcript_files.extend(
-            f"transcripts/retry-{retry_index}.jsonl"
+    transcript_attempts = (
+        ["initial"]
+        + [
+            f"retry-{retry_index}"
             for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
+        ]
+        if attempt_label == "initial"
+        else [attempt_label]
+    )
+    remove_transcripts(
+        stage_attempt_transcript_path(
+            mitigator_artifacts_path,
+            attempt=transcript_attempt,
         )
-    else:
-        transcript_files = [f"transcripts/{attempt_label}.jsonl"]
-    reset_stage_attempt_artifacts(
-        mitigator_artifacts_path,
-        filenames=transcript_files,
+        for transcript_attempt in transcript_attempts
     )
 
 
@@ -241,8 +249,9 @@ def prepare_mitigation_transcript(
     published_transcript_path: Path | None,
     attempt_label: str,
 ) -> tuple[Path, ...]:
-    local_transcript_path = (
-        mitigator_artifacts_path / "transcripts" / f"{attempt_label}.jsonl"
+    local_transcript_path = stage_attempt_transcript_path(
+        mitigator_artifacts_path,
+        attempt=attempt_label,
     )
     if published_transcript_path is None:
         return (local_transcript_path,)

@@ -21,6 +21,7 @@ from sec_review_agents.delivery_stages.model import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
 from sec_review_agents.utils.files import reset_stage_attempt_artifacts
 from sec_review_agents.utils.markdown import inline_code, md
 from sec_review_agents.workspace.file_changes import FileChange
@@ -198,8 +199,9 @@ async def synthesize_combined_delivery_patch(
     ) as tempdir:
         reset_stage_attempt_artifacts(
             delivery_artifacts_root,
-            filenames=("transcript.jsonl", "workspace.patch"),
+            filenames=("workspace.patch",),
         )
+        remove_transcripts((transcript_path(delivery_artifacts_root),))
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
             tar_path=baseline_snapshot_tar_path,
@@ -221,7 +223,7 @@ async def synthesize_combined_delivery_patch(
                 agent_name=PATCH_SYNTHESIS_AGENT_NAME,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                transcript_paths=(delivery_artifacts_root / "transcript.jsonl",),
+                transcript_paths=(transcript_path(delivery_artifacts_root),),
             )
 
         raw_declared_changed_files = structured_payload.get("declared_changed_files")
