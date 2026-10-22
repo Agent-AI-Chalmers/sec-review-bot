@@ -2,9 +2,9 @@
 
 Language: English | [中文](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
-This guide covers local deployment of the GitHub integration, Review Control Plane, Runner Service, Temporal, object storage, and a host execution worker.
+This guide covers local deployment of the GitHub integration, Review Control Plane, Execution Gateway, Temporal, object storage, and a host execution worker.
 
-Use it to run the complete integrated path locally. For running agents directly without the HTTP Runner Service, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
+Use it to run the complete integrated path locally. For running agents directly without the HTTP Execution Gateway, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
 ## Deployment Shape
 
@@ -15,24 +15,25 @@ flowchart LR
 
     subgraph compose["Docker Compose"]
         integration["github-integration"] --> control["Review Control Plane<br/>admit and coordinate review runs"]
-        control --> runner["Runner Service<br/>submit and query review tasks"]
+        control --> api["Execution API<br/>submit and query review tasks"]
+        api --> gateway["Execution Gateway<br/>current provider"]
         control --> postgres[(PostgreSQL)]
-        runner --> temporal["Temporal<br/>workflow state and task queue"]
+        gateway --> temporal["Temporal<br/>workflow state and task queue"]
         integration -->|write input bundles| storage["Object Storage<br/>immutable input and result artifacts"]
-        runner -->|write terminal result artifacts| storage
+        gateway -->|write terminal result artifacts| storage
     end
 
     subgraph host["Host"]
-        worker["sec-review-agents-worker"] --> sandbox["Docker sandbox"]
+        worker["sec-review-agents-execution-worker"] --> sandbox["Docker sandbox"]
     end
 
     tunnel --> integration
     temporal --> worker
     storage -->|read input bundles| worker
-    storage -->|read stored artifacts| runner
+    storage -->|read stored artifacts| gateway
 ```
 
-Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, Runner Service and Temporal dispatch its work, and the host worker executes the agents in Docker sandboxes. PostgreSQL stores control state, while RustFS stores run inputs and artifacts.
+Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, Execution Gateway and Temporal dispatch its work, and the host worker executes the agents in Docker sandboxes. PostgreSQL stores control state, while RustFS stores run inputs and artifacts.
 
 Control Plane UI is a separately deployed console. Its same-origin server reads run state from Control Plane and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
 
@@ -45,7 +46,7 @@ Default local endpoints:
 | GitHub integration | `http://127.0.0.1:30000` |
 | Review Control Plane | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
-| Runner Service | `http://127.0.0.1:8000` |
+| Execution Gateway | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
 | RustFS API | `http://127.0.0.1:9100` |
@@ -119,7 +120,7 @@ chmod 600 .env \
   ops/systemd/deployment.env
 ```
 
-The samples contain both usable defaults and empty or placeholder values that must be replaced. At minimum, configure the Runner Service token, GitHub App credentials, and model deployment credentials. The systemd installer combines the deployment settings with repository paths and writes the result to `/etc` as described below.
+The samples contain both usable defaults and empty or placeholder values that must be replaced. At minimum, configure the Execution API token, GitHub App credentials, and model deployment credentials. The systemd installer combines the deployment settings with repository paths and writes the result to `/etc` as described below.
 
 `agents/.env` is used by `run-local-*` and other local CLIs. Compose and the systemd worker do not load it automatically. See the [agents local running guide](../../agents/README.md) for local CLI configuration.
 
@@ -127,9 +128,9 @@ The samples contain both usable defaults and empty or placeholder values that mu
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-Set `RUNNER_SERVICE_TOKEN` and the PostgreSQL/RustFS passwords to locally generated secrets, for example with `openssl rand -hex 32`. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
+Set `EXECUTION_API_TOKEN`, `AGENT_MEMORY_CATALOG_TOKEN`, and the PostgreSQL/RustFS passwords to independently generated secrets, for example with `openssl rand -hex 32`. Copy the same Memory Catalog token into `ops/systemd/deployment.env`; Compose gives it to the independent Memory Catalog Server container, while the host worker uses it as a narrow client credential. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
 
-RustFS uses a separate workload identity for each responsibility: the integration writes input objects, the host worker reads inputs, the artifact storage writer writes terminal artifacts, and the UI BFF reads stored artifacts for authenticated downloads. The corresponding secret keys in `compose.env.sample` belong to those identities and should be generated independently.
+RustFS uses a separate workload identity for each responsibility: the integration writes input objects; the host worker reads inputs and reads/writes immutable transcript bundles, memory versions, and memory-agent audit bundles; the artifact storage writer writes terminal artifacts; and the UI BFF reads stored artifacts for authenticated downloads. The corresponding secret keys in `compose.env.sample` belong to those identities and should be generated independently.
 
 ### 2. GitHub Integration `.env`
 
@@ -141,7 +142,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose injects the Runner Service address and token only into Control Plane for initial submission, submission recovery, and terminal observation. It injects the container private-key path, Control Plane address and token, and RustFS input storage configuration into the integration. PostgreSQL and Runner credentials are not available to the integration. These values do not need to be repeated in `apps/github-integration/.env`.
+Compose injects the Execution API address and token only into Control Plane for initial submission, submission recovery, and terminal observation. The address currently resolves to the Execution Gateway service, but Control Plane is configured only in API terms. Compose injects the container private-key path, Control Plane address and token, and RustFS input storage configuration into the integration. PostgreSQL and execution credentials are not available to the integration. These values do not need to be repeated in `apps/github-integration/.env`.
 
 ### 3. Model Configuration
 
@@ -191,9 +192,13 @@ Core fields:
 | `AGENT_JOERN_ENABLED`, `AGENT_PLAYWRIGHT_ENABLED` | Advertise the corresponding installed CLI to eligible agents; both default to `false`. |
 | `AGENT_MCP_ENABLED` | Enable configured MCP integrations; defaults to `false`. |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Read-only RustFS credential matching the runner values in the repository `.env`. |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Narrow RustFS credential matching the Execution Worker values in the repository `.env`; it can read run inputs and read/write run transcript bundles, memory versions, and memory-agent audit bundles. |
+| `AGENT_MEMORY_CATALOG_URL` | Independent managed-memory API; the Compose default is `http://127.0.0.1:8092`. |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Must match the repository `.env`; it authorizes memory coordination but grants no direct PostgreSQL access. |
 
-The Runner service receives a separate artifact-storage-writer credential through Compose. It can write only `runs/*/artifacts/*`; the host worker has no object-storage credential. The service reads the worker's artifact root through a read-only bind mount when a terminal run is observed.
+Execution Gateway receives a separate artifact-storage-writer credential through Compose. It can write only `runs/*/artifacts/*`. The host worker's credential is limited to `runs/*/input/*` reads plus reads/writes under `runs/*/transcripts/*`, `memory/versions/*`, and `memory/audit/*`; agent sandboxes do not receive it. Gateway reads the worker's artifact root through a read-only bind mount only after a run becomes terminal.
+
+The Memory Catalog Server is a separate TypeScript service, not part of Control Plane. It alone receives `MEMORY_CATALOG_DATABASE_URL` inside Compose and stores observations plus the active memory pointer in PostgreSQL. Temporal owns extraction execution and the singleton maintenance workflow; PostgreSQL is only the durable catalog and compare-and-swap commit boundary. Host workers call the service with `AGENT_MEMORY_CATALOG_TOKEN`; they materialize transcripts and active memory locally for each activity, and agent sandboxes only see the resulting filesystem mounts. Do not also set `AGENT_MEMORY_DIR` for a managed worker.
 
 Most local deployments can keep these defaults. Rerun the installer after moving the checkout.
 
@@ -265,10 +270,10 @@ With the sample configuration, the integrated deployment stores runtime data in 
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | Persistent object storage for input archives exchanged between integration and Runner |
+| `.agent-rustfs-state` | RustFS | Persistent object storage for input archives exchanged between integration and the Execution Worker |
 | `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published diagnostic bundles |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
-| `.agent-postgres-state` | PostgreSQL | Admission, Runner observation, and publication step coordination |
+| `.agent-postgres-state` | PostgreSQL | Admission, execution observation, and publication step coordination |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
 | `.agent-memory` | Host worker | Persistent agent memory store, when memory is enabled |
 
@@ -298,9 +303,9 @@ Start the complete integrated service and enable it at boot:
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-agents-worker@1.service` so they can be managed together.
+`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-agents-execution-worker@1.service` so they can be managed together.
 
-The control plane contains GitHub integration, Runner Service, and Temporal. The host worker executes review activities and creates Docker sandboxes.
+The control plane contains GitHub integration, Execution Gateway, and Temporal. The host worker executes review activities and creates Docker sandboxes.
 
 Startup and runtime failures are supervised differently, and it matters when diagnosing a run:
 
@@ -322,10 +327,10 @@ Inspect the deployment status and logs:
 ```bash
 sudo systemctl status sec-review-bot.target
 sudo systemctl status sec-review-bot-control-plane.service
-sudo systemctl status sec-review-agents-worker@1.service
+sudo systemctl status sec-review-agents-execution-worker@1.service
 sudo journalctl \
   -u sec-review-bot-control-plane.service \
-  -u sec-review-agents-worker@1.service \
+  -u sec-review-agents-execution-worker@1.service \
   -f
 ```
 
@@ -359,12 +364,12 @@ sudo systemctl restart sec-review-bot.target
 
 After changing installation files under `ops/systemd`, run the installer again before restarting the service.
 
-Check Runner Service:
+Check Execution Gateway:
 
 ```bash
-RUNNER_SERVICE_TOKEN=<paste-your-token>
+EXECUTION_API_TOKEN=<paste-your-token>
 curl -sS http://127.0.0.1:8000/healthz \
-  -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
+  -H "Authorization: Bearer ${EXECUTION_API_TOKEN}"
 ```
 
 Check whether Control Plane can safely accept coordination requests:
@@ -373,7 +378,7 @@ Check whether Control Plane can safely accept coordination requests:
 curl -sS http://127.0.0.1:8090/readyz
 ```
 
-`/healthz` is process liveness only. `/readyz` returns `503` when PostgreSQL, its connection pool, or a schema ledger whose complete version set does not match this application is unavailable; it intentionally does not include Runner or GitHub reachability.
+`/healthz` is process liveness only. `/readyz` returns `503` when PostgreSQL, its connection pool, or a schema ledger whose complete version set does not match this application is unavailable; it intentionally does not include the Execution API or GitHub reachability.
 
 ### Component-Level Operations
 
@@ -381,7 +386,7 @@ For troubleshooting or updating one component, restart the control plane or work
 
 ```bash
 sudo systemctl restart sec-review-bot-control-plane.service
-sudo systemctl restart sec-review-agents-worker@1.service
+sudo systemctl restart sec-review-agents-execution-worker@1.service
 ```
 
 For development, you can bypass systemd and run the Compose control plane in the foreground:
@@ -399,8 +404,8 @@ This command does not start the host worker.
 The systemd template can run multiple worker processes on one execution node:
 
 ```bash
-sudo systemctl enable --now sec-review-agents-worker@2.service
-sudo systemctl enable --now sec-review-agents-worker@3.service
+sudo systemctl enable --now sec-review-agents-execution-worker@2.service
+sudo systemctl enable --now sec-review-agents-execution-worker@3.service
 ```
 
 Temporal distributes tasks among instances that share a task queue. Tune one process first; add processes or execution nodes only when measurements show that one process is a bottleneck or when process-level fault isolation is required.
@@ -465,7 +470,7 @@ GitHub integration uses `git fetch` to retrieve the target commit while preparin
 GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://host.docker.internal:7897
 ```
 
-Compose maps `host.docker.internal` to the host. The proxy must listen on an address reachable from Docker containers instead of loopback only. This variable does not change the network path used by the GitHub API, Runner Service, worker, or sandboxes.
+Compose maps `host.docker.internal` to the host. The proxy must listen on an address reachable from Docker containers instead of loopback only. This variable does not change the network path used by the GitHub API, Execution Gateway, worker, or sandboxes.
 
 When running GitHub integration without Compose, use an address reachable by the host process instead, for example:
 

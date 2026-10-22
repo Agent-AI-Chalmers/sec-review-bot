@@ -16,7 +16,7 @@ These layers are related, but they are not the same knob.
 
 ## Runs Are Not Activity Slots
 
-The runner service starts Temporal workflows for app-submitted runs. Temporal does not treat one whole run as one worker slot. A run is decomposed into workflow tasks, activity tasks, and sometimes child workflows.
+The execution gateway starts Temporal workflows for app-submitted runs. Temporal does not treat one whole run as one worker slot. A run is decomposed into workflow tasks, activity tasks, and sometimes child workflows.
 
 `TEMPORAL_MAX_CONCURRENT_ACTIVITIES` limits how many activities one worker process can execute at once. It does not mean "how many app-submitted runs may be active."
 

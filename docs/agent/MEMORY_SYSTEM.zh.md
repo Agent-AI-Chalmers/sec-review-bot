@@ -72,11 +72,11 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 
 经验产出走异步链路，无论如何都不影响正常流程（指 review）。
 
-大致流程就是定时检查：
+大致流程就是异步检查：
 
-- 来源：issue 或 pull-request review 发布 transcripts 后，会登记一个待处理的 extraction job。repository review 则会为每个成功完成的 case 单独登记 job；未完整执行的 case 不会登记 extraction。
-- extraction 定时检查，有就处理：extraction schedule 默认每 10 分钟运行一次，处理已登记的 extraction jobs 并产出 pending observations。
-  - 可以并发处理多个 job。
+- 来源：issue 或 pull-request review 发布 transcripts 后，会直接启动对应 review 的 extraction。repository review 则会为每个实际存在 transcripts 的 case 启动一次 extraction。
+- extraction 会分别处理各个 review，并产出 pending observations。
+  - 可以并发执行多个 extraction。
 - maintenance 定时检查，达到阈值或者时间过长就处理：maintenance trigger schedule 默认每小时运行一次。只有 pending observations 至少有 10 条，或者最老的 pending observation 已经等待至少 1 天时，才启动 maintenance。
   - maintenance 不可并行，同一时间只有一个；但是一次会处理多条 observations；
   - 用 `processed` 表示已经审阅并处理过，不表示经验一定被吸收进 memory（如上会做判断）。

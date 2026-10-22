@@ -20,7 +20,7 @@ repository-review 阶段内部的并发另见
 
 ## Run 不是 activity slot
 
-Runner service 会为 app 提交的 run 启动 Temporal workflow。Temporal 不会把一个完整 run 当成一个 worker slot。一个 run 会被拆成 workflow tasks、activity tasks，有时还有 child workflows。
+Execution Gateway 会为 app 提交的 run 启动 Temporal workflow。Temporal 不会把一个完整 run 当成一个 worker slot。一个 run 会被拆成 workflow tasks、activity tasks，有时还有 child workflows。
 
 `TEMPORAL_MAX_CONCURRENT_ACTIVITIES` 限制一个 worker 进程同时执行的 activities 数量。它不是“允许多少个 app 提交的 runs 处于 active”。
 
