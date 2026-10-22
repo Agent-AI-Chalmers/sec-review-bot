@@ -1,0 +1,155 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 680" role="img" aria-labelledby="title description">
+  <title id="title">Sec Review Bot runtime topology</title>
+  <desc id="description">External systems connect to runtime services, with persistence infrastructure beneath the services.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.1" />
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head" />
+    </marker>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; fill: #263244; }
+      .group { stroke-width: 1.25; }
+      .external { fill: #f8fafc; stroke: #d8dee8; }
+      .runtime { fill: #f8fbfa; stroke: #c7d8d2; }
+      .persistence { fill: #fbfaf8; stroke: #ded8ce; }
+      .group-label { font-size: 21px; font-weight: 650; fill: #475569; }
+      .node, .store { filter: url(#shadow); }
+      .node-surface { fill: #ffffff; stroke: #d6dce5; stroke-width: 1.25; }
+      .node-accent { fill: none; stroke-width: 3; stroke-linecap: round; }
+      .external-node .node-accent { stroke: #64748b; }
+      .control-node .node-accent { stroke: #2878b5; }
+      .execution-node .node-accent { stroke: #b85c38; }
+      .memory-node .node-accent { stroke: #2f806a; }
+      .storage-node .node-accent { stroke: #9a6a22; }
+      .store-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
+      .store-icon.no-fill { fill: none; }
+      .object-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
+      .node-label { font-size: 17px; font-weight: 550; }
+      .edge { fill: none; stroke: #718096; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+      .arrow-head { fill: #718096; }
+    </style>
+  </defs>
+  <g>
+    <rect x="20" y="24" width="200" height="360" rx="7" class="group external" />
+    <text x="120" y="54" class="group-label" text-anchor="middle">
+      <tspan x="120" dy="0">External</tspan>
+    </text>
+  </g>
+  <g>
+    <rect x="250" y="24" width="1120" height="360" rx="7" class="group runtime" />
+    <text x="810" y="54" class="group-label" text-anchor="middle">
+      <tspan x="810" dy="0">Runtime services</tspan>
+    </text>
+  </g>
+  <g>
+    <rect x="250" y="420" width="1120" height="230" rx="7" class="group persistence" />
+  </g>
+  <g id="operator" class="node external-node">
+    <rect x="45" y="94" width="150" height="72" rx="8" class="node-surface" />
+    <path d="M 53 95 H 187" class="node-accent" />
+    <text x="120" y="126" class="node-label" text-anchor="middle">
+      <tspan x="120" dy="0">Operator</tspan>
+      <tspan x="120" dy="18">browser</tspan>
+    </text>
+  </g>
+  <g id="github" class="node external-node">
+    <rect x="45" y="254" width="150" height="72" rx="8" class="node-surface" />
+    <path d="M 53 255 H 187" class="node-accent" />
+    <text x="120" y="295" class="node-label" text-anchor="middle">
+      <tspan x="120" dy="0">GitHub</tspan>
+    </text>
+  </g>
+  <g id="ui" class="node control-node">
+    <rect x="280" y="94" width="160" height="72" rx="8" class="node-surface" />
+    <path d="M 288 95 H 432" class="node-accent" />
+    <text x="360" y="135" class="node-label" text-anchor="middle">
+      <tspan x="360" dy="0">Control Plane UI</tspan>
+    </text>
+  </g>
+  <g id="integration" class="node control-node">
+    <rect x="280" y="254" width="160" height="72" rx="8" class="node-surface" />
+    <path d="M 288 255 H 432" class="node-accent" />
+    <text x="360" y="286" class="node-label" text-anchor="middle">
+      <tspan x="360" dy="0">GitHub</tspan>
+      <tspan x="360" dy="18">Integration</tspan>
+    </text>
+  </g>
+  <g id="control" class="node control-node">
+    <rect x="495" y="94" width="170" height="72" rx="8" class="node-surface" />
+    <path d="M 503 95 H 657" class="node-accent" />
+    <text x="580" y="126" class="node-label" text-anchor="middle">
+      <tspan x="580" dy="0">Review Control</tspan>
+      <tspan x="580" dy="18">Plane</tspan>
+    </text>
+  </g>
+  <g id="gateway" class="node execution-node">
+    <rect x="710" y="94" width="160" height="72" rx="8" class="node-surface" />
+    <path d="M 718 95 H 862" class="node-accent" />
+    <text x="790" y="126" class="node-label" text-anchor="middle">
+      <tspan x="790" dy="0">Execution</tspan>
+      <tspan x="790" dy="18">Gateway</tspan>
+    </text>
+  </g>
+  <g id="temporal" class="node execution-node">
+    <rect x="895" y="94" width="160" height="72" rx="8" class="node-surface" />
+    <path d="M 903 95 H 1047" class="node-accent" />
+    <text x="975" y="135" class="node-label" text-anchor="middle">
+      <tspan x="975" dy="0">Temporal Server</tspan>
+    </text>
+  </g>
+  <g id="worker" class="node execution-node">
+    <rect x="1080" y="94" width="160" height="72" rx="8" class="node-surface" />
+    <path d="M 1088 95 H 1232" class="node-accent" />
+    <text x="1160" y="126" class="node-label" text-anchor="middle">
+      <tspan x="1160" dy="0">Execution</tspan>
+      <tspan x="1160" dy="18">Worker</tspan>
+    </text>
+  </g>
+  <g id="catalog" class="node memory-node">
+    <rect x="1080" y="254" width="160" height="72" rx="8" class="node-surface" />
+    <path d="M 1088 255 H 1232" class="node-accent" />
+    <text x="1160" y="286" class="node-label" text-anchor="middle">
+      <tspan x="1160" dy="0">Memory Catalog</tspan>
+      <tspan x="1160" dy="18">Server</tspan>
+    </text>
+  </g>
+  <g id="postgres" class="store storage-node">
+    <rect x="500" y="515" width="210" height="92" rx="8" class="node-surface" />
+    <path d="M 508 516 H 702" class="node-accent" />
+    <ellipse cx="534" cy="551" rx="16" ry="5" class="store-icon" />
+    <path d="M 518 551 V 572 M 550 551 V 572 M 518 572 C 518 579, 550 579, 550 572" class="store-icon no-fill" />
+    <text x="628" y="567" class="node-label" text-anchor="middle">
+      <tspan x="628" dy="0">PostgreSQL</tspan>
+    </text>
+  </g>
+  <g id="storage" class="store storage-node">
+    <rect x="970" y="515" width="210" height="92" rx="8" class="node-surface" />
+    <path d="M 978 516 H 1172" class="node-accent" />
+    <rect x="987" y="545" width="14" height="14" rx="3" class="object-icon" />
+    <rect x="1007" y="545" width="14" height="14" rx="3" class="object-icon" />
+    <rect x="987" y="565" width="14" height="14" rx="3" class="object-icon" />
+    <rect x="1007" y="565" width="14" height="14" rx="3" class="object-icon" />
+    <text x="1098" y="567" class="node-label" text-anchor="middle">
+      <tspan x="1098" dy="0">Object Storage</tspan>
+    </text>
+  </g>
+  <path d="M 195 130 L 280 130" class="edge" marker-end="url(#arrow)" />
+  <path d="M 195 290 L 280 290" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 440 130 L 495 130" class="edge" marker-end="url(#arrow)" />
+  <path d="M 440 290 L 470 290 L 470 148 L 495 148" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 665 130 L 710 130" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 870 130 L 895 130" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1055 130 L 1080 130" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1160 166 L 1160 254" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 580 166 L 580 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1160 326 L 1160 485 L 655 485 L 655 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 360 326 L 360 625 L 930 625 L 930 561 L 970 561" class="edge" marker-end="url(#arrow)" />
+  <path d="M 790 166 L 790 400 L 950 400 L 950 475 L 1075 475 L 1075 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1240 130 L 1310 130 L 1310 561 L 1180 561" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <text x="810" y="454" class="group-label" text-anchor="middle">
+    <tspan x="810" dy="0">Persistence infrastructure</tspan>
+  </text>
+</svg>

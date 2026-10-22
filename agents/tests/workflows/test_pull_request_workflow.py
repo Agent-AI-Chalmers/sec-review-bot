@@ -78,7 +78,7 @@ async def test_mitigation_activity_run_accepts_serialized_artifact_root(
     assert captured["incremental_window_path"] == artifact_root / "incremental.json"
     assert captured["mitigator_artifacts_path"] == artifact_root / "mitigator"
     assert captured["published_transcript_path"] == (
-        artifact_root / "transcripts" / "0002-mitigator-initial.json"
+        artifact_root / "transcripts" / "0002-mitigator-initial.jsonl"
     )
 
 

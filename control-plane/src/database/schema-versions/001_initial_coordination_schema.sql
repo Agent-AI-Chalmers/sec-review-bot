@@ -19,7 +19,7 @@ CREATE TABLE review_runs (
 COMMENT ON TABLE review_runs IS
   'Durable review identity: the externally admitted task and the fields that span all three lifecycle axes. Execution, preparation, and publication each keep their own state machine and their own input in executions, preparations, and publications.';
 COMMENT ON COLUMN review_runs.run_id IS
-  'Stable review identity assigned at admission, before preparation, execution, or publication begins, and shared with the Runner.';
+  'Stable review identity assigned at admission, before preparation, execution, or publication begins, and shared with the Execution.';
 COMMENT ON COLUMN review_runs.connector_id IS
   'Coordination namespace that owns the run, such as one configured GitHub App connector.';
 COMMENT ON COLUMN review_runs.workflow IS
@@ -34,7 +34,7 @@ COMMENT ON COLUMN review_runs.updated_at IS
   'Row mtime for the trunk row: last time identity metadata or an ingress checkpoint changed. Lifetime progress and per-axis input live on the axis tables.';
 
 -- Execution is the third lifecycle axis, alongside preparation and publication. It has no
--- externally claimable owner (Control Plane observes the Runner), so its claim token only
+-- externally claimable owner (Control Plane observes the Execution), so its claim token only
 -- fences replay of an uncertain submission. It deliberately mirrors the axis shape:
 -- run_id + connector_id + status + failure + claim/lease + timestamps.
 CREATE TABLE executions (
@@ -51,7 +51,7 @@ CREATE TABLE executions (
   claim_token uuid,
   claimed_at timestamptz,
   -- How many recovery replays of an uncertain submission produced another unknown outcome. The
-  -- axis stays `uncertain` on each such replay, so without a budget a Runner that keeps timing
+  -- axis stays `uncertain` on each such replay, so without a budget an Execution provider that keeps timing
   -- out would be replayed forever and the run would never reach a state anyone is told about.
   -- Named `attempt_count` like the other two axes: the name says what is counted (attempts), and
   -- each table has exactly one such counter, so the axis is the qualifier. Counted here rather
@@ -81,8 +81,8 @@ CREATE TABLE executions (
   -- have a start and no end.
   --
   -- A terminal state can be end-only. `skipped` never ran at all (preparation failed before the
-  -- Runner was called), and `failed` reaches that shape when a replay of an uncertain submission
-  -- is rejected: the Runner never accepted it, so execution still never began. Both conclude the
+  -- Execution was called), and `failed` reaches that shape when a replay of an uncertain submission
+  -- is rejected: the Execution never accepted it, so execution still never began. Both conclude the
   -- axis without a start, which is why a measured duration requires started_at to be non-null.
   CHECK (
     CASE status
@@ -102,29 +102,29 @@ CREATE TABLE executions (
 );
 
 COMMENT ON TABLE executions IS
-  'Run-level state machine for Runner submission and execution. One row per run, created at admission.';
+  'Run-level state machine for Execution submission and execution. One row per run, created at admission.';
 COMMENT ON COLUMN executions.status IS
-  'Runner-side lifecycle only: pending until the prepared input is submitted, then Runner execution. uncertain means a submission may have reached the Runner and automation is retrying the idempotent request. disconnected means that retry budget is exhausted and automation has stopped without asserting failure; an operator must resume recovery or explicitly abandon the run. skipped means execution never ran because preparation failed.';
+  'Execution-side lifecycle only: pending until the prepared input is submitted, then active execution. uncertain means a submission may have reached the Execution provider and automation is retrying the idempotent request. disconnected means that retry budget is exhausted and automation has stopped without asserting failure; an operator must resume recovery or explicitly abandon the run. skipped means execution never ran because preparation failed.';
 COMMENT ON COLUMN executions.input IS
-  'Prepared Runner request, including artifact references. Retained so an uncertain submission can be replayed safely.';
+  'Prepared Execution request, including artifact references. Retained so an uncertain submission can be replayed safely.';
 COMMENT ON COLUMN executions.started_at IS
-  'Immutable instant the prepared Runner input was accepted and execution began, i.e. the execution axis start. NULL until then, and also NULL for a skipped execution, which is concluded without ever having started. Written once and never moved, so a recovery replay cannot shorten a measured duration. Named to match preparations.started_at and publications.started_at: each axis ends its phase in finished_at.';
+  'Immutable instant the prepared Execution input was accepted and execution began, i.e. the execution axis start. NULL until then, and also NULL for a skipped execution, which is concluded without ever having started. Written once and never moved, so a recovery replay cannot shorten a measured duration. Named to match preparations.started_at and publications.started_at: each axis ends its phase in finished_at.';
 COMMENT ON COLUMN executions.finished_at IS
-  'Immutable instant the execution axis reached a terminal state (succeeded, failed, or skipped); NULL while it is still pending, queued, running, or uncertain. Written once, in the same UPDATE that sets the terminal status. Distinct from observed_at, which also moves on every successful poll and therefore cannot mark the phase end. skipped deliberately has an end but no started_at: preparation failed before the Runner was called, so the axis is concluded without ever having started, and finished_at - started_at is only meaningful when started_at is non-null.';
+  'Immutable instant the execution axis reached a terminal state (succeeded, failed, or skipped); NULL while it is still pending, queued, running, or uncertain. Written once, in the same UPDATE that sets the terminal status. Distinct from observed_at, which also moves on every successful poll and therefore cannot mark the phase end. skipped deliberately has an end but no started_at: preparation failed before the Execution was called, so the axis is concluded without ever having started, and finished_at - started_at is only meaningful when started_at is non-null.';
 COMMENT ON COLUMN executions.failure_code IS
-  'Machine-readable reason for a submission, polling, or Runner execution failure; NULL when preparation failed instead (see preparations.failure_code).';
+  'Machine-readable reason for a submission, polling, or execution failure; NULL when preparation failed instead (see preparations.failure_code).';
 COMMENT ON COLUMN executions.failure_message IS
   'Operator-readable detail associated with failure_code.';
 COMMENT ON COLUMN executions.artifact_storage IS
-  'Runner-reported terminal diagnostic artifact storage result and immutable object reference when available.';
+  'Execution-reported terminal diagnostic artifact storage result and immutable object reference when available.';
 COMMENT ON COLUMN executions.workflow_result IS
-  'Terminal successful workflow result returned by the Runner and consumed by the connector publisher.';
+  'Terminal successful workflow result returned by the Execution and consumed by the connector publisher.';
 COMMENT ON COLUMN executions.claim_token IS
-  'Fencing token held while reconciling a Runner submission whose acceptance was uncertain. Not a long-running lease: the replay is short and the Runner owns request idempotency.';
+  'Fencing token held while reconciling an Execution submission whose acceptance was uncertain. Not a long-running lease: the replay is short and the Execution provider owns request idempotency.';
 COMMENT ON COLUMN executions.claimed_at IS
   'When the current recovery claim was taken; a stale claim is reclaimed after the claim timeout.';
 COMMENT ON COLUMN executions.attempt_count IS
-  'Number of recovery replays that ended with the outcome still unknown. The row stays uncertain on each one; when this reaches the recovery budget it becomes disconnected, stopping automation without asserting that the Runner did not accept the run. Automatic work never clears it - that is what bounds a run''s automatic recovery rather than one owner''s tenure - and only an operator resume resets it, which grants a fresh budget by design.';
+  'Number of recovery replays that ended with the outcome still unknown. The row stays uncertain on each one; when this reaches the recovery budget it becomes disconnected, stopping automation without asserting that the Execution did not accept the run. Automatic work never clears it - that is what bounds a run''s automatic recovery rather than one owner''s tenure - and only an operator resume resets it, which grants a fresh budget by design.';
 COMMENT ON COLUMN executions.observed_at IS
   'Last time polling successfully confirmed the run state. Informational: it never drives claim expiry.';
 COMMENT ON COLUMN executions.created_at IS
@@ -198,7 +198,7 @@ CREATE TABLE preparations (
 COMMENT ON TABLE preparations IS
   'Provider-neutral, durable preparation work for one review run. Connectors own how work is reconstructed and executed.';
 COMMENT ON COLUMN preparations.run_id IS
-  'Review run whose Runner input is being prepared.';
+  'Review run whose Execution input is being prepared.';
 COMMENT ON COLUMN preparations.connector_id IS
   'Connector namespace allowed to claim and complete this preparation.';
 COMMENT ON COLUMN preparations.input_version IS
@@ -206,7 +206,7 @@ COMMENT ON COLUMN preparations.input_version IS
 COMMENT ON COLUMN preparations.input IS
   'Connector-owned, replayable preparation input. It contains no Control Plane-defined provider fields.';
 COMMENT ON COLUMN preparations.status IS
-  'Preparation lifecycle: pending (waiting for a preparer), preparing (a preparer currently owns the claim), uncertain (the claim lapsed and it is unknown whether the prepared input reached the Control Plane), disconnected (automatic work stopped without a conclusion; a person must decide), submitted (input handed to the Runner), failed (terminal). An expired claim returns to uncertain, never to pending; expiry after the retry budget is exhausted is terminal.';
+  'Preparation lifecycle: pending (waiting for a preparer), preparing (a preparer currently owns the claim), uncertain (the claim lapsed and it is unknown whether the prepared input reached the Control Plane), disconnected (automatic work stopped without a conclusion; a person must decide), submitted (input handed to the Execution), failed (terminal). An expired claim returns to uncertain, never to pending; expiry after the retry budget is exhausted is terminal.';
 COMMENT ON COLUMN preparations.available_at IS
   'Earliest time a pending preparation may be claimed. Retry backoff is durable so a process restart cannot bypass it.';
 COMMENT ON COLUMN preparations.claim_token IS
@@ -331,7 +331,7 @@ COMMENT ON COLUMN publications.run_id IS
 COMMENT ON COLUMN publications.connector_id IS
   'Connector namespace allowed to claim and complete this publication.';
 COMMENT ON COLUMN publications.input IS
-  'Connector-owned publish context, such as repository and pull request identity; it selects the publication target and is never sent to the Runner.';
+  'Connector-owned publish context, such as repository and pull request identity; it selects the publication target and is never sent to the Execution.';
 COMMENT ON COLUMN publications.status IS
   'Overall delivery state: pending (no publisher yet), publishing (a publisher owns it), uncertain (a step may have taken effect remotely and is being reconciled), disconnected (automatic reconciliation stopped; an operator must decide), published, permanently failed, or not applicable.';
 COMMENT ON COLUMN publications.claim_token IS
@@ -429,7 +429,7 @@ COMMENT ON COLUMN publication_steps.updated_at IS
 -- Append-only log of coordination-side state transitions, so an operator can see how a
 -- run reached its current state instead of reconstructing it from row mtimes or process
 -- logs. The live snapshot tables above remain the source of truth for "now"; this table is
--- an audit trail. It deliberately records only Control Plane coordination axes: the Runner's
+-- an audit trail. It deliberately records only Control Plane coordination axes: the Execution's
 -- own execution history lives in Temporal and is not duplicated here.
 CREATE TABLE review_run_events (
   event_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

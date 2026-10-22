@@ -95,4 +95,4 @@ def test_local_temporal_uses_materialized_artifact_root(
     assert request.prepared_input["artifact_root_path"] == str(
         bundle.artifact_root_path
     )
-    assert request.memory_extraction_registration_enabled is False
+    assert request.memory_extraction_enabled is False

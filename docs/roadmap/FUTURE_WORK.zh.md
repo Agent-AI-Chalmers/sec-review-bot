@@ -9,7 +9,7 @@
 ## 平台适配
 
 - 在 `apps/github-integration/` 旁边增加 GitLab integration。
-- 保持 runner input 和 public result 平台无关。
+- 保持 execution input 和 public result 平台无关。
 - 只有第二个 adapter 暴露出真实重复之后，才考虑共享的平台抽象。
 
 ## Agent 能力提升

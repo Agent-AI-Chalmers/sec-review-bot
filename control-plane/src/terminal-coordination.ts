@@ -1,22 +1,24 @@
 import type { ReviewRunRecord, ReviewRunStore } from './review-store.js'
-import type { RunnerRunStatus } from './runner-client.js'
+import type { ExecutionRunStatus } from './execution-client.js'
 
 type ObservationStore = Pick<
   ReviewRunStore,
   | 'markRunning'
-  | 'recordRunnerSuccess'
-  | 'failRunnerExecution'
+  | 'recordExecutionSuccess'
+  | 'failExecution'
   | 'touchObservation'
 >
-export type RunnerObservationResult =
+export type ExecutionObservationResult =
   'active' | 'succeeded' | 'failed' | 'poll_retry'
-export interface RunnerObservationEvent {
+export interface ExecutionObservationEvent {
   kind:
-    'runner_poll_retry' | 'runner_state_changed' | 'runner_terminal_recorded'
+    | 'execution_poll_retry'
+    | 'execution_state_changed'
+    | 'execution_terminal_recorded'
   run_id: string
   workflow: ReviewRunRecord['workflow']
   from: ReviewRunRecord['execution']['status']
-  to: RunnerObservationResult
+  to: ExecutionObservationResult
   error_code?: string
 }
 
@@ -27,31 +29,31 @@ function errorInfo(error: unknown): { code: string; message: string } {
     'code' in error &&
     typeof error.code === 'string'
       ? error.code
-      : 'RUNNER_EXECUTION_FAILED'
+      : 'EXECUTION_FAILED'
   return {
     code,
     message: error instanceof Error ? error.message : String(error)
   }
 }
 
-/** Persists Runner state only; connector-specific interpretation and publication happen later. */
-export async function observeRunnerRun(
+/** Persists Execution state only; connector-specific interpretation and publication happen later. */
+export async function observeExecutionRun(
   store: ObservationStore,
   run: ReviewRunRecord,
   getStatus: (
     runId: string,
     workflow: ReviewRunRecord['workflow']
-  ) => Promise<RunnerRunStatus>,
+  ) => Promise<ExecutionRunStatus>,
   isTerminalPollingError: (error: unknown) => boolean,
-  onEvent: (event: RunnerObservationEvent) => void = () => {}
-): Promise<RunnerObservationResult> {
-  let status: RunnerRunStatus
+  onEvent: (event: ExecutionObservationEvent) => void = () => {}
+): Promise<ExecutionObservationResult> {
+  let status: ExecutionRunStatus
   try {
     status = await getStatus(run.run_id, run.workflow)
   } catch (error) {
     if (!isTerminalPollingError(error)) {
       onEvent({
-        kind: 'runner_poll_retry',
+        kind: 'execution_poll_retry',
         run_id: run.run_id,
         workflow: run.workflow,
         from: run.execution.status,
@@ -59,9 +61,9 @@ export async function observeRunnerRun(
       })
       return 'poll_retry'
     }
-    await store.failRunnerExecution(run.run_id, errorInfo(error))
+    await store.failExecution(run.run_id, errorInfo(error))
     onEvent({
-      kind: 'runner_terminal_recorded',
+      kind: 'execution_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
       from: run.execution.status,
@@ -79,7 +81,7 @@ export async function observeRunnerRun(
       return 'active'
     }
     onEvent({
-      kind: 'runner_state_changed',
+      kind: 'execution_state_changed',
       run_id: run.run_id,
       workflow: run.workflow,
       from: run.execution.status,
@@ -88,60 +90,60 @@ export async function observeRunnerRun(
     return 'active'
   }
   if (status.status !== 'succeeded' && status.status !== 'failed') {
-    // The Runner still reports an unfinished task. Refresh the observation heartbeat only for
+    // The Execution still reports an unfinished task. Refresh the observation heartbeat only for
     // the states it applies to; `touchObservation` is a no-op for pending/uncertain.
     await store.touchObservation(run.run_id)
     return 'active'
   }
   if (status.status === 'failed') {
-    const recorded = await store.failRunnerExecution(
+    const recorded = await store.failExecution(
       run.run_id,
       status.error === undefined
         ? {
-            code: 'RUNNER_EXECUTION_FAILED',
-            message: `Runner run failed without an error: ${run.run_id}`
+            code: 'EXECUTION_FAILED',
+            message: `Execution run failed without an error: ${run.run_id}`
           }
         : {
-            code: status.error.code ?? 'RUNNER_EXECUTION_FAILED',
-            message: status.error.message ?? 'Runner execution failed.'
+            code: status.error.code ?? 'EXECUTION_FAILED',
+            message: status.error.message ?? 'Execution failed.'
           },
       status.artifact_storage
     )
     if (!recorded) return 'failed'
     onEvent({
-      kind: 'runner_terminal_recorded',
+      kind: 'execution_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
       from: run.execution.status,
       to: 'failed',
-      error_code: status.error?.code ?? 'RUNNER_EXECUTION_FAILED'
+      error_code: status.error?.code ?? 'EXECUTION_FAILED'
     })
     return 'failed'
   }
   // Only a missing field is checked here, not a null one. A top-level `null` cannot arrive:
-  // the Runner validates the result against the v6 contract before it reports `succeeded`
+  // the Execution validates the result against the v6 contract before it reports `succeeded`
   // (`temporal_gateway.py`), and its response model serializes with `exclude_none`, so a null
   // would be omitted rather than sent as `"result": null`. Checking for null here would be
   // defensive code for an unreachable input. It matters that the assumption stays true: a
   // stored JSON `null` would be excluded by the `jsonb_typeof(...) <> 'null'` guard on every
   // publication claim, stranding the run with a publication no claim can pick up.
   if (!Object.hasOwn(status, 'result')) {
-    await store.failRunnerExecution(run.run_id, {
-      code: 'RUNNER_RESULT_MISSING',
-      message: 'Runner succeeded without a workflow result.'
+    await store.failExecution(run.run_id, {
+      code: 'EXECUTION_RESULT_MISSING',
+      message: 'Execution succeeded without a workflow result.'
     })
     onEvent({
-      kind: 'runner_terminal_recorded',
+      kind: 'execution_terminal_recorded',
       run_id: run.run_id,
       workflow: run.workflow,
       from: run.execution.status,
       to: 'failed',
-      error_code: 'RUNNER_RESULT_MISSING'
+      error_code: 'EXECUTION_RESULT_MISSING'
     })
     return 'failed'
   }
   if (
-    !(await store.recordRunnerSuccess(
+    !(await store.recordExecutionSuccess(
       run.run_id,
       status.result,
       status.artifact_storage
@@ -150,7 +152,7 @@ export async function observeRunnerRun(
     return 'succeeded'
   }
   onEvent({
-    kind: 'runner_terminal_recorded',
+    kind: 'execution_terminal_recorded',
     run_id: run.run_id,
     workflow: run.workflow,
     from: run.execution.status,

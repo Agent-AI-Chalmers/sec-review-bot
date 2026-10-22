@@ -23,7 +23,14 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
-from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
+from sec_review_agents.runtime.transcripts import (
+    remove_transcripts,
+    stage_attempt_transcript_path,
+)
+from sec_review_agents.utils.files import (
+    persist_json_artifact,
+    remove_json_artifacts,
+)
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 
@@ -33,15 +40,15 @@ def persist_verification_result(
     *,
     attempt_label: str,
 ) -> None:
-    persist_json(
+    persist_json_artifact(
         verifier_artifacts_path,
-        "verification-result.json",
+        "verification-result",
         result,
     )
     if attempt_label != "initial":
-        persist_json(
+        persist_json_artifact(
             verifier_artifacts_path,
-            f"verification-result.{attempt_label}.json",
+            f"verification-result.{attempt_label}",
             result,
         )
 
@@ -57,43 +64,30 @@ def verification_attempt_label(retry_context: Mapping[str, Any] | None) -> str:
 def reset_verification_attempt_artifacts(
     verifier_artifacts_path: Path, *, attempt_label: str
 ) -> None:
-    filenames = [
-        "verification-result.json",
-    ]
+    json_stems = ["verification-result"]
     if attempt_label != "initial":
-        filenames.extend(
-            [
-                f"verification-result.{attempt_label}.json",
-            ]
-        )
+        json_stems.append(f"verification-result.{attempt_label}")
     else:
-        filenames.extend(
-            [
-                "verification-result.initial.json",
-            ]
-        )
+        json_stems.append("verification-result.initial")
         for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1):
             retry_label = f"retry-{retry_index}"
-            filenames.extend(
-                [
-                    f"verification-result.{retry_label}.json",
-                ]
-            )
-    reset_stage_attempt_artifacts(
-        verifier_artifacts_path,
-        filenames=filenames,
-    )
-    if attempt_label == "initial":
-        transcript_files = ["transcripts/initial.json"]
-        transcript_files.extend(
-            f"transcripts/retry-{retry_index}.json"
+            json_stems.append(f"verification-result.{retry_label}")
+    remove_json_artifacts(verifier_artifacts_path, json_stems)
+    transcript_attempts = (
+        ["initial"]
+        + [
+            f"retry-{retry_index}"
             for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
+        ]
+        if attempt_label == "initial"
+        else [attempt_label]
+    )
+    remove_transcripts(
+        stage_attempt_transcript_path(
+            verifier_artifacts_path,
+            attempt=transcript_attempt,
         )
-    else:
-        transcript_files = [f"transcripts/{attempt_label}.json"]
-    reset_stage_attempt_artifacts(
-        verifier_artifacts_path,
-        filenames=transcript_files,
+        for transcript_attempt in transcript_attempts
     )
 
 
@@ -221,8 +215,9 @@ async def run_verification_stage(
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir:
-        local_transcript_path = (
-            verifier_artifacts_path / "transcripts" / f"{attempt_label}.json"
+        local_transcript_path = stage_attempt_transcript_path(
+            verifier_artifacts_path,
+            attempt=attempt_label,
         )
         transcript_paths: tuple[Path, ...] = (local_transcript_path,)
         if published_transcript_path is not None:

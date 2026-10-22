@@ -27,6 +27,7 @@ GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图
 
 - observed run 的字段名与必填字段；
 - 以嵌套对象报告的三条生命周期轴：脱敏的 `preparation` 摘要，以及 `execution` / `publication`。每组各自报告 `status`、`started_at`、`finished_at` 与该轴的 `updated_at`（最后一次写入时间，不是阶段边界）；用于筛选它们的查询参数沿用既有的 `*_status` 拼写；
+- `notices`：当 run 的某个环节失败或需要关注时，应由集成展示给用户的消息。消息按产生时间从早到晚排列；同一 run 发生多次独立事件时会保留多条，不会合并；
 - `artifact_storage` 的变体：不存在；状态为 `unavailable` 或 `failed` 的错误变体，可带 `error_code` 与 `message`；或 `available` 且带有已存储的 bundle。
 
 以下不属于本契约：
@@ -44,6 +45,6 @@ GitHub 集成直接 import Control Plane 的形状，因此它对记录的视图
 ## 错误码
 
 - **校验错误码** —— `INVALID_QUERY`、`INVALID_BODY`、`INVALID_PATH_PARAMETER` —— 指明请求的哪一部分未通过契约自身的 schema，因此按 `code` 分类的调用方可以区分运行列表过滤器出错、请求体出错、还是路径参数出错。运行列表请求还会对声明的 query 参数做严格校验：未声明的 query 参数会以 `INVALID_QUERY` 被拒绝，而不是被忽略，因为 `listRuns` 把过滤器建模为一个 `additionalProperties: false` 的对象，而非裸参数列表。它们以 HTTP 400 + 字符串 `code` 呈现。服务端把整个 enum 投影为 `ERROR_RESPONSE_CODES_FROM_CONTRACT`，并拒绝发出契约未声明的码，因此信封不会对外宣称一个 [openapi.yaml](openapi.yaml) 的 `ErrorResponse.code` enum 之外的值。
-- **控制流错误码** —— Control Plane 作为终态（确定性）发布失败而发出的四个 `PUBLICATION_STEP_*` 码 —— 单一事实来源化在 [openapi.yaml](openapi.yaml) 的 `ErrorResponse.code` enum 里，并在写面上以 HTTP 409 + 字符串 `code` 呈现。服务端的 `PUBLICATION_STEP_ERROR_CODES`（control-plane）是这份 enum 的投影，GitHub 集成为每个码分类为 `retry: false`，因此任一侧新增一个码都会被 `publication-error-code-alignment.test.ts` 捕获，而不是让 runner 永续重试。
+- **控制流错误码** —— Control Plane 作为终态（确定性）发布失败而发出的四个 `PUBLICATION_STEP_*` 码 —— 单一事实来源化在 [openapi.yaml](openapi.yaml) 的 `ErrorResponse.code` enum 里，并在写面上以 HTTP 409 + 字符串 `code` 呈现。服务端的 `PUBLICATION_STEP_ERROR_CODES`（control-plane）是这份 enum 的投影，GitHub 集成为每个码分类为 `retry: false`，因此任一侧新增一个码都会被 `publication-error-code-alignment.test.ts` 捕获，而不是让发布流程永续重试。
 - **不带 `code` 的响应** —— 每个操作都声明了内部故障的 HTTP 500（`InternalError`），每个读取请求体的操作还声明了请求体超过 1 MiB 上限的 HTTP 413（`PayloadTooLarge`）。两者都不带 `code`：故障信息刻意不透明，超限的请求体在契约自身的 schema 之前就被拒绝。Spectral 规则（`operation-declares-server-errors`）会让遗漏它们的新操作失败。
-- **诊断错误码**（`failure_code`、runner 错误 `code`）是开放集合，在词汇稳定之前不做枚举。
+- **诊断错误码**（`failure_code`、执行错误 `code`）是开放集合，在词汇稳定之前不做枚举。

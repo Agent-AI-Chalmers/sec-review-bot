@@ -49,7 +49,7 @@ async def test_triage_workflow_handles_scanner_noise_and_uses_guidance() -> None
             triage_mode="single",
         )
 
-    read_paths = read_file_paths_from_transcript(triage_root / "transcript.json")
+    read_paths = read_file_paths_from_transcript(triage_root / "transcript.jsonl")
 
     print(
         json.dumps(

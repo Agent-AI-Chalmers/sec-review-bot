@@ -10,31 +10,9 @@
 
 ## 部署结构
 
-```mermaid
-flowchart LR
-    webhook["GitHub App webhook<br/>/api/webhook"] --> tunnel["Cloudflare Tunnel"]
-    dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
+![本地集成部署结构](../../assets/operations/local-integrated-deployment.zh.svg)
 
-    subgraph compose["Docker Compose"]
-        integration["github-integration"] --> control["Review Control Plane<br/>接纳和协调 review run"]
-        control --> runner["Runner Service<br/>提交和查询 review 任务"]
-        control --> postgres[(PostgreSQL)]
-        runner --> temporal["Temporal<br/>workflow 状态和 task queue"]
-        integration -->|写入 input bundle| storage["Object Storage<br/>不可变 input 和 result artifact"]
-        runner -->|写入终态 result artifact| storage
-    end
-
-    subgraph host["宿主机"]
-        worker["sec-review-agents-worker"] --> sandbox["Docker sandbox"]
-    end
-
-    tunnel --> integration
-    temporal --> worker
-    storage -->|读取 input bundle| worker
-    storage -->|读取已发布 artifact| runner
-```
-
-Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run，Runner Service 和 Temporal 分派任务，宿主机 worker 在 Docker sandbox 中执行 agent。PostgreSQL 保存控制状态，RustFS 保存运行输入和 artifact。
+Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run，Execution Gateway 和 Temporal 分派任务，宿主机 worker 在 Docker sandbox 中执行 agent。PostgreSQL 保存控制状态，RustFS 保存运行输入和 artifact。
 
 Control Plane UI 是独立部署的控制台。它的同源服务端从 Control Plane 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
@@ -47,7 +25,7 @@ Control Plane UI 是独立部署的控制台。它的同源服务端从 Control 
 | GitHub integration | `http://127.0.0.1:30000` |
 | Review Control Plane | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
-| Runner Service | `http://127.0.0.1:8000` |
+| Execution Gateway | `http://127.0.0.1:8000` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
 | RustFS API | `http://127.0.0.1:9100` |
@@ -121,7 +99,7 @@ chmod 600 .env \
   ops/systemd/deployment.env
 ```
 
-Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Runner Service token、GitHub App 凭据和模型 deployment 凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
+Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Execution API token、GitHub App 凭据和模型 deployment 凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
 
 `agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd worker 自动读取。本地 CLI 的配置方式见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -129,9 +107,9 @@ Sample 中既有可直接使用的默认值，也有必须替换的空值和占�
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-将 `RUNNER_SERVICE_TOKEN` 以及 PostgreSQL/RustFS 密码设置为本地生成的 secret，例如使用 `openssl rand -hex 32`。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
+将 `EXECUTION_API_TOKEN`、`AGENT_MEMORY_CATALOG_TOKEN` 以及 PostgreSQL/RustFS 密码分别设置为独立生成的 secret，例如使用 `openssl rand -hex 32`。把同一枚 Memory Catalog token 也写入 `ops/systemd/deployment.env`：Compose 把它交给独立 Memory Catalog Server 容器，宿主 worker 用它作为窄客户端凭据。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
 
-RustFS 按职责为各组件分配独立身份：integration 写入 input object，宿主机 worker 读取 input，artifact storage writer 写入终态 artifact，UI BFF 为经过认证的下载读取已存储 artifact。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
+RustFS 按职责为各组件分配独立身份：integration 写入 input object；宿主机 worker 读取 input，并读写不可变 transcript bundles、memory versions 和 memory-agent audit bundles；artifact storage writer 写入终态 artifact；UI BFF 为经过认证的下载读取已存储 artifact。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
 
 ### 2. GitHub integration `.env`
 
@@ -143,7 +121,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose 只把 Runner Service 地址和 token 注入 Control Plane，用于初次提交、提交恢复和终态观察。Integration 只接收容器内私钥路径、Control Plane 地址和 token，以及 RustFS input storage 配置，不持有 PostgreSQL 或 Runner 凭据。这些值不需要在 `apps/github-integration/.env` 中重复配置。
+Compose 只把 Execution API 地址和 token 注入 Control Plane，用于初次提交、提交恢复和终态观察。该地址当前解析到 Execution Gateway 服务，但 Control Plane 的配置只使用 API 术语。Integration 只接收容器内私钥路径、Control Plane 地址和 token，以及 RustFS input storage 配置，不持有 PostgreSQL 或 execution 凭据。这些值不需要在 `apps/github-integration/.env` 中重复配置。
 
 ### 3. 模型配置
 
@@ -193,9 +171,15 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `AGENT_JOERN_ENABLED`、`AGENT_PLAYWRIGHT_ENABLED` | 向适用的 agent 提示镜像中已安装的相应 CLI；两者默认均为 `false`。 |
 | `AGENT_MCP_ENABLED` | 启用已配置的 MCP 集成；默认是 `false`。 |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
-| `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` | 与仓库 `.env` 中 runner 配置相匹配的 RustFS 只读凭据。 |
+| `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` | 与仓库 `.env` 中 Execution Worker 配置相匹配的受限 RustFS 凭据；可读取 run input，并读写 run transcript bundles、memory versions 和 memory-agent audit bundles。 |
+| `AGENT_MEMORY_CATALOG_URL` | 独立的 managed-memory API；Compose 默认是 `http://127.0.0.1:8092`。 |
+| `AGENT_MEMORY_CATALOG_TOKEN` | 必须与仓库 `.env` 一致；它只授权 memory 协调，不提供 PostgreSQL 直连权限。 |
 
-Runner service 通过 Compose 使用独立的 artifact-storage-writer 凭据，只能写入 `runs/*/artifacts/*`；宿主机 worker 不持有对象存储凭据。Runner service 观察到终态 run 后，通过只读 bind mount 读取 worker 的 artifact root。
+Execution Gateway 通过 Compose 使用独立的 artifact-storage-writer 凭据，只能写入 `runs/*/artifacts/*`。宿主机 worker 的凭据仅能读取 `runs/*/input/*`，并读写 `runs/*/transcripts/*`、`memory/versions/*` 和 `memory/audit/*`；agent sandbox 不会收到该凭据。Gateway 只在 run 进入终态后通过只读 bind mount 读取 worker artifact root。
+
+Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 observations 和 active memory pointer。提取执行和单例维护 workflow 由 Temporal 管理，PostgreSQL 只负责持久目录以及 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；transcript 和 active memory 仍由 worker 在每次 activity 中物化到本地，agent sandbox 只看到最终 filesystem mount。Managed worker 不要同时设置 `AGENT_MEMORY_DIR`。
+
+PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Control Plane 和 Memory Catalog 数据。
 
 大多数本地部署可以保留这些默认值。移动 checkout 后，重新运行安装脚本。
 
@@ -267,10 +251,10 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | integration 与 Runner 交换 input archive 的持久对象存储 |
+| `.agent-rustfs-state` | RustFS | integration 与 Execution Worker 交换 input archive 的持久对象存储 |
 | `.agent-run-inputs` | 宿主机 worker | 活跃运行所需的本地输入；不会进入对外发布的诊断材料 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
-| `.agent-postgres-state` | PostgreSQL | admission、Runner observation 与 publication step 协调状态 |
+| `.agent-postgres-state` | PostgreSQL | admission、execution observation 与 publication step 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
 | `.agent-memory` | 宿主机 worker | 启用 memory 时的持久 agent memory store |
 
@@ -300,9 +284,9 @@ sudo ops/systemd/install.sh "$USER"
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面和 `sec-review-agents-worker@1.service` 组合起来，使二者可以一起管理。
+`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面和 `sec-review-agents-execution-worker@1.service` 组合起来，使二者可以一起管理。
 
-控制平面包括 GitHub integration、Runner Service 和 Temporal。宿主机 worker 执行 review activity 并创建 Docker sandbox。
+控制平面包括 GitHub integration、Execution Gateway 和 Temporal。宿主机 worker 执行 review activity 并创建 Docker sandbox。
 
 启动期失败和运行期失败的监督方式不同，排查时这个区别很关键：
 
@@ -324,10 +308,10 @@ Temporal development server 的状态保存在 `.agent-temporal-state` 下，因
 ```bash
 sudo systemctl status sec-review-bot.target
 sudo systemctl status sec-review-bot-control-plane.service
-sudo systemctl status sec-review-agents-worker@1.service
+sudo systemctl status sec-review-agents-execution-worker@1.service
 sudo journalctl \
   -u sec-review-bot-control-plane.service \
-  -u sec-review-agents-worker@1.service \
+  -u sec-review-agents-execution-worker@1.service \
   -f
 ```
 
@@ -361,12 +345,12 @@ sudo systemctl restart sec-review-bot.target
 
 修改 `ops/systemd` 下的安装文件后，先重新运行安装脚本，再重启服务。
 
-验证 Runner Service：
+验证 Execution Gateway：
 
 ```bash
-RUNNER_SERVICE_TOKEN=<paste-your-token>
+EXECUTION_API_TOKEN=<paste-your-token>
 curl -sS http://127.0.0.1:8000/healthz \
-  -H "Authorization: Bearer ${RUNNER_SERVICE_TOKEN}"
+  -H "Authorization: Bearer ${EXECUTION_API_TOKEN}"
 ```
 
 验证 Control Plane 是否可以安全接收协调请求：
@@ -375,7 +359,7 @@ curl -sS http://127.0.0.1:8000/healthz \
 curl -sS http://127.0.0.1:8090/readyz
 ```
 
-`/healthz` 仅表示进程存活。PostgreSQL、连接池或完整版本集合与本应用不一致的 schema ledger 不可用时，`/readyz` 返回 `503`；它有意不包含 Runner 或 GitHub 的可达性。
+`/healthz` 仅表示进程存活。PostgreSQL、连接池或完整版本集合与本应用不一致的 schema ledger 不可用时，`/readyz` 返回 `503`；它有意不包含 Execution API 或 GitHub 的可达性。
 
 ### 组件级操作
 
@@ -383,7 +367,7 @@ curl -sS http://127.0.0.1:8090/readyz
 
 ```bash
 sudo systemctl restart sec-review-bot-control-plane.service
-sudo systemctl restart sec-review-agents-worker@1.service
+sudo systemctl restart sec-review-agents-execution-worker@1.service
 ```
 
 也可以绕过 systemd，在前台启动 Compose 控制平面进行开发调试：
@@ -401,8 +385,8 @@ docker compose --profile app up --build
 systemd template 可以在同一执行节点运行多个 worker 进程：
 
 ```bash
-sudo systemctl enable --now sec-review-agents-worker@2.service
-sudo systemctl enable --now sec-review-agents-worker@3.service
+sudo systemctl enable --now sec-review-agents-execution-worker@2.service
+sudo systemctl enable --now sec-review-agents-execution-worker@3.service
 ```
 
 Temporal 会在共用 task queue 的实例之间分配任务。应先调整单进程配置；只有测量表明单进程成为瓶颈，或需要进程级故障隔离时，再增加进程或执行节点。
@@ -467,7 +451,7 @@ GitHub integration 在准备 review input bundle 时通过 `git fetch` 拉取目
 GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://host.docker.internal:7897
 ```
 
-Compose 会把 `host.docker.internal` 映射到宿主机。代理必须监听 Docker 容器可访问的地址，而不是只监听 `127.0.0.1`。这个变量不会改变 GitHub API、Runner Service、worker 或 sandbox 的网络路径。
+Compose 会把 `host.docker.internal` 映射到宿主机。代理必须监听 Docker 容器可访问的地址，而不是只监听 `127.0.0.1`。这个变量不会改变 GitHub API、Execution Gateway、worker 或 sandbox 的网络路径。
 
 非 Compose 启动 GitHub integration 时，可以改用宿主机进程能够访问的地址，例如：
 

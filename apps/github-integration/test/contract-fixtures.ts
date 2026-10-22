@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { CONTRACT_VERSION_DIR } from '../src/runner/contract-version.js'
+import { CONTRACT_VERSION_DIR } from '../src/execution/contract-version.js'
 
 /** The repository root, located by walking up to the shared `contracts/` tree. Exported so the
  * package's tests anchor on one implementation of "where is the repo" rather than each

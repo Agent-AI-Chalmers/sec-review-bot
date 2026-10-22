@@ -1,0 +1,29 @@
+# Shared rules for every hand-maintained OpenAPI contract in this repository.
+extends:
+  - spectral:oas
+functionsDir: spectral-functions
+functions:
+  - operationRequiresSecurity
+  - operationDeclaresServerErrors
+rules:
+  operation-operationId: error
+  operation-tags: "off"
+  operation-description: warn
+  oas3-api-servers: "off"
+  info-contact: "off"
+
+  operation-requires-security:
+    description: "Every operation must declare a security requirement (`security: []` if deliberately public)."
+    message: "{{error}}"
+    severity: error
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      function: operationRequiresSecurity
+
+  operation-declares-server-errors:
+    description: Every operation must declare `500`, and `413` when it reads a request body.
+    message: "{{error}}"
+    severity: error
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      function: operationDeclaresServerErrors

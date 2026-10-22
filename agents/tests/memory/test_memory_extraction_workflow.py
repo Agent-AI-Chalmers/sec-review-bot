@@ -1,1133 +1,278 @@
-import sqlite3
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
-from temporalio.exceptions import WorkflowAlreadyStartedError
+from temporalio.common import WorkflowIDReusePolicy
 
-from sec_review_agents.memory import store as memory_store
+from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.entrypoints.execution_worker import main as worker
+from sec_review_agents.memory import extraction_workflow, maintenance_workflow
 from sec_review_agents.memory.extraction_workflow import (
-    MemoryExtractionJobRequest,
-    MemoryExtractionRegistrationRequest,
-    MemoryExtractionRunRequest,
+    MemoryExtractionRequest,
     MemoryExtractionWorkflow,
-    claim_pending_memory_extraction_jobs_activity,
-    mark_memory_extraction_job_failed_activity,
-    register_memory_extraction_job_activity,
-    run_memory_extraction_job_activity,
+    TranscriptBundlePublicationRequest,
+    memory_extraction_workflow_id,
+    publish_and_start_memory_extractions,
+    run_memory_extraction,
 )
 from sec_review_agents.memory.maintenance_workflow import (
-    MEMORY_MAINTENANCE_DEFAULT_BATCH_SIZE,
-    MEMORY_MAINTENANCE_PENDING_MAX_AGE,
-    MEMORY_MAINTENANCE_PENDING_THRESHOLD,
-    MEMORY_MAINTENANCE_THRESHOLD_WORKFLOW_ID,
     MemoryMaintenanceRequest,
-    MemoryMaintenanceTriggerRequest,
-    MemoryMaintenanceTriggerWorkflow,
     MemoryMaintenanceWorkflow,
-    count_pending_memory_observations_activity,
-    maybe_start_memory_maintenance_for_pending_observations,
-    run_memory_maintenance_activity,
 )
-from sec_review_agents.memory.state import (
-    EXTRACTION_JOB_STATUS_FAILED,
-    EXTRACTION_JOB_STATUS_PENDING,
-    EXTRACTION_JOB_STATUS_PROCESSED,
-    EXTRACTION_JOB_STATUS_RUNNING,
-    OBSERVATION_STATUS_PENDING,
-    OBSERVATION_STATUS_PROCESSED,
-    claim_pending_extraction_jobs,
-    count_observations_by_status,
-    fetch_all_extraction_jobs,
-    initialize_memory_state,
-    oldest_observation_created_at_by_status,
-    open_memory_state,
-    upsert_observation,
-)
-from sec_review_agents.utils.time import utc_now_iso
 
 
-def _fake_workflow_logger() -> SimpleNamespace:
-    return SimpleNamespace(
-        info=lambda *_args, **_kwargs: None,
-        warning=lambda *_args, **_kwargs: None,
+def _reference() -> ArtifactReference:
+    return ArtifactReference(
+        uri="s3://sec-review/runs/run-1/transcripts/review.tar.zst",
+        digest=f"sha256:{'a' * 64}",
+        media_type="application/tar+zstd",
+        size_bytes=42,
     )
 
 
-def _seed_extraction_job(
-    connection: sqlite3.Connection,
-    *,
-    job_id: str,
-    source_workflow: str,
-    run_id: str,
-    artifact_root_path: str,
-    status: str,
-) -> None:
-    """Insert an extraction job in an arbitrary status, bypassing the state machine.
-
-    Tests seed each status (pending/running/processed/failed) directly to verify how the
-    workflow handles a job that already exists in that status. The production seeder
-    ``register_pending_extraction_job`` can only create ``pending`` rows, so it cannot
-    be reused here.
-    """
-    now = utc_now_iso()
-    connection.execute(
-        """
-        insert into extraction_jobs (
-          job_id, source_workflow, run_id, artifact_root_path, status, created_at, updated_at
-        ) values (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (job_id, source_workflow, run_id, artifact_root_path, status, now, now),
-    )
-
-
-def test_worker_imports_memory_maintenance_workflow_and_activity() -> None:
-    from sec_review_agents.entrypoints.service import worker
-
-    assert worker.MemoryMaintenanceTriggerWorkflow is MemoryMaintenanceTriggerWorkflow
+def test_worker_registers_direct_memory_workflows_and_activities() -> None:
+    assert worker.MemoryExtractionWorkflow is MemoryExtractionWorkflow
     assert worker.MemoryMaintenanceWorkflow is MemoryMaintenanceWorkflow
-    assert worker.run_memory_maintenance_activity is run_memory_maintenance_activity
-    assert (
-        worker.count_pending_memory_observations_activity
-        is count_pending_memory_observations_activity
+    assert worker.run_memory_extraction_activity is (
+        extraction_workflow.run_memory_extraction_activity
     )
-    assert (
-        worker.register_memory_extraction_job_activity
-        is register_memory_extraction_job_activity
-    )
-    assert (
-        worker.claim_pending_memory_extraction_jobs_activity
-        is claim_pending_memory_extraction_jobs_activity
-    )
-    assert (
-        worker.mark_memory_extraction_job_failed_activity
-        is mark_memory_extraction_job_failed_activity
-    )
-    assert (
-        worker.run_memory_extraction_job_activity is run_memory_extraction_job_activity
+    assert worker.run_memory_maintenance_activity is (
+        maintenance_workflow.run_memory_maintenance_activity
     )
 
 
-def test_register_memory_extraction_job_activity_writes_pending_job(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    request = MemoryExtractionRegistrationRequest(
-        job_id="issue-review-run-1",
-        source_workflow="issue-review",
-        run_id="run-1",
-        artifact_root_path="/tmp/run/artifacts",
-        timeout_seconds=30,
+def test_extraction_workflow_id_is_stable_per_transcript_unit() -> None:
+    first = memory_extraction_workflow_id(
+        transcript_digest=_reference().digest,
+        review_unit_id="case-a",
     )
-
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = register_memory_extraction_job_activity(request)
-
-    assert result == {
-        "ok": True,
-        "skipped": False,
-        "job_id": "issue-review-run-1",
-    }
-    with open_memory_state(memory_store_dir) as connection:
-        jobs = fetch_all_extraction_jobs(connection)
-    assert len(jobs) == 1
-    assert jobs[0].job_id == "issue-review-run-1"
-    assert jobs[0].status == EXTRACTION_JOB_STATUS_PENDING
-
-
-def test_register_memory_extraction_job_activity_skips_processed_job(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="issue-review-run-1",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/artifacts",
-            status=EXTRACTION_JOB_STATUS_PROCESSED,
-        )
-    request = MemoryExtractionRegistrationRequest(
-        job_id="issue-review-run-1",
-        source_workflow="issue-review",
-        run_id="run-1",
-        artifact_root_path="/tmp/run/artifacts",
-        timeout_seconds=30,
+    assert first == memory_extraction_workflow_id(
+        transcript_digest=_reference().digest,
+        review_unit_id="case-a",
     )
-
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = register_memory_extraction_job_activity(request)
-
-    assert result == {
-        "ok": True,
-        "skipped": True,
-        "reason": "Memory extraction job already processed.",
-        "job_id": "issue-review-run-1",
-    }
-
-
-def test_register_memory_extraction_job_activity_does_not_demote_running_job(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="issue-review-run-1",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/artifacts",
-            status=EXTRACTION_JOB_STATUS_RUNNING,
-        )
-    request = MemoryExtractionRegistrationRequest(
-        job_id="issue-review-run-1",
-        source_workflow="issue-review",
-        run_id="run-1",
-        artifact_root_path="/tmp/run/artifacts",
-        timeout_seconds=30,
+    assert first != memory_extraction_workflow_id(
+        transcript_digest=_reference().digest,
+        review_unit_id="case-b",
     )
-
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = register_memory_extraction_job_activity(request)
-
-    assert result == {
-        "ok": True,
-        "skipped": True,
-        "job_id": "issue-review-run-1",
-    }
-    with open_memory_state(memory_store_dir) as connection:
-        jobs = fetch_all_extraction_jobs(connection)
-    assert jobs[0].status == EXTRACTION_JOB_STATUS_RUNNING
 
 
 @pytest.mark.asyncio
-async def test_run_memory_extraction_job_requires_claimed_running_job(
-    tmp_path,
-) -> None:
-    from sec_review_agents.memory.extraction_workflow import run_memory_extraction_job
-
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="issue-review-run-1",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/artifacts",
-            status=EXTRACTION_JOB_STATUS_PENDING,
-        )
-
-    with (
-        patch(
-            "sec_review_agents.memory.extractor.extract_memory_observations_from_paths",
-            return_value=SimpleNamespace(
-                skipped=False,
-                summary="Memory observation written.",
-                observation_paths=(),
-            ),
-        ) as extract,
-        pytest.raises(RuntimeError, match="not running"),
-    ):
-        await run_memory_extraction_job(
-            memory_store_dir=memory_store_dir,
-            job_id="issue-review-run-1",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/artifacts",
-            deployment=None,
-        )
-
-    with open_memory_state(memory_store_dir) as connection:
-        jobs = fetch_all_extraction_jobs(connection)
-    extract.assert_not_called()
-    assert jobs[0].status == EXTRACTION_JOB_STATUS_PENDING
-
-
-def test_register_memory_extraction_job_activity_skips_failed_job(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="issue-review-run-1",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/artifacts",
-            status=EXTRACTION_JOB_STATUS_FAILED,
-        )
-
-    request = MemoryExtractionRegistrationRequest(
-        job_id="issue-review-run-1",
-        source_workflow="issue-review",
-        run_id="run-1",
-        artifact_root_path="/tmp/run/artifacts-new",
-        timeout_seconds=30,
-    )
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = register_memory_extraction_job_activity(request)
-
-    assert result == {
-        "ok": True,
-        "skipped": True,
-        "reason": "Memory extraction job already failed.",
-        "job_id": "issue-review-run-1",
-    }
-    with open_memory_state(memory_store_dir) as connection:
-        jobs = fetch_all_extraction_jobs(connection)
-    assert jobs[0].status == EXTRACTION_JOB_STATUS_FAILED
-    assert jobs[0].artifact_root_path == "/tmp/run/artifacts"
-
-
-def test_claim_pending_extraction_jobs_marks_rows_running(tmp_path: Path) -> None:
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="first",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/one",
-            status=EXTRACTION_JOB_STATUS_PENDING,
-        )
-        _seed_extraction_job(
-            connection,
-            job_id="second",
-            source_workflow="issue-review",
-            run_id="run-2",
-            artifact_root_path="/tmp/run/two",
-            status=EXTRACTION_JOB_STATUS_PENDING,
-        )
-        claimed = claim_pending_extraction_jobs(connection, limit=1)
-        second_claim = claim_pending_extraction_jobs(connection, limit=10)
-
-    assert [job.job_id for job in claimed] == ["first"]
-    assert claimed[0].status == EXTRACTION_JOB_STATUS_RUNNING
-    assert [job.job_id for job in second_claim] == ["second"]
-
-
-def test_claim_pending_memory_extraction_jobs_fails_stale_running_jobs(
-    tmp_path: Path,
-) -> None:
-    """Recover jobs abandoned in running state instead of leaving them invisible."""
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    stale_created_at = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="stale",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/stale",
-            status=EXTRACTION_JOB_STATUS_RUNNING,
-        )
-        connection.execute(
-            """
-            update extraction_jobs
-            set updated_at = ?
-            where job_id = ?
-            """,
-            (stale_created_at, "stale"),
-        )
-
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = claim_pending_memory_extraction_jobs_activity(
-            MemoryExtractionRunRequest(
-                timeout_seconds=30,
-                batch_size=1,
-            )
-        )
-
-    assert result["jobs"] == []
-    with open_memory_state(memory_store_dir) as connection:
-        jobs = fetch_all_extraction_jobs(connection)
-    assert jobs[0].status == EXTRACTION_JOB_STATUS_FAILED
-
-
-@pytest.mark.asyncio
-async def test_run_memory_extraction_job_leaves_running_job_for_workflow_finalizer(
-    tmp_path: Path,
-) -> None:
-    """Let the workflow own terminal failure after Temporal exhausts activity retries."""
-    from sec_review_agents.memory.extraction_workflow import run_memory_extraction_job
-
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="first",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/one",
-            status=EXTRACTION_JOB_STATUS_RUNNING,
-        )
-
-    with (
-        patch(
-            "sec_review_agents.memory.extractor.extract_memory_observations_from_paths",
-            side_effect=RuntimeError("llm failed"),
-        ),
-        pytest.raises(RuntimeError, match="llm failed"),
-    ):
-        await run_memory_extraction_job(
-            memory_store_dir=memory_store_dir,
-            job_id="first",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/one",
-            deployment=None,
-        )
-
-    with open_memory_state(memory_store_dir) as connection:
-        jobs = fetch_all_extraction_jobs(connection)
-    assert jobs[0].status == EXTRACTION_JOB_STATUS_RUNNING
-
-
-@pytest.mark.asyncio
-async def test_run_memory_extraction_job_activity_raises_for_temporal_retry(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="first",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/one",
-            status=EXTRACTION_JOB_STATUS_RUNNING,
-        )
-
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-        patch(
-            "sec_review_agents.memory.extractor.extract_memory_observations_from_paths",
-            side_effect=RuntimeError("llm failed"),
-        ),
-        pytest.raises(RuntimeError, match="llm failed"),
-    ):
-        await run_memory_extraction_job_activity(
-            MemoryExtractionJobRequest(
-                job_id="first",
-                source_workflow="issue-review",
-                run_id="run-1",
-                artifact_root_path="/tmp/run/one",
-            )
-        )
-
-    with open_memory_state(memory_store_dir) as connection:
-        jobs = fetch_all_extraction_jobs(connection)
-    assert jobs[0].status == EXTRACTION_JOB_STATUS_RUNNING
-
-
-def test_mark_memory_extraction_job_failed_activity_marks_running_job(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    memory_store_dir.mkdir(parents=True)
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        _seed_extraction_job(
-            connection,
-            job_id="first",
-            source_workflow="issue-review",
-            run_id="run-1",
-            artifact_root_path="/tmp/run/one",
-            status=EXTRACTION_JOB_STATUS_RUNNING,
-        )
-
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = mark_memory_extraction_job_failed_activity(
-            MemoryExtractionJobRequest(
-                job_id="first",
-                source_workflow="issue-review",
-                run_id="run-1",
-                artifact_root_path="/tmp/run/one",
-            )
-        )
-
-    assert result == {"ok": True, "job_id": "first", "marked": True}
-    with open_memory_state(memory_store_dir) as connection:
-        jobs = fetch_all_extraction_jobs(connection)
-    assert jobs[0].status == EXTRACTION_JOB_STATUS_FAILED
-
-
-@pytest.mark.asyncio
-async def test_memory_extraction_workflow_fans_out_claimed_jobs(monkeypatch) -> None:
-    activity_calls = []
-    request = MemoryExtractionRunRequest(timeout_seconds=30, batch_size=2)
-
-    async def fake_execute_activity(activity_fn, activity_request, **kwargs):
-        activity_calls.append((activity_fn, activity_request, kwargs))
-        if activity_fn is claim_pending_memory_extraction_jobs_activity:
-            return {
-                "ok": True,
-                "skipped": False,
-                "jobs": [
-                    {
-                        "job_id": "first",
-                        "source_workflow": "issue-review",
-                        "run_id": "run-1",
-                        "artifact_root_path": "/tmp/run/one",
-                    },
-                    {
-                        "job_id": "second",
-                        "source_workflow": "issue-review",
-                        "run_id": "run-2",
-                        "artifact_root_path": "/tmp/run/two",
-                    },
-                ],
-            }
-        if activity_fn is run_memory_extraction_job_activity:
-            assert isinstance(activity_request, MemoryExtractionJobRequest)
-            if activity_request.job_id == "second":
-                raise RuntimeError("second failed")
-            return {
-                "ok": True,
-                "job_id": activity_request.job_id,
-                "skipped": False,
-                "summary": "done",
-                "observation_paths": [],
-                "source_workflow": activity_request.source_workflow,
-                "run_id": activity_request.run_id,
-            }
-        if activity_fn is mark_memory_extraction_job_failed_activity:
-            assert isinstance(activity_request, MemoryExtractionJobRequest)
-            if activity_request.job_id == "second":
-                raise RuntimeError("finalizer failed")
-            return {
-                "ok": True,
-                "job_id": activity_request.job_id,
-                "marked": True,
-            }
-        raise AssertionError(f"Unexpected activity: {activity_fn}")
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.extraction_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-
-    result = await MemoryExtractionWorkflow().run(request)
-
-    assert result == {
-        "ok": False,
-        "skipped": False,
-        "processed_count": 1,
-        "failure_count": 1,
-        "job_ids": ["first"],
-        "failures": [{"job_id": "second", "error": "second failed"}],
-    }
-    assert [call[0] for call in activity_calls] == [
-        claim_pending_memory_extraction_jobs_activity,
-        run_memory_extraction_job_activity,
-        run_memory_extraction_job_activity,
-        mark_memory_extraction_job_failed_activity,
-    ]
-    assert activity_calls[0][2]["retry_policy"].maximum_attempts == 3
-    assert activity_calls[1][2]["retry_policy"].maximum_attempts == 3
-    assert activity_calls[2][2]["retry_policy"].maximum_attempts == 3
-    assert activity_calls[3][2]["retry_policy"].maximum_attempts == 3
-
-
-@pytest.mark.asyncio
-async def test_memory_extraction_workflow_keeps_original_failure_when_finalizer_fails(
+async def test_publication_starts_one_abandoned_child_per_review_unit(
     monkeypatch,
 ) -> None:
-    """Report the extraction failure rather than masking it with cleanup failure."""
-    request = MemoryExtractionRunRequest(timeout_seconds=30, batch_size=1)
-
-    async def fake_execute_activity(activity_fn, activity_request, **kwargs):
-        if activity_fn is claim_pending_memory_extraction_jobs_activity:
-            return {
-                "ok": True,
-                "skipped": False,
-                "jobs": [
-                    {
-                        "job_id": "first",
-                        "source_workflow": "issue-review",
-                        "run_id": "run-1",
-                        "artifact_root_path": "/tmp/run/one",
-                    }
-                ],
-            }
-        if activity_fn is run_memory_extraction_job_activity:
-            raise RuntimeError("extract failed")
-        if activity_fn is mark_memory_extraction_job_failed_activity:
-            raise RuntimeError("finalizer failed")
-        raise AssertionError(f"Unexpected activity: {activity_fn}")
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.extraction_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-
-    result = await MemoryExtractionWorkflow().run(request)
-
-    assert result == {
-        "ok": False,
-        "skipped": False,
-        "processed_count": 0,
-        "failure_count": 1,
-        "job_ids": [],
-        "failures": [{"job_id": "first", "error": "extract failed"}],
-    }
-
-
-@pytest.mark.asyncio
-async def test_run_memory_maintenance_activity_skips_without_memory_dir() -> None:
-    request = MemoryMaintenanceRequest(timeout_seconds=30)
-
-    with (
-        patch.dict("os.environ", {}, clear=True),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = await run_memory_maintenance_activity(request)
-
-    assert result == {
-        "ok": True,
-        "skipped": True,
-        "reason": "AGENT_MEMORY_DIR is not configured.",
-    }
-
-
-@pytest.mark.asyncio
-async def test_run_memory_maintenance_activity_skips_when_memory_globally_disabled() -> (
-    None
-):
-    request = MemoryMaintenanceRequest(timeout_seconds=30)
-
-    with (
-        patch.dict("os.environ", {"AGENT_MEMORY_ENABLED": "false"}, clear=True),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = await run_memory_maintenance_activity(request)
-
-    assert result == {
-        "ok": True,
-        "skipped": True,
-        "reason": "AGENT_MEMORY_ENABLED is false.",
-    }
-
-
-def test_register_memory_extraction_job_activity_skips_when_memory_globally_disabled(
-    tmp_path: Path,
-) -> None:
-    request = MemoryExtractionRegistrationRequest(
-        job_id="issue-review-run-1",
-        source_workflow="issue-review",
-        run_id="run-1",
-        artifact_root_path=str(tmp_path / "artifacts"),
-        timeout_seconds=30,
-    )
-
-    with (
-        patch.dict("os.environ", {"AGENT_MEMORY_ENABLED": "false"}, clear=True),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = register_memory_extraction_job_activity(request)
-
-    assert result == {
-        "ok": True,
-        "skipped": True,
-        "reason": "AGENT_MEMORY_ENABLED is false.",
-    }
-
-
-def test_count_pending_memory_observations_activity_skips_when_memory_globally_disabled() -> (
-    None
-):
-    with (
-        patch.dict("os.environ", {"AGENT_MEMORY_ENABLED": "false"}, clear=True),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = count_pending_memory_observations_activity()
-
-    assert result == {
-        "ok": True,
-        "skipped": True,
-        "pending_count": 0,
-        "reason": "AGENT_MEMORY_ENABLED is false.",
-    }
-
-
-@pytest.mark.asyncio
-async def test_run_memory_maintenance_activity_returns_processed_count(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    request = MemoryMaintenanceRequest(
-        timeout_seconds=30,
-        batch_size=MEMORY_MAINTENANCE_DEFAULT_BATCH_SIZE,
-    )
-
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-        patch(
-            "sec_review_agents.memory.maintainer.maintain_memory_with_result",
-            return_value=SimpleNamespace(
-                summary="Memory maintained.",
-                processed_count=2,
-                skipped=False,
-            ),
-        ) as maintain,
-    ):
-        result = await run_memory_maintenance_activity(request)
-
-    maintain.assert_called_once_with(
-        memory_store_dir=memory_store_dir.resolve(),
-        deployment=None,
-        batch_size=MEMORY_MAINTENANCE_DEFAULT_BATCH_SIZE,
-    )
-    assert result["ok"] is True
-    assert result["skipped"] is False
-    assert result["processed_count"] == 2
-
-
-def test_count_pending_memory_observations_activity_counts_pending_only(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    observations_root = memory_store.memory_observations_dir(memory_store_dir)
-    observations_root.mkdir(parents=True)
-    pending = observations_root / "pending.md"
-    processed = observations_root / "processed.md"
-    pending.write_text("pending\n", encoding="utf-8")
-    processed.write_text("processed\n", encoding="utf-8")
-
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        upsert_observation(
-            connection,
-            observation_id="pending",
-            path=str(pending),
-            status=OBSERVATION_STATUS_PENDING,
-        )
-        upsert_observation(
-            connection,
-            observation_id="processed",
-            path=str(processed),
-            status=OBSERVATION_STATUS_PROCESSED,
-        )
-
-    with (
-        patch.dict(
-            "os.environ", {"AGENT_MEMORY_DIR": str(memory_store_dir)}, clear=True
-        ),
-        patch("sec_review_agents.utils.env.bootstrap_agents_env"),
-    ):
-        result = count_pending_memory_observations_activity()
-
-    assert result["ok"] is True
-    assert result["pending_count"] == 1
-    assert result["oldest_pending_created_at"] is not None
-
-
-def test_count_observations_by_status_counts_only_matching_rows(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    observations_root = memory_store.memory_observations_dir(memory_store_dir)
-    observations_root.mkdir(parents=True)
-    pending = observations_root / "pending.md"
-    processed = observations_root / "processed.md"
-    pending.write_text("pending\n", encoding="utf-8")
-    processed.write_text("processed\n", encoding="utf-8")
-
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        upsert_observation(
-            connection,
-            observation_id="pending",
-            path=str(pending),
-            status=OBSERVATION_STATUS_PENDING,
-        )
-        upsert_observation(
-            connection,
-            observation_id="processed",
-            path=str(processed),
-            status=OBSERVATION_STATUS_PROCESSED,
-        )
-
-    with open_memory_state(memory_store_dir) as connection:
-        assert (
-            count_observations_by_status(
-                connection,
-                status=OBSERVATION_STATUS_PENDING,
-            )
-            == 1
-        )
-
-
-def test_oldest_observation_created_at_by_status_uses_oldest_pending(
-    tmp_path: Path,
-) -> None:
-    memory_store_dir = tmp_path / "memory"
-    observations_root = memory_store.memory_observations_dir(memory_store_dir)
-    observations_root.mkdir(parents=True)
-    first = observations_root / "first.md"
-    second = observations_root / "second.md"
-    first.write_text("first\n", encoding="utf-8")
-    second.write_text("second\n", encoding="utf-8")
-
-    initialize_memory_state(memory_store_dir)
-    with open_memory_state(memory_store_dir) as connection:
-        upsert_observation(
-            connection,
-            observation_id="first",
-            path=str(first),
-            status=OBSERVATION_STATUS_PENDING,
-        )
-        first_created_at = oldest_observation_created_at_by_status(
-            connection,
-            status=OBSERVATION_STATUS_PENDING,
-        )
-        upsert_observation(
-            connection,
-            observation_id="second",
-            path=str(second),
-            status=OBSERVATION_STATUS_PENDING,
-        )
-
-    with open_memory_state(memory_store_dir) as connection:
-        assert (
-            oldest_observation_created_at_by_status(
-                connection,
-                status=OBSERVATION_STATUS_PENDING,
-            )
-            == first_created_at
-        )
-
-
-@pytest.mark.asyncio
-async def test_threshold_maintenance_workflow_continues_when_pending_remains(
-    monkeypatch,
-) -> None:
-    """Drain large backlogs through bounded workflow histories."""
-    activity_results = [
-        {"ok": True, "skipped": False, "processed_count": 10},
-        {"ok": True, "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD},
-    ]
-    continued = []
-
-    async def fake_execute_activity(*_args, **_kwargs):
-        return activity_results.pop(0)
-
-    def fake_continue_as_new(request):
-        continued.append(request)
-        raise RuntimeError("continued as new")
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.continue_as_new",
-        fake_continue_as_new,
-    )
-    request = MemoryMaintenanceRequest(
-        timeout_seconds=30,
-        batch_size=MEMORY_MAINTENANCE_DEFAULT_BATCH_SIZE,
-    )
-
-    try:
-        await MemoryMaintenanceWorkflow().run(request)
-    except RuntimeError as error:
-        assert str(error) == "continued as new"
-    else:
-        raise AssertionError("threshold workflow did not continue as new")
-
-    assert continued == [request]
-
-
-@pytest.mark.asyncio
-async def test_threshold_maintenance_workflow_stops_when_pending_below_threshold(
-    monkeypatch,
-) -> None:
-    activity_results = [
-        {"ok": True, "skipped": False, "processed_count": 10},
-        {"ok": True, "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD - 1},
-    ]
-
-    async def fake_execute_activity(*_args, **_kwargs):
-        return activity_results.pop(0)
-
-    def fake_continue_as_new(_request):
-        raise AssertionError("workflow should not continue as new")
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.continue_as_new",
-        fake_continue_as_new,
-    )
-    request = MemoryMaintenanceRequest(
-        timeout_seconds=30,
-        batch_size=MEMORY_MAINTENANCE_DEFAULT_BATCH_SIZE,
-    )
-
-    result = await MemoryMaintenanceWorkflow().run(request)
-
-    assert result == {"ok": True, "skipped": False, "processed_count": 10}
-    assert activity_results == []
-
-
-@pytest.mark.asyncio
-async def test_pending_observations_trigger_skips_below_threshold(monkeypatch) -> None:
-    calls = []
-
-    async def fake_execute_activity(*_args, **_kwargs):
-        return {"ok": True, "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD - 1}
-
-    async def fake_start_child_workflow(*args, **kwargs):
-        calls.append((args, kwargs))
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.start_child_workflow",
-        fake_start_child_workflow,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.logger",
-        _fake_workflow_logger(),
-    )
-
-    result = await maybe_start_memory_maintenance_for_pending_observations(
-        MemoryMaintenanceTriggerRequest(
-            timeout_seconds=30,
-        ),
-        now=datetime.now(UTC),
-    )
-
-    assert result == {
-        "ok": True,
-        "started": False,
-        "reason": "below_threshold",
-        "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD - 1,
-        "oldest_pending_created_at": None,
-    }
-    assert calls == []
-
-
-@pytest.mark.asyncio
-async def test_pending_observations_trigger_starts_at_threshold(monkeypatch) -> None:
-    calls = []
-
-    async def fake_execute_activity(*_args, **_kwargs):
-        return {"ok": True, "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD}
-
-    async def fake_start_child_workflow(*args, **kwargs):
-        calls.append((args, kwargs))
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.start_child_workflow",
-        fake_start_child_workflow,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.logger",
-        _fake_workflow_logger(),
-    )
-
-    result = await maybe_start_memory_maintenance_for_pending_observations(
-        MemoryMaintenanceTriggerRequest(
-            timeout_seconds=30,
-        ),
-        now=datetime.now(UTC),
-    )
-
-    assert result == {
-        "ok": True,
-        "started": True,
-        "reason": "pending_threshold",
-        "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD,
-        "oldest_pending_created_at": None,
-    }
-    assert len(calls) == 1
-    args, kwargs = calls[0]
-    assert args[0] == MemoryMaintenanceWorkflow.run
-    assert kwargs["id"] == MEMORY_MAINTENANCE_THRESHOLD_WORKFLOW_ID
-
-
-@pytest.mark.asyncio
-async def test_pending_observations_trigger_starts_when_oldest_pending_is_stale(
-    monkeypatch,
-) -> None:
-    """Process a small old backlog even when it never reaches the size threshold."""
-    calls = []
-    stale_created_at = (
-        datetime.now(UTC) - MEMORY_MAINTENANCE_PENDING_MAX_AGE - timedelta(hours=1)
-    ).isoformat()
+    started = []
 
     async def fake_execute_activity(*_args, **_kwargs):
         return {
+            "transcript_bundle": _reference().as_dict(),
+            "review_unit_ids": ["case-a", "case-b"],
+        }
+
+    async def fake_start_child(*args, **kwargs):
+        started.append((args, kwargs))
+
+    monkeypatch.setattr(
+        extraction_workflow.workflow, "execute_activity", fake_execute_activity
+    )
+    monkeypatch.setattr(
+        extraction_workflow.workflow, "start_child_workflow", fake_start_child
+    )
+
+    result = await publish_and_start_memory_extractions(
+        TranscriptBundlePublicationRequest(
+            run_id="run-1",
+            artifact_root_path="/tmp/run-1",
+            review_units=[],
+            timeout_seconds=30,
+        ),
+        source_workflow="repository-review",
+        start_extractions=True,
+    )
+
+    assert result["transcript_publication"] == "published"
+    assert [entry["status"] for entry in result["extractions"]] == [
+        "started",
+        "started",
+    ]
+    assert [call[0][1].review_unit_id for call in started] == ["case-a", "case-b"]
+    assert all(
+        call[1]["parent_close_policy"]
+        is extraction_workflow.workflow.ParentClosePolicy.ABANDON
+        for call in started
+    )
+    assert all(
+        call[1]["id_reuse_policy"] is WorkflowIDReusePolicy.REJECT_DUPLICATE
+        for call in started
+    )
+
+
+@pytest.mark.asyncio
+async def test_publication_failure_is_returned_as_postprocessing_metadata(
+    monkeypatch,
+) -> None:
+    async def fail(*_args, **_kwargs):
+        raise RuntimeError("storage unavailable")
+
+    monkeypatch.setattr(extraction_workflow.workflow, "execute_activity", fail)
+    monkeypatch.setattr(extraction_workflow.workflow, "logger", Mock())
+    result = await publish_and_start_memory_extractions(
+        TranscriptBundlePublicationRequest("run-1", "/tmp/run-1", [], 30),
+        source_workflow="issue-review",
+        start_extractions=True,
+    )
+    assert result == {
+        "transcript_publication": "failed",
+        "extractions": [],
+        "error_code": "TRANSCRIPT_PUBLICATION_FAILED",
+    }
+
+
+@pytest.mark.asyncio
+async def test_extraction_workflow_executes_one_activity(monkeypatch) -> None:
+    request = MemoryExtractionRequest(
+        source_workflow="issue-review",
+        run_id="run-1",
+        review_unit_id="review",
+        transcript_bundle=_reference().as_dict(),
+        timeout_seconds=30,
+    )
+    execute = AsyncMock(return_value={"ok": True})
+    monkeypatch.setattr(extraction_workflow.workflow, "execute_activity", execute)
+
+    assert await MemoryExtractionWorkflow().run(request) == {"ok": True}
+    assert execute.call_args.args == (
+        extraction_workflow.run_memory_extraction_activity,
+        request,
+    )
+
+
+@pytest.mark.asyncio
+async def test_managed_extraction_registers_observation_with_provenance(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text("{}\n", encoding="utf-8")
+    client = Mock()
+    preview = SimpleNamespace(
+        observation_id="observation-1",
+        observation_markdown="Remember this.",
+        skipped=False,
+        summary="Produced observation.",
+    )
+    audit = ArtifactReference(
+        uri="s3://sec-review/memory/audit/extraction.tar.zst",
+        digest=f"sha256:{'b' * 64}",
+        media_type="application/tar+zstd",
+        size_bytes=10,
+    )
+
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        lambda: client,
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.transcript_bundle.materialize_transcript_unit",
+        lambda *_args, **_kwargs: SimpleNamespace(transcript_paths=(transcript,)),
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.extractor.preview_memory_observation_from_paths",
+        AsyncMock(return_value=preview),
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.audit_bundle.publish_memory_audit_bundle",
+        lambda **_kwargs: audit,
+    )
+    request = MemoryExtractionRequest(
+        source_workflow="issue-review",
+        run_id="run-1",
+        review_unit_id="review",
+        transcript_bundle=_reference().as_dict(),
+        timeout_seconds=30,
+    )
+
+    result = await run_memory_extraction(request)
+
+    assert result["observation_id"] == "observation-1"
+    client.register_observation.assert_called_once_with(
+        observation_id="observation-1",
+        source_workflow="issue-review",
+        source_run_id="run-1",
+        source_review_unit_id="review",
+        transcript_digest=_reference().digest,
+        body_markdown="Remember this.",
+        audit_reference=audit,
+    )
+
+
+@pytest.mark.asyncio
+async def test_catalog_observation_conflict_is_not_retried(monkeypatch) -> None:
+    from temporalio.exceptions import ApplicationError
+
+    from sec_review_agents.memory.catalog_client import MemoryCatalogConflictError
+    from sec_review_agents.memory.extraction_workflow import (
+        run_memory_extraction_activity,
+    )
+
+    async def conflict(_request):
+        raise MemoryCatalogConflictError("observation content differs")
+
+    monkeypatch.setattr(extraction_workflow, "run_memory_extraction", conflict)
+    request = MemoryExtractionRequest(
+        source_workflow="issue-review",
+        run_id="run-1",
+        review_unit_id="review",
+        transcript_bundle=_reference().as_dict(),
+        timeout_seconds=30,
+    )
+
+    with pytest.raises(ApplicationError) as captured:
+        await run_memory_extraction_activity(request)
+
+    assert captured.value.type == "MEMORY_CATALOG_OBSERVATION_CONFLICT"
+    assert captured.value.non_retryable is True
+
+
+@pytest.mark.asyncio
+async def test_scheduled_maintenance_skips_below_threshold(monkeypatch) -> None:
+    execute = AsyncMock(
+        return_value={
             "ok": True,
             "pending_count": 1,
-            "oldest_pending_created_at": stale_created_at,
+            "oldest_pending_created_at": None,
         }
-
-    async def fake_start_child_workflow(*args, **kwargs):
-        calls.append((args, kwargs))
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.execute_activity",
-        fake_execute_activity,
     )
+    monkeypatch.setattr(maintenance_workflow.workflow, "execute_activity", execute)
     monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.start_child_workflow",
-        fake_start_child_workflow,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.logger",
-        _fake_workflow_logger(),
-    )
-
-    result = await maybe_start_memory_maintenance_for_pending_observations(
-        MemoryMaintenanceTriggerRequest(
-            timeout_seconds=30,
+        maintenance_workflow.workflow,
+        "now",
+        lambda: maintenance_workflow.datetime.fromisoformat(
+            "2026-01-01T00:00:00+00:00"
         ),
-        now=datetime.now(UTC),
     )
-
-    assert result == {
-        "ok": True,
-        "started": True,
-        "reason": "pending_age",
-        "pending_count": 1,
-        "oldest_pending_created_at": stale_created_at,
-    }
-    assert len(calls) == 1
+    result = await MemoryMaintenanceWorkflow().run(
+        MemoryMaintenanceRequest(timeout_seconds=30, require_threshold=True)
+    )
+    assert result["reason"] == "below_threshold"
+    assert result["skipped"] is True
+    assert execute.call_count == 1
 
 
 @pytest.mark.asyncio
-async def test_pending_observations_trigger_handles_duplicate_start(
-    monkeypatch,
-) -> None:
-    """Treat an already-running singleton maintainer as successful coalescing."""
-
-    async def fake_execute_activity(*_args, **_kwargs):
-        return {"ok": True, "pending_count": MEMORY_MAINTENANCE_PENDING_THRESHOLD}
-
-    async def fake_start_child_workflow(*_args, **_kwargs):
-        raise WorkflowAlreadyStartedError(
-            MEMORY_MAINTENANCE_THRESHOLD_WORKFLOW_ID,
-            "MemoryMaintenanceWorkflow",
-        )
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.execute_activity",
-        fake_execute_activity,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.start_child_workflow",
-        fake_start_child_workflow,
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow.workflow.logger",
-        _fake_workflow_logger(),
+async def test_manual_maintenance_runs_without_threshold(monkeypatch) -> None:
+    results = iter(
+        [
+            {"ok": True, "pending_count": 1, "oldest_pending_created_at": None},
+            {"ok": True, "processed_count": 1},
+            {"ok": True, "pending_count": 0, "oldest_pending_created_at": None},
+        ]
     )
 
-    result = await maybe_start_memory_maintenance_for_pending_observations(
-        MemoryMaintenanceTriggerRequest(
-            timeout_seconds=30,
-        ),
-        now=datetime.now(UTC),
-    )
+    async def execute(*_args, **_kwargs):
+        return next(results)
 
-    assert result == {
-        "ok": True,
-        "started": False,
-        "reason": "already_running",
-    }
-
-
-@pytest.mark.asyncio
-async def test_memory_maintenance_trigger_workflow_runs_pending_observations_trigger(
-    monkeypatch,
-) -> None:
-    async def fake_trigger(request):
-        return {
-            "ok": True,
-            "started": False,
-            "reason": "below_threshold",
-            "timeout": request.timeout_seconds,
-        }
-
-    monkeypatch.setattr(
-        "sec_review_agents.memory.maintenance_workflow."
-        "maybe_start_memory_maintenance_for_pending_observations",
-        fake_trigger,
-    )
-
-    result = await MemoryMaintenanceTriggerWorkflow().run(
-        MemoryMaintenanceTriggerRequest(timeout_seconds=30)
-    )
-
-    assert result == {
-        "ok": True,
-        "started": False,
-        "reason": "below_threshold",
-        "timeout": 30,
-    }
+    monkeypatch.setattr(maintenance_workflow.workflow, "execute_activity", execute)
+    assert await MemoryMaintenanceWorkflow().run(
+        MemoryMaintenanceRequest(timeout_seconds=30)
+    ) == {"ok": True, "processed_count": 1}

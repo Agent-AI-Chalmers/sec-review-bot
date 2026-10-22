@@ -92,8 +92,8 @@ import type {
   ReviewRunRecord,
   ReviewRunAdmission
 } from '../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
-import type { RepositoryReviewInput } from '../../src/runner/input.js'
+import { CONTRACT_VERSION } from '../../src/execution/contract-version.js'
+import type { RepositoryReviewInput } from '../../src/execution/input.js'
 import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
 
 function fakeApp(): App {
@@ -542,10 +542,10 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
   ])
 })
 
-test('dispatchRepositoryReview preserves an uncertain Runner submission for replay', async () => {
+test('dispatchRepositoryReview preserves an uncertain Execution submission for replay', async () => {
   const transitions: unknown[] = []
   const error = new ControlPlaneSubmissionError(
-    'Runner response was lost.',
+    'Execution response was lost.',
     'SUBMISSION_STATE_UNCERTAIN'
   )
 

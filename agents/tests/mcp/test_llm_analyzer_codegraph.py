@@ -143,7 +143,7 @@ async def _run_probe(
         "mentionsJinja": "jinja" in result_text,
         "mentionsRenderUserTemplate": "render_user_template" in result_text,
         "toolUsage": tool_usage_from_transcript(
-            analyzer_artifacts / "transcript.json",
+            analyzer_artifacts / "transcript.jsonl",
             observations=(_codegraph_tool_observation,),
         ),
         "result": result,

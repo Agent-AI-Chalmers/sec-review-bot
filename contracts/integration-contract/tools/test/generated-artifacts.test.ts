@@ -24,8 +24,29 @@ const MANIFEST_PATH = path.join(
 )
 
 interface Manifest {
-  generators: Array<{ name: string; outputs: string[] }>
+  generators: Array<{
+    name: string
+    script: string
+    code_inputs?: string[]
+    inputs: string[]
+    outputs: string[]
+  }>
 }
+
+test('the HTTP contract is a hand-maintained YAML source, not a service projection', () => {
+  const sourcePath = path.join(
+    REPO_ROOT,
+    'contracts',
+    'integration-contract',
+    'openapi.yaml'
+  )
+  const contract = parse(readFileSync(sourcePath, 'utf8')) as {
+    openapi?: unknown
+    'x-contract-source'?: unknown
+  }
+  assert.equal(contract.openapi, '3.1.0')
+  assert.equal(contract['x-contract-source'], 'hand-maintained')
+})
 
 const ACTUAL_OUTPUTS: Record<string, string[]> = {
   types: types().map((a) => path.relative(REPO_ROOT, a.output)),
@@ -64,13 +85,51 @@ test('every file the manifest names exists', () => {
   for (const generator of (
     JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest
   ).generators) {
-    for (const output of generator.outputs) {
+    for (const file of [
+      generator.script,
+      ...(generator.code_inputs ?? []),
+      ...generator.inputs,
+      ...generator.outputs
+    ]) {
       assert.doesNotThrow(
-        () => readFileSync(path.join(REPO_ROOT, output), 'utf8'),
-        `${output} is listed in the manifest but cannot be read`
+        () => readFileSync(path.join(REPO_ROOT, file), 'utf8'),
+        `${file} is listed in the manifest but cannot be read`
       )
     }
   }
+})
+
+test('the workflow byte limit is projected from common.schema.json', () => {
+  const common = JSON.parse(
+    readFileSync(
+      path.join(
+        REPO_ROOT,
+        'contracts',
+        'integration-contract',
+        'v6',
+        'schemas',
+        'common.schema.json'
+      ),
+      'utf8'
+    )
+  ) as { $defs: { workflowInputBytes: { const: number } } }
+  const generated = readFileSync(
+    path.join(
+      REPO_ROOT,
+      'apps',
+      'github-integration',
+      'src',
+      'execution',
+      'integration-contract-types-generated.ts'
+    ),
+    'utf8'
+  )
+  assert.match(
+    generated,
+    new RegExp(
+      `export const MAX_WORKFLOW_INPUT_BYTES = ${common.$defs.workflowInputBytes.const}(?:\\n|$)`
+    )
+  )
 })
 
 /** Does any glob in `patterns` cover `filePath`? Supports `**` and `*`; exact strings match. */

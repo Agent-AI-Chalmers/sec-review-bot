@@ -1,6 +1,6 @@
 import { asErrorWithResponse, errorCode } from '../utils/error-utils.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../runner/publish-error-code.js'
-import { isDeterministicRunnerPublishError } from '../runner/publish-error.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../execution/publish-error-code.js'
+import { isDeterministicExecutionPublishError } from '../execution/publish-error.js'
 
 interface PublishFailureClassification {
   retry: boolean
@@ -12,9 +12,9 @@ interface PublishFailureClassification {
 // fixed for a stored run, so re-claiming the publication re-enters the same
 // condition and fails identically. Treat them as terminal instead of looping.
 const DETERMINISTIC_CONTROL_PLANE_PUBLICATION_CODES = new Set<string>([
-  RUNNER_PUBLISH_ERROR_CODES.publication_step_set_duplicate,
-  RUNNER_PUBLISH_ERROR_CODES.publication_step_set_changed,
-  RUNNER_PUBLISH_ERROR_CODES.publication_step_not_claimable
+  EXECUTION_PUBLISH_ERROR_CODES.publication_step_set_duplicate,
+  EXECUTION_PUBLISH_ERROR_CODES.publication_step_set_changed,
+  EXECUTION_PUBLISH_ERROR_CODES.publication_step_not_claimable
 ])
 
 /** Whether the failure is about reaching the service, not about what it answered.
@@ -47,7 +47,7 @@ function isRateLimitOrAbuseLimit(error: unknown): boolean {
 export function classifyPublicationFailure(
   error: unknown
 ): PublishFailureClassification {
-  if (isDeterministicRunnerPublishError(error)) {
+  if (isDeterministicExecutionPublishError(error)) {
     return {
       retry: false,
       code: errorCode(error),
@@ -66,7 +66,7 @@ export function classifyPublicationFailure(
   // owner re-reads the step instead.
   if (
     errorCode(error) ===
-    RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+    EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
   ) {
     return {
       retry: isTransportFault(error),
@@ -115,14 +115,15 @@ export function classifyPublicationFailure(
   if (responseStatus === 401 || responseStatus === 403) {
     return {
       retry: false,
-      code: errorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_auth_rejected,
+      code:
+        errorCode(error) ?? EXECUTION_PUBLISH_ERROR_CODES.github_auth_rejected,
       reason: 'github-auth-rejected'
     }
   }
   if (responseStatus === 404) {
     return {
       retry: false,
-      code: errorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_not_found,
+      code: errorCode(error) ?? EXECUTION_PUBLISH_ERROR_CODES.github_not_found,
       reason: 'github-not-found'
     }
   }
@@ -131,7 +132,7 @@ export function classifyPublicationFailure(
       retry: false,
       code:
         errorCode(error) ??
-        RUNNER_PUBLISH_ERROR_CODES.github_validation_rejected,
+        EXECUTION_PUBLISH_ERROR_CODES.github_validation_rejected,
       reason: 'github-validation-rejected'
     }
   }
@@ -139,7 +140,8 @@ export function classifyPublicationFailure(
     return {
       retry: false,
       code:
-        errorCode(error) ?? RUNNER_PUBLISH_ERROR_CODES.github_publish_rejected,
+        errorCode(error) ??
+        EXECUTION_PUBLISH_ERROR_CODES.github_publish_rejected,
       reason: 'github-deterministic-response'
     }
   }

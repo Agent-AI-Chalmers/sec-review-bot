@@ -49,11 +49,27 @@ class CustomBuildHook(BuildHookInterface):
         contract_version_dir = _contract_version_dir(Path(self.root))
         schema_root = _contract_schemas_root(Path(self.root))
         force_include = build_data.setdefault("force_include", {})
+        runtime_schema = (
+            Path(self.root).parent
+            / "contracts"
+            / "execution-contract"
+            / "v1"
+            / "execution-request.schema.json"
+        )
+        if not runtime_schema.is_file():
+            raise RuntimeError("Could not locate execution-contract/v1 schema.")
         if self.target_name == "sdist":
             force_include[str(schema_root)] = (
                 f"contracts/integration-contract/{contract_version_dir}/schemas"
             )
+            force_include[str(runtime_schema)] = (
+                "contracts/execution-contract/v1/execution-request.schema.json"
+            )
         elif self.target_name == "wheel":
             force_include[str(schema_root)] = (
                 f"sec_review_agents/resources/contracts/{contract_version_dir}"
+            )
+            force_include[str(runtime_schema)] = (
+                "sec_review_agents/resources/contracts/execution-contract/v1/"
+                "execution-request.schema.json"
             )

@@ -9,7 +9,7 @@ import test from 'node:test'
 
 import {
   CONTROL_PLANE_API_TYPES_PATH,
-  RUNNER_API_SCHEMA_PATH
+  EXECUTION_API_SCHEMA_PATH
 } from './generated-paths.js'
 
 test('the control-plane API projection still describes the shapes the client reads', () => {
@@ -27,11 +27,11 @@ test('the control-plane API projection still describes the shapes the client rea
   }
 })
 
-test('the runner API projection still describes the shapes the client reads', () => {
-  const generated = readFileSync(RUNNER_API_SCHEMA_PATH, 'utf8')
+test('the execution API projection still describes the shapes the client reads', () => {
+  const generated = readFileSync(EXECUTION_API_SCHEMA_PATH, 'utf8')
   for (const name of [
     'RunResponse',
-    'RunnerError',
+    'ExecutionError',
     'RunStatusResponse',
     'RunStatusToken'
   ]) {

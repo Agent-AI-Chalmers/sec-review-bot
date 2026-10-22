@@ -1,18 +1,19 @@
-// Project the runner's OpenAPI document into TypeScript.
+// Project the Execution API OpenAPI document into TypeScript.
 //
-// The document itself is owned by the `agents` package, where a test keeps it identical to
-// the service code. This module only produces its TypeScript view, so that the control
-// plane stops restating the runner's shapes by hand.
+// The document is the hand-maintained source of truth for the Execution API.
+// This module projects it into both the provider and consumer TypeScript packages.
 //
 // The generator and the test that fails when the committed file lags both call
-// `renderRunnerApiTypes`, so they cannot disagree about what "current" means.
+// `renderExecutionApiTypes`, so they cannot disagree about what "current" means.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import openapiTS, { astToString, type OpenAPI3 } from 'openapi-typescript'
 import prettier from 'prettier'
+import { parse } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
+import { renderWorkflowInputDeclarations } from './generate-workflow-input-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
@@ -21,33 +22,59 @@ export const SPEC_PATH = path.resolve(
   REPO_ROOT,
   'contracts',
   'integration-contract',
-  'openapi.json'
+  'openapi.yaml'
 )
-export const OUTPUT_PATH = path.join(
+export const CONTROL_PLANE_OUTPUT_PATH = path.join(
   CONTROL_PLANE_ROOT,
   'src',
-  'runner-api-schema.ts'
+  'execution-api-schema.ts'
+)
+export const GATEWAY_OUTPUT_PATH = path.join(
+  REPO_ROOT,
+  'execution-gateway',
+  'src',
+  'contract-types-generated.ts'
 )
 
 const HEADER = `// Generated from ${path.relative(REPO_ROOT, SPEC_PATH)} (path relative to the repository root). Do not edit.
 //
-// That document is owned by the agents package and checked there against the service code,
-// so this file is a projection of a contract rather than a second copy of one. Regenerate
-// it with \`pnpm --dir contracts/integration-contract/tools run generate\`.
+// This file is a generated projection of the contract. Regenerate it with
+// \`pnpm --dir contracts/integration-contract/tools run generate\`.
 `
 
-/** The committed content of `src/runner-api-schema.ts`. */
-export async function renderRunnerApiTypes(): Promise<string> {
-  const spec = JSON.parse(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
-  const rendered = HEADER + astToString(await openapiTS(spec))
+/** The committed content of `src/execution-api-schema.ts`. */
+export async function renderExecutionApiTypes(
+  outputPath: string
+): Promise<string> {
+  const spec = parse(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
+  const composedTypes = `
+${renderWorkflowInputDeclarations()}
+
+export interface WorkflowInputByName {
+  'issue-review': IssueReviewInput
+  'pull-request-review': PullRequestReviewInput
+  'repository-review': RepositoryReviewInput
+}
+
+export type ExecutionWorkflow = keyof WorkflowInputByName
+
+export type CreateRunRequestFor<Workflow extends ExecutionWorkflow> =
+  Omit<components['schemas']['CreateRunRequest'], 'input'> & {
+    input: WorkflowInputByName[Workflow]
+  }
+`
+  const rendered = HEADER + astToString(await openapiTS(spec)) + composedTypes
   // `format` does not read the project's Prettier config from `filepath`; it has to be
   // resolved and passed, or the output keeps the generator's own quoting and fails
   // `format:check`.
-  const options = await prettier.resolveConfig(OUTPUT_PATH)
-  return await prettier.format(rendered, { ...options, filepath: OUTPUT_PATH })
+  const options = await prettier.resolveConfig(outputPath)
+  return await prettier.format(rendered, { ...options, filepath: outputPath })
 }
 
 /** This generator's outputs as the shared descriptor the checker walks. */
 export function generatedArtifacts(): GeneratedArtifact[] {
-  return [{ output: OUTPUT_PATH, render: renderRunnerApiTypes }]
+  return [CONTROL_PLANE_OUTPUT_PATH, GATEWAY_OUTPUT_PATH].map((output) => ({
+    output,
+    render: async () => await renderExecutionApiTypes(output)
+  }))
 }

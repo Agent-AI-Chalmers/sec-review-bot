@@ -1,4 +1,4 @@
-"""Validate public Runner workflow inputs and results against contract schemas."""
+"""Validate public execution inputs and results against contract schemas."""
 
 import json
 import os
@@ -28,6 +28,8 @@ RESULT_SCHEMA_BY_WORKFLOW = {
     "repository-review": "repository-review-result.schema.json",
 }
 
+INPUT_BUNDLE_MANIFEST_SCHEMA = "input-bundle-manifest.schema.json"
+
 
 # The subtree under a contracts root that holds the canonical v6 schemas. An
 # operator points `SEC_REVIEW_CONTRACTS_ROOT` at the directory that contains it.
@@ -49,7 +51,7 @@ def _schema_root() -> Traversable:
        than something to fall through, so a misconfigured deployment fails loudly
        instead of silently reading a different copy.
     2. The schemas packaged in the wheel (`sec_review_agents.resources`), which is how
-       an installed Runner carries them.
+       an installed Execution Worker carries them.
     3. The source-checkout layout, read relative to the working directory. This is the
        finite pair the repository uses (a checkout run from `agents/`, or from the
        repository root); the Docker image (`WORKDIR /app`, schemas at `/contracts`) is
@@ -78,7 +80,7 @@ def _schema_root() -> Traversable:
             return candidate / _CONTRACT_SUBTREE
 
     raise RuntimeError(
-        "Could not locate contract v6 schemas for Runner validation. Set "
+        "Could not locate contract v6 schemas for Execution Worker validation. Set "
         f"{_SCHEMAS_ROOT_ENV} to the directory containing {_CONTRACT_SUBTREE}."
     )
 
@@ -122,7 +124,7 @@ def _validate_workflow_contract(
     location = ".".join(str(part) for part in error.absolute_path)
     label = f" at {location}" if location else ""
     raise ValueError(
-        f"Runner {value_label} does not match contract v6{label}: {error.message}"
+        f"Execution {value_label} does not match contract v6{label}: {error.message}"
     )
 
 
@@ -146,11 +148,28 @@ def validate_v6_workflow_result(result: Any, workflow: str) -> None:
     )
 
 
+def validate_v6_input_bundle_manifest(manifest: Any) -> None:
+    """Reject an input bundle manifest that does not match the public v6 shape."""
+    validator = _validators()[INPUT_BUNDLE_MANIFEST_SCHEMA]
+    errors = sorted(validator.iter_errors(manifest), key=lambda error: list(error.path))
+    if not errors:
+        return
+    error = errors[0]
+    location = ".".join(str(part) for part in error.absolute_path)
+    label = f" at {location}" if location else ""
+    raise ValueError(
+        "Execution input bundle manifest does not match contract "
+        f"{CONTRACT_VERSION}{label}: {error.message}"
+    )
+
+
 __all__ = [
     "CONTRACT_VERSION",
     "CONTRACT_VERSION_DIR",
+    "INPUT_BUNDLE_MANIFEST_SCHEMA",
     "INPUT_SCHEMA_BY_WORKFLOW",
     "RESULT_SCHEMA_BY_WORKFLOW",
+    "validate_v6_input_bundle_manifest",
     "validate_v6_workflow_input",
     "validate_v6_workflow_result",
 ]

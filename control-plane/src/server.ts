@@ -16,23 +16,23 @@ import { ReviewRunStore } from './review-store.js'
 import type {
   PreparationStatus,
   PublicationStatus,
-  RunnerStatus
+  ExecutionStatus
 } from './review-store.js'
 import { type ControlPlaneWorkflow } from './contracts.js'
 import {
   coordinateReviewRunsOnce,
   startReviewRunCoordinatorLoop
 } from './coordinator.js'
-import { observeRunnerRun } from './terminal-coordination.js'
+import { observeExecutionRun } from './terminal-coordination.js'
 import {
-  getRunnerRunStatus,
-  getRunnerRunStatuses,
-  isTerminalRunnerPollingError,
-  RunnerSubmissionUncertainError,
-  submitRunnerRun,
-  type RunnerRunStatus,
-  type RunnerRunStatusBatch
-} from './runner-client.js'
+  getExecutionRunStatus,
+  getExecutionRunStatuses,
+  isTerminalExecutionPollingError,
+  ExecutionSubmissionUncertainError,
+  submitExecutionRun,
+  type ExecutionRunStatus,
+  type ExecutionRunStatusBatch
+} from './execution-client.js'
 import {
   concludeExhaustedSubmissionRecovery,
   recoverReviewRunSubmission
@@ -127,16 +127,19 @@ const STATUSES_NEEDING_RUN_RECORD = new Set(['succeeded', 'failed'])
  * Answer a run's status from the batch the pass already read, and fetch the full record
  * only when the caller is about to store something from it.
  */
-function runnerStatusFromBatch(
-  batch: RunnerRunStatusBatch
-): (runId: string, workflow: ControlPlaneWorkflow) => Promise<RunnerRunStatus> {
+function executionStatusFromBatch(
+  batch: ExecutionRunStatusBatch
+): (
+  runId: string,
+  workflow: ControlPlaneWorkflow
+) => Promise<ExecutionRunStatus> {
   return async (runId, workflow) => {
     const status = batch.byRunId.get(runId)
     if (status !== undefined && !STATUSES_NEEDING_RUN_RECORD.has(status)) {
       return { run_id: runId, workflow, status }
     }
     // A terminal status, or a run this pass did not learn about, needs the record itself.
-    return await getRunnerRunStatus(runId, workflow)
+    return await getExecutionRunStatus(runId, workflow)
   }
 }
 // The list-query filter values are constrained by the contract's query schema (glue mounts it
@@ -192,7 +195,7 @@ function parseListQuery(url: URL): ListQueryOptions {
   }
   const executionStatus = url.searchParams.get('execution_status')
   if (executionStatus !== null)
-    options.execution_status = executionStatus as RunnerStatus
+    options.execution_status = executionStatus as ExecutionStatus
   const publicationStatus = url.searchParams.get('publication_status')
   if (publicationStatus !== null)
     options.publication_status = publicationStatus as PublicationStatus
@@ -213,7 +216,7 @@ function parseListQuery(url: URL): ListQueryOptions {
 
 function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   // Keep operational logs structured, but never serialize request arguments:
-  // they may contain runner input, publish context, or claim credentials.
+  // they may contain execution input, publish context, or claim credentials.
   console.info(JSON.stringify({ event, ...fields }))
 }
 
@@ -422,7 +425,7 @@ export async function registerControlPlaneRoutes(
           publishContext: publish_context,
           input
         },
-        submitRunnerRun
+        submitExecutionRun
       )
     },
 
@@ -809,7 +812,7 @@ export async function startControlPlaneServer(): Promise<{
   })
   await store.initialize()
   const configuredIntervalMs = Number.parseInt(
-    process.env.AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS || '15000',
+    process.env.AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS || '15000',
     10
   )
   const intervalMs =
@@ -821,19 +824,19 @@ export async function startControlPlaneServer(): Promise<{
     runOnce: async () =>
       await coordinateReviewRunsOnce(store, {
         recoverSubmission: async (run) => {
-          logEvent('runner_submission_recovery_started', {
+          logEvent('execution_submission_recovery_started', {
             connector_id: store.connectorId,
             run_id: run.run_id,
             workflow: run.workflow
           })
           // Enforce the replay budget before replaying. Exhaustion stops automatic recovery, but
-          // does not prove the Runner rejected an earlier request, so it becomes disconnected.
+          // does not prove the Execution rejected an earlier request, so it becomes disconnected.
           const exhausted = await concludeExhaustedSubmissionRecovery(
             store,
             run
           )
           if (exhausted !== null) {
-            logEvent('runner_submission_recovery_disconnected', {
+            logEvent('execution_submission_recovery_disconnected', {
               connector_id: store.connectorId,
               run_id: run.run_id,
               workflow: run.workflow
@@ -841,11 +844,11 @@ export async function startControlPlaneServer(): Promise<{
             return
           }
           await recoverReviewRunSubmission(store, run, {
-            submit: submitRunnerRun,
+            submit: submitExecutionRun,
             classifyError: (error) => ({
-              uncertain: error instanceof RunnerSubmissionUncertainError,
+              uncertain: error instanceof ExecutionSubmissionUncertainError,
               code:
-                error instanceof RunnerSubmissionUncertainError
+                error instanceof ExecutionSubmissionUncertainError
                   ? SUBMISSION_STATE_UNCERTAIN
                   : error instanceof Error &&
                       'code' in error &&
@@ -855,14 +858,14 @@ export async function startControlPlaneServer(): Promise<{
               message: error instanceof Error ? error.message : String(error)
             })
           })
-          logEvent('runner_submission_recovery_completed', {
+          logEvent('execution_submission_recovery_completed', {
             connector_id: store.connectorId,
             run_id: run.run_id,
             workflow: run.workflow
           })
         },
-        readRunnerStatuses: (runs) =>
-          getRunnerRunStatuses(runs.map((run) => run.run_id)),
+        readExecutionStatuses: (runs) =>
+          getExecutionRunStatuses(runs.map((run) => run.run_id)),
         // A row the contract cannot represent is reported and skipped rather than aborting
         // the pass, so one corrupt row cannot stop coordination for every other run. The log
         // carries the run id and the underlying fault, which is the diagnosis the opaque
@@ -876,11 +879,11 @@ export async function startControlPlaneServer(): Promise<{
           logParkedRun(store.connectorId, blocked)
         },
         observeActiveRun: async (run, statuses) => {
-          await observeRunnerRun(
+          await observeExecutionRun(
             store,
             run,
-            runnerStatusFromBatch(statuses),
-            isTerminalRunnerPollingError,
+            executionStatusFromBatch(statuses),
+            isTerminalExecutionPollingError,
             (event) => {
               console.info(
                 JSON.stringify({
@@ -894,7 +897,7 @@ export async function startControlPlaneServer(): Promise<{
         }
       }),
     onError: (error) => {
-      console.error('control_plane_runner_coordination_failed', error)
+      console.error('control_plane_execution_coordination_failed', error)
     }
   })
   const app = Fastify(CONTROL_PLANE_FASTIFY_OPTIONS)

@@ -15,6 +15,7 @@ from sec_review_agents.agents.discovery.prompts import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
+from sec_review_agents.runtime.transcripts import stage_attempt_transcript_path
 
 
 async def run_repository_discovery_agent(
@@ -25,7 +26,12 @@ async def run_repository_discovery_agent(
 ) -> dict:
     chunk_id = str((chunk or {}).get("chunk_id") or "").strip()
     transcript_paths = (
-        (discovery_artifacts_path / "transcripts" / f"{chunk_id}.json",)
+        (
+            stage_attempt_transcript_path(
+                discovery_artifacts_path,
+                attempt=chunk_id,
+            ),
+        )
         if discovery_artifacts_path
         else ()
     )

@@ -4,14 +4,14 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-本族描述 Runner 与其调用方之间受支持的公开集成点。它分为两层：
+本族描述 Execution 与其调用方之间受支持的公开集成点。它分为两层：
 
-1. 生产传输层：HTTP Agent Runner Service。
-2. 数据契约：runner 输入、workflow 结果、`ReviewRecord` 和 repository `deliveries[]`。
+1. 生产传输层：HTTP Execution API。
+2. 数据契约：execution 输入、workflow 结果、`ReviewRecord` 和 repository `deliveries[]`。
 
 从这些文档开始：
 
-- [openapi.json](openapi.json)：调用方如何创建和轮询 workflow run —— 路径、状态码、请求与响应形状、以及鉴权方案。
+- [openapi.yaml](openapi.yaml)：调用方如何创建和轮询 workflow run —— 路径、状态码、请求与响应形状、以及鉴权方案。
 - [v6/CONTRACT.zh.md](v6/CONTRACT.zh.md)：workflow 输入和结果结构。
 - [v6/schemas](v6/schemas)：用于机器校验的 JSON Schema。
 - [v6/fixtures](v6/fixtures)：Python 和 TypeScript 测试共享的可执行 JSON 示例。
@@ -22,10 +22,10 @@ HTTP API 和 workflow 契约是稳定的公开接口。
 
 调用方可以依赖：
 
-- runner HTTP API；
+- Execution API；
 - HTTP API 接受的公开 workflow 名称；
-- 当前 `contract_version` 的 runner 输入和公开 workflow 结果结构；
-- 结构化 runner 成功和错误响应体。
+- 当前 `contract_version` 的 execution 输入和公开 workflow 结果结构；
+- 结构化 Execution API 成功和错误响应体。
 
 以下内容不是稳定的公开 API：
 
@@ -51,24 +51,26 @@ Agents 负责：
 - 产出以 `review_record` 和 repository `deliveries[]` 为核心的结构化 workflow 结果；
 - 保存 stage 产物。
 
-GitHub integration 是调用方一侧的一种实现：它把 GitHub 事件与发布规则转成 runner 输入和结果发布。
+GitHub integration 是调用方一侧的一种实现：它把 GitHub 事件与发布规则转成 execution 输入和结果发布。
 
-这条分界同时也是安全边界。GitHub 身份、权限、API 调用、发布、重试与审计行为都留在调用方一侧。Agents 在 runner 契约内运行，不直接控制 GitHub 平台能力。
+这条分界同时也是安全边界。GitHub 身份、权限、API 调用、发布、重试与审计行为都留在调用方一侧。Execution Worker 在 execution 契约内运行，不直接控制 GitHub 平台能力。
 
-## 生成的规范
+## HTTP 唯一真值
 
-[openapi.json](openapi.json) 是 runner 服务的 OpenAPI 文档，由代码生成。服务本身也在 `/openapi.json` 提供它，并在 `/docs` 提供可读版本；两者都刻意不要求 service token，因为接口说明里没有运行数据，也没有凭据。
+[openapi.yaml](openapi.yaml) 是人工维护的 Execution API HTTP 边界唯一真值，不由服务代码生成。当前 TypeScript provider Execution Gateway 从该文档挂载路由和校验，contract tools 也从中生成 provider 与 consumer 类型。
 
-## Runner 错误码
+生成的 TypeScript 投影会把 HTTP envelope 与显式选择的 v6 workflow input schema 组合起来，使 provider 在编译期拥有 `workflow` 到 `input` 的对应关系，同时不引入共享运行时 package，也不设置仓库级“当前 schema”选择器。每个 provider 或 consumer 仍各自声明自己支持哪个版本。
 
-以下是调用方可以据以分支的稳定机器可读错误码。这个集合是**开放**的：服务暂时无法归类的失败会以 `RUNNER_EXECUTION_FAILED` 到达，而新增含义时会新增错误码，而不是复用旧码。
+## Execution 错误码
 
-- `RUNNER_REQUEST_INVALID`
-- `RUNNER_WORKFLOW_UNSUPPORTED`
-- `RUNNER_RUN_CONFLICT`
-- `RUNNER_RUN_NOT_FOUND`
-- `RUNNER_RESPONSE_INVALID`
-- `RUNNER_EXECUTION_FAILED`
+以下是调用方可以据以分支的稳定机器可读错误码。这个集合是**开放**的：服务暂时无法归类的失败会以 `EXECUTION_FAILED` 到达，而新增含义时会新增错误码，而不是复用旧码。
+
+- `EXECUTION_REQUEST_INVALID`
+- `EXECUTION_WORKFLOW_UNSUPPORTED`
+- `EXECUTION_RUN_CONFLICT`
+- `EXECUTION_RUN_NOT_FOUND`
+- `EXECUTION_RESPONSE_INVALID`
+- `EXECUTION_FAILED`
 
 ## 兼容性规则
 
@@ -84,7 +86,7 @@ GitHub integration 是调用方一侧的一种实现：它把 GitHub 事件与�
 
 ## 执行方式
 
-Schema 文件是规范的可执行结构形式。当前版本使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python Runner 使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 校验输入与结果 schema，TypeScript integration 独立使用 [Ajv](https://ajv.js.org/) 校验。两个包在测试中都会执行共享 fixture。
+Schema 文件是规范的可执行结构形式。当前版本使用 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)。Python Execution 使用 [jsonschema](https://python-jsonschema.readthedocs.io/) 校验输入与结果 schema，TypeScript integration 独立使用 [Ajv](https://ajv.js.org/) 校验。两个包在测试中都会执行共享 fixture。
 
 agents wheel 会在构建时把权威 schema 复制为包数据，因此安装后的 Python 工具在运行时不依赖仓库级 `contracts/` 路径。
 

@@ -35,7 +35,7 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         help=(
             "Review artifact directories containing transcripts/, or transcript "
-            "JSON transcript files."
+            "JSONL transcript files."
         ),
     )
     parser.add_argument(
@@ -63,7 +63,7 @@ def _parse_args() -> argparse.Namespace:
     id_group.add_argument(
         "--job-id",
         default=None,
-        help="Stable extraction job id used to derive the observation id.",
+        help="Stable extraction id used to derive the observation id.",
     )
     parser.add_argument(
         "--run-id",
@@ -93,6 +93,7 @@ async def main() -> int:
         job_id=args.job_id,
         source_workflow=args.source_workflow,
         run_id=args.run_id,
+        audit_root=output_dir,
     )
     if result.skipped or result.observation_markdown is None:
         print(f"No observation written: {result.summary}")

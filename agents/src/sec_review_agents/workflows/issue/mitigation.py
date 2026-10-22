@@ -4,7 +4,7 @@ from typing import Any
 
 from sec_review_agents.agents.mitigation import issue as issue_mitigation_agent
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.workflows.review_intent import (
     TestChangesPolicy,
 )
@@ -20,7 +20,7 @@ async def mitigate_issue(
     test_changes: TestChangesPolicy,
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None = None,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     return await run_mitigation_stage(

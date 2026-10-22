@@ -24,7 +24,7 @@ function run(
       failure_code: null,
       disconnect_reason: null
     },
-    ...(input === null ? {} : { runner_input: input }),
+    ...(input === null ? {} : { execution_input: input }),
     execution: {
       status: 'uncertain',
       started_at: null,
@@ -106,7 +106,7 @@ test('submission recovery replays the persisted input and commits its claim', as
 })
 
 test('submission recovery leaves an uncertain replay untouched', async () => {
-  // An unknown replay outcome is not a failure: the Runner may have accepted the request, so
+  // An unknown replay outcome is not a failure: the Execution may have accepted the request, so
   // nothing may be concluded and the state must stay `uncertain`. The claim is deliberately left
   // in place too - the run becomes claimable again when its lease expires, which is the pace it
   // had before this path existed. Clearing it would replay a failing submission every tick.
@@ -148,7 +148,7 @@ test('submission recovery leaves an uncertain replay untouched', async () => {
   )
 })
 
-test('submission recovery records missing persisted input without calling Runner', async () => {
+test('submission recovery records missing persisted input without calling Execution', async () => {
   let submitted = false
   let failure: { code?: string | null; message: string } | undefined
   const result = await recoverReviewRunSubmission(
@@ -176,7 +176,7 @@ test('submission recovery records missing persisted input without calling Runner
 
 test('an uncertain submission disconnects once its replay budget is spent', async () => {
   // A submission whose replays never resolve would otherwise stay `uncertain` forever: no axis
-  // must stop automation, but it is not evidence that the Runner rejected the submission.
+  // must stop automation, but it is not evidence that the Execution rejected the submission.
   const result = await concludeExhaustedSubmissionRecovery(
     store({
       async submissionRecoveryAttemptCount() {

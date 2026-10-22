@@ -40,39 +40,23 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
 
 ## Architecture
 
-This repository contains four runtime entities: GitHub integration, Review Control Plane, Control Plane UI, and Agent Runner. They cooperate through authenticated HTTP, shared object storage, and durable PostgreSQL state, while keeping separate responsibilities, configuration, and deployment boundaries.
+This repository contains six runtime entities: GitHub Integration, Review Control Plane, Control Plane UI, Execution Gateway, Execution Worker, and Memory Catalog Server. They cooperate through authenticated HTTP, Temporal, object storage, and durable PostgreSQL state while keeping separate responsibilities, configuration, and deployment boundaries.
 
 - [`apps/github-integration/`](apps/github-integration/README.md): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
 - [`control-plane/`](control-plane/README.md): independently deployed TypeScript service for review-run admission and durable coordination
 - [`apps/control-plane-ui/`](apps/control-plane-ui/README.md): independently deployed web console for inspecting Control Plane runs
-- [`agents/`](agents/README.md): Python multi-agent runner and review logic
+- [`execution-gateway/`](execution-gateway/README.md): independent TypeScript HTTP service that validates requests and submits Temporal executions
+- [`agents/`](agents/README.md): Python Execution Worker, agent runtime, workflows, and review logic
+- [`memory-catalog/`](memory-catalog/README.md): independent TypeScript HTTP service for managed-memory catalog state and revision commits
 
 Each contract family under [`contracts/`](contracts/README.md) owns the tool that renders and checks its projections (`contracts/<family>/tools/`); that is build-time, not a runtime entity.
 
-```mermaid
-flowchart LR
-  github[GitHub]
-  integration[apps/github-integration]
-  control[control-plane]
-  ui[apps/control-plane-ui]
-  agents[agents]
-  storage[(Object Storage)]
-  state[(PostgreSQL)]
-
-  github -->|webhook or Actions request| integration
-  integration -->|authenticated review request| control
-  control -->|run submission and observation| agents
-  integration -->|input bundle| storage
-  agents -->|terminal artifact| storage
-  control <-->|run and publication state| state
-  ui -->|query API| control
-  integration -->|GitHub publication| github
-```
+![Sec Review Bot runtime topology](assets/architecture/runtime-topology.svg)
 
 ## Runtime Stack
 
-- **Languages**: [TypeScript](https://www.typescriptlang.org/) ([Node.js](https://nodejs.org/)) for the integration, Control Plane, and UI server; [Python](https://www.python.org/) 3.14 for the agent backend.
-- **Web and UI**: [FastAPI](https://fastapi.tiangolo.com/) serves the agent execution service (Runner) HTTP API; [Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) make up the console.
+- **Languages**: [TypeScript](https://www.typescriptlang.org/) ([Node.js](https://nodejs.org/)) for the integration, Control Plane, Execution Gateway, Memory Catalog, and UI server; [Python](https://www.python.org/) 3.14 for the Execution Worker and agent runtime.
+- **Web and UI**: [Fastify](https://fastify.dev/) serves the Control Plane, Execution Gateway, and Memory Catalog APIs; [Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) make up the console.
 - **Agent runtime**: [LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/) ([deepagents](https://github.com/langchain-ai/deepagents)) for chat-model adapters, structured output, and tool calls.
 - **Durable execution**: [Temporal](https://temporal.io/) owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
 - **State and storage**: [PostgreSQL](https://www.postgresql.org/) for coordination state; S3-compatible object storage ([RustFS](https://github.com/rustfs/rustfs) locally) for input bundles and diagnostic artifacts.
@@ -82,7 +66,7 @@ flowchart LR
 
 ## Project Status
 
-This project is experimental and intended for local development, integration testing, and workflow research. The public runner contract is documented, but internal package layout and agent workflows may still change.
+This project is experimental and intended for local development, integration testing, and workflow research. The public execution contract is documented, but internal package layout and agent workflows may still change.
 
 The agent's final behavior depends heavily on the underlying LLM's code understanding, reasoning, and patch-generation ability, as well as input quality and the tool/runtime environment. The workflow and runner design is not a model-independent performance guarantee.
 

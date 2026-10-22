@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
 )
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 from sec_review_agents.workspace.file_changes import FileChange
 
 
@@ -125,8 +125,8 @@ def persist_delivery_result(
         if not delivery_id:
             continue
         slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", delivery_id).strip("-")
-        persist_json(delivery_artifacts_dir, f"{slug or 'delivery'}.json", artifact)
-    persist_json(stage_artifacts_path, "delivery-result.json", result)
+        persist_json_artifact(delivery_artifacts_dir, slug or "delivery", artifact)
+    persist_json_artifact(stage_artifacts_path, "delivery-result", result)
 
 
 __all__ = [

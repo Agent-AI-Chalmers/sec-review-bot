@@ -55,7 +55,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       preparing: {
         label: 'Preparing',
         description:
-          'A coordinator currently owns the claim and is building the Runner input.'
+          'A coordinator currently owns the claim and is building the Execution input.'
       },
       uncertain: {
         label: 'Uncertain',
@@ -70,12 +70,12 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       submitted: {
         label: 'Submitted',
         description:
-          'The input was accepted and handed to the Runner; preparation is done.'
+          'The input was accepted and handed to the Execution API provider; preparation is done.'
       },
       failed: {
         label: 'Failed',
         description:
-          'Preparation failed permanently (retry budget exhausted or input could not be built). The Runner was never handed input, so execution is skipped.'
+          'Preparation failed permanently (retry budget exhausted or input could not be built). The Execution API provider was never handed input, so execution is skipped.'
       }
     },
     transitions: [
@@ -162,22 +162,22 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       pending: {
         label: 'Pending',
         description:
-          'Admitted, but its prepared input has not been submitted to the Runner yet.'
+          'Admitted, but its prepared input has not been submitted to the Execution API provider yet.'
       },
       queued: {
         label: 'Queued',
         description:
-          'The Runner accepted the submission; polling has not yet seen it start.'
+          'The Execution API provider accepted the submission; polling has not yet seen it start.'
       },
       running: {
         label: 'Running',
         description:
-          'Polling observed that the Runner is executing this run. A transient network blip while polling does not change this state: the run keeps the last observed value and is polled again, so this state may be slightly out of date.'
+          'Polling observed that the Execution API provider is executing this run. A transient network blip while polling does not change this state: the run keeps the last observed value and is polled again, so this state may be slightly out of date.'
       },
       succeeded: {
         label: 'Succeeded',
         description:
-          'The Runner returned a result; it now becomes eligible for publication.'
+          'The Execution API provider returned a result; it now becomes eligible for publication.'
       },
       skipped: {
         label: 'Skipped',
@@ -187,17 +187,17 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       uncertain: {
         label: 'Unconfirmed',
         description:
-          'The task was submitted, but no response arrived, so it is unknown whether the Runner accepted it. This is not a failure: the submission is replayed under the same run_id.'
+          'The task was submitted, but no response arrived, so it is unknown whether the Execution API provider accepted it. This is not a failure: the submission is replayed under the same run_id.'
       },
       disconnected: {
         label: 'Disconnected',
         description:
-          'Automatic recovery used its budget without a conclusive Runner answer. The run is visible for operator action and is not reported as failed.'
+          'Automatic recovery used its budget without a conclusive Execution API provider answer. The run is visible for operator action and is not reported as failed.'
       },
       failed: {
         label: 'Failed',
         description:
-          'A definite failure, in one of two ways: (1) polling produced a conclusive answer that the task cannot succeed — the Runner reported it failed, or the run could not be found, returned no result, or the response broke the protocol; (2) a retried submission failed conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not a definite failure.'
+          'A definite failure, in one of two ways: (1) polling produced a conclusive answer that the task cannot succeed — the Execution API provider reported it failed, or the run could not be found, returned no result, or the response broke the protocol; (2) a retried submission failed conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not a definite failure.'
       }
     },
     transitions: [
@@ -254,17 +254,17 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       {
         from: 'queued',
         to: 'running',
-        label: 'runner started'
+        label: 'execution started'
       },
       {
         from: 'queued',
         to: 'succeeded',
-        label: 'runner succeeded'
+        label: 'execution succeeded'
       },
       {
         from: 'running',
         to: 'succeeded',
-        label: 'runner succeeded'
+        label: 'execution succeeded'
       },
       {
         from: 'queued',

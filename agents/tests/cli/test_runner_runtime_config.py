@@ -29,7 +29,7 @@ def _issue_input() -> dict:
 def test_runner_runtime_config_is_applied_after_workflow_input_preparation(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("RUNNER_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
+    monkeypatch.setenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
     input_data = _issue_input()
     runtime = {
         "workspace_image": "benchmark-image:latest",
@@ -48,7 +48,7 @@ def test_runner_runtime_config_is_applied_after_workflow_input_preparation(
     assert runtime_context.get("workspace_image") == "benchmark-image:latest"
 
 
-def test_runner_input_preparation_does_not_mutate_payload_input() -> None:
+def test_execution_input_preparation_does_not_mutate_payload_input() -> None:
     input_data = _issue_input()
 
     first_input = prepare_run_input(
@@ -71,14 +71,14 @@ def test_runner_input_preparation_does_not_mutate_payload_input() -> None:
 def test_runner_runtime_config_rejects_workspace_image_override_by_default(
     monkeypatch,
 ) -> None:
-    monkeypatch.delenv("RUNNER_ALLOW_WORKSPACE_IMAGE_OVERRIDE", raising=False)
+    monkeypatch.delenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", raising=False)
 
     with pytest.raises(ValueError, match="override is disabled"):
         runtime_context_from_config({"workspace_image": "benchmark-image:latest"})
 
 
 def test_runner_runtime_config_rejects_invalid_workspace_image(monkeypatch) -> None:
-    monkeypatch.setenv("RUNNER_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
+    monkeypatch.setenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
 
     with pytest.raises(ValueError, match="workspace_image"):
         runtime_context_from_config({"workspace_image": ""})
@@ -92,7 +92,7 @@ def test_runner_runtime_config_rejects_unknown_keys() -> None:
         runtime_context_from_config({"extraRuntimeKnob": True})
 
 
-def test_runner_input_rejects_caller_runtime_context() -> None:
+def test_execution_input_rejects_caller_runtime_context() -> None:
     input_data = _issue_input()
     input_data["runtime_context"] = {
         "workspace_image": "smuggled:latest",
@@ -106,7 +106,7 @@ def test_runner_input_rejects_caller_runtime_context() -> None:
         )
 
 
-def test_runner_input_rejects_caller_run_id() -> None:
+def test_execution_input_rejects_caller_run_id() -> None:
     input_data = _issue_input()
     input_data["run_id"] = "smuggled-run"
 

@@ -67,7 +67,7 @@ def test_local_pull_request_bundle_passes_the_v6_input_schema(
 def test_local_pull_request_metadata_is_the_agent_facing_subset(
     git_repo: Path, tmp_path: Path
 ) -> None:
-    # The agent file and the runner input are different objects: the file carries only the
+    # The agent file and the execution input are different objects: the file carries only the
     # window and the commit list, matching what the GitHub producer writes to this path.
     bundle = build_local_pull_request_bundle(
         repo_path=git_repo,

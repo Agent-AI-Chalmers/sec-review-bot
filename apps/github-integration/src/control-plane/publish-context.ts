@@ -7,7 +7,7 @@
  *
  * GitHub webhook or Actions dispatch
  *   -> prepare agent input and persist publish context
- *   -> submit the run to the Python Runner / agent
+ *   -> submit the run to the Execution Worker
  *   -> end the original HTTP request
  *   -> retrieve the agent result later
  *   -> combine the result with publish context
@@ -21,8 +21,8 @@ import type { SubmittedIssueReviewRun } from '../reviews/issues/submit.js'
 import type { SubmittedPullRequestReviewRun } from '../reviews/pull-requests/submit.js'
 import type { SubmittedRepositoryReviewRun } from '../reviews/repositories/submit.js'
 import { splitRepoFullName } from '../github/repository-service.js'
-import { DeterministicRunnerPublishError } from '../runner/publish-error.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../runner/publish-error-code.js'
+import { DeterministicExecutionPublishError } from '../execution/publish-error.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../execution/publish-error-code.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -92,9 +92,9 @@ export type PublishContext =
 
 function invalid(path: string, expectation: string): never {
   // Stored corruption cannot be repaired by another publication attempt.
-  throw new DeterministicRunnerPublishError(
+  throw new DeterministicExecutionPublishError(
     `Persisted publish context is invalid at ${path}: expected ${expectation}.`,
-    RUNNER_PUBLISH_ERROR_CODES.publish_context_invalid
+    EXECUTION_PUBLISH_ERROR_CODES.publish_context_invalid
   )
 }
 

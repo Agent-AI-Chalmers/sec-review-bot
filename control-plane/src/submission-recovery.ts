@@ -25,7 +25,7 @@ export type SubmissionRecoveryResult =
  *
  * Mirrors `MAX_PREPARATION_ATTEMPTS`: the point is not a particular number, it is that a number
  * exists. The bound limits automatic external traffic; it is not evidence about whether the
- * Runner accepted a prior request. */
+ * Execution accepted a prior request. */
 export const MAX_SUBMISSION_RECOVERY_ATTEMPTS = 8
 
 /** The code recorded when the replay budget stops automatic recovery. */
@@ -41,7 +41,7 @@ export interface SubmissionRecoveryDependencies {
 }
 
 /**
- * Replays the persisted request with the original run identity. Runner owns
+ * Replays the persisted request with the original run identity. Execution owns
  * request idempotency; Control Plane owns the recovery claim and durable state.
  */
 export async function recoverReviewRunSubmission(
@@ -52,11 +52,11 @@ export async function recoverReviewRunSubmission(
   const claimToken = await store.claimSubmissionRecovery(run.run_id)
   if (claimToken === null) return { status: 'claim_unavailable' }
 
-  if (run.runner_input === undefined) {
+  if (run.execution_input === undefined) {
     await store.failSubmissionRecovery(run.run_id, claimToken, {
       code: 'SUBMISSION_RECOVERY_INPUT_MISSING',
       message:
-        'The persisted Runner input is missing; this submission cannot be recovered.'
+        'The persisted Execution input is missing; this submission cannot be recovered.'
     })
     return { status: 'input_missing' }
   }
@@ -65,7 +65,7 @@ export async function recoverReviewRunSubmission(
     await dependencies.submit({
       workflow: run.workflow,
       run_id: run.run_id,
-      input: run.runner_input
+      input: run.execution_input
     })
     return (await store.completeSubmissionRecovery(run.run_id, claimToken))
       ? { status: 'recovered' }
@@ -74,7 +74,7 @@ export async function recoverReviewRunSubmission(
     const classified = dependencies.classifyError(error)
     if (classified.uncertain) {
       // The replay's outcome is unknown, which is exactly what `uncertain` already means: the
-      // Runner may have accepted it, so nothing may be concluded. Counting the attempt only
+      // Execution may have accepted it, so nothing may be concluded. Counting the attempt only
       // bounds automatic recovery; exhaustion moves the run to disconnected, never failed.
       await store.recordUnknownRecoveryOutcome(run.run_id, claimToken)
       return { status: 'deferred', error }

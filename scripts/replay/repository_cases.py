@@ -18,7 +18,7 @@ from sec_review_agents.utils.env import (
     parse_bool_env,
     parse_int_env,
 )
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 from sec_review_agents.workflows.repository.case_execution_input import (
     prepare_case_execution_input,
     window_deletion_summary,
@@ -213,7 +213,7 @@ def _case_review_request(
         ),
         "timeout_seconds": DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
         "runtime_context": {},
-        "memory_extraction_registration_enabled": False,
+        "memory_extraction_enabled": False,
     }
 
 
@@ -361,7 +361,7 @@ async def main() -> None:
         delivery_result=None,
         case_results=ordered_case_results,
     )
-    persist_json(run_artifacts, "repository-review-result.json", workflow_result)
+    persist_json_artifact(run_artifacts, "repository-review-result", workflow_result)
 
     print(
         json.dumps(

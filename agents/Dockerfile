@@ -32,6 +32,7 @@ COPY . ./
 # directory that happens to match. The build-only `tools/` working tree never reaches this
 # COPY because `contracts/.dockerignore` keeps it out of the build context.
 COPY --from=contracts integration-contract /contracts/integration-contract
+COPY --from=contracts execution-contract /contracts/execution-contract
 RUN uv sync --frozen --no-dev
 
-CMD ["sec-review-agents-service"]
+CMD ["sec-review-agents-execution-worker"]

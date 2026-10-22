@@ -1,17 +1,17 @@
-// Owns the execution axis: Runner submission fencing, execution-status transitions, the
+// Owns the execution axis: Execution submission fencing, execution-status transitions, the
 // observation heartbeat, and the terminal artifact/result writes.
 //
 // This store only performs single-axis transactions on `executions`. Transitions that must
 // also move another axis in the same transaction (submission -> queued, terminal failure ->
 // publication skipped) stay in `ReviewRunStore`, which owns cross-axis orchestration. A
 // resolved recovery moves no other axis: publication stayed `pending` throughout `uncertain`,
-// because a submission the Runner may have accepted could still produce a publishable result.
+// because a submission the Execution may have accepted could still produce a publishable result.
 // Reading the full run record is likewise not here: the record projection spans all three axes
 // and lives with `ReviewRunStore`.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
-import type { RunnerArtifactStorage } from './contracts.js'
+import type { ExecutionArtifactStorage } from './contracts.js'
 import { appendEvent } from './review-run-events.js'
 import { queueRunNotice } from './run-notices.js'
 import { normalizeArtifactStorage } from './shapes.js'
@@ -24,9 +24,9 @@ export class ExecutionStore {
     private readonly claimTimeoutMs: number
   ) {}
 
-  /** Record that the Runner was observed just now, without changing state.
+  /** Record that the Execution was observed just now, without changing state.
    *
-   * Polling learns a run's state by asking the Runner. When the answer matches the state
+   * Polling learns a run's state by asking the Execution. When the answer matches the state
    * already stored, nothing else would write, so `observed_at` would freeze and the console
    * could not tell a fresh observation from a stale one. This writes `observed_at` only:
    * recovery lease expiry reads `claimed_at`, so an observation heartbeat can never extend a
@@ -64,7 +64,7 @@ export class ExecutionStore {
 
   async recordArtifactStorage(
     runId: string,
-    storage: RunnerArtifactStorage | undefined
+    storage: ExecutionArtifactStorage | undefined
   ): Promise<void> {
     if (storage === undefined) return
     await this.pool.query(
@@ -81,10 +81,10 @@ export class ExecutionStore {
     )
   }
 
-  async recordRunnerSuccess(
+  async recordExecutionSuccess(
     runId: string,
     workflowResult: unknown,
-    storage: RunnerArtifactStorage | undefined
+    storage: ExecutionArtifactStorage | undefined
   ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       // RETURNING the previous status through a CTE gives the event a truthful from_status: the
@@ -172,7 +172,7 @@ export class ExecutionStore {
    * `attempt_count` is reset because it is the budget the disconnect consumed: a row resumed with
    * the count intact would be disconnected again by the next coordination pass, and the
    * operator's decision would never get a replay to act on. The reset grants attempts, not facts
-   * — the run still does not know whether the Runner accepted anything.
+   * — the run still does not know whether the Execution accepted anything.
    *
    * Returns false when the row is not (or no longer) disconnected. */
   async resumeDisconnectedSubmissionRecovery(runId: string): Promise<boolean> {
@@ -216,9 +216,9 @@ export class ExecutionStore {
 
   /** Stop automatic recovery for an uncertain submission whose replay budget is exhausted.
    *
-   * `recordUnknownRecoveryOutcome` keeps handing the row back to another owner, so a Runner that
+   * `recordUnknownRecoveryOutcome` keeps handing the row back to another owner, so an Execution provider that
    * answers every replay with another timeout would leave the run `uncertain` forever. That is
-   * not evidence that the Runner rejected it, though, so the only automatic conclusion is
+   * not evidence that the Execution rejected it, though, so the only automatic conclusion is
    * `disconnected`: stop issuing replays and make the uncertainty visible to an operator.
    *
    * The take is an UPDATE gated on the budget *and* the claim, so a caller that read an outdated
@@ -266,7 +266,7 @@ export class ExecutionStore {
     })
   }
 
-  /** Record that a replay was handed to the Runner and its outcome is still unknown.
+  /** Record that a replay was handed to the Execution and its outcome is still unknown.
    *
    * The axis stays `uncertain` — that is what the state means, and concluding anything from an
    * unknown answer is exactly the mistake the state exists to prevent. What this adds is the

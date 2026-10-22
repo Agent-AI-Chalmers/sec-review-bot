@@ -11,7 +11,7 @@ import { handleRepositoryReviewRun } from '../../../src/reviews/repositories/pub
 import { REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE } from '../../../src/reviews/repositories/renderer.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 import type { PublicationStepStore } from '../../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 // The summary comment is recognized by this app's bot, so the app identity must be set.

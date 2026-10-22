@@ -8,7 +8,7 @@ from temporalio import activity, workflow
 
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
@@ -29,7 +29,7 @@ from sec_review_agents.workflows.review_intent import (
 async def mitigate_issue_self_check_activity(
     prepared_input: dict[str, Any],
     analysis_result: Mapping[str, Any],
-    runtime_context: RunnerRuntimeContext,
+    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.review_stages.mitigation.stage import (
         create_skipped_mitigation_result,
@@ -147,7 +147,7 @@ async def run_issue_two_stage(
     mitigator_artifacts_path: Path,
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run analyzer plus self-checking mitigation and return raw stage outputs."""
@@ -229,7 +229,7 @@ async def execute_issue_two_stage(
     mitigator_artifacts_path: Path,
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run the stages and project them into the public ablation result shape."""

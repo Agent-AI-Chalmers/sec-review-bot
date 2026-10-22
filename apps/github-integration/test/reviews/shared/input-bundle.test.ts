@@ -10,7 +10,7 @@ import {
   assertWorkflowInputFits,
   readSetupDeclaration
 } from '../../../src/reviews/shared/input-bundle.js'
-import { MAX_WORKFLOW_INPUT_BYTES } from '../../../src/runner/input.js'
+import { MAX_WORKFLOW_INPUT_BYTES } from '../../../src/execution/input.js'
 import { fakeGitHub, githubFile, githubJson } from '../../github-client.js'
 
 /**
@@ -73,8 +73,8 @@ test('readSetupDeclaration returns null when the declaration is absent', async (
 })
 
 test('readSetupDeclaration treats a whitespace-only declaration as absent', async () => {
-  // A blank (but present) setup.yml must not reach the runner as a
-  // `setup_declaration` value: the runner contract types that field as a
+  // A blank (but present) setup.yml must not reach the Execution Worker as a
+  // `setup_declaration` value: the execution contract types that field as a
   // non-blank string, so a blank value would fail validation of the whole
   // workflow input and reject every review of the repository.
   const octokit = octokitForContent({ '.sec-review/setup.yml': '   \n\n' })

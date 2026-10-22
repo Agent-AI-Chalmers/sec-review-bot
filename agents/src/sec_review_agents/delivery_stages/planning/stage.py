@@ -15,7 +15,7 @@ from sec_review_agents.observability.diagnostics import (
     log_stage_failed,
     log_stage_started,
 )
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 
 
 async def generate_delivery_plan(
@@ -54,9 +54,9 @@ async def generate_delivery_plan(
             "counts": counts,
             "deliveries": planned_entries,
         }
-        persist_json(
+        persist_json_artifact(
             delivery_planning_root,
-            "delivery-plan.json",
+            "delivery-plan",
             result,
         )
         log_stage_completed(
@@ -93,9 +93,9 @@ def build_skipped_delivery_plan(
         },
         "deliveries": [],
     }
-    persist_json(
+    persist_json_artifact(
         run_artifacts_root / "delivery-planning",
-        "delivery-plan.json",
+        "delivery-plan",
         result,
     )
     return result

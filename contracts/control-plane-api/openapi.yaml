@@ -130,7 +130,7 @@ components:
         publish_context:
           type: object
           additionalProperties: {}
-        runner_input:
+        execution_input:
           type: object
           additionalProperties: {}
         preparation:
@@ -318,7 +318,7 @@ components:
         publish_context:
           type: object
           additionalProperties: {}
-        runner_input:
+        execution_input:
           type: object
           additionalProperties: {}
         preparation:
@@ -515,11 +515,11 @@ components:
         status:
           type: string
           description: >-
-            The Runner lifecycle, retained under its established public name. `pending` means
-            the run has been admitted but its prepared input has not yet been submitted to the
-            Runner; preparation progress is reported separately by `preparation`. `skipped`
+            The execution lifecycle as coordinated through Execution API provider. `pending` means the
+            run has been admitted but its prepared input has not yet been submitted to the
+            Execution API provider; preparation progress is reported separately by `preparation`. `skipped`
             means execution never ran because preparation failed; the reason is on
-            `preparation`, not here. `uncertain` means a submission may have reached the Runner
+            `preparation`, not here. `uncertain` means a submission may have reached the Execution API provider
             but its result could not be confirmed; a recovery replays it under the same identity.
             `disconnected` means automatic recovery stopped after its finite budget without a
             conclusive answer, so it is not a failure.
@@ -538,7 +538,7 @@ components:
             - "null"
           format: date-time
           description: >-
-            Immutable instant the prepared Runner input was accepted and execution began; null
+            Immutable instant the prepared Execution input was accepted and execution began; null
             while the run is still pending, and also null for `skipped`, which is concluded
             without ever having started. Written once, so a recovery replay does not move it.
         finished_at:
@@ -695,7 +695,7 @@ components:
           description: >-
             Preparation lifecycle. `preparing` means a preparer currently owns the claim;
             it is the preparation axis's own "in progress" state and is unrelated to the
-            Runner, which is only submitted to once preparation reaches `submitted`.
+            Execution API provider, which is only submitted to once preparation reaches `submitted`.
           enum:
             - pending
             - preparing
@@ -788,7 +788,7 @@ components:
                     - diagnostic_bundle
                 uri:
                   type: string
-                  pattern: ^s3://sec-review/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
+                  pattern: ^s3://[^/]+/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
                 media_type:
                   type: string
                   enum:
@@ -820,7 +820,7 @@ x-state-machines:
         description: Admitted, but no preparer has claimed the work yet.
       preparing:
         label: Preparing
-        description: A coordinator currently owns the claim and is building the Runner input.
+        description: A coordinator currently owns the claim and is building the Execution input.
       uncertain:
         label: Uncertain
         description: >-
@@ -835,12 +835,12 @@ x-state-machines:
           own; an operator resumes it into `uncertain` or abandons it.
       submitted:
         label: Submitted
-        description: The input was accepted and handed to the Runner; preparation is done.
+        description: The input was accepted and handed to the Execution API provider; preparation is done.
       failed:
         label: Failed
         description: >-
           Preparation failed permanently (retry budget exhausted or input could not be built).
-          The Runner was never handed input, so execution is skipped.
+          The Execution API provider was never handed input, so execution is skipped.
     transitions:
       - { from: pending, to: preparing, label: claimed}
       - { from: preparing, to: submitted, label: input accepted}
@@ -875,19 +875,19 @@ x-state-machines:
     states:
       pending:
         label: Pending
-        description: Admitted, but its prepared input has not been submitted to the Runner yet.
+        description: Admitted, but its prepared input has not been submitted to the Execution API provider yet.
       queued:
         label: Queued
-        description: The Runner accepted the submission; polling has not yet seen it start.
+        description: The Execution API provider accepted the submission; polling has not yet seen it start.
       running:
         label: Running
         description: >-
-          Polling observed that the Runner is executing this run. A transient network blip while
+          Polling observed that the Execution API provider is executing this run. A transient network blip while
           polling does not change this state: the run keeps the last observed value and is polled
           again, so this state may be slightly out of date.
       succeeded:
         label: Succeeded
-        description: The Runner returned a result; it now becomes eligible for publication.
+        description: The Execution API provider returned a result; it now becomes eligible for publication.
       skipped:
         label: Skipped
         description: >-
@@ -896,18 +896,18 @@ x-state-machines:
       uncertain:
         label: Unconfirmed
         description: >-
-          The task was submitted, but no response arrived, so it is unknown whether the Runner
+          The task was submitted, but no response arrived, so it is unknown whether the Execution API provider
           accepted it. This is not a failure: the submission is replayed under the same run_id.
       disconnected:
         label: Disconnected
         description: >-
-          Automatic recovery used its budget without a conclusive Runner answer. The run is
+          Automatic recovery used its budget without a conclusive Execution API provider answer. The run is
           visible for operator action and is not reported as failed.
       failed:
         label: Failed
         description: >-
           A definite failure, in one of two ways: (1) polling produced a conclusive answer that
-          the task cannot succeed — the Runner reported it failed, or the run could not be found,
+          the task cannot succeed — the Execution API provider reported it failed, or the run could not be found,
           returned no result, or the response broke the protocol; (2) a retried submission failed
           conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not
           a definite failure.
@@ -926,16 +926,16 @@ x-state-machines:
       # The only way out of a disconnected recovery other than failing the run: an operator hands
       # it back with a fresh replay budget, so automatic replay can try to resolve it again.
       - { from: disconnected, to: uncertain, reason: SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR, label: resumed by an operator }
-      # Giving up does NOT claim the task never ran: the Runner may have accepted it. It records
+      # Giving up does NOT claim the task never ran: the Execution API provider may have accepted it. It records
       # only that the outcome will not be waited for, so this axis ends as `failed` with a reason
       # that says so, and the publication is skipped because there is no result to deliver.
       - { from: disconnected, to: failed, reason: SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR, label: given up by an operator }
-      # Observation (a read): the console learns the Runner's progress by polling. A short task
+      # Observation (a read): the console learns the Execution API provider's progress by polling. A short task
       # can be observed as already finished on the first poll, so `queued` reaches `succeeded`
       # without ever being seen `running`.
-      - { from: queued, to: running, label: runner started }
-      - { from: queued, to: succeeded, label: runner succeeded }
-      - { from: running, to: succeeded, label: runner succeeded }
+      - { from: queued, to: running, label: execution started }
+      - { from: queued, to: succeeded, label: execution succeeded }
+      - { from: running, to: succeeded, label: execution succeeded }
       - { from: queued, to: failed, label: polling concluded failure }
       - { from: running, to: failed, label: polling concluded failure }
   publication:
@@ -1191,7 +1191,7 @@ paths:
                 publish_context:
                   type: object
                   additionalProperties: {}
-                runner_input:
+                execution_input:
                   type: object
                   additionalProperties: {}
                 preparation_input_version:
@@ -1304,7 +1304,7 @@ paths:
       description: >-
         Read the append-only coordination event log for one run, oldest first. Each event is
         a state transition on one coordination axis (execution, preparation, publication, or
-        notice). This is an audit trail over the snapshot tables, not the Runner's execution
+        notice). This is an audit trail over the snapshot tables, not the Execution API provider's execution
         history, which lives in Temporal. Requires the read token.
       security:
         - readToken: []
@@ -1345,8 +1345,8 @@ paths:
     post:
       operationId: submitPreparedRun
       description: >-
-        Submit a prepared run to the Runner, persisting the input and commit claim before the
-        Runner call so an uncertain submission stays recoverable.
+        Submit a prepared run to the Execution API provider, persisting the input and commit claim before the
+        Execution API provider call so an uncertain submission stays recoverable.
       security:
         - serviceToken: []
       parameters:
@@ -2175,7 +2175,7 @@ paths:
     get:
       operationId: getInternalRun
       description: >-
-        Read the full run record, including `runner_input` and `publish_context`. Requires the
+        Read the full run record, including `execution_input` and `publish_context`. Requires the
         service token; never exposed to the console.
       security:
         - serviceToken: []
@@ -2189,7 +2189,7 @@ paths:
             pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       responses:
         "200":
-          description: Full run record (includes runner_input/publish_context).
+          description: Full run record (includes execution_input/publish_context).
           content:
             application/json:
               schema:
@@ -2327,7 +2327,7 @@ paths:
       description: >-
         An operator decision that stops waiting for a disconnected run instead of resuming it.
         It never claims that nothing happened: a disconnected execution may already have been
-        accepted by the Runner, and a disconnected publication may already have delivered some of
+        accepted by the Execution API provider, and a disconnected publication may already have delivered some of
         its steps. The decision is therefore recorded as "this outcome will not be waited for":
         the disconnected axis ends as failed with a reason naming the operator, and whatever the
         run would still have produced is not published. A disconnected preparation concludes as a

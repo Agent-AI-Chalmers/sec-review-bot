@@ -68,7 +68,11 @@ def translated_doc_paths(root: Path) -> list[Path]:
     except (OSError, subprocess.CalledProcessError):
         return sorted(root.rglob("*.zh.md"))
 
-    return sorted(root / path for path in completed.stdout.splitlines() if path)
+    return sorted(
+        root / path
+        for path in completed.stdout.splitlines()
+        if path and not Path(path).name.startswith("TEMP_")
+    )
 
 
 def headings(path: Path) -> list[Heading]:

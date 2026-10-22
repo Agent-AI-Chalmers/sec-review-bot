@@ -29,6 +29,8 @@ jobs:
       ops: ${{ steps.filter.outputs.ops }}
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
       control-plane: ${{ steps.filter.outputs.control-plane }}
+      execution-gateway: ${{ steps.filter.outputs.execution-gateway }}
+      memory-catalog: ${{ steps.filter.outputs.memory-catalog }}
       github-integration: ${{ steps.filter.outputs.github-integration }}
       control-plane-ui: ${{ steps.filter.outputs.control-plane-ui }}
       agents: ${{ steps.filter.outputs.agents }}
@@ -108,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [control-plane-api, integration-contract]
+        family: [control-plane-api, integration-contract, memory-catalog-api]
     defaults:
       run:
         working-directory: contracts/${{ matrix.family }}/tools
@@ -202,6 +204,82 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
         run: pnpm run test:integration
+
+  execution-gateway:
+    name: Execution Gateway
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.execution-gateway == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: execution-gateway
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: execution-gateway/package.json
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: execution-gateway/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: execution-gateway/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
+
+  memory-catalog:
+    name: Memory Catalog
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.memory-catalog == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: memory-catalog
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: memory-catalog/package.json
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: memory-catalog/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: memory-catalog/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
 
   github-integration:
     name: GitHub Integration
@@ -435,6 +513,8 @@ jobs:
       - ops
       - contract-tools
       - control-plane
+      - execution-gateway
+      - memory-catalog
       - github-integration
       - control-plane-ui
       - agents
@@ -451,6 +531,8 @@ jobs:
           OPS_RESULT: ${{ needs.ops.result }}
           CONTRACT_TOOLS_RESULT: ${{ needs.contract-tools.result }}
           CONTROL_PLANE_RESULT: ${{ needs.control-plane.result }}
+          EXECUTION_GATEWAY_RESULT: ${{ needs.execution-gateway.result }}
+          MEMORY_CATALOG_RESULT: ${{ needs.memory-catalog.result }}
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
           CONTROL_PLANE_UI_RESULT: ${{ needs.control-plane-ui.result }}
           AGENTS_RESULT: ${{ needs.agents.result }}
@@ -467,6 +549,8 @@ jobs:
             "$OPS_RESULT" \
             "$CONTRACT_TOOLS_RESULT" \
             "$CONTROL_PLANE_RESULT" \
+            "$EXECUTION_GATEWAY_RESULT" \
+            "$MEMORY_CATALOG_RESULT" \
             "$GITHUB_INTEGRATION_RESULT" \
             "$CONTROL_PLANE_UI_RESULT" \
             "$AGENTS_RESULT" \

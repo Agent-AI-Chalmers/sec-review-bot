@@ -5,9 +5,21 @@
     {
       "name": "types",
       "script": "contracts/integration-contract/tools/src/generate-types.ts",
+      "code_inputs": [
+        "contracts/integration-contract/tools/src/generate-workflow-input-types.ts"
+      ],
       "command": "pnpm --dir contracts/integration-contract/tools run generate",
-      "inputs": ["contracts/integration-contract/openapi.json"],
-      "outputs": ["control-plane/src/runner-api-schema.ts"]
+      "inputs": [
+        "contracts/integration-contract/openapi.yaml",
+        "contracts/integration-contract/v6/schemas/issue-review-input.schema.json",
+        "contracts/integration-contract/v6/schemas/pull-request-review-input.schema.json",
+        "contracts/integration-contract/v6/schemas/repository-review-input.schema.json",
+        "contracts/integration-contract/v6/schemas/common.schema.json"
+      ],
+      "outputs": [
+        "control-plane/src/execution-api-schema.ts",
+        "execution-gateway/src/contract-types-generated.ts"
+      ]
     },
     {
       "name": "workflow-input-types",
@@ -20,7 +32,7 @@
         "contracts/integration-contract/v6/schemas/common.schema.json"
       ],
       "outputs": [
-        "apps/github-integration/src/runner/integration-contract-types-generated.ts"
+        "apps/github-integration/src/execution/integration-contract-types-generated.ts"
       ]
     }
   ]

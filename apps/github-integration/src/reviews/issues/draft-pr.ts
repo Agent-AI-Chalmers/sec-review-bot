@@ -10,7 +10,7 @@ import type { FileChange, FileMode } from '../file-change.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import { resolveTrustedDefaultBranch } from '../../github/default-branch-service.js'
 import { isBranchAlreadyExists } from '../shared/branch-already-exists.js'
-import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
+import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
 
 interface IssueContext {
   issue_number: number
@@ -284,7 +284,7 @@ export async function createDraftPullRequestFromIssueReviewRecord({
       existingCommit.data.parents?.length !== 1 ||
       existingCommit.data.parents[0]?.sha !== head_sha
     ) {
-      throw new DeterministicRunnerPublishError(
+      throw new DeterministicExecutionPublishError(
         `Existing draft PR branch does not match the validated result for run ${run_id}.`
       )
     }

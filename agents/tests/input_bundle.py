@@ -15,7 +15,6 @@ def write_test_input_bundle(
             json.dumps(
                 {
                     "contract_version": CONTRACT_VERSION,
-                    "kind": "runner-input-bundle",
                     "workspace": {"snapshot": "workspace.snapshot.tar"},
                     "history": {"path": "history"},
                 }

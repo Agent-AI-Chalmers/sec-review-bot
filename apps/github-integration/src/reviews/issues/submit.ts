@@ -3,7 +3,10 @@ import type { TrustedDefaultBranch } from '../../github/default-branch-service.j
 import type { Octokit } from 'octokit'
 import { prepareIssueReviewInput } from './prepare-input.js'
 import { logInfo } from '../../utils/logger.js'
-import type { IssueReviewInput, TestChangesPolicy } from '../../runner/input.js'
+import type {
+  IssueReviewInput,
+  TestChangesPolicy
+} from '../../execution/input.js'
 
 interface RunIssueReviewArgs {
   run_id: string
@@ -25,7 +28,7 @@ interface RunIssueReviewArgs {
 
 interface StartIssueReviewRunDeps {
   // Test seam: defaults to the real preparer. Lets a unit test assert what this
-  // layer forwards to the runner input without materializing a git workspace.
+  // layer forwards to the execution input without materializing a git workspace.
   prepare_input: typeof prepareIssueReviewInput
 }
 
@@ -42,7 +45,9 @@ function assertIssueReviewInput(
   input: IssueReviewInput
 ): asserts input is IssueReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error('Issue review input is missing before runner invocation.')
+    throw new Error(
+      'Issue review input is missing before execution submission.'
+    )
   }
 }
 
@@ -66,8 +71,8 @@ async function materializeIssueReviewInput(
   const resolvedReviewObjective = review_objective ?? 'audit'
   // `test_changes` constrains the mitigation patch, not the objective. An `audit`
   // review enters mitigation as soon as the analyzer confirms a vulnerability, so an
-  // explicit test_changes must reach the runner for both objectives. When the caller does
-  // not supply one, the field is left absent and the runner applies its own default (`allow`).
+  // explicit test_changes must reach the Execution Worker for both objectives. When the caller does
+  // not supply one, the field is left absent and the Execution Worker applies its own default (`allow`).
   const resolvedTestChanges = test_changes ?? undefined
 
   logInfo('issue_review_workflow_started', {
@@ -137,7 +142,7 @@ export async function startIssueReviewRun(
   if (args.on_prepared === undefined)
     throw new Error('Issue review submission callback is required.')
   await args.on_prepared(preparedRun, input)
-  logInfo('issue_review_runner_run_submitted', {
+  logInfo('issue_review_execution_submitted', {
     event_type,
     issue: args.issue.issue_number,
     repo: args.issue.repo_full_name,

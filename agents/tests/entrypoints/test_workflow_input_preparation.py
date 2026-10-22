@@ -23,7 +23,6 @@ def _write_bundle_manifest(
     root.mkdir(parents=True, exist_ok=True)
     manifest = {
         "contract_version": CONTRACT_VERSION,
-        "kind": "runner-input-bundle",
         "workspace": {"snapshot": "workspace.snapshot.tar"},
         "history": {"path": "history"},
     }

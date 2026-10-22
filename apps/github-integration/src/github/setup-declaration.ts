@@ -1,28 +1,28 @@
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 import type { Node, YAMLMap } from 'yaml'
 
-import { MAX_SETUP_DECLARATION_TEXT } from '../runner/input.js'
+import { MAX_SETUP_DECLARATION_TEXT } from '../execution/input.js'
 import { isRecord } from '../utils/error-utils.js'
 
 /**
  * Parse and validate the setup declaration (`.sec-review/setup.yml`).
  *
- * The GitHub integration is the producer of the runner workflow input, so it
+ * The GitHub integration is the producer of the execution workflow input, so it
  * owns the rules for what a declaration may contain. It reads the file from the
  * base repository's default branch and must decide, before submitting, whether
- * the content is a valid declaration. The runner parses the same text again as
+ * the content is a valid declaration. The Execution Worker parses the same text again as
  * defense in depth, but a malformed declaration is rejected *here*, with the
  * repository/ref/path context, rather than surfacing downstream as an opaque
  * contract violation.
  *
- * The allow-list below mirrors the runner's parser
+ * The allow-list below mirrors the worker's parser
  * (`agents/src/sec_review_agents/entrypoints/setup_declaration.py`). The two
  * must agree: a shared corpus is run by both sides' tests so they cannot
  * silently drift. (That corpus is the `setup-declaration` contract family; see
  * `contracts/setup-declaration/`.)
  *
  * Blank content is not an error: an empty or whitespace-only declaration means
- * "no declaration" and parses to `null`, matching the runner's notion of an
+ * "no declaration" and parses to `null`, matching the worker's notion of an
  * absent declaration.
  */
 
@@ -98,7 +98,7 @@ export function isSetupDeclarationError(
  * This is not a schema difference: it is that `toJS()` stringifies a non-string
  * mapping key (`true`/`123`/`null` -- whichever schema -- become `"true"`/`"123"`/
  * `"null"`), which would then pass the identifier check as a valid-looking name.
- * The runner's parser keeps the key's real type and rejects it, so this AST
+ * The worker's parser keeps the key's real type and rejects it, so this AST
  * check keeps the two enforcers on the same boundary. A quoted `"123"` stays a
  * string in both.
  */
@@ -132,8 +132,8 @@ function rejectNonStringEnvKeys(contents: Node | null): void {
  * The declaration format is the plain YAML 1.2 Core schema, and the two
  * enforcers disagree about explicit tags: `yaml` silently falls back to the raw
  * string when a tag's scalar does not match (`!!bool on` -> `"on"`), while the
- * runner's loader (yamlcore/PyYAML) raises. Rejecting every explicitly tagged
- * node here — the TS analogue of the runner's event-level check — keeps the two
+ * worker's loader (yamlcore/PyYAML) raises. Rejecting every explicitly tagged
+ * node here — the TS analogue of the worker's event-level check — keeps the two
  * classifications identical. A plain scalar carries no `tag` in the AST;
  * `!!str x`, `!!bool on`, and `!!seq [...]` all do.
  */
@@ -165,11 +165,11 @@ function rejectExplicitTags(node: Node | null): void {
  * Reject a `timeout_seconds` written in float syntax (e.g. `1.0`, `1e3`).
  *
  * `yaml` resolves `1.0`/`1e3` to a JS number whose `Number.isInteger` is true,
- * so `parseTimeout` would accept them; the runner's loader resolves them to a
+ * so `parseTimeout` would accept them; the worker's loader resolves them to a
  * Python `float`, which its `isinstance(value, int)` check rejects. Compare the
  * scalar's *source* text instead of the resolved value so both sides reject
  * float-syntax timeouts. Hex/octal integers (`0x10`, `0o10`) and signed
- * decimals stay valid, matching the runner.
+ * decimals stay valid, matching the Execution Worker.
  */
 function rejectNonIntegerTimeoutScalars(contents: Node | null): void {
   const steps = isMap(contents) ? contents.get('setup') : undefined
@@ -325,7 +325,7 @@ function parseTimeout(value: unknown, label: string): number {
       }
     )
   }
-  // The effective cap is enforced by the runner at execution time (it caps to
+  // The effective cap is enforced by the Execution Worker at execution time (it caps to
   // SEC_REVIEW_SETUP_STEP_MAX_SECONDS); the integration only validates shape.
   return value
 }
@@ -348,7 +348,7 @@ export function parseSetupDeclaration(
     )
   }
 
-  // Parse with the YAML 1.2 Core schema, the same schema the runner uses (its
+  // Parse with the YAML 1.2 Core schema, the same schema the Execution Worker uses (its
   // `yamlcore.CCoreLoader`). With one schema on both sides, every scalar
   // resolves identically, so no value-level reconciliation is needed: under the
   // Core schema `on`/`yes`/`no`/`off`/`y`/`n` are plain strings, not booleans.

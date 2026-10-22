@@ -12,7 +12,7 @@ import {
   artifact_s3_region,
   artifact_store
 } from '../config.js'
-import type { InputBundleArtifactRef } from '../runner/input.js'
+import type { InputBundleArtifactRef } from '../execution/input.js'
 
 function inputObjectKey(runId: string): string {
   return `runs/${runId}/input/input-bundle.v1.tar.zst`

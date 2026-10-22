@@ -20,7 +20,8 @@ from sec_review_agents.agents.delivery_planning.workbench_state import (
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
+from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
+from sec_review_agents.utils.files import persist_json_artifact
 
 DEFAULT_DELIVERY_PLANNING_PASSES = 2
 DEFAULT_DELIVERY_PLANNING_BATCH_SIZE = 30
@@ -44,9 +45,9 @@ def persist_delivery_planning_input(
     delivery_planning_root: Path, planning_cases: list[dict[str, Any]]
 ) -> None:
     """Persist archive-only planning input for operator inspection."""
-    persist_json(
+    persist_json_artifact(
         delivery_planning_root,
-        "delivery-planning-input.json",
+        "delivery-planning-input",
         {"cases": planning_cases},
     )
 
@@ -244,10 +245,7 @@ async def _run_delivery_planning_agent_pass(
     pass_artifacts_path = _delivery_planning_pass_artifacts_path(
         delivery_planning_root, pass_meta
     )
-    reset_stage_attempt_artifacts(
-        pass_artifacts_path,
-        filenames=("transcript.json",),
-    )
+    remove_transcripts((transcript_path(pass_artifacts_path),))
     backend = create_repository_delivery_planning_backend(
         patch_root=delivery_planning_root / "patches",
     )
@@ -272,7 +270,7 @@ async def _run_delivery_planning_agent_pass(
                 pass_kind=pass_kind,
                 draft_origins=draft_origins,
             ),
-            transcript_paths=(pass_artifacts_path / "transcript.json",),
+            transcript_paths=(transcript_path(pass_artifacts_path),),
         )
 
 

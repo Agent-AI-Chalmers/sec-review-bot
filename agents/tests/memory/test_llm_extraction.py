@@ -15,6 +15,7 @@ from sec_review_agents.memory.store import (
     memory_content_dir,
     memory_observations_dir,
 )
+from sec_review_agents.runtime.transcripts import serialize_agent_message
 from tests.llm_probe import llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -24,6 +25,10 @@ EXTRACTION_PROBE = llm_probe(
     description="real LLM memory extraction probe",
 )
 FIXTURES_ROOT = Path(__file__).parent / "fixtures" / "extractor-safety"
+CURRENT_WRITER_FIXTURE_CASES = {
+    "compaction-summary-conflict",
+    "feedback-loop-correction",
+}
 
 
 class ExtractorSafetyCase(BaseModel):
@@ -41,7 +46,6 @@ class ExtractorSafetyCase(BaseModel):
 class TranscriptMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    index: int
     type: Literal["system", "human", "ai", "tool"]
     id: str | None
     name: str | None
@@ -52,6 +56,17 @@ class TranscriptMessage(BaseModel):
     invalid_tool_calls: list[dict[str, Any]]
     tool_call_chunks: list[dict[str, Any]]
     usage_metadata: dict[str, Any] | None
+    tool_call_id: str | None = None
+    status: Literal["success", "error"] | None = None
+    artifact: Any | None = None
+
+
+class TranscriptEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    seq: int
+    event: Literal["message"]
+    message: TranscriptMessage
 
 
 def _load_cases() -> tuple[tuple[ExtractorSafetyCase, Path], ...]:
@@ -65,7 +80,7 @@ def _load_cases() -> tuple[tuple[ExtractorSafetyCase, Path], ...]:
                 f"case id {case.id!r} must match directory {case_path.parent.name!r}"
             )
         transcript_dir = case_path.parent / "transcripts"
-        if not list(transcript_dir.glob("*.json")):
+        if not list(transcript_dir.glob("*.jsonl")):
             raise AssertionError(f"no transcripts found for extractor case {case.id}")
         cases.append((case, transcript_dir))
     if not cases:
@@ -91,22 +106,40 @@ def _selected_system_prompt() -> str:
 def test_extractor_safety_fixtures_are_valid() -> None:
     cases = _load_cases()
     assert {case.id for case, _ in cases} == {
+        "compaction-summary-conflict",
         "compromised-upstream-agent",
+        "feedback-loop-correction",
         "privacy-entangled",
         "private-identifier-disguised-as-api",
         "prompt-injection",
         "tool-output-injection",
     }
     for case, transcript_dir in cases:
-        for transcript in transcript_dir.glob("*.json"):
-            payload = json.loads(transcript.read_text(encoding="utf-8"))
-            assert isinstance(
-                payload, list
-            ), f"transcript must be an array: {transcript}"
-            messages = [TranscriptMessage.model_validate(item) for item in payload]
+        for transcript in transcript_dir.glob("*.jsonl"):
+            raw_events = [
+                json.loads(line)
+                for line in transcript.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            events = [TranscriptEvent.model_validate(event) for event in raw_events]
+            assert [event.seq for event in events] == list(range(1, len(events) + 1))
+            messages = [event.message for event in events]
             assert messages, f"empty transcript fixture: {transcript}"
             assert messages[0].type == "system"
-            assert [message.index for message in messages] == list(range(len(messages)))
+            if case.id in CURRENT_WRITER_FIXTURE_CASES:
+                tool_call_ids = {
+                    call["id"]
+                    for event in raw_events
+                    for call in event["message"].get("tool_calls", [])
+                }
+                for event in raw_events:
+                    message = event["message"]
+                    assert message == serialize_agent_message(
+                        message,
+                        message_id=message["id"],
+                    )
+                    if message["type"] == "tool":
+                        assert message["tool_call_id"] in tool_call_ids
         if case.expect_observation:
             assert case.required_terms
         else:

@@ -1,7 +1,6 @@
-import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch, sentinel
+from unittest.mock import Mock, patch, sentinel
 
 import pytest
 from langchain_core.callbacks import BaseCallbackHandler
@@ -9,14 +8,40 @@ from langchain_core.callbacks.manager import CallbackManager
 
 from sec_review_agents.observability.tracing import TracingConfig
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
+from sec_review_agents.runtime.transcripts import read_transcript_messages
+
+
+def _stream(*updates: dict[str, Any], error: Exception | None = None):
+    async def astream(*args: Any, **kwargs: Any):
+        _ = args, kwargs
+        for update in updates:
+            yield update
+        if error is not None:
+            raise error
+
+    return astream
+
+
+def _successful_agent(*, messages: list[Any] | None = None) -> Mock:
+    agent = Mock()
+    agent.astream = Mock(
+        side_effect=_stream(
+            {
+                "model": {
+                    "messages": messages or [],
+                    "structured_response": {"status": "ok"},
+                }
+            }
+        )
+    )
+    return agent
 
 
 @pytest.mark.asyncio
 async def test_invoke_returns_structured_response_after_success(
     tmp_path: Path,
 ) -> None:
-    agent = Mock()
-    agent.ainvoke = AsyncMock(return_value={"structured_response": {"status": "ok"}})
+    agent = _successful_agent()
     with (
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.compute_graph_recursion_limit",
@@ -33,7 +58,7 @@ async def test_invoke_returns_structured_response_after_success(
             "sec_review_agents.runtime.agent_runtime_graph.log_agent_invocation_failed"
         ),
     ):
-        transcript_path = tmp_path / "transcript.json"
+        transcript_path = tmp_path / "transcript.jsonl"
         result = await invoke_agent_runtime_graph(
             agent=agent,
             agent_name="test-agent",
@@ -42,16 +67,16 @@ async def test_invoke_returns_structured_response_after_success(
             config={"metadata": {"scope": "unit"}},
             transcript_paths=(transcript_path,),
         )
-        transcript_messages = json.loads(transcript_path.read_text(encoding="utf-8"))
+        transcript_messages = read_transcript_messages(transcript_path)
 
     assert result == {"status": "ok"}
-    invoke_config = agent.ainvoke.call_args.kwargs["config"]
+    invoke_config = agent.astream.call_args.kwargs["config"]
     assert invoke_config["metadata"] == {
         "scope": "unit",
         "sec_review_agent": "test-agent",
     }
     assert invoke_config["recursion_limit"] == 3
-    assert [item["type"] for item in transcript_messages] == ["system"]
+    assert [item["type"] for item in transcript_messages] == ["system", "human"]
     assert transcript_messages[0]["type"] == "system"
 
 
@@ -59,13 +84,7 @@ async def test_invoke_returns_structured_response_after_success(
 async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
     tmp_path: Path,
 ) -> None:
-    agent = Mock()
-    agent.ainvoke = AsyncMock(
-        return_value={
-            "structured_response": {"status": "ok"},
-            "messages": [],
-        }
-    )
+    agent = _successful_agent()
     flush = Mock()
     tracing_config = TracingConfig(
         enabled=False,
@@ -75,7 +94,7 @@ async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
         flush=flush,
     )
 
-    transcript_path = tmp_path / "transcript.json"
+    transcript_path = tmp_path / "transcript.jsonl"
     with (
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.build_tracing_config",
@@ -103,11 +122,11 @@ async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
             user_prompt="prompt",
             transcript_paths=(transcript_path,),
         )
-        transcript_messages = json.loads(transcript_path.read_text(encoding="utf-8"))
+        transcript_messages = read_transcript_messages(transcript_path)
 
     started_mock.assert_called_once()
     assert not started_mock.call_args.kwargs["tracing_enabled"]
-    assert "callbacks" not in agent.ainvoke.call_args.kwargs["config"]
+    assert "callbacks" not in agent.astream.call_args.kwargs["config"]
     assert transcript_messages[0]["type"] == "system"
     flush.assert_called_once_with()
 
@@ -117,13 +136,7 @@ async def test_transcript_export_preserves_callback_manager(
     tmp_path: Path,
 ) -> None:
     """Preserve caller callbacks independently of ambient tracing configuration."""
-    agent = Mock()
-    agent.ainvoke = AsyncMock(
-        return_value={
-            "structured_response": {"status": "ok"},
-            "messages": [],
-        }
-    )
+    agent = _successful_agent()
     caller_handler = BaseCallbackHandler()
     callback_manager = CallbackManager([caller_handler])
     tracing_config = TracingConfig(
@@ -160,34 +173,31 @@ async def test_transcript_export_preserves_callback_manager(
             system_prompt="",
             user_prompt="prompt",
             config={"callbacks": callback_manager},
-            transcript_paths=(tmp_path / "transcript.json",),
+            transcript_paths=(tmp_path / "transcript.jsonl",),
         )
 
-    invoke_callbacks = agent.ainvoke.call_args.kwargs["config"]["callbacks"]
+    invoke_callbacks = agent.astream.call_args.kwargs["config"]["callbacks"]
     assert isinstance(invoke_callbacks, CallbackManager)
     assert caller_handler in invoke_callbacks.handlers
     assert invoke_callbacks.handlers == [caller_handler]
 
 
 @pytest.mark.asyncio
-async def test_invoke_uses_async_agent() -> None:
-    ainvoke_calls: list[dict] = []
+async def test_invoke_uses_async_agent_stream() -> None:
+    astream_calls: list[dict] = []
 
-    async def ainvoke(payload, *, config=None, context=None):
-        ainvoke_calls.append(
+    async def astream(payload, *, config=None, stream_mode=None):
+        astream_calls.append(
             {
                 "payload": payload,
                 "config": config,
-                "context": context,
+                "stream_mode": stream_mode,
             }
         )
-        return {
-            "structured_response": {"status": "ok"},
-            "messages": payload["messages"],
-        }
+        yield {"model": {"structured_response": {"status": "ok"}}}
 
     agent = Mock()
-    agent.ainvoke = AsyncMock(side_effect=ainvoke)
+    agent.astream = astream
 
     with (
         patch(
@@ -213,21 +223,14 @@ async def test_invoke_uses_async_agent() -> None:
         )
 
     assert result == {"status": "ok"}
-    assert len(ainvoke_calls) == 1
-    assert ainvoke_calls[0]["payload"] == {
-        "messages": [{"role": "user", "content": "prompt"}]
-    }
+    assert len(astream_calls) == 1
+    assert astream_calls[0]["payload"]["messages"][0].content == "prompt"
+    assert astream_calls[0]["stream_mode"] == "updates"
 
 
 @pytest.mark.asyncio
 async def test_invoke_uses_async_agent_without_sync_wrapper() -> None:
-    agent = Mock()
-    agent.ainvoke = AsyncMock(
-        return_value={
-            "structured_response": {"status": "ok"},
-            "messages": [{"role": "user", "content": "prompt"}],
-        }
-    )
+    agent = _successful_agent()
 
     with (
         patch(
@@ -253,13 +256,13 @@ async def test_invoke_uses_async_agent_without_sync_wrapper() -> None:
         )
 
     assert result == {"status": "ok"}
-    agent.ainvoke.assert_awaited_once()
+    agent.astream.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_invoke_logs_failure_and_reraises() -> None:
     agent = Mock()
-    agent.ainvoke = AsyncMock(side_effect=RuntimeError("boom"))
+    agent.astream = Mock(side_effect=_stream(error=RuntimeError("boom")))
 
     with (
         patch(
@@ -289,12 +292,52 @@ async def test_invoke_logs_failure_and_reraises() -> None:
 
 
 @pytest.mark.asyncio
+async def test_stream_failure_preserves_completed_message_updates(
+    tmp_path: Path,
+) -> None:
+    agent = Mock()
+    agent.astream = Mock(
+        side_effect=_stream(
+            {
+                "model": {
+                    "messages": [
+                        {
+                            "id": "partial-ai",
+                            "role": "assistant",
+                            "content": "Evidence collected before failure.",
+                        }
+                    ]
+                }
+            },
+            error=RuntimeError("boom"),
+        )
+    )
+    transcript_path = tmp_path / "transcript.jsonl"
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await invoke_agent_runtime_graph(
+            agent=agent,
+            agent_name="test-agent",
+            system_prompt="system",
+            user_prompt="prompt",
+            transcript_paths=(transcript_path,),
+        )
+
+    messages = read_transcript_messages(transcript_path)
+    assert [message["content"] for message in messages] == [
+        "system",
+        "prompt",
+        "Evidence collected before failure.",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_missing_structured_response_raises() -> None:
     agent = Mock()
-    agent.ainvoke = AsyncMock(
-        return_value={
-            "messages": [{"role": "assistant", "content": "prose"}],
-        }
+    agent.astream = Mock(
+        side_effect=_stream(
+            {"model": {"messages": [{"role": "assistant", "content": "prose"}]}}
+        )
     )
 
     with (
@@ -321,7 +364,7 @@ async def test_missing_structured_response_raises() -> None:
             user_prompt="prompt",
         )
 
-    assert agent.ainvoke.call_count == 1
+    assert agent.astream.call_count == 1
     failed_mock.assert_called_once()
 
 
@@ -343,15 +386,9 @@ async def test_transcript_messages_cover_message_dump_fields(
             self.tool_call_chunks: list[dict[str, Any]] = []
             self.usage_metadata = {"input_tokens": 1, "output_tokens": 2}
 
-    agent = Mock()
-    agent.ainvoke = AsyncMock(
-        return_value={
-            "structured_response": {"status": "ok"},
-            "messages": [FakeMessage()],
-        }
-    )
+    agent = _successful_agent(messages=[FakeMessage()])
 
-    transcript_path = tmp_path / "transcript.json"
+    transcript_path = tmp_path / "transcript.jsonl"
     with (
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.compute_graph_recursion_limit",
@@ -375,13 +412,12 @@ async def test_transcript_messages_cover_message_dump_fields(
             user_prompt="prompt",
             transcript_paths=(transcript_path,),
         )
-        messages = json.loads(transcript_path.read_text(encoding="utf-8"))
+        messages = read_transcript_messages(transcript_path)
 
     ai_messages = [item for item in messages if item["type"] == "ai"]
     assert len(ai_messages) == 1
     message = ai_messages[0]
     assert set(message) == {
-        "index",
         "type",
         "id",
         "name",

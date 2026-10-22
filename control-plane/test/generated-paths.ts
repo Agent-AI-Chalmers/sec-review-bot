@@ -19,17 +19,17 @@ export const CONTROL_PLANE_API_SPEC_PATH = path.join(
   'control-plane-api',
   'openapi.yaml'
 )
-export const RUNNER_API_SPEC_PATH = path.join(
+export const EXECUTION_API_SPEC_PATH = path.join(
   REPO_ROOT,
   'contracts',
   'integration-contract',
-  'openapi.json'
+  'openapi.yaml'
 )
-export const RUNNER_API_SCHEMA_PATH = path.join(
+export const EXECUTION_API_SCHEMA_PATH = path.join(
   REPO_ROOT,
   'control-plane',
   'src',
-  'runner-api-schema.ts'
+  'execution-api-schema.ts'
 )
 export const CONTROL_PLANE_API_TYPES_PATH = path.join(
   REPO_ROOT,

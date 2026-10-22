@@ -1,0 +1,12 @@
+{
+  "contract_version": "v6",
+  "workspace": {
+    "snapshot": "workspace.snapshot.tar"
+  },
+  "history": {
+    "path": "history"
+  },
+  "incremental_window": {
+    "path": "incremental-window"
+  }
+}

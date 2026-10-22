@@ -108,8 +108,8 @@ export const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
     'failureCodeSubmissionRecoveryAbandoned',
   PREPARATION_GIVEN_UP_BY_OPERATOR: 'failureCodePreparationGivenUp',
   PUBLICATION_ABANDONED_BY_OPERATOR: 'failureCodePublicationGivenUp',
-  RUNNER_EXECUTION_FAILED: 'failureCodeRunnerExecutionFailed',
-  RUNNER_RESULT_MISSING: 'failureCodeRunnerResultMissing',
+  EXECUTION_FAILED: 'failureCodeExecutionFailed',
+  EXECUTION_RESULT_MISSING: 'failureCodeExecutionResultMissing',
   PUBLICATION_ABANDONED: 'failureCodePublicationAbandoned',
   PUBLICATION_STEP_RETRY_EXHAUSTED: 'failureCodePublicationStepRetryExhausted',
   GITHUB_VALIDATION_REJECTED: 'failureCodeGithubValidationRejected'

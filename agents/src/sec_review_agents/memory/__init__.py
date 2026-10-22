@@ -8,7 +8,7 @@ asynchronous extraction pipeline:
         MEMORY.md             # startup index, mounted for agents as /memory/MEMORY.md
         topics/               # detailed lessons, mounted as /memory/topics/
       observations/           # unreviewed extraction outputs
-      memory_state.sqlite     # observation ledger and extraction-job state
+      memory_state.sqlite     # local observation ledger
 
 Main review agents only receive the ``memory/`` subtree as ``/memory``.
 The observation files and SQLite state stay outside that memory view and are

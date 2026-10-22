@@ -1,5 +1,5 @@
 // Accepts repository-dispatch reviews, validates their local contract, and
-// prepares a durable Runner submission under a fenced preparation claim.
+// prepares a durable Execution submission under a fenced preparation claim.
 import type { App } from 'octokit'
 import { admitReviewRun } from '../control-plane/admission.js'
 import {
@@ -16,7 +16,7 @@ import {
   startRepositoryReviewRun,
   type SubmittedRepositoryReviewRun
 } from '../reviews/repositories/submit.js'
-import type { TestChangesPolicy } from '../runner/input.js'
+import type { TestChangesPolicy } from '../execution/input.js'
 import { repositoryReviewPublishContext } from '../control-plane/publish-context.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'

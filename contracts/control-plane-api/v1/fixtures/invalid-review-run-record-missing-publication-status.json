@@ -25,7 +25,7 @@
     "repository": "octo/example",
     "pull_request": 41
   },
-  "runner_input": {
+  "execution_input": {
     "diff": "sha256:ignored-by-the-contract"
   },
   "ingress_kind": "github_webhook",

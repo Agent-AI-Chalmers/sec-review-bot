@@ -30,8 +30,8 @@ services:
       RUSTFS_ROOT_PASSWORD: "${RUSTFS_ROOT_PASSWORD:?RUSTFS_ROOT_PASSWORD is required}"
       SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY: "${SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY:-sec-review-integration}"
       SEC_REVIEW_INTEGRATION_S3_SECRET_KEY: "${SEC_REVIEW_INTEGRATION_S3_SECRET_KEY:?SEC_REVIEW_INTEGRATION_S3_SECRET_KEY is required}"
-      SEC_REVIEW_RUNNER_S3_ACCESS_KEY: "${SEC_REVIEW_RUNNER_S3_ACCESS_KEY:-sec-review-runner}"
-      SEC_REVIEW_RUNNER_S3_SECRET_KEY: "${SEC_REVIEW_RUNNER_S3_SECRET_KEY:?SEC_REVIEW_RUNNER_S3_SECRET_KEY is required}"
+      SEC_REVIEW_EXECUTION_S3_ACCESS_KEY: "${SEC_REVIEW_EXECUTION_S3_ACCESS_KEY:-sec-review-execution-worker}"
+      SEC_REVIEW_EXECUTION_S3_SECRET_KEY: "${SEC_REVIEW_EXECUTION_S3_SECRET_KEY:?SEC_REVIEW_EXECUTION_S3_SECRET_KEY is required}"
       SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY: "${SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY:-sec-review-artifact-storage-writer}"
       SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY: "${SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY:?SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY is required}"
       SEC_REVIEW_UI_S3_ACCESS_KEY: "${SEC_REVIEW_UI_S3_ACCESS_KEY:-sec-review-ui-artifact-reader}"
@@ -42,15 +42,20 @@ services:
     image: postgres:18-alpine
     restart: "on-failure:5"
     environment:
-      POSTGRES_DB: "${POSTGRES_DB:-sec_review_bot}"
+      POSTGRES_DB: "postgres"
       POSTGRES_USER: "${POSTGRES_USER:-sec_review_bot}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
     volumes:
       - "${PWD}/.agent-postgres-state:/var/lib/postgresql"
+      - "./ops/postgres-init:/docker-entrypoint-initdb.d:ro"
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} && psql -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc \"select count(*) from pg_database where datname in ('sec_review_control_plane','sec_review_memory_catalog')\" | grep -q 2",
+        ]
       interval: 2s
       timeout: 5s
       retries: 30
@@ -75,21 +80,23 @@ services:
       - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
       - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"
 
-  runner-service:
+  execution-gateway:
     restart: "on-failure:5"
     build:
-      context: agents
+      context: execution-gateway
       dockerfile: Dockerfile
       additional_contexts:
         contracts: contracts
+      args:
+        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     environment:
-      RUNNER_SERVICE_HOST: "0.0.0.0"
-      RUNNER_SERVICE_PORT: "8000"
+      EXECUTION_GATEWAY_HOST: "0.0.0.0"
+      EXECUTION_GATEWAY_PORT: "8000"
       TEMPORAL_ADDRESS: "temporal:7233"
       TEMPORAL_NAMESPACE: "${TEMPORAL_NAMESPACE:-default}"
       TEMPORAL_TASK_QUEUE: "${TEMPORAL_TASK_QUEUE:-sec-review-agents}"
       # No default token: the runner can spend LLM quota and execute workflows.
-      RUNNER_SERVICE_TOKEN: "${RUNNER_SERVICE_TOKEN:?RUNNER_SERVICE_TOKEN is required}"
+      EXECUTION_GATEWAY_TOKEN: "${EXECUTION_API_TOKEN:?EXECUTION_API_TOKEN is required}"
       TEMPORAL_WORKFLOW_TIMEOUT_SECONDS: "${TEMPORAL_WORKFLOW_TIMEOUT_SECONDS:-10800}"
       SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"
       SEC_REVIEW_ARTIFACT_S3_ENDPOINT: "http://rustfs:9000"
@@ -98,15 +105,59 @@ services:
       AWS_ACCESS_KEY_ID: "${SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY:-sec-review-artifact-storage-writer}"
       AWS_SECRET_ACCESS_KEY: "${SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY:?SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY is required}"
     volumes:
-      # The service reads worker output but owns the only credential that can store it.
       - "${PWD}/.agent-artifacts:${PWD}/.agent-artifacts:ro"
     ports:
-      - "127.0.0.1:${RUNNER_SERVICE_PORT:-8000}:8000"
+      - "127.0.0.1:${EXECUTION_GATEWAY_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     depends_on:
       rustfs-init:
         condition: service_completed_successfully
       temporal:
         condition: service_started
+
+  memory-catalog-server:
+    restart: "on-failure:5"
+    profiles: ["app"]
+    build:
+      context: memory-catalog
+      dockerfile: Dockerfile
+      additional_contexts:
+        contracts: contracts
+      args:
+        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+    environment:
+      MEMORY_CATALOG_HOST: "0.0.0.0"
+      MEMORY_CATALOG_PORT: "8092"
+      # Keep profile-independent Compose commands usable when managed memory is not
+      # enabled. The service itself rejects an empty token before binding its port.
+      MEMORY_CATALOG_TOKEN: "${AGENT_MEMORY_CATALOG_TOKEN:-}"
+      MEMORY_CATALOG_DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/sec_review_memory_catalog"
+    ports:
+      - "127.0.0.1:${MEMORY_CATALOG_HOST_PORT:-8092}:8092"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8092/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   control-plane:
     restart: "on-failure:5"
@@ -125,10 +176,10 @@ services:
       # Optional: an empty value disables the /v1/admin surface entirely (it answers 404).
       CONTROL_PLANE_ADMIN_TOKEN: "${CONTROL_PLANE_ADMIN_TOKEN:-}"
       CONNECTOR_ID: "${CONNECTOR_ID:-github-app:default}"
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sec_review_bot}"
-      AGENT_RUNNER_SERVICE_URL: "http://runner-service:8000"
-      AGENT_RUNNER_SERVICE_TOKEN: "${RUNNER_SERVICE_TOKEN:?RUNNER_SERVICE_TOKEN is required}"
-      AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_RUNNER_BACKGROUND_POLL_INTERVAL_MS:-15000}"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/sec_review_control_plane"
+      EXECUTION_API_URL: "http://execution-gateway:8000"
+      EXECUTION_API_TOKEN: "${EXECUTION_API_TOKEN:?EXECUTION_API_TOKEN is required}"
+      AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS:-15000}"
     ports:
       - "127.0.0.1:${CONTROL_PLANE_HOST_PORT:-8090}:8090"
     healthcheck:
@@ -145,8 +196,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      runner-service:
-        condition: service_started
+      execution-gateway:
+        condition: service_healthy
 
   control-plane-ui:
     restart: "on-failure:5"

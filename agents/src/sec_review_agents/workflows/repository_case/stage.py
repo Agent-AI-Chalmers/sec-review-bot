@@ -7,7 +7,7 @@ from sec_review_agents.observability.diagnostics import (
     log_stage_failed,
     log_stage_started,
 )
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.repository_case.analysis import (
     analyze_repository_case,
@@ -132,7 +132,7 @@ async def analyze_repository_case_stage(
     *,
     analyzer_artifacts_path: Path,
     published_transcript_path: Path | None = None,
-    runtime_context: RunnerRuntimeContext | None,
+    runtime_context: ExecutionRuntimeContext | None,
 ) -> dict[str, Any]:
     case_id = str(case_execution_input["case_id"])
     scan_mode = case_execution_input["scan_mode"]
@@ -226,7 +226,7 @@ async def run_repository_case_mitigation_stage(
     case_execution_input: Mapping[str, Any],
     analyzer_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None,
-    runtime_context: RunnerRuntimeContext | None,
+    runtime_context: ExecutionRuntimeContext | None,
     *,
     mitigator_artifacts_path: Path,
     published_transcript_path: Path | None = None,
@@ -282,7 +282,7 @@ async def run_repository_case_verification_stage(
     analyzer_result: Mapping[str, Any],
     mitigator_result: Mapping[str, Any] | None,
     retry_context: Mapping[str, Any] | None,
-    runtime_context: RunnerRuntimeContext | None,
+    runtime_context: ExecutionRuntimeContext | None,
     *,
     verifier_artifacts_path: Path,
     published_transcript_path: Path | None = None,

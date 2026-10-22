@@ -12,7 +12,7 @@ from sec_review_agents.scan_stages.triage.result import (
     TriageMetadata,
     TriageResult,
 )
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 
 TRIAGE_STAGE = "triage"
 REPOSITORY_TRIAGER_AGENT_NAME = "repository-triager"
@@ -92,9 +92,9 @@ async def run_repository_triage_stage(
             "cases": cases,
             "suppressed_candidates": suppressed_candidates,
         }
-        persist_json(
+        persist_json_artifact(
             triage_root,
-            "triage-result.json",
+            "triage-result",
             result,
         )
         log_stage_completed(

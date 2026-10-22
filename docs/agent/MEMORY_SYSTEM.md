@@ -70,11 +70,11 @@ Main agents only read the curated memory view and do not write memory directly. 
 
 Experience production runs through an asynchronous path and does not affect the normal flow, meaning the review itself.
 
-Roughly, the flow is a set of periodic checks:
+Roughly, the flow is a set of asynchronous checks:
 
-- Source: after an issue or pull-request review publishes transcripts, it registers a pending extraction job. Repository review registers one job per successfully completed case; a case that fails before completion never registers extraction.
-- Extraction checks periodically and processes available work: the extraction schedule runs every 10 minutes by default, processes registered extraction jobs, and produces pending observations.
-  - Multiple jobs can be processed concurrently.
+- Source: after an issue or pull-request review publishes transcripts, it starts extraction for that review. Repository review starts one extraction per case whose transcripts exist.
+- Extraction processes each review independently and produces pending observations.
+  - Multiple extractions can run concurrently.
 - Maintenance checks periodically and runs when the threshold or age condition is met: the maintenance trigger schedule runs every hour by default. It starts maintenance only when at least 10 observations are pending, or when the oldest pending observation has waited at least one day.
   - Maintenance does not run in parallel; only one maintenance run exists at a time, though one run may process multiple observations.
   - `processed` means reviewed and handled. It does not mean the experience was necessarily absorbed into memory.

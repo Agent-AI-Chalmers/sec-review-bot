@@ -2,6 +2,8 @@ import json
 from annotationlib import Format, get_annotations
 from typing import Any
 
+from pydantic import BaseModel
+
 from sec_review_agents.review_stages.cvss import (
     CvssMetricDetail,
     CvssStageResult,
@@ -12,10 +14,20 @@ from sec_review_agents.review_stages.cvss.stage import (
 )
 from sec_review_agents.review_stages.record import (
     ReviewRecordAnalysis,
+    ReviewRecordCvss,
+    ReviewRecordMitigation,
     ReviewRecordVerification,
     build_review_record,
 )
 from sec_review_agents.review_stages.single_agent import SingleAgentFixOutcome
+from sec_review_agents.review_stages.types import (
+    CVSS_OUTCOME_VALUES,
+    PATCH_COVERAGE_VALUES,
+    REGRESSION_STATUS_VALUES,
+    RESOLUTION_NEXT_STEP_VALUES,
+    VALIDATION_LEVEL_VALUES,
+    VERDICT_VALUES,
+)
 from sec_review_agents.workflows.issue.single_agent import (
     execute_issue_single_agent,
 )
@@ -24,25 +36,57 @@ from sec_review_agents.workflows.repository.result import (
     ScanSummary,
     build_repository_workflow_result,
 )
+from tests.contract_fixtures import contract_schema
 
 
 def test_review_record_public_contract_tracks_current_shape() -> None:
-    assert set(ReviewRecordAnalysis.model_fields) == {
-        "verdict",
-        "overview",
-        "narratives",
+    review_record = contract_schema("common.schema.json")["$defs"]["reviewRecord"]
+    models: dict[str, type[BaseModel]] = {
+        "analysis": ReviewRecordAnalysis,
+        "mitigation": ReviewRecordMitigation,
+        "verification": ReviewRecordVerification,
     }
-    assert set(ReviewRecordVerification.model_fields) == {
-        "overview",
-        "review_target_claim",
-        "validation_level",
-        "patch_coverage",
-        "regression_status",
-        "resolution_next_step",
-        "patch_findings",
-        "verification_findings",
-        "residual_risks",
+
+    for section, model in models.items():
+        section_schema = review_record["properties"][section]
+        assert set(model.model_fields) == set(section_schema["properties"])
+        assert set(model.model_fields) == set(section_schema["required"])
+
+    cvss_schema = review_record["properties"]["cvss"]["anyOf"][1]
+    assert set(ReviewRecordCvss.model_fields) == set(cvss_schema["properties"])
+    assert set(ReviewRecordCvss.model_fields) == set(cvss_schema["required"])
+
+
+def test_review_record_enum_allowlists_match_shared_schema() -> None:
+    review_record = contract_schema("common.schema.json")["$defs"]["reviewRecord"]
+    analysis = review_record["properties"]["analysis"]["properties"]
+    verification = review_record["properties"]["verification"]["properties"]
+    cvss = review_record["properties"]["cvss"]["anyOf"][1]["properties"]
+
+    expected = {
+        "verdict": (VERDICT_VALUES, analysis["verdict"]["enum"]),
+        "validation_level": (
+            VALIDATION_LEVEL_VALUES,
+            verification["validation_level"]["enum"],
+        ),
+        "patch_coverage": (
+            PATCH_COVERAGE_VALUES,
+            verification["patch_coverage"]["enum"],
+        ),
+        "regression_status": (
+            REGRESSION_STATUS_VALUES,
+            verification["regression_status"]["enum"],
+        ),
+        "resolution_next_step": (
+            RESOLUTION_NEXT_STEP_VALUES,
+            verification["resolution_next_step"]["enum"],
+        ),
+        "cvss_outcome": (CVSS_OUTCOME_VALUES, cvss["outcome"]["enum"]),
     }
+    for name, (runtime_values, schema_values) in expected.items():
+        assert set(runtime_values) == {
+            value for value in schema_values if value is not None
+        }, name
 
 
 def test_issue_single_agent_workflow_return_annotation_is_public_payload() -> None:

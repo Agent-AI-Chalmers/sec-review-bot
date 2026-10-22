@@ -5,7 +5,10 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Literal, overload
+from urllib.parse import urlparse
+from uuid import uuid4
 
+from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.features import (
     AGENT_MEMORY_ENABLED_ENV,
     agent_memory_enabled,
@@ -13,11 +16,13 @@ from sec_review_agents.features import (
 from sec_review_agents.filesystem.path_views import PathView, memory_view
 from sec_review_agents.memory.state import initialize_memory_state
 from sec_review_agents.utils.env import env_value
+from sec_review_agents.utils.files import slug_filename_component
 
 AGENT_MEMORY_DIR_ENV = "AGENT_MEMORY_DIR"
 AGENT_MEMORY_MATERIALIZED_ROOT_ENV = "AGENT_MEMORY_MATERIALIZED_ROOT"
 MEMORY_DIRNAME = "memory"
 MEMORY_OBSERVATIONS_DIRNAME = "observations"
+MEMORY_AGENT_TRANSCRIPTS_DIRNAME = "agent-transcripts"
 
 _DEFAULT_MEMORY_MATERIALIZED_ROOT: Path | None = None
 
@@ -43,6 +48,9 @@ def initialize_memory_store(memory_store_dir: Path) -> Path:
     content_dir.mkdir(exist_ok=True)
     (content_dir / "topics").mkdir(exist_ok=True)
     (resolved_store_dir / MEMORY_OBSERVATIONS_DIRNAME).mkdir(exist_ok=True)
+    audit_root = resolved_store_dir / MEMORY_AGENT_TRANSCRIPTS_DIRNAME
+    (audit_root / "memory-extractor").mkdir(parents=True, exist_ok=True)
+    (audit_root / "memory-maintainer").mkdir(exist_ok=True)
     initialize_memory_state(resolved_store_dir)
     index_path = content_dir / "MEMORY.md"
     if not index_path.exists():
@@ -56,6 +64,20 @@ def memory_content_dir(memory_store_dir: Path) -> Path:
 
 def memory_observations_dir(memory_store_dir: Path) -> Path:
     return memory_store_dir / MEMORY_OBSERVATIONS_DIRNAME
+
+
+def memory_agent_transcript_path(
+    memory_store_dir: Path,
+    *,
+    agent_name: str,
+    run_label: str,
+) -> Path:
+    """Allocate one non-overwriting audit transcript for a memory-agent run."""
+    agent = slug_filename_component(agent_name, fallback="run")
+    label = slug_filename_component(run_label, fallback="run")
+    root = memory_store_dir / MEMORY_AGENT_TRANSCRIPTS_DIRNAME / agent
+    root.mkdir(parents=True, exist_ok=True)
+    return root / f"{label}-{uuid4().hex}.jsonl"
 
 
 @contextlib.contextmanager
@@ -119,6 +141,12 @@ def resolve_memory_store_dir(
 
 
 def initialize_configured_memory_store() -> Path | None:
+    from sec_review_agents.memory.catalog_client import (
+        configured_memory_catalog_client,
+    )
+
+    if configured_memory_catalog_client() is not None:
+        return None
     memory_store_dir = resolve_memory_store_dir(None, required=False)
     if memory_store_dir is None:
         return None
@@ -130,11 +158,7 @@ def memory_runtime_available() -> bool:
     # This answers runtime readiness, not feature policy: memory may be globally
     # enabled, but main agents can only use it when a configured directory
     # already provides a readable MEMORY.md startup index.
-    memory_store_dir = resolve_memory_store_dir(None, required=False)
-    return (
-        memory_store_dir is not None
-        and (memory_content_dir(memory_store_dir) / "MEMORY.md").is_file()
-    )
+    return materialize_configured_memory_view() is not None
 
 
 def memory_materialized_base_root() -> Path:
@@ -202,6 +226,46 @@ def _rebuild_memory_view(memory_store_dir: Path, destination: Path) -> None:
 
 
 def materialize_configured_memory_view() -> Path | None:
+    from sec_review_agents.memory.catalog_client import (
+        configured_memory_catalog_client,
+    )
+    from sec_review_agents.memory.version_bundle import materialize_memory_version
+
+    catalog_client = configured_memory_catalog_client()
+    if catalog_client is not None:
+        active = catalog_client.active_version()
+        raw_reference = active.get("artifact_reference")
+        if raw_reference is None:
+            return None
+        reference = ArtifactReference.from_mapping(raw_reference)
+        if urlparse(reference.uri).scheme != "s3":
+            raise ValueError("Managed active memory must use an S3 artifact reference.")
+        base_root = memory_materialized_base_root()
+        base_root.mkdir(parents=True, exist_ok=True)
+        digest = reference.digest.removeprefix("sha256:")
+        version_root = base_root / f"managed-{digest}"
+        content_root = version_root / MEMORY_DIRNAME
+        lock_path = base_root / f".{version_root.name}.lock"
+        with lock_path.open("w", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            if not (content_root / "MEMORY.md").is_file():
+                if version_root.exists():
+                    shutil.rmtree(version_root)
+                try:
+                    materialized = materialize_memory_version(
+                        reference,
+                        destination=version_root,
+                    )
+                except Exception:
+                    if version_root.exists():
+                        shutil.rmtree(version_root)
+                    raise
+                if materialized != content_root:
+                    raise RuntimeError(
+                        "Memory version materialized at an unexpected path."
+                    )
+        return content_root
+
     memory_store_dir = resolve_memory_store_dir(None, required=False)
     if (
         memory_store_dir is None

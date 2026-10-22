@@ -79,7 +79,7 @@ async def test_llm_corrects_rejected_changed_files_response_in_same_thread(
             'declared_changed_files exactly ["b.txt"], and a short rationale. '
             "Do not mention a.txt yet."
         ),
-        transcript_paths=(tmp_path / "transcript.json",),
+        transcript_paths=(tmp_path / "transcript.jsonl",),
     )
 
     assert result["declared_changed_files"] == ["a.txt"]

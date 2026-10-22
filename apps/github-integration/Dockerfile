@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS builder
+FROM node:24-alpine AS builder
 
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
@@ -17,25 +17,20 @@ RUN pnpm run build
 # root, so the default implementation needs no injected workspace packages.
 RUN pnpm deploy --filter . --prod /prod
 
-FROM node:24-bookworm-slim
+FROM node:24-alpine
 
 # The GitHub integration service is also the input bundle materializer. It needs git to
 # materialize review refs and tar to create / extract workspace snapshots.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        git \
-        tar \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates git tar
 
 WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /prod ./
-# The service validates runner results against the canonical contract schemas, which it
+# The service validates execution results against the canonical contract schemas, which it
 # must carry itself (compose supplies `contracts/` only as a build context, not a runtime
 # mount). Copy the integration-contract family and let the runtime pick the version directory
-# itself, via `CONTRACT_VERSION_DIR` in `src/runner/contract-version.ts`. Naming the version
+# itself, via `CONTRACT_VERSION_DIR` in `src/execution/contract-version.ts`. Naming the version
 # here instead is what let a v5 -> v6 bump leave the image pointing at stale schemas; the image
 # now carries no version literal to fall out of sync. The path lands on the resolver's primary
 # candidate (`<cwd>/contracts/integration-contract/<version>/schemas`, with cwd `/app`) rather

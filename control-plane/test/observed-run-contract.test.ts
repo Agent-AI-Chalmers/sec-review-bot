@@ -195,7 +195,7 @@ function recordWith(
     failure_message: null,
     artifact_storage: artifactStorage,
     notices: [],
-    runner_input: { must: 'not leak' },
+    execution_input: { must: 'not leak' },
     publish_context: { repository: 'octo/example' }
   } as ReviewRunRecord
 }
@@ -227,7 +227,7 @@ test('the redacted read never carries a field the observed schema does not decla
   // The connector-owned record fields are the ones that must not survive redaction.
   for (const dropped of [
     'publish_context',
-    'runner_input',
+    'execution_input',
     'failure_message'
   ]) {
     assert.ok(

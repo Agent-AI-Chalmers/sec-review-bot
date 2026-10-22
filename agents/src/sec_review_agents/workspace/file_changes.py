@@ -10,23 +10,39 @@ import base64
 import stat
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 from sec_review_agents.workspace.paths import normalize_declared_file_path
 
-FILE_MODE_REGULAR = "100644"
-FILE_MODE_EXECUTABLE = "100755"
+type FileMode = Literal["100644", "100755"]
+type ContentEncoding = Literal["utf-8", "base64"]
+
+FILE_MODE_REGULAR: FileMode = "100644"
+FILE_MODE_EXECUTABLE: FileMode = "100755"
 
 
-class FileChange(TypedDict, total=False):
-    path: str
-    status: str
+class EncodedFileContent(TypedDict):
     content: str
-    content_encoding: str
-    mode: str
+    content_encoding: ContentEncoding
 
 
-def encode_file_content(content_buffer: bytes) -> dict[str, str]:
+class DeletedFileChange(TypedDict):
+    path: str
+    status: Literal["deleted"]
+
+
+class UpsertFileChange(TypedDict):
+    path: str
+    status: Literal["upsert"]
+    content: str
+    content_encoding: ContentEncoding
+    mode: NotRequired[FileMode]
+
+
+type FileChange = DeletedFileChange | UpsertFileChange
+
+
+def encode_file_content(content_buffer: bytes) -> EncodedFileContent:
     if b"\x00" not in content_buffer:
         try:
             return {
@@ -42,7 +58,7 @@ def encode_file_content(content_buffer: bytes) -> dict[str, str]:
     }
 
 
-def git_blob_mode(path: Path) -> str:
+def git_blob_mode(path: Path) -> FileMode:
     executable_bits = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
     if path.stat().st_mode & executable_bits:
         return FILE_MODE_EXECUTABLE

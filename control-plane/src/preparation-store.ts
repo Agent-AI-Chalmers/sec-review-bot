@@ -366,7 +366,7 @@ export class PreparationStore {
    *
    * Throws `ExpiryUnreconcilableError` when the execution axis has moved past `pending`: that is
    * the case a preparation conclusion can no longer explain, because the input did reach the
-   * Runner after all. Writing the "execution never ran" conclusion then would overwrite a real
+   * Execution after all. Writing the "execution never ran" conclusion then would overwrite a real
    * result, so the caller rolls this row back and disconnects it for an operator instead. */
   private async concludeExpiry(
     client: PoolClient,
@@ -497,10 +497,10 @@ export class PreparationStore {
           return { retry_scheduled: true }
         }
       }
-      // Whether execution is "uncertain" or "skipped" depends on whether the Runner may have
+      // Whether execution is "uncertain" or "skipped" depends on whether the Execution may have
       // been reached. An uncertain submission may have been accepted but unconfirmed, so
       // execution is `uncertain` (a recovery replays it) — not a failure. Any other terminal
-      // preparation failure means the Runner was never called, so execution is `skipped`.
+      // preparation failure means the Execution was never called, so execution is `skipped`.
       // Matching the shared constant keeps this in step with the submission paths that stamp it.
       const submissionUncertain = error.code === SUBMISSION_STATE_UNCERTAIN
       // Close the preparation row first. This UPDATE is also the claim check: it only matches
@@ -558,7 +558,7 @@ export class PreparationStore {
       // No notice on the uncertain path. The outcome there is unknown, not failed, so telling the
       // requester "this never started" would state a conclusion the replay may contradict — and a
       // posted comment cannot be taken back. The notice is created by `failSubmissionRecovery`
-      // instead, in the transaction that turns that uncertainty into a real failure (the Runner
+      // instead, in the transaction that turns that uncertainty into a real failure (the Execution
       // rejected the replay, or the replay budget ran out). Entering a failure stage below is
       // therefore limited to the branch that skipped execution outright.
       const preparationEventId = await appendEvent(client, {

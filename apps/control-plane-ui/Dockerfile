@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS builder
+FROM node:24-alpine AS builder
 
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
@@ -13,7 +13,7 @@ COPY . ./
 RUN pnpm run build
 RUN pnpm deploy --filter . --prod /app/prod
 
-FROM node:24-bookworm-slim
+FROM node:24-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist-server ./dist-server

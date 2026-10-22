@@ -3,14 +3,14 @@ import os
 from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict
+from typing import Any, TypedDict
 
 from temporalio import activity, workflow
 
 from sec_review_agents.delivery_stages.model import DeliveryCaseInput
 from sec_review_agents.memory.extraction_workflow import (
-    MemoryExtractionRegistrationRequest,
-    register_memory_extraction,
+    TranscriptBundlePublicationRequest,
+    publish_and_start_memory_extractions,
 )
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
@@ -19,7 +19,7 @@ from sec_review_agents.review_stages.feedback_loop import (
 )
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.scan_stages.triage.result import TriageResult
 from sec_review_agents.temporal.support import (
@@ -45,8 +45,7 @@ class RepositoryCaseReviewRequest(TypedDict):
     cases_artifacts_path: str
     published_transcripts_path: str
     timeout_seconds: int
-    runtime_context: RunnerRuntimeContext
-    memory_extraction_registration_enabled: NotRequired[bool]
+    runtime_context: ExecutionRuntimeContext
 
 
 class RepositoryCaseRequestBatch(TypedDict):
@@ -324,9 +323,6 @@ def prepare_repository_case_review_inputs_activity(
                 ),
                 "timeout_seconds": timeout_seconds,
                 "runtime_context": request.runtime_context,
-                "memory_extraction_registration_enabled": (
-                    request.memory_extraction_registration_enabled
-                ),
             }
             for index, case in enumerate(all_cases, start=1)
         ],
@@ -363,7 +359,7 @@ def prepare_repository_case_activity(
 @activity.defn
 async def analyze_repository_case_activity(
     prepared_case: dict[str, Any],
-    runtime_context: RunnerRuntimeContext,
+    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.utils.paths import artifact_path
@@ -435,7 +431,7 @@ async def mitigate_repository_case_activity(
     prepared_case: dict[str, Any],
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None,
-    runtime_context: RunnerRuntimeContext,
+    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
@@ -491,7 +487,7 @@ async def verify_repository_case_activity(
     analysis_result: Mapping[str, Any],
     mitigation_result: dict[str, Any] | None,
     retry_context: Mapping[str, Any] | None,
-    runtime_context: RunnerRuntimeContext,
+    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
@@ -799,7 +795,7 @@ def build_repository_review_result_activity(
     case_results: Sequence[Mapping[str, Any]],
     delivery_result: Mapping[str, Any],
 ) -> dict[str, Any]:
-    from sec_review_agents.utils.files import persist_json
+    from sec_review_agents.utils.files import persist_json_artifact
     from sec_review_agents.utils.paths import required_path
     from sec_review_agents.workflows.repository.result import (
         build_repository_workflow_result,
@@ -814,9 +810,9 @@ def build_repository_review_result_activity(
         delivery_result=delivery_result,
         case_results=case_results,
     )
-    persist_json(
+    persist_json_artifact(
         run_artifacts_root,
-        "repository-review-result.json",
+        "repository-review-result",
         workflow_result,
     )
     return workflow_result
@@ -1041,19 +1037,6 @@ class RepositoryCaseReviewWorkflow:
             schedule_to_close_timeout=activity_timeout,
             retry_policy=retry_policy,
         )
-        case_id = _repository_case_id_from_request(request)
-        if request.get("memory_extraction_registration_enabled", True):
-            await register_memory_extraction(
-                MemoryExtractionRegistrationRequest(
-                    job_id=f"repository-review-{request['run_id']}-{case_id}",
-                    source_workflow="repository-review",
-                    run_id=request["run_id"],
-                    artifact_root_path=str(
-                        Path(request["cases_artifacts_path"]) / case_id
-                    ),
-                    timeout_seconds=request["timeout_seconds"],
-                )
-            )
         return result
 
 
@@ -1238,7 +1221,37 @@ class RepositoryReviewWorkflow:
             delivery_result,
             timeout_seconds=request.timeout_seconds,
         )
-        return {"ok": True, "result": result}
+        artifact_root = Path(str(request.prepared_input["artifact_root_path"]))
+        review_units = [
+            {
+                "review_unit_id": str(case_result["case_id"]),
+                "transcript_root": str(
+                    artifact_root
+                    / "cases"
+                    / str(case_result["case_id"])
+                    / "transcripts"
+                ),
+            }
+            for case_result in case_results
+            if isinstance(case_result.get("case_id"), str)
+        ]
+        memory_processing: dict[str, Any] | None = None
+        if review_units:
+            memory_processing = await publish_and_start_memory_extractions(
+                TranscriptBundlePublicationRequest(
+                    run_id=request.run_id,
+                    artifact_root_path=str(artifact_root),
+                    review_units=review_units,
+                    timeout_seconds=request.timeout_seconds,
+                ),
+                source_workflow=request.workflow,
+                start_extractions=request.memory_extraction_enabled,
+            )
+        return {
+            "ok": True,
+            "result": result,
+            "memory_processing": memory_processing,
+        }
 
 
 def _repository_case_workflow_id(

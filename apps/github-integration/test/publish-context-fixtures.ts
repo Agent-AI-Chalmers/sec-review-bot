@@ -1,4 +1,4 @@
-import type { WorkflowName } from '../src/runner/shapes.js'
+import type { WorkflowName } from '../src/execution/shapes.js'
 import type { PublishContext } from '../src/control-plane/publish-context.js'
 
 export function publishContextForWorkflow(

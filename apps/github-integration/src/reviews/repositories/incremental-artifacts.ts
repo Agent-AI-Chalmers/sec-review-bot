@@ -4,7 +4,7 @@ import path from 'path'
 import type { Octokit } from 'octokit'
 
 import { exportWorkspaceWindow } from '../../artifacts/git-workspace.js'
-import type { RepositoryScanScope } from '../../runner/input.js'
+import type { RepositoryScanScope } from '../../execution/input.js'
 import type { RepositoryContext } from './submit.js'
 
 /**
@@ -12,7 +12,7 @@ import type { RepositoryContext } from './submit.js'
  *
  * The three identity fields are the contract's, and their type comes from the schema through
  * `RepositoryScanScope`, so `status` cannot drift to a value the scan scope does not accept. The
- * line counts are artifact-only: the runner's scan scope does not carry them.
+ * line counts are artifact-only: the execution scan scope does not carry them.
  */
 export type ChangedFileRecord =
   RepositoryScanScope['incremental_changed_files'][number] & {

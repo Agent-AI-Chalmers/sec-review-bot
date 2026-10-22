@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION } from '../../runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../execution/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -13,9 +13,9 @@ import type {
   InputBundleArtifactRef,
   PullRequestReviewInput,
   PullRequestReviewSubject
-} from '../../runner/input.js'
-import type { TestChangesPolicy } from '../../runner/input.js'
-import { MAX_PR_COMMIT_SHAS } from '../../runner/input.js'
+} from '../../execution/input.js'
+import type { TestChangesPolicy } from '../../execution/input.js'
+import { MAX_PR_COMMIT_SHAS } from '../../execution/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import {
   exportWorkspaceWindow,
@@ -261,7 +261,7 @@ async function materializeHistoryArtifacts({
   await fs.writeFile(
     path.join(history_path, 'pr-metadata.json'),
     // The agent gets the window and the commit list only. Identity fields stay
-    // in the runner input: an agent reading a full identity record spends
+    // in the execution input: an agent reading a full identity record spends
     // context on values it cannot act on, and every extra range-shaped field is
     // another candidate for what the review boundary is.
     JSON.stringify(

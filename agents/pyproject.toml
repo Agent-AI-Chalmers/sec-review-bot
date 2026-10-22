@@ -7,7 +7,6 @@ license = "Apache-2.0"
 requires-python = ">=3.14"
 dependencies = [
   "deepagents>=0.7.9",
-  "fastapi>=0.141.1",
   "langfuse>=4.14.0",
   "langchain>=1.3.13",
   "langchain-core>=1.2.28",
@@ -22,14 +21,12 @@ dependencies = [
   "cvss>=3.4",
   "structlog>=26.1.0",
   "temporalio>=1.30.0",
-  "uvicorn>=0.52.0",
   "boto3>=1.40.0",
   "yamlcore>=0.0.4",
 ]
 
 [dependency-groups]
 test = [
-  "httpx2>=2.9.1",
   "pytest>=9.0.0",
   "pytest-asyncio>=1.3.0",
   "pytest-timeout>=2.4.0",
@@ -43,6 +40,7 @@ typecheck = [
   "mypy>=2.2.0",
   "pyright>=1.1.411",
   "types-PyYAML>=6.0.0",
+  "types-jsonschema>=4.26.0.20250516",
 ]
 dev = [
   { include-group = "test" },
@@ -51,8 +49,7 @@ dev = [
 ]
 
 [project.scripts]
-sec-review-agents-service = "sec_review_agents.entrypoints.service.app:main"
-sec-review-agents-worker = "sec_review_agents.entrypoints.service.worker:main"
+sec-review-agents-execution-worker = "sec_review_agents.entrypoints.execution_worker.main:main"
 sec-review-agents-check-llm-deployments = "sec_review_agents.cli.check_llm_deployments:main"
 sec-review-agents-run-local-issue = "sec_review_agents.cli.run_local_issue:main"
 sec-review-agents-run-local-pr = "sec_review_agents.cli.run_local_pr:main"

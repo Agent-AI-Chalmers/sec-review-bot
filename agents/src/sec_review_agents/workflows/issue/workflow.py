@@ -5,8 +5,8 @@ from temporalio import activity, workflow
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.memory.extraction_workflow import (
-    MemoryExtractionRegistrationRequest,
-    register_memory_extraction,
+    TranscriptBundlePublicationRequest,
+    publish_and_start_memory_extractions,
 )
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
@@ -14,7 +14,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     should_retry_from_verifier_result,
 )
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
@@ -29,7 +29,7 @@ from sec_review_agents.workflows.review_intent import (
 @activity.defn
 async def analyze_issue_activity(
     prepared_input: dict[str, Any],
-    runtime_context: RunnerRuntimeContext,
+    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
@@ -78,7 +78,7 @@ async def mitigate_issue_activity(
     prepared_input: dict[str, Any],
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None,
-    runtime_context: RunnerRuntimeContext,
+    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.mitigation.stage import (
@@ -152,7 +152,7 @@ async def verify_issue_activity(
     analysis_result: Mapping[str, Any],
     mitigation_result: Mapping[str, Any] | None,
     retry_context: Mapping[str, Any] | None,
-    runtime_context: RunnerRuntimeContext,
+    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.verification.stage import (
@@ -335,22 +335,30 @@ class IssueReviewWorkflow:
             verifier_result,
             timeout_seconds=request.timeout_seconds,
         )
-        if request.memory_extraction_registration_enabled:
-            await register_memory_extraction(
-                MemoryExtractionRegistrationRequest(
-                    job_id=f"{request.workflow}-{request.run_id}",
-                    source_workflow=request.workflow,
-                    run_id=request.run_id,
-                    artifact_root_path=str(
-                        required_path(
-                            request.prepared_input.get("artifact_root_path"),
-                            label="artifact_root_path",
-                        )
-                    ),
-                    timeout_seconds=request.timeout_seconds,
-                )
-            )
-        return {"ok": True, "result": result}
+        artifact_root = required_path(
+            request.prepared_input.get("artifact_root_path"),
+            label="artifact_root_path",
+        )
+        memory_processing = await publish_and_start_memory_extractions(
+            TranscriptBundlePublicationRequest(
+                run_id=request.run_id,
+                artifact_root_path=str(artifact_root),
+                review_units=[
+                    {
+                        "review_unit_id": "review",
+                        "transcript_root": str(artifact_root / "transcripts"),
+                    }
+                ],
+                timeout_seconds=request.timeout_seconds,
+            ),
+            source_workflow=request.workflow,
+            start_extractions=request.memory_extraction_enabled,
+        )
+        return {
+            "ok": True,
+            "result": result,
+            "memory_processing": memory_processing,
+        }
 
 
 __all__ = [

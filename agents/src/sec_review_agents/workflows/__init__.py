@@ -1,1 +1,1 @@
-"""Runner workflow orchestration entrypoints."""
+"""Execution Worker workflow orchestration entrypoints."""

@@ -2,15 +2,15 @@
 
 Language: English | [中文](README.zh.md)
 
-This family is the supported public integration point between the Runner and its callers. It has two layers:
+This family is the supported public integration point between the Execution and its callers. It has two layers:
 
-1. Production transport: the HTTP Agent Runner Service.
-2. Data contract: runner inputs, workflow results, `ReviewRecord`, and repository
+1. Production transport: the HTTP Execution API.
+2. Data contract: execution inputs, workflow results, `ReviewRecord`, and repository
    `deliveries[]`.
 
 Use these documents:
 
-- [openapi.json](openapi.json): how callers create and poll workflow runs — paths, status
+- [openapi.yaml](openapi.yaml): how callers create and poll workflow runs — paths, status
   codes, request and response shapes, and the security scheme.
 - [v6/CONTRACT.md](v6/CONTRACT.md): workflow input and result shapes.
 - [v6/schemas](v6/schemas): JSON Schemas for machine validation.
@@ -23,10 +23,10 @@ The HTTP API and the workflow contract are the stable public interface.
 
 Callers can rely on:
 
-- the runner HTTP API;
+- the Execution API;
 - public workflow names accepted by the HTTP API;
-- runner input and public workflow result shapes for the current `contract_version`;
-- structured runner success and error response bodies.
+- execution input and public workflow result shapes for the current `contract_version`;
+- structured Execution API success and error response bodies.
 
 The following are not stable public APIs:
 
@@ -53,24 +53,26 @@ Agents are responsible for:
   `deliveries[]`;
 - saving stage artifacts.
 
-The GitHub integration is one implementation of the caller side: it turns GitHub events and publishing rules into runner inputs and result publication.
+The GitHub integration is one implementation of the caller side: it turns GitHub events and publishing rules into execution inputs and result publication.
 
-This split is also a security boundary. GitHub identity, permissions, API calls, publishing, retry, and audit behavior stay on the caller side. Agents operate inside the runner contract and do not directly control GitHub platform capabilities.
+This split is also a security boundary. GitHub identity, permissions, API calls, publishing, retry, and audit behavior stay on the caller side. Agents operate inside the execution contract and do not directly control GitHub platform capabilities.
 
-## Generated Specification
+## HTTP Source Of Truth
 
-[openapi.json](openapi.json) is the runner service's OpenAPI document, generated from its code. The service also serves it at `/openapi.json` and a readable view at `/docs`; both are deliberately reachable without the service token, because an API description carries no run data or credentials.
+[openapi.yaml](openapi.yaml) is the hand-maintained single source of truth for the Execution API HTTP boundary. It is not generated from service code. The current TypeScript provider, Execution Gateway, mounts routes and validation from it, and the contract tools generate provider and consumer types from it.
 
-## Runner Error Codes
+The generated TypeScript projection composes that HTTP envelope with the explicitly selected v6 workflow input schemas. This gives the provider a compile-time `workflow`-to-`input` relationship without introducing a shared runtime package or a repository-wide "current schema" selector. Each provider or consumer remains responsible for declaring which version it supports.
 
-These are the stable machine-readable codes a caller may branch on. The set is open: a failure the service cannot classify yet arrives as `RUNNER_EXECUTION_FAILED`, and new codes are added rather than reusing an existing one for a different meaning.
+## Execution Error Codes
 
-- `RUNNER_REQUEST_INVALID`
-- `RUNNER_WORKFLOW_UNSUPPORTED`
-- `RUNNER_RUN_CONFLICT`
-- `RUNNER_RUN_NOT_FOUND`
-- `RUNNER_RESPONSE_INVALID`
-- `RUNNER_EXECUTION_FAILED`
+These are the stable machine-readable codes a caller may branch on. The set is open: a failure the service cannot classify yet arrives as `EXECUTION_FAILED`, and new codes are added rather than reusing an existing one for a different meaning.
+
+- `EXECUTION_REQUEST_INVALID`
+- `EXECUTION_WORKFLOW_UNSUPPORTED`
+- `EXECUTION_RUN_CONFLICT`
+- `EXECUTION_RUN_NOT_FOUND`
+- `EXECUTION_RESPONSE_INVALID`
+- `EXECUTION_FAILED`
 
 ## Compatibility Rules
 
@@ -87,7 +89,7 @@ non-breaking extension.
 
 ## Enforcement
 
-The schema files are the executable structural form of the specification. The current version uses [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12). The Python Runner enforces input and result schemas with [jsonschema](https://python-jsonschema.readthedocs.io/), and the TypeScript integration independently enforces them with [Ajv](https://ajv.js.org/). Both packages also execute the shared fixtures in tests.
+The schema files are the executable structural form of the specification. The current version uses [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12). The Python Execution enforces input and result schemas with [jsonschema](https://python-jsonschema.readthedocs.io/), and the TypeScript integration independently enforces them with [Ajv](https://ajv.js.org/). Both packages also execute the shared fixtures in tests.
 
 The agents wheel includes a build-time copy of the canonical schemas as package data, so installed Python tools do not depend on the repository-level `contracts/` path at runtime.
 

@@ -12,9 +12,9 @@ import {
   recoverReviewRunSubmission,
   ReviewRunStore,
   submitPreparedRun,
-  type RunnerArtifactStorage
+  type ExecutionArtifactStorage
 } from '../../src/index.js'
-import { RunnerSubmissionUncertainError } from '../../src/runner-client.js'
+import { ExecutionSubmissionUncertainError } from '../../src/execution-client.js'
 
 const connectionString =
   process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -64,7 +64,7 @@ async function createSuccessfulRun(
 ): Promise<string> {
   await createQueuedRun(store, runId)
   assert.strictEqual(
-    await store.recordRunnerSuccess(
+    await store.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }
@@ -95,7 +95,7 @@ test('ReviewRunStore prevents cross-connector access to a globally unique run id
     assert.strictEqual((await first.listActiveRuns()).runs.length, 1)
     assert.strictEqual((await second.listActiveRuns()).runs.length, 0)
     assert.strictEqual(await first.claimPublication(runId), null)
-    await first.recordRunnerSuccess(
+    await first.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }
@@ -117,7 +117,7 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
   const store = await createStore()
   try {
     const queuedId = await createQueuedRun(store)
-    const artifactStorage: RunnerArtifactStorage = {
+    const artifactStorage: ExecutionArtifactStorage = {
       status: 'available',
       artifact: {
         kind: 'diagnostic_bundle',
@@ -177,7 +177,7 @@ test('execution.started_at marks the instant execution began and does not move a
   }
 })
 
-test('runner termination events name the state they came from', async () => {
+test('execution termination events name the state they came from', async () => {
   const store = await createStore()
   try {
     // running -> succeeded must record from_status 'running', not null. `null` is reserved for
@@ -186,7 +186,7 @@ test('runner termination events name the state they came from', async () => {
     const succeededId = await createQueuedRun(store)
     await store.markRunning(succeededId)
     assert.strictEqual(
-      await store.recordRunnerSuccess(
+      await store.recordExecutionSuccess(
         succeededId,
         { run_id: succeededId },
         undefined
@@ -209,8 +209,8 @@ test('runner termination events name the state they came from', async () => {
     // queued -> failed likewise records the real origin.
     const failedId = await createQueuedRun(store)
     assert.strictEqual(
-      await store.failRunnerExecution(failedId, {
-        code: 'RUNNER_EXECUTION_FAILED',
+      await store.failExecution(failedId, {
+        code: 'EXECUTION_FAILED',
         message: 'boom'
       }),
       true
@@ -235,7 +235,7 @@ test('the coordination event log records each transition once, oldest first', as
   const store = await createStore()
   try {
     const runId = await createQueuedRun(store)
-    // At least the admission (runner pending, preparation preparing, publication pending)
+    // At least the admission (execution pending, preparation preparing, publication pending)
     // and the pending->queued + preparing->submitted transitions must be present.
     const events = await store.listEvents(runId)
     const axes = events.map((event) => `${event.axis}:${event.to_status}`)
@@ -320,10 +320,10 @@ test('heartbeats do not refresh an expired recovery lease', async () => {
           input: {}
         },
         async () => {
-          throw new RunnerSubmissionUncertainError('response lost')
+          throw new ExecutionSubmissionUncertainError('response lost')
         }
       ),
-      RunnerSubmissionUncertainError
+      ExecutionSubmissionUncertainError
     )
     const first = await store.claimSubmissionRecovery(runId)
     assert.ok(first)
@@ -378,10 +378,10 @@ test('an observation heartbeat never extends the recovery lease', async () => {
           input: {}
         },
         async () => {
-          throw new RunnerSubmissionUncertainError('response lost')
+          throw new ExecutionSubmissionUncertainError('response lost')
         }
       ),
-      RunnerSubmissionUncertainError
+      ExecutionSubmissionUncertainError
     )
     assert.strictEqual(
       (await store.getRun(runId))?.execution.status,
@@ -997,7 +997,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
     )
     const recovered = await store.getRun(runId)
     assert.strictEqual(recovered?.execution.status, 'queued')
-    // An accepted replay proves the Runner did take the submission, so the execution phase
+    // An accepted replay proves the Execution did take the submission, so the execution phase
     // began then. `uncertain` deliberately left `started_at` NULL (acceptance was unknown);
     // resolving it without filling the start would leave a `queued` run with no beginning,
     // which no other path can produce and which silently breaks phase timing.
@@ -1039,12 +1039,12 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
           input
         },
         async () => {
-          throw new RunnerSubmissionUncertainError('response lost')
+          throw new ExecutionSubmissionUncertainError('response lost')
         }
       ),
-      RunnerSubmissionUncertainError
+      ExecutionSubmissionUncertainError
     )
-    // An uncertain submission may have reached the Runner, so execution is `uncertain` (a
+    // An uncertain submission may have reached the Execution, so execution is `uncertain` (a
     // later recovery replays it) rather than skipped or failed.
     assert.strictEqual(
       (await owner.getRun(runId))?.execution.status,
@@ -1068,7 +1068,7 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
           }
         })
       },
-      async readRunnerStatuses() {
+      async readExecutionStatuses() {
         return { runs: [], missing: [], byRunId: new Map() }
       },
       async observeActiveRun() {},
@@ -1554,20 +1554,20 @@ test('a reconciliation that finds the side effect completes an exhausted step', 
   }
 })
 
-test('ReviewRunStore records Runner execution failure without publication failure', async () => {
+test('ReviewRunStore records execution failure without publication failure', async () => {
   const store = await createStore()
   const runId = await createQueuedRun(store)
   try {
     assert.strictEqual(
-      await store.failRunnerExecution(runId, {
-        code: 'RUNNER_EXECUTION_FAILED',
+      await store.failExecution(runId, {
+        code: 'EXECUTION_FAILED',
         message: 'Agent execution failed.'
       }),
       true
     )
     const record = await store.getRun(runId)
     assert.strictEqual(record?.execution.status, 'failed')
-    assert.strictEqual(record?.failure_code, 'RUNNER_EXECUTION_FAILED')
+    assert.strictEqual(record?.failure_code, 'EXECUTION_FAILED')
     assert.strictEqual(await store.claimPublication(runId), null)
 
     // An execution failure ends the run, so the requester has to be told. The notice names the
@@ -1577,7 +1577,7 @@ test('ReviewRunStore records Runner execution failure without publication failur
     assert.notStrictEqual(notice, null)
     assert.strictEqual(notice?.run_id, runId)
     assert.strictEqual(notice?.axis, 'execution')
-    assert.strictEqual(notice?.reason_code, 'RUNNER_EXECUTION_FAILED')
+    assert.strictEqual(notice?.reason_code, 'EXECUTION_FAILED')
     assert.strictEqual(
       await store.completeRunNotice(
         notice?.notice_id ?? '',
@@ -1599,8 +1599,8 @@ test('ReviewRunStore stores the comment a delivered notice points at', async () 
     'https://github.com/example/example/issues/1#issuecomment-99'
   try {
     assert.strictEqual(
-      await store.failRunnerExecution(runId, {
-        code: 'RUNNER_EXECUTION_FAILED',
+      await store.failExecution(runId, {
+        code: 'EXECUTION_FAILED',
         message: 'Agent execution failed.'
       }),
       true
@@ -1638,8 +1638,8 @@ test('ReviewRunStore records an undeliverable notice as failed, not skipped', as
   const runId = await createQueuedRun(store)
   try {
     assert.strictEqual(
-      await store.failRunnerExecution(runId, {
-        code: 'RUNNER_EXECUTION_FAILED',
+      await store.failExecution(runId, {
+        code: 'EXECUTION_FAILED',
         message: 'Agent execution failed.'
       }),
       true
@@ -1707,8 +1707,8 @@ test('every terminal path that concludes a run queues a failure notice', async (
     // execution failure
     const executionRun = await createQueuedRun(store)
     assert.strictEqual(
-      await store.failRunnerExecution(executionRun, {
-        code: 'RUNNER_EXECUTION_FAILED',
+      await store.failExecution(executionRun, {
+        code: 'EXECUTION_FAILED',
         message: 'boom'
       }),
       true
@@ -1823,7 +1823,7 @@ test('abandoning a blocked run concludes an execution that is still in flight', 
       assert.strictEqual(abandoned.publication.status, 'skipped')
       // Nothing can move it afterwards, whichever way it was concluded.
       assert.strictEqual(
-        await store.recordRunnerSuccess(
+        await store.recordExecutionSuccess(
           runId,
           { run_id: runId },
           { status: 'unavailable' }
@@ -2033,7 +2033,7 @@ test('ReviewRunStore reports a changed publication step set as deterministic', a
 })
 
 test('claimNextPublication returns the persisted result, context, and artifact', async () => {
-  // `claimNextPublication` hands the publisher everything it needs to publish: the Runner's
+  // `claimNextPublication` hands the publisher everything it needs to publish: the Execution's
   // opaque result, the publish context, and the artifact reference, alongside the claim
   // token. `claimPublication` (covered above) only returns a token, so this is the shape a
   // publisher actually receives and must match what was persisted.
@@ -2052,7 +2052,7 @@ test('claimNextPublication returns the persisted result, context, and artifact',
     review_record: { analysis: { verdict: 'no-findings' } }
   }
   assert.strictEqual(
-    await store.recordRunnerSuccess(runId, workflowResult, {
+    await store.recordExecutionSuccess(runId, workflowResult, {
       status: 'unavailable'
     }),
     true
@@ -2177,7 +2177,7 @@ test('the write path refuses an artifact storage value the contract forbids', as
       )
     )
     await assert.rejects(
-      store.recordRunnerSuccess(
+      store.recordExecutionSuccess(
         runId,
         { run_id: runId },
         { status: 'available' }
@@ -2185,7 +2185,7 @@ test('the write path refuses an artifact storage value the contract forbids', as
       /without its artifact reference/
     )
     await assert.rejects(
-      store.failRunnerExecution(
+      store.failExecution(
         runId,
         { message: 'failed' },
         { status: 'available' }
@@ -2212,8 +2212,8 @@ test('every publication transition writes exactly one audit event', async () => 
     // Terminal execution failure skips publication.
     const failedRun = await createQueuedRun(store)
     assert.strictEqual(
-      await store.failRunnerExecution(failedRun, {
-        code: 'RUNNER_EXECUTION_FAILED',
+      await store.failExecution(failedRun, {
+        code: 'EXECUTION_FAILED',
         message: 'boom'
       }),
       true
@@ -2342,7 +2342,7 @@ test('each lifecycle axis records an immutable start and end', async () => {
 
     // Execution ends on the terminal result; publication has not started, so it has no start.
     assert.strictEqual(
-      await store.recordRunnerSuccess(
+      await store.recordExecutionSuccess(
         runId,
         { run_id: runId },
         { status: 'unavailable' }
@@ -2602,8 +2602,8 @@ test('a terminal execution failure converges an in-flight publication', async ()
       await pool.end()
     }
     assert.strictEqual(
-      await store.failRunnerExecution(runId, {
-        code: 'RUNNER_LOST',
+      await store.failExecution(runId, {
+        code: 'EXECUTION_LOST',
         message: 'expected output'
       }),
       true
@@ -3060,7 +3060,7 @@ test('reclaiming a running publication step records that another attempt started
 test('an unreconcilable expiry blocks one run instead of aborting the pass forever', async () => {
   // A run whose execution already reached a terminal state while its preparation still holds an
   // expired `preparing` lease cannot be concluded: a preparation failure would have to overwrite
-  // a real Runner result. The old behaviour threw from inside the shared expiry transaction, and
+  // a real Execution result. The old behaviour threw from inside the shared expiry transaction, and
   // because coordination expires preparations *first*, every pass rolled back before recovering
   // submissions or observing active runs. One corrupt run therefore starved every other run, on
   // every tick, with the same error. This pins the fix: the bad run is marked and skipped, the
@@ -3185,7 +3185,7 @@ test('a blocked expiry does not stop the rest of the coordination pass', async (
     const observed: string[] = []
     await coordinateReviewRunsOnce(store, {
       async recoverSubmission() {},
-      async readRunnerStatuses() {
+      async readExecutionStatuses() {
         return { runs: [], missing: [], byRunId: new Map() }
       },
       async observeActiveRun(run) {
@@ -3216,7 +3216,7 @@ test('a blocked expiry does not stop the rest of the coordination pass', async (
 test('abandoning a disconnected run concludes its open axes and keeps the execution evidence', async () => {
   // The operator path for a disconnected run. It is an abandonment, not a repair: the open axes are
   // concluded so the run stops holding work nobody can conclude, while the execution axis keeps
-  // the result the Runner actually produced. Nothing is deleted, and the ingress identity stays,
+  // the result the Execution actually produced. Nothing is deleted, and the ingress identity stays,
   // so a replay of the same webhook resolves to this run instead of starting a second one.
   const store = await createStore({ claimTimeoutMs: 0 })
   const pool = new Pool({ connectionString: requireTestDatabase() })
@@ -3474,7 +3474,7 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
 
 test('giving up on a disconnected execution stops waiting without claiming it never ran', async () => {
   // The decision this covers is "we will not wait for this outcome", not "the task never ran".
-  // The Runner may have accepted and be executing the task right now, so the failure code has to
+  // The Execution may have accepted and be executing the task right now, so the failure code has to
   // name the decision, and publication must be skipped for "no result to deliver" rather than
   // for "nothing was produced".
   const store = await createStore()
@@ -4145,9 +4145,9 @@ test('an execution failure and an in-flight step commit converge on one outcome'
             url: 'https://example.test/comment'
           })
         const failExecution = async (): Promise<boolean> =>
-          await store.failRunnerExecution(runId, {
-            code: 'RUNNER_EXECUTION_FAILED',
-            message: 'the runner concluded the task failed'
+          await store.failExecution(runId, {
+            code: 'EXECUTION_FAILED',
+            message: 'execution concluded the task failed'
           })
 
         if (executorFirst) {
@@ -4402,8 +4402,8 @@ test('a rejected replay announces the failure that actually happened', async () 
     assert.ok(recoveryToken)
     assert.strictEqual(
       await store.failSubmissionRecovery(runId, recoveryToken, {
-        code: 'RUNNER_REJECTED',
-        message: 'the Runner refused the replayed submission'
+        code: 'EXECUTION_REJECTED',
+        message: 'the Execution refused the replayed submission'
       }),
       true
     )
@@ -4417,7 +4417,7 @@ test('a rejected replay announces the failure that actually happened', async () 
         kind: 'failure',
         axis: 'execution',
         status: 'pending',
-        reason_code: 'RUNNER_REJECTED',
+        reason_code: 'EXECUTION_REJECTED',
         comment_url: null
       }
     ])

@@ -1,0 +1,37 @@
+import { CONTRACT_VERSION } from './contract-version.js'
+import fs from 'fs/promises'
+import path from 'path'
+
+import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../artifacts/git-workspace.js'
+import { assertInputBundleManifest } from './contract-schema.js'
+
+export const INPUT_BUNDLE_MANIFEST_NAME = 'manifest.json'
+
+export async function writeInputBundleManifest({
+  input_bundle_root,
+  include_incremental_window
+}: {
+  input_bundle_root: string
+  include_incremental_window: boolean
+}): Promise<void> {
+  const manifest: Record<string, unknown> = {
+    contract_version: CONTRACT_VERSION,
+    workspace: {
+      snapshot: WORKSPACE_SNAPSHOT_TAR_NAME
+    },
+    history: {
+      path: 'history'
+    }
+  }
+  if (include_incremental_window) {
+    manifest.incremental_window = {
+      path: 'incremental-window'
+    }
+  }
+  assertInputBundleManifest(manifest)
+  await fs.writeFile(
+    path.join(input_bundle_root, INPUT_BUNDLE_MANIFEST_NAME),
+    JSON.stringify(manifest, null, 2),
+    'utf8'
+  )
+}

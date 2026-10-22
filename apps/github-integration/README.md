@@ -41,7 +41,7 @@ pnpm run test:integration
 
 ## Local Receiver
 
-A complete review also needs the runner service and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub integration service.
+A complete review also needs the execution gateway and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub integration service.
 
 For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `CONTROL_PLANE_SERVICE_URL`, and `CONTROL_PLANE_SERVICE_TOKEN`.
 
@@ -102,7 +102,7 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
 - `github/` - thin GitHub API wrappers and webhook helpers
 - `control-plane/` - Control Plane client, claim handling, and publication coordination
-- `runner/` - Runner input, result, and error contracts consumed by this connector
+- `execution/` - Execution input, result, and error contracts consumed by this connector
 - `artifacts/` - input bundle storage and Git workspace preparation
 - `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling
 - `triggers/` - turns webhook / Actions / comment requests into Control Plane review submissions
@@ -123,7 +123,7 @@ sec_review_bot:
   # - manual_only: automatic PR / issue events are ignored;
   #   only explicit comment commands from repository write+ users trigger reviews.
   # - automatic: dangerous mode. PR / issue events from any author trigger
-  #   reviews without maintainer approval and can spend runner / LLM resources.
+  #   reviews without maintainer approval and can spend Execution Worker / LLM resources.
   trigger_mode: manual_only
 
   # Optional repository discovery ignore patterns (glob)
@@ -137,7 +137,7 @@ sec_review_bot:
 Semantics:
 
 - `trigger_mode: manual_only`: automatic object events are received and skipped; only explicit comment commands from repository `write`, `maintain`, or `admin` users trigger workflows.
-- `trigger_mode: automatic`: dangerous mode. PR / issue events such as `pull_request.opened`, `pull_request.ready_for_review`, and `issues.opened` trigger workflows for any author, including users without repository write access. It can spend runner / LLM resources without maintainer approval.
+- `trigger_mode: automatic`: dangerous mode. PR / issue events such as `pull_request.opened`, `pull_request.ready_for_review`, and `issues.opened` trigger workflows for any author, including users without repository write access. It can spend Execution Worker / LLM resources without maintainer approval.
 
 Notes:
 
@@ -165,7 +165,7 @@ Issue and PR conversation comments share one command grammar. The flags below ar
 ```
 
 - `review`: triggers a review. The final patch, if any, may include reasonable test changes.
-- `--test-changes allow|deny`: whether the final mitigation patch may contain test changes. `deny` forbids test changes; tests may only be used as temporary validation work. With no flag the runner uses `allow`.
+- `--test-changes allow|deny`: whether the final mitigation patch may contain test changes. `deny` forbids test changes; tests may only be used as temporary validation work. With no flag the Execution Worker uses `allow`.
 - `--open-pr`: issue reviews only. Allows the run to open a draft pull request when the review produces a ready patch; without it the patch stays in the issue summary comment. Automatic `issues.opened` reviews never open a draft PR. On a PR comment this flag has no effect and is ignored, because a PR review does not create a branch or a new pull request.
 
 Flags are order-independent and may be combined. There is no objective argument: the GitHub integration always reviews in `audit` mode.

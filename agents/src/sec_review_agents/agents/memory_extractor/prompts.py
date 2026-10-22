@@ -13,7 +13,10 @@ def build_extractor_prompt(staged_transcripts: StagedTranscripts) -> str:
         [
             "### Transcript Inputs",
             "",
-            "The staged review transcripts are mounted at `/transcripts`.",
+            (
+                "The staged append-only JSONL review transcripts are mounted at "
+                "`/transcripts`."
+            ),
             "",
             "Read these transcript files in order:",
             "",

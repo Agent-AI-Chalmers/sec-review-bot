@@ -126,7 +126,7 @@ def test_local_direct_uses_materialized_artifact_root(
     assert request.prepared_input["artifact_root_path"] == str(
         bundle.artifact_root_path
     )
-    assert request.memory_extraction_registration_enabled is False
+    assert request.memory_extraction_enabled is False
 
 
 def test_local_direct_runs_review_only(
@@ -134,6 +134,9 @@ def test_local_direct_runs_review_only(
     monkeypatch,
 ) -> None:
     bundle = _prepared_issue_bundle(tmp_path)
+    transcripts = bundle.artifact_root_path / "transcripts"
+    transcripts.mkdir(parents=True)
+    (transcripts / "0001-analyzer-initial.jsonl").write_text("{}\n", encoding="utf-8")
     calls: list[str] = []
 
     async def fake_direct(request):
@@ -149,6 +152,9 @@ def test_local_direct_runs_review_only(
 
     assert result == {"ok": True}
     assert calls == ["direct:run-1"]
+    assert (
+        bundle.artifact_root_path / "published" / "review-transcripts.v1.tar.zst"
+    ).is_file()
 
 
 @pytest.mark.parametrize(

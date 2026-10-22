@@ -20,7 +20,7 @@ def test_validate_run_id_accepts_public_slug_shape(run_id: str) -> None:
 def test_validate_run_id_rejects_empty_value_as_missing() -> None:
     with pytest.raises(ValueError) as error:
         run_protocol.validate_run_id("")
-    assert str(error.value) == "Runner run request body is missing run_id."
+    assert str(error.value) == "Execution request body is missing run_id."
 
 
 @pytest.mark.parametrize(
@@ -45,7 +45,7 @@ def test_validate_run_id_rejects_path_like_or_noncanonical_values(
 
 
 def test_public_runner_workflow_allowlist() -> None:
-    assert run_protocol.SUPPORTED_RUNNER_WORKFLOWS == {
+    assert run_protocol.SUPPORTED_EXECUTION_WORKFLOWS == {
         "issue-review",
         "pull-request-review",
         "repository-review",

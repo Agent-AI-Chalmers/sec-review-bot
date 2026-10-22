@@ -2,7 +2,7 @@
  * Publication-step failure codes Control Plane can emit as terminal (deterministic).
  *
  * These cross the package boundary: github-integration must classify each as `retry: false`,
- * otherwise a new code silently loops the runner forever (asserted by
+ * otherwise a new code silently loops execution forever (asserted by
  * `publication-error-code-alignment.test.ts`).
  *
  * The *strings* are owned by the hand-written OpenAPI contract
@@ -15,11 +15,11 @@
 import type { PublicationStepErrorCode } from './error-codes-generated.js'
 
 /**
- * The failure code that means "the Runner may have accepted this submission, but we could not
+ * The failure code that means "the Execution may have accepted this submission, but we could not
  * confirm it yet".
  *
  * It is the one code with a meaning beyond its text: every terminal preparation failure is
- * reported as execution `skipped` (the Runner was never called), except this one, which becomes
+ * reported as execution `skipped` (the Execution was never called), except this one, which becomes
  * execution `uncertain` and keeps publication `pending` because the run may still succeed. The
  * code is stamped by the submission paths in this package
  * (`prepared-submission.ts`, `server.ts`) and read back by `preparation-store.ts`, so it lives

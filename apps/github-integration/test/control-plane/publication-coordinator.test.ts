@@ -14,8 +14,8 @@ import type {
 import { fakeApp } from '../github-app-stubs.js'
 import { fakeGitHub, githubJson } from '../github-client.js'
 import { settleExhaustedStep } from '../../src/reviews/shared/settle-exhausted-step.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../src/runner/publish-error-code.js'
-import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../../src/execution/publish-error-code.js'
+import { CONTRACT_VERSION } from '../../src/execution/contract-version.js'
 
 const RUN_ID = '6f1c2f9e-0000-4000-8000-000000000001'
 
@@ -336,7 +336,7 @@ test('a reconciliation that loses the step ends the publication instead of holdi
     // request that never reached it.
     requirePublicationStepClaim: async () => {
       throw Object.assign(new Error('no attempts left'), {
-        code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+        code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
         status: 409
       })
     },
@@ -362,7 +362,7 @@ test('a reconciliation that loses the step ends the publication instead of holdi
     failures,
     [
       {
-        code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+        code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
         retry: false
       }
     ],

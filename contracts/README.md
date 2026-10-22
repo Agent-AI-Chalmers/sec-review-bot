@@ -28,9 +28,12 @@ A family may also hold documents that apply to every version, such as a transpor
 
 - [integration-contract](integration-contract/README.md): the public integration point
   between the Runner and its callers. Current version: [v6](integration-contract/v6/CONTRACT.md).
+- [execution-contract](execution-contract/README.md): the private Temporal dispatch boundary between Execution Gateway and Execution Worker. Current version: v1.
 - [control-plane-api](control-plane-api/README.md): the shapes Control Plane exchanges
   with its callers. Current version:
   [v1](control-plane-api/README.md).
+- [memory-catalog-api](memory-catalog-api/README.md): the HTTP boundary between the
+  Memory Catalog Server and execution workers. Current version: v1.
 - [setup-declaration](setup-declaration/README.md): the `.sec-review/setup.yml` format a
   repository uses to prepare its review sandbox. Current version:
   [v1](setup-declaration/v1/SPEC.md).

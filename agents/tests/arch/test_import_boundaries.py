@@ -244,7 +244,7 @@ def test_foundational_packages_do_not_import_runner_runtime_input_preparation() 
     assert violations == []
 
 
-def test_run_protocol_and_service_do_not_leak_into_workflow_input_consumers() -> None:
+def test_run_protocol_does_not_leak_into_workflow_input_consumers() -> None:
     roots = [
         PACKAGE_ROOT / "cli",
         PACKAGE_ROOT / "workflows",
@@ -255,10 +255,7 @@ def test_run_protocol_and_service_do_not_leak_into_workflow_input_consumers() ->
         violations.extend(
             import_violations(
                 root,
-                (
-                    "sec_review_agents.entrypoints.run_protocol",
-                    "sec_review_agents.entrypoints.service",
-                ),
+                ("sec_review_agents.entrypoints.run_protocol",),
             )
         )
 

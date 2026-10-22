@@ -25,13 +25,17 @@ def download_s3_input_bundle(
         raise ValueError(f"{ARTIFACT_S3_BUCKET_ENV} is required for s3 input bundles.")
     if parsed.netloc != configured_bucket:
         raise ValueError(
-            "Runner input input_bundle.uri uses an unconfigured S3 bucket."
+            "Execution input input_bundle.uri uses an unconfigured S3 bucket."
         )
     key = unquote(parsed.path).lstrip("/")
     if not key or parsed.query or parsed.fragment:
-        raise ValueError("Runner input input_bundle.uri must identify one S3 object.")
+        raise ValueError(
+            "Execution input input_bundle.uri must identify one S3 object."
+        )
     if expected_key is not None and key != expected_key:
-        raise ValueError("Runner input input_bundle.uri does not belong to this run.")
+        raise ValueError(
+            "Execution input input_bundle.uri does not belong to this run."
+        )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_suffix(f"{destination.suffix}.partial")

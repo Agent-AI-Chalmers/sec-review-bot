@@ -4,14 +4,14 @@ import {
 } from '../../github/comment-service.js'
 import { findRepositorySecuritySummaryIssue } from '../../github/repository-service.js'
 import type { Octokit } from 'octokit'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
 import type { PublicationStepStore } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
   isPublicationClaimLostError,
   PublicationClaimLostError
 } from '../../control-plane/publication-claim.js'
-import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
+import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
 import { parseRepositoryReviewPublishContext } from '../../control-plane/publish-context.js'
 import {
   buildRepositoryDeliveryBranchName,
@@ -68,7 +68,7 @@ interface DraftPullRequestSummary {
 }
 
 type InstallationOctokitForRepo = (repo_full_name: string) => Promise<Octokit>
-type CompletedRunnerRun = {
+type CompletedExecutionRun = {
   run_id: string
   publish_context: Record<string, unknown>
 }
@@ -83,11 +83,11 @@ function repositoryResultFromWorkflowResult(
   try {
     return parseRepositoryWorkflowResult(result)
   } catch (error) {
-    // The completed runner payload is already persisted; polling it again will
+    // The completed execution payload is already persisted; polling it again will
     // return the same invalid contract result.
-    throw new DeterministicRunnerPublishError(
+    throw new DeterministicExecutionPublishError(
       `Repository review result is invalid: ${asErrorMessage(error)}`,
-      RUNNER_PUBLISH_ERROR_CODES.repository_result_invalid,
+      EXECUTION_PUBLISH_ERROR_CODES.repository_result_invalid,
       { cause: error }
     )
   }
@@ -663,7 +663,7 @@ export async function handleRepositoryReviewRun({
   assert_publication_claim,
   installation_octokit_for_repo
 }: {
-  run: CompletedRunnerRun
+  run: CompletedExecutionRun
   result: unknown
   store: PublicationStepStore
   claim_token: string

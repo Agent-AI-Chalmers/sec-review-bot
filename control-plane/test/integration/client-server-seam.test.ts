@@ -123,7 +123,7 @@ test('a void operation (empty 200) resolves for the real client against the real
   const seam = await startSeam()
   try {
     // None of these may throw. `initializePublicationSteps` was the first call every
-    // publication made, so under the empty-200 bug it looped the runner forever.
+    // publication made, so under the empty-200 bug it looped execution forever.
     assert.strictEqual(
       await controlPlaneClient.initializePublicationSteps(RUN_ID, 'claim-1', [
         'pull-request:review'

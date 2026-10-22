@@ -1,8 +1,20 @@
 import json
 import shutil
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
+
+JSON_SUFFIX = ".json"
+
+
+def slug_filename_component(value: str, *, fallback: str) -> str:
+    """Normalize one filename component while preserving Unicode letters."""
+    slug = "".join(
+        character.lower() if character.isalnum() else "-" for character in value.strip()
+    ).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or fallback
 
 
 def reset_stage_attempt_artifacts(
@@ -29,6 +41,18 @@ def artifact_path(root: Path, filename: str) -> Path:
     return root / safe_artifact_filename(filename)
 
 
+def json_artifact_path(root: Path, stem: str) -> Path:
+    normalized = safe_artifact_filename(stem)
+    if normalized.endswith(JSON_SUFFIX):
+        raise ValueError(f"JSON artifact name must omit {JSON_SUFFIX}: {stem!r}")
+    return root / f"{normalized}{JSON_SUFFIX}"
+
+
+def remove_json_artifacts(root: Path, stems: Iterable[str]) -> None:
+    for stem in stems:
+        json_artifact_path(root, stem).unlink(missing_ok=True)
+
+
 def write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2), encoding="utf-8")
 
@@ -44,9 +68,11 @@ def persist_text_artifact(
     return target
 
 
-def persist_json(
+def persist_json_artifact(
     path: Path,
-    filename: str,
+    stem: str,
     payload: Any,
 ) -> None:
-    persist_text_artifact(path, filename, json.dumps(payload, indent=2))
+    target = json_artifact_path(path, stem)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    write_json(target, payload)

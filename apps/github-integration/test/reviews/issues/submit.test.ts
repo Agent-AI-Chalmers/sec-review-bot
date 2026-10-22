@@ -6,8 +6,8 @@ import type { IssueContext } from '../../../src/github/issue-service.js'
 import type {
   IssueReviewInput,
   TestChangesPolicy
-} from '../../../src/runner/input.js'
-import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+} from '../../../src/execution/input.js'
+import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
 import type { prepareIssueReviewInput } from '../../../src/reviews/issues/prepare-input.js'
 import { unusedGitHub } from '../../github-client.js'
 
@@ -83,7 +83,7 @@ async function runWith(
   return calls
 }
 
-test('audit review forwards an explicit test_changes to the runner input', async () => {
+test('audit review forwards an explicit test_changes to the execution input', async () => {
   // The regression this guards: an issue comment now always audits, but audit can still
   // reach the repair stage, so a user-chosen test_changes must not be silently dropped.
   assert.deepStrictEqual(await runWith('audit', 'deny'), [
@@ -98,7 +98,7 @@ test('audit review without a test_changes leaves the field absent', async () => 
 })
 
 test('repair review without a test_changes leaves the field absent', async () => {
-  // The runner owns the default (`allow`); the GitHub integration never injects one.
+  // The Execution Worker owns the default (`allow`); the GitHub integration never injects one.
   assert.deepStrictEqual(await runWith('repair', null), [
     { review_objective: 'repair' }
   ])

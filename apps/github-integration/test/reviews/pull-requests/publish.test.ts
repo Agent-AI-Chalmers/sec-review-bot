@@ -8,7 +8,7 @@ import test from 'node:test'
 import { handlePullRequestReviewRun } from '../../../src/reviews/pull-requests/publish.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 import type { PublicationStepStore } from '../../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 // Publish paths now share the fail-closed attribution check, so the app must know its own bot

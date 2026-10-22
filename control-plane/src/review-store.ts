@@ -23,7 +23,7 @@ import { Pool, type PoolClient } from 'pg'
 
 import type {
   ControlPlaneWorkflow as WorkflowName,
-  RunnerArtifactStorage
+  ExecutionArtifactStorage
 } from './contracts.js'
 import {
   applySchemaVersions,
@@ -40,7 +40,7 @@ import {
   type ReviewRunAdmission,
   type ReviewRunEvent,
   type ReviewRunRecord,
-  type RunnerStatus
+  type ExecutionStatus
 } from './shapes.js'
 import {
   PreparationStore,
@@ -63,7 +63,7 @@ export type {
   PublicationWork,
   ReviewRunAdmission,
   ReviewRunRecord,
-  RunnerStatus
+  ExecutionStatus
 } from './shapes.js'
 
 type JsonObject = Record<string, unknown>
@@ -107,11 +107,11 @@ interface ReviewRunRow {
     ingress_kind: 'github_webhook' | 'github_actions_dispatch' | null
     ingress_key: string | null
   }
-  execution: AxisRowColumns<RunnerStatus> & {
+  execution: AxisRowColumns<ExecutionStatus> & {
     missing: boolean
     input: JsonObject | null
     observed_at: string | null
-    artifact_storage: RunnerArtifactStorage | null
+    artifact_storage: ExecutionArtifactStorage | null
     workflow_result: unknown | null
   }
   publication: AxisRowColumns<PublicationStatus>
@@ -260,7 +260,7 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
     run_id: trunk.run_id,
     workflow: trunk.workflow,
     publish_context: trunk.publish_context,
-    ...(execution.input === null ? {} : { runner_input: execution.input }),
+    ...(execution.input === null ? {} : { execution_input: execution.input }),
     preparation: {
       status: preparation.status,
       attempt_count: preparation.attempt_count,
@@ -475,7 +475,9 @@ export class ReviewRunStore {
       [
         run.run_id,
         this.connectorId,
-        run.runner_input === undefined ? null : JSON.stringify(run.runner_input)
+        run.execution_input === undefined
+          ? null
+          : JSON.stringify(run.execution_input)
       ]
     )
     // Admission itself takes the first preparation claim, so the preparation phase starts here
@@ -500,7 +502,7 @@ export class ReviewRunStore {
     `,
       [run.run_id, this.connectorId, JSON.stringify(run.publish_context)]
     )
-    // Admission is the first transition on both axes: the runner starts `pending` (input not
+    // Admission is the first transition on both axes: execution starts `pending` (input not
     // yet submitted) and a preparation row is created already owned by this admission's claim.
     await appendEvent(client, {
       runId: run.run_id,
@@ -525,7 +527,7 @@ export class ReviewRunStore {
     })
     const record = await this.getWith(client, run.run_id)
     if (record === null)
-      throw new Error(`Runner run was not persisted: ${run.run_id}`)
+      throw new Error(`Execution run was not persisted: ${run.run_id}`)
     return { record, created: true, preparation_token: preparationToken }
   }
   async createPreparingReviewRun(
@@ -811,7 +813,7 @@ export class ReviewRunStore {
     options: {
       limit?: number
       cursor?: string
-      execution_status?: RunnerStatus
+      execution_status?: ExecutionStatus
       publication_status?: PublicationStatus
       preparation_status?: PreparationStatus
       workflow?: WorkflowName
@@ -893,7 +895,7 @@ export class ReviewRunStore {
     options: {
       limit?: number
       cursor?: string
-      execution_status?: RunnerStatus
+      execution_status?: ExecutionStatus
       publication_status?: PublicationStatus
       preparation_status?: PreparationStatus
       workflow?: WorkflowName
@@ -1116,7 +1118,7 @@ export class ReviewRunStore {
    *   the claim condition `claimNext` enforces: if execution moved on, a resumed row would sit in
    *   `uncertain` forever with no preparer able to take it - worse than staying parked, because a
    *   parked row is at least visible in the operator queue. Resuming there would also invite
-   *   rebuilding an input whose previous copy may already have been consumed by the Runner.
+   *   rebuilding an input whose previous copy may already have been consumed by the Execution.
    *
    * A run with no disconnected axis, or one parked where resuming cannot help, answers 409.
    */
@@ -1270,7 +1272,7 @@ export class ReviewRunStore {
   /** Stop waiting for a disconnected execution at the operator's request.
    *
    * The task ends `failed` with `SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR`. That code is chosen
-   * over anything resembling "never ran" on purpose: the Runner may have accepted this task and
+   * over anything resembling "never ran" on purpose: the Execution may have accepted this task and
    * may be running it right now. What ends is this run's willingness to find out. Publication is
    * skipped because no result will be delivered, not because none exists. */
   private async giveUpDisconnectedExecution(
@@ -1504,7 +1506,7 @@ export class ReviewRunStore {
   /** Commit an accepted replay: the submission is confirmed, so execution is now queued.
    *
    * `started_at` is filled here, not when the run entered `uncertain`: that state records an
-   * unconfirmed submission, so it deliberately has no start. A resolved replay means the Runner
+   * unconfirmed submission, so it deliberately has no start. A resolved replay means the Execution
    * did accept it, making this the instant execution actually began. Leaving it NULL would
    * produce a `queued` run with no start, a state no other path can reach. */
   async completeSubmissionRecovery(
@@ -1552,7 +1554,7 @@ export class ReviewRunStore {
    * `uncertain` means the outcome is unknown, so a notice there would announce a failure the run
    * may still disprove by being accepted on replay; a notice is therefore created here, in the
    * same transaction that turns that uncertainty into a conclusion. Both ways of getting here —
-   * the Runner rejecting the replay, and the replay budget running out — mean the run has no
+   * the Execution rejecting the replay, and the replay budget running out — mean the run has no
    * result, so both skip publication and both queue the notice.
    */
   async failSubmissionRecovery(
@@ -1610,7 +1612,7 @@ export class ReviewRunStore {
           fromStatus,
           toStatus: 'skipped',
           // The publication was abandoned because execution was conclusively rejected, not for
-          // the rejection's own reason: that code belongs to the runner event above. Keeping it
+          // the rejection's own reason: that code belongs to the execution event above. Keeping it
           // constant is what lets the contract declare this edge's reason exactly.
           reasonCode: 'PUBLICATION_ABANDONED'
         })
@@ -1631,7 +1633,7 @@ export class ReviewRunStore {
     )
     return projectRunRows(result.rows)
   }
-  /** Record that the Runner was observed just now, without changing state. Writes only
+  /** Record that the Execution was observed just now, without changing state. Writes only
    * `observed_at`, so a heartbeat can never extend the recovery lease. */
   async touchObservation(runId: string): Promise<void> {
     return await this.executions.touchObservation(runId)
@@ -1641,25 +1643,25 @@ export class ReviewRunStore {
   }
   async recordArtifactStorage(
     runId: string,
-    storage: RunnerArtifactStorage | undefined
+    storage: ExecutionArtifactStorage | undefined
   ): Promise<void> {
     return await this.executions.recordArtifactStorage(runId, storage)
   }
-  async recordRunnerSuccess(
+  async recordExecutionSuccess(
     runId: string,
     workflowResult: unknown,
-    storage: RunnerArtifactStorage | undefined
+    storage: ExecutionArtifactStorage | undefined
   ): Promise<boolean> {
-    return await this.executions.recordRunnerSuccess(
+    return await this.executions.recordExecutionSuccess(
       runId,
       workflowResult,
       storage
     )
   }
-  async failRunnerExecution(
+  async failExecution(
     runId: string,
     error: { code?: string | null; message: string },
-    storage?: RunnerArtifactStorage
+    storage?: ExecutionArtifactStorage
   ): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
       // As with success, capture the pre-update status so the event names the real origin.
@@ -1693,7 +1695,7 @@ export class ReviewRunStore {
       // A terminal execution failure ends the run, so the requester is told about it. The notice is
       // keyed by the run rather than by preparation: this failure is not a preparation failure,
       // and leaving it unannounced meant a run could stop partway with no reply ever posted.
-      // A terminal Runner failure has no result to publish. Keep the publication row only as the
+      // A terminal Execution failure has no result to publish. Keep the publication row only as the
       // durable declaration that publication is not applicable, converging an in-flight one too.
       const fromStatus = await abandonInFlightPublication(
         client,
@@ -1812,7 +1814,7 @@ export class ReviewRunStore {
    * The wait lives here because the state it looks for is in this database: a re-check
    * costs one indexed query per tick for the single caller that waits. Waiting on a
    * remote service is a different trade, since there each re-check is a round trip per
-   * watched item — which is why the Runner status query deliberately offers no such
+   * watched item — which is why the Execution status query deliberately offers no such
    * option.
    */
   async claimNextPublication(waitMs = 0): Promise<PublicationWork | null> {

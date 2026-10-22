@@ -1,8 +1,8 @@
-import { type ContractVersion } from '../../runner/contract-version.js'
+import { type ContractVersion } from '../../execution/contract-version.js'
 import type { FileChange } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import type { ReviewRecord } from '../review-record.js'
-import { assertWorkflowResult } from '../../runner/contract-schema.js'
+import { assertWorkflowResult } from '../../execution/contract-schema.js'
 
 // Consumer-side view for repository delivery publishing. Unlike the JSON Schema, this
 // intentionally lists only fields this integration reads; add another public field here

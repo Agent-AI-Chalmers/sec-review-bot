@@ -30,7 +30,7 @@ from sec_review_agents.agents.verification.repository import (
     create_repository_verification_backend,
 )
 from sec_review_agents.filesystem.bwrap_backend import BwrapSandboxBackend
-from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
+from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
 pytestmark = pytest.mark.integration
 
@@ -91,7 +91,7 @@ def _scan_mode(input_data: dict) -> str:
 
 def _repository_analyzer_backend(
     input_data: dict,
-    runtime_context: RunnerRuntimeContext | None = None,
+    runtime_context: ExecutionRuntimeContext | None = None,
 ):
     local_root = _local_root(input_data)
     scan_mode = _scan_mode(input_data)

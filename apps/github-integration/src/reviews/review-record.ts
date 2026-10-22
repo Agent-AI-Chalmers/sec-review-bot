@@ -1,5 +1,5 @@
 import type { FileChange } from './file-change.js'
-import { assertReviewRecord } from '../runner/contract-schema.js'
+import { assertReviewRecord } from '../execution/contract-schema.js'
 
 type AnyRecord = Record<string, unknown>
 

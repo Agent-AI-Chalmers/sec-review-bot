@@ -10,7 +10,7 @@ import type { PullRequestContext } from '../github/pull-request-service.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
 import { pullRequestReviewPublishContext } from '../control-plane/publish-context.js'
 import { controlPlaneClient } from '../control-plane/client.js'
-import type { TestChangesPolicy } from '../runner/input.js'
+import type { TestChangesPolicy } from '../execution/input.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'
 import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
@@ -143,7 +143,7 @@ export async function startPullRequestReviewCommand({
 
   let submitted: SubmittedPullRequestReviewRun
   try {
-    // Admission happens before PR lookup, input preparation, and Runner
+    // Admission happens before PR lookup, input preparation, and Execution
     // submission. Any failure below therefore remains attached to this run_id
     // instead of becoming an untracked pre-run error.
     const resolvedPr = pr ?? (await resolve_pr?.())

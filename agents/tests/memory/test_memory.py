@@ -2,6 +2,7 @@ import ast
 import asyncio
 import contextlib
 import fcntl
+import json
 import os
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -11,12 +12,19 @@ from deepagents.backends import CompositeBackend
 from langchain.agents.middleware.types import ModelRequest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 
+from sec_review_agents.agents.memory_extractor.backend import (
+    create_memory_extractor_backend,
+)
 from sec_review_agents.agents.memory_extractor.model import StagedTranscripts
 from sec_review_agents.agents.memory_extractor.prompts import build_extractor_prompt
+from sec_review_agents.agents.memory_extractor.tools import (
+    build_transcript_tools,
+)
 from sec_review_agents.agents.memory_maintainer.prompts import build_maintenance_prompt
 from sec_review_agents.agents.memory_maintainer.tools import (
     build_memory_delete_file_tool,
 )
+from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.filesystem.backend_factory import (
     create_backend_with_path_views,
 )
@@ -93,12 +101,37 @@ def _memory_observations_dir(memory_store_dir: Path) -> Path:
     return memory_store.memory_observations_dir(memory_store_dir)
 
 
-def test_stage_transcripts_copies_ordered_json_files(tmp_path: Path) -> None:
-    source = tmp_path / "run" / "transcript.json"
-    source.parent.mkdir()
-    source.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
+def _transcript_jsonl(*contents: str) -> str:
+    return "".join(
+        json.dumps(
+            {
+                "seq": index,
+                "event": "message",
+                "message": {
+                    "type": "ai",
+                    "id": f"message-{index}",
+                    "name": None,
+                    "content": content,
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "tool_calls": [],
+                    "invalid_tool_calls": [],
+                    "tool_call_chunks": [],
+                    "usage_metadata": None,
+                },
+            },
+            separators=(",", ":"),
+        )
+        + "\n"
+        for index, content in enumerate(contents, start=1)
     )
+
+
+def test_stage_transcripts_copies_ordered_jsonl_files(tmp_path: Path) -> None:
+    source = tmp_path / "run" / "transcript.jsonl"
+    source.parent.mkdir()
+    transcript_content = _transcript_jsonl("message")
+    source.write_text(transcript_content, encoding="utf-8")
     destination = tmp_path / "staged"
 
     staged = memory_extraction.stage_transcripts(
@@ -115,26 +148,93 @@ def test_stage_transcripts_copies_ordered_json_files(tmp_path: Path) -> None:
     assert staged.entries == [
         (
             "transcript",
-            Path("/transcripts/0001-transcript.json"),
+            Path("/transcripts/0001-transcript.jsonl"),
         )
     ]
-    assert (destination / "0001-transcript.json").read_text(encoding="utf-8") == (
-        '[{"index":0,"type":"ai","content":"message"}]\n'
-    )
+    assert (destination / "0001-transcript.jsonl").read_text(
+        encoding="utf-8"
+    ) == transcript_content
     assert not (destination / "MANIFEST.md").exists()
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        _transcript_jsonl("readable") + '{"seq":2,"event":"message","message":',
+        '{"seq":2,"event":"message","message":{}}\n',
+        "\n",
+    ],
+)
+def test_stage_transcripts_preserves_incomplete_input(
+    tmp_path: Path, content: str
+) -> None:
+    source = tmp_path / "transcript.jsonl"
+    source.write_text(content, encoding="utf-8")
+
+    destination = tmp_path / "staged"
+    memory_extraction.stage_transcripts(
+        [memory_extraction.TranscriptRef("analyzer", "initial", source)],
+        destination,
+    )
+
+    assert (destination / "0001-analyzer-initial.jsonl").read_text(
+        encoding="utf-8"
+    ) == content
+
+
+def test_transcript_tools_list_and_read_messages(tmp_path: Path) -> None:
+    transcript = tmp_path / "0001-analyzer-initial.jsonl"
+    transcript.write_text(
+        _transcript_jsonl("initial claim", "verified conclusion"),
+        encoding="utf-8",
+    )
+    backend = create_memory_extractor_backend(transcript_root=tmp_path)
+    list_messages, read_message = build_transcript_tools(backend)
+
+    listed = list_messages.invoke(
+        {"file_path": "/transcripts/0001-analyzer-initial.jsonl"}
+    )
+    message = read_message.invoke(
+        {
+            "file_path": "/transcripts/0001-analyzer-initial.jsonl",
+            "seq": 2,
+        }
+    )
+
+    assert listed["ok"] is True
+    assert [item["seq"] for item in listed["messages"]] == [1, 2]
+    assert listed["messages"][1]["preview"] == "verified conclusion"
+    assert message["message"]["content"] == "verified conclusion"
+
+
+def test_list_transcript_messages_reports_partial_lines_without_losing_messages(
+    tmp_path: Path,
+) -> None:
+    transcript = tmp_path / "0001-analyzer-initial.jsonl"
+    transcript.write_text(
+        _transcript_jsonl("readable") + '{"seq":2,"event":"message"',
+        encoding="utf-8",
+    )
+    backend = create_memory_extractor_backend(transcript_root=tmp_path)
+    list_messages, _ = build_transcript_tools(backend)
+
+    result = list_messages.invoke(
+        {"file_path": "/transcripts/0001-analyzer-initial.jsonl"}
+    )
+
+    assert [message["seq"] for message in result["messages"]] == [1]
+    assert result["parse_errors"][0]["line"] == 2
 
 
 def test_collect_review_memory_transcripts_uses_flat_published_files(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    published = review_root / "transcripts" / "0001-analyzer-initial.json"
+    published = review_root / "transcripts" / "0001-analyzer-initial.jsonl"
     unrelated = review_root / "notes" / "scratch.json"
     published.parent.mkdir(parents=True)
     unrelated.parent.mkdir(parents=True)
-    published.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
+    published.write_text(_transcript_jsonl("message"), encoding="utf-8")
     unrelated.write_text(
         '[{"index":0,"type":"note","content":"scratch"}]\n', encoding="utf-8"
     )
@@ -154,23 +254,35 @@ def test_collect_review_memory_transcripts_rejects_invalid_published_name(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    transcript = review_root / "transcripts" / "analyzer.json"
+    transcript = review_root / "transcripts" / "analyzer.jsonl"
     transcript.parent.mkdir(parents=True)
-    transcript.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
+    transcript.write_text(_transcript_jsonl("message"), encoding="utf-8")
 
     with pytest.raises(ValueError, match="<order>-<stage>-<attempt>"):
         memory_extraction.collect_review_memory_transcripts(review_root)
 
 
+def test_collect_review_memory_transcripts_skips_non_memory_stage(
+    tmp_path: Path,
+) -> None:
+    review_root = tmp_path / "review"
+    transcripts = review_root / "transcripts"
+    transcripts.mkdir(parents=True)
+    analyzer = transcripts / "0001-analyzer-initial.jsonl"
+    cvss = transcripts / "0002-cvss-initial.jsonl"
+    analyzer.write_text(_transcript_jsonl("analysis"), encoding="utf-8")
+    cvss.write_text(_transcript_jsonl("score"), encoding="utf-8")
+
+    refs = memory_extraction.collect_review_memory_transcripts(review_root)
+
+    assert [(ref.stage, ref.path) for ref in refs] == [("analyzer", analyzer.resolve())]
+
+
 def test_stage_review_transcripts_writes_ordered_prompt(tmp_path: Path) -> None:
     sources = []
     for label in ("analyzer", "mitigator", "verifier"):
-        path = tmp_path / f"{label}.json"
-        path.write_text(
-            '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-        )
+        path = tmp_path / f"{label}.jsonl"
+        path.write_text(_transcript_jsonl("message"), encoding="utf-8")
         sources.append(path)
 
     staged = memory_extraction.stage_transcripts(
@@ -185,21 +297,21 @@ def test_stage_review_transcripts_writes_ordered_prompt(tmp_path: Path) -> None:
     assert staged.entries == [
         (
             "analyzer initial",
-            Path("/transcripts/0001-analyzer-initial.json"),
+            Path("/transcripts/0001-analyzer-initial.jsonl"),
         ),
         (
             "mitigator initial",
-            Path("/transcripts/0002-mitigator-initial.json"),
+            Path("/transcripts/0002-mitigator-initial.jsonl"),
         ),
         (
             "verifier initial",
-            Path("/transcripts/0003-verifier-initial.json"),
+            Path("/transcripts/0003-verifier-initial.jsonl"),
         ),
     ]
     prompt = build_extractor_prompt(staged)
-    assert "analyzer initial: `/transcripts/0001-analyzer-initial.json`" in prompt
-    assert "mitigator initial: `/transcripts/0002-mitigator-initial.json`" in prompt
-    assert "verifier initial: `/transcripts/0003-verifier-initial.json`" in prompt
+    assert "analyzer initial: `/transcripts/0001-analyzer-initial.jsonl`" in prompt
+    assert "mitigator initial: `/transcripts/0002-mitigator-initial.jsonl`" in prompt
+    assert "verifier initial: `/transcripts/0003-verifier-initial.jsonl`" in prompt
     assert str(tmp_path) not in prompt
     assert "source:" not in prompt
     assert "/transcripts/MANIFEST.md" not in prompt
@@ -227,6 +339,8 @@ def test_initialize_memory_store_seeds_external_memory(tmp_path: Path) -> None:
     assert (_memory_content_dir(memory_store_dir) / "MEMORY.md").is_file()
     assert (_memory_content_dir(memory_store_dir) / "topics").is_dir()
     assert (_memory_observations_dir(memory_store_dir)).is_dir()
+    assert (memory_store_dir / "agent-transcripts" / "memory-extractor").is_dir()
+    assert (memory_store_dir / "agent-transcripts" / "memory-maintainer").is_dir()
     assert (memory_store_dir / "memory_state.sqlite").is_file()
     assert list((_memory_content_dir(memory_store_dir) / "topics").iterdir()) == []
     assert (
@@ -234,6 +348,30 @@ def test_initialize_memory_store_seeds_external_memory(tmp_path: Path) -> None:
         .read_text(encoding="utf-8")
         .strip()
     )
+
+
+def test_memory_agent_transcript_paths_are_auditable_and_non_overwriting(
+    tmp_path: Path,
+) -> None:
+    memory_root = memory_store.initialize_memory_store(tmp_path / "memory")
+
+    first = memory_store.memory_agent_transcript_path(
+        memory_root,
+        agent_name="memory-extractor",
+        run_label="Issue Review/run-1",
+    )
+    second = memory_store.memory_agent_transcript_path(
+        memory_root,
+        agent_name="memory-extractor",
+        run_label="Issue Review/run-1",
+    )
+
+    expected_root = memory_root / "agent-transcripts" / "memory-extractor"
+    assert first.parent == expected_root
+    assert second.parent == expected_root
+    assert first.name.startswith("issue-review-run-1-")
+    assert first.suffix == ".jsonl"
+    assert first != second
 
 
 def test_resolve_memory_store_dir_reads_environment(tmp_path: Path) -> None:
@@ -582,6 +720,77 @@ def test_materialize_configured_memory_view_locks_source_during_snapshot(
     assert lock_calls == [(memory_root.resolve(), False)]
 
 
+def test_materialize_managed_active_memory_by_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    materialized_root = tmp_path / "materialized"
+    local_memory = tmp_path / "local-memory"
+    local_memory.mkdir()
+    monkeypatch.setenv(AGENT_MEMORY_DIR_ENV, str(local_memory))
+    monkeypatch.setenv(AGENT_MEMORY_MATERIALIZED_ROOT_ENV, str(materialized_root))
+    reference = ArtifactReference(
+        uri=f"s3://sec-review/memory/versions/{'a' * 64}/memory-tree.v1.tar.zst",
+        digest=f"sha256:{'a' * 64}",
+        media_type="application/tar+zstd",
+        size_bytes=42,
+    )
+    catalog_client = Mock(
+        active_version=Mock(
+            return_value={"revision": 3, "artifact_reference": reference.as_dict()}
+        )
+    )
+    materialize_calls: list[tuple[ArtifactReference, Path]] = []
+
+    def fake_materialize(
+        value: ArtifactReference,
+        *,
+        destination: Path,
+    ) -> Path:
+        materialize_calls.append((value, destination))
+        content_root = destination / "memory"
+        (content_root / "topics").mkdir(parents=True)
+        (content_root / "MEMORY.md").write_text("# Managed\n", encoding="utf-8")
+        return content_root
+
+    with (
+        patch(
+            "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+            return_value=catalog_client,
+        ),
+        patch(
+            "sec_review_agents.memory.version_bundle.materialize_memory_version",
+            side_effect=fake_materialize,
+        ),
+    ):
+        first = materialize_configured_memory_view()
+        second = materialize_configured_memory_view()
+
+    expected = materialized_root / f"managed-{'a' * 64}" / "memory"
+    assert first == expected
+    assert second == expected
+    assert (expected / "MEMORY.md").read_text(encoding="utf-8") == "# Managed\n"
+    assert materialize_calls == [(reference, expected.parent)]
+
+
+def test_managed_memory_without_active_version_does_not_fall_back_locally(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    local_memory = memory_store.initialize_memory_store(tmp_path / "local-memory")
+    monkeypatch.setenv(AGENT_MEMORY_DIR_ENV, str(local_memory))
+    catalog_client = Mock(
+        active_version=Mock(return_value={"revision": 0, "artifact_reference": None})
+    )
+
+    with patch(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        return_value=catalog_client,
+    ):
+        assert materialize_configured_memory_view() is None
+        assert not memory_runtime_available()
+
+
 def test_memory_runtime_unavailable_without_initialized_index(
     tmp_path: Path,
     monkeypatch,
@@ -692,11 +901,9 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
-    transcript.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
+    transcript.write_text(_transcript_jsonl("message"), encoding="utf-8")
 
     with (
         patch("sec_review_agents.memory.extractor.create_memory_extractor_agent_graph"),
@@ -720,6 +927,12 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
         )
 
     run_agent.assert_called_once()
+    audit_paths = run_agent.call_args.kwargs["transcript_paths"]
+    assert len(audit_paths) == 1
+    assert audit_paths[0].parent == (
+        memory_root / "agent-transcripts" / "memory-extractor"
+    )
+    assert audit_paths[0].name.startswith("issue-review-run-1-")
     assert result.skipped is False
     assert (
         result.observation_path
@@ -751,11 +964,9 @@ async def test_extract_memory_observations_repeated_id_updates_pending_row(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
-    transcript.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
+    transcript.write_text(_transcript_jsonl("message"), encoding="utf-8")
     bodies = iter(["First durable lesson.", "Second durable lesson."])
 
     with (
@@ -799,11 +1010,9 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
-    transcript.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
+    transcript.write_text(_transcript_jsonl("message"), encoding="utf-8")
 
     with (
         patch("sec_review_agents.memory.extractor.create_memory_extractor_agent_graph"),
@@ -843,11 +1052,9 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
-    transcript.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
+    transcript.write_text(_transcript_jsonl("message"), encoding="utf-8")
     observation = _memory_observations_dir(memory_root) / "same-run.md"
     observation.parent.mkdir(parents=True, exist_ok=True)
     observation.write_text("Original durable lesson.\n", encoding="utf-8")
@@ -893,11 +1100,9 @@ async def test_extract_memory_observations_skips_publish_when_observation_proces
     """Do not republish work that another maintainer consumed during extraction."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
-    transcript.write_text(
-        '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
-    )
+    transcript.write_text(_transcript_jsonl("message"), encoding="utf-8")
     observation = _memory_observations_dir(memory_root) / "same-run.md"
     observation.parent.mkdir(parents=True, exist_ok=True)
     observation.write_text("Maintained lesson.\n", encoding="utf-8")
@@ -974,6 +1179,12 @@ async def test_maintain_memory_marks_observations_processed(tmp_path: Path) -> N
             "`issue-review-run-1`: `/memory/observations/issue-review-run-1.md`"
             in user_prompt
         )
+        transcript_paths = _kwargs["transcript_paths"]
+        assert len(transcript_paths) == 1
+        assert transcript_paths[0].parent == (
+            memory_root / "agent-transcripts" / "memory-maintainer"
+        )
+        assert transcript_paths[0].name.startswith("maintenance-")
         return {"done": True}
 
     with (
