@@ -11,7 +11,7 @@ from sec_review_agents.delivery_stages.model import (
     DeliveryStrategy,
 )
 from sec_review_agents.utils.env import parse_int_env
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 
 DELIVERY_PATCH_MAX_CONCURRENCY = 4
 DELIVERY_STRATEGIES = {"single", "combined"}
@@ -131,9 +131,9 @@ def persist_delivery_execution_input(
             for item in keep_case_results
         ],
     }
-    persist_json(
+    persist_json_artifact(
         run_artifacts_root / "delivery-execution",
-        "delivery-execution-input.json",
+        "delivery-execution-input",
         execution_payload,
     )
 

@@ -27,8 +27,9 @@ from sec_review_agents.runtime.transcripts import (
     stage_attempt_transcript_path,
 )
 from sec_review_agents.utils.files import (
-    persist_json,
+    persist_json_artifact,
     persist_text_artifact,
+    remove_json_artifacts,
     reset_stage_attempt_artifacts,
 )
 from sec_review_agents.workspace.patches import (
@@ -46,15 +47,15 @@ def persist_mitigation_result(
     *,
     attempt_label: str,
 ) -> None:
-    persist_json(
+    persist_json_artifact(
         mitigator_artifacts_path,
-        "mitigation-result.json",
+        "mitigation-result",
         result,
     )
     if attempt_label != "initial":
-        persist_json(
+        persist_json_artifact(
             mitigator_artifacts_path,
-            f"mitigation-result.{attempt_label}.json",
+            f"mitigation-result.{attempt_label}",
             result,
         )
 
@@ -72,32 +73,19 @@ def reset_mitigation_attempt_artifacts(
     mitigator_artifacts_path: Path,
     attempt_label: str,
 ) -> None:
-    filenames = [
-        "mitigation-result.json",
-        "workspace.patch",
-    ]
+    json_stems = ["mitigation-result"]
+    filenames = ["workspace.patch"]
     if attempt_label != "initial":
-        filenames.extend(
-            [
-                f"mitigation-result.{attempt_label}.json",
-                f"workspace.{attempt_label}.patch",
-            ]
-        )
+        json_stems.append(f"mitigation-result.{attempt_label}")
+        filenames.append(f"workspace.{attempt_label}.patch")
     else:
-        filenames.extend(
-            [
-                "mitigation-result.initial.json",
-                "workspace.initial.patch",
-            ]
-        )
+        json_stems.append("mitigation-result.initial")
+        filenames.append("workspace.initial.patch")
         for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1):
             retry_label = f"retry-{retry_index}"
-            filenames.extend(
-                [
-                    f"mitigation-result.{retry_label}.json",
-                    f"workspace.{retry_label}.patch",
-                ]
-            )
+            json_stems.append(f"mitigation-result.{retry_label}")
+            filenames.append(f"workspace.{retry_label}.patch")
+    remove_json_artifacts(mitigator_artifacts_path, json_stems)
     reset_stage_attempt_artifacts(
         mitigator_artifacts_path,
         filenames=filenames,

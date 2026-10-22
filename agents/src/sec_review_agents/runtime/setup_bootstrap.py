@@ -49,7 +49,7 @@ from sec_review_agents.filesystem.backend_selection import (
     selected_sandbox_backend_kind,
 )
 from sec_review_agents.observability.diagnostics import log_diagnostic
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 
 WORKSPACE_ROOT_IN_CONTAINER = "/workspace"
 
@@ -204,7 +204,7 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
     """Record the bootstrap outcome as a stage diagnostic (visible, not silent).
 
     The environment-incomplete state must be discoverable by operators and by a
-    human reading the run; it is recorded as a stage artifact ("environment.json")
+    human reading the run; it is recorded as the stage's environment artifact
     and a structured diagnostic log. It is deliberately kept out of the agent's
     context: the agent should reason from the repository, not from host setup
     details that it cannot act on.
@@ -230,9 +230,9 @@ def record_bootstrap_result(artifacts_path: Path, result: BootstrapResult) -> No
         }
         for step in result.steps
     ]
-    persist_json(
+    persist_json_artifact(
         artifacts_path,
-        "environment.json",
+        "environment",
         {
             "environment_incomplete": result.status is BootstrapStatus.INCOMPLETE,
             "setup_status": result.status.value,

@@ -19,7 +19,7 @@ from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_g
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
 from sec_review_agents.scan_stages.triage.batching import triage_candidate_batches
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 
 DEFAULT_TRIAGE_PASSES = 2
 DEFAULT_TRIAGE_BATCH_SIZE = 30
@@ -49,9 +49,9 @@ async def run_repository_triage_agent(
     triage_mode: TriageMode = "single",
     max_batch_size: int = DEFAULT_TRIAGE_BATCH_SIZE,
 ) -> dict:
-    persist_json(
+    persist_json_artifact(
         triage_root,
-        "triage-input.json",
+        "triage-input",
         {
             "summary": {
                 "candidate_count": len(triage_candidates),

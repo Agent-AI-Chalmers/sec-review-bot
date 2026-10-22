@@ -799,7 +799,7 @@ def build_repository_review_result_activity(
     case_results: Sequence[Mapping[str, Any]],
     delivery_result: Mapping[str, Any],
 ) -> dict[str, Any]:
-    from sec_review_agents.utils.files import persist_json
+    from sec_review_agents.utils.files import persist_json_artifact
     from sec_review_agents.utils.paths import required_path
     from sec_review_agents.workflows.repository.result import (
         build_repository_workflow_result,
@@ -814,9 +814,9 @@ def build_repository_review_result_activity(
         delivery_result=delivery_result,
         case_results=case_results,
     )
-    persist_json(
+    persist_json_artifact(
         run_artifacts_root,
-        "repository-review-result.json",
+        "repository-review-result",
         workflow_result,
     )
     return workflow_result

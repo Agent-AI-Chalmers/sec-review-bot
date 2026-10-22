@@ -21,7 +21,7 @@ from sec_review_agents.delivery_stages.planning.batching import planning_case_id
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 
 DEFAULT_DELIVERY_PLANNING_PASSES = 2
 DEFAULT_DELIVERY_PLANNING_BATCH_SIZE = 30
@@ -45,9 +45,9 @@ def persist_delivery_planning_input(
     delivery_planning_root: Path, planning_cases: list[dict[str, Any]]
 ) -> None:
     """Persist archive-only planning input for operator inspection."""
-    persist_json(
+    persist_json_artifact(
         delivery_planning_root,
-        "delivery-planning-input.json",
+        "delivery-planning-input",
         {"cases": planning_cases},
     )
 

@@ -24,7 +24,7 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryResult,
 )
 from sec_review_agents.utils.env import parse_int_env
-from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
+from sec_review_agents.utils.files import persist_json_artifact, remove_json_artifacts
 from sec_review_agents.utils.paths_ignore import (
     matches_paths_ignore,
     normalize_paths_ignore,
@@ -274,9 +274,9 @@ def _build_scan_manifest(
         "files": entries,
         "skipped_files": skipped,
     }
-    persist_json(
+    persist_json_artifact(
         discovery_artifacts_path,
-        "scan-manifest.json",
+        "scan-manifest",
         manifest,
     )
     return entries, skipped
@@ -460,9 +460,9 @@ def _build_incremental_scan_manifest(
         "files": entries,
         "skipped_files": skipped,
     }
-    persist_json(
+    persist_json_artifact(
         discovery_artifacts_path,
-        "scan-manifest.json",
+        "scan-manifest",
         manifest,
     )
     return entries, skipped
@@ -934,9 +934,9 @@ def build_discovery_result_from_chunks(
         "skipped_files": all_skipped_files,
         "candidates": candidates,
     }
-    persist_json(
+    persist_json_artifact(
         discovery_artifacts_path,
-        "discovery-result.json",
+        "discovery-result",
         result,
     )
     if started_at is not None:
@@ -960,12 +960,9 @@ def prepare_discovery_chunks(
     chunk_target_ratio: tuple[int, int] = (1, 5),
     chunk_strategy: str | None = None,
 ) -> dict[str, Any]:
-    reset_stage_attempt_artifacts(
+    remove_json_artifacts(
         discovery_artifacts_path,
-        filenames=(
-            "discovery-result.json",
-            "discovery-chunks.json",
-        ),
+        ("discovery-result", "discovery-chunks"),
     )
     is_incremental = scan_mode == "incremental"
     if is_incremental:
@@ -999,9 +996,9 @@ def prepare_discovery_chunks(
         strategy=resolved_chunk_strategy,
     )
     skipped_files.extend(chunk_skipped_files)
-    persist_json(
+    persist_json_artifact(
         discovery_artifacts_path,
-        "discovery-chunks.json",
+        "discovery-chunks",
         {
             "metadata": {
                 "deployment_input_limit_tokens": deployment_input_limit_tokens,

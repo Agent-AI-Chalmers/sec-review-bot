@@ -109,7 +109,7 @@ def build_issue_single_agent_result_activity(
     request: InternalWorkflowRequest,
     single_agent_result: dict[str, Any],
 ) -> dict[str, Any]:
-    from sec_review_agents.utils.files import persist_json
+    from sec_review_agents.utils.files import persist_json_artifact
     from sec_review_agents.utils.paths import required_path
 
     prepared_input = request.prepared_input
@@ -118,9 +118,9 @@ def build_issue_single_agent_result_activity(
         label="artifact_root_path",
     )
     result = build_issue_single_agent_result(single_agent_result=single_agent_result)
-    persist_json(
+    persist_json_artifact(
         run_artifacts_root / "single-agent",
-        "single-agent-result.json",
+        "single-agent-result",
         result,
     )
     return result
@@ -249,11 +249,11 @@ async def execute_issue_single_agent(
         setup_declaration_content=setup_declaration_content,
     )
     result = build_issue_single_agent_result(single_agent_result=single_agent_result)
-    from sec_review_agents.utils.files import persist_json
+    from sec_review_agents.utils.files import persist_json_artifact
 
-    persist_json(
+    persist_json_artifact(
         single_agent_artifacts_path,
-        "single-agent-result.json",
+        "single-agent-result",
         result,
     )
     return result

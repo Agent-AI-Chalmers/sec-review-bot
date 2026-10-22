@@ -27,7 +27,10 @@ from sec_review_agents.runtime.transcripts import (
     remove_transcripts,
     stage_attempt_transcript_path,
 )
-from sec_review_agents.utils.files import persist_json, reset_stage_attempt_artifacts
+from sec_review_agents.utils.files import (
+    persist_json_artifact,
+    remove_json_artifacts,
+)
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 
@@ -37,15 +40,15 @@ def persist_verification_result(
     *,
     attempt_label: str,
 ) -> None:
-    persist_json(
+    persist_json_artifact(
         verifier_artifacts_path,
-        "verification-result.json",
+        "verification-result",
         result,
     )
     if attempt_label != "initial":
-        persist_json(
+        persist_json_artifact(
             verifier_artifacts_path,
-            f"verification-result.{attempt_label}.json",
+            f"verification-result.{attempt_label}",
             result,
         )
 
@@ -61,32 +64,15 @@ def verification_attempt_label(retry_context: Mapping[str, Any] | None) -> str:
 def reset_verification_attempt_artifacts(
     verifier_artifacts_path: Path, *, attempt_label: str
 ) -> None:
-    filenames = [
-        "verification-result.json",
-    ]
+    json_stems = ["verification-result"]
     if attempt_label != "initial":
-        filenames.extend(
-            [
-                f"verification-result.{attempt_label}.json",
-            ]
-        )
+        json_stems.append(f"verification-result.{attempt_label}")
     else:
-        filenames.extend(
-            [
-                "verification-result.initial.json",
-            ]
-        )
+        json_stems.append("verification-result.initial")
         for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1):
             retry_label = f"retry-{retry_index}"
-            filenames.extend(
-                [
-                    f"verification-result.{retry_label}.json",
-                ]
-            )
-    reset_stage_attempt_artifacts(
-        verifier_artifacts_path,
-        filenames=filenames,
-    )
+            json_stems.append(f"verification-result.{retry_label}")
+    remove_json_artifacts(verifier_artifacts_path, json_stems)
     transcript_attempts = (
         ["initial"]
         + [

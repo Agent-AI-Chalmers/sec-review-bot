@@ -3,6 +3,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from sec_review_agents.utils.files import json_artifact_path
 from sec_review_agents.utils.structured_renderer import (
     render_structured_markdown,
     render_structured_markdown_section,
@@ -15,11 +16,9 @@ MAX_FEEDBACK_RETRY_ATTEMPTS = 1
 MAX_RETRY_HISTORY_PROMPT_ITEMS = 5
 
 
-def _copy_existing_artifact(root: Path, source: str, target: str) -> None:
-    source_path = root / source
+def _copy_existing_artifact(source_path: Path, target_path: Path) -> None:
     if not source_path.exists():
         return
-    target_path = root / target
     target_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source_path, target_path)
 
@@ -34,16 +33,18 @@ def archive_initial_feedback_attempt(
     if retry_context.get("retry_index") != 1:
         return
 
-    for source, target in (
-        ("mitigation-result.json", "mitigation-result.initial.json"),
-        ("workspace.patch", "workspace.initial.patch"),
-    ):
-        _copy_existing_artifact(mitigator_root, source, target)
+    _copy_existing_artifact(
+        json_artifact_path(mitigator_root, "mitigation-result"),
+        json_artifact_path(mitigator_root, "mitigation-result.initial"),
+    )
+    _copy_existing_artifact(
+        mitigator_root / "workspace.patch",
+        mitigator_root / "workspace.initial.patch",
+    )
 
     _copy_existing_artifact(
-        verifier_root,
-        "verification-result.json",
-        "verification-result.initial.json",
+        json_artifact_path(verifier_root, "verification-result"),
+        json_artifact_path(verifier_root, "verification-result.initial"),
     )
 
 

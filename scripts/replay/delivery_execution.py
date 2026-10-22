@@ -19,7 +19,7 @@ from sec_review_agents.delivery_stages.result import (
     persist_delivery_result,
 )
 from sec_review_agents.utils.env import bootstrap_agents_env, env_value
-from sec_review_agents.utils.files import persist_json
+from sec_review_agents.utils.files import persist_json_artifact
 from sec_review_agents.workflows.repository.result import (
     build_scan_summary,
 )
@@ -220,7 +220,7 @@ async def main() -> None:
         case_results=case_results,
     )
 
-    persist_json(run_artifacts, "repository-review-result.json", workflow_result)
+    persist_json_artifact(run_artifacts, "repository-review-result", workflow_result)
     print(
         json.dumps(
             {
