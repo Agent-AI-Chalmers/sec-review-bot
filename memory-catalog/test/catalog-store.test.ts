@@ -24,11 +24,9 @@ void test('maintenance commit records immutable history before moving the active
   const client = {
     query: (sql: string, parameters?: unknown[]) => {
       statements.push({ sql, ...(parameters ? { parameters } : {}) })
-      if (sql.includes('select revision from managed_memory_active_revision'))
+      if (sql.includes('select revision from active_revision'))
         return Promise.resolve({ rows: [{ revision: '3' }], rowCount: 1 })
-      if (
-        sql.includes('select observation_id from managed_memory_observations')
-      )
+      if (sql.includes('select observation_id from observations'))
         return Promise.resolve({
           rows: [{ observation_id: 'observation-1' }],
           rowCount: 1,
@@ -56,11 +54,11 @@ void test('maintenance commit records immutable history before moving the active
   const operations = statements
     .map(({ sql }) => sql.trim())
     .filter((sql) => sql !== 'begin' && sql !== 'commit')
-  assert.match(operations[0] ?? '', /managed_memory_active_revision/)
-  assert.match(operations[1] ?? '', /managed_memory_observations/)
-  assert.match(operations[2] ?? '', /insert into managed_memory_revisions/)
+  assert.match(operations[0] ?? '', /active_revision/)
+  assert.match(operations[1] ?? '', /observations/)
+  assert.match(operations[2] ?? '', /insert into revisions/)
   assert.match(operations[3] ?? '', /set consumed_revision=/)
-  assert.match(operations[4] ?? '', /update managed_memory_active_revision/)
+  assert.match(operations[4] ?? '', /update active_revision/)
   assert.deepEqual(statements[4]?.parameters, [4, ['observation-1']])
   assert.deepEqual(statements[5]?.parameters, [4])
 })

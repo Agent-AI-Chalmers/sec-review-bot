@@ -1,10 +1,7 @@
-import { readFile } from 'node:fs/promises'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-
 import { Pool, type PoolClient } from 'pg'
 
 import type { components } from './contract-types-generated.js'
+import { applySchemaVersions } from './database/schema-version-runner.js'
 
 type ArtifactReference = components['schemas']['ArtifactReference']
 type ObservationRegistration = components['schemas']['ObservationRegistration']
@@ -14,17 +11,6 @@ type MaintenanceBatch = components['schemas']['MaintenanceBatch']
 type ActiveVersion = components['schemas']['ActiveVersion']
 type MemoryRevision = components['schemas']['MemoryRevision']
 type MemoryRevisionList = components['schemas']['MemoryRevisionList']
-
-const SCHEMA_VERSION = 1
-
-function schemaPath(): string {
-  return path.join(
-    path.dirname(fileURLToPath(import.meta.url)),
-    'database',
-    'schema-versions',
-    '001_initial_catalog.sql',
-  )
-}
 
 async function inTransaction<T>(
   pool: Pool,
@@ -74,30 +60,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   }
 
   async initialize(): Promise<void> {
-    await inTransaction(this.#pool, async (client) => {
-      await client.query(`
-        create table if not exists managed_memory_schema (
-          singleton boolean primary key default true check (singleton),
-          version integer not null check (version > 0)
-        )
-      `)
-      const existing = await client.query<{ version: number }>(
-        'select version from managed_memory_schema where singleton=true',
-      )
-      if (existing.rowCount === 1) {
-        if (existing.rows[0]?.version !== SCHEMA_VERSION) {
-          throw new Error(
-            `Unsupported managed memory schema version: ${existing.rows[0]?.version}`,
-          )
-        }
-        return
-      }
-      await client.query(await readFile(schemaPath(), 'utf8'))
-      await client.query(
-        'insert into managed_memory_schema (singleton, version) values (true,$1)',
-        [SCHEMA_VERSION],
-      )
-    })
+    await applySchemaVersions(this.#pool)
   }
 
   async close(): Promise<void> {
@@ -107,7 +70,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   async registerObservation(input: ObservationRegistration): Promise<boolean> {
     return await inTransaction(this.#pool, async (client) => {
       const inserted = await client.query(
-        `insert into managed_memory_observations (
+        `insert into observations (
            observation_id, source_workflow, source_run_id, source_review_unit_id,
            transcript_digest, body_markdown, audit_reference
          ) values ($1,$2,$3,$4,$5,$6,$7)
@@ -127,7 +90,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         `select source_workflow=$2 and source_run_id=$3 and
                 source_review_unit_id=$4 and transcript_digest=$5 and
                 body_markdown=$6 and audit_reference=$7::jsonb as identical
-         from managed_memory_observations where observation_id=$1`,
+         from observations where observation_id=$1`,
         [
           input.observation_id,
           input.source_workflow,
@@ -153,7 +116,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       oldest_pending_created_at: Date | null
     }>(`select count(*) as pending_count,
                min(created_at) as oldest_pending_created_at
-        from managed_memory_observations where consumed_revision is null`)
+        from observations where consumed_revision is null`)
     const row = result.rows[0]
     if (row === undefined)
       throw new Error('Pending summary query returned no row.')
@@ -173,7 +136,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         body_markdown: string
       }>(
         `select observation_id, body_markdown
-         from managed_memory_observations
+         from observations
          where consumed_revision is null
          order by created_at, observation_id limit $1`,
         [limit],
@@ -183,8 +146,8 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         revision: string
         artifact_reference: ArtifactReference | null
       }>(`select active.revision, revision.artifact_reference
-          from managed_memory_active_revision active
-          left join managed_memory_revisions revision
+          from active_revision active
+          left join revisions revision
             on revision.revision=active.revision
           where active.singleton=true`)
       const row = active.rows[0]
@@ -205,12 +168,12 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   }): Promise<boolean> {
     return await inTransaction(this.#pool, async (client) => {
       const active = await client.query<{ revision: string }>(
-        `select revision from managed_memory_active_revision
+        `select revision from active_revision
          where singleton=true for update`,
       )
       if (Number(active.rows[0]?.revision) !== input.base_revision) return false
       const selected = await client.query<{ observation_id: string }>(
-        `select observation_id from managed_memory_observations
+        `select observation_id from observations
          where observation_id=any($1) and consumed_revision is null for update`,
         [input.observation_ids],
       )
@@ -224,18 +187,18 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       }
       const nextRevision = input.base_revision + 1
       await client.query(
-        `insert into managed_memory_revisions (
+        `insert into revisions (
            revision, artifact_reference, maintenance_audit_reference
          ) values ($1,$2,$3)`,
         [nextRevision, input.memory_version, input.audit_reference],
       )
       await client.query(
-        `update managed_memory_observations set consumed_revision=$1
+        `update observations set consumed_revision=$1
          where observation_id=any($2) and consumed_revision is null`,
         [nextRevision, input.observation_ids],
       )
       await client.query(
-        `update managed_memory_active_revision
+        `update active_revision
          set revision=$1, updated_at=clock_timestamp()
          where singleton=true`,
         [nextRevision],
@@ -249,8 +212,8 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       revision: string
       artifact_reference: ArtifactReference | null
     }>(`select active.revision, revision.artifact_reference
-        from managed_memory_active_revision active
-        left join managed_memory_revisions revision
+        from active_revision active
+        left join revisions revision
           on revision.revision=active.revision
         where active.singleton=true`)
     const row = result.rows[0]
@@ -269,7 +232,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       created_at: Date
     }>(
       `select revision, artifact_reference, maintenance_audit_reference, created_at
-        from managed_memory_revisions where revision=$1`,
+        from revisions where revision=$1`,
       [revision],
     )
     const row = result.rows[0]
@@ -287,7 +250,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       created_at: Date
     }>(
       `select revision, artifact_reference, maintenance_audit_reference, created_at
-        from managed_memory_revisions
+        from revisions
         where ($1::bigint is null or revision < $1)
         order by revision desc limit $2`,
       [beforeRevision ?? null, limit + 1],
