@@ -132,7 +132,7 @@ def _published_transcript_stage_attempt(transcript: Path) -> tuple[str, str]:
     if not order.isdecimal() or stage not in PUBLISHED_TRANSCRIPT_STAGES or not attempt:
         raise ValueError(
             "Published transcript files must be named "
-            "<order>-<stage>-<attempt>.json with stage analyzer, mitigator, or verifier: "
+            "<order>-<stage>-<attempt>.jsonl with stage analyzer, mitigator, or verifier: "
             f"{transcript}"
         )
     return stage, attempt
@@ -144,7 +144,7 @@ def collect_published_transcripts(review_artifact_root: Path) -> list[Transcript
     if not transcripts_root.is_dir():
         return []
     refs: list[TranscriptRef] = []
-    for transcript in sorted(transcripts_root.glob("*.json")):
+    for transcript in sorted(transcripts_root.glob("*.jsonl")):
         stage, attempt = _published_transcript_stage_attempt(transcript)
         refs.append(
             TranscriptRef(
@@ -199,7 +199,7 @@ def stage_transcripts(
     entries: list[tuple[str, Path]] = []
     for index, transcript in enumerate(transcripts, start=1):
         source = transcript.path
-        target = destination / f"{index:04d}-{transcript.label}.json"
+        target = destination / f"{index:04d}-{transcript.label}.jsonl"
         shutil.copy2(source, target)
         mounted = Path("/transcripts") / target.name
         entries.append((transcript.display, mounted))

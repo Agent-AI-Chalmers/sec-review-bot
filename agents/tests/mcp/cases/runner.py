@@ -68,7 +68,7 @@ async def run_mcp_case(
             ),
         )
 
-    transcript = artifacts / "transcripts" / "initial.json"
+    transcript = artifacts / "transcripts" / "initial.jsonl"
     usage = tool_usage_from_transcript(transcript)
     return {
         "case": case.id,

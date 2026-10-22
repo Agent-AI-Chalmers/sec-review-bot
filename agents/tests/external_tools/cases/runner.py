@@ -78,7 +78,7 @@ async def run_external_tool_case(
                 scan_mode="full",
                 review_input=agent_case.review_input,
             )
-            transcript = artifacts / "transcript.json"
+            transcript = artifacts / "transcript.jsonl"
         else:
             result = await verify_repository_case(
                 workspace_snapshot_tar_path=snapshot,
@@ -98,7 +98,7 @@ async def run_external_tool_case(
                 },
                 setup_declaration_content=setup_content,
             )
-            transcript = artifacts / "transcripts" / "initial.json"
+            transcript = artifacts / "transcripts" / "initial.jsonl"
     duration_seconds = monotonic() - started_at
 
     usage = tool_usage_from_transcript(transcript)

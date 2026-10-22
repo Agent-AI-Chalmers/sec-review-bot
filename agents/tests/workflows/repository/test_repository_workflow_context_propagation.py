@@ -49,6 +49,6 @@ async def test_repository_case_activity_binds_trace_context() -> None:
 
     bind_mock.assert_called_once_with(workflow="repository-review")
     assert analyzer_stage_mock.call_args.kwargs["published_transcript_path"] == (
-        Path(published_transcripts_path) / "0001-analyzer-initial.json"
+        Path(published_transcripts_path) / "0001-analyzer-initial.jsonl"
     )
     assert result == analyzer_result

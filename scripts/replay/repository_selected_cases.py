@@ -76,14 +76,21 @@ def _case_index(case_results: list[dict[str, Any]], case_id: str) -> int:
 
 
 def _max_tokens_failure(run_artifacts: Path, case_id: str) -> bool:
-    messages_path = run_artifacts / "cases" / case_id / "analyzer" / "transcript.json"
+    messages_path = run_artifacts / "cases" / case_id / "analyzer" / "transcript.jsonl"
     if not messages_path.is_file():
         return False
     try:
-        messages = json.loads(messages_path.read_text(encoding="utf-8"))
+        events = [
+            json.loads(line)
+            for line in messages_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
     except json.JSONDecodeError:
         return False
-    for message in messages:
+    for event in events:
+        message = event.get("message") if isinstance(event, dict) else None
+        if not isinstance(message, dict):
+            continue
         metadata = message.get("response_metadata") or {}
         if metadata.get("stop_reason") == "max_tokens":
             return True

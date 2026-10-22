@@ -1,4 +1,3 @@
-import json
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -6,6 +5,7 @@ from typing import Any
 import pytest
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from langchain.agents import create_agent
+from langchain.agents.middleware import SummarizationMiddleware
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,7 @@ from sec_review_agents.runtime.changed_files_acceptance_middleware import (
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
 )
+from sec_review_agents.runtime.transcripts import read_transcript_messages
 from tests.review_stages.stages.test_mitigation_changed_files_acceptance import (
     _baseline_snapshot,
     _copy_repo,
@@ -82,7 +83,7 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
         system_prompt="Return the configured structured response.",
     )
     with tempfile.TemporaryDirectory() as tempdir:
-        transcript_path = Path(tempdir) / "transcript.json"
+        transcript_path = Path(tempdir) / "transcript.jsonl"
         result = await invoke_agent_runtime_graph(
             agent=agent,
             agent_name="fake-missing-structured-response",
@@ -90,7 +91,7 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
             user_prompt="Return a patch claim.",
             transcript_paths=(transcript_path,),
         )
-        transcript_messages = json.loads(transcript_path.read_text(encoding="utf-8"))
+        transcript_messages = read_transcript_messages(transcript_path)
 
     assert result["changed_files"] == ["a.txt"]
     assert transcript_messages[0]["type"] == "system"
@@ -111,6 +112,73 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
     ]
     assert transcript_messages[-1]["type"] == "tool"
     assert transcript_messages[-1]["name"] == "PatchClaimProbeOutput"
+
+
+@pytest.mark.asyncio
+async def test_transcript_preserves_messages_replaced_by_summarization(
+    tmp_path: Path,
+) -> None:
+    model = ToolCallingFakeMessagesListChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "lookup_evidence",
+                        "args": {"query": "redirect"},
+                        "id": "call-evidence",
+                    }
+                ],
+            ),
+            structured_tool_call_message(
+                PatchClaimProbeOutput,
+                {
+                    "status": "confirmed",
+                    "changed_files": [],
+                    "rationale": "redirect evidence confirmed the finding",
+                },
+                call_id="call-output",
+            ),
+        ]
+    )
+    agent = create_agent(
+        model=model,
+        tools=[lookup_evidence],
+        response_format=PatchClaimProbeOutput,
+        middleware=[
+            SummarizationMiddleware(
+                model=model,
+                trigger=("messages", 3),
+                keep=("messages", 1),
+                summarizer=lambda _messages: "Earlier context inspected redirect evidence.",
+            )
+        ],
+    )
+    transcript_path = tmp_path / "transcript.jsonl"
+
+    await invoke_agent_runtime_graph(
+        agent=agent,
+        agent_name="summarized-transcript-probe",
+        system_prompt="Review redirect behavior.",
+        user_prompt="Inspect the redirect target.",
+        transcript_paths=(transcript_path,),
+    )
+
+    messages = read_transcript_messages(transcript_path)
+    message_ids = [message["id"] for message in messages]
+    assert len(message_ids) == len(set(message_ids))
+    assert [message["type"] for message in messages] == [
+        "system",
+        "human",
+        "ai",
+        "tool",
+        "human",
+        "ai",
+        "tool",
+    ]
+    assert messages[1]["content"] == "Inspect the redirect target."
+    assert messages[4]["additional_kwargs"]["lc_source"] == "summarization"
+    assert "Earlier context" in messages[4]["content"]
 
 
 def test_missing_structured_response_middleware_keeps_tool_agent_in_one_invoke() -> (

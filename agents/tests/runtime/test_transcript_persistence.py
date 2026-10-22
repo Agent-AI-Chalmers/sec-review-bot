@@ -1,18 +1,21 @@
-import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import pytest
 
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.transcripts import TranscriptWriter
+from sec_review_agents.runtime.transcripts import (
+    TranscriptWriter,
+    read_transcript_events,
+    read_transcript_messages,
+)
 
 
 class _FakeMessage:
-    def __init__(self, content: str) -> None:
+    def __init__(self, content: str, *, message_id: str = "msg-1") -> None:
         self.type = "human"
-        self.id = "msg-1"
+        self.id = message_id
         self.name = None
         self.content = content
         self.additional_kwargs: dict[str, Any] = {}
@@ -23,51 +26,85 @@ class _FakeMessage:
         self.usage_metadata = None
 
 
-def test_transcript_writes_flat_message_array(tmp_path: Path) -> None:
-    transcript_path = tmp_path / "transcript.json"
-    writer = TranscriptWriter((transcript_path,), agent_name="test-agent")
+class _ImmutableMessage:
+    __slots__ = ("content", "type")
+
+    def __init__(self, content: str) -> None:
+        self.type = "human"
+        self.content = content
+
+
+def test_transcript_appends_jsonl_message_events(tmp_path: Path) -> None:
+    transcript_path = tmp_path / "transcript.jsonl"
+    writer = TranscriptWriter((transcript_path,))
 
     writer.write_messages([_FakeMessage("first")])
-    writer.write_messages([_FakeMessage("second")])
+    writer.write_messages([_FakeMessage("second", message_id="msg-2")])
 
-    messages = json.loads(transcript_path.read_text(encoding="utf-8"))
-    assert [item["index"] for item in messages] == [0, 1]
+    events = read_transcript_events(transcript_path)
+    messages = read_transcript_messages(transcript_path)
+    assert [item["seq"] for item in events] == [1, 2]
+    assert [item["event"] for item in events] == ["message", "message"]
     assert [item["content"] for item in messages] == ["first", "second"]
 
 
 def test_transcript_writer_fans_out_to_multiple_paths(tmp_path: Path) -> None:
-    primary = tmp_path / "stage" / "transcript.json"
-    consumer = tmp_path / "transcripts" / "0001-analyzer-initial.json"
-    writer = TranscriptWriter((primary, consumer), agent_name="test-agent")
+    primary = tmp_path / "stage" / "transcript.jsonl"
+    consumer = tmp_path / "transcripts" / "0001-analyzer-initial.jsonl"
+    writer = TranscriptWriter((primary, consumer))
 
     writer.write_messages([_FakeMessage("shared")])
 
     assert primary.read_text(encoding="utf-8") == consumer.read_text(encoding="utf-8")
-    messages = json.loads(consumer.read_text(encoding="utf-8"))
+    messages = read_transcript_messages(consumer)
     assert messages[0]["content"] == "shared"
 
 
-def test_transcript_exports_system_prompt_as_first_message(tmp_path: Path) -> None:
-    transcript_path = tmp_path / "transcript.json"
-    writer = TranscriptWriter((transcript_path,), agent_name="test-agent")
-    writer.write_system_prompt("Base system prompt.")
+def test_transcript_writes_system_message(tmp_path: Path) -> None:
+    transcript_path = tmp_path / "transcript.jsonl"
+    writer = TranscriptWriter((transcript_path,))
+    writer.write_messages([{"type": "system", "content": "Base system prompt."}])
 
-    message = json.loads(transcript_path.read_text(encoding="utf-8"))[0]
-    assert message["index"] == 0
+    message = read_transcript_messages(transcript_path)[0]
     assert message["type"] == "system"
     assert message["content"] == "Base system prompt."
 
 
+def test_transcript_assigns_id_before_deduplicating_message(tmp_path: Path) -> None:
+    transcript_path = tmp_path / "transcript.jsonl"
+    writer = TranscriptWriter((transcript_path,))
+    message = _FakeMessage("repeated", message_id="")
+
+    writer.write_messages([message])
+    writer.write_messages([message])
+
+    messages = read_transcript_messages(transcript_path)
+    assert isinstance(message.id, str) and message.id
+    assert [item["id"] for item in messages] == [message.id]
+
+
+def test_transcript_rejects_message_when_generated_id_cannot_be_persisted(
+    tmp_path: Path,
+) -> None:
+    writer = TranscriptWriter((tmp_path / "transcript.jsonl",))
+
+    with pytest.raises(
+        TypeError,
+        match="Transcript messages without IDs must allow assigning an id",
+    ):
+        writer.write_messages([_ImmutableMessage("immutable")])
+
+
 @pytest.mark.asyncio
 async def test_agent_runtime_graph_prepends_system_message(tmp_path: Path) -> None:
-    transcript_path = tmp_path / "transcript.json"
+    transcript_path = tmp_path / "transcript.jsonl"
     agent = Mock()
-    agent.ainvoke = AsyncMock(
-        return_value={
-            "messages": [{"role": "human", "content": "User prompt."}],
-            "structured_response": {"ok": True},
-        }
-    )
+
+    async def astream(*args: Any, **kwargs: Any):
+        _ = args, kwargs
+        yield {"model": {"structured_response": {"ok": True}}}
+
+    agent.astream = astream
     await invoke_agent_runtime_graph(
         agent=agent,
         agent_name="test-agent",
@@ -76,6 +113,6 @@ async def test_agent_runtime_graph_prepends_system_message(tmp_path: Path) -> No
         transcript_paths=(transcript_path,),
     )
 
-    messages = json.loads(transcript_path.read_text(encoding="utf-8"))
+    messages = read_transcript_messages(transcript_path)
     assert [item["type"] for item in messages] == ["system", "human"]
     assert messages[0]["content"] == "Base system prompt."

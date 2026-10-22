@@ -48,7 +48,7 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
     memory_root = initialize_memory_store(root / "memory")
 
     _write_transcript(
-        transcript_root / "0001-analyzer-initial.json",
+        transcript_root / "0001-analyzer-initial.jsonl",
         [
             {
                 "index": 0,
@@ -69,7 +69,7 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
         ],
     )
     _write_transcript(
-        transcript_root / "0002-mitigator-initial.json",
+        transcript_root / "0002-mitigator-initial.jsonl",
         [
             {
                 "index": 0,
@@ -82,7 +82,7 @@ async def test_llm_extracts_and_maintains_memory_from_review_transcripts() -> No
         ],
     )
     _write_transcript(
-        transcript_root / "0003-verifier-initial.json",
+        transcript_root / "0003-verifier-initial.jsonl",
         [
             {
                 "index": 0,

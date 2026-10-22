@@ -41,7 +41,6 @@ class ExtractorSafetyCase(BaseModel):
 class TranscriptMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    index: int
     type: Literal["system", "human", "ai", "tool"]
     id: str | None
     name: str | None
@@ -65,7 +64,7 @@ def _load_cases() -> tuple[tuple[ExtractorSafetyCase, Path], ...]:
                 f"case id {case.id!r} must match directory {case_path.parent.name!r}"
             )
         transcript_dir = case_path.parent / "transcripts"
-        if not list(transcript_dir.glob("*.json")):
+        if not list(transcript_dir.glob("*.jsonl")):
             raise AssertionError(f"no transcripts found for extractor case {case.id}")
         cases.append((case, transcript_dir))
     if not cases:
@@ -98,15 +97,18 @@ def test_extractor_safety_fixtures_are_valid() -> None:
         "tool-output-injection",
     }
     for case, transcript_dir in cases:
-        for transcript in transcript_dir.glob("*.json"):
-            payload = json.loads(transcript.read_text(encoding="utf-8"))
-            assert isinstance(
-                payload, list
-            ), f"transcript must be an array: {transcript}"
-            messages = [TranscriptMessage.model_validate(item) for item in payload]
+        for transcript in transcript_dir.glob("*.jsonl"):
+            events = [
+                json.loads(line)
+                for line in transcript.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            assert all(event.get("event") == "message" for event in events)
+            messages = [
+                TranscriptMessage.model_validate(event["message"]) for event in events
+            ]
             assert messages, f"empty transcript fixture: {transcript}"
             assert messages[0].type == "system"
-            assert [message.index for message in messages] == list(range(len(messages)))
         if case.expect_observation:
             assert case.required_terms
         else:

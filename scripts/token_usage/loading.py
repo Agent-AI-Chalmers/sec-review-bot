@@ -182,8 +182,16 @@ def _fallback_model_id(messages: list[dict[str, Any]]) -> str | None:
 
 
 def _read_transcript_usage(path: Path, *, stage: str) -> StageUsage:
-    value = json.loads(path.read_text(encoding="utf-8"))
-    messages = value if isinstance(value, list) else []
+    messages: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        event = json.loads(line)
+        if not isinstance(event, dict) or event.get("event") != "message":
+            continue
+        message = event.get("message")
+        if isinstance(message, dict):
+            messages.append(message)
     records = _usage_records_from_value(messages)
     totals = {field: 0 for field in NUMERIC_FIELDS}
     for record, _model_id in records:
@@ -234,7 +242,7 @@ def _classify_transcript(artifact_root: Path, path: Path) -> tuple[str, str] | N
     A transcript belongs to the nearest ancestor directory that is a known stage
     directory, so container directories such as `cases/`, `batches/`, or a delivery id
     never become a stage. The attempt comes from how the stage nests the file: a bare
-    `transcript.json` is the initial attempt, a file under `transcripts/` is named by that
+    `transcript.jsonl` is the initial attempt, a file under `transcripts/` is named by that
     file, and any other subdirectory names the attempt. Published copies at the artifact
     root are not under a stage directory and return ``None``.
     """
@@ -264,9 +272,9 @@ def _discover_transcripts(artifact_root: Path) -> list[tuple[Path, str, str]]:
     published_root = artifact_root / TRANSCRIPTS_DIRNAME
     transcripts: set[tuple[Path, str, str]] = set()
     unclassified: list[Path] = []
-    for candidate in artifact_root.rglob("*.json"):
+    for candidate in artifact_root.rglob("*.jsonl"):
         if (
-            candidate.name != "transcript.json"
+            candidate.name != "transcript.jsonl"
             and candidate.parent.name != TRANSCRIPTS_DIRNAME
         ):
             continue

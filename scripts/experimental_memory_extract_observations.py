@@ -35,7 +35,7 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         help=(
             "Review artifact directories containing transcripts/, or transcript "
-            "JSON transcript files."
+            "JSONL transcript files."
         ),
     )
     parser.add_argument(

@@ -19,7 +19,7 @@ def test_review_stage_transcript_path_uses_flat_transcripts_directory(
             order=1,
             stage="analyzer",
         )
-        == tmp_path / "transcripts" / "0001-analyzer-initial.json"
+        == tmp_path / "transcripts" / "0001-analyzer-initial.jsonl"
     )
 
 
@@ -31,7 +31,7 @@ def test_transcript_file_numbers_stage_attempt(tmp_path: Path) -> None:
             stage="mitigator",
             attempt="retry-1",
         )
-        == tmp_path / "transcripts" / "0004-mitigator-retry-1.json"
+        == tmp_path / "transcripts" / "0004-mitigator-retry-1.jsonl"
     )
 
 

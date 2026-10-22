@@ -8,7 +8,10 @@ from pydantic import ValidationError
 
 import sec_review_agents.scan_stages.discovery.stage as discovery_stage
 from sec_review_agents.agents.discovery.model import DiscoveryLocation
-from sec_review_agents.runtime.transcripts import TranscriptWriter
+from sec_review_agents.runtime.transcripts import (
+    TranscriptWriter,
+    read_transcript_messages,
+)
 
 
 def test_discovery_location_accepts_file_level_anchor() -> None:
@@ -163,7 +166,7 @@ async def test_execute_discovery_persists_chunk_message_history(
             self.tool_call_chunks: list[dict[str, Any]] = []
 
     async def fake_invoke_agent_runtime_graph(**kwargs):
-        writer = TranscriptWriter(kwargs["transcript_paths"], agent_name="test")
+        writer = TranscriptWriter(kwargs["transcript_paths"])
         writer.write_messages([FakeMessage()])
         return {"candidates": []}
 
@@ -197,8 +200,8 @@ async def test_execute_discovery_persists_chunk_message_history(
             discovery_artifacts_path=artifact_root,
         )
 
-    transcript_file = artifact_root / "transcripts" / "discovery-chunk-0001.json"
-    messages = json.loads(transcript_file.read_text(encoding="utf-8"))
+    transcript_file = artifact_root / "transcripts" / "discovery-chunk-0001.jsonl"
+    messages = read_transcript_messages(transcript_file)
     assert messages[0]["content"] == "chunk scan response"
 
 

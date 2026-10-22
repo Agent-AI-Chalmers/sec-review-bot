@@ -94,7 +94,7 @@ def _memory_observations_dir(memory_store_dir: Path) -> Path:
 
 
 def test_stage_transcripts_copies_ordered_json_files(tmp_path: Path) -> None:
-    source = tmp_path / "run" / "transcript.json"
+    source = tmp_path / "run" / "transcript.jsonl"
     source.parent.mkdir()
     source.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -115,10 +115,10 @@ def test_stage_transcripts_copies_ordered_json_files(tmp_path: Path) -> None:
     assert staged.entries == [
         (
             "transcript",
-            Path("/transcripts/0001-transcript.json"),
+            Path("/transcripts/0001-transcript.jsonl"),
         )
     ]
-    assert (destination / "0001-transcript.json").read_text(encoding="utf-8") == (
+    assert (destination / "0001-transcript.jsonl").read_text(encoding="utf-8") == (
         '[{"index":0,"type":"ai","content":"message"}]\n'
     )
     assert not (destination / "MANIFEST.md").exists()
@@ -128,7 +128,7 @@ def test_collect_review_memory_transcripts_uses_flat_published_files(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    published = review_root / "transcripts" / "0001-analyzer-initial.json"
+    published = review_root / "transcripts" / "0001-analyzer-initial.jsonl"
     unrelated = review_root / "notes" / "scratch.json"
     published.parent.mkdir(parents=True)
     unrelated.parent.mkdir(parents=True)
@@ -154,7 +154,7 @@ def test_collect_review_memory_transcripts_rejects_invalid_published_name(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    transcript = review_root / "transcripts" / "analyzer.json"
+    transcript = review_root / "transcripts" / "analyzer.jsonl"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -185,21 +185,21 @@ def test_stage_review_transcripts_writes_ordered_prompt(tmp_path: Path) -> None:
     assert staged.entries == [
         (
             "analyzer initial",
-            Path("/transcripts/0001-analyzer-initial.json"),
+            Path("/transcripts/0001-analyzer-initial.jsonl"),
         ),
         (
             "mitigator initial",
-            Path("/transcripts/0002-mitigator-initial.json"),
+            Path("/transcripts/0002-mitigator-initial.jsonl"),
         ),
         (
             "verifier initial",
-            Path("/transcripts/0003-verifier-initial.json"),
+            Path("/transcripts/0003-verifier-initial.jsonl"),
         ),
     ]
     prompt = build_extractor_prompt(staged)
-    assert "analyzer initial: `/transcripts/0001-analyzer-initial.json`" in prompt
-    assert "mitigator initial: `/transcripts/0002-mitigator-initial.json`" in prompt
-    assert "verifier initial: `/transcripts/0003-verifier-initial.json`" in prompt
+    assert "analyzer initial: `/transcripts/0001-analyzer-initial.jsonl`" in prompt
+    assert "mitigator initial: `/transcripts/0002-mitigator-initial.jsonl`" in prompt
+    assert "verifier initial: `/transcripts/0003-verifier-initial.jsonl`" in prompt
     assert str(tmp_path) not in prompt
     assert "source:" not in prompt
     assert "/transcripts/MANIFEST.md" not in prompt
@@ -692,7 +692,7 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -751,7 +751,7 @@ async def test_extract_memory_observations_repeated_id_updates_pending_row(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -799,7 +799,7 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -843,7 +843,7 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
 ) -> None:
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"
@@ -893,7 +893,7 @@ async def test_extract_memory_observations_skips_publish_when_observation_proces
     """Do not republish work that another maintainer consumed during extraction."""
     memory_root = tmp_path / "memory"
     memory_store.initialize_memory_store(memory_root)
-    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.json"
+    transcript = tmp_path / "review" / "transcripts" / "0001-analyzer-initial.jsonl"
     transcript.parent.mkdir(parents=True)
     transcript.write_text(
         '[{"index":0,"type":"ai","content":"message"}]\n', encoding="utf-8"

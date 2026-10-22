@@ -124,7 +124,7 @@ async def run_cvss_v4_scoring_stage(
             tar_path=baseline_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        transcript_path = cvss_artifacts_path / "transcript.json"
+        transcript_path = cvss_artifacts_path / "transcript.jsonl"
         backend = build_backend(workspace_path)
         async with amanaged_backend(backend):
             agent = await create_cvss_agent_graph(
@@ -150,7 +150,7 @@ async def run_cvss_v4_scoring_stage(
 def reset_cvss_artifacts(*, cvss_artifacts_path: Path) -> None:
     reset_stage_attempt_artifacts(
         cvss_artifacts_path,
-        filenames=("cvss-v4-result.json", "transcript.json"),
+        filenames=("cvss-v4-result.json", "transcript.jsonl"),
     )
 
 

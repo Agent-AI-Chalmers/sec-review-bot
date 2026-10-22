@@ -5,41 +5,50 @@ from tests.runtime.transcript_artifact_helpers import (
 )
 
 
-def test_tool_interactions_pair_same_named_calls_with_their_results(tmp_path) -> None:
-    transcript = tmp_path / "transcript.json"
+def _write_messages(transcript, messages: list[dict]) -> None:
     transcript.write_text(
-        json.dumps(
-            [
-                {
-                    "type": "ai",
-                    "tool_calls": [
-                        {
-                            "id": "call-first",
-                            "name": "playwright_browser_navigate",
-                            "args": {"url": "https://example.test/first"},
-                        },
-                        {
-                            "id": "call-second",
-                            "name": "playwright_browser_navigate",
-                            "args": {"url": "https://example.test/second"},
-                        },
-                    ],
-                },
-                {
-                    "type": "tool",
-                    "tool_call_id": "call-second",
-                    "name": "playwright_browser_navigate",
-                    "content": "second result",
-                },
-                {
-                    "type": "tool",
-                    "tool_call_id": "call-first",
-                    "name": "playwright_browser_navigate",
-                    "content": "first result",
-                },
-            ]
-        ),
+        "\n".join(
+            json.dumps({"seq": index, "event": "message", "message": message})
+            for index, message in enumerate(messages, start=1)
+        )
+        + "\n",
         encoding="utf-8",
+    )
+
+
+def test_tool_interactions_pair_same_named_calls_with_their_results(tmp_path) -> None:
+    transcript = tmp_path / "transcript.jsonl"
+    _write_messages(
+        transcript,
+        [
+            {
+                "type": "ai",
+                "tool_calls": [
+                    {
+                        "id": "call-first",
+                        "name": "playwright_browser_navigate",
+                        "args": {"url": "https://example.test/first"},
+                    },
+                    {
+                        "id": "call-second",
+                        "name": "playwright_browser_navigate",
+                        "args": {"url": "https://example.test/second"},
+                    },
+                ],
+            },
+            {
+                "type": "tool",
+                "tool_call_id": "call-second",
+                "name": "playwright_browser_navigate",
+                "content": "second result",
+            },
+            {
+                "type": "tool",
+                "tool_call_id": "call-first",
+                "name": "playwright_browser_navigate",
+                "content": "first result",
+            },
+        ],
     )
 
     assert tool_interactions_from_transcript(transcript) == [
@@ -57,27 +66,25 @@ def test_tool_interactions_pair_same_named_calls_with_their_results(tmp_path) ->
 
 
 def test_tool_interactions_ignore_calls_without_stable_ids(tmp_path) -> None:
-    transcript = tmp_path / "transcript.json"
-    transcript.write_text(
-        json.dumps(
-            [
-                {
-                    "type": "ai",
-                    "tool_calls": [
-                        {
-                            "name": "playwright_browser_navigate",
-                            "args": {"url": "https://example.test"},
-                        }
-                    ],
-                },
-                {
-                    "type": "tool",
-                    "name": "playwright_browser_navigate",
-                    "content": "unattributed result",
-                },
-            ]
-        ),
-        encoding="utf-8",
+    transcript = tmp_path / "transcript.jsonl"
+    _write_messages(
+        transcript,
+        [
+            {
+                "type": "ai",
+                "tool_calls": [
+                    {
+                        "name": "playwright_browser_navigate",
+                        "args": {"url": "https://example.test"},
+                    }
+                ],
+            },
+            {
+                "type": "tool",
+                "name": "playwright_browser_navigate",
+                "content": "unattributed result",
+            },
+        ],
     )
 
     assert tool_interactions_from_transcript(transcript) == []

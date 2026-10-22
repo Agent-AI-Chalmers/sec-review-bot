@@ -89,7 +89,7 @@ async def run_analysis_stage(
 def reset_analysis_artifacts(*, analyzer_artifacts_path: Path) -> None:
     reset_stage_attempt_artifacts(
         analyzer_artifacts_path,
-        filenames=("analysis-result.json", "transcript.json"),
+        filenames=("analysis-result.json", "transcript.jsonl"),
     )
 
 
@@ -98,7 +98,7 @@ def prepare_analysis_transcript(
     analyzer_artifacts_path: Path,
     published_transcript_path: Path | None,
 ) -> tuple[Path, ...]:
-    local_transcript_path = analyzer_artifacts_path / "transcript.json"
+    local_transcript_path = analyzer_artifacts_path / "transcript.jsonl"
     if published_transcript_path is None:
         return (local_transcript_path,)
 

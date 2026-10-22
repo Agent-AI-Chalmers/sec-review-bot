@@ -1,6 +1,6 @@
 # Memory Extractor Safety Fixtures
 
-Each case contains production-shaped JSON review transcripts and a `case.json` semantic oracle. The oracle checks whether extraction should occur, which technical concepts must survive, which sensitive canaries must not survive, and whether extraction leaves `MEMORY.md` unchanged. It intentionally does not prescribe exact model wording.
+Each case contains production-shaped JSONL review transcripts and a `case.json` semantic oracle. The oracle checks whether extraction should occur, which technical concepts must survive, which sensitive canaries must not survive, and whether extraction leaves `MEMORY.md` unchanged. It intentionally does not prescribe exact model wording.
 
 Cases with `allow_skip` isolate a confidentiality property: skipping is acceptable when the lesson is not novel, but any produced observation must still satisfy the semantic oracle and exclude every forbidden value.
 

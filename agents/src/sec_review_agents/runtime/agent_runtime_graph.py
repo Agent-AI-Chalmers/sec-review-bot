@@ -6,6 +6,7 @@ from deepagents.backends.protocol import BackendProtocol
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import merge_configs
 from langgraph.graph.state import CompiledStateGraph
@@ -73,17 +74,13 @@ async def invoke_agent_runtime_graph(
     transcript_paths: tuple[Path, ...] = (),
     config: RunnableConfig | None = None,
 ) -> dict:
-    """Run a configured LangGraph agent and return its structured payload."""
+    """Return only the agent's structured payload, not its messages or graph state."""
 
     recursion_limit = compute_graph_recursion_limit(agent)
     tracing_config = build_tracing_config(
         agent_name=agent_name,
     )
-    transcript_writer = (
-        TranscriptWriter(transcript_paths, agent_name=agent_name)
-        if transcript_paths
-        else None
-    )
+    transcript_writer = TranscriptWriter(transcript_paths) if transcript_paths else None
 
     invoke_config = merge_configs(
         config,
@@ -97,28 +94,32 @@ async def invoke_agent_runtime_graph(
         recursion_limit=recursion_limit,
         tracing_enabled=tracing_config.enabled,
     )
+    user_message = HumanMessage(content=user_prompt)
     if transcript_writer is not None:
-        transcript_writer.write_system_prompt(system_prompt)
-
-    messages: list[Any] = [
-        {
-            "role": "user",
-            "content": user_prompt,
-        }
-    ]
-
-    async def invoke_agent() -> dict:
-        agent_result = await agent.ainvoke(
-            {"messages": messages},
-            config=invoke_config,
+        transcript_writer.write_messages(
+            [SystemMessage(content=system_prompt), user_message]
         )
 
-        if transcript_writer is not None:
-            transcript_writer.write_messages(
-                agent_result.get("messages") if isinstance(agent_result, dict) else None
-            )
-
-        return agent_result if isinstance(agent_result, dict) else {}
+    async def invoke_agent() -> dict:
+        structured_result: Any | None = None
+        async for update in agent.astream(
+            {"messages": [user_message]},
+            config=invoke_config,
+            stream_mode="updates",
+        ):
+            if not isinstance(update, Mapping):
+                continue
+            for node_update in update.values():
+                if not isinstance(node_update, Mapping):
+                    continue
+                if transcript_writer is not None:
+                    update_messages = node_update.get("messages")
+                    if isinstance(update_messages, list):
+                        transcript_writer.write_messages(update_messages)
+                candidate = node_update.get("structured_response")
+                if candidate is not None:
+                    structured_result = candidate
+        return {"structured_response": structured_result}
 
     try:
         agent_result_mapping = await invoke_agent()
