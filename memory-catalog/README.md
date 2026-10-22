@@ -6,6 +6,8 @@ Language: English | [中文](README.zh.md)
 
 It owns the PostgreSQL catalog, observation registration, immutable memory revision history, the active revision pointer, and compare-and-swap maintenance commit. It does not run agents, read transcripts, access object storage, or poll Temporal task queues.
 
+The service owns its PostgreSQL database and its `schema_versions` ledger. The default integrated deployment places that database beside, but separate from, the Control Plane database in the same PostgreSQL instance.
+
 ## Run Locally
 
 ```bash
