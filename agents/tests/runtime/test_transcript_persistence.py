@@ -3,6 +3,7 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from langchain_core.messages import ToolMessage
 
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.transcripts import (
@@ -68,6 +69,28 @@ def test_transcript_writes_system_message(tmp_path: Path) -> None:
     message = read_transcript_messages(transcript_path)[0]
     assert message["type"] == "system"
     assert message["content"] == "Base system prompt."
+
+
+def test_transcript_preserves_tool_result_linkage_and_metadata(tmp_path: Path) -> None:
+    transcript_path = tmp_path / "transcript.jsonl"
+    writer = TranscriptWriter((transcript_path,))
+
+    writer.write_messages(
+        [
+            ToolMessage(
+                content="tool output",
+                tool_call_id="call-1",
+                name="inspect",
+                status="error",
+                artifact={"stderr": "failure detail"},
+            )
+        ]
+    )
+
+    message = read_transcript_messages(transcript_path)[0]
+    assert message["tool_call_id"] == "call-1"
+    assert message["status"] == "error"
+    assert message["artifact"] == {"stderr": "failure detail"}
 
 
 def test_transcript_assigns_id_before_deduplicating_message(tmp_path: Path) -> None:

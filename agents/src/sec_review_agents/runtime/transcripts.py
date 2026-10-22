@@ -101,7 +101,7 @@ def _message_type(message: Any) -> str:
 
 def serialize_agent_message(message: Any, *, message_id: str) -> dict:
     if isinstance(message, dict):
-        return {
+        serialized = {
             "type": _message_type(message),
             "id": message_id,
             "name": message.get("name"),
@@ -113,7 +113,19 @@ def serialize_agent_message(message: Any, *, message_id: str) -> dict:
             "tool_call_chunks": json_safe(message.get("tool_call_chunks", [])),
             "usage_metadata": json_safe(message.get("usage_metadata")),
         }
-    return {
+        # Tool linkage belongs only on tool results; null fields on every other
+        # message would make the append-only artifact noisier without adding data.
+        if serialized["type"] == "tool":
+            serialized.update(
+                {
+                    "tool_call_id": message.get("tool_call_id"),
+                    "status": message.get("status"),
+                    "artifact": json_safe(message.get("artifact")),
+                }
+            )
+        return serialized
+
+    serialized = {
         "type": _message_type(message),
         "id": message_id,
         "name": getattr(message, "name", None),
@@ -125,6 +137,16 @@ def serialize_agent_message(message: Any, *, message_id: str) -> dict:
         "tool_call_chunks": json_safe(getattr(message, "tool_call_chunks", [])),
         "usage_metadata": json_safe(getattr(message, "usage_metadata", None)),
     }
+    # Keep tool-call correlation and result metadata next to the tool message.
+    if serialized["type"] == "tool":
+        serialized.update(
+            {
+                "tool_call_id": getattr(message, "tool_call_id", None),
+                "status": getattr(message, "status", None),
+                "artifact": json_safe(getattr(message, "artifact", None)),
+            }
+        )
+    return serialized
 
 
 def read_transcript_events(path: Path) -> list[dict[str, Any]]:
