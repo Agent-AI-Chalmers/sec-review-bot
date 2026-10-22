@@ -34,13 +34,15 @@ contract-tools:
   # without wiring it here.
   - 'control-plane/src/contract-types-generated.ts'
   - 'control-plane/src/error-codes-generated.ts'
-  - 'control-plane/src/runner-api-schema.ts'
+  - 'control-plane/src/execution-api-schema.ts'
   - 'apps/github-integration/src/control-plane/control-plane-api.ts'
   - 'apps/control-plane-ui/src/list-run-query-params.ts'
   - 'apps/control-plane-ui/src/control-plane-api-types.ts'
   - 'apps/control-plane-ui/src/state-machines.generated.ts'
   - 'control-plane/src/state-machines.generated.ts'
-  - 'apps/github-integration/src/runner/integration-contract-types-generated.ts'
+  - 'apps/github-integration/src/execution/integration-contract-types-generated.ts'
+  - 'execution-gateway/src/contract-types-generated.ts'
+  - 'memory-catalog/src/contract-types-generated.ts'
   # CI tooling.
   - '.github/ci/**'
   - '.github/workflows/ci.yml'
@@ -55,6 +57,17 @@ control-plane:
   - 'apps/github-integration/src/control-plane/control-plane-api.ts'
   # CI tooling.
   - '.github/ci/**'
+  - '.github/workflows/ci.yml'
+
+execution-gateway:
+  - 'execution-gateway/**'
+  - 'contracts/integration-contract/**'
+  - 'contracts/execution-contract/**'
+  - '.github/workflows/ci.yml'
+
+memory-catalog:
+  - 'memory-catalog/**'
+  - 'contracts/memory-catalog-api/**'
   - '.github/workflows/ci.yml'
 
 github-integration:
@@ -77,7 +90,7 @@ agents:
   - 'agents/**'
   # The wheel packages the canonical contract schemas.
   - 'contracts/**'
-  # `.sec-review/setup.yml` is parsed and executed by the runner, so a change to
+  # `.sec-review/setup.yml` is parsed and executed by the Execution Worker, so a change to
   # it can affect the agents suite's contract (and the repository's own setup).
   - '.sec-review/**'
   # CI tooling.

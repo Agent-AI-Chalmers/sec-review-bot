@@ -63,7 +63,7 @@ def _parse_args() -> argparse.Namespace:
     id_group.add_argument(
         "--job-id",
         default=None,
-        help="Stable extraction job id used to derive the observation id.",
+        help="Stable extraction id used to derive the observation id.",
     )
     parser.add_argument(
         "--run-id",

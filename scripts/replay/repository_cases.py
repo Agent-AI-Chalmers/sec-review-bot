@@ -213,7 +213,7 @@ def _case_review_request(
         ),
         "timeout_seconds": DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
         "runtime_context": {},
-        "memory_extraction_registration_enabled": False,
+        "memory_extraction_enabled": False,
     }
 
 

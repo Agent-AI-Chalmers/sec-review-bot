@@ -9,8 +9,9 @@ storage client: normal services never receive the root credentials used here.
 The resulting ownership model is:
 
 * GitHub integration can read and write immutable input bundles.
-* The execution worker can only read input bundles.
-* Runner Service can read and write terminal result artifacts.
+* The execution worker reads input bundles and reads/writes run transcripts,
+  immutable memory versions, and memory-agent audit bundles.
+* Execution Gateway can read and write terminal result artifacts.
 * Control Plane UI can only read terminal result artifacts.
 
 All provisioning operations are safe to repeat. Rerunning the container also
@@ -140,11 +141,11 @@ def main() -> None:
     integration_access_key = os.environ.get(
         "SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY", "sec-review-integration"
     )
-    runner_access_key = os.environ.get(
-        "SEC_REVIEW_RUNNER_S3_ACCESS_KEY", "sec-review-runner"
+    execution_worker_access_key = os.environ.get(
+        "SEC_REVIEW_EXECUTION_S3_ACCESS_KEY", "sec-review-execution-worker"
     )
     integration_secret_key = required_env("SEC_REVIEW_INTEGRATION_S3_SECRET_KEY")
-    runner_secret_key = required_env("SEC_REVIEW_RUNNER_S3_SECRET_KEY")
+    execution_worker_secret_key = required_env("SEC_REVIEW_EXECUTION_S3_SECRET_KEY")
     storage_writer_access_key = os.environ.get(
         "SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY",
         "sec-review-artifact-storage-writer",
@@ -158,18 +159,21 @@ def main() -> None:
 
     wait_for_rustfs()
     put_user(integration_access_key, integration_secret_key)
-    put_user(runner_access_key, runner_secret_key)
+    put_user(execution_worker_access_key, execution_worker_secret_key)
     put_user(storage_writer_access_key, storage_writer_secret_key)
     put_user(ui_reader_access_key, ui_reader_secret_key)
     put_policy("sec-review-input-writer", policy_root / "integration-policy.json")
-    put_policy("sec-review-input-reader", policy_root / "runner-policy.json")
+    put_policy(
+        "sec-review-execution-worker-storage",
+        policy_root / "execution-worker-policy.json",
+    )
     put_policy("sec-review-artifact-storage-writer", policy_root / "artifact-policy.json")
     put_policy(
         "sec-review-ui-artifact-reader",
         policy_root / "ui-artifact-reader-policy.json",
     )
     attach_policy("sec-review-input-writer", integration_access_key)
-    attach_policy("sec-review-input-reader", runner_access_key)
+    attach_policy("sec-review-execution-worker-storage", execution_worker_access_key)
     attach_policy("sec-review-artifact-storage-writer", storage_writer_access_key)
     attach_policy("sec-review-ui-artifact-reader", ui_reader_access_key)
 
