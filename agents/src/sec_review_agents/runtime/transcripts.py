@@ -99,11 +99,11 @@ def _message_type(message: Any) -> str:
     return "unknown"
 
 
-def serialize_agent_message(message: Any) -> dict:
+def serialize_agent_message(message: Any, *, message_id: str) -> dict:
     if isinstance(message, dict):
         return {
             "type": _message_type(message),
-            "id": message.get("id"),
+            "id": message_id,
             "name": message.get("name"),
             "content": json_safe(message.get("content")),
             "additional_kwargs": json_safe(message.get("additional_kwargs", {})),
@@ -115,7 +115,7 @@ def serialize_agent_message(message: Any) -> dict:
         }
     return {
         "type": _message_type(message),
-        "id": getattr(message, "id", None),
+        "id": message_id,
         "name": getattr(message, "name", None),
         "content": json_safe(getattr(message, "content", None)),
         "additional_kwargs": json_safe(getattr(message, "additional_kwargs", {})),
@@ -157,6 +157,7 @@ class TranscriptWriter:
         self.path = self.paths[0]
         self._seq = 0
         self._seen_message_ids: set[str] = set()
+        self._object_message_ids: dict[int, tuple[Any, str]] = {}
         self._lock = Lock()
         for path in self.paths:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,8 +170,7 @@ class TranscriptWriter:
                 transcript_file.write(encoded)
                 transcript_file.write("\n")
 
-    @staticmethod
-    def _ensure_message_id(message: Any) -> str:
+    def _ensure_message_id(self, message: Any) -> str:
         if isinstance(message, dict):
             message_id = message.get("id")
             if not isinstance(message_id, str) or not message_id:
@@ -180,14 +180,19 @@ class TranscriptWriter:
 
         message_id = getattr(message, "id", None)
         if not isinstance(message_id, str) or not message_id:
+            object_id = id(message)
+            cached = self._object_message_ids.get(object_id)
+            if cached is not None and cached[0] is message:
+                return cached[1]
+
             message_id = str(uuid4())
             # Persist the ID so repeated stream snapshots can be de-duplicated.
             try:
                 message.id = message_id
-            except (AttributeError, TypeError) as exc:
-                raise TypeError(
-                    "Transcript messages without IDs must allow assigning an id."
-                ) from exc
+            except AttributeError, TypeError:
+                # Keep a strong reference so Python cannot reuse the object ID
+                # for a different message during this writer's lifetime.
+                self._object_message_ids[object_id] = (message, message_id)
         return message_id
 
     def write_messages(self, messages: list | None) -> None:
@@ -206,7 +211,10 @@ class TranscriptWriter:
                     {
                         "seq": self._seq,
                         "event": "message",
-                        "message": serialize_agent_message(message),
+                        "message": serialize_agent_message(
+                            message,
+                            message_id=message_id,
+                        ),
                     }
                 )
 

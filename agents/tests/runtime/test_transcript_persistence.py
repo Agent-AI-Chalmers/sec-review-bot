@@ -83,16 +83,34 @@ def test_transcript_assigns_id_before_deduplicating_message(tmp_path: Path) -> N
     assert [item["id"] for item in messages] == [message.id]
 
 
-def test_transcript_rejects_message_when_generated_id_cannot_be_persisted(
+def test_transcript_uses_object_identity_when_generated_id_cannot_be_persisted(
     tmp_path: Path,
 ) -> None:
-    writer = TranscriptWriter((tmp_path / "transcript.jsonl",))
+    transcript_path = tmp_path / "transcript.jsonl"
+    writer = TranscriptWriter((transcript_path,))
+    message = _ImmutableMessage("immutable")
 
-    with pytest.raises(
-        TypeError,
-        match="Transcript messages without IDs must allow assigning an id",
-    ):
-        writer.write_messages([_ImmutableMessage("immutable")])
+    writer.write_messages([message])
+    writer.write_messages([message])
+
+    messages = read_transcript_messages(transcript_path)
+    assert len(messages) == 1
+    assert isinstance(messages[0]["id"], str) and messages[0]["id"]
+
+
+def test_transcript_does_not_merge_distinct_idless_immutable_messages(
+    tmp_path: Path,
+) -> None:
+    transcript_path = tmp_path / "transcript.jsonl"
+    writer = TranscriptWriter((transcript_path,))
+
+    writer.write_messages(
+        [_ImmutableMessage("same content"), _ImmutableMessage("same content")]
+    )
+
+    messages = read_transcript_messages(transcript_path)
+    assert len(messages) == 2
+    assert messages[0]["id"] != messages[1]["id"]
 
 
 @pytest.mark.asyncio
