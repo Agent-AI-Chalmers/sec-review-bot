@@ -54,10 +54,7 @@ async def mitigate_issue_self_check_activity(
         prepared_input["artifact_paths"],
         "mitigator",
     )
-    if not should_run_issue_mitigation(
-        review_objective=review_intent.objective,
-        analysis_result=analysis_result,
-    ):
+    if not should_run_issue_mitigation(analysis_result):
         review_stage_transcript_path(
             run_artifacts_root,
             order=2,
@@ -172,10 +169,7 @@ async def run_issue_two_stage(
         setup_declaration_content=setup_declaration_content,
     )
 
-    if not should_run_issue_mitigation(
-        review_objective=review_objective,
-        analysis_result=analysis_result,
-    ):
+    if not should_run_issue_mitigation(analysis_result):
         mitigation_result: dict[str, Any] = create_skipped_mitigation_result(
             mitigator_artifacts_path=mitigator_artifacts_path,
             retry_context=None,

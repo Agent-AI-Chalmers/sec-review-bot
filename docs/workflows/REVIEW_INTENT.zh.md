@@ -59,6 +59,8 @@
 
 `repair` 不允许凭空编造发现，也不是盲目服从报告。它仍然要求仓库证据。区别只是默认方向：推进到正确修复，而不是重新争论这个修复是否该被提出。
 
+Objective 改变的是 analyzer 的调查立场，不改变其结构化结果的含义。只有 analysis 产生 `confirmed-vulnerability` 或 `confirmed-defect` narrative 时才进入 mitigation；同一个 analysis result 在两种 objective 下具有相同的下游行为。
+
 ## Test Changes Policy
 
 `test_changes` 约束 mitigation 输出：

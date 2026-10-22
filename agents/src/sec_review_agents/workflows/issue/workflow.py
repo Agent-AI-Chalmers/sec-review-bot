@@ -21,8 +21,6 @@ from sec_review_agents.temporal.support import (
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.review_intent import (
-    REVIEW_OBJECTIVE_REPAIR,
-    ReviewObjective,
     require_review_intent,
 )
 
@@ -105,10 +103,7 @@ async def mitigate_issue_activity(
         label="artifact_root_path",
     )
     review_intent = require_review_intent(prepared_input.get("review_intent"))
-    if not should_run_issue_mitigation(
-        review_objective=review_intent.objective,
-        analysis_result=analysis_result,
-    ):
+    if not should_run_issue_mitigation(analysis_result):
         review_stage_transcript_path(
             run_artifacts_root,
             order=review_stage_attempt_order(
@@ -345,12 +340,8 @@ class IssueReviewWorkflow:
 
 
 def should_run_issue_mitigation(
-    *,
-    review_objective: ReviewObjective,
     analysis_result: Mapping[str, Any] | None,
 ) -> bool:
-    if review_objective == REVIEW_OBJECTIVE_REPAIR:
-        return True
     narratives = (analysis_result or {}).get("narratives")
     if not isinstance(narratives, list):
         return False
