@@ -7,7 +7,7 @@ import type {
   TestChangesPolicy,
   RepositoryScanTarget,
   RepositoryReviewInput
-} from '../../runner/input.js'
+} from '../../execution/input.js'
 
 export interface RepositoryContext {
   owner_login: string
@@ -26,7 +26,7 @@ interface RunRepositoryReviewArgs {
   head_sha?: string | null
   event_type?: 'manual' | 'scheduled'
   test_changes?: TestChangesPolicy | null
-  // Runs after preparation and before the Runner POST, so callers can durably
+  // Runs after preparation and before the Execution API request, so callers can durably
   // retain the context needed if the submission response is lost.
   on_prepared?: (
     submitted: SubmittedRepositoryReviewRun,
@@ -48,7 +48,7 @@ function assertRepositoryReviewInput(
 ): asserts input is RepositoryReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error(
-      'Repository review input is missing before runner invocation.'
+      'Repository review input is missing before execution submission.'
     )
   }
 }
@@ -152,7 +152,7 @@ export async function startRepositoryReviewRun({
     throw new Error('Repository review submission callback is required.')
   await on_prepared(preparedRun, input)
 
-  logInfo('repository_review_runner_run_submitted', {
+  logInfo('repository_review_execution_submitted', {
     event_type,
     repo: repo.repo_full_name,
     run_id: run_id,

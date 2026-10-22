@@ -16,6 +16,8 @@ const RESULT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
   'repository-review': 'repository-review-result.schema.json'
 }
 
+const INPUT_BUNDLE_MANIFEST_SCHEMA = 'input-bundle-manifest.schema.json'
+
 let validators: Map<string, ValidateFunction> | null = null
 
 function contractSchemasRoot(): string {
@@ -53,7 +55,7 @@ function contractSchemasRoot(): string {
   )
   if (root === undefined) {
     throw new Error(
-      `Could not locate contract ${CONTRACT_VERSION_DIR} schemas for Runner validation.`
+      `Could not locate contract ${CONTRACT_VERSION_DIR} schemas for execution validation.`
     )
   }
   return root
@@ -79,6 +81,10 @@ function resultValidators(): Map<string, ValidateFunction> {
     [
       'review-record.schema.json',
       ajv.compile(readSchema(root, 'review-record.schema.json'))
+    ],
+    [
+      INPUT_BUNDLE_MANIFEST_SCHEMA,
+      ajv.compile(readSchema(root, INPUT_BUNDLE_MANIFEST_SCHEMA))
     ],
     ...Object.values(RESULT_SCHEMA_BY_WORKFLOW).map(
       (name): [string, ValidateFunction] => [
@@ -125,6 +131,11 @@ export function assertWorkflowResult(
 /** Validate a review record against the current contract's review-record schema. */
 export function assertReviewRecord(value: unknown): void {
   assertSchema('review-record.schema.json', value, 'review_record')
+}
+
+/** Validate an input bundle manifest before publishing its archive. */
+export function assertInputBundleManifest(value: unknown): void {
+  assertSchema(INPUT_BUNDLE_MANIFEST_SCHEMA, value, 'input bundle manifest')
 }
 
 /**

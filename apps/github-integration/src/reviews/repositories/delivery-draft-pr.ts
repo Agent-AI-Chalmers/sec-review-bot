@@ -6,7 +6,7 @@ import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import type { RepositoryCaseResult, RepositoryDelivery } from './result.js'
 import { isBranchAlreadyExists } from '../shared/branch-already-exists.js'
-import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
+import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
 
 interface RepositoryContext {
   owner_login: string
@@ -276,7 +276,7 @@ export async function createRepositoryDeliveryDraftPr({
       existingCommit.data.parents?.length !== 1 ||
       existingCommit.data.parents[0]?.sha !== head_sha
     ) {
-      throw new DeterministicRunnerPublishError(
+      throw new DeterministicExecutionPublishError(
         `Existing delivery draft PR branch does not match the validated result for ${String(delivery.delivery_id)}.`
       )
     }

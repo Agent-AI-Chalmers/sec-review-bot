@@ -272,10 +272,10 @@ test('a notice with a failure code still states it', async () => {
       verified_repository: 'octo/example'
     },
     axis: 'execution',
-    reason_code: 'RUNNER_RESULT_MISSING',
+    reason_code: 'EXECUTION_RESULT_MISSING',
     kind: 'failure'
   })
 
   assert.strictEqual(report.bodies.length, 1)
-  assert.match(report.bodies[0]!, /Reason: `RUNNER_RESULT_MISSING`\./)
+  assert.match(report.bodies[0]!, /Reason: `EXECUTION_RESULT_MISSING`\./)
 })

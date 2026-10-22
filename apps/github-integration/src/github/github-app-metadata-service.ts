@@ -1,5 +1,5 @@
-import { DeterministicRunnerPublishError } from '../runner/publish-error.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../runner/publish-error-code.js'
+import { DeterministicExecutionPublishError } from '../execution/publish-error.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../execution/publish-error-code.js'
 
 interface GitHubAppMetadata {
   id: number | null
@@ -74,9 +74,9 @@ export function currentAppBotLogin(): string | null {
 function requireAppBotLogin(): string {
   const expectedLogin = currentAppBotLogin()
   if (expectedLogin === null) {
-    throw new DeterministicRunnerPublishError(
+    throw new DeterministicExecutionPublishError(
       'GitHub App metadata is not loaded; cannot attribute a bot-authored object.',
-      RUNNER_PUBLISH_ERROR_CODES.app_metadata_unavailable
+      EXECUTION_PUBLISH_ERROR_CODES.app_metadata_unavailable
     )
   }
   return expectedLogin

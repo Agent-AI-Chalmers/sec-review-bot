@@ -14,6 +14,7 @@ import {
 interface FixtureManifest {
   schema_fixtures: Record<string, string>
   invalid_schema_fixtures: Record<string, string>
+  invalid_fixture_error_paths: Record<string, string>
 }
 
 function invalidFixtureSchemas(): Array<[string, string]> {
@@ -83,12 +84,38 @@ test('shared v6 contract fixture manifest covers fixture and schema files', () =
 })
 
 test('shared v6 invalid contract fixtures are rejected by JSON schemas', () => {
+  const manifest = contractFixtureManifest() as FixtureManifest
+  assert.deepStrictEqual(
+    Object.keys(manifest.invalid_fixture_error_paths).sort(),
+    Object.keys(manifest.invalid_schema_fixtures).sort(),
+    'every invalid fixture must declare where it is expected to fail'
+  )
   for (const [fixtureName, schemaName] of invalidFixtureSchemas()) {
     const validate = contractValidator(schemaName)
-    assert.strictEqual(
-      validate(contractFixture(fixtureName)),
-      false,
-      fixtureName
+    validate(contractFixture(fixtureName))
+    const allFailing = new Set(
+      (validate.errors ?? []).map((error) =>
+        error.instancePath === ''
+          ? '<root>'
+          : error.instancePath
+              .slice(1)
+              .split('/')
+              .map((part) => part.replaceAll('~1', '/').replaceAll('~0', '~'))
+              .join('.')
+      )
+    )
+    const failing = new Set(
+      [...allFailing].filter(
+        (candidate) =>
+          ![...allFailing].some(
+            (other) => other !== candidate && candidate.startsWith(`${other}.`)
+          )
+      )
+    )
+    assert.deepStrictEqual(
+      failing,
+      new Set([manifest.invalid_fixture_error_paths[fixtureName]]),
+      `${fixtureName} should fail only at its declared path`
     )
   }
 })

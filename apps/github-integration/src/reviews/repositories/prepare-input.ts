@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION } from '../../runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../execution/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -12,11 +12,11 @@ import type {
   InputBundleArtifactRef,
   TestChangesPolicy,
   RepositoryReviewInput
-} from '../../runner/input.js'
+} from '../../execution/input.js'
 import {
   MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES,
   MAX_SCAN_TARGET_COMMIT_SHAS
-} from '../../runner/input.js'
+} from '../../execution/input.js'
 import { getInstallationAccessToken } from '../../github/installation-auth.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {

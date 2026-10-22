@@ -5,14 +5,14 @@ import {
   parseIssueReviewPublishContext,
   parsePublishContextForWorkflow
 } from '../../src/control-plane/publish-context.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../src/runner/publish-error-code.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../../src/execution/publish-error-code.js'
 import { publishContextForWorkflow } from '../publish-context-fixtures.js'
 
 function assertInvalidPublishContext(operation: () => unknown): void {
   assert.throws(operation, (error) => {
     assert.strictEqual(
       (error as { code?: unknown }).code,
-      RUNNER_PUBLISH_ERROR_CODES.publish_context_invalid
+      EXECUTION_PUBLISH_ERROR_CODES.publish_context_invalid
     )
     return true
   })

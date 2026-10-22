@@ -117,7 +117,7 @@ export async function withPublicationHeartbeat(
   }
 }
 
-/** Claims only terminal work; Runner observation is owned by Control Plane. */
+/** Claims only terminal work; Execution Gateway observation is owned by Control Plane. */
 export async function publishReviewRunsOnce({
   app,
   store = controlPlaneClient

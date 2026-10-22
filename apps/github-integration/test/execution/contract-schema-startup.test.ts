@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { verifyContractSchemasLoadable } from '../../src/runner/contract-schema.js'
+import { verifyContractSchemasLoadable } from '../../src/execution/contract-schema.js'
 
 // Startup guard: a service image that did not carry the contract schemas must
 // fail to start, not start and then fail on the first published result. The

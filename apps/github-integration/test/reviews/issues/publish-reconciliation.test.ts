@@ -10,10 +10,10 @@ import test from 'node:test'
 
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
 import { settleExhaustedStep } from '../../../src/reviews/shared/settle-exhausted-step.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../../src/runner/publish-error-code.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../../../src/execution/publish-error-code.js'
 import type { PublicationStepStore } from '../../../src/control-plane/client.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
-import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 
@@ -68,7 +68,7 @@ function postedComment(): {
 /** The error Control Plane raises when a step has no attempts left. */
 function exhaustedError(): Error {
   return Object.assign(new Error('no attempts left'), {
-    code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+    code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
   })
 }
 
@@ -186,7 +186,8 @@ test('an exhausted comment step with no comment on GitHub stays a failure', asyn
     return (
       error instanceof Error &&
       'code' in error &&
-      error.code === RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+      error.code ===
+        EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
     )
   })
   assert.deepStrictEqual(

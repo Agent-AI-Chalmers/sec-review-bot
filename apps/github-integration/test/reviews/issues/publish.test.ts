@@ -7,7 +7,7 @@ import type {
   PublicationStepRecord,
   PublicationStepStore
 } from '../../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 function issueReviewRecordWithPatch(): ReviewRecord {

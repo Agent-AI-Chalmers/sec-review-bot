@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION } from '../../runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../execution/contract-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -13,7 +13,7 @@ import type {
   InputBundleArtifactRef,
   IssueReviewInput,
   TestChangesPolicy
-} from '../../runner/input.js'
+} from '../../execution/input.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
   archiveInputBundleAndPublish,
@@ -60,7 +60,7 @@ async function materializeHistoryArtifacts({
     ReturnType<typeof fetchTimelineLinkedPullRequests>
   >
 }> {
-  // The runner validates this against the v6 issue schema, which forbids additional
+  // The Execution Worker validates this against the v6 issue schema, which forbids additional
   // properties. Identity fields plus what the prompts render; `default_branch` and
   // `workspace_ref` are already consumed when the bundle is built, so recording them here
   // would add fields no consumer reads.

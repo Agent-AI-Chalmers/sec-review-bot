@@ -1,4 +1,4 @@
-import type { TestChangesPolicy } from '../runner/input.js'
+import type { TestChangesPolicy } from '../execution/input.js'
 import {
   currentAppBotLogin,
   getGitHubAppMetadata
@@ -34,7 +34,7 @@ function stripMarkdownQuotedLines(body: string): string {
     .join('\n')
 }
 
-/** The default when no `--test-changes` flag is present, taken from the runner input contract. */
+/** The default when no `--test-changes` flag is present, taken from the execution input contract. */
 const DEFAULT_TEST_CHANGES: TestChangesPolicy = 'allow'
 
 /** Parse flags after the command: `--test-changes <allow|deny>` takes a value, `--open-pr` is a

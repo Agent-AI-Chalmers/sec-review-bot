@@ -14,14 +14,14 @@
 import type { Octokit } from 'octokit'
 
 import type { PublicationStepStore } from '../../control-plane/client.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
 import { errorCode } from '../../utils/error-utils.js'
 
 /** Whether a publish error is the "no attempts left, reconcile first" signal. */
 export function isPublicationStepExhausted(error: unknown): boolean {
   return (
     errorCode(error) ===
-    RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
+    EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
   )
 }
 

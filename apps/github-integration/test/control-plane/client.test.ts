@@ -7,7 +7,7 @@ import {
   controlPlaneClient,
   type ReviewRunRecord
 } from '../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../src/execution/contract-version.js'
 import { asErrorWithResponse, errorCode } from '../../src/utils/error-utils.js'
 
 const preparingRun: ReviewRunRecord = {

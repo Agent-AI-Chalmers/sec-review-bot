@@ -1,5 +1,5 @@
 // Turns an issue review request into a durable run, fencing preparation until
-// the Runner submission boundary has been crossed.
+// the Execution submission boundary has been crossed.
 import { admitReviewRun } from '../control-plane/admission.js'
 import {
   PreparationClaimLostError,
@@ -13,7 +13,7 @@ import {
   type SubmittedIssueReviewRun
 } from '../reviews/issues/submit.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
-import type { TestChangesPolicy } from '../runner/input.js'
+import type { TestChangesPolicy } from '../execution/input.js'
 import { controlPlaneClient } from '../control-plane/client.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
 import { ControlPlaneSubmissionError } from '../control-plane/client.js'

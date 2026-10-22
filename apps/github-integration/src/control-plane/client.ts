@@ -203,7 +203,7 @@ class HttpControlPlaneClient {
   async admitReviewRun(run: {
     workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
     publish_context: JsonObject
-    runner_input?: JsonObject
+    execution_input?: JsonObject
     ingress_kind: 'github_webhook' | 'github_actions_dispatch'
     ingress_key: string
     preparation_input_version: string

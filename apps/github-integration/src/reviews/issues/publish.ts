@@ -1,7 +1,7 @@
 import {
   CONTRACT_VERSION,
   type ContractVersion
-} from '../../runner/contract-version.js'
+} from '../../execution/contract-version.js'
 import {
   createIssueCommentUnlessMarkerExists,
   findIssueCommentByMarker
@@ -12,8 +12,8 @@ import {
   buildDraftBranchName,
   createDraftPullRequestFromIssueReviewRecord
 } from './draft-pr.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../runner/publish-error-code.js'
-import { DeterministicRunnerPublishError } from '../../runner/publish-error.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
+import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
 import { parseIssueReviewPublishContext } from '../../control-plane/publish-context.js'
 import {
   buildSuggestedDraftPrPlanFromReviewRecord,
@@ -27,7 +27,7 @@ import {
   settleExhaustedStep
 } from '../shared/settle-exhausted-step.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { assertWorkflowResult } from '../../runner/contract-schema.js'
+import { assertWorkflowResult } from '../../execution/contract-schema.js'
 import type { PublicationStepStore } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
@@ -59,7 +59,7 @@ export interface IssueReviewWorkflowResult {
 }
 
 type InstallationOctokitForRepo = (repo_full_name: string) => Promise<Octokit>
-type CompletedRunnerRun = {
+type CompletedExecutionRun = {
   run_id: string
   publish_context: Record<string, unknown>
 }
@@ -78,11 +78,11 @@ function issueReviewResultFromWorkflowResult(
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {
-    // The completed runner payload is already persisted; polling it again will
+    // The completed execution payload is already persisted; polling it again will
     // return the same invalid contract result.
-    throw new DeterministicRunnerPublishError(
+    throw new DeterministicExecutionPublishError(
       `Issue review result is invalid: ${asErrorMessage(error)}`,
-      RUNNER_PUBLISH_ERROR_CODES.issue_result_invalid,
+      EXECUTION_PUBLISH_ERROR_CODES.issue_result_invalid,
       { cause: error }
     )
   }
@@ -96,7 +96,7 @@ export async function handleIssueReviewRun({
   assert_publication_claim,
   installation_octokit_for_repo
 }: {
-  run: CompletedRunnerRun
+  run: CompletedExecutionRun
   result: unknown
   store: PublicationStepStore
   claim_token: string

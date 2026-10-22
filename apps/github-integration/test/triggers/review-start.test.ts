@@ -1,5 +1,5 @@
 // Covers issue and pull-request trigger behavior at the durable admission,
-// preparation-claim, and Runner-submission boundaries.
+// preparation-claim, and execution-submission boundaries.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -9,12 +9,12 @@ import type { SubmittedPullRequestReviewRun } from '../../src/reviews/pull-reque
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../src/runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../src/execution/contract-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
 import type {
   IssueReviewInput,
   PullRequestReviewInput
-} from '../../src/runner/input.js'
+} from '../../src/execution/input.js'
 import type {
   ReviewRunAdmission,
   ReviewRunRecord
@@ -407,10 +407,10 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
   ])
 })
 
-test('startIssueReviewCommand preserves an uncertain Runner submission for replay', async () => {
+test('startIssueReviewCommand preserves an uncertain Execution submission for replay', async () => {
   const transitions: unknown[] = []
   const error = new ControlPlaneSubmissionError(
-    'Runner response was lost.',
+    'Execution response was lost.',
     'SUBMISSION_STATE_UNCERTAIN'
   )
 
@@ -458,10 +458,10 @@ test('startIssueReviewCommand preserves an uncertain Runner submission for repla
   assert.strictEqual(transitions.length, 1)
 })
 
-test('startPullRequestReviewCommand preserves an uncertain Runner submission for replay', async () => {
+test('startPullRequestReviewCommand preserves an uncertain Execution submission for replay', async () => {
   const transitions: unknown[] = []
   const error = new ControlPlaneSubmissionError(
-    'Runner response was lost.',
+    'Execution response was lost.',
     'SUBMISSION_STATE_UNCERTAIN'
   )
 

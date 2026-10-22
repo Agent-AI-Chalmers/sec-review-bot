@@ -11,7 +11,7 @@ import { logInfo } from '../../utils/logger.js'
 import type {
   PullRequestReviewInput,
   TestChangesPolicy
-} from '../../runner/input.js'
+} from '../../execution/input.js'
 
 export interface SubmittedPullRequestReviewRun {
   pr: PullRequestContext
@@ -26,7 +26,7 @@ function assertPullRequestReviewInput(
 ): asserts input is PullRequestReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error(
-      'Pull request review input is missing before runner invocation.'
+      'Pull request review input is missing before execution submission.'
     )
   }
 }
@@ -209,7 +209,7 @@ export async function startPullRequestReviewRun(args: {
   if (args.on_prepared === undefined)
     throw new Error('Pull request review submission callback is required.')
   await args.on_prepared(preparedRun, prepared.input)
-  logInfo('pull_request_review_runner_run_submitted', {
+  logInfo('pull_request_review_execution_submitted', {
     event_type: args.event_type,
     pr: args.pr.pr_number,
     repo: args.pr.repo_full_name,

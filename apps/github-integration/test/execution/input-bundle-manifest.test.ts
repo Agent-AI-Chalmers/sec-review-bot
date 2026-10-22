@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 
-import { writeInputBundleManifest } from '../../src/runner/input-bundle-manifest.js'
+import { writeInputBundleManifest } from '../../src/execution/input-bundle-manifest.js'
 
 async function readManifest(root: string): Promise<Record<string, unknown>> {
   return JSON.parse(
@@ -21,7 +21,7 @@ test('writes the contract v6 manifest without a setup declaration field', async 
     })
     const manifest = await readManifest(root)
     assert.strictEqual(manifest.contract_version, 'v6')
-    assert.strictEqual(manifest.kind, 'runner-input-bundle')
+    assert.strictEqual('kind' in manifest, false)
     // The setup declaration travels inline in the workflow input, not the manifest.
     assert.strictEqual('setup_declaration' in manifest, false)
   } finally {

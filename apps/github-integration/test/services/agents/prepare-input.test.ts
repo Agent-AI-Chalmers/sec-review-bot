@@ -12,12 +12,12 @@ import type { Octokit } from 'octokit'
 import type { IssueContext } from '../../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../../src/github/pull-request-service.js'
 import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/artifacts/git-workspace.js'
-import { CONTRACT_VERSION } from '../../../src/runner/contract-version.js'
+import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 const execFileAsync = promisify(execFile)
 
-const PRIVATE_RUNNER_INPUT_KEYS = new Set([
+const PRIVATE_EXECUTION_INPUT_KEYS = new Set([
   'runArtifactsPath',
   'analyzer_artifacts_path',
   'cvss_artifacts_path',
@@ -168,11 +168,11 @@ async function assertRunnerInputArtifact<
   assertPathIsWithin(suiteInputBundleRoot, inputBundleRoot)
   assertPathIsWithin(inputBundleRoot, inputPath)
   const keys = collectKeys(input)
-  for (const key of PRIVATE_RUNNER_INPUT_KEYS) {
+  for (const key of PRIVATE_EXECUTION_INPUT_KEYS) {
     assert.strictEqual(
       keys.has(key),
       false,
-      `runner input must not expose ${key}`
+      `execution input must not expose ${key}`
     )
   }
   assert.deepStrictEqual(
@@ -345,7 +345,6 @@ test(
       ) as Record<string, unknown>
       assert.deepStrictEqual(manifest, {
         contract_version: CONTRACT_VERSION,
-        kind: 'runner-input-bundle',
         workspace: { snapshot: WORKSPACE_SNAPSHOT_TAR_NAME },
         history: { path: 'history' }
       })
@@ -377,7 +376,7 @@ test(
 )
 
 test(
-  'pull request input preparer writes a canonical runner bundle',
+  'pull request input preparer writes a canonical execution bundle',
   { concurrency: false },
   async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pr-input-'))
@@ -465,7 +464,7 @@ test(
       assert.strictEqual('pullRequest' in prepared.input, false)
       assert.strictEqual('repository' in prepared.input, false)
       // The file handed to the agent carries only what a review can act on.
-      // Identity fields stay in the runner input; putting them in this file
+      // Identity fields stay in the execution input; putting them in this file
       // spends agent context and offers extra ranges that can be mistaken for
       // the review boundary.
       const agent_metadata = JSON.parse(
@@ -483,7 +482,7 @@ test(
         'full'
       )
 
-      // The runner input carries the review subject, not the raw webhook
+      // The execution input carries the review subject, not the raw webhook
       // payload: no endpoint URLs, commit counts, or sender identity.
       assert.strictEqual(prepared.input.pr.repo_full_name, 'octo/demo')
       assert.strictEqual(prepared.input.pr.base_sha, refs.base_sha)
@@ -531,7 +530,7 @@ test(
 )
 
 test(
-  'repository input preparer writes full and incremental runner bundles',
+  'repository input preparer writes full and incremental execution bundles',
   { concurrency: false },
   async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'repo-input-'))

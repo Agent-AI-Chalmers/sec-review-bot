@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { classifyPublicationFailure } from '../../src/control-plane/publication-failure.js'
-import { RUNNER_PUBLISH_ERROR_CODES } from '../../src/runner/publish-error-code.js'
+import { EXECUTION_PUBLISH_ERROR_CODES } from '../../src/execution/publish-error-code.js'
 
 test('a publication step that exhausted its retry budget fails rather than retries', () => {
   // Control Plane throws PUBLICATION_STEP_RETRY_EXHAUSTED once a step has no attempt left, and
@@ -11,7 +11,7 @@ test('a publication step that exhausted its retry budget fails rather than retri
   const error = Object.assign(
     new Error('Publication step exhausted its retry budget: issue:draft-pr'),
     {
-      code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+      code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
       status: 409
     }
   )
@@ -29,7 +29,7 @@ test('the same exhaustion code carried by a proxy answer stays retryable', () =>
   // steps were never refused. (A client-side timeout does not carry this code at all: the client
   // raises `CONTROL_PLANE_REQUEST_TIMEOUT` for those, which is already retryable.)
   const relayed = Object.assign(new Error('Bad Gateway'), {
-    code: RUNNER_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
+    code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted,
     status: 503
   })
   assert.deepStrictEqual(classifyPublicationFailure(relayed), {
@@ -46,11 +46,11 @@ test('Control Plane publication faults that cannot be repaired fail rather than 
   // their own codes: an uncoded deterministic fault looped forever.
   for (const [code, reason] of [
     [
-      RUNNER_PUBLISH_ERROR_CODES.publication_step_set_duplicate,
+      EXECUTION_PUBLISH_ERROR_CODES.publication_step_set_duplicate,
       'control-plane-deterministic-publication-fault'
     ],
     [
-      RUNNER_PUBLISH_ERROR_CODES.publication_step_set_changed,
+      EXECUTION_PUBLISH_ERROR_CODES.publication_step_set_changed,
       'control-plane-deterministic-publication-fault'
     ]
   ] as const) {

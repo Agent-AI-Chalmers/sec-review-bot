@@ -3,6 +3,7 @@ import fs from 'fs/promises'
 import path from 'path'
 
 import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../artifacts/git-workspace.js'
+import { assertInputBundleManifest } from './contract-schema.js'
 
 export const INPUT_BUNDLE_MANIFEST_NAME = 'manifest.json'
 
@@ -15,7 +16,6 @@ export async function writeInputBundleManifest({
 }): Promise<void> {
   const manifest: Record<string, unknown> = {
     contract_version: CONTRACT_VERSION,
-    kind: 'runner-input-bundle',
     workspace: {
       snapshot: WORKSPACE_SNAPSHOT_TAR_NAME
     },
@@ -28,6 +28,7 @@ export async function writeInputBundleManifest({
       path: 'incremental-window'
     }
   }
+  assertInputBundleManifest(manifest)
   await fs.writeFile(
     path.join(input_bundle_root, INPUT_BUNDLE_MANIFEST_NAME),
     JSON.stringify(manifest, null, 2),

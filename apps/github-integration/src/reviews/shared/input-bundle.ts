@@ -12,7 +12,7 @@ import {
   INPUT_BUNDLE_MEDIA_TYPE,
   MAX_WORKFLOW_INPUT_BYTES,
   type InputBundleArtifactRef
-} from '../../runner/input.js'
+} from '../../execution/input.js'
 import {
   publishedInputBundleReference,
   publishInputBundle
@@ -23,7 +23,7 @@ import {
   createWorkspaceSnapshotTar
 } from '../../artifacts/git-workspace.js'
 import type { Octokit } from 'octokit'
-import { writeInputBundleManifest } from '../../runner/input-bundle-manifest.js'
+import { writeInputBundleManifest } from '../../execution/input-bundle-manifest.js'
 import {
   MAX_SETUP_DECLARATION_BYTES,
   SetupDeclarationError,
@@ -241,7 +241,7 @@ export async function archiveInputBundle({
   ]
   await fs.rm(tarPath, { force: true })
   await fs.rm(archivePath, { force: true })
-  // Keep the workspace snapshot as an inner, uncompressed tar: Runner stages
+  // Keep the workspace snapshot as an inner, uncompressed tar: Execution Worker stages
   // reuse it to create isolated workspaces. Only the transport bundle is zstd
   // compressed, and the live staging checkout is deliberately not included.
   await execFileAsync('tar', [

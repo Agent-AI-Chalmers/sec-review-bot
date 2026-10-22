@@ -10,8 +10,8 @@ import {
 import { CONTRACTS_ROOT } from '../contract-fixtures.js'
 
 // Shared corpus of the setup-declaration contract family, also run by the
-// runner's own test suite. Keeping both sides on the same files is what stops
-// the integration validator and the runner parser from drifting apart. The
+// Execution Worker's own test suite. Keeping both sides on the same files is what stops
+// the integration validator and the worker parser from drifting apart. The
 // corpus lives under its own family because the declaration format is decision
 // logic enforced in code, not a JSON Schema-shaped contract.
 const corpusDir = path.join(CONTRACTS_ROOT, 'setup-declaration', 'v1', 'corpus')
@@ -141,7 +141,7 @@ test('rejects non-string env keys', () => {
 test('rejects explicit YAML tags', () => {
   // The format is the plain Core schema. Both enforcers reject every explicit
   // tag, because `yaml` silently falls back to the raw string for a mismatched
-  // tag (`!!bool on` -> "on") while the runner's loader raises.
+  // tag (`!!bool on` -> "on") while the worker's loader raises.
   for (const raw of [
     '!!bool on',
     '!!str npm ci',
@@ -158,7 +158,7 @@ test('rejects explicit YAML tags', () => {
 })
 
 test('rejects a float-syntax timeout', () => {
-  // `1.0`/`1e3` resolve to an integer-valued JS number, but the runner resolves
+  // `1.0`/`1e3` resolve to an integer-valued JS number, but the Execution Worker resolves
   // them to a Python float and rejects them; both sides reject by source text.
   for (const raw of ['1.0', '1e3', '1.0e2', '10.']) {
     assert.throws(

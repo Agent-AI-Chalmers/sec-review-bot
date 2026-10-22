@@ -42,7 +42,7 @@ pnpm run test:integration
 
 ## 本地接收端
 
-完整 review 还需要 runner service 和 worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub integration service。
+完整 review 还需要 execution gateway 和 worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub integration service。
 
 非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET`、`CONTROL_PLANE_SERVICE_URL` 和 `CONTROL_PLANE_SERVICE_TOKEN`。
 
@@ -103,7 +103,7 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
   - `reviews/repositories/` - repository review、摘要 issue 与修复 draft PR
 - `github/` - GitHub API 薄封装和 webhook 辅助函数
 - `control-plane/` - Control Plane client、claim 处理与发布协调
-- `runner/` - 此 connector 消费的 Runner input、result 与错误契约
+- `execution/` - 此 connector 消费的 Execution input、result 与错误契约
 - `artifacts/` - input bundle 存储与 Git workspace 准备
 - `ingress/` - HTTP、GitHub Actions 和 GitHub webhook 的入站处理
 - `triggers/` - 把 webhook / Actions / comment 请求转换为提交给 Control Plane 的 review 请求
@@ -124,7 +124,7 @@ sec_review_bot:
   # - manual_only: 不响应自动 PR / issue 事件；
   #   只有仓库 write+ 用户的显式 comment 命令会触发 review。
   # - automatic: 危险模式。任意作者的 PR / issue 事件都会自动触发 review，
-  #   无需维护者确认，并可能消耗 runner / LLM 资源。
+  #   无需维护者确认，并可能消耗 Execution Worker / LLM 资源。
   trigger_mode: manual_only
 
   # 可选：repository discovery 阶段忽略路径（glob）
@@ -138,7 +138,7 @@ sec_review_bot:
 配置含义如下：
 
 - `trigger_mode: manual_only`：自动对象事件会被接收后跳过，只有仓库 `write`、`maintain` 或 `admin` 用户在 comment 中显式写出对应手动命令才会触发 workflow。
-- `trigger_mode: automatic`：危险模式。`pull_request.opened`、`pull_request.ready_for_review`、`issues.opened` 等事件会为任意作者触发 workflow，包括没有仓库写权限的用户。它无需维护者确认就可能消耗 runner / LLM 资源。
+- `trigger_mode: automatic`：危险模式。`pull_request.opened`、`pull_request.ready_for_review`、`issues.opened` 等事件会为任意作者触发 workflow，包括没有仓库写权限的用户。它无需维护者确认就可能消耗 Execution Worker / LLM 资源。
 
 说明：
 
@@ -166,7 +166,7 @@ issue 与 PR conversation comment 共用同一套命令语法；下面的参数�
 ```
 
 - `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
-- `--test-changes allow|deny`：最终 mitigation patch 是否允许包含测试改动。`deny` 表示不得包含测试改动；测试只能作为临时验证手段。不带该参数时 runner 使用 `allow`。
+- `--test-changes allow|deny`：最终 mitigation patch 是否允许包含测试改动。`deny` 表示不得包含测试改动；测试只能作为临时验证手段。不带该参数时 Execution Worker 使用 `allow`。
 - `--open-pr`：仅对 issue review 生效；当 review 产出可用的 patch 时，允许本次运行创建 draft pull request；不带该参数时 patch 只保留在 issue 的 summary comment 中。`issues.opened` 自动触发的 review 永不创建 draft PR。在 PR 评论上该参数无对应动作，会被忽略，因为 PR review 不会创建分支或新的 pull request。
 
 各参数与顺序无关，可组合使用。没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。

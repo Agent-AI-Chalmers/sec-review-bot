@@ -212,13 +212,16 @@ test('repository dispatch does not echo internal submission errors', async () =>
     response,
     oidcVerifier: oidcVerifier(),
     dispatchReview: async () => {
-      throw new Error('sensitive runner failure detail')
+      throw new Error('sensitive execution failure detail')
     }
   })
 
   assert.strictEqual(response.statusCodeValue, 500)
   assert.match(String(response.body), /Repository review dispatch failed/)
-  assert.doesNotMatch(String(response.body), /sensitive runner failure detail/)
+  assert.doesNotMatch(
+    String(response.body),
+    /sensitive execution failure detail/
+  )
 })
 
 test('repository dispatch rejects oversized request bodies before authentication', async () => {
