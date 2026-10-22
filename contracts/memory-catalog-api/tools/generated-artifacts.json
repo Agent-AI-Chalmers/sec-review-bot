@@ -1,0 +1,8 @@
+{
+  "artifacts": [
+    {
+      "generator": "src/generate.ts",
+      "output": "../../../memory-catalog/src/contract-types-generated.ts"
+    }
+  ]
+}

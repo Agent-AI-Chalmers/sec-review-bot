@@ -26,7 +26,7 @@
     "repository": "octo/example",
     "pull_request": 41
   },
-  "runner_input": {
+  "execution_input": {
     "diff": "sha256:ignored-by-the-contract"
   },
   "ingress_kind": "github_webhook",
@@ -44,6 +44,6 @@
       "size_bytes": 4096
     }
   },
-  "runner_updated_at": "2026-10-11T02:04:31.000Z",
+  "internal_execution_updated_at": "2026-10-11T02:04:31.000Z",
   "notices": []
 }

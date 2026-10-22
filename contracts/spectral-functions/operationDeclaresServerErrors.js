@@ -17,24 +17,24 @@
 export default function operationDeclaresServerErrors(
   operation,
   _options,
-  context
+  context,
 ) {
-  const responses = operation.responses ?? {}
-  const problems = []
+  const responses = operation.responses ?? {};
+  const problems = [];
 
-  if (responses['500'] === undefined) {
+  if (responses["500"] === undefined) {
     problems.push({
       message:
-        'operation must declare a `500` response (any internal fault can return it).',
-      path: [...context.path, 'responses']
-    })
+        "operation must declare a `500` response (any internal fault can return it).",
+      path: [...context.path, "responses"],
+    });
   }
-  if (operation.requestBody !== undefined && responses['413'] === undefined) {
+  if (operation.requestBody !== undefined && responses["413"] === undefined) {
     problems.push({
       message:
-        'operation reads a request body, so it must declare a `413` response.',
-      path: [...context.path, 'responses']
-    })
+        "operation reads a request body, so it must declare a `413` response.",
+      path: [...context.path, "responses"],
+    });
   }
-  return problems
+  return problems;
 }

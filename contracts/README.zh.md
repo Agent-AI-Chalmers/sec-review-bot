@@ -30,7 +30,9 @@ contracts/
 ## 契约族
 
 - [integration-contract](integration-contract/README.zh.md)：Runner 与其调用方之间的公开集成点。当前版本：[v6](integration-contract/v6/CONTRACT.zh.md)。
+- [execution-contract](execution-contract/README.zh.md)：Execution Gateway 与 Execution Worker 之间私有的 Temporal dispatch 边界。当前版本：v1。
 - [control-plane-api](control-plane-api/README.zh.md)：Control Plane 与其调用方交换的形状。当前版本：[v1](control-plane-api/README.zh.md)。
+- [memory-catalog-api](memory-catalog-api/README.zh.md)：Memory Catalog Server 与 Execution Worker 之间的 HTTP 边界。当前版本：v1。
 - [setup-declaration](setup-declaration/README.zh.md)：仓库用来准备其审查沙箱的 `.sec-review/setup.yml` 格式。当前版本：[v1](setup-declaration/v1/SPEC.zh.md)。
 
 ## 适用于每个族的规则

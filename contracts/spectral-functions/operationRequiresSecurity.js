@@ -20,18 +20,18 @@
 export default function operationRequiresSecurity(
   operation,
   _options,
-  context
+  context,
 ) {
-  if (Array.isArray(operation.security)) return
+  if (Array.isArray(operation.security)) return;
 
   // `context.path` is [...pathSegments, method, ...]; the path string is two up from here
   // because `given` selected the operation. This reads Spectral's path array shape, which is
   // the only way a function can recover the path key it is being run against.
-  const path = context.path[context.path.length - 2]
+  const path = context.path[context.path.length - 2];
   return [
     {
       message: `${path} must declare a security requirement (use \`security: []\` if it is deliberately public).`,
-      path: [...context.path, 'security']
-    }
-  ]
+      path: [...context.path, "security"],
+    },
+  ];
 }

@@ -40,6 +40,12 @@
       "$comment": "Repository-relative path only: rejects leading/trailing whitespace, absolute paths, Windows drive paths, backslashes, empty path segments, . or .. segments, and .git segments.",
       "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*/$)(?!.*(?:^|/)(?:\\.{1,2}|\\.git)(?:/|$))(?!.*\\s$).+$"
     },
+    "bundleRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "Input-bundle-relative path only: rejects surrounding whitespace, absolute paths, Windows drive paths, backslashes, empty path segments, and . or .. segments.",
+      "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*/$)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\s$).+$"
+    },
     "reviewIntent": {
       "type": "object",
       "additionalProperties": false,

@@ -1,0 +1,10 @@
+{
+  "contract_version": "v6",
+  "kind": "runner-input-bundle",
+  "workspace": {
+    "snapshot": "workspace.snapshot.tar"
+  },
+  "history": {
+    "path": "history"
+  }
+}

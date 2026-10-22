@@ -5,8 +5,8 @@
 // TypeScript, and a hand-maintained copy is how the producer's field names drifted away from
 // them; this generator makes the integration's types a projection instead.
 //
-// This is separate from `generate-types.ts`, which projects the runner HTTP API from
-// `openapi.json`: that describes the transport envelope, while these describe the workflow
+// This is separate from `generate-types.ts`, which projects the Execution API from
+// `openapi.yaml`: that describes the transport envelope, while these describe the workflow
 // `input` object carried inside it.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -386,20 +386,22 @@ function limitName(path: string[]): string | null {
     .toUpperCase()}`
 }
 
-function renderFile(): string {
+export function renderWorkflowInputDeclarations(): string {
   const common = readSchema(COMMON_SCHEMA)
   const inputs = WORKFLOW_INPUTS.map(({ schema, interface: name }) =>
     renderInterface(name, readSchema(schema), common)
   )
+  return [renderCommonTypes(common), '', inputs.join('\n\n')].join('\n')
+}
+
+function renderFile(): string {
   return [
     '// Generated from contracts/integration-contract/v6/schemas. Do not edit by hand.',
     '// Regenerate with `pnpm --dir contracts/integration-contract/tools run generate`.',
     '',
-    renderCommonTypes(common),
+    renderWorkflowInputDeclarations(),
     '',
     renderLimits(),
-    '',
-    inputs.join('\n\n'),
     ''
   ].join('\n')
 }
@@ -410,7 +412,7 @@ function inputTypesOutput(): string {
     'apps',
     'github-integration',
     'src',
-    'runner',
+    'execution',
     'integration-contract-types-generated.ts'
   )
 }
