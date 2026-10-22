@@ -10,30 +10,7 @@
 
 ## 部署结构
 
-```mermaid
-flowchart LR
-    webhook["GitHub App webhook<br/>/api/webhook"] --> tunnel["Cloudflare Tunnel"]
-    dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
-
-    subgraph compose["Docker Compose"]
-        integration["github-integration"] --> control["Review Control Plane<br/>接纳和协调 review run"]
-        control --> api["Execution API<br/>提交和查询 review 任务"]
-        api --> gateway["Execution Gateway<br/>当前 provider"]
-        control --> postgres[(PostgreSQL)]
-        gateway --> temporal["Temporal<br/>workflow 状态和 task queue"]
-        integration -->|写入 input bundle| storage["Object Storage<br/>不可变 input 和 result artifact"]
-        gateway -->|写入终态 result artifact| storage
-    end
-
-    subgraph host["宿主机"]
-        worker["sec-review-agents-execution-worker"] --> sandbox["Docker sandbox"]
-    end
-
-    tunnel --> integration
-    temporal --> worker
-    storage -->|读取 input bundle| worker
-    storage -->|读取已发布 artifact| gateway
-```
+![本地集成部署结构](../../assets/operations/local-integrated-deployment.zh.svg)
 
 Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run，Execution Gateway 和 Temporal 分派任务，宿主机 worker 在 Docker sandbox 中执行 agent。PostgreSQL 保存控制状态，RustFS 保存运行输入和 artifact。
 

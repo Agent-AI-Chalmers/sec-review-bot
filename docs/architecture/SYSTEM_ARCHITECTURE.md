@@ -17,7 +17,7 @@ sequenceDiagram
   participant Control as Review Control Plane
   participant Storage as Object Storage
   participant Gateway as Execution Gateway
-  participant Temporal
+  participant Temporal as Temporal Server
   participant Worker as Execution Worker
 
   GitHub->>Integration: Webhook or Actions request
@@ -45,42 +45,32 @@ sequenceDiagram
 ## Asynchronous memory path
 
 ```mermaid
-flowchart LR
-  records[Completed review records]
-  extraction[Experience extraction]
-  observations[Pending observations]
-  maintenance[Memory maintenance]
-  versions[Immutable memory revisions]
-  active[Active curated memory]
+sequenceDiagram
+  participant Temporal as Temporal Server
+  participant Worker as Execution Worker
+  participant Catalog as Memory Catalog Server
+  participant Storage as Object Storage
 
-  records --> extraction
-  extraction --> observations
-  observations --> maintenance
-  maintenance --> versions
-  versions --> active
-  active -.read by future reviews.-> records
+  Worker->>Storage: Publish completed-review transcripts
+  Worker->>Temporal: Start extraction workflow
+  Temporal->>Worker: Dispatch extraction work
+  Worker->>Storage: Read transcript bundle and publish audit bundle
+  Worker->>Catalog: Register pending observation
+  loop Scheduled memory maintenance
+    Temporal->>Worker: Dispatch maintenance work
+    Worker->>Catalog: Read pending observations and active revision
+    Catalog-->>Worker: Observations and active revision reference
+    Worker->>Storage: Read active memory and publish immutable revision
+    Worker->>Catalog: Commit revision and active pointer with compare-and-swap
+  end
+  Worker->>Catalog: Read active revision for a later review
+  Catalog-->>Worker: Active revision reference
+  Worker->>Storage: Materialize curated memory
 ```
 
-## Normal flow
+## Durability and ownership
 
-1. GitHub sends a webhook or Actions request to the integration.
-2. The integration validates the platform request and asks Control Plane to admit it; the admission request does not carry the raw GitHub webhook payload.
-3. Control Plane creates the run and persists its identity in PostgreSQL.
-4. Control Plane returns the stable `run_id` to the integration. State, artifacts, Execution API requests, and logs use this same identity.
-5. The integration prepares the input bundle and writes it to Object Storage under that run identity.
-6. The integration submits `publish_context` and replayable Execution input containing the input `ArtifactRef`; archive bytes remain in Object Storage.
-7. Control Plane persists the Execution input before crossing the Execution API boundary, allowing an uncertain submission to be replayed without reconstructing process-local state.
-8. Control Plane submits the `run_id` and input reference through the Execution API. The current provider, Execution Gateway, starts the Temporal workflow.
-9. Execution Worker reads the input bundle from Object Storage by reference.
-10. Control Plane polls the Execution API for execution status.
-11. Execution Worker finishes the terminal artifact tree on the shared artifact volume.
-12. Execution Gateway archives that tree and publishes the terminal artifact to Object Storage.
-13. The Execution API provider projects the Temporal result and returns the workflow result plus terminal artifact reference to Control Plane; the artifact bytes remain in Object Storage. Control Plane persists both without interpreting workflow-specific result content.
-14. The integration claims the corresponding publication work. Control Plane returns the workflow result and the opaque `publish_context` originally supplied by that connector; `publish_context` contains no credentials or process-local objects.
-15. The integration publishes the GitHub review, comment, issue, or pull request.
-16. The integration records the publication outcome through Control Plane.
-
-The sequence and list show the first occurrence of each step. Polling, heartbeats, retries, and state writes can repeat. Because steps 3 and 4 precede input preparation, a failure in step 5 or 6 still has a durable `run_id`; only a request rejected before admission has no `run_id`.
+The diagrams show the first occurrence of each interaction. Polling, heartbeats, retries, and state writes can repeat. Control Plane persists the stable `run_id` before the integration prepares input, so preparation or submission failure still leaves a durable run identity; only a request rejected before admission has no `run_id`. Control Plane also persists replayable Execution input before crossing the Execution API boundary, allowing an uncertain submission to be retried without reconstructing process-local state.
 
 Integration pulls publication work from Control Plane rather than receiving a callback. Control Plane keeps successful terminal work in `pending`, atomically assigns a publication claim to the connector, and accepts the connector's success or failure outcome. This keeps GitHub-specific side effects out of Control Plane while allowing an integration restart to resume unfinished work.
 

@@ -8,30 +8,7 @@ Use it to run the complete integrated path locally. For running agents directly 
 
 ## Deployment Shape
 
-```mermaid
-flowchart LR
-    webhook["GitHub App webhook<br/>/api/webhook"] --> tunnel["Cloudflare Tunnel"]
-    dispatch["GitHub Actions repository review<br/>/api/repository-review/dispatch"] --> tunnel
-
-    subgraph compose["Docker Compose"]
-        integration["github-integration"] --> control["Review Control Plane<br/>admit and coordinate review runs"]
-        control --> api["Execution API<br/>submit and query review tasks"]
-        api --> gateway["Execution Gateway<br/>current provider"]
-        control --> postgres[(PostgreSQL)]
-        gateway --> temporal["Temporal<br/>workflow state and task queue"]
-        integration -->|write input bundles| storage["Object Storage<br/>immutable input and result artifacts"]
-        gateway -->|write terminal result artifacts| storage
-    end
-
-    subgraph host["Host"]
-        worker["sec-review-agents-execution-worker"] --> sandbox["Docker sandbox"]
-    end
-
-    tunnel --> integration
-    temporal --> worker
-    storage -->|read input bundles| worker
-    storage -->|read stored artifacts| gateway
-```
+![Local integrated deployment shape](../../assets/operations/local-integrated-deployment.svg)
 
 Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, Execution Gateway and Temporal dispatch its work, and the host worker executes the agents in Docker sandboxes. PostgreSQL stores control state, while RustFS stores run inputs and artifacts.
 

@@ -21,7 +21,7 @@ sequenceDiagram
   participant Control as Review Control Plane
   participant Storage as 对象存储
   participant Gateway as Execution Gateway
-  participant Temporal
+  participant Temporal as Temporal Server
   participant Worker as Execution Worker
 
   GitHub->>Integration: Webhook 或 Actions 请求
@@ -49,42 +49,32 @@ sequenceDiagram
 ## 异步 Memory 链路
 
 ```mermaid
-flowchart LR
-  records[已完成 review 的过程记录]
-  extraction[经验提取]
-  observations[待处理 observations]
-  maintenance[Memory maintenance]
-  versions[不可变 memory revisions]
-  active[当前生效的 memory]
+sequenceDiagram
+  participant Temporal as Temporal Server
+  participant Worker as Execution Worker
+  participant Catalog as Memory Catalog Server
+  participant Storage as 对象存储
 
-  records --> extraction
-  extraction --> observations
-  observations --> maintenance
-  maintenance --> versions
-  versions --> active
-  active -.供后续 review 读取.-> records
+  Worker->>Storage: 发布已完成 review 的 transcript
+  Worker->>Temporal: 启动 extraction workflow
+  Temporal->>Worker: 分发 extraction 工作
+  Worker->>Storage: 读取 transcript bundle 并发布 audit bundle
+  Worker->>Catalog: 注册待处理 observation
+  loop 定期 memory maintenance
+    Temporal->>Worker: 分发 maintenance 工作
+    Worker->>Catalog: 读取待处理 observations 和 active revision
+    Catalog-->>Worker: 返回 observations 和 active revision 引用
+    Worker->>Storage: 读取 active memory 并发布不可变 revision
+    Worker->>Catalog: 通过 compare-and-swap 提交 revision 和 active pointer
+  end
+  Worker->>Catalog: 为后续 review 读取 active revision
+  Catalog-->>Worker: 返回 active revision 引用
+  Worker->>Storage: 物化 curated memory
 ```
 
-## 正常流程
+## 持久化与职责边界
 
-1. GitHub 把 webhook 或 Actions 请求交给 integration。
-2. Integration 校验平台请求，并请求 Control Plane 接纳它；接纳请求不携带原始 GitHub webhook payload。
-3. Control Plane 创建 run，并将其身份持久化到 PostgreSQL。
-4. Control Plane 把稳定的 `run_id` 返回给 integration。状态、artifact、Execution API 请求和日志都使用同一个身份。
-5. Integration 准备 input bundle，并使用该 run 身份将其写入对象存储。
-6. Integration 向 Control Plane 提交 `publish_context` 和包含 input `ArtifactRef` 的可重放 Execution input；archive 内容仍留在对象存储。
-7. Control Plane 在跨越 Execution API 边界前持久化 Execution input，使状态不确定的 submission 可以重放，而不需要重建进程内状态。
-8. Control Plane 通过 Execution API 提交 `run_id` 和 input 引用；当前 provider Execution Gateway 负责启动 Temporal workflow。
-9. Execution Worker 按引用从对象存储读取 input bundle。
-10. Control Plane 轮询 Execution API 的执行状态。
-11. Execution Worker 在共享 artifact volume 上完成终态 artifact tree。
-12. Execution Gateway 将该目录归档，并把终态 artifact 发布到对象存储。
-13. Execution API provider 投影 Temporal 结果，并向 Control Plane 返回 workflow result 和终态 artifact 引用；Control Plane 持久化两者，但不解释 workflow 专用的 result 内容。
-14. Integration 领取对应的 publication 工作。Control Plane 返回 workflow result 和该 connector 最初提交的不透明 `publish_context`；`publish_context` 不包含凭据或进程内对象。
-15. Integration 发布 GitHub review、comment、issue 或 pull request。
-16. Integration 通过 Control Plane 记录发布结果。
-
-时序图和列表展示每一步首次发生的顺序；轮询、heartbeat、重试和状态写入可能重复多次。由于第 3、4 步早于 input 准备，第 5 或第 6 步失败时仍然存在持久化的 `run_id`；只有在接纳前被拒绝的请求没有 `run_id`。
+图中展示的是每次交互首次发生的顺序；轮询、heartbeat、重试和状态写入可能重复多次。Control Plane 在 integration 准备 input 前持久化稳定的 `run_id`，因此 input 准备或提交失败时仍然存在持久化的 run 身份；只有在接纳前被拒绝的请求没有 `run_id`。Control Plane 还会在跨越 Execution API 边界前持久化可重放的 Execution input，使状态不确定的 submission 可以重试，而不需要重建进程内状态。
 
 Integration 主动从 Control Plane 领取 publication 工作，而不是等待 Control Plane 回调。Control Plane 将成功终态的工作保持为 `pending`，原子地向 connector 分配 publication claim，并接收 connector 回写的成功或失败结果。因此 GitHub 专用副作用不会进入 Control Plane，integration 重启后也能继续处理未完成工作。
 
