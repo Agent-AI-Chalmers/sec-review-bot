@@ -121,10 +121,10 @@ interface RecordedEdge {
  */
 async function recordEveryPath(): Promise<RecordedEdge[]> {
   const runIds: string[] = []
-  // A real lease length. Expiry is provoked by backdating `claimed_at` below, never by
-  // shortening the lease: with a millisecond lease every ordinary write races the clock, and
-  // a slow CI worker turns an unrelated assertion into a lost-claim failure.
-  const store = await createStore({ claimTimeoutMs: 5_000 })
+  // Expiry is provoked by backdating `claimed_at` below, never by waiting on this lease. Keep
+  // enough headroom for a shared CI runner to suspend this process without turning an ordinary
+  // write into an unrelated lost-claim failure.
+  const store = await createStore({ claimTimeoutMs: 60_000 })
   const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const newPreparingRun = async (): Promise<{
