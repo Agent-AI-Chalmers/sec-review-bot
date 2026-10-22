@@ -1,4 +1,5 @@
 import json
+from email.message import Message
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -146,7 +147,7 @@ def test_observation_conflict_preserves_non_retryable_catalog_semantics() -> Non
         "http://catalog/v1/observations",
         409,
         "Conflict",
-        {},
+        Message(),
         BytesIO(b'{"error":"different content"}'),
     )
 

@@ -66,7 +66,8 @@ export async function submitPreparedRun(
     try {
       await store.failPreparation(args.runId, args.preparationToken, {
         code:
-          executionAccepted || error instanceof ExecutionSubmissionUncertainError
+          executionAccepted ||
+          error instanceof ExecutionSubmissionUncertainError
             ? SUBMISSION_STATE_UNCERTAIN
             : error instanceof Error &&
                 'code' in error &&
