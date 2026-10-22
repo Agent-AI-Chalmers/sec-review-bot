@@ -13,6 +13,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
+from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
@@ -116,7 +117,7 @@ async def mitigate_pull_request_activity(
         prepared_input["artifact_root_path"],
         label="artifact_root_path",
     )
-    if not _should_run_pr_mitigation(analysis_result):
+    if not has_confirmed_repair_target(analysis_result):
         review_stage_transcript_path(
             run_artifacts_root,
             order=review_stage_attempt_order(
@@ -172,6 +173,7 @@ async def verify_pull_request_activity(
 ) -> dict[str, Any]:
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.verification.stage import (
+        create_skipped_verification_result,
         verification_attempt_label,
     )
     from sec_review_agents.runtime.setup_bootstrap import (
@@ -190,6 +192,24 @@ async def verify_pull_request_activity(
         prepared_input["artifact_root_path"],
         label="artifact_root_path",
     )
+    verifier_artifacts_path = artifact_path(
+        prepared_input["artifact_paths"],
+        "verifier",
+    )
+    if not has_confirmed_repair_target(analysis_result):
+        review_stage_transcript_path(
+            run_artifacts_root,
+            order=review_stage_attempt_order(
+                stage="verifier", retry_context=retry_context
+            ),
+            stage="verifier",
+            attempt=verification_attempt_label(retry_context),
+        ).unlink(missing_ok=True)
+        return create_skipped_verification_result(
+            verifier_artifacts_path=verifier_artifacts_path,
+            retry_context=retry_context,
+            reason="Verification was skipped because analysis produced no confirmed repair target.",
+        )
     bundle_paths = prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
         bundle_paths["workspace_snapshot_tar_path"],
@@ -206,10 +226,7 @@ async def verify_pull_request_activity(
             bundle_paths["incremental_window_path"],
             label="bundle_paths.incremental_window_path",
         ),
-        verifier_artifacts_path=artifact_path(
-            prepared_input["artifact_paths"],
-            "verifier",
-        ),
+        verifier_artifacts_path=verifier_artifacts_path,
         published_transcript_path=review_stage_transcript_path(
             run_artifacts_root,
             order=review_stage_attempt_order(
@@ -301,10 +318,7 @@ class PullRequestReviewWorkflow:
         history: list[dict[str, Any]] = []
         while (
             retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
-            and should_retry_from_verifier_result(
-                mitigation_result,
-                verifier_result,
-            )
+            and should_retry_from_verifier_result(verifier_result)
         ):
             retry_count += 1
             retry_context = feedback_retry_context(
@@ -360,17 +374,6 @@ class PullRequestReviewWorkflow:
                 )
             )
         return {"ok": True, "result": result}
-
-
-def _should_run_pr_mitigation(analysis_result: Mapping[str, Any] | None) -> bool:
-    narratives = (analysis_result or {}).get("narratives")
-    if not isinstance(narratives, list):
-        return False
-    return any(
-        isinstance(narrative, dict)
-        and narrative.get("verdict") in {"confirmed-vulnerability", "confirmed-defect"}
-        for narrative in narratives
-    )
 
 
 __all__ = [

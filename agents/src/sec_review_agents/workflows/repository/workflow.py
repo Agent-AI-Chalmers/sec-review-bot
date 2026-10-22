@@ -18,6 +18,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     should_retry_from_verifier_result,
 )
 from sec_review_agents.review_stages.record import build_review_record
+from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
 from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.scan_stages.triage.result import TriageResult
@@ -446,7 +447,6 @@ async def mitigate_repository_case_activity(
     from sec_review_agents.workflows.repository_case.stage import (
         MITIGATION_NO_TARGET_REASON,
         run_repository_case_mitigation_stage,
-        should_run_repository_mitigation,
     )
 
     bind_trace_context(workflow="repository-review")
@@ -454,7 +454,7 @@ async def mitigate_repository_case_activity(
         prepared_case["artifact_paths"],
         "mitigator",
     )
-    if not should_run_repository_mitigation(analysis_result):
+    if not has_confirmed_repair_target(analysis_result):
         _repository_case_published_transcript_path(
             prepared_case,
             order=review_stage_attempt_order(
@@ -496,6 +496,7 @@ async def verify_repository_case_activity(
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.verification.stage import (
+        create_skipped_verification_result,
         verification_attempt_label,
     )
     from sec_review_agents.utils.paths import artifact_path
@@ -504,16 +505,31 @@ async def verify_repository_case_activity(
     )
 
     bind_trace_context(workflow="repository-review")
+    verifier_artifacts_path = artifact_path(
+        prepared_case["artifact_paths"],
+        "verifier",
+    )
+    if not has_confirmed_repair_target(analysis_result):
+        _repository_case_published_transcript_path(
+            prepared_case,
+            order=review_stage_attempt_order(
+                stage="verifier", retry_context=retry_context
+            ),
+            stage="verifier",
+            attempt=verification_attempt_label(retry_context),
+        ).unlink(missing_ok=True)
+        return create_skipped_verification_result(
+            verifier_artifacts_path=verifier_artifacts_path,
+            retry_context=retry_context,
+            reason="Verification was skipped because analysis produced no confirmed repair target.",
+        )
     return await run_repository_case_verification_stage(
         prepared_case["case_execution_input"],
         analysis_result,
         mitigation_result,
         retry_context,
         runtime_context,
-        verifier_artifacts_path=artifact_path(
-            prepared_case["artifact_paths"],
-            "verifier",
-        ),
+        verifier_artifacts_path=verifier_artifacts_path,
         published_transcript_path=_repository_case_published_transcript_path(
             prepared_case,
             order=review_stage_attempt_order(
@@ -953,10 +969,7 @@ class RepositoryCaseReviewWorkflow:
             history: list[dict[str, Any]] = []
             while (
                 retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
-                and should_retry_from_verifier_result(
-                    mitigation_result,
-                    verifier_result,
-                )
+                and should_retry_from_verifier_result(verifier_result)
             ):
                 retry_count += 1
                 retry_context = feedback_retry_context(

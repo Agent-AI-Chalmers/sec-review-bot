@@ -1,20 +1,16 @@
 from sec_review_agents.review_stages import feedback_loop
 
 
-def test_retry_decision_requires_changed_files_and_retry_ai_verifier_next_step() -> (
-    None
-):
+def test_retry_decision_follows_verifier_next_step_without_requiring_a_patch() -> None:
+    """A failed first mitigation can receive a bounded retry before any patch exists."""
     assert feedback_loop.should_retry_from_verifier_result(
-        {"changed_files": ["app.py"]},
         {"resolution_next_step": "retry-ai"},
     )
     assert not feedback_loop.should_retry_from_verifier_result(
-        {"changed_files": []},
-        {"resolution_next_step": "retry-ai"},
-    )
-    assert not feedback_loop.should_retry_from_verifier_result(
-        {"changed_files": ["app.py"]},
         {"resolution_next_step": "none"},
+    )
+    assert not feedback_loop.should_retry_from_verifier_result(
+        None,
     )
 
 

@@ -2,6 +2,7 @@ import asyncio
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -21,6 +22,7 @@ from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseReviewWorkflow,
     RepositoryDiscoveryWorkflow,
     resolve_repository_case_processing_max_concurrency,
+    verify_repository_case_activity,
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
@@ -69,6 +71,98 @@ def repository_case_review_request(case_id: str) -> RepositoryCaseReviewRequest:
         "timeout_seconds": 30,
         "runtime_context": {},
     }
+
+
+@pytest.mark.asyncio
+async def test_direct_case_records_skipped_verification_without_confirmed_target() -> (
+    None
+):
+    prepared_case = {
+        "case_execution_input": repository_case_execution_input("case-1"),
+        "artifact_paths": {
+            "analyzer": "/tmp/cases/case-1/analyzer",
+            "cvss": "/tmp/cases/case-1/cvss",
+            "mitigator": "/tmp/cases/case-1/mitigator",
+            "verifier": "/tmp/cases/case-1/verifier",
+        },
+    }
+    analysis_result = {"verdict": "no-actionable-finding", "narratives": []}
+    mitigation_result: dict[str, Any] = {"changed_files": []}
+    verifier_result = {
+        "overview": "Verification skipped.",
+        "resolution_next_step": "none",
+    }
+
+    with (
+        patch.object(
+            repository_case_direct,
+            "prepare_repository_case_activity",
+            return_value=prepared_case,
+        ),
+        patch.object(
+            repository_case_direct,
+            "analyze_repository_case_activity",
+            return_value=analysis_result,
+        ),
+        patch.object(
+            repository_case_direct,
+            "score_repository_case_cvss_activity",
+            return_value={"outcome": "skipped"},
+        ),
+        patch.object(
+            repository_case_direct,
+            "mitigate_repository_case_activity",
+            return_value=mitigation_result,
+        ),
+        patch.object(
+            repository_case_direct,
+            "verify_repository_case_activity",
+            return_value=verifier_result,
+        ) as verify_mock,
+        patch.object(
+            repository_case_direct,
+            "build_repository_case_result_activity",
+            return_value={"case_id": "case-1"},
+        ) as build_result_mock,
+    ):
+        await repository_case_direct.run_repository_case_review_direct(
+            repository_case_review_request("case-1")
+        )
+
+    verify_mock.assert_awaited_once_with(
+        prepared_case,
+        analysis_result,
+        mitigation_result,
+        None,
+        {},
+    )
+    assert build_result_mock.call_args.args[-1] == verifier_result
+
+
+@pytest.mark.asyncio
+async def test_case_verification_activity_persists_skip_without_running_verifier(
+    tmp_path: Path,
+) -> None:
+    prepared_case = {
+        "case_execution_input": repository_case_execution_input("case-1"),
+        "artifact_paths": {"verifier": str(tmp_path / "verifier")},
+        "published_transcripts_path": str(tmp_path / "transcripts"),
+    }
+
+    with patch(
+        "sec_review_agents.workflows.repository_case.stage.run_repository_case_verification_stage"
+    ) as verify_mock:
+        result = await verify_repository_case_activity(
+            prepared_case,
+            {"verdict": "no-actionable-finding", "narratives": []},
+            {"changed_files": []},
+            None,
+            {},
+        )
+
+    verify_mock.assert_not_called()
+    assert result["patch_coverage"] is None
+    assert (tmp_path / "verifier" / "verification-result.json").is_file()
 
 
 @pytest.mark.asyncio
@@ -685,7 +779,10 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
 
     @activity.defn(name="analyze_repository_case_activity")
     def fake_analyzer(_prepared_case: dict, _runtime_context: dict) -> dict:
-        return {"verdict": "confirmed-vulnerability"}
+        return {
+            "verdict": "confirmed-vulnerability",
+            "narratives": [{"verdict": "confirmed-vulnerability"}],
+        }
 
     @activity.defn(name="score_repository_case_cvss_activity")
     def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
@@ -824,7 +921,10 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         _prepared_case: dict,
         _runtime_context: dict,
     ) -> dict:
-        return {"verdict": "confirmed-vulnerability"}
+        return {
+            "verdict": "confirmed-vulnerability",
+            "narratives": [{"verdict": "confirmed-vulnerability"}],
+        }
 
     async def fake_verifier(
         _prepared_case: dict,
@@ -917,7 +1017,10 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
         _prepared_case: dict,
         _runtime_context: dict,
     ) -> dict:
-        return {"verdict": "confirmed-vulnerability"}
+        return {
+            "verdict": "confirmed-vulnerability",
+            "narratives": [{"verdict": "confirmed-vulnerability"}],
+        }
 
     async def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
         raise RuntimeError("cvss model failed")

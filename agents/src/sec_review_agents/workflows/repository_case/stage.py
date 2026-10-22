@@ -40,19 +40,6 @@ def _blocked_case_disposition(reason: str) -> dict[str, Any]:
     }
 
 
-def should_run_repository_mitigation(
-    analysis_result: Mapping[str, Any] | None,
-) -> bool:
-    narratives = (analysis_result or {}).get("narratives")
-    if not isinstance(narratives, list):
-        return False
-    return any(
-        isinstance(narrative, dict)
-        and narrative.get("verdict") in {"confirmed-vulnerability", "confirmed-defect"}
-        for narrative in narratives
-    )
-
-
 def derive_case_disposition(
     analyzer_result: Mapping[str, Any],
     mitigator_result: Mapping[str, Any],

@@ -39,6 +39,8 @@ In practice, though, many security repair tasks do not come with runnable PoCs, 
 
 ## Core Workflow
 
+The confirmed repair target gate is also the verifier eligibility boundary. If analysis does not produce a confirmed vulnerability or confirmed defect repair target, the mitigation and verification stage wrappers emit deterministic skipped results without starting either agent. The skipped verification result is persisted with empty judgment fields and `resolution_next_step=none`, so no feedback retry is scheduled. This prevents verification from becoming a second analyzer pass over a case with no accepted repair target while preserving an explicit stage audit record.
+
 ### Normal Path
 
 - `analyzer -> mitigator -> verifier`
@@ -94,6 +96,8 @@ Examples:
 ## Retry Trigger Policy
 
 Retry is driven by `resolution_next_step=retry-ai`, not by `patch_coverage` alone.
+
+A first mitigation attempt does not need to produce changed files to be retry-eligible. If verifier identifies a concrete in-scope repair that the first attempt missed, `patch_coverage=no-patch` with actionable `patch_findings` may use `resolution_next_step=retry-ai`. The workflow bounds that recovery in the same way as a retry after a partial patch.
 
 Retry-eligible patch judgments are usually `partial` / `local-only` / `unresolved` / `misaligned`. Full security coverage can also be retry-eligible when `regression_status=failed`. Every retry-eligible outcome must carry `resolution_next_step=retry-ai`.
 

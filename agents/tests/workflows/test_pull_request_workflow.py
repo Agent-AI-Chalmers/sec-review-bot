@@ -1,10 +1,16 @@
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
+from sec_review_agents.workflows.pull_request.direct import (
+    run_pull_request_review_direct,
+)
 from sec_review_agents.workflows.pull_request.workflow import (
     mitigate_pull_request_activity,
+    verify_pull_request_activity,
 )
 
 
@@ -74,3 +80,89 @@ async def test_mitigation_activity_run_accepts_serialized_artifact_root(
     assert captured["published_transcript_path"] == (
         artifact_root / "transcripts" / "0002-mitigator-initial.json"
     )
+
+
+@pytest.mark.asyncio
+async def test_direct_review_records_skipped_verification_without_confirmed_target() -> (
+    None
+):
+    analysis_result = {"verdict": "no-actionable-finding", "narratives": []}
+    mitigation_result = {
+        "overview": "No confirmed repair target.",
+        "changed_files": [],
+        "file_changes": [],
+        "patch_diff": "",
+    }
+    verifier_result = {
+        "overview": "Verification skipped.",
+        "resolution_next_step": "none",
+    }
+    request = InternalWorkflowRequest(
+        workflow="pull-request-review",
+        run_id="run-no-target",
+        prepared_input={},
+        timeout_seconds=30,
+        runtime_context={},
+    )
+
+    with (
+        patch(
+            "sec_review_agents.workflows.pull_request.direct.prepare_internal_workflow_activity"
+        ),
+        patch(
+            "sec_review_agents.workflows.pull_request.direct.analyze_pull_request_activity",
+            return_value=analysis_result,
+        ),
+        patch(
+            "sec_review_agents.workflows.pull_request.direct.mitigate_pull_request_activity",
+            return_value=mitigation_result,
+        ),
+        patch(
+            "sec_review_agents.workflows.pull_request.direct.verify_pull_request_activity",
+            return_value=verifier_result,
+        ) as verify_mock,
+        patch(
+            "sec_review_agents.workflows.pull_request.direct.build_pull_request_review_result_activity",
+            return_value={"review_record": {}},
+        ) as build_result_mock,
+    ):
+        await run_pull_request_review_direct(request)
+
+    verify_mock.assert_awaited_once_with(
+        {},
+        analysis_result,
+        mitigation_result,
+        None,
+        {},
+    )
+    build_result_mock.assert_called_once_with(
+        analysis_result,
+        mitigation_result,
+        verifier_result,
+    )
+
+
+@pytest.mark.asyncio
+async def test_verification_activity_persists_skip_without_running_verifier(
+    tmp_path: Path,
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    prepared_input = {
+        "artifact_root_path": str(artifact_root),
+        "artifact_paths": {"verifier": str(artifact_root / "verifier")},
+    }
+
+    with patch(
+        "sec_review_agents.workflows.pull_request.verification.verify_pull_request"
+    ) as verify_mock:
+        result = await verify_pull_request_activity(
+            prepared_input,
+            {"verdict": "no-actionable-finding", "narratives": []},
+            {"changed_files": []},
+            None,
+            {},
+        )
+
+    verify_mock.assert_not_called()
+    assert result["patch_coverage"] is None
+    assert (artifact_root / "verifier" / "verification-result.json").is_file()

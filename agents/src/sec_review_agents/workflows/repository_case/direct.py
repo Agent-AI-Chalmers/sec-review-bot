@@ -57,7 +57,7 @@ async def run_repository_case_review_direct(
         history: list[dict[str, Any]] = []
         while (
             retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
-            and should_retry_from_verifier_result(mitigation_result, verifier_result)
+            and should_retry_from_verifier_result(verifier_result)
         ):
             retry_count += 1
             retry_context = feedback_retry_context(

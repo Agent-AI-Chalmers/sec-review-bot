@@ -7,6 +7,7 @@ from typing import Any
 from temporalio import activity, workflow
 
 from sec_review_agents.review_stages.record import build_review_record
+from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
@@ -15,7 +16,6 @@ from sec_review_agents.temporal.support import (
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.issue.workflow import (
     analyze_issue_activity,
-    should_run_issue_mitigation,
 )
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
@@ -54,7 +54,7 @@ async def mitigate_issue_self_check_activity(
         prepared_input["artifact_paths"],
         "mitigator",
     )
-    if not should_run_issue_mitigation(analysis_result):
+    if not has_confirmed_repair_target(analysis_result):
         review_stage_transcript_path(
             run_artifacts_root,
             order=2,
@@ -169,7 +169,7 @@ async def run_issue_two_stage(
         setup_declaration_content=setup_declaration_content,
     )
 
-    if not should_run_issue_mitigation(analysis_result):
+    if not has_confirmed_repair_target(analysis_result):
         mitigation_result: dict[str, Any] = create_skipped_mitigation_result(
             mitigator_artifacts_path=mitigator_artifacts_path,
             retry_context=None,

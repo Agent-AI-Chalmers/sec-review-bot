@@ -15,12 +15,12 @@ from sec_review_agents.review_stages.types import (
 class VerificationStageResult(BaseModel):
     overview: str
     review_target_claim: str | None
-    patch_coverage: PatchCoverage
+    patch_coverage: PatchCoverage | None
     resolution_next_step: ResolutionNextStep
     patch_findings: list[str] = Field(default_factory=list)
     verification_findings: list[str] = Field(default_factory=list)
-    validation_level: ValidationLevel
-    regression_status: RegressionStatus
+    validation_level: ValidationLevel | None
+    regression_status: RegressionStatus | None
     residual_risks: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
@@ -49,5 +49,21 @@ def build_verification_stage_result(
             "validation_level": validation_level,
             "regression_status": regression_status,
             "residual_risks": residual_risks,
+        }
+    ).model_dump(mode="json")
+
+
+def build_skipped_verification_result(*, reason: str) -> dict[str, Any]:
+    return VerificationStageResult.model_validate(
+        {
+            "overview": reason,
+            "review_target_claim": None,
+            "patch_coverage": None,
+            "resolution_next_step": "none",
+            "patch_findings": [],
+            "verification_findings": [],
+            "validation_level": None,
+            "regression_status": None,
+            "residual_risks": [],
         }
     ).model_dump(mode="json")
