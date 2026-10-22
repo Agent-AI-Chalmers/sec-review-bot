@@ -88,19 +88,19 @@ export const messages = {
     failureCodeExecutionAlreadyAdvanced:
       'The preparation claim expired while execution was already past pending. A preparation failure means the task never started, which this run contradicts, so the expiry could not be concluded.',
     failureCodeSubmissionUncertain:
-      'The Runner never confirmed whether it accepted the task.',
+      'The Execution Gateway never confirmed whether it accepted the task.',
     failureCodeSubmissionRecoveryExhausted:
-      'Replays of the submission kept ending without an answer from the Runner, so its acceptance is still unknown.',
+      'Replays of the submission kept ending without an answer from the Execution Gateway, so its acceptance is still unknown.',
     failureCodeSubmissionRecoveryAbandoned:
-      'An operator stopped waiting for this outcome. The Runner may still have accepted and run this task.',
+      'An operator stopped waiting for this outcome. The Execution Gateway may still have accepted and run this task.',
     failureCodePreparationGivenUp:
       'An operator stopped waiting for this preparation.',
     failureCodePublicationGivenUp:
       'An operator stopped publishing while a step could not be confirmed; that step may already have taken effect on GitHub.',
-    failureCodeRunnerExecutionFailed:
-      'The Runner reported that the task failed.',
-    failureCodeRunnerResultMissing:
-      'The Runner reported success without a usable result.',
+    failureCodeExecutionFailed:
+      'The Execution Gateway reported that the task failed.',
+    failureCodeExecutionResultMissing:
+      'The Execution Gateway reported success without a usable result.',
     failureCodePublicationAbandoned:
       'Publishing stopped because the run will not produce a result.',
     failureCodePublicationStepRetryExhausted:
@@ -142,7 +142,7 @@ export const messages = {
     abandonFailed: 'The run could not be abandoned.',
     disconnectedExecutionTitle: 'This run cannot continue on its own',
     disconnectedExecutionBody:
-      'Automatic replays of this task ran out without a conclusive answer from the Runner, so the system stopped and will not try again on its own. It is not known whether the Runner accepted this task. Resuming grants a fresh replay budget; abandoning ends the run.',
+      'Automatic replays of this task ran out without a conclusive answer from the Execution Gateway, so the system stopped and will not try again on its own. It is not known whether the Execution Gateway accepted this task. Resuming grants a fresh replay budget; abandoning ends the run.',
     disconnectedExecutionOutcomeResume:
       'Resume grants a fresh replay budget so the system can try to establish the outcome again. There is no way to abandon a run in this state yet.',
     disconnectedPublicationTitle: 'This run needs your review',
@@ -155,10 +155,10 @@ export const messages = {
     giveUpRun: 'Give up',
     giveUpTitle: 'Stop waiting for this outcome',
     giveUpExplainer:
-      'This stops waiting, without claiming that nothing happened. The Runner may still have accepted and run this task, or some publishing steps may already exist on GitHub. This run will not wait for the result any longer and will not publish anything more. Whatever already happened remotely stays there. This cannot be undone.',
+      'This stops waiting, without claiming that nothing happened. The Execution Gateway may still have accepted and run this task, or some publishing steps may already exist on GitHub. This run will not wait for the result any longer and will not publish anything more. Whatever already happened remotely stays there. This cannot be undone.',
     giveUpConfirm: 'Stop waiting',
     disconnectedExecutionOutcomeGiveUp:
-      'Giving up stops waiting for the result: the task is recorded as failed with a reason naming this decision, and nothing is published. The Runner may still be running it.',
+      'Giving up stops waiting for the result: the task is recorded as failed with a reason naming this decision, and nothing is published. The Execution Gateway may still be running it.',
     resumeRun: 'Resume',
     resumeTitle: 'Resume this run',
     resumeExplainer:
@@ -196,7 +196,7 @@ export const messages = {
       'The run was created, but no preparer has taken the work yet: nothing is happening to this run until one does.',
     state_preparation_preparing_label: 'Preparing',
     state_preparation_preparing_desc:
-      'Preparing the input that will be sent to the Runner.',
+      'Preparing the input that will be sent to the Execution Gateway.',
     state_preparation_uncertain_label: 'Uncertain',
     state_preparation_uncertain_desc:
       'The preparer\u2019s claim lapsed before it reported, so it is unknown whether the prepared input reached Control Plane. This is not a failure: the input can be rebuilt and resubmitted under the same identity.',
@@ -205,34 +205,34 @@ export const messages = {
       'Automatic work stopped because this run\u2019s own records no longer admit the transition expiry could make. Nothing retries it on its own.',
     state_preparation_submitted_label: 'Submitted',
     state_preparation_submitted_desc:
-      'The input is ready and has been handed to the Runner. Preparation is done.',
+      'The input is ready and has been handed to the Execution Gateway. Preparation is done.',
     state_preparation_failed_label: 'Failed',
     state_preparation_failed_desc:
-      'Preparation failed for good (retries used up, or the input could not be built). The Runner never received the task, so execution is skipped.',
+      'Preparation failed for good (retries used up, or the input could not be built). The Execution Gateway never received the task, so execution is skipped.',
     state_execution_pending_label: 'Pending',
     state_execution_pending_desc:
-      'The run was created and is still being prepared; nothing has been sent to the Runner yet.',
+      'The run was created and is still being prepared; nothing has been sent to the Execution Gateway yet.',
     state_execution_queued_label: 'Queued',
     state_execution_queued_desc:
-      'The Runner accepted the task and will start it; it has not started executing yet.',
+      'The Execution Gateway accepted the task and will start it; it has not started executing yet.',
     state_execution_running_label: 'Running',
     state_execution_running_desc:
-      'Polling observed that the Runner is executing this task. A transient network blip while polling does not change this state: the run keeps the last observed value and is polled again, so this state may be a little out of date.',
+      'Polling observed that the Execution Gateway is executing this task. A transient network blip while polling does not change this state: the run keeps the last observed value and is polled again, so this state may be a little out of date.',
     state_execution_uncertain_label: 'Uncertain',
     state_execution_uncertain_desc:
-      'A submission may have reached the Runner but its result could not be confirmed. A recovery replays the same run_id to find out whether it ran.',
+      'A submission may have reached the Execution Gateway but its result could not be confirmed. A recovery replays the same run_id to find out whether it ran.',
     state_execution_disconnected_label: 'Disconnected',
     state_execution_disconnected_desc:
-      'Automatic replays ran out without a conclusive Runner answer. Automation has stopped and will not retry by itself; this is not a failure, and an operator has to establish whether the Runner actually has this task.',
+      'Automatic replays ran out without a conclusive Execution Gateway answer. Automation has stopped and will not retry by itself; this is not a failure, and an operator has to establish whether the Execution Gateway actually has this task.',
     state_execution_succeeded_label: 'Succeeded',
     state_execution_succeeded_desc:
-      'The Runner finished successfully; the result can now be published.',
+      'The Execution Gateway finished successfully; the result can now be published.',
     state_execution_skipped_label: 'Skipped',
     state_execution_skipped_desc:
       'Execution never ran because preparation failed, so there is nothing to execute. The reason lives on the preparation axis; this axis is concluded, not waiting.',
     state_execution_failed_label: 'Failed',
     state_execution_failed_desc:
-      'A definite failure, in one of two ways: 1. polling got a conclusive answer that the task cannot succeed — the Runner reported a failure, or the run could not be found, returned no result, or broke the protocol; 2. a retried submission failed conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not a definite failure.',
+      'A definite failure, in one of two ways: 1. polling got a conclusive answer that the task cannot succeed — the Execution Gateway reported a failure, or the run could not be found, returned no result, or broke the protocol; 2. a retried submission failed conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not a definite failure.',
     state_publication_pending_label: 'Pending',
     state_publication_pending_desc:
       'Waiting for a successful result before publishing.',
@@ -260,7 +260,7 @@ export const messages = {
     edge_preparation_pending_preparing:
       'a worker picked up the task and started preparing the input',
     edge_preparation_preparing_submitted:
-      'the input is ready and was handed to the Runner',
+      'the input is ready and was handed to the Execution Gateway',
     edge_preparation_preparing_pending:
       'this attempt failed; it will be retried shortly',
     edge_preparation_preparing_uncertain:
@@ -280,7 +280,7 @@ export const messages = {
     edge_preparation_preparing_failed:
       'preparation failed for good (retries exhausted, or an error that cannot be retried)',
     edge_execution_pending_queued:
-      'the prepared input was submitted and the Runner accepted it',
+      'the prepared input was submitted and the Execution Gateway accepted it',
     edge_execution_pending_skipped:
       'preparation failed, so execution will never run',
     edge_publication_publishing_pending:
@@ -305,11 +305,12 @@ export const messages = {
       'an operator handed it back to automatic replay with a fresh budget',
     edge_execution_disconnected_failed:
       'an operator stopped waiting for the result (it may still be running)',
-    edge_execution_queued_running: 'polling saw the Runner start the task',
+    edge_execution_queued_running:
+      'polling saw the Execution Gateway start the task',
     edge_execution_running_succeeded:
-      'polling saw the Runner finish successfully',
+      'polling saw the Execution Gateway finish successfully',
     edge_execution_queued_succeeded:
-      'polling saw the Runner finish before it was ever seen running',
+      'polling saw the Execution Gateway finish before it was ever seen running',
     edge_execution_queued_failed:
       'polling reached a definite failure (reported failure, run not found, no result, or bad response)',
     edge_execution_running_failed:
@@ -424,16 +425,17 @@ export const messages = {
       '有人主动结束了这个 run，没有让它继续下去，因此准备阶段按失败收尾。',
     failureCodeExecutionAlreadyAdvanced:
       '准备阶段的认领过期时，执行已经不在「等待中」。准备失败意味着任务从未开始，而这个 run 与这一点相矛盾，因此这次过期无法收尾。',
-    failureCodeSubmissionUncertain: 'Runner 没有确认是否接单。',
+    failureCodeSubmissionUncertain: 'Execution Gateway 没有确认是否接单。',
     failureCodeSubmissionRecoveryExhausted:
-      '提交的重放一直没有得到 Runner 的答复，因此它是否被接受仍然未知。',
+      '提交的重放一直没有得到 Execution Gateway 的答复，因此它是否被接受仍然未知。',
     failureCodeSubmissionRecoveryAbandoned:
-      'operator 决定不再等待这个结果。Runner 可能已经接受并执行了这个任务。',
+      'operator 决定不再等待这个结果。Execution Gateway 可能已经接受并执行了这个任务。',
     failureCodePreparationGivenUp: 'operator 决定不再等待这次准备。',
     failureCodePublicationGivenUp:
       '某个步骤无法确认时，operator 决定停止发布；该步骤可能已经在 GitHub 上生效。',
-    failureCodeRunnerExecutionFailed: 'Runner 报告任务执行失败。',
-    failureCodeRunnerResultMissing: 'Runner 报告成功，但没有可用的结果。',
+    failureCodeExecutionFailed: 'Execution Gateway 报告任务执行失败。',
+    failureCodeExecutionResultMissing:
+      'Execution Gateway 报告成功，但没有可用的结果。',
     failureCodePublicationAbandoned: '这个 run 不会产出结果，发布已停止。',
     failureCodePublicationStepRetryExhausted:
       '某个发布步骤反复失败，重试次数已用完。',
@@ -462,7 +464,7 @@ export const messages = {
     abandonFailed: '放弃失败。',
     disconnectedExecutionTitle: '这个 run 无法自行继续',
     disconnectedExecutionBody:
-      '这个任务的自动重放已用尽次数，仍未得到 Runner 的确定答复，因此系统停手，不再自动重试。Runner 到底有没有接受这个任务，目前不得而知。恢复会给予新的重放预算；放弃则会结束这个 run。',
+      '这个任务的自动重放已用尽次数，仍未得到 Execution Gateway 的确定答复，因此系统停手，不再自动重试。Execution Gateway 到底有没有接受这个任务，目前不得而知。恢复会给予新的重放预算；放弃则会结束这个 run。',
     disconnectedExecutionOutcomeResume:
       '「恢复」会给予新的重放预算，让系统再尝试确认结果。目前这个状态还没有「放弃」的选项。',
     disconnectedPublicationTitle: '这个 run 需要你审计',
@@ -475,10 +477,10 @@ export const messages = {
     giveUpRun: '放弃',
     giveUpTitle: '不再等待这个结果',
     giveUpExplainer:
-      '这表示不再等待，但并不宣称什么都没发生。Runner 可能已经接受并执行了这个任务，也可能已经有部分发布步骤出现在 GitHub 上。这个 run 不再等待结果，也不会再发布任何内容；远端已经发生的事会留在那里。此操作不可撤销。',
+      '这表示不再等待，但并不宣称什么都没发生。Execution Gateway 可能已经接受并执行了这个任务，也可能已经有部分发布步骤出现在 GitHub 上。这个 run 不再等待结果，也不会再发布任何内容；远端已经发生的事会留在那里。此操作不可撤销。',
     giveUpConfirm: '不再等待',
     disconnectedExecutionOutcomeGiveUp:
-      '「放弃」是不再等待结果：该任务会记为失败，并注明这是本次决定所致，不发布任何内容。Runner 那边可能仍在执行。',
+      '「放弃」是不再等待结果：该任务会记为失败，并注明这是本次决定所致，不发布任何内容。Execution Gateway 那边可能仍在执行。',
     resumeRun: '恢复',
     resumeTitle: '恢复这个 run',
     resumeExplainer:
@@ -515,7 +517,8 @@ export const messages = {
     state_preparation_pending_desc:
       '任务已创建，但还没有执行者接手：在有人接手之前，这个 run 不会有任何进展。',
     state_preparation_preparing_label: '准备中',
-    state_preparation_preparing_desc: '正在准备要发送给 Runner 的输入。',
+    state_preparation_preparing_desc:
+      '正在准备要发送给 Execution Gateway 的输入。',
     state_preparation_uncertain_label: '待确认',
     state_preparation_uncertain_desc:
       '准备者的认领在回报之前就过期了，因此不确定准备好的输入是否已经到达 Control Plane。这不是失败：可以用同一身份重建输入并重新提交。',
@@ -524,24 +527,25 @@ export const messages = {
       '这个 run 自身的记录已经不允许过期能做出的那个迁移，因此自动处理停在这里。不会有任何东西自动重试。',
     state_preparation_submitted_label: '已提交',
     state_preparation_submitted_desc:
-      '输入已准备好并交给 Runner，准备阶段完成。',
+      '输入已准备好并交给 Execution Gateway，准备阶段完成。',
     state_preparation_failed_label: '失败',
     state_preparation_failed_desc:
-      '准备最终失败（重试次数用尽，或无法构造输入）。Runner 从未收到任务，因此执行被跳过。',
+      '准备最终失败（重试次数用尽，或无法构造输入）。Execution Gateway 从未收到任务，因此执行被跳过。',
     state_execution_pending_label: '等待中',
-    state_execution_pending_desc: '任务已创建，仍在准备中，尚未发送给 Runner。',
+    state_execution_pending_desc:
+      '任务已创建，仍在准备中，尚未发送给 Execution Gateway。',
     state_execution_queued_label: '排队中',
     state_execution_queued_desc:
-      'Runner 已接受这次提交，但轮询还没观察到它开始执行。',
+      'Execution Gateway 已接受这次提交，但轮询还没观察到它开始执行。',
     state_execution_running_label: '执行中',
     state_execution_running_desc:
-      '轮询观察到 Runner 正在执行该任务。轮询时偶发的网络抖动不会改变这个状态：会保留上次观察到的值并继续轮询，因此这个状态可能略有滞后。',
+      '轮询观察到 Execution Gateway 正在执行该任务。轮询时偶发的网络抖动不会改变这个状态：会保留上次观察到的值并继续轮询，因此这个状态可能略有滞后。',
     state_execution_uncertain_label: '待确认',
     state_execution_uncertain_desc:
-      '已提交但没收到响应，因此无法确认 Runner 是否接受。这不是失败：系统仍会自动重放这次提交来确认，其余什么都不做。',
+      '已提交但没收到响应，因此无法确认 Execution Gateway 是否接受。这不是失败：系统仍会自动重放这次提交来确认，其余什么都不做。',
     state_execution_disconnected_label: '失联',
     state_execution_disconnected_desc:
-      '自动重放已用尽次数，仍未得到 Runner 的确定答复。系统已经停手，不再自动重试；这不等于失败，需要人工确认 Runner 那边到底有没有这个任务。',
+      '自动重放已用尽次数，仍未得到 Execution Gateway 的确定答复。系统已经停手，不再自动重试；这不等于失败，需要人工确认 Execution Gateway 那边到底有没有这个任务。',
     state_execution_succeeded_label: '执行成功',
     state_execution_succeeded_desc: '轮询观察到执行成功，结果可以发布。',
     state_execution_skipped_label: '已跳过',
@@ -549,7 +553,7 @@ export const messages = {
       '因为准备失败，执行从未运行，因此没有可执行的内容。原因记录在准备阶段；这一轴到此结束，不再等待任何东西。',
     state_execution_failed_label: '失败',
     state_execution_failed_desc:
-      '确定性的失败，分两种情况：1. 轮询得到了“不可能成功”的确定结论：Runner 报告执行失败，或查不到该 run、没有返回结果、响应不符合约定；2. 重放提交得到确定性失败。而网络抖动（超时、5xx、连接中断）不算确定性失败。',
+      '确定性的失败，分两种情况：1. 轮询得到了“不可能成功”的确定结论：Execution Gateway 报告执行失败，或查不到该 run、没有返回结果、响应不符合约定；2. 重放提交得到确定性失败。而网络抖动（超时、5xx、连接中断）不算确定性失败。',
     state_publication_pending_label: '等待中',
     state_publication_pending_desc: '等待执行成功后开始发布。',
     state_publication_publishing_label: '发布中',
@@ -572,7 +576,8 @@ export const messages = {
     machine_execution_title: '执行',
     machine_publication_title: '发布',
     edge_preparation_pending_preparing: '有执行者接手，开始准备输入',
-    edge_preparation_preparing_submitted: '输入构造完成，已交给 Runner',
+    edge_preparation_preparing_submitted:
+      '输入构造完成，已交给 Execution Gateway',
     edge_preparation_preparing_pending: '本次准备失败，稍后重试',
     edge_preparation_preparing_uncertain: '认领在准备者回报之前就过期了',
     edge_preparation_uncertain_preparing:
@@ -593,7 +598,8 @@ export const messages = {
       'operator 决定停止发布（部分步骤可能已经完成）',
     edge_preparation_preparing_failed:
       '准备失败（可能是重试次数用尽，也可能是不可重试的错误）',
-    edge_execution_pending_queued: '准备好的输入已提交，Runner 接受了该任务',
+    edge_execution_pending_queued:
+      '准备好的输入已提交，Execution Gateway 接受了该任务',
     edge_execution_pending_skipped: '准备失败，因此执行不会发生',
     edge_publication_publishing_pending: '某步骤失败但可重试，回到等待后重试',
     edge_publication_publishing_failed: '重试次数用尽，发布最终失败',
@@ -611,10 +617,10 @@ export const messages = {
       'operator 把它交回自动重放，并获得新的预算',
     edge_execution_disconnected_failed:
       'operator 决定不再等待结果（任务可能仍在执行）',
-    edge_execution_queued_running: '轮询观察到 Runner 开始执行',
-    edge_execution_running_succeeded: '轮询观察到 Runner 执行成功',
+    edge_execution_queued_running: '轮询观察到 Execution Gateway 开始执行',
+    edge_execution_running_succeeded: '轮询观察到 Execution Gateway 执行成功',
     edge_execution_queued_succeeded:
-      '首次轮询时 Runner 已完成，未观察到执行中状态',
+      '首次轮询时 Execution Gateway 已完成，未观察到执行中状态',
     edge_execution_queued_failed:
       '轮询得到确定性失败（报告失败、查不到 run、无结果或响应不合约定）',
     edge_execution_running_failed:

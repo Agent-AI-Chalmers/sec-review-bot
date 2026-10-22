@@ -2,7 +2,7 @@
 // callers import its storage, transport, or generated-contract internals directly.
 export type {
   ControlPlaneWorkflow,
-  RunnerArtifactStorage
+  ExecutionArtifactStorage
 } from './contracts.js'
 export { submitPreparedRun } from './prepared-submission.js'
 export {
@@ -33,6 +33,6 @@ export {
   type SubmissionRecoveryResult
 } from './submission-recovery.js'
 export {
-  observeRunnerRun,
-  type RunnerObservationResult
+  observeExecutionRun,
+  type ExecutionObservationResult
 } from './terminal-coordination.js'

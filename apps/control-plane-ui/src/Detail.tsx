@@ -276,7 +276,7 @@ function AbandonDialog({
 /** Stop waiting for an outcome that cannot be established.
  *
  * Distinct from `AbandonDialog`, which resolves a *contradiction*. This one accepts that the
- * outcome is unknowable — the Runner may have accepted the task, a publication step may already
+ * outcome is unknowable — the Execution API may have accepted the task, a publication step may already
  * have taken effect — and records only that the run will not wait for it any longer. A reason is
  * required because the decision is irreversible and says nothing about what actually happened.
  */
@@ -513,7 +513,7 @@ function NoticeLine({
 
 /** A failure code, with its meaning on hover when the console knows one.
  *
- * The code stays visible either way: it is what the logs and the Runner use, and an operator
+ * The code stays visible either way: it is what the logs and the Execution API use, and an operator
  * searching for it must not have to reconstruct it from a tooltip. A code the console does not
  * recognise renders plainly rather than being guessed at.
  */
@@ -1016,7 +1016,7 @@ export function Detail(): React.JSX.Element {
                 >
                   {run.execution.started_at === null ? (
                     // Execution has not begun: either preparation has not handed the input to the
-                    // Runner yet (nothing to time), or it never will because preparation failed
+                    // Execution API yet (nothing to time), or it never will because preparation failed
                     // and the axis was concluded as `skipped`. The latter has an end without a
                     // start, so report when it was concluded rather than a duration it never had.
                     <Text c="dimmed" size="sm">

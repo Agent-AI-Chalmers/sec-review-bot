@@ -64,7 +64,7 @@ test('coordination expires preparations before recovery and active observation',
     async recoverSubmission(entry) {
       events.push(`recover:${entry.run_id}`)
     },
-    async readRunnerStatuses() {
+    async readExecutionStatuses() {
       events.push('read')
       return { runs: [], missing: [], byRunId: new Map() }
     },
@@ -111,7 +111,7 @@ test('one pass reads every active run status in a single request', async () => {
     async recoverSubmission() {
       throw new Error('this pass has nothing to recover')
     },
-    async readRunnerStatuses(runs) {
+    async readExecutionStatuses(runs) {
       reads.push(runs.map((entry) => entry.run_id))
       return { runs: [], missing: [], byRunId: new Map() }
     },
@@ -130,7 +130,7 @@ test('one pass reads every active run status in a single request', async () => {
   assert.deepStrictEqual(observed, ['active-1', 'active-2', 'active-3'])
 })
 
-test('a pass with no active runs asks the Runner nothing', async () => {
+test('a pass with no active runs asks the Execution nothing', async () => {
   const reads: number[] = []
   const store = {
     async expireStalePreparations() {
@@ -148,7 +148,7 @@ test('a pass with no active runs asks the Runner nothing', async () => {
     async recoverSubmission() {
       throw new Error('this pass has nothing to recover')
     },
-    async readRunnerStatuses() {
+    async readExecutionStatuses() {
       reads.push(1)
       return { runs: [], missing: [], byRunId: new Map() }
     },
@@ -197,7 +197,7 @@ test('a single row the contract cannot represent degrades that run, not the pass
 
   await coordinateReviewRunsOnce(store, {
     async recoverSubmission() {},
-    async readRunnerStatuses() {
+    async readExecutionStatuses() {
       return { runs: [], missing: [], byRunId: new Map() }
     },
     async observeActiveRun(entry) {

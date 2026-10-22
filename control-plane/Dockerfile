@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS builder
+FROM node:24-alpine AS builder
 
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
@@ -24,7 +24,7 @@ RUN pnpm run build
 # root, so the default implementation needs no injected workspace packages.
 RUN pnpm deploy --filter . --prod /prod
 
-FROM node:24-bookworm-slim
+FROM node:24-alpine
 
 WORKDIR /app
 

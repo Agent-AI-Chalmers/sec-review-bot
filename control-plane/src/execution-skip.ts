@@ -1,6 +1,6 @@
 // One cross-axis transition shared by the stores: conclude an execution that never ran.
 //
-// When preparation fails, the Runner is never called, so execution is `skipped` rather than
+// When preparation fails, the Execution is never called, so execution is `skipped` rather than
 // `failed` - there is no execution failure to report, and the reason stays on the preparation
 // axis. Two preparation paths reach it (a terminal failure with a live claim, and a lease that
 // expired on the final attempt), and both used to spell the UPDATE out themselves. Keeping one
@@ -15,7 +15,7 @@ import type { PoolClient } from 'pg'
 /** Mark pending executions as `skipped`, in the caller's transaction.
  *
  * Only `pending` is eligible: that is the only execution state that has not handed input to the
- * Runner. A run whose execution is already `queued` or beyond cannot be "skipped" by a later
+ * Execution. A run whose execution is already `queued` or beyond cannot be "skipped" by a later
  * preparation failure without contradicting the fact that it was submitted, so it is left alone
  * and the returned ids say which rows this call actually moved.
  *

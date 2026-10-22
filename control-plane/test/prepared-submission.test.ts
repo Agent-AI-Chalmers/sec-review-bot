@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { submitPreparedRun, type ReviewRunRecord } from '../src/index.js'
-import { RunnerSubmissionUncertainError } from '../src/runner-client.js'
+import { ExecutionSubmissionUncertainError } from '../src/execution-client.js'
 
 const run: ReviewRunRecord = {
   run_id: 'run-1',
@@ -36,7 +36,7 @@ const run: ReviewRunRecord = {
   notices: []
 }
 
-test('prepared submission persists input before crossing the Runner boundary', async () => {
+test('prepared submission persists input before crossing the Execution boundary', async () => {
   const events: string[] = []
   const result = await submitPreparedRun(
     {
@@ -72,9 +72,9 @@ test('prepared submission persists input before crossing the Runner boundary', a
   })
 })
 
-test('uncertain Runner submission is persisted for recovery', async () => {
+test('uncertain Execution submission is persisted for recovery', async () => {
   let failure: unknown
-  const error = new RunnerSubmissionUncertainError('response lost')
+  const error = new ExecutionSubmissionUncertainError('response lost')
   await assert.rejects(
     submitPreparedRun(
       {
@@ -107,7 +107,7 @@ test('uncertain Runner submission is persisted for recovery', async () => {
   })
 })
 
-test('a queued-state write failure after Runner accepts is recoverable uncertainty', async () => {
+test('a queued-state write failure after Execution accepts is recoverable uncertainty', async () => {
   let failure: unknown
   await assert.rejects(
     submitPreparedRun(

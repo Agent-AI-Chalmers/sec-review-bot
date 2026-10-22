@@ -297,7 +297,7 @@ const SCENARIOS: readonly Scenario[] = [
     preparation_notice: null
   },
   {
-    // Recovery exhausted its replay budget without learning whether the Runner accepted this
+    // Recovery exhausted its replay budget without learning whether the Execution Gateway accepted this
     // submission. The execution has not started from Control Plane's point of view, publication
     // remains pending, and the queued attention notice is deliberately not a failure report.
     execution_status: 'disconnected',
@@ -407,7 +407,7 @@ const SCENARIOS: readonly Scenario[] = [
   {
     execution_status: 'failed',
     publication_status: 'skipped',
-    failure_code: 'RUNNER_EXECUTION_FAILED',
+    failure_code: 'EXECUTION_FAILED',
     artifact: 'unavailable',
     executionMs: 74_000,
     publicationMs: 74_000,
@@ -528,14 +528,14 @@ function artifactFor(
   }
   return {
     status: 'unavailable',
-    message: 'The runner reported no diagnostic bundle.'
+    message: 'The Execution API reported no diagnostic bundle.'
   }
 }
 
 /**
  * A coherent coordination history for one fixture run, derived from its current state so the
  * console's History section has something truthful to show without a backend. The order and
- * axes mirror what the Control Plane writes: runner and preparation start at admission,
+ * axes mirror what the Control Plane writes: execution and preparation start at admission,
  * publication starts once execution succeeds.
  */
 function eventsFor(run: FixtureRun): Array<{
@@ -586,7 +586,7 @@ function eventsFor(run: FixtureRun): Array<{
     run.execution.status === 'disconnected'
   ) {
     // An unresolved submission never reached `queued`: Control Plane moves `pending` straight to
-    // `uncertain` when the Runner call's acceptance could not be confirmed. The recovery then
+    // `uncertain` when the Execution Gateway call's acceptance could not be confirmed. The recovery then
     // resolves it to `queued` or `failed`, which is why this originates at `pending`.
     events.push(
       push(
@@ -624,8 +624,8 @@ function eventsFor(run: FixtureRun): Array<{
       )
     }
   } else if (run.execution.status === 'skipped') {
-    // The Runner was never called: execution was skipped because preparation failed, so no
-    // failure reason rides on the runner axis.
+    // The Execution Gateway was never called: execution was skipped because preparation failed, so no
+    // failure reason rides on the execution axis.
     events.push(
       push('execution', 'pending', 'skipped', run.execution.updated_at)
     )
@@ -779,7 +779,7 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
   ) {
     fail('execution_finished_at is set exactly when the execution is terminal')
   }
-  // `skipped` ends the axis without starting it: preparation failed before the Runner was ever
+  // `skipped` ends the axis without starting it: preparation failed before the Execution Gateway was ever
   // called, so there is an end but no `execution.started_at`. Every other terminal state ran.
   if (run.execution.finished_at !== null && execution !== 'skipped') {
     if (run.execution.started_at === null) {
@@ -931,7 +931,7 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
     ].includes(execution)
   ) {
     fail(
-      'a submitted preparation means the run has moved on to the Runner lifecycle'
+      'a submitted preparation means the run has moved on to the Execution Gateway lifecycle'
     )
   }
   if (
@@ -1272,7 +1272,7 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
 
 // The operator queue, shaped exactly as coordination would leave it. `EXECUTION_ALREADY_ADVANCED`
 // means an expired preparation lease could not be concluded because execution had already moved
-// past `pending`: writing "the Runner never ran" would overwrite a real result. So the two runs
+// past `pending`: writing "the Execution Gateway never ran" would overwrite a real result. So the two runs
 // below are put into that contradictory state - preparation still `preparing`, execution advanced,
 // publication still waiting - rather than just being labelled with the code. A marker on a run
 // whose axes are consistent would teach the console a state the Control Plane cannot produce.

@@ -1,8 +1,8 @@
-// Owns the narrow uncertainty boundary around Runner submission: persist the
+// Owns the narrow uncertainty boundary around Execution submission: persist the
 // replayable request before sending it, then commit the durable queued state.
 import type { ControlPlaneWorkflow } from './contracts.js'
 import type { ReviewRunStore } from './review-store.js'
-import { RunnerSubmissionUncertainError } from './runner-client.js'
+import { ExecutionSubmissionUncertainError } from './execution-client.js'
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 
 type Store = Pick<
@@ -18,7 +18,7 @@ type Store = Pick<
   ) => Promise<void | { retry_scheduled: boolean }>
 }
 
-/** Persists the replayable request before crossing the Runner uncertainty boundary. */
+/** Persists the replayable request before crossing the Execution uncertainty boundary. */
 export async function submitPreparedRun(
   store: Store,
   args: {
@@ -42,7 +42,7 @@ export async function submitPreparedRun(
     throw Object.assign(new Error(`Review run does not exist: ${args.runId}`), {
       code: 'REVIEW_RUN_NOT_FOUND'
     })
-  let runnerAccepted = false
+  let executionAccepted = false
   try {
     await store.savePreparedSubmission(
       args.runId,
@@ -55,7 +55,7 @@ export async function submitPreparedRun(
       run_id: args.runId,
       input: args.input
     })
-    runnerAccepted = true
+    executionAccepted = true
     await store.markQueued(
       args.runId,
       args.preparationToken,
@@ -66,7 +66,7 @@ export async function submitPreparedRun(
     try {
       await store.failPreparation(args.runId, args.preparationToken, {
         code:
-          runnerAccepted || error instanceof RunnerSubmissionUncertainError
+          executionAccepted || error instanceof ExecutionSubmissionUncertainError
             ? SUBMISSION_STATE_UNCERTAIN
             : error instanceof Error &&
                 'code' in error &&

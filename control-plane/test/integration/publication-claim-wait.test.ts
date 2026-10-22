@@ -33,7 +33,7 @@ async function createPublishableRun(store: ReviewRunStore): Promise<string> {
   assert.ok(admission.preparation_token)
   await store.markQueued(runId, admission.preparation_token, {})
   assert.strictEqual(
-    await store.recordRunnerSuccess(
+    await store.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }

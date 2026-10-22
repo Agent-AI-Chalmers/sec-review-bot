@@ -2,9 +2,9 @@ import { isIP } from 'node:net'
 
 import type {
   ControlPlaneWorkflow,
-  RunnerArtifactStorage
+  ExecutionArtifactStorage
 } from './contracts.js'
-import type { components } from './runner-api-schema.js'
+import type { components } from './execution-api-schema.js'
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 
 type JsonObject = Record<string, unknown>
@@ -34,21 +34,23 @@ type ValidatedRunResponse = UnvalidatedRunResponse & {
 }
 
 /** The error envelope as parsed. Every field is read defensively. */
-type UnvalidatedRunnerError = Partial<components['schemas']['RunnerError']>
+type UnvalidatedExecutionError = Partial<
+  components['schemas']['ExecutionError']
+>
 
 /**
- * The statuses the runner may report.
+ * The statuses the Execution API may report.
  *
  * The values are listed once, as data, because the client checks them at runtime; the
  * assertion below ties that list to the contract so the two cannot drift.
  */
-const RUNNER_STATUS_VALUES = [
+const EXECUTION_STATUS_VALUES = [
   'queued',
   'running',
   'succeeded',
   'failed'
 ] as const
-const RUNNER_STATUSES: ReadonlySet<string> = new Set(RUNNER_STATUS_VALUES)
+const EXECUTION_STATUSES: ReadonlySet<string> = new Set(EXECUTION_STATUS_VALUES)
 
 type SameValues<A, B> = [A] extends [B]
   ? [B] extends [A]
@@ -59,59 +61,59 @@ type Expect<T extends true> = T
 /** Fails to compile if the runtime status list and the contract disagree either way. */
 export type StatusesMatchTheContract = Expect<
   SameValues<
-    (typeof RUNNER_STATUS_VALUES)[number],
+    (typeof EXECUTION_STATUS_VALUES)[number],
     ContractRunResponse['status']
   >
 >
 
-export const RUNNER_RUN_NOT_FOUND = 'RUNNER_RUN_NOT_FOUND'
+export const EXECUTION_RUN_NOT_FOUND = 'EXECUTION_RUN_NOT_FOUND'
 
-export interface RunnerRunStatus extends Omit<
+export interface ExecutionRunStatus extends Omit<
   ContractRunResponse,
   'run_id' | 'workflow' | 'status' | 'error' | 'artifact_storage'
 > {
   run_id: string
   workflow: ControlPlaneWorkflow
   status: string
-  error?: UnvalidatedRunnerError
+  error?: UnvalidatedExecutionError
   /** Present only once `parseArtifactStorage` has accepted it. */
-  artifact_storage?: RunnerArtifactStorage
+  artifact_storage?: ExecutionArtifactStorage
 }
-export interface AgentRunnerServiceError extends Error {
-  name: 'AgentRunnerServiceError'
+export interface ExecutionServiceError extends Error {
+  name: 'ExecutionServiceError'
   code: string
   retryable: boolean
 }
 
-export class RunnerProtocolError extends Error {
+export class ExecutionProtocolError extends Error {
   readonly code: string
   readonly retryable = false
 
   constructor(code: string, message: string, options?: ErrorOptions) {
     super(message, options)
-    this.name = 'RunnerProtocolError'
+    this.name = 'ExecutionProtocolError'
     this.code = code
   }
 }
 
-export function isTerminalRunnerPollingError(error: unknown): boolean {
+export function isTerminalExecutionPollingError(error: unknown): boolean {
   return (
-    error instanceof RunnerProtocolError ||
+    error instanceof ExecutionProtocolError ||
     (typeof error === 'object' &&
       error !== null &&
       'name' in error &&
-      error.name === 'AgentRunnerServiceError' &&
+      error.name === 'ExecutionServiceError' &&
       (('retryable' in error && error.retryable === false) ||
-        ('code' in error && error.code === RUNNER_RUN_NOT_FOUND)))
+        ('code' in error && error.code === EXECUTION_RUN_NOT_FOUND)))
   )
 }
 
-export class RunnerSubmissionUncertainError extends Error {
+export class ExecutionSubmissionUncertainError extends Error {
   readonly code = SUBMISSION_STATE_UNCERTAIN
 
   constructor(message: string, options?: ErrorOptions) {
     super(message, options)
-    this.name = 'RunnerSubmissionUncertainError'
+    this.name = 'ExecutionSubmissionUncertainError'
   }
 }
 
@@ -130,16 +132,16 @@ function isWorkflow(value: unknown): value is ControlPlaneWorkflow {
 function parseArtifactStorage(
   value: unknown,
   runId: string
-): RunnerArtifactStorage {
+): ExecutionArtifactStorage {
   if (
     !isRecord(value) ||
     !['available', 'unavailable', 'failed'].includes(String(value.status))
   )
-    throw new RunnerProtocolError(
-      'RUNNER_INVALID_ARTIFACT_STORAGE',
-      `Runner returned invalid artifact storage metadata for ${runId}.`
+    throw new ExecutionProtocolError(
+      'EXECUTION_INVALID_ARTIFACT_STORAGE',
+      `Execution returned invalid artifact storage metadata for ${runId}.`
     )
-  const status = value.status as RunnerArtifactStorage['status']
+  const status = value.status as ExecutionArtifactStorage['status']
   if (status !== 'available') {
     if (
       Object.hasOwn(value, 'artifact') ||
@@ -150,9 +152,9 @@ function parseArtifactStorage(
         typeof value.error_code !== 'string') ||
       (value.message !== undefined && typeof value.message !== 'string')
     )
-      throw new RunnerProtocolError(
-        'RUNNER_INVALID_ARTIFACT_STORAGE',
-        `Runner returned invalid artifact storage metadata for ${runId}.`
+      throw new ExecutionProtocolError(
+        'EXECUTION_INVALID_ARTIFACT_STORAGE',
+        `Execution returned invalid artifact storage metadata for ${runId}.`
       )
     return {
       status,
@@ -163,7 +165,10 @@ function parseArtifactStorage(
     }
   }
   const artifact = value.artifact
-  const expectedUri = `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
+  const artifactUri =
+    typeof artifact === 'object' && artifact !== null && 'uri' in artifact
+      ? parseDiagnosticArtifactUri(artifact.uri, runId)
+      : undefined
   if (
     Object.keys(value).some((key) => !['status', 'artifact'].includes(key)) ||
     !isRecord(artifact) ||
@@ -172,23 +177,23 @@ function parseArtifactStorage(
         !['kind', 'uri', 'media_type', 'digest', 'size_bytes'].includes(key)
     ) ||
     artifact.kind !== 'diagnostic_bundle' ||
-    artifact.uri !== expectedUri ||
+    artifactUri === undefined ||
     artifact.media_type !== 'application/tar+zstd' ||
     typeof artifact.digest !== 'string' ||
     !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
     !Number.isSafeInteger(artifact.size_bytes) ||
     (artifact.size_bytes as number) < 0
   )
-    throw new RunnerProtocolError(
-      'RUNNER_INVALID_ARTIFACT_STORAGE',
-      `Runner returned invalid artifact storage metadata for ${runId}.`
+    throw new ExecutionProtocolError(
+      'EXECUTION_INVALID_ARTIFACT_STORAGE',
+      `Execution returned invalid artifact storage metadata for ${runId}.`
     )
   return {
     status,
     artifact: {
       // The literal that was just checked, not the unvalidated field it came from.
       kind: 'diagnostic_bundle',
-      uri: expectedUri,
+      uri: artifactUri,
       media_type: artifact.media_type,
       digest: artifact.digest,
       size_bytes: artifact.size_bytes as number
@@ -196,11 +201,36 @@ function parseArtifactStorage(
   }
 }
 
+function parseDiagnosticArtifactUri(
+  value: unknown,
+  runId: string
+): string | undefined {
+  if (typeof value !== 'string') return undefined
+  let uri: URL
+  try {
+    uri = new URL(value)
+  } catch {
+    return undefined
+  }
+  if (
+    uri.protocol !== 's3:' ||
+    uri.hostname === '' ||
+    uri.username !== '' ||
+    uri.password !== '' ||
+    uri.port !== '' ||
+    uri.search !== '' ||
+    uri.hash !== '' ||
+    uri.pathname !== `/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
+  )
+    return undefined
+  return value
+}
+
 function serviceUrl(): string {
-  const value = process.env.AGENT_RUNNER_SERVICE_URL?.trim()
+  const value = process.env.EXECUTION_API_URL?.trim()
   if (!value)
-    throw Object.assign(new Error('AGENT_RUNNER_SERVICE_URL is required.'), {
-      code: 'RUNNER_SERVICE_URL_MISSING'
+    throw Object.assign(new Error('EXECUTION_API_URL is required.'), {
+      code: 'EXECUTION_API_URL_MISSING'
     })
   return value.replace(/\/+$/, '')
 }
@@ -225,14 +255,14 @@ function isLoopback(hostname: string): boolean {
 }
 
 function serviceHeaders(url: string): Record<string, string> {
-  const token = process.env.AGENT_RUNNER_SERVICE_TOKEN?.trim()
+  const token = process.env.EXECUTION_API_TOKEN?.trim()
   const parsed = new URL(url)
   if (!token && !(parsed.protocol === 'http:' && isLoopback(parsed.hostname))) {
     throw Object.assign(
       new Error(
-        'AGENT_RUNNER_SERVICE_TOKEN is required unless Runner uses loopback HTTP.'
+        'EXECUTION_API_TOKEN is required unless the Execution API uses loopback HTTP.'
       ),
-      { code: 'RUNNER_SERVICE_TOKEN_MISSING' }
+      { code: 'EXECUTION_API_TOKEN_MISSING' }
     )
   }
   return {
@@ -241,16 +271,16 @@ function serviceHeaders(url: string): Record<string, string> {
   }
 }
 
-function runnerError(body: unknown, status: number): AgentRunnerServiceError {
+function executionError(body: unknown, status: number): ExecutionServiceError {
   const source =
     isRecord(body) && isRecord(body.error)
-      ? (body.error as UnvalidatedRunnerError)
+      ? (body.error as UnvalidatedExecutionError)
       : {}
   return Object.assign(
-    new Error(source.message ?? `Runner returned HTTP ${status}.`),
+    new Error(source.message ?? `Execution returned HTTP ${status}.`),
     {
-      name: 'AgentRunnerServiceError' as const,
-      code: source.code ?? 'RUNNER_SERVICE_ERROR',
+      name: 'ExecutionServiceError' as const,
+      code: source.code ?? 'EXECUTION_API_ERROR',
       retryable: source.retryable ?? (status === 429 || status >= 500)
     }
   )
@@ -276,9 +306,9 @@ async function request(
   bodyParseError?: SyntaxError
 }> {
   const base = serviceUrl()
-  const retries = integerEnv('AGENT_RUNNER_SERVICE_REQUEST_RETRIES', 2, true)
-  const timeout = integerEnv('AGENT_RUNNER_SERVICE_REQUEST_TIMEOUT_MS', 30_000)
-  const delay = integerEnv('AGENT_RUNNER_SERVICE_RETRY_BASE_DELAY_MS', 500)
+  const retries = integerEnv('EXECUTION_API_REQUEST_RETRIES', 2, true)
+  const timeout = integerEnv('EXECUTION_API_REQUEST_TIMEOUT_MS', 30_000)
+  const delay = integerEnv('EXECUTION_API_RETRY_BASE_DELAY_MS', 500)
   let lastError: unknown
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -321,34 +351,34 @@ function parseResponse(
   expectedWorkflow?: ControlPlaneWorkflow
 ): ValidatedRunResponse {
   if (!isRecord(body) || typeof body.status !== 'string')
-    throw new RunnerProtocolError(
-      'RUNNER_INVALID_RESPONSE',
-      'Runner returned an invalid run response.'
+    throw new ExecutionProtocolError(
+      'EXECUTION_INVALID_RESPONSE',
+      'Execution returned an invalid run response.'
     )
-  if (!RUNNER_STATUSES.has(body.status)) {
-    throw new RunnerProtocolError(
-      'RUNNER_INVALID_STATUS',
-      `Runner returned an unknown status: ${body.status}.`
+  if (!EXECUTION_STATUSES.has(body.status)) {
+    throw new ExecutionProtocolError(
+      'EXECUTION_INVALID_STATUS',
+      `Execution returned an unknown status: ${body.status}.`
     )
   }
   if (body.run_id !== expectedRunId)
-    throw new RunnerProtocolError(
-      'RUNNER_IDENTITY_MISMATCH',
-      `Runner returned an unexpected run_id for ${expectedRunId}.`
+    throw new ExecutionProtocolError(
+      'EXECUTION_IDENTITY_MISMATCH',
+      `Execution returned an unexpected run_id for ${expectedRunId}.`
     )
   if (
     !isWorkflow(body.workflow) ||
     (expectedWorkflow !== undefined && body.workflow !== expectedWorkflow)
   ) {
-    throw new RunnerProtocolError(
-      'RUNNER_WORKFLOW_MISMATCH',
-      `Runner returned an unexpected workflow for ${expectedRunId}.`
+    throw new ExecutionProtocolError(
+      'EXECUTION_WORKFLOW_MISMATCH',
+      `Execution returned an unexpected workflow for ${expectedRunId}.`
     )
   }
   return body as unknown as ValidatedRunResponse
 }
 
-export async function submitRunnerRun({
+export async function submitExecutionRun({
   workflow,
   run_id,
   input
@@ -371,51 +401,51 @@ export async function submitRunnerRun({
       }
     )
   } catch (error) {
-    throw new RunnerSubmissionUncertainError(
-      `Runner submission state is uncertain for run ${run_id}.`,
+    throw new ExecutionSubmissionUncertainError(
+      `Execution submission state is uncertain for run ${run_id}.`,
       { cause: error }
     )
   }
   if (!result.response.ok) {
     if (isRetryableStatus(result.response.status)) {
-      throw new RunnerSubmissionUncertainError(
-        `Runner submission returned HTTP ${result.response.status} for run ${run_id}.`
+      throw new ExecutionSubmissionUncertainError(
+        `Execution submission returned HTTP ${result.response.status} for run ${run_id}.`
       )
     }
-    throw runnerError(result.body, result.response.status)
+    throw executionError(result.body, result.response.status)
   }
   try {
     if (result.bodyParseError) throw result.bodyParseError
     parseResponse(result.body, run_id, workflow)
   } catch (error) {
-    throw new RunnerSubmissionUncertainError(
-      `Runner accepted run ${run_id}, but returned an invalid creation response.`,
+    throw new ExecutionSubmissionUncertainError(
+      `Execution accepted run ${run_id}, but returned an invalid creation response.`,
       { cause: error }
     )
   }
 }
 
-export interface RunnerRunStatusBatch {
-  /** Status tokens for runs the Runner knows, in the order they were requested. */
-  readonly runs: readonly RunnerRunStatusToken[]
-  /** Runs the Runner has no record for, kept apart so a caller can tell them from a drop. */
+export interface ExecutionRunStatusBatch {
+  /** Status tokens for runs the Execution knows, in the order they were requested. */
+  readonly runs: readonly ExecutionRunStatusToken[]
+  /** Runs the Execution has no record for, kept apart so a caller can tell them from a drop. */
   readonly missing: readonly string[]
   /** The same statuses by run id, for callers that look runs up instead of iterating. */
   readonly byRunId: ReadonlyMap<string, string>
 }
 
 /** One run's status token, as the contract defines it. */
-export type RunnerRunStatusToken = components['schemas']['RunStatusToken']
+export type ExecutionRunStatusToken = components['schemas']['RunStatusToken']
 
 /**
  * How many run IDs one status request carries.
  *
- * The runner rejects a longer batch, so a caller tracking more runs than this has its
+ * The Execution API rejects a longer batch, so a caller tracking more runs than this has its
  * request split rather than failing. The number is the contract's `maxItems` for
  * `RunStatusQuery.run_ids`, and a test asserts the two agree: a client-side copy of a
  * contract limit is exactly the kind of value that otherwise drifts.
  */
-export const RUNNER_STATUS_QUERY_LIMIT = 200
+export const EXECUTION_STATUS_QUERY_LIMIT = 200
 
 /**
  * Read many run statuses in one request.
@@ -424,25 +454,25 @@ export const RUNNER_STATUS_QUERY_LIMIT = 200
  * frequency falls exactly when the most runs are in flight.
  *
  * There is deliberately no option to wait for a change here. Waiting was tried and made
- * the Runner busier, not less: the state lives in Temporal, so holding a request open
+ * the Execution busier, not less: the state lives in Temporal, so holding a request open
  * means re-reading every listed workflow on a timer, which costs far more reads than the
  * polling it replaced. A wait belongs where the state lives, not in this layer.
  */
 
-export async function getRunnerRunStatuses(
+export async function getExecutionRunStatuses(
   runIds: readonly string[]
-): Promise<RunnerRunStatusBatch> {
-  const runs: RunnerRunStatusToken[] = []
+): Promise<ExecutionRunStatusBatch> {
+  const runs: ExecutionRunStatusToken[] = []
   const missing: string[] = []
   const byRunId = new Map<string, string>()
 
   for (
     let start = 0;
     start < runIds.length;
-    start += RUNNER_STATUS_QUERY_LIMIT
+    start += EXECUTION_STATUS_QUERY_LIMIT
   ) {
-    const batch = await readRunnerRunStatuses(
-      runIds.slice(start, start + RUNNER_STATUS_QUERY_LIMIT)
+    const batch = await readExecutionRunStatuses(
+      runIds.slice(start, start + EXECUTION_STATUS_QUERY_LIMIT)
     )
     runs.push(...batch.runs)
     missing.push(...batch.missing)
@@ -452,20 +482,20 @@ export async function getRunnerRunStatuses(
   return { runs, missing, byRunId }
 }
 
-/** One status request, within the batch size the runner accepts. */
-async function readRunnerRunStatuses(
+/** One status request, within the batch size the Execution API accepts. */
+async function readExecutionRunStatuses(
   runIds: readonly string[]
-): Promise<RunnerRunStatusBatch> {
+): Promise<ExecutionRunStatusBatch> {
   const { response, body, bodyParseError } = await request('/v1/runs/status', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ run_ids: [...runIds] })
   })
-  if (!response.ok) throw runnerError(body, response.status)
+  if (!response.ok) throw executionError(body, response.status)
   if (bodyParseError) {
-    throw new RunnerProtocolError(
-      'RUNNER_INVALID_JSON',
-      'Runner returned invalid JSON for a status query.',
+    throw new ExecutionProtocolError(
+      'EXECUTION_INVALID_JSON',
+      'Execution returned invalid JSON for a status query.',
       { cause: bodyParseError }
     )
   }
@@ -474,12 +504,12 @@ async function readRunnerRunStatuses(
     !Array.isArray(body.runs) ||
     !Array.isArray(body.missing)
   ) {
-    throw new RunnerProtocolError(
-      'RUNNER_INVALID_RESPONSE',
-      'Runner returned an invalid status query response.'
+    throw new ExecutionProtocolError(
+      'EXECUTION_INVALID_RESPONSE',
+      'Execution returned an invalid status query response.'
     )
   }
-  const runs: RunnerRunStatusToken[] = []
+  const runs: ExecutionRunStatusToken[] = []
   const byRunId = new Map<string, string>()
   for (const entry of body.runs) {
     if (
@@ -487,15 +517,15 @@ async function readRunnerRunStatuses(
       typeof entry.run_id !== 'string' ||
       typeof entry.status !== 'string'
     ) {
-      throw new RunnerProtocolError(
-        'RUNNER_INVALID_RESPONSE',
-        'Runner returned an invalid status entry.'
+      throw new ExecutionProtocolError(
+        'EXECUTION_INVALID_RESPONSE',
+        'Execution returned an invalid status entry.'
       )
     }
-    if (!RUNNER_STATUSES.has(entry.status)) {
-      throw new RunnerProtocolError(
-        'RUNNER_INVALID_STATUS',
-        `Runner returned an unknown status: ${entry.status}.`
+    if (!EXECUTION_STATUSES.has(entry.status)) {
+      throw new ExecutionProtocolError(
+        'EXECUTION_INVALID_STATUS',
+        `Execution returned an unknown status: ${entry.status}.`
       )
     }
     runs.push({ run_id: entry.run_id, status: entry.status })
@@ -507,19 +537,19 @@ async function readRunnerRunStatuses(
   return { runs, missing, byRunId }
 }
 
-export async function getRunnerRunStatus(
+export async function getExecutionRunStatus(
   runId: string,
   workflow?: ControlPlaneWorkflow
-): Promise<RunnerRunStatus> {
+): Promise<ExecutionRunStatus> {
   const { response, body, bodyParseError } = await request(
     `/v1/runs/${encodeURIComponent(runId)}`,
     { method: 'GET' }
   )
-  if (!response.ok) throw runnerError(body, response.status)
+  if (!response.ok) throw executionError(body, response.status)
   if (bodyParseError) {
-    throw new RunnerProtocolError(
-      'RUNNER_INVALID_JSON',
-      `Runner returned invalid JSON for ${runId}.`,
+    throw new ExecutionProtocolError(
+      'EXECUTION_INVALID_JSON',
+      `Execution returned invalid JSON for ${runId}.`,
       { cause: bodyParseError }
     )
   }
@@ -529,8 +559,11 @@ export async function getRunnerRunStatus(
     workflow: parsed.workflow as ControlPlaneWorkflow,
     status: parsed.status,
     ...(Object.hasOwn(parsed, 'result') ? { result: parsed.result } : {}),
+    ...(isRecord(parsed.memory_processing)
+      ? { memory_processing: parsed.memory_processing }
+      : {}),
     ...(isRecord(parsed.error)
-      ? { error: parsed.error as UnvalidatedRunnerError }
+      ? { error: parsed.error as UnvalidatedExecutionError }
       : {}),
     ...(parsed.artifact_storage === undefined
       ? {}

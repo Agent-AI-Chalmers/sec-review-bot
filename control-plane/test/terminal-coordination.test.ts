@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { observeRunnerRun, type ReviewRunRecord } from '../src/index.js'
+import { observeExecutionRun, type ReviewRunRecord } from '../src/index.js'
 
 const run: ReviewRunRecord = {
   run_id: 'run-1',
@@ -34,17 +34,17 @@ const run: ReviewRunRecord = {
   artifact_storage: null,
   notices: []
 }
-function store(events: unknown[][]): Parameters<typeof observeRunnerRun>[0] {
+function store(events: unknown[][]): Parameters<typeof observeExecutionRun>[0] {
   return {
     async markRunning(id) {
       events.push(['running', id])
       return true
     },
-    async recordRunnerSuccess(id, result, artifact) {
+    async recordExecutionSuccess(id, result, artifact) {
       events.push(['succeeded', id, result, artifact])
       return true
     },
-    async failRunnerExecution(id, failure, artifact) {
+    async failExecution(id, failure, artifact) {
       events.push(['failed', id, failure, artifact])
       return true
     },
@@ -54,10 +54,10 @@ function store(events: unknown[][]): Parameters<typeof observeRunnerRun>[0] {
   }
 }
 
-test('active Runner execution advances without publishing', async () => {
+test('active execution advances without publishing', async () => {
   const events: unknown[][] = []
   assert.strictEqual(
-    await observeRunnerRun(
+    await observeExecutionRun(
       store(events),
       run,
       async () => ({
@@ -72,11 +72,11 @@ test('active Runner execution advances without publishing', async () => {
   assert.deepStrictEqual(events, [['running', 'run-1']])
 })
 
-test('successful Runner result is durably recorded for later publication', async () => {
+test('successful Execution result is durably recorded for later publication', async () => {
   const events: unknown[][] = []
   const artifact = { status: 'unavailable' as const }
   assert.strictEqual(
-    await observeRunnerRun(
+    await observeExecutionRun(
       store(events),
       run,
       async () => ({
@@ -99,7 +99,7 @@ test('successful Runner result is durably recorded for later publication', async
 test('transient polling failure leaves the run active', async () => {
   const events: unknown[][] = []
   assert.strictEqual(
-    await observeRunnerRun(
+    await observeExecutionRun(
       store(events),
       run,
       async () => {
@@ -115,10 +115,10 @@ test('transient polling failure leaves the run active', async () => {
 test('terminal polling failure fails the run without publication', async () => {
   const events: unknown[][] = []
   const error = Object.assign(new Error('missing'), {
-    code: 'RUNNER_RUN_NOT_FOUND'
+    code: 'EXECUTION_RUN_NOT_FOUND'
   })
   assert.strictEqual(
-    await observeRunnerRun(
+    await observeExecutionRun(
       store(events),
       run,
       async () => {
@@ -132,17 +132,17 @@ test('terminal polling failure fails the run without publication', async () => {
     [
       'failed',
       'run-1',
-      { code: 'RUNNER_RUN_NOT_FOUND', message: 'missing' },
+      { code: 'EXECUTION_RUN_NOT_FOUND', message: 'missing' },
       undefined
     ]
   ])
 })
 
-test('Runner failure records its artifact atomically with the terminal failure', async () => {
+test('Execution failure records its artifact atomically with the terminal failure', async () => {
   const events: unknown[][] = []
   const artifact = { status: 'failed' as const, error: 'upload failed' }
   assert.strictEqual(
-    await observeRunnerRun(
+    await observeExecutionRun(
       store(events),
       run,
       async () => ({
@@ -151,20 +151,25 @@ test('Runner failure records its artifact atomically with the terminal failure',
         status: 'failed',
         artifact_storage: artifact,
         notices: [],
-        error: { code: 'RUNNER_FAILED', message: 'failed' }
+        error: { code: 'EXECUTION_FAILED', message: 'failed' }
       }),
       () => false
     ),
     'failed'
   )
   assert.deepStrictEqual(events, [
-    ['failed', 'run-1', { code: 'RUNNER_FAILED', message: 'failed' }, artifact]
+    [
+      'failed',
+      'run-1',
+      { code: 'EXECUTION_FAILED', message: 'failed' },
+      artifact
+    ]
   ])
 })
 
 test('a stale running observation does not emit a state-change event', async () => {
   const events: unknown[] = []
-  const result = await observeRunnerRun(
+  const result = await observeExecutionRun(
     {
       ...store([]),
       markRunning: async () => false
@@ -184,10 +189,10 @@ test('a stale running observation does not emit a state-change event', async () 
 
 test('a stale successful observation does not emit a terminal event', async () => {
   const events: unknown[] = []
-  const result = await observeRunnerRun(
+  const result = await observeExecutionRun(
     {
       ...store([]),
-      recordRunnerSuccess: async () => false
+      recordExecutionSuccess: async () => false
     },
     run,
     async () => ({

@@ -309,7 +309,7 @@ export function StateMachineDiagram({
   for (const state of machine.states)
     rows.set(state, mainPath.has(state) ? 0 : 1)
   // A UI-side layout override places a state on an explicit cell where the computed grid would
-  // misplace a branch (e.g. the Runner's `failed` under `running`). This is drawing, not
+  // misplace a branch (e.g. execution `failed` under `running`). This is drawing, not
   // contract, so it lives in `state-machine-layout.ts`.
   const overrides = STATE_LAYOUT[machine.axis] ?? {}
   for (const state of machine.states) {

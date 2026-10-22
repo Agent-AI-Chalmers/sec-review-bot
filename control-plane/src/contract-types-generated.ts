@@ -33,7 +33,7 @@ export interface components {
       publish_context: {
         [key: string]: unknown
       }
-      runner_input?: {
+      execution_input?: {
         [key: string]: unknown
       }
       preparation: components['schemas']['PreparationSummary']
@@ -100,7 +100,7 @@ export interface components {
       publish_context: {
         [key: string]: unknown
       }
-      runner_input?: {
+      execution_input?: {
         [key: string]: unknown
       }
       preparation: components['schemas']['PreparationSummary']
@@ -177,7 +177,7 @@ export interface components {
     }
     ExecutionSummary: {
       /**
-       * @description The Runner lifecycle, retained under its established public name. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Runner; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Runner but its result could not be confirmed; a recovery replays it under the same identity. `disconnected` means automatic recovery stopped after its finite budget without a conclusive answer, so it is not a failure.
+       * @description The execution lifecycle as coordinated through Execution API provider. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Execution API provider; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Execution API provider but its result could not be confirmed; a recovery replays it under the same identity. `disconnected` means automatic recovery stopped after its finite budget without a conclusive answer, so it is not a failure.
        * @enum {string}
        */
       status:
@@ -191,7 +191,7 @@ export interface components {
         | 'failed'
       /**
        * Format: date-time
-       * @description Immutable instant the prepared Runner input was accepted and execution began; null while the run is still pending, and also null for `skipped`, which is concluded without ever having started. Written once, so a recovery replay does not move it.
+       * @description Immutable instant the prepared Execution input was accepted and execution began; null while the run is still pending, and also null for `skipped`, which is concluded without ever having started. Written once, so a recovery replay does not move it.
        */
       started_at: string | null
       /**
@@ -261,7 +261,7 @@ export interface components {
     /** @description Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — the Control Plane drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary. */
     PreparationSummary: {
       /**
-       * @description Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own "in progress" state and is unrelated to the Runner, which is only submitted to once preparation reaches `submitted`.
+       * @description Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own "in progress" state and is unrelated to the Execution API provider, which is only submitted to once preparation reaches `submitted`.
        * @enum {string}
        */
       status:
@@ -515,7 +515,7 @@ export interface operations {
           publish_context: {
             [key: string]: unknown
           }
-          runner_input?: {
+          execution_input?: {
             [key: string]: unknown
           }
           preparation_input_version: string
@@ -1215,7 +1215,7 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description Full run record (includes runner_input/publish_context). */
+      /** @description Full run record (includes execution_input/publish_context). */
       200: {
         headers: {
           [name: string]: unknown

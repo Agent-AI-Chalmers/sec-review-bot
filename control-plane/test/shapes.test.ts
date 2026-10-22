@@ -22,11 +22,11 @@ test('an available artifact storage record keeps its artifact reference', () => 
 })
 
 test('normalizeArtifactStorage rejects an available record with no artifact', () => {
-  // The runner's own schema requires only `status` and allows a null `artifact`, because it
+  // The Execution API schema requires only `status` and allows a null `artifact`, because it
   // also covers the unavailable/failed cases. The persisted record's schema is stricter: an
   // `available` branch without `artifact` is invalid, and the repository ships a fixture
   // asserting exactly that. `parseArtifactStorage` is what rejects such a payload at the
-  // runner boundary; this asserts the narrowing does not silently accept one if a future
+  // execution boundary; this asserts the narrowing does not silently accept one if a future
   // caller skips that boundary and persists a record the contract forbids.
   for (const storage of [
     { status: 'available' as const },
@@ -70,6 +70,6 @@ test('unavailable and failed records carry their reason without an artifact', ()
       message: 'Unable to store terminal run artifacts.'
     }
   )
-  // Null storage (the runner never attached metadata) stays null rather than becoming absent.
+  // Null storage (Execution never attached metadata) stays null rather than becoming absent.
   assert.strictEqual(normalizeArtifactStorage(null), null)
 })

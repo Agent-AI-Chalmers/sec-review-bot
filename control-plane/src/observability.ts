@@ -5,7 +5,7 @@ export type { ObservedRun, PublicationStepSummary } from './shapes.js'
 
 export function observeRun(run: ReviewRunRecord): ObservedRun {
   // The record and observed-run shapes now agree on every axis, so this is a redaction rather
-  // than a projection: it drops the connector-owned context, the Runner input, the connector
+  // than a projection: it drops the connector-owned context, the Execution input, the connector
   // identity, and the failure detail, and keeps the rest verbatim.
   return {
     run_id: run.run_id,

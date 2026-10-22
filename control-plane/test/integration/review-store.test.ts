@@ -208,7 +208,7 @@ test('admission creates exactly one executions row alongside the run trunk', asy
     )
     for (const moved of [
       'runner_status',
-      'runner_input',
+      'execution_input',
       'runner_failure_code',
       'artifact_storage',
       'workflow_result',
@@ -417,7 +417,7 @@ test('run queries survive a fresh store connection and preserve stable paginatio
         run_id,
         workflow: 'issue-review',
         publish_context: { private: true },
-        runner_input: { secret: true }
+        execution_input: { secret: true }
       })
     }
   } finally {
@@ -446,7 +446,7 @@ test('run queries survive a fresh store connection and preserve stable paginatio
     assert.notStrictEqual(secondPage[0]?.run_id, firstPage[0]?.run_id)
     assert.strictEqual(finalCursor, null)
     assert.strictEqual(
-      (await restarted.getRun(runIds[0] ?? ''))?.runner_input?.secret,
+      (await restarted.getRun(runIds[0] ?? ''))?.execution_input?.secret,
       true
     )
   } finally {
@@ -481,7 +481,7 @@ test('run queries apply status filters before pagination limits', async () => {
       })
     }
 
-    // The preparation failed before the Runner was called, so execution is `skipped`, not
+    // The preparation failed before the Execution was called, so execution is `skipped`, not
     // failed; the filter narrows to exactly that terminal run.
     const { runs: skippedRuns } = await store.listRunsPage({
       execution_status: 'skipped',

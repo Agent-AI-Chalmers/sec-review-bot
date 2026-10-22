@@ -86,7 +86,7 @@ test('the record getRun returns validates against the shared schema', async () =
     await store.markQueued(runId, admission.preparation_token, {
       repository: 'octo/example'
     })
-    await store.recordRunnerSuccess(
+    await store.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }

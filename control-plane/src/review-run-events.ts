@@ -4,7 +4,7 @@
 //
 // This is an audit trail, not event sourcing: the snapshot tables stay the current-state
 // truth, and writes never depend on the log. It records only Control Plane coordination axes;
-// the Runner's own execution history lives in Temporal and is deliberately not duplicated.
+// the Execution's own execution history lives in Temporal and is deliberately not duplicated.
 import type { PoolClient } from 'pg'
 
 import type { ReviewRunEvent } from './shapes.js'

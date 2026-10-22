@@ -145,7 +145,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       const runId = await createQueuedRun(store)
       runIds.push(runId)
       assert.strictEqual(
-        await store.recordRunnerSuccess(
+        await store.recordExecutionSuccess(
           runId,
           { run_id: runId },
           { status: 'unavailable' }
@@ -272,7 +272,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     )
 
     // execution: uncertain -> disconnected when automatic recovery reaches its budget. This is
-    // deliberately not a failure: a prior idempotent submission may still exist at the Runner.
+    // deliberately not a failure: a prior idempotent submission may still exist at the Execution.
     const uncertainDisconnects = await newPreparingRun()
     await store.failPreparation(
       uncertainDisconnects.runId,
@@ -292,7 +292,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     await store.resumeDisconnectedExecution(uncertainDisconnects.runId)
 
     // execution: disconnected -> failed when an operator stops waiting. This does not claim the
-    // task never ran - the Runner may still have it - only that the outcome will not be awaited.
+    // task never ran - the Execution may still have it - only that the outcome will not be awaited.
     const giveUpExecution = await newPreparingRun()
     await store.failPreparation(
       giveUpExecution.runId,
@@ -328,7 +328,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       await store.failSubmissionRecovery(
         uncertainFails.runId,
         failingRecovery as string,
-        { code: 'RUNNER_EXECUTION_FAILED', message: 'replay rejected' }
+        { code: 'EXECUTION_FAILED', message: 'replay rejected' }
       ),
       true
     )
@@ -337,7 +337,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     const observed = await newPreparingRun()
     await store.markQueued(observed.runId, observed.token, {})
     await store.markRunning(observed.runId)
-    await store.recordRunnerSuccess(
+    await store.recordExecutionSuccess(
       observed.runId,
       { run_id: observed.runId },
       { status: 'unavailable' }
@@ -346,17 +346,17 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // execution: pending -> queued -> failed without ever running, which also skips publication.
     const queuedFailed = await newPreparingRun()
     await store.markQueued(queuedFailed.runId, queuedFailed.token, {})
-    await store.failRunnerExecution(queuedFailed.runId, {
-      code: 'RUNNER_EXECUTION_FAILED',
+    await store.failExecution(queuedFailed.runId, {
+      code: 'EXECUTION_FAILED',
       message: 'boom'
     })
 
     // execution: pending -> queued -> running -> failed, which also skips publication.
-    const runnerFailed = await newPreparingRun()
-    await store.markQueued(runnerFailed.runId, runnerFailed.token, {})
-    await store.markRunning(runnerFailed.runId)
-    await store.failRunnerExecution(runnerFailed.runId, {
-      code: 'RUNNER_EXECUTION_FAILED',
+    const executionFailed = await newPreparingRun()
+    await store.markQueued(executionFailed.runId, executionFailed.token, {})
+    await store.markRunning(executionFailed.runId)
+    await store.failExecution(executionFailed.runId, {
+      code: 'EXECUTION_FAILED',
       message: 'boom'
     })
 

@@ -1,38 +1,39 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { parse } from 'yaml'
 
 import {
-  getRunnerRunStatus,
-  getRunnerRunStatuses,
-  isTerminalRunnerPollingError,
-  RUNNER_STATUS_QUERY_LIMIT,
-  RunnerSubmissionUncertainError,
-  submitRunnerRun
-} from '../src/runner-client.js'
-import { RUNNER_API_SPEC_PATH as SPEC_PATH } from './generated-paths.js'
+  getExecutionRunStatus,
+  getExecutionRunStatuses,
+  isTerminalExecutionPollingError,
+  EXECUTION_STATUS_QUERY_LIMIT,
+  ExecutionSubmissionUncertainError,
+  submitExecutionRun
+} from '../src/execution-client.js'
+import { EXECUTION_API_SPEC_PATH as SPEC_PATH } from './generated-paths.js'
 
 const originalFetch = globalThis.fetch
 
-function configureRunner(): void {
-  process.env.AGENT_RUNNER_SERVICE_URL = 'https://runner.test'
-  process.env.AGENT_RUNNER_SERVICE_TOKEN = 'test-token'
-  process.env.AGENT_RUNNER_SERVICE_REQUEST_RETRIES = '0'
+function configureExecution(): void {
+  process.env.EXECUTION_API_URL = 'https://execution.test'
+  process.env.EXECUTION_API_TOKEN = 'test-token'
+  process.env.EXECUTION_API_REQUEST_RETRIES = '0'
 }
 
 test.afterEach(() => {
   globalThis.fetch = originalFetch
-  delete process.env.AGENT_RUNNER_SERVICE_URL
-  delete process.env.AGENT_RUNNER_SERVICE_TOKEN
-  delete process.env.AGENT_RUNNER_SERVICE_REQUEST_RETRIES
+  delete process.env.EXECUTION_API_URL
+  delete process.env.EXECUTION_API_TOKEN
+  delete process.env.EXECUTION_API_REQUEST_RETRIES
 })
 
 test('submission sends authentication and accepts only the expected identity', async () => {
-  configureRunner()
+  configureExecution()
   globalThis.fetch = async (input, init) => {
     assert.strictEqual(
       input,
-      'https://runner.test/v1/workflows/issue-review/runs'
+      'https://execution.test/v1/workflows/issue-review/runs'
     )
     assert.strictEqual(
       (init?.headers as Record<string, string>).authorization,
@@ -48,7 +49,7 @@ test('submission sends authentication and accepts only the expected identity', a
     )
   }
 
-  await submitRunnerRun({
+  await submitExecutionRun({
     workflow: 'issue-review',
     run_id: 'run-1',
     input: { contract_version: 'v6' }
@@ -56,7 +57,7 @@ test('submission sends authentication and accepts only the expected identity', a
 })
 
 test('mismatched submission identity remains recoverable uncertainty', async () => {
-  configureRunner()
+  configureExecution()
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
@@ -68,13 +69,17 @@ test('mismatched submission identity remains recoverable uncertainty', async () 
     )
 
   await assert.rejects(
-    submitRunnerRun({ workflow: 'issue-review', run_id: 'run-1', input: {} }),
-    RunnerSubmissionUncertainError
+    submitExecutionRun({
+      workflow: 'issue-review',
+      run_id: 'run-1',
+      input: {}
+    }),
+    ExecutionSubmissionUncertainError
   )
 })
 
 test('status response cannot substitute another run or workflow', async () => {
-  configureRunner()
+  configureExecution()
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
@@ -86,40 +91,43 @@ test('status response cannot substitute another run or workflow', async () => {
       { status: 200 }
     )
 
-  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+  await assert.rejects(getExecutionRunStatus('run-1'), (error: unknown) => {
     assert.match((error as Error).message, /unexpected run_id/)
-    assert.strictEqual(isTerminalRunnerPollingError(error), true)
+    assert.strictEqual(isTerminalExecutionPollingError(error), true)
     return true
   })
 })
 
 test('malformed successful status response is a terminal protocol failure', async () => {
-  configureRunner()
+  configureExecution()
   globalThis.fetch = async () => new Response('{invalid', { status: 200 })
 
-  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
-    assert.strictEqual((error as { code?: string }).code, 'RUNNER_INVALID_JSON')
-    assert.strictEqual(isTerminalRunnerPollingError(error), true)
+  await assert.rejects(getExecutionRunStatus('run-1'), (error: unknown) => {
+    assert.strictEqual(
+      (error as { code?: string }).code,
+      'EXECUTION_INVALID_JSON'
+    )
+    assert.strictEqual(isTerminalExecutionPollingError(error), true)
     return true
   })
 })
 
 test('malformed transient error response remains retryable', async () => {
-  configureRunner()
+  configureExecution()
   globalThis.fetch = async () => new Response('{invalid', { status: 500 })
 
-  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+  await assert.rejects(getExecutionRunStatus('run-1'), (error: unknown) => {
     assert.strictEqual(
       (error as { name?: string }).name,
-      'AgentRunnerServiceError'
+      'ExecutionServiceError'
     )
-    assert.strictEqual(isTerminalRunnerPollingError(error), false)
+    assert.strictEqual(isTerminalExecutionPollingError(error), false)
     return true
   })
 })
 
 test('status response must match the persisted workflow', async () => {
-  configureRunner()
+  configureExecution()
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
@@ -131,13 +139,13 @@ test('status response must match the persisted workflow', async () => {
     )
 
   await assert.rejects(
-    getRunnerRunStatus('run-1', 'issue-review'),
+    getExecutionRunStatus('run-1', 'issue-review'),
     /unexpected workflow/
   )
 })
 
 test('status response preserves a valid terminal result', async () => {
-  configureRunner()
+  configureExecution()
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
@@ -149,7 +157,7 @@ test('status response preserves a valid terminal result', async () => {
       { status: 200 }
     )
 
-  assert.deepStrictEqual(await getRunnerRunStatus('run-1'), {
+  assert.deepStrictEqual(await getExecutionRunStatus('run-1'), {
     run_id: 'run-1',
     workflow: 'pull-request-review',
     status: 'succeeded',
@@ -158,12 +166,12 @@ test('status response preserves a valid terminal result', async () => {
 })
 
 test('status response validates an available artifact against the run identity', async () => {
-  configureRunner()
+  configureExecution()
   const artifactStorage = {
     status: 'available',
     artifact: {
       kind: 'diagnostic_bundle',
-      uri: 's3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
+      uri: 's3://deployment-bucket/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
       media_type: 'application/tar+zstd',
       digest: `sha256:${'a'.repeat(64)}`,
       size_bytes: 42
@@ -180,13 +188,13 @@ test('status response validates an available artifact against the run identity',
     )
 
   assert.deepStrictEqual(
-    (await getRunnerRunStatus('run-1')).artifact_storage,
+    (await getExecutionRunStatus('run-1')).artifact_storage,
     artifactStorage
   )
 })
 
 test('status response rejects an artifact reference owned by another run', async () => {
-  configureRunner()
+  configureExecution()
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
@@ -206,17 +214,17 @@ test('status response rejects an artifact reference owned by another run', async
       })
     )
 
-  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+  await assert.rejects(getExecutionRunStatus('run-1'), (error: unknown) => {
     assert.strictEqual(
       (error as { code?: string }).code,
-      'RUNNER_INVALID_ARTIFACT_STORAGE'
+      'EXECUTION_INVALID_ARTIFACT_STORAGE'
     )
     return true
   })
 })
 
-test('status response rejects an unknown Runner state', async () => {
-  configureRunner()
+test('status response rejects an unknown Execution state', async () => {
+  configureExecution()
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
@@ -227,20 +235,20 @@ test('status response rejects an unknown Runner state', async () => {
       { status: 200 }
     )
 
-  await assert.rejects(getRunnerRunStatus('run-1'), (error: unknown) => {
+  await assert.rejects(getExecutionRunStatus('run-1'), (error: unknown) => {
     assert.strictEqual(
       (error as { code?: string }).code,
-      'RUNNER_INVALID_STATUS'
+      'EXECUTION_INVALID_STATUS'
     )
     assert.strictEqual((error as { retryable?: boolean }).retryable, false)
     return true
   })
 })
 
-test('a status query is split into batches the runner accepts', async () => {
-  // The runner rejects a longer batch, so a caller tracking more runs than the limit would
+test('a status query is split into batches the Execution API accepts', async () => {
+  // The Execution API rejects a longer batch, so a caller tracking more runs than the limit would
   // otherwise fail every pass and stop observing runs altogether.
-  configureRunner()
+  configureExecution()
   const sent: string[][] = []
   globalThis.fetch = async (_input, init) => {
     const body = JSON.parse(String(init?.body)) as { run_ids: string[] }
@@ -258,13 +266,13 @@ test('a status query is split into batches the runner accepts', async () => {
   }
 
   const runIds = Array.from(
-    { length: RUNNER_STATUS_QUERY_LIMIT + 1 },
+    { length: EXECUTION_STATUS_QUERY_LIMIT + 1 },
     (_, index) => `run-${index}`
   )
-  const batch = await getRunnerRunStatuses(runIds)
+  const batch = await getExecutionRunStatuses(runIds)
 
   assert.strictEqual(sent.length, 2)
-  assert.strictEqual(sent[0]?.length, RUNNER_STATUS_QUERY_LIMIT)
+  assert.strictEqual(sent[0]?.length, EXECUTION_STATUS_QUERY_LIMIT)
   assert.strictEqual(sent[1]?.length, 1)
   // Split requests must still answer in the order the caller asked about runs.
   assert.deepStrictEqual(
@@ -276,7 +284,7 @@ test('a status query is split into batches the runner accepts', async () => {
 })
 
 test('the status batch size is the limit the contract publishes', () => {
-  const spec = JSON.parse(readFileSync(SPEC_PATH, 'utf8')) as {
+  const spec = parse(readFileSync(SPEC_PATH, 'utf8')) as {
     components: {
       schemas: {
         RunStatusQuery: { properties: { run_ids: { maxItems: number } } }
@@ -286,6 +294,6 @@ test('the status batch size is the limit the contract publishes', () => {
 
   assert.strictEqual(
     spec.components.schemas.RunStatusQuery.properties.run_ids.maxItems,
-    RUNNER_STATUS_QUERY_LIMIT
+    EXECUTION_STATUS_QUERY_LIMIT
   )
 })

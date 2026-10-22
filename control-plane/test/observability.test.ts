@@ -33,7 +33,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
     failure_message: 'request failed for https://secret@example.test/private',
     artifact_storage: null,
     notices: [],
-    runner_input: { secret: 'must-not-leak' },
+    execution_input: { secret: 'must-not-leak' },
     publish_context: { repository: 'octo/example' }
   })
   assert.deepStrictEqual(observed, {

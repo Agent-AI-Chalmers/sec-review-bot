@@ -20,8 +20,8 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     CONTROL_PLANE_SERVICE_TOKEN: `mutation-${token}`,
     CONTROL_PLANE_READ_TOKEN: token,
     CONNECTOR_ID: connectorId,
-    AGENT_RUNNER_SERVICE_URL: 'http://127.0.0.1:1',
-    AGENT_RUNNER_SERVICE_TOKEN: 'unused'
+    EXECUTION_API_URL: 'http://127.0.0.1:1',
+    EXECUTION_API_TOKEN: 'unused'
   })
   const { startControlPlaneServer } = await import('../../src/server.js')
   const base = `http://127.0.0.1:${port}`

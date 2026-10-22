@@ -747,7 +747,7 @@ try {
     // same instant read differently depending on the console language. The console now pins
     // `hour12: false` for both, and this assertion is what keeps that from regressing.
     const TIMESTAMP = /\d{1,2}\/\d{1,2}\/\d{4}, \d{2}:\d{2}:\d{2}/
-    const [created, preparation, runner, publication] = steps
+    const [created, preparation, execution, publication] = steps
     assert.match(
       created.body,
       TIMESTAMP,
@@ -759,7 +759,7 @@ try {
       `${name} "Preparation" must show a timestamp`
     )
     assert.match(
-      runner.body,
+      execution.body,
       TIMESTAMP,
       `${name} "Execution" must show a timestamp`
     )
@@ -772,12 +772,12 @@ try {
     // Each phase reports how long it took, and the id is copyable without selecting it
     // by hand — the console is the only place that knows the id.
     assert.match(
-      runner.body,
+      execution.body,
       /\d+[dhms]/,
       `${name} the Execution phase must report its elapsed time`
     )
     assert.match(
-      runner.body,
+      execution.body,
       /so far/,
       `${name} an in-flight phase must read as still running`
     )
@@ -802,7 +802,7 @@ try {
     )
 
     // The general form of the same bug: a timeline may not run backwards.
-    const instants = [created, preparation, runner, publication]
+    const instants = [created, preparation, execution, publication]
       .map((step) => TIMESTAMP.exec(step.body)?.[0])
       .filter((text) => text !== undefined)
       .map((text) => Date.parse(text))

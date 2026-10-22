@@ -2,8 +2,8 @@
 //
 // The console localizes the contract rather than shipping its own copy: state and edge labels
 // come from `x-state-machines`, and the console looks each one up as `state_<axis>_<state>_*`,
-// `edge_<axis>_<from>_<to>` or `machine_<axis>_title`. When an axis was renamed from `runner` to
-// `execution`, those keys kept the old spelling, so the Execution diagram silently fell back to
+// `edge_<axis>_<from>_<to>` or `machine_<axis>_title`. When an axis is renamed, stale keys can make
+// the Execution diagram silently fall back to
 // the contract's English text even in a Chinese console. Nothing failed: a missing key renders
 // the fallback, which looks like a translation choice rather than a gap. This test makes the
 // gap visible.
