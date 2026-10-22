@@ -133,12 +133,10 @@ def collect_review_memory_transcripts(
 
 def _published_transcript_stage_attempt(transcript: Path) -> tuple[str, str]:
     order, stage, attempt = (transcript.stem.split("-", 2) + ["", ""])[:3]
-    if not order.isdecimal() or stage not in PUBLISHED_TRANSCRIPT_STAGES or not attempt:
+    if not order.isdecimal() or not stage or not attempt:
         raise ValueError(
             "Published transcript files must be named "
-            f"<order>-<stage>-<attempt>{TRANSCRIPT_SUFFIX} with stage analyzer, "
-            "mitigator, or verifier: "
-            f"{transcript}"
+            f"<order>-<stage>-<attempt>{TRANSCRIPT_SUFFIX}: {transcript}"
         )
     return stage, attempt
 
@@ -151,6 +149,8 @@ def collect_published_transcripts(review_artifact_root: Path) -> list[Transcript
     refs: list[TranscriptRef] = []
     for transcript in sorted(transcripts_root.glob(f"*{TRANSCRIPT_SUFFIX}")):
         stage, attempt = _published_transcript_stage_attempt(transcript)
+        if stage not in PUBLISHED_TRANSCRIPT_STAGES:
+            continue
         refs.append(
             TranscriptRef(
                 stage=stage,

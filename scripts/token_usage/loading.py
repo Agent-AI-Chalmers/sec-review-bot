@@ -186,7 +186,10 @@ def _read_transcript_usage(path: Path, *, stage: str) -> StageUsage:
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
-        event = json.loads(line)
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
         if not isinstance(event, dict) or event.get("event") != "message":
             continue
         message = event.get("message")

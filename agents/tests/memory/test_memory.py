@@ -261,6 +261,22 @@ def test_collect_review_memory_transcripts_rejects_invalid_published_name(
         memory_extraction.collect_review_memory_transcripts(review_root)
 
 
+def test_collect_review_memory_transcripts_skips_non_memory_stage(
+    tmp_path: Path,
+) -> None:
+    review_root = tmp_path / "review"
+    transcripts = review_root / "transcripts"
+    transcripts.mkdir(parents=True)
+    analyzer = transcripts / "0001-analyzer-initial.jsonl"
+    cvss = transcripts / "0002-cvss-initial.jsonl"
+    analyzer.write_text(_transcript_jsonl("analysis"), encoding="utf-8")
+    cvss.write_text(_transcript_jsonl("score"), encoding="utf-8")
+
+    refs = memory_extraction.collect_review_memory_transcripts(review_root)
+
+    assert [(ref.stage, ref.path) for ref in refs] == [("analyzer", analyzer.resolve())]
+
+
 def test_stage_review_transcripts_writes_ordered_prompt(tmp_path: Path) -> None:
     sources = []
     for label in ("analyzer", "mitigator", "verifier"):
