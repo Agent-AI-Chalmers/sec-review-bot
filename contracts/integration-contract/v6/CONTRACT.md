@@ -114,7 +114,7 @@ Runtime exceptions are not part of `ReviewRecord`. If analyzer / mitigator / ver
 
 Workflow: `issue-review`
 
-Input keeps the existing issue input contract and expresses review intent through `review_intent`. This is the workflow where `review_intent.objective = "repair"` changes analyzer stance and the mitigation gate.
+Input keeps the existing issue input contract and expresses review intent through `review_intent`. This is the workflow where `review_intent.objective = "repair"` changes analyzer stance. Downstream mitigation still depends only on the analyzer's structured result.
 
 The result shape is defined by [`issue-review-result.schema.json`](schemas/issue-review-result.schema.json).
 

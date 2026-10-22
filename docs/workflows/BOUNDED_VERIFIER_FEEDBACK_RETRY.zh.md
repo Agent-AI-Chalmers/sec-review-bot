@@ -41,6 +41,8 @@ Verifier-led retry 弱于 failed PoC、failed test 或另一个可直接复现�
 
 ## Core Workflow
 
+confirmed repair target 的准入条件同时也是 verifier 准入边界。如果 analysis 没有产生 `confirmed-vulnerability` 或 `confirmed-defect` 的 repair target，mitigation 和 verification 的阶段 wrapper 都会生成确定性的 skipped result，但不会启动对应 agent。Skipped verification result 会以空判断字段和 `resolution_next_step=none` 持久化，因此不会触发 feedback retry。这样既能避免 verification 在没有已接受 repair target 的 case 上退化成第二次 analyzer pass，也能保留明确的阶段审计记录。
+
 ### Normal Path
 
 - `analyzer -> mitigator -> verifier`
@@ -96,6 +98,8 @@ Examples:
 ## Retry Trigger Policy
 
 Retry 由 `resolution_next_step=retry-ai` 驱动，而不是只由 `patch_coverage` 驱动。
+
+第一次 mitigation attempt 不需要产生 changed files 才有资格 retry。如果 verifier 找到了第一次尝试遗漏的、具体且在 scope 内的修复，`patch_coverage=no-patch` 可以在提供 actionable `patch_findings` 时使用 `resolution_next_step=retry-ai`。Workflow 对这种 recovery 使用与 partial patch retry 相同的次数上限。
 
 Retry-eligible patch judgments 通常是 `partial` / `local-only` / `unresolved` / `misaligned`。当 `regression_status=failed` 时，完整安全覆盖也可以进入 retry。所有 retry-eligible outcome 都必须携带 `resolution_next_step=retry-ai`。
 

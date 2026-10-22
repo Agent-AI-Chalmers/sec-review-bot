@@ -116,7 +116,7 @@ Issue / PR presentation 直接使用 `ReviewRecord`。Repository case presentati
 
 Workflow：`issue-review`
 
-输入仍使用现有 issue input contract，并通过 `review_intent` 表达 review intent。这个 workflow 中，`review_intent.objective = "repair"` 会改变 analyzer stance 和 mitigation gate。
+输入仍使用现有 issue input contract，并通过 `review_intent` 表达 review intent。这个 workflow 中，`review_intent.objective = "repair"` 会改变 analyzer 的调查立场；下游是否进入 mitigation 仍只由 analyzer 的结构化结果决定。
 
 结果结构由 [`issue-review-result.schema.json`](schemas/issue-review-result.schema.json) 定义。
 

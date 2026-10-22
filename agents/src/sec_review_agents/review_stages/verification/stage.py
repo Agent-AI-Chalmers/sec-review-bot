@@ -14,6 +14,7 @@ from sec_review_agents.mcp.client import managed_mcp_tools_async
 from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
 from sec_review_agents.review_stages.verification.result import (
+    build_skipped_verification_result,
     build_verification_stage_result,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
@@ -94,6 +95,26 @@ def reset_verification_attempt_artifacts(
         verifier_artifacts_path,
         filenames=transcript_files,
     )
+
+
+def create_skipped_verification_result(
+    *,
+    verifier_artifacts_path: Path,
+    retry_context: Mapping[str, Any] | None,
+    reason: str,
+) -> dict[str, Any]:
+    attempt_label = verification_attempt_label(retry_context)
+    reset_verification_attempt_artifacts(
+        verifier_artifacts_path,
+        attempt_label=attempt_label,
+    )
+    result = build_skipped_verification_result(reason=reason)
+    persist_verification_result(
+        verifier_artifacts_path,
+        result,
+        attempt_label=attempt_label,
+    )
+    return result
 
 
 def _apply_workspace_patch(
@@ -271,6 +292,7 @@ async def run_verification_stage(
 
 
 __all__ = [
+    "create_skipped_verification_result",
     "reset_verification_attempt_artifacts",
     "run_verification_stage",
     "verification_attempt_label",

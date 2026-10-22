@@ -13,6 +13,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
+from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.runtime.runtime_config import RunnerRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
@@ -21,8 +22,6 @@ from sec_review_agents.temporal.support import (
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.review_intent import (
-    REVIEW_OBJECTIVE_REPAIR,
-    ReviewObjective,
     require_review_intent,
 )
 
@@ -105,10 +104,7 @@ async def mitigate_issue_activity(
         label="artifact_root_path",
     )
     review_intent = require_review_intent(prepared_input.get("review_intent"))
-    if not should_run_issue_mitigation(
-        review_objective=review_intent.objective,
-        analysis_result=analysis_result,
-    ):
+    if not has_confirmed_repair_target(analysis_result):
         review_stage_transcript_path(
             run_artifacts_root,
             order=review_stage_attempt_order(
@@ -160,6 +156,7 @@ async def verify_issue_activity(
 ) -> dict[str, Any]:
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.verification.stage import (
+        create_skipped_verification_result,
         verification_attempt_label,
     )
     from sec_review_agents.runtime.setup_bootstrap import (
@@ -176,6 +173,24 @@ async def verify_issue_activity(
         prepared_input["artifact_root_path"],
         label="artifact_root_path",
     )
+    verifier_artifacts_path = artifact_path(
+        prepared_input["artifact_paths"],
+        "verifier",
+    )
+    if not has_confirmed_repair_target(analysis_result):
+        review_stage_transcript_path(
+            run_artifacts_root,
+            order=review_stage_attempt_order(
+                stage="verifier", retry_context=retry_context
+            ),
+            stage="verifier",
+            attempt=verification_attempt_label(retry_context),
+        ).unlink(missing_ok=True)
+        return create_skipped_verification_result(
+            verifier_artifacts_path=verifier_artifacts_path,
+            retry_context=retry_context,
+            reason="Verification was skipped because analysis produced no confirmed repair target.",
+        )
     bundle_paths = prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
         bundle_paths["workspace_snapshot_tar_path"],
@@ -188,10 +203,7 @@ async def verify_issue_activity(
             bundle_paths["history_path"],
             label="bundle_paths.history_path",
         ),
-        verifier_artifacts_path=artifact_path(
-            prepared_input["artifact_paths"],
-            "verifier",
-        ),
+        verifier_artifacts_path=verifier_artifacts_path,
         published_transcript_path=review_stage_transcript_path(
             run_artifacts_root,
             order=review_stage_attempt_order(
@@ -283,10 +295,7 @@ class IssueReviewWorkflow:
         history: list[dict[str, Any]] = []
         while (
             retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
-            and should_retry_from_verifier_result(
-                mitigation_result,
-                verifier_result,
-            )
+            and should_retry_from_verifier_result(verifier_result)
         ):
             retry_count += 1
             retry_context = feedback_retry_context(
@@ -344,29 +353,11 @@ class IssueReviewWorkflow:
         return {"ok": True, "result": result}
 
 
-def should_run_issue_mitigation(
-    *,
-    review_objective: ReviewObjective,
-    analysis_result: Mapping[str, Any] | None,
-) -> bool:
-    if review_objective == REVIEW_OBJECTIVE_REPAIR:
-        return True
-    narratives = (analysis_result or {}).get("narratives")
-    if not isinstance(narratives, list):
-        return False
-    return any(
-        isinstance(narrative, dict)
-        and narrative.get("verdict") in {"confirmed-vulnerability", "confirmed-defect"}
-        for narrative in narratives
-    )
-
-
 __all__ = [
     "IssueReviewWorkflow",
     "analyze_issue_activity",
     "archive_issue_feedback_attempt_activity",
     "build_issue_review_result_activity",
     "mitigate_issue_activity",
-    "should_run_issue_mitigation",
     "verify_issue_activity",
 ]

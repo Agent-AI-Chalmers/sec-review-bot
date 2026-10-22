@@ -31,6 +31,7 @@ from sec_review_agents.review_stages.cvss import (
 from sec_review_agents.review_stages.cvss.stage import (
     is_cvss_v4_scoring_target,
 )
+from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
@@ -39,7 +40,6 @@ from sec_review_agents.workflows.repository.workflow import (
 )
 from sec_review_agents.workflows.repository_case.stage import (
     derive_case_disposition,
-    should_run_repository_mitigation,
 )
 
 
@@ -166,14 +166,14 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
         assert analysis["verdict"] == "no-actionable-finding"
         assert analysis["narratives"] == []
-        assert not should_run_repository_mitigation(analysis)
+        assert not has_confirmed_repair_target(analysis)
 
     def test_t2_confirmed_case_enters_mitigation(self) -> None:
         analysis = self._confirmed_analysis()
 
         assert analysis["verdict"] == "confirmed-vulnerability"
         assert len(analysis["narratives"]) == 1
-        assert should_run_repository_mitigation(analysis)
+        assert has_confirmed_repair_target(analysis)
         assert is_cvss_v4_scoring_target(analysis)
 
     def test_t3_no_confirmed_narrative_is_not_promoted_to_mitigation_target(

@@ -171,8 +171,8 @@ async def test_repository_case_workflow_retries_and_passes_verifier_history() ->
     state = _CaseWorkflowState(
         mitigation_results=[
             {
-                "overview": "applied",
-                "changed_files": ["case-0.py"],
+                "overview": "The first mitigation did not produce a patch.",
+                "changed_files": [],
                 "residual_risks": [],
             },
             {

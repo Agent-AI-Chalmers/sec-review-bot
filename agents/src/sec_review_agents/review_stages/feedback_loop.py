@@ -65,12 +65,9 @@ def review_stage_attempt_order(
 
 
 def should_retry_from_verifier_result(
-    mitigation_result: Mapping[str, Any] | None,
     verifier_result: Mapping[str, Any] | None,
 ) -> bool:
-    changed_files = (mitigation_result or {}).get("changed_files")
-    if not (isinstance(changed_files, list) and changed_files):
-        return False
+    """Use the verifier's requested next step as the sole bounded-retry signal."""
     resolution_next_step = (
         str((verifier_result or {}).get("resolution_next_step") or "").strip().lower()
     )
