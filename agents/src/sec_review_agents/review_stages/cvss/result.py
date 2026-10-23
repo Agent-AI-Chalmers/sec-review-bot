@@ -59,19 +59,11 @@ def build_skipped_cvss_v4_result(*, reason: str) -> dict[str, Any]:
     return build_cvss_v4_stage_result(outcome="skipped", overview=reason)
 
 
-def build_failed_cvss_v4_result(*, error: str) -> dict[str, Any]:
-    return {
-        "overview": f"CVSS v4.0 scoring failed: {error}",
-        "error": error,
-    }
-
-
 # Public exports
 
 __all__ = [
     "CvssMetricDetail",
     "CvssStageResult",
     "build_cvss_v4_stage_result",
-    "build_failed_cvss_v4_result",
     "build_skipped_cvss_v4_result",
 ]

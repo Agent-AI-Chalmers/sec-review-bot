@@ -12,10 +12,10 @@ from sec_review_agents.workflows.repository.workflow import (
     _stage_error_message,
     analyze_repository_case_activity,
     archive_repository_case_feedback_attempt_activity,
-    build_failed_repository_case_cvss_result_activity,
     build_repository_case_result_activity,
     mitigate_repository_case_activity,
     prepare_repository_case_activity,
+    record_repository_case_cvss_failure_activity,
     score_repository_case_cvss_activity,
     verify_repository_case_activity,
 )
@@ -90,10 +90,11 @@ async def run_repository_case_review_direct(
         try:
             cvss_result = await cvss_result_task
         except Exception as cvss_error:
-            cvss_result = build_failed_repository_case_cvss_result_activity(
+            record_repository_case_cvss_failure_activity(
                 prepared_case,
                 _stage_error_message(cvss_error),
             )
+            cvss_result = None
     except Exception:
         cvss_result_task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):

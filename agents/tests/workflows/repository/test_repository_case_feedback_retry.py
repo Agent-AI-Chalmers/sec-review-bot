@@ -264,7 +264,7 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> dict[str, Any]:
     ) -> dict[str, Any]:
         return {"outcome": "scored"}
 
-    @activity.defn(name="build_failed_repository_case_cvss_result_activity")
+    @activity.defn(name="record_repository_case_cvss_failure_activity")
     def fake_build_failed_repository_case_cvss_result(
         _prepared_case: dict[str, Any],
         error: str,

@@ -409,18 +409,18 @@ async def score_repository_case_cvss_activity(
 
 
 @activity.defn
-def build_failed_repository_case_cvss_result_activity(
+def record_repository_case_cvss_failure_activity(
     prepared_case: dict[str, Any],
     error: str,
 ) -> None:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.cvss.stage import (
-        persist_failed_cvss_v4_result,
+        persist_cvss_failure,
     )
     from sec_review_agents.utils.paths import artifact_path
 
     bind_trace_context(workflow="repository-review")
-    return persist_failed_cvss_v4_result(
+    persist_cvss_failure(
         cvss_artifacts_path=artifact_path(
             prepared_case["artifact_paths"],
             "cvss",
@@ -1015,7 +1015,7 @@ class RepositoryCaseReviewWorkflow:
                 cvss_result = await cvss_task
             except Exception as cvss_error:
                 cvss_result = await workflow.execute_activity(
-                    build_failed_repository_case_cvss_result_activity,
+                    record_repository_case_cvss_failure_activity,
                     args=[prepared_case, _stage_error_message(cvss_error)],
                     schedule_to_close_timeout=activity_timeout,
                     retry_policy=retry_policy,
@@ -1277,7 +1277,6 @@ __all__ = [
     "analyze_repository_case_activity",
     "archive_repository_case_feedback_attempt_activity",
     "build_blocked_repository_case_result",
-    "build_failed_repository_case_cvss_result_activity",
     "build_repository_case_result_activity",
     "build_repository_delivery_result_activity",
     "build_repository_discovery_manifest_activity",
@@ -1292,6 +1291,7 @@ __all__ = [
     "prepare_repository_case_review_inputs_activity",
     "prepare_repository_delivery_execution_activity",
     "project_repository_case_result_for_delivery",
+    "record_repository_case_cvss_failure_activity",
     "scan_repository_discovery_chunk_activity",
     "score_repository_case_cvss_activity",
     "triage_repository_activity",

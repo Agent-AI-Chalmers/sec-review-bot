@@ -325,7 +325,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
             "severity": "high",
         }
 
-    @activity.defn(name="build_failed_repository_case_cvss_result_activity")
+    @activity.defn(name="record_repository_case_cvss_failure_activity")
     def fake_failed_cvss(_prepared_case: dict, error: str) -> None:
         _ = error
 
@@ -670,7 +670,7 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
             "severity": "high",
         }
 
-    @activity.defn(name="build_failed_repository_case_cvss_result_activity")
+    @activity.defn(name="record_repository_case_cvss_failure_activity")
     def fake_failed_cvss(_prepared_case: dict, error: str) -> None:
         _ = error
 
@@ -788,7 +788,7 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
     def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
         raise RuntimeError("cvss failed after retries")
 
-    @activity.defn(name="build_failed_repository_case_cvss_result_activity")
+    @activity.defn(name="record_repository_case_cvss_failure_activity")
     def fake_failed_cvss(_prepared_case: dict, error: str) -> None:
         _ = error
 
@@ -1087,7 +1087,7 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
         ),
         patch.object(
             repository_case_direct,
-            "build_failed_repository_case_cvss_result_activity",
+            "record_repository_case_cvss_failure_activity",
             side_effect=fake_failed_cvss,
         ),
         patch.object(
