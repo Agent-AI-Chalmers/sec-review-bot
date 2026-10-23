@@ -276,9 +276,8 @@ Agents that require structured output check whether the final state contains `st
 
 Agent stages that review code run in a sandbox that can execute commands, because without one they cannot run tests, read history, or reproduce a finding. Which sandbox that is, is deployment configuration:
 
-- `AGENT_SANDBOX_BACKEND` unset or `auto`: use the Docker sandbox when the Docker runtime is available, otherwise fail with an error naming what is missing
-- `AGENT_SANDBOX_BACKEND=docker`: require the Docker sandbox
-- `AGENT_SANDBOX_BACKEND=bwrap`: opt into bubblewrap (Linux/WSL2 only; it is never chosen by `auto`)
+- `AGENT_SANDBOX_BACKEND` unset or set to `docker`: require the Docker sandbox
+- `AGENT_SANDBOX_BACKEND=bwrap`: opt into bubblewrap (Linux/WSL2 only)
 
 There is no value that selects the local filesystem backend. It has no shell, so handing it to a stage that reviews code would quietly remove that stage's ability to run anything. Stages that do not need one select it themselves, so this is not a deployment setting.
 
