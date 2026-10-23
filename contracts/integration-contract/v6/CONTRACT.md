@@ -100,6 +100,8 @@ Issue and PR presentation use `ReviewRecord` directly. Repository case presentat
 
 `ReviewRecord` is a workflow result projection. Runtime diagnostics belong to observability and artifact debugging, not `ReviewRecord`.
 
+`ReviewRecord.mitigation.file_changes` is the authoritative patch state. Display paths are derived from `file_changes[].path`; there is no independent `changed_files` field. `patch_diff` is a cached review and location artifact that may be regenerated from the baseline tree and `file_changes`; it must not be treated as another source of final file contents.
+
 The Execution Worker produces this projection from internal stage output. Its `ReviewRecord` builder intentionally keeps only the public fields: unknown internal fields are discarded, malformed optional scalar values become `null`, and malformed list members are omitted. This degradation policy applies only while producing optional report detail. The completed public result must still validate against the full workflow result schema before it crosses the Execution API boundary.
 
 Runtime exceptions are not part of `ReviewRecord`. If analyzer / mitigator / verifier / discovery / delivery synthesis fails at runtime, the workflow run should fail and the Execution API should return a structured execution error. Do not publish stage-level `status="error"`, `unavailable`, or other compatibility error projections in the public result.
@@ -150,7 +152,7 @@ The GitHub summary renderer can render confirmed cases that did not reach the de
 
 `deliveries[]` items are `RepositoryDelivery` objects defined by the repository result schema.
 
-A `RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry the generated `patch_diff` and final `file_changes`; display file paths are derived from `file_changes[].path`. `file_changes` is authoritative for applying content; `patch_diff` is the diff/reference view and must not be used to reconstruct publishable file contents. `case_ids` links back to case-level review details in top-level `case_results[]`.
+A `RepositoryDelivery` is the authoritative input for callers publishing repository delivery draft PRs. Each delivery must carry the generated `patch_diff` and final `file_changes`; display file paths are derived from `file_changes[].path`. `file_changes` is authoritative for applying content; `patch_diff` is a cached review/location view that can be regenerated from the delivery baseline and `file_changes`, and must not be used to reconstruct publishable file contents. `case_ids` links back to case-level review details in top-level `case_results[]`.
 
 ### Validation Ownership
 

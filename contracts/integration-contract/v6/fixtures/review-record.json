@@ -22,9 +22,6 @@
   },
   "mitigation": {
     "overview": "Recompute the signature metadata before enqueueing retry payloads.",
-    "changed_files": [
-      "src/webhook.ts"
-    ],
     "file_changes": [
       {
         "path": "src/webhook.ts",

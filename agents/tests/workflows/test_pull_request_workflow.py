@@ -42,7 +42,7 @@ async def test_mitigation_activity_skip_accepts_serialized_artifact_root(
         runtime_context={},
     )
 
-    assert result["changed_files"] == []
+    assert result["file_changes"] == []
     assert (artifact_root / "mitigator" / "mitigation-result.json").is_file()
 
 

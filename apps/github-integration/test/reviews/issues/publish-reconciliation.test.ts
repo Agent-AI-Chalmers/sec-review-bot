@@ -29,7 +29,6 @@ function reviewRecord(): ReviewRecord {
     },
     mitigation: {
       overview: 'Nothing to change.',
-      changed_files: [],
       file_changes: [],
       patch_diff: null
     },

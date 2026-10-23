@@ -13,8 +13,7 @@ function reviewRecord(): ReviewRecord {
     },
     mitigation: {
       overview: 'Mitigation overview text.',
-      changed_files: ['src/app.ts'],
-      file_changes: [],
+      file_changes: [{ path: 'src/app.ts', status: 'deleted' }],
       patch_diff: null
     },
     verification: {
@@ -72,5 +71,6 @@ test('unpromoted issue comment shares the same status vocabulary and reports the
     /- Verification: `full coverage; logic simulation; checks not run`/
   )
   assert.match(body, /- Patch ready: `yes`/)
+  assert.match(body, /- `src\/app\.ts`/)
   assert.doesNotMatch(body, /Next step/)
 })

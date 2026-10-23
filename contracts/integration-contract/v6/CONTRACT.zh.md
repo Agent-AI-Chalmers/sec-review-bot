@@ -102,6 +102,8 @@ Issue / PR presentation 直接使用 `ReviewRecord`。Repository case presentati
 
 `ReviewRecord` 是 workflow 结果投影；运行诊断用于观测和调试 artifacts，不进入 `ReviewRecord`。
 
+`ReviewRecord.mitigation.file_changes` 是补丁状态的权威来源。展示路径从 `file_changes[].path` 派生，不再存在独立的 `changed_files` 字段。`patch_diff` 是缓存的审查与定位产物，可以从基线文件树和 `file_changes` 重新生成；不能把它当成另一份最终文件内容来源。
+
 Execution Worker 根据内部 stage 输出生产这份投影。`ReviewRecord` builder 会有意只保留公开字段：未知内部字段会被丢弃，格式错误的可选 scalar 会变成 `null`，list 中格式错误的成员会被省略。这项降级策略只适用于生产可选报告细节；完整公开结果在跨越 Execution API 边界前仍必须通过完整 workflow result schema 校验。
 
 运行时异常不属于 `ReviewRecord`。Analyzer / mitigator / verifier / discovery / delivery synthesis 运行失败时，workflow run 应失败，并由 Execution API 返回结构化 execution error；不要在公开结果中发布 stage-level `status="error"`、`unavailable` 或其他兼容性错误投影。
@@ -152,7 +154,7 @@ GitHub summary renderer 可以从 `case_results[]` 渲染已确认但未达到 d
 
 `deliveries[]` 条目是 repository result schema 中定义的 `RepositoryDelivery` 对象。
 
-调用方发布 repository delivery draft PR 时应使用 `RepositoryDelivery`。每个 delivery 必须携带生成的 `patch_diff` 和最终 `file_changes`；展示文件路径从 `file_changes[].path` 派生。`file_changes` 是应用文件内容的权威表示；`patch_diff` 是 diff/reference 视图，不得用于重建可发布的文件内容。`case_ids` 用于关联顶层 `case_results[]` 中的 case-level review 详情。
+调用方发布 repository delivery draft PR 时应使用 `RepositoryDelivery`。每个 delivery 必须携带生成的 `patch_diff` 和最终 `file_changes`；展示文件路径从 `file_changes[].path` 派生。`file_changes` 是应用文件内容的权威表示；`patch_diff` 是可从 delivery 基线与 `file_changes` 重新生成的缓存审查/定位视图，不得用于重建可发布的文件内容。`case_ids` 用于关联顶层 `case_results[]` 中的 case-level review 详情。
 
 ### 校验责任
 

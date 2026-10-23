@@ -63,7 +63,7 @@ def _workflow_result() -> dict:
             },
             "mitigation": {
                 "overview": "Restricted the endpoint to a safe root.",
-                "changed_files": ["src/server.js"],
+                "file_changes": [{"path": "src/server.js", "status": "deleted"}],
                 "patch_diff": "--- a/src/server.js\n+++ b/src/server.js\n@@\n-old\n+new\n",
                 "residual_risks": [],
             },
@@ -153,7 +153,7 @@ def test_pull_request_preview_summarizes_review_stages(tmp_path: Path) -> None:
     workflow_result = _workflow_result()
     review_record = workflow_result["review_record"]
     review_record["analysis"]["verdict"] = "no-actionable-finding"
-    review_record["mitigation"]["changed_files"] = []
+    review_record["mitigation"]["file_changes"] = []
     review_record["mitigation"]["patch_diff"] = None
     review_record["verification"].update(
         {
@@ -188,7 +188,10 @@ def test_pull_request_preview_reports_patch_and_manual_review(tmp_path: Path) ->
     workflow_result = _workflow_result()
     review_record = workflow_result["review_record"]
     review_record["analysis"]["verdict"] = "confirmed-vulnerability"
-    review_record["mitigation"]["changed_files"] = ["src/a.py", "src/b.py"]
+    review_record["mitigation"]["file_changes"] = [
+        {"path": "src/a.py", "status": "deleted"},
+        {"path": "src/b.py", "status": "deleted"},
+    ]
     review_record["verification"].update(
         {
             "validation_level": "runtime-partial",

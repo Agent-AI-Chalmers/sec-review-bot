@@ -338,7 +338,7 @@ def test_repository_case_results_normalize_partial_review_record_shape() -> None
     review_record = result["case_results"][0]["review_record"]
     assert review_record["analysis"]["verdict"] == "confirmed-defect"
     assert review_record["analysis"]["overview"] is None
-    assert review_record["mitigation"]["changed_files"] == []
+    assert review_record["mitigation"]["file_changes"] == []
     assert review_record["verification"]["patch_coverage"] is None
     assert review_record["cvss"] is None
     assert "unexpected" not in review_record["analysis"]
@@ -389,7 +389,7 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
     }
     review_record = result["case_results"][0]["review_record"]
     assert review_record["analysis"]["verdict"] is None
-    assert review_record["mitigation"]["changed_files"] == []
+    assert review_record["mitigation"]["file_changes"] == []
     assert review_record["verification"]["patch_coverage"] is None
     assert review_record["cvss"] is None
 

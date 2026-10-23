@@ -26,6 +26,7 @@ from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_DENY,
     TestChangesPolicy,
 )
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 MITIGATION_NO_TARGET_REASON = (
     "No confirmed, reparable mitigation target was available from the repository "
@@ -46,8 +47,7 @@ def derive_case_disposition(
     verifier_result: Mapping[str, Any],
 ) -> dict[str, Any]:
     verdict = analyzer_result.get("verdict")
-    changed_files = mitigator_result.get("changed_files")
-    if not (isinstance(changed_files, list) and changed_files):
+    if not file_change_paths(mitigator_result.get("file_changes")):
         return _blocked_case_disposition("The case did not produce an applied patch.")
 
     if verifier_result.get("patch_coverage") != "full":
@@ -264,7 +264,7 @@ async def run_repository_case_mitigation_stage(
             stage="mitigator",
             started_at=started_at,
             case_id=case_id,
-            changed_file_count=len(result.get("changed_files") or []),
+            changed_file_count=len(file_change_paths(result.get("file_changes"))),
         )
         return result
     except Exception as error:

@@ -28,6 +28,7 @@ from sec_review_agents.workflows.repository_case.direct import (
     run_repository_case_review_direct,
 )
 from sec_review_agents.workflows.review_intent import require_review_intent
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 from scripts.replay.input_bundle import (
     read_json,
@@ -262,7 +263,7 @@ def _summary_from_replayed(case_id: str, replayed: dict[str, Any]) -> dict[str, 
         "analysis_verdict": analysis.get("verdict"),
         "mitigation_status": mitigation.get("status"),
         "verification_coverage": verification.get("patch_coverage"),
-        "changed_files": mitigation.get("changed_files") or [],
+        "changed_files": file_change_paths(mitigation.get("file_changes")),
     }
 
 

@@ -14,7 +14,6 @@ interface FixtureManifest {
 interface ReviewRecordFixture {
   analysis: Record<string, unknown>
   mitigation: Record<string, unknown> & {
-    changed_files: string[]
     file_changes: unknown[]
   }
   verification: Record<string, unknown>
@@ -38,7 +37,6 @@ function validReviewRecord(): ReviewRecordFixture {
     },
     mitigation: {
       overview: null,
-      changed_files: [],
       file_changes: [],
       patch_diff: null
     },
@@ -61,7 +59,7 @@ test('parseReviewRecord accepts a complete v6 review_record', () => {
   const record = parseReviewRecord(validReviewRecord())
 
   assert.strictEqual(record.analysis.verdict, 'confirmed-vulnerability')
-  assert.deepStrictEqual(record.mitigation.changed_files, [])
+  assert.deepStrictEqual(record.mitigation.file_changes, [])
 })
 
 test('parseReviewRecord accepts the shared v6 review_record fixture', () => {
@@ -250,11 +248,9 @@ test('parseReviewRecord rejects removed public status fields', () => {
   )
 })
 
-test('parseReviewRecord rejects numeric changed_files instead of coercing them', () => {
+test('parseReviewRecord rejects the removed changed_files field', () => {
   const record = validReviewRecord()
-  // Deliberately violate the type: the point of the test is that the runtime validator, not the
-  // compiler, rejects a wrong element type arriving from persisted or external data.
-  record.mitigation.changed_files = [123] as unknown as string[]
+  Object.assign(record.mitigation, { changed_files: ['src/server.ts'] })
 
   assert.throws(
     () => parseReviewRecord(record),

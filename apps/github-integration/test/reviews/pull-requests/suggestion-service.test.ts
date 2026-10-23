@@ -13,7 +13,6 @@ function reviewRecordWithPatchDiff(patch_diff: string): ReviewRecord {
     },
     mitigation: {
       overview: null,
-      changed_files: [],
       file_changes: [],
       patch_diff
     },

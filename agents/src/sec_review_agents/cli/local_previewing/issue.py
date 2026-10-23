@@ -3,7 +3,6 @@ from typing import Any
 
 from sec_review_agents.cli.local_previewing.shared import (
     as_dict,
-    as_list,
     patch_block,
     render_analysis_narratives,
     render_mitigation_preview_lines,
@@ -19,6 +18,7 @@ from sec_review_agents.utils.markdown import (
     plain_text,
     write_markdown,
 )
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 
 def _fix_sections(
@@ -87,7 +87,7 @@ def _render_issue_draft_pr(
     review_record: dict[str, Any],
 ) -> list[str]:
     analysis, mitigation, verification = _fix_sections(review_record)
-    changed_files = dedupe_text_items(as_list(mitigation.get("changed_files")))
+    changed_files = dedupe_text_items(file_change_paths(mitigation.get("file_changes")))
     return [
         f"Refs #{issue_number}",
         "",
@@ -164,7 +164,7 @@ def write_issue_previews(
     )
     review_record = as_dict(workflow_result.get("review_record"))
     mitigation = as_dict(review_record.get("mitigation"))
-    draft_pr_ready = bool(as_list(mitigation.get("changed_files")))
+    draft_pr_ready = bool(file_change_paths(mitigation.get("file_changes")))
     output_dir = local_root_path / "artifacts" / "previews"
     items: list[dict[str, Any]] = []
 

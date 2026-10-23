@@ -103,7 +103,6 @@ def test_issue_single_agent_contract_tracks_required_sections() -> None:
         "validation_level",
         "regression_status",
         "target_claim",
-        "changed_files",
         "file_changes",
         "patch_diff",
         "residual_risks",

@@ -36,13 +36,11 @@ def _build_single_delivery_outcome(
 
     case_result = case_results_by_case_id[case_id]
     patch_diff = case_result["mitigator_patch_diff"] or ""
-    changed_files = case_result["mitigator_changed_files"]
     file_changes = case_result["mitigator_file_changes"]
     return build_delivery_execution_result(
         delivery_id=delivery_id,
         status="ready",
         error=None,
-        changed_files=changed_files,
         file_changes=file_changes,
         patch_diff=patch_diff,
         applied_case_ids=[case_id],
@@ -91,7 +89,6 @@ async def execute_delivery_entry(
             delivery_id=delivery_id,
             status=synthesis_result["status"],
             error=synthesis_result.get("error"),
-            changed_files=synthesis_result.get("changed_files") or [],
             file_changes=synthesis_result.get("file_changes") or [],
             patch_diff=str(synthesis_result.get("patch_diff") or ""),
             applied_case_ids=case_ids,
@@ -102,7 +99,6 @@ async def execute_delivery_entry(
             delivery_id=delivery_id,
             status="failed",
             error=f"Patch synthesis failed: {error}",
-            changed_files=[],
             file_changes=[],
             patch_diff="",
             applied_case_ids=case_ids,

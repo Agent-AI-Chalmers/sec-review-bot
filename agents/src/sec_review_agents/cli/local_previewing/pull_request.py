@@ -3,7 +3,6 @@ from typing import Any
 
 from sec_review_agents.cli.local_previewing.shared import (
     as_dict,
-    as_list,
     patch_block,
     render_analysis_narratives,
     render_mitigation_preview_lines,
@@ -16,6 +15,7 @@ from sec_review_agents.utils.markdown import (
     plain_text,
     write_markdown,
 )
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 
 def _review_record(workflow_result: dict[str, Any]) -> dict[str, Any]:
@@ -44,7 +44,7 @@ def _analysis_lines(analysis: dict[str, Any]) -> list[str]:
 
 def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
     analysis, mitigation, verification = _fix_sections(review_record)
-    changed_files = as_list(mitigation.get("changed_files"))
+    changed_files = file_change_paths(mitigation.get("file_changes"))
     lines = [
         "## PR Security Review",
         "",

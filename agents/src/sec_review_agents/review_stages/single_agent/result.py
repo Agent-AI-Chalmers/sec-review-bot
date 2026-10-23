@@ -22,7 +22,6 @@ class SingleAgentFixOutcome(BaseModel):
     validation_level: ValidationLevel
     regression_status: RegressionStatus
     target_claim: str
-    changed_files: list[str] = Field(default_factory=list)
     file_changes: list[FileChange] = Field(default_factory=list)
     patch_diff: str = ""
     residual_risks: list[str] = Field(default_factory=list)
@@ -38,7 +37,6 @@ def build_single_agent_fix_outcome(
     validation_level: str,
     regression_status: str,
     target_claim: str,
-    changed_files: list[str],
     file_changes: Sequence[Mapping[str, Any]] | None = None,
     patch_diff: str = "",
     residual_risks: list[str] | None = None,
@@ -51,7 +49,6 @@ def build_single_agent_fix_outcome(
             "validation_level": validation_level,
             "regression_status": regression_status,
             "target_claim": target_claim,
-            "changed_files": changed_files,
             "file_changes": file_changes or [],
             "patch_diff": patch_diff,
             "residual_risks": residual_risks or [],

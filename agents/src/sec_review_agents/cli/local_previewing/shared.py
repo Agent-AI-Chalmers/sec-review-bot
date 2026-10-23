@@ -10,6 +10,7 @@ from sec_review_agents.utils.structured_renderer import (
     StructuredRenderSchema,
     render_structured_markdown,
 )
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 PREVIEW_STAGE_SUMMARY_SCHEMA = StructuredRenderSchema(
     prose_keys=frozenset(
@@ -62,7 +63,7 @@ def render_mitigation_preview_lines(
     lines = render_structured_markdown(
         {
             "overview": compact_plain_text(mitigation.get("overview")) or fallback,
-            "changed_files": as_list(mitigation.get("changed_files")),
+            "changed_files": file_change_paths(mitigation.get("file_changes")),
         },
         schema=PREVIEW_STAGE_SUMMARY_SCHEMA,
     )
@@ -358,7 +359,7 @@ def render_review_status_lines(
         + inline_code(
             mitigation_headline(
                 analysis.get("verdict"),
-                as_list(mitigation.get("changed_files")),
+                file_change_paths(mitigation.get("file_changes")),
             )
         ),
         "- Verification: "

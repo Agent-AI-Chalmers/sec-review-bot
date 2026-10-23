@@ -18,6 +18,7 @@ from sec_review_agents.workflows.review_intent import (
     require_review_intent,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 
 async def run_issue_single_agent(
@@ -168,7 +169,8 @@ def _single_agent_mitigation_projection(
 ) -> dict[str, Any] | None:
     if not isinstance(result, Mapping):
         return None
-    changed_files = result.get("changed_files") or []
+    file_changes = result.get("file_changes") or []
+    changed_files = file_change_paths(file_changes)
     status = (
         "skipped"
         if result.get("verdict") == "no-actionable-finding" and not changed_files
@@ -177,8 +179,7 @@ def _single_agent_mitigation_projection(
     return {
         "status": status,
         "overview": result.get("overview"),
-        "changed_files": changed_files,
-        "file_changes": result.get("file_changes") or [],
+        "file_changes": file_changes,
         "patch_diff": result.get("patch_diff"),
     }
 
@@ -188,7 +189,9 @@ def _single_agent_verification_projection(
 ) -> dict[str, Any] | None:
     if not isinstance(result, Mapping):
         return None
-    patch_coverage = "full" if result.get("changed_files") else "not-applicable"
+    patch_coverage = (
+        "full" if file_change_paths(result.get("file_changes")) else "not-applicable"
+    )
     return {
         "overview": result.get("overview"),
         "validation_level": result.get("validation_level"),

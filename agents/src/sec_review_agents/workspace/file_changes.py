@@ -8,7 +8,7 @@ Git blobs (`100644` and `100755`); symlink entries are not part of this contract
 
 import base64
 import stat
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -40,6 +40,18 @@ class UpsertFileChange(TypedDict):
 
 
 type FileChange = DeletedFileChange | UpsertFileChange
+
+
+def file_change_paths(file_changes: Sequence[Mapping[str, Any]] | None) -> list[str]:
+    """Return the ordered unique paths represented by final-file changes."""
+    paths: list[str] = []
+    seen: set[str] = set()
+    for item in file_changes or []:
+        path = item.get("path")
+        if isinstance(path, str) and path and path not in seen:
+            seen.add(path)
+            paths.append(path)
+    return paths
 
 
 def encode_file_content(content_buffer: bytes) -> EncodedFileContent:
