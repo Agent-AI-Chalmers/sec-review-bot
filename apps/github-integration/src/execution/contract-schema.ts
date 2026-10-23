@@ -7,7 +7,7 @@ import {
   type ValidateFunction
 } from 'ajv/dist/2020.js'
 
-import type { WorkflowName } from './shapes.js'
+import type { WorkflowName } from './integration-contract-types-generated.js'
 import { CONTRACT_VERSION } from './contract-version.js'
 
 const RESULT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {

@@ -1,6 +1,9 @@
 // Generated from contracts/integration-contract/v6/schemas. Do not edit by hand.
 // Regenerate with `pnpm --dir contracts/integration-contract/tools run generate`.
 
+export type WorkflowName =
+  'issue-review' | 'pull-request-review' | 'repository-review'
+
 export interface InputBundleArtifactRef {
   uri: string
   digest: string
