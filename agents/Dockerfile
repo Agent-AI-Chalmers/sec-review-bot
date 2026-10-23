@@ -23,9 +23,9 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY . ./
-# Copy the integration-contract family and let the resolver pick the version directory itself,
-# via CONTRACT_VERSION_DIR in `sec_review_agents/contract_version.py`. Naming the version here
-# instead is what let a v5 -> v6 bump leave the image pointing at stale schemas. Compose
+# Copy the integration-contract family and let the resolver use CONTRACT_VERSION from
+# `sec_review_agents/contract_version.py`. Naming the version here instead is what let a v5 -> v6
+# bump leave the image pointing at stale schemas. Compose
 # supplies `contracts/` as a separate named context; this lands under
 # `/contracts/integration-contract/`, and `SEC_REVIEW_CONTRACTS_ROOT=/contracts` above names the
 # root explicitly — the resolver reads that variable rather than searching the filesystem for a

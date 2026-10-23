@@ -11,34 +11,34 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 _SRC = Path("src")
 
 
-def _contract_version_dir(project_root: Path) -> str:
+def _contract_version(project_root: Path) -> str:
     src = str((project_root / _SRC).resolve())
     if src not in sys.path:
         sys.path.insert(0, src)
-    from sec_review_agents.contract_version import CONTRACT_VERSION_DIR
+    from sec_review_agents.contract_version import CONTRACT_VERSION
 
-    return CONTRACT_VERSION_DIR
+    return CONTRACT_VERSION
 
 
 def _contract_schemas_root(project_root: Path) -> Path:
-    contract_version_dir = _contract_version_dir(project_root)
+    contract_version = _contract_version(project_root)
     candidates = (
         project_root.parent
         / "contracts"
         / "integration-contract"
-        / contract_version_dir
+        / contract_version
         / "schemas",
         project_root
         / "contracts"
         / "integration-contract"
-        / contract_version_dir
+        / contract_version
         / "schemas",
     )
     for candidate in candidates:
         if (candidate / "common.schema.json").is_file():
             return candidate
     raise RuntimeError(
-        f"Could not locate canonical contract {contract_version_dir} schemas for packaging."
+        f"Could not locate canonical contract {contract_version} schemas for packaging."
     )
 
 
@@ -62,20 +62,20 @@ class CustomBuildHook(BuildHookInterface):
     """Include canonical schemas in both source and wheel distributions."""
 
     def initialize(self, version: str, build_data: dict[str, Any]) -> None:
-        contract_version_dir = _contract_version_dir(Path(self.root))
+        contract_version = _contract_version(Path(self.root))
         schema_root = _contract_schemas_root(Path(self.root))
         force_include = build_data.setdefault("force_include", {})
         runtime_schema = _execution_schema_path(Path(self.root))
         if self.target_name == "sdist":
             force_include[str(schema_root)] = (
-                f"contracts/integration-contract/{contract_version_dir}/schemas"
+                f"contracts/integration-contract/{contract_version}/schemas"
             )
             force_include[str(runtime_schema)] = (
                 "contracts/execution-contract/v1/execution-request.schema.json"
             )
         elif self.target_name == "wheel":
             force_include[str(schema_root)] = (
-                f"sec_review_agents/resources/contracts/{contract_version_dir}"
+                f"sec_review_agents/resources/contracts/{contract_version}"
             )
             force_include[str(runtime_schema)] = (
                 "sec_review_agents/resources/contracts/execution-contract/v1/"

@@ -11,10 +11,7 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from referencing import Registry, Resource
 
-from sec_review_agents.contract_version import (
-    CONTRACT_VERSION,
-    CONTRACT_VERSION_DIR,
-)
+from sec_review_agents.contract_version import CONTRACT_VERSION
 
 INPUT_SCHEMA_BY_WORKFLOW = {
     "issue-review": "issue-review-input.schema.json",
@@ -33,7 +30,7 @@ INPUT_BUNDLE_MANIFEST_SCHEMA = "input-bundle-manifest.schema.json"
 
 # The subtree under a contracts root that holds the canonical v6 schemas. An
 # operator points `SEC_REVIEW_CONTRACTS_ROOT` at the directory that contains it.
-_CONTRACT_SUBTREE = Path("integration-contract") / CONTRACT_VERSION_DIR / "schemas"
+_CONTRACT_SUBTREE = Path("integration-contract") / CONTRACT_VERSION / "schemas"
 _SCHEMAS_ROOT_ENV = "SEC_REVIEW_CONTRACTS_ROOT"
 
 
@@ -69,7 +66,7 @@ def _schema_root() -> Traversable:
         return root / _CONTRACT_SUBTREE
 
     packaged = files("sec_review_agents.resources").joinpath(
-        "contracts", CONTRACT_VERSION_DIR
+        "contracts", CONTRACT_VERSION
     )
     if packaged.joinpath("common.schema.json").is_file():
         return packaged
@@ -165,7 +162,6 @@ def validate_v6_input_bundle_manifest(manifest: Any) -> None:
 
 __all__ = [
     "CONTRACT_VERSION",
-    "CONTRACT_VERSION_DIR",
     "INPUT_BUNDLE_MANIFEST_SCHEMA",
     "INPUT_SCHEMA_BY_WORKFLOW",
     "RESULT_SCHEMA_BY_WORKFLOW",
